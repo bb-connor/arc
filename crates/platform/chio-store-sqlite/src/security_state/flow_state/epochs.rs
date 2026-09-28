@@ -130,7 +130,7 @@ impl FlowMutation<'_> {
     pub(super) fn open_isolation_epoch(
         &self,
         transition: &IsolationEpochTransition,
-        verified_evidence: &VerifiedIsolationEvidence,
+        verified_evidence: &IsolationVerificationRecord,
     ) -> PortResult<FlowStateSnapshot> {
         validate_isolation_transition(transition)?;
         let request_hash = canonical_request_hash(transition)?;

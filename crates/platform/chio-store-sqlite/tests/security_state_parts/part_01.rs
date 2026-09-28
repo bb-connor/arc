@@ -23,14 +23,14 @@ use chio_security_types::ports::{
     CorrelationPartial, CorrelationPartitionKey, CreateOutcome, Digest32, EffectId,
     EffectOperation, EffectRequest, EffectResult, EgressFenceCommit, EgressFenceRequest, ErrorCode,
     EventId, EventPartitionScan, FlowJoinRequest, FlowStateKey, FlowStateStore,
-    IsolationEpochEvidenceVerifierPort, IsolationEpochId, IsolationEpochTransition, LineageId,
-    OpaqueReceiptRef, OverlayApplyRequest, OverlayContribution, OverlayContributions,
-    OverlayRemoveRequest, OverlaySnapshot, PortError, PortErrorKind, PortResult, ProducerId,
-    ProducerTrustClass, RecordId, ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey,
-    ResponsePlanRecord, ResponseSchedulerStore, ResponseStore, RuleId, SchedulerClaimRequest,
-    SchedulerHealthAckRequest, SchedulerRetryRequest, SchedulerWorkKey, SecurityEventStore,
-    SessionId, TenantId, TenantScopedId, UnverifiedSecurityEvent, VerifiedIsolationEvidence,
-    VerifiedSecurityEvent,
+    IsolationEpochEvidenceVerifierPort, IsolationEpochId, IsolationEpochTransition,
+    IsolationVerificationRecord, LineageId, OpaqueReceiptRef, OverlayApplyRequest,
+    OverlayContribution, OverlayContributions, OverlayRemoveRequest, OverlaySnapshot, PortError,
+    PortErrorKind, PortResult, ProducerId, ProducerTrustClass, RecordId, ResponseEffectKey,
+    ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord, ResponseSchedulerStore,
+    ResponseStore, RuleId, SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerRetryRequest,
+    SchedulerWorkKey, SecurityEventStore, SecurityEventVerificationRecord, SessionId, TenantId,
+    TenantScopedId, UnverifiedSecurityEvent,
 };
 use chio_security_types::ports::{
     ActionId, LineageFenceRelease, LineageFenceRequest, LineageFenceStore,
@@ -73,11 +73,11 @@ impl IsolationEpochEvidenceVerifierPort for TestIsolationEpochVerifier {
     fn verify(
         &self,
         transition: &IsolationEpochTransition,
-    ) -> PortResult<VerifiedIsolationEvidence> {
+    ) -> PortResult<IsolationVerificationRecord> {
         if transition.verification_evidence_hash != Digest32::new([1_u8; 32]) {
             return Err(PortError::invalid_data());
         }
-        Ok(VerifiedIsolationEvidence {
+        Ok(IsolationVerificationRecord {
             verifier_id: record("test-isolation-verifier"),
             receipt_ref: OpaqueReceiptRef::new("test-isolation-receipt")
                 .map_err(PortError::from)?,
@@ -117,7 +117,7 @@ fn digest(bytes: &[u8]) -> Digest32 {
 
 fn authenticated_correlation_event(
     event_id: &str,
-) -> (UnverifiedSecurityEvent, VerifiedSecurityEvent) {
+) -> (UnverifiedSecurityEvent, SecurityEventVerificationRecord) {
     authenticated_correlation_event_at(event_id, 10, 11)
 }
 
@@ -125,7 +125,7 @@ fn authenticated_correlation_event_at(
     event_id: &str,
     event_time_unix_ms: u64,
     received_at_unix_ms: u64,
-) -> (UnverifiedSecurityEvent, VerifiedSecurityEvent) {
+) -> (UnverifiedSecurityEvent, SecurityEventVerificationRecord) {
     let tenant_id = tenant("tenant-correlation-ingress");
     let event_id = EventId::new(event_id).unwrap_or_else(|error| panic!("event id: {error}"));
     let producer_id = ProducerId::new("detector-correlation-ingress")
@@ -181,7 +181,7 @@ fn authenticated_correlation_event_at(
         body_hash,
         source_evidence,
     };
-    let verified = VerifiedSecurityEvent {
+    let verified = SecurityEventVerificationRecord {
         tenant_id,
         event_id,
         producer_id,

@@ -120,7 +120,7 @@ fn structured_authorize_body(
             .event_id
             .clone()
             .ok_or_else(|| std::io::Error::other("missing test event"))?,
-        BudgetAuthorizeHoldDecision::Authorized(AuthorizedBudgetHold {
+        BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
             hold_id: request.hold_id.clone(),
             admission_binding: request.admission_binding.clone(),
             authorized_exposure_units: request.requested_exposure_units,

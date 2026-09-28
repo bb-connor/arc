@@ -86,7 +86,11 @@ where
 
 pub fn load_key_log_policy(path: impl AsRef<Path>) -> Result<KeyLogPolicy> {
     let (bytes, _) = read_bounded_regular_file(path.as_ref(), crate::MAX_CANONICAL_RECORD_BYTES)?;
-    let document: KeyLogPolicyDocument = serde_json::from_slice(&bytes)?;
+    let document: KeyLogPolicyDocument = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        &bytes,
+        crate::MAX_CANONICAL_RECORD_BYTES,
+    )?
+    .decode_signed()?;
     document.into_policy()
 }
 
@@ -213,7 +217,13 @@ where
             "key-log service request is empty".to_string(),
         ));
     }
-    Ok(Some(serde_json::from_slice(&line)?))
+    Ok(Some(
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            &line,
+            crate::MAX_CANONICAL_RECORD_BYTES,
+        )?
+        .decode_signed()?,
+    ))
 }
 
 #[derive(Clone, Debug, Deserialize)]

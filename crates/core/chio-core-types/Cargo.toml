@@ -13,6 +13,7 @@ publish = false
 name = "chio_core_types"
 
 [dependencies]
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
 # Pure-alloc dependencies are always enabled with `default-features = false`
 # so that downstream `no_std + alloc` consumers (e.g. chio-kernel-core on
 # wasm32-unknown-unknown) can link this crate. The `std` feature below

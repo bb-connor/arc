@@ -38,8 +38,8 @@ impl SupplementalQuotaVerifier for Verifier {
         &self,
         bytes: &[u8],
         context: &SupplementalQuotaVerificationContext,
-    ) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaVerifierError> {
-        let checked = || -> super::Result<VerifiedSupplementalQuotaClaim> {
+    ) -> Result<SupplementalQuotaVerificationRecord, SupplementalQuotaVerifierError> {
+        let checked = || -> super::Result<SupplementalQuotaVerificationRecord> {
             let artifact: Artifact = serde_json::from_slice(bytes)?;
             let body = artifact.body;
             if !super::issuer()
@@ -52,7 +52,7 @@ impl SupplementalQuotaVerifier for Verifier {
             {
                 return Err("signed supplemental binding mismatch".into());
             }
-            Ok(VerifiedSupplementalQuotaClaim {
+            Ok(SupplementalQuotaVerificationRecord {
                 profile: BROKER_CAPABILITY_EXECUTION_PROFILE.into(),
                 broker_capability_id: "process-supplemental-budget".into(),
                 issuer: super::issuer().public_key(),

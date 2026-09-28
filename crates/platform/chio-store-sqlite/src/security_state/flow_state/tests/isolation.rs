@@ -6,8 +6,8 @@ use super::*;
 struct FixedVerifier;
 
 impl IsolationEpochEvidenceVerifierPort for FixedVerifier {
-    fn verify(&self, _: &IsolationEpochTransition) -> PortResult<VerifiedIsolationEvidence> {
-        Ok(VerifiedIsolationEvidence {
+    fn verify(&self, _: &IsolationEpochTransition) -> PortResult<IsolationVerificationRecord> {
+        Ok(IsolationVerificationRecord {
             verifier_id: RecordId::new("competitor-verifier")?,
             receipt_ref: OpaqueReceiptRef::new("competitor-receipt")?,
         })
@@ -33,7 +33,7 @@ impl IsolationEpochEvidenceVerifierPort for WritingVerifier {
     fn verify(
         &self,
         transition: &IsolationEpochTransition,
-    ) -> PortResult<VerifiedIsolationEvidence> {
+    ) -> PortResult<IsolationVerificationRecord> {
         self.calls.fetch_add(1, Ordering::AcqRel);
         let store = self
             .store
@@ -82,7 +82,7 @@ impl IsolationEpochEvidenceVerifierPort for WritingVerifier {
                     .map_err(|_| PortError::conflict())?;
             }
         }
-        Ok(VerifiedIsolationEvidence {
+        Ok(IsolationVerificationRecord {
             verifier_id: RecordId::new("outer-verifier")?,
             receipt_ref: OpaqueReceiptRef::new("outer-receipt")?,
         })

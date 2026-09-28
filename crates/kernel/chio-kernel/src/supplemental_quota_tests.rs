@@ -3,7 +3,7 @@ use chio_core::crypto::Keypair;
 
 const EXTENSION: &[u8] = b"opaque-signed-broker-capability";
 
-type ClaimMutation = fn(&mut VerifiedSupplementalQuotaClaim);
+type ClaimMutation = fn(&mut SupplementalQuotaVerificationRecord);
 type NamedClaimMutation = (&'static str, ClaimMutation);
 type ExpectedClaimMutation = (SupplementalQuotaError, ClaimMutation);
 
@@ -17,7 +17,7 @@ fn digest(hex_digit: char) -> String {
 
 #[derive(Clone)]
 struct StubVerifier {
-    claim: Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaVerifierError>,
+    claim: Result<SupplementalQuotaVerificationRecord, SupplementalQuotaVerifierError>,
 }
 
 impl SupplementalQuotaVerifier for StubVerifier {
@@ -25,7 +25,7 @@ impl SupplementalQuotaVerifier for StubVerifier {
         &self,
         signed_extension: &[u8],
         _context: &SupplementalQuotaVerificationContext,
-    ) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaVerifierError> {
+    ) -> Result<SupplementalQuotaVerificationRecord, SupplementalQuotaVerifierError> {
         if signed_extension != EXTENSION {
             return Err(SupplementalQuotaVerifierError::new(
                 "extension bytes changed",
@@ -60,9 +60,9 @@ fn context() -> SupplementalQuotaVerificationContext {
 
 fn claim(
     context: &SupplementalQuotaVerificationContext,
-) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaError> {
+) -> Result<SupplementalQuotaVerificationRecord, SupplementalQuotaError> {
     let supplemental_revocation_ids = vec!["broker-capability-9".to_string()];
-    Ok(VerifiedSupplementalQuotaClaim {
+    Ok(SupplementalQuotaVerificationRecord {
         profile: context.negotiated_profile.clone(),
         broker_capability_id: "broker-capability-9".to_string(),
         issuer: key(2),
@@ -84,14 +84,14 @@ fn claim(
     })
 }
 
-fn verifier(claim: VerifiedSupplementalQuotaClaim) -> StubVerifier {
+fn verifier(claim: SupplementalQuotaVerificationRecord) -> StubVerifier {
     StubVerifier { claim: Ok(claim) }
 }
 
 fn assert_claim_error(
     context: &SupplementalQuotaVerificationContext,
     expected: SupplementalQuotaError,
-    mutate: fn(&mut VerifiedSupplementalQuotaClaim),
+    mutate: fn(&mut SupplementalQuotaVerificationRecord),
 ) -> Result<(), SupplementalQuotaError> {
     let mut mismatched = claim(context)?;
     mutate(&mut mismatched);
@@ -181,7 +181,7 @@ fn every_echoed_request_field_is_rechecked() -> Result<(), SupplementalQuotaErro
     let mutations: &[NamedClaimMutation] = &[
         (
             "capability_id",
-            |claim: &mut VerifiedSupplementalQuotaClaim| claim.capability_id.push('x'),
+            |claim: &mut SupplementalQuotaVerificationRecord| claim.capability_id.push('x'),
         ),
         ("capability_digest", |claim| {
             claim.capability_digest = digest('a')

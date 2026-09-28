@@ -1705,10 +1705,11 @@ impl ThresholdApprovalProposal {
     }
 }
 
-/// Canonical evidence emitted after a complete threshold set verifies.
+/// Serializable signed approval-set data. This body is not verification
+/// evidence; kernel approval verification binds it before reservation or use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct VerifiedApprovalSetBody {
+pub struct ApprovalSetBody {
     pub token_digests: Vec<String>,
     pub policy_hash: String,
     pub threshold: u32,
@@ -1723,7 +1724,7 @@ pub struct VerifiedApprovalSetBody {
     pub proposal_deadline: u64,
 }
 
-impl VerifiedApprovalSetBody {
+impl ApprovalSetBody {
     pub fn new(
         mut token_digests: Vec<String>,
         proposal: &ThresholdApprovalProposal,

@@ -40,7 +40,7 @@ impl FlowStateStore for FakePorts {
 }
 
 impl IsolationEpochEvidenceVerifierPort for FakePorts {
-    fn verify(&self, _: &IsolationEpochTransition) -> PortResult<VerifiedIsolationEvidence> {
+    fn verify(&self, _: &IsolationEpochTransition) -> PortResult<IsolationVerificationRecord> {
         unavailable!()
     }
 }
@@ -68,7 +68,7 @@ impl DeclassificationUseStore for FakePorts {
 }
 
 impl SecurityEventVerifierPort for FakePorts {
-    fn verify(&self, _: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
+    fn verify(&self, _: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
         unavailable!()
     }
 }
@@ -81,7 +81,7 @@ impl SecurityEventStore for FakePorts {
         unavailable!()
     }
 
-    fn append_verified(&self, _: &VerifiedSecurityEvent) -> PortResult<EventAppend> {
+    fn append_verified(&self, _: &SecurityEventVerificationRecord) -> PortResult<EventAppend> {
         unavailable!()
     }
 

@@ -1,3 +1,5 @@
+-- tenant-read-contract: security_participant_egress_events; class=administrative; principal=kernel-admission
+-- Contracts: docs/security/trust-boundary-inventory.json
 -- Native egress is independent of the immutable join-v1 journal vocabulary.
 CREATE TABLE IF NOT EXISTS security_participant_egress_events (
     security_authority_id TEXT NOT NULL REFERENCES security_participant_state_initializations(security_authority_id),

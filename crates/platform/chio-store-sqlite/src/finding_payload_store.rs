@@ -1,3 +1,5 @@
+// tenant-read-contract: chio_finding_payloads; class=tenant-predicate; principal=finding-delivery
+// Contracts: docs/security/trust-boundary-inventory.json
 //! Encrypted durable storage for sealed cognition-market payloads.
 //!
 //! The public Finding commits to a payload digest while the payload itself

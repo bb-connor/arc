@@ -7,9 +7,8 @@ use chio_core::capability::aggregate_invocation::{
 };
 use chio_core::capability::attenuation::{scope_hash, DelegationLink, DelegationLinkBody};
 use chio_core::capability::governance::{
-    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+    ApprovalSetBody, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::threshold_approval::{
@@ -390,13 +389,13 @@ fn verified_approval_set_is_order_invariant_and_domain_separated() -> TestResult
     let proposal = proposal(&fixture)?;
     let alice = approval_token(&proposal, &fixture.alice, "token-alice")?.artifact_digest()?;
     let bob = approval_token(&proposal, &fixture.bob, "token-bob")?.artifact_digest()?;
-    let first = VerifiedApprovalSetBody::new(vec![alice.clone(), bob.clone()], &proposal)?;
-    let second = VerifiedApprovalSetBody::new(vec![bob, alice], &proposal)?;
+    let first = ApprovalSetBody::new(vec![alice.clone(), bob.clone()], &proposal)?;
+    let second = ApprovalSetBody::new(vec![bob, alice], &proposal)?;
 
     assert_eq!(first, second);
     assert_eq!(first.approval_set_hash()?, second.approval_set_hash()?);
     assert_ne!(first.approval_set_hash()?, proposal.artifact_digest()?);
-    assert!(VerifiedApprovalSetBody::new(
+    assert!(ApprovalSetBody::new(
         vec![sha256_hex(b"duplicate"), sha256_hex(b"duplicate")],
         &proposal,
     )

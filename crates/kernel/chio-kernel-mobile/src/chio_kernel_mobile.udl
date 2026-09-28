@@ -19,7 +19,7 @@
 //    (`ChioMobileError`) and Kotlin (`ChioMobileException`) both render
 //    human-readable deny reasons via `.message` / `.localizedMessage`.
 //
-//  - `VerifiedCapability` and `PortablePassportMetadata` are returned
+//  - `CapabilityVerificationRecord` and `PortablePassportMetadata` are returned
 //    as UDL records so the mobile app can inspect the decoded view
 //    (subject, issuer, expiry, evaluated_at) without re-parsing the
 //    wrapped JSON.
@@ -84,7 +84,7 @@ namespace chio_kernel_mobile {
     // validity window, evaluation time). Signature, issuer-trust, and
     // time-bound failures surface as ChioMobileError.InvalidCapability.
     [Throws=ChioMobileError]
-    VerifiedCapability verify_capability(string token_json, string authority_pub_hex);
+    CapabilityVerificationRecord verify_capability(string token_json, string authority_pub_hex);
 
     // Verify a capability token with the full portable JSON context.
     //
@@ -92,7 +92,7 @@ namespace chio_kernel_mobile {
     // snapshot fields as `evaluate`, allowing delegated tokens to seed
     // sibling-sum enforcement before verification.
     [Throws=ChioMobileError]
-    VerifiedCapability verify_capability_with_context(string request_json);
+    CapabilityVerificationRecord verify_capability_with_context(string request_json);
 
     // Verify a portable passport envelope (v1 wire format).
     //
@@ -157,10 +157,10 @@ namespace chio_kernel_mobile {
 
 // Verified capability snapshot returned by `verify_capability`.
 //
-// Mirrors `chio_kernel_core::VerifiedCapability` minus the `scope` field,
+// Mirrors `chio_kernel_core::CapabilityVerificationRecord` minus the `scope` field,
 // which is returned as its canonical JSON blob so the mobile host can
 // decode it using whatever projection it prefers.
-dictionary VerifiedCapability {
+dictionary CapabilityVerificationRecord {
     string id;
     string subject_hex;
     string issuer_hex;

@@ -16,7 +16,7 @@ use serde_json::{Map, Number, Value};
 /// Whitespace and object ordering are immaterial. No signature is verified here.
 /// The verifier must reconstruct the typed signing body and verify its signature.
 /// Protocols constrained to I-JSON use [`super::canonical_json_bytes_from_str`].
-pub fn parse_signed_json(input: &str) -> crate::error::Result<Value> {
+pub(super) fn parse_signed_json(input: &str) -> crate::error::Result<Value> {
     parse(input).map_err(crate::error::Error::CanonicalJson)
 }
 

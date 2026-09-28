@@ -152,7 +152,7 @@ impl SqliteBudgetStore {
             ));
         }
         Ok(Some(BudgetAuthorizeHoldDecision::Authorized(
-            AuthorizedBudgetHold {
+            BudgetHoldAuthorizationRecord {
                 hold_id: approved.hold_id,
                 admission_binding: approved.admission_binding,
                 authorized_exposure_units: hold.authorized_exposure,

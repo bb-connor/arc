@@ -28,7 +28,9 @@ use crate::error::{Error, Result};
 
 #[path = "canonical/signed_json.rs"]
 mod signed_json;
-pub use signed_json::parse_signed_json;
+#[path = "canonical/untrusted.rs"]
+mod untrusted;
+pub use untrusted::{UntrustedJsonError, UntrustedJsonText};
 
 /// Largest integer magnitude permitted for interoperable JSON exchange
 /// (`2^53 - 1`). RFC 7493 (I-JSON) §2.2 requires integers to fall within

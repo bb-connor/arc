@@ -1,3 +1,57 @@
+// tenant-read-contract: security_advisory_events; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_attested_finding_batch_items; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_attested_finding_batches; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_capability_set_suspension_commands; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_capability_set_suspension_effects; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_capability_set_suspension_members; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_capability_set_suspension_state; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_containment_overlay_commands; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_events; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_ingress; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_outcomes; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_partials; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_partition_heads; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_evidence_identity; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_receipt_outbox; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_tombstones; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_uses; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_effect_contributions; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_egress_fences; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_egress_restriction_commands; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_egress_restriction_destinations; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_egress_restriction_effects; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_egress_restriction_state; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_event_ids; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_flow_contexts; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_flow_sequences; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_isolation_epochs; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_issuance_freeze_commands; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_issuance_freeze_effects; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_issuance_freeze_state; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_lineage_fences; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_lineage_flow_state; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_overlay_state; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_principal_flow_state; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_response_dispatch_fences; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_response_dispatch_recoveries; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_response_dispatches; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_response_effects; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_response_plans; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_response_receipt_cursors; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_scheduler_claims; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_scheduler_fence_sequences; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_scheduler_leases; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_scheduler_retries; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_session_flow_state; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_session_memberships; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_session_throttle_commands; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_session_throttle_effects; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_session_throttle_invocations; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_session_throttle_state; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_session_throttle_windows; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_transitions; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_verified_events; class=tenant-predicate; principal=security-runtime
+// Contracts: docs/security/trust-boundary-inventory.json
 fn migrate(connection: &Connection) -> PortResult<()> {
     connection
         .execute_batch(

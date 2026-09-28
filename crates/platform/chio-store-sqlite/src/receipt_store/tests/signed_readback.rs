@@ -40,7 +40,7 @@ fn signed_readback_underwriting_rejects_precision_alias_before_verification() {
     replace_raw(&store, "underwriting_decisions", &aliased);
     assert!(matches!(
         store.query_underwriting_decisions(&UnderwritingDecisionQuery::default()),
-        Err(ReceiptStoreError::Conflict(reason)) if reason.contains("loses precision")
+        Err(ReceiptStoreError::UntrustedInput(error)) if matches!(error.as_ref(), chio_core::canonical::UntrustedJsonError::SignedInput(chio_core::Error::CanonicalJson(reason)) if reason.contains("loses precision"))
     ));
 }
 
@@ -300,6 +300,6 @@ fn signed_readback_rejects_nested_duplicate_map_keys() {
     assert!(erased.verify_signature().test_unwrap());
     assert!(matches!(
         decode_verified_signed_export::<serde_json::Value>(&aliased),
-        Err(ReceiptStoreError::Conflict(reason)) if reason.contains("duplicate object key")
+        Err(ReceiptStoreError::UntrustedInput(error)) if matches!(error.as_ref(), chio_core::canonical::UntrustedJsonError::SignedInput(chio_core::Error::CanonicalJson(reason)) if reason.contains("duplicate object key"))
     ));
 }

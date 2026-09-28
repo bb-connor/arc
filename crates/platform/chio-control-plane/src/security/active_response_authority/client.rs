@@ -137,12 +137,12 @@ impl ProductionActiveResponseAuthorityClient {
             read_bounded_frame(&mut stream, super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES)
                 .map_err(|_| PortError::unavailable())?;
         let response: SignedActiveResponseAuthorityResponse =
-            serde_json::from_slice(&response_bytes).map_err(|_| PortError::integrity_failure())?;
-        let canonical =
-            canonical_json_bytes(&response).map_err(|_| PortError::integrity_failure())?;
-        if canonical != response_bytes {
-            return Err(PortError::integrity_failure());
-        }
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                &response_bytes,
+                super::MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
+            )
+            .and_then(|text| text.decode_canonical())
+            .map_err(|_| PortError::integrity_failure())?;
         self.verify_response(
             &response,
             request.body.request_id.as_str(),

@@ -794,34 +794,48 @@ The per-store, four-cutpoint mutation campaign above is a separate acceptance it
 
 #### 10.2 Type the untrusted-serialization boundary (S2)
 
-- [ ] Introduce `UntrustedJsonText(String)`, constructed at every wire, file and
-      database read boundary, whose only canonicalization method is the strict one.
-- [ ] Migrate the boundaries enumerated by correction 1F onto it, so the permissive
-      path is unreachable from untrusted input without an explicit conversion.
-- [ ] Add a gate listing the constructors, so a new boundary that forgets the type
-      is visible in review.
+- [x] Introduce constrained `UntrustedJsonText<'a>`. Borrow the owner's bounded
+      input instead of copying it. No raw accessor, implicit string conversion or
+      serde implementation. Preserve distinct strict I-JSON, native full-width
+      integer and exact canonical byte contracts.
+- [x] Migrate correction 1F's receipt, signed export, lineage, manifest, keyring,
+      broker and response-authority readers. The closed checkpoint decoder and
+      dedicated zeroizing broker credential decoder retain explicit contracts.
+- [x] Gate the 18 constructor sites and remaining raw decoders in migrated files;
+      calibrate injected decoder bypasses. The gate does not classify arbitrary
+      new reader APIs outside those files.
+- [ ] Complete the broader wire/file/database reader census and migration.
+
+Implementation and focused evidence: [trust-boundary execution](../../reviews/2026-09-27-trust-boundary-execution.md).
 
 #### 10.3 Classify tenant scoping by the enforcing principal (S3, corrected by the external review's R4)
 
-- [ ] Classify each of the 64 tenant-scoped tables by who is allowed to read it:
+- [x] Classify each of the 85 current SQLite tenant-scoped tables by who may read it
+      (the earlier review counted 64):
       tenant predicate required; privileged administrative read under a named
       principal; or an explicit bearer-capability contract where possession of an
       identifier is deliberately authority. "Unguessable derived identifier" is not
       a class: a content hash is computable from its inputs and identifiers appear
       in receipts and logs.
-- [ ] Record the class next to the schema. Gate on statements touching a
-      tenant-predicate table without the predicate.
+- [x] Record the contract beside each schema and pin 170 statements without a
+      simple static tenant predicate to explicit principal contracts. Include
+      dynamic predicates, integrity scans and administrative/recovery owners.
+      No identifier is classified as a bearer capability.
 - [ ] Every isolation test gives tenant B the exact valid identifier belonging to
-      tenant A and requires denial, for every table in every class. None exists
-      today.
-- [ ] Resolve how `chio_tool_receipts.receipt_id` is produced first
-      (`receipt/body.rs:240` derives it from the body); if unscoped reads on it are
-      meant to be authorized by possession, that is a bearer contract to specify,
-      not a property to assume. If no such contract is intended, the 72 unscoped
-      statements are a possible cross-tenant read and this becomes a P1.
+      tenant A and requires denial, for every table in every class. Receipt point
+      and list tests now cover exact IDs, unattributed rows, invalid contexts and
+      forged tenant projections. The full per-table runtime matrix remains open.
+- [x] Receipt IDs are lookup keys, not read authority. User-facing point loads
+      require a sealed adapter-issued context, SQL tenant binding and signed-body
+      binding. HTTP point loads retain their admin-only contract. Internal kernel
+      provenance reads are explicitly privileged composition dependencies.
+- [x] Remove the tenant strictness switch and NULL-row compatibility fallback.
+      Tenant reads always require the exact signed tenant.
 - [ ] Typed derivation (standard rule 14.7, following `enterprise_receipt.rs:414`)
       is still worth having for collision resistance and construction discipline;
       it is not the isolation mechanism and is not recorded as one.
+
+Current classification and gate limits: [tenant read contracts](../../security/tenant-read-contracts.md).
 
 #### 10.4 One parser for signed data, and constrained columns (S4)
 

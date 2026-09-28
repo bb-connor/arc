@@ -146,6 +146,7 @@ fn main() -> ExitCode {
 
 fn error_code(error: &BrokerError) -> &'static str {
     match error {
+        BrokerError::UntrustedInput(error) => error.code(),
         BrokerError::Clock(error) => error.code(),
         BrokerError::InvalidRequest(_) => "invalid_configuration",
         BrokerError::AuthorizationDenied(_) => "authorization_denied",

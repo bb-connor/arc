@@ -42,8 +42,7 @@ fn stored_tool_json_rejects_duplicate_keys_and_precision_aliases(
         let aliased = raw.replacen(original, replacement, 1);
         assert!(matches!(
             decode_verified_chio_receipt(&aliased, "test tool", Some(1)),
-            Err(ReceiptStoreError::Conflict(reason))
-                if reason.starts_with("test tool seq 1 failed to decode:") && reason.contains(cause)
+            Err(ReceiptStoreError::UntrustedInput(error)) if matches!(error.as_ref(), chio_core::canonical::UntrustedJsonError::SignedInput(chio_core::Error::CanonicalJson(reason)) if reason.contains(cause))
         ));
     }
     Ok(())
@@ -63,8 +62,7 @@ fn stored_child_json_rejects_duplicate_keys() -> Result<(), Box<dyn std::error::
     let aliased = raw.replacen(original, r#""id":"shadow","id":"child-rcpt-test-001""#, 1);
     assert!(matches!(
         decode_verified_child_receipt(&aliased, "test child", Some(2)),
-        Err(ReceiptStoreError::Conflict(reason))
-            if reason.starts_with("test child seq 2 failed to decode:") && reason.contains("duplicate object key")
+        Err(ReceiptStoreError::UntrustedInput(error)) if matches!(error.as_ref(), chio_core::canonical::UntrustedJsonError::SignedInput(chio_core::Error::CanonicalJson(reason)) if reason.contains("duplicate object key"))
     ));
     Ok(())
 }

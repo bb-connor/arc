@@ -39,6 +39,8 @@ pub use encrypted_blob_backend::{EncryptedBlobSecretBackend, SealedKeyFd, Sealed
 #[derive(Debug, thiserror::Error)]
 pub enum BrokerError {
     #[error(transparent)]
+    UntrustedInput(#[from] chio_core_types::canonical::UntrustedJsonError),
+    #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("broker request is invalid: {0}")]
     InvalidRequest(String),
@@ -61,10 +63,31 @@ pub enum BrokerError {
 }
 
 impl BrokerError {
+    /// Bounded broker wire reason. Typed error sources retain their registered
+    /// URNs; each one has a distinct wire spelling accepted by the IPC grammar.
     #[must_use]
     pub const fn diagnostic_code(&self) -> &'static str {
+        use chio_core_types::canonical::UntrustedJsonError;
+        use chio_security_types::clock::ClockError;
         match self {
-            Self::Clock(error) => error.code(),
+            Self::UntrustedInput(error) => match error {
+                UntrustedJsonError::TooLarge { .. } => "signed_json_too_large",
+                UntrustedJsonError::NotUtf8(_) => "signed_json_not_utf8",
+                UntrustedJsonError::SignedInput(_) => "signed_json_invalid_input",
+                UntrustedJsonError::Decode(_) => "signed_json_invalid_shape",
+                UntrustedJsonError::Canonicalization(_) => "signed_json_canonicalization",
+                UntrustedJsonError::NonCanonical => "signed_json_noncanonical",
+            },
+            Self::Clock(error) => match error {
+                ClockError::Unavailable => "clock_unavailable",
+                ClockError::BeforeEpoch => "clock_before_epoch",
+                ClockError::Overflow => "clock_overflow",
+                ClockError::WallClockRegression => "clock_wall_clock_regression",
+                ClockError::MonotonicRegression => "clock_monotonic_regression",
+                ClockError::Expired => "clock_expired",
+                ClockError::NotYetValid => "clock_not_yet_valid",
+                ClockError::InvalidWindow => "clock_invalid_window",
+            },
             Self::InvalidRequest(_) => "invalid_request",
             Self::AuthorizationDenied(_) => "authorization_denied",
             Self::AuthorityUnavailable(_) => "authority_unavailable",
@@ -80,6 +103,7 @@ impl BrokerError {
     pub(crate) fn redacted(self) -> Self {
         let code = self.diagnostic_code().to_string();
         match self {
+            Self::UntrustedInput(error) => Self::UntrustedInput(error),
             Self::Clock(error) => Self::Clock(error),
             Self::InvalidRequest(_) => Self::InvalidRequest(code),
             Self::AuthorizationDenied(_) => Self::AuthorizationDenied(code),

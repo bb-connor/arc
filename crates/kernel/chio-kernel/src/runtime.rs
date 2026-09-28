@@ -175,7 +175,7 @@ impl ToolCallRequest {
             .iter()
             .map(GovernedApprovalToken::artifact_digest)
             .collect::<Result<Vec<_>, chio_core::Error>>()?;
-        chio_core::capability::governance::VerifiedApprovalSetBody::new(token_digests, proposal)?
+        chio_core::capability::governance::ApprovalSetBody::new(token_digests, proposal)?
             .approval_set_hash()
             .map(Some)
     }

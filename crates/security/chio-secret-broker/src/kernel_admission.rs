@@ -9,10 +9,9 @@ use std::sync::Arc;
 use chio_core_types::{canonical_json_bytes, PublicKey};
 use chio_kernel::supplemental_quota::{
     supplemental_authorization_artifact_digest, supplemental_request_binding_hash,
-    SupplementalQuotaVerificationContext, SupplementalQuotaVerifier,
-    SupplementalQuotaVerifierBinding, SupplementalQuotaVerifierError,
-    VerifiedSupplementalQuotaClaim, BROKER_CAPABILITY_EXECUTION_PROFILE,
-    MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES,
+    SupplementalQuotaVerificationContext, SupplementalQuotaVerificationRecord,
+    SupplementalQuotaVerifier, SupplementalQuotaVerifierBinding, SupplementalQuotaVerifierError,
+    BROKER_CAPABILITY_EXECUTION_PROFILE, MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -106,7 +105,7 @@ impl BrokerQuotaVerifier {
         &self,
         bytes: &[u8],
         context: &SupplementalQuotaVerificationContext,
-    ) -> Result<VerifiedSupplementalQuotaClaim> {
+    ) -> Result<SupplementalQuotaVerificationRecord> {
         if bytes.is_empty()
             || bytes.len() > MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES
             || context.verifier_binding != self.binding
@@ -177,7 +176,7 @@ impl BrokerQuotaVerifier {
         }
         let mut revocations = vec![body.capability_id.clone(), body.revocation_id.clone()];
         revocations.sort_unstable();
-        Ok(VerifiedSupplementalQuotaClaim {
+        Ok(SupplementalQuotaVerificationRecord {
             profile: BROKER_CAPABILITY_EXECUTION_PROFILE.into(),
             broker_capability_id: body.capability_id.clone(),
             issuer: body.issuer.clone(),
@@ -207,7 +206,8 @@ impl SupplementalQuotaVerifier for BrokerQuotaVerifier {
         &self,
         bytes: &[u8],
         context: &SupplementalQuotaVerificationContext,
-    ) -> std::result::Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaVerifierError> {
+    ) -> std::result::Result<SupplementalQuotaVerificationRecord, SupplementalQuotaVerifierError>
+    {
         self.verify_request(bytes, context)
             .map_err(|error| SupplementalQuotaVerifierError::new(error.diagnostic_code()))
     }

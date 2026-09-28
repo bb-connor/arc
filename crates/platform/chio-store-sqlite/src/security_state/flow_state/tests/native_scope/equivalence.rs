@@ -82,7 +82,7 @@ fn native_and_legacy_domain_mutations_produce_identical_retained_cells() -> Test
             transition_id: RecordId::new("isolation-transition")?,
             effective_at_unix_ms: 1_000,
         };
-        let verified = VerifiedIsolationEvidence {
+        let verified = IsolationVerificationRecord {
             verifier_id: RecordId::new("verifier")?,
             receipt_ref: OpaqueReceiptRef::new("receipt")?,
         };

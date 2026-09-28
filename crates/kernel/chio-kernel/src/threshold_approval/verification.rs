@@ -9,7 +9,7 @@ use super::{
 use crate::approval::{ApprovalReservationMember, ApprovalSetReservationInput, ApprovalStoreError};
 use chio_core::canonical_json_bytes;
 use chio_core::capability::governance::{
-    GovernedApprovalDecision, GovernedApprovalToken, VerifiedApprovalSetBody,
+    ApprovalSetBody, GovernedApprovalDecision, GovernedApprovalToken,
 };
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{sha256_hex, PublicKey, SigningAlgorithm};
@@ -79,13 +79,13 @@ pub enum ThresholdApprovalVerificationError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedThresholdApprovalSet {
-    body: VerifiedApprovalSetBody,
+    body: ApprovalSetBody,
     members: Vec<ApprovalReservationMember>,
 }
 
 impl VerifiedThresholdApprovalSet {
     #[must_use]
-    pub fn body(&self) -> &VerifiedApprovalSetBody {
+    pub fn body(&self) -> &ApprovalSetBody {
         &self.body
     }
 
@@ -112,7 +112,7 @@ impl VerifiedThresholdApprovalSet {
 }
 
 impl core::ops::Deref for VerifiedThresholdApprovalSet {
-    type Target = VerifiedApprovalSetBody;
+    type Target = ApprovalSetBody;
 
     fn deref(&self) -> &Self::Target {
         &self.body
@@ -234,7 +234,7 @@ pub(crate) fn verify_threshold_approval_set_with_requirement(
             .cmp(right.token_digest())
             .then_with(|| left.token_id().cmp(right.token_id()))
     });
-    let body = VerifiedApprovalSetBody::new(token_digests.into_iter().collect(), proposal)
+    let body = ApprovalSetBody::new(token_digests.into_iter().collect(), proposal)
         .map_err(|error| threshold_denied(&format!("verified approval set failed: {error}")))?;
     Ok(VerifiedThresholdApprovalSet { body, members })
 }

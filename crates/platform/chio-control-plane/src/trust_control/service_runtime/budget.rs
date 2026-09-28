@@ -852,7 +852,7 @@ impl BudgetStore for RemoteBudgetStore {
         );
         let decision = match response.decision {
             BudgetAuthorizeExposureDecision::Authorized => {
-                BudgetAuthorizeHoldDecision::Authorized(AuthorizedBudgetHold {
+                BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
                     hold_id: request.hold_id,
                     admission_binding: None,
                     authorized_exposure_units: request.requested_exposure_units,

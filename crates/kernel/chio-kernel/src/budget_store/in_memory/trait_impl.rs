@@ -534,7 +534,7 @@ impl BudgetStore for InMemoryBudgetStore {
         }
 
         Ok(BudgetAuthorizeHoldDecision::Authorized(
-            AuthorizedBudgetHold {
+            BudgetHoldAuthorizationRecord {
                 hold_id: event.hold_id,
                 admission_binding: event.admission_binding,
                 authorized_exposure_units: event.exposure_units,

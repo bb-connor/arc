@@ -58,8 +58,8 @@ pub use pure::{
 };
 pub use rng::{WebCryptoRng, WebCryptoRngError};
 pub use wire::{
-    AdmittedChildBudgetJson, BindingError, EvaluateRequestJson, EvaluationVerdictJson,
-    ParentBudgetSnapshotJson, SignReceiptRequestJson, ToolCallRequestJson, VerifiedCapabilityJson,
+    AdmittedChildBudgetJson, BindingError, CapabilityVerificationJson, EvaluateRequestJson,
+    EvaluationVerdictJson, ParentBudgetSnapshotJson, SignReceiptRequestJson, ToolCallRequestJson,
     VerifyCapabilityRequestJson, VerifyReceiptResultJson,
 };
 

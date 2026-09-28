@@ -1,3 +1,17 @@
+-- tenant-read-contract: security_participant_state_declassification_evidence_identity; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_declassification_receipt_outbox; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_declassification_tombstones; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_declassification_uses; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_egress_fences; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_flow_contexts; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_flow_sequences; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_isolation_epochs; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_lineage_flow_state; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_principal_flow_state; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_session_flow_state; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_session_memberships; class=administrative; principal=kernel-admission
+-- tenant-read-contract: security_participant_state_transitions; class=administrative; principal=kernel-admission
+-- Contracts: docs/security/trust-boundary-inventory.json
 -- Authority-scoped native rows. Hydration is not serving activation.
 CREATE TABLE IF NOT EXISTS security_participant_state_initializations (
     security_authority_id TEXT NOT NULL PRIMARY KEY,

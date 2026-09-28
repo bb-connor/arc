@@ -9,7 +9,7 @@ use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsE
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chio_core_types::{canonical_json_bytes, Ed25519Backend, PublicKey, SigningBackend};
+use chio_core_types::{Ed25519Backend, PublicKey, SigningBackend};
 use chio_security_types::ports::RecordId;
 use chio_security_types::{
     EnterpriseMigrationControl, EnterpriseMigrationKey, EnterpriseMigrationMinimumHead,
@@ -251,17 +251,9 @@ impl BrokerDaemonConfig {
             ));
         }
         retained_config.validate()?;
-        let config: Self = serde_json::from_slice(&bytes).map_err(|error| {
-            BrokerError::InvalidRequest(format!("daemon config decoding failed: {error}"))
-        })?;
-        let canonical = canonical_json_bytes(&config).map_err(|error| {
-            BrokerError::InvalidRequest(format!("daemon config encoding failed: {error}"))
-        })?;
-        if canonical != bytes {
-            return Err(BrokerError::InvalidRequest(
-                "daemon config is not canonical JSON".to_string(),
-            ));
-        }
+        let config: Self =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(&bytes, 65_536)?
+                .decode_canonical()?;
         #[cfg(unix)]
         if metadata.uid() != config.trusted_service_uid {
             return Err(BrokerError::Custody(

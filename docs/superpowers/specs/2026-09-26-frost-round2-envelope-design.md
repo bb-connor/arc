@@ -1,11 +1,15 @@
 # FROST DKG round-2 packages: sealing design
 
-Status: design note, precondition for the Wave 3 lane named in the hardening
-spec (H7) and the dispatch plan. Reviewed against
+Status: step 1 implemented locally on 2026-09-27; step 2 sealing remains open.
+The type split, private encrypted custody representation, restart/binding tests
+and extraction-site gate are recorded in
+[trust-boundary execution](../../reviews/2026-09-27-trust-boundary-execution.md).
+This design is the precondition for the Wave 3 lane named in the hardening
+spec (H7) and the dispatch plan. Its original review was against
 `crates/trust/chio-federation-authority/src/frost_ceremony.rs` at integration
 `3788269c6a`.
 
-## What the code does today
+## Original implementation at the reviewed base
 
 A FROST distributed key generation runs in two rounds. Round 1 broadcasts a
 commitment package that is public by construction. Round 2 sends each

@@ -1,3 +1,5 @@
+-- tenant-read-contract: security_participant_state_mutations; class=administrative; principal=kernel-admission
+-- Contracts: docs/security/trust-boundary-inventory.json
 
 CREATE TABLE IF NOT EXISTS security_participant_state_mutations (
     security_authority_id TEXT NOT NULL CHECK (length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512),

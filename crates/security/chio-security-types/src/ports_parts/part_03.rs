@@ -551,7 +551,7 @@ pub trait IsolationEpochEvidenceVerifierPort: Send + Sync {
     fn verify(
         &self,
         transition: &IsolationEpochTransition,
-    ) -> PortResult<VerifiedIsolationEvidence>;
+    ) -> PortResult<IsolationVerificationRecord>;
 }
 
 #[cfg(feature = "std")]
@@ -651,7 +651,10 @@ pub trait DeclassificationEvidenceCommitStore: Send + Sync {
 
 #[cfg(feature = "std")]
 pub trait SecurityEventVerifierPort: Send + Sync {
-    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent>;
+    fn verify(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord>;
 }
 
 #[cfg(feature = "std")]
@@ -660,7 +663,7 @@ pub trait SecurityEventStore: Send + Sync {
         &self,
         request: &CorrelationEventAdmissionRequest,
     ) -> PortResult<CorrelationEventAdmission>;
-    fn append_verified(&self, event: &VerifiedSecurityEvent) -> PortResult<EventAppend>;
+    fn append_verified(&self, event: &SecurityEventVerificationRecord) -> PortResult<EventAppend>;
     fn append_advisory(&self, event: &AdvisorySecurityEvent) -> PortResult<EventAppend>;
     fn index_partition_event(&self, request: &CorrelationEventIndexRequest) -> PortResult<()>;
     fn scan_partition(&self, scan: &EventPartitionScan) -> PortResult<CorrelationScan>;
@@ -709,16 +712,14 @@ pub trait CorrelationIngressStore: Send + Sync {
     fn enqueue_verified_correlation_event(
         &self,
         event: &UnverifiedSecurityEvent,
-        verified: &VerifiedSecurityEvent,
+        verified: &SecurityEventVerificationRecord,
     ) -> PortResult<EventAppend>;
-    fn load_pending_correlation_events(
-        &self,
-        max_results: u32,
-    ) -> PortResult<UnverifiedEventBatch>;
+    fn load_pending_correlation_events(&self, max_results: u32)
+        -> PortResult<UnverifiedEventBatch>;
     fn validate_pending_correlation_event(
         &self,
         event: &UnverifiedSecurityEvent,
-        verified: &VerifiedSecurityEvent,
+        verified: &SecurityEventVerificationRecord,
     ) -> PortResult<()>;
     fn acknowledge_correlated_event(&self, event: &UnverifiedSecurityEvent) -> PortResult<()>;
     fn count_pending_correlation_events(&self) -> PortResult<u64>;

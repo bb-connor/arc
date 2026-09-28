@@ -189,7 +189,7 @@ impl SecurityStateWriteTransaction<'_> {
     pub(in super::super) fn open_isolation_epoch(
         self,
         transition: &IsolationEpochTransition,
-        verified: &VerifiedIsolationEvidence,
+        verified: &IsolationVerificationRecord,
     ) -> PortResult<(Self, FlowStateSnapshot)> {
         let snapshot =
             FlowMutation::legacy(self.transaction()).open_isolation_epoch(transition, verified)?;

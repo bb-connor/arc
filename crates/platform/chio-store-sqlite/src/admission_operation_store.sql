@@ -1,3 +1,5 @@
+-- tenant-read-contract: admission_operation_authorization_consumptions; class=administrative; principal=kernel-admission
+-- Contracts: docs/security/trust-boundary-inventory.json
 CREATE TABLE IF NOT EXISTS admission_operations (
     operation_id TEXT NOT NULL PRIMARY KEY
         CHECK (length(operation_id) = 64 AND operation_id NOT GLOB '*[^0-9a-f]*'),

@@ -145,7 +145,7 @@ fn aggregate_invocation_budget_accepts_only_when_negotiated() -> Result<(), Capa
         &mut budgets,
     )?;
 
-    assert_eq!(verified.id, token.id);
+    assert_eq!(verified.id(), token.id);
     Ok(())
 }
 
@@ -341,7 +341,7 @@ fn delegated_aggregate_budget_accepts_authenticated_root() -> Result<(), Capabil
         &mut budgets,
     )?;
 
-    assert_eq!(verified.id, child.id);
+    assert_eq!(verified.id(), child.id);
     Ok(())
 }
 
@@ -390,7 +390,7 @@ fn cumulative_approval_requires_negotiation() -> Result<(), CapabilityError> {
         &resolver,
         &mut budgets,
     )?;
-    assert_eq!(verified.id, token.id);
+    assert_eq!(verified.id(), token.id);
     Ok(())
 }
 
@@ -478,7 +478,7 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
         &resolver,
         &mut budgets,
     )?;
-    assert_eq!(verified.id, child.id);
+    assert_eq!(verified.id(), child.id);
     Ok(())
 }
 
@@ -574,7 +574,7 @@ fn allow_classical_accepts_classical_capability() {
     )
     .expect("classical capability is accepted under allow_classical");
 
-    assert_eq!(verified.id, "cap-classical");
+    assert_eq!(verified.id(), "cap-classical");
 }
 
 fn make_attenuated_token(id: &str, issuer: &Keypair, subject: &Keypair) -> CapabilityToken {
@@ -799,7 +799,7 @@ fn full_verifier_accepts_plain_pass_through_delegation_when_chain_binding_featur
     )
     .expect("pass-through delegation must verify when no new attenuation is introduced");
 
-    assert_eq!(verified.id, "delegated-current-v1-token");
+    assert_eq!(verified.id(), "delegated-current-v1-token");
 }
 
 #[test]

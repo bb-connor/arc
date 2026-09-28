@@ -335,7 +335,7 @@ fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated()
     let body = CanonicalBody::new(b"{}".to_vec())
         .unwrap_or_else(|error| panic!("canonical body: {error}"));
     store
-        .append_verified(&VerifiedSecurityEvent {
+        .append_verified(&SecurityEventVerificationRecord {
             tenant_id: tenant("tenant-a"),
             event_id: EventId::new("event-a").unwrap_or_else(|error| panic!("event id: {error}")),
             producer_id: ProducerId::new("detector-a")
@@ -349,7 +349,7 @@ fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated()
         })
         .unwrap_or_else(|error| panic!("append verified event: {error}"));
     store
-        .append_verified(&VerifiedSecurityEvent {
+        .append_verified(&SecurityEventVerificationRecord {
             tenant_id: tenant("tenant-a"),
             event_id: EventId::new("event-b").unwrap_or_else(|error| panic!("event id: {error}")),
             producer_id: ProducerId::new("detector-a")
@@ -471,7 +471,7 @@ fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated()
     assert!(!observed.truncated);
     assert_eq!(observed.events.len(), 2);
     store
-        .append_verified(&VerifiedSecurityEvent {
+        .append_verified(&SecurityEventVerificationRecord {
             tenant_id: tenant("tenant-a"),
             event_id: EventId::new("event-future")
                 .unwrap_or_else(|error| panic!("event id: {error}")),
@@ -502,8 +502,7 @@ fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated()
         store
             .load_correlation_max_seen_event_time(&CorrelationPartitionKey {
                 tenant_id: tenant("tenant-a"),
-                rule_id: RuleId::new("rule-a")
-                    .unwrap_or_else(|error| panic!("rule id: {error}")),
+                rule_id: RuleId::new("rule-a").unwrap_or_else(|error| panic!("rule id: {error}")),
                 partition_hash: partition,
             })
             .unwrap_or_else(|error| panic!("load indexed max seen: {error}")),
@@ -556,7 +555,7 @@ fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated()
         })
         .unwrap_or_else(|error| panic!("advance correlation: {error}"));
     store
-        .append_verified(&VerifiedSecurityEvent {
+        .append_verified(&SecurityEventVerificationRecord {
             tenant_id: tenant("tenant-a"),
             event_id: EventId::new("event-late")
                 .unwrap_or_else(|error| panic!("event id: {error}")),
@@ -582,7 +581,7 @@ fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated()
     }));
     assert_eq!(late_error.kind(), PortErrorKind::Conflict);
     store
-        .append_verified(&VerifiedSecurityEvent {
+        .append_verified(&SecurityEventVerificationRecord {
             tenant_id: tenant("tenant-a"),
             event_id: EventId::new("event-zero")
                 .unwrap_or_else(|error| panic!("event id: {error}")),
@@ -637,7 +636,7 @@ fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated()
         })
         .unwrap_or_else(|error| panic!("corrupt event hashes: {error}"));
     let verified_error = require_error(
-        store.append_verified(&VerifiedSecurityEvent {
+        store.append_verified(&SecurityEventVerificationRecord {
             tenant_id: tenant("tenant-a"),
             event_id: EventId::new("event-a").unwrap_or_else(|error| panic!("event id: {error}")),
             producer_id: ProducerId::new("detector-a")
@@ -716,7 +715,7 @@ fn verified_event_capacity_and_rule_index_roll_back_as_one_sqlite_transaction() 
     let event_id = EventId::new("event-atomic").unwrap_or_else(|error| panic!("event id: {error}"));
     let error = require_error(
         store.admit_verified_correlation_event(&CorrelationEventAdmissionRequest {
-            event: VerifiedSecurityEvent {
+            event: SecurityEventVerificationRecord {
                 tenant_id: tenant_id.clone(),
                 event_id: event_id.clone(),
                 producer_id: ProducerId::new("detector-atomic")

@@ -41,7 +41,7 @@ use chio_security_types::ports::{
     GovernedApprovalReservationMutation, OpaqueReceiptRef, PortError, PortErrorKind, PortResult,
     PreparedActiveResponseDispatchBinding, ProducerId, ProducerTrustClass, RecordId, RuleId,
     SecurityEventStore, SecurityEventVerifierPort, TenantId, UnverifiedSecurityEvent,
-    VerifiedSecurityEvent, ATTESTED_FINDING_BATCH_SCHEMA_VERSION,
+    SecurityEventVerificationRecord, ATTESTED_FINDING_BATCH_SCHEMA_VERSION,
     ATTESTED_FINDING_RESPONSE_INITIAL_RETRY_MS, ATTESTED_FINDING_RESPONSE_MAX_RETRY_MS,
     ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION, MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN,
 };
@@ -187,8 +187,8 @@ impl NativeSecurityEventVerifier {
         event: &UnverifiedSecurityEvent,
         trust_class: ProducerTrustClass,
         evidence_hash: Digest32,
-    ) -> VerifiedSecurityEvent {
-        VerifiedSecurityEvent {
+    ) -> SecurityEventVerificationRecord {
+        SecurityEventVerificationRecord {
             tenant_id: event.tenant_id.clone(),
             event_id: event.event_id.clone(),
             producer_id: event.producer_id.clone(),
@@ -225,7 +225,7 @@ impl NativeSecurityEventVerifier {
         event: &UnverifiedSecurityEvent,
         body: &SecurityEventBody,
         enforce_freshness: bool,
-    ) -> PortResult<VerifiedSecurityEvent> {
+    ) -> PortResult<SecurityEventVerificationRecord> {
         let signed: SignedSecurityEvent = serde_json::from_slice(event.source_evidence.as_bytes())
             .map_err(|_| PortError::invalid_data())?;
         let canonical_signed =
@@ -264,7 +264,7 @@ impl NativeSecurityEventVerifier {
         event: &UnverifiedSecurityEvent,
         body: &SecurityEventBody,
         enforce_freshness: bool,
-    ) -> PortResult<VerifiedSecurityEvent> {
+    ) -> PortResult<SecurityEventVerificationRecord> {
         let receipt: ChioReceipt = serde_json::from_slice(event.source_evidence.as_bytes())
             .map_err(|_| PortError::invalid_data())?;
         let canonical_receipt =
@@ -332,7 +332,7 @@ impl NativeSecurityEventVerifier {
         ))
     }
 
-    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
+    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
         self.ensure_ready()?;
         let body = self.parse_bound_body(event)?;
         match body.trust_class {
@@ -343,7 +343,7 @@ impl NativeSecurityEventVerifier {
 }
 
 impl SecurityEventVerifierPort for NativeSecurityEventVerifier {
-    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
+    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
         self.ensure_ready()?;
         let body = self.parse_bound_body(event)?;
         match body.trust_class {
@@ -660,8 +660,8 @@ impl DurableCorrelationIngress {
 trait CorrelationEventVerifier: Send + Sync {
     fn ensure_ready(&self) -> PortResult<()>;
     fn now_unix_ms(&self) -> PortResult<u64>;
-    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent>;
-    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent>;
+    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord>;
+    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord>;
 }
 
 impl CorrelationEventVerifier for NativeSecurityEventVerifier {
@@ -676,11 +676,11 @@ impl CorrelationEventVerifier for NativeSecurityEventVerifier {
             .map_err(PortError::from)
     }
 
-    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
+    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
         SecurityEventVerifierPort::verify(self, event)
     }
 
-    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
+    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
         NativeSecurityEventVerifier::verify_durable(self, event)
     }
 }
@@ -690,7 +690,7 @@ trait CorrelationPort: Send + Sync {
     fn accepts_policy(&self, policy_version: &RecordId) -> bool;
     fn correlate(
         &self,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         observed_at_unix_ms: u64,
     ) -> PortResult<Vec<RuleCorrelationOutcome>>;
 }
@@ -802,7 +802,7 @@ impl CorrelationPort for SqliteTemporalCorrelationPort {
 
     fn correlate(
         &self,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         observed_at_unix_ms: u64,
     ) -> PortResult<Vec<RuleCorrelationOutcome>> {
         let body: SecurityEventBody = serde_json::from_slice(event.canonical_body.as_bytes())
@@ -940,20 +940,20 @@ impl ProductionCorrelationConsumer {
             .map(|consumed| consumed.report)
     }
 
-    fn verify_live(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
+    fn verify_live(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
         let verified = self.verifier.verify(event)?;
         self.ensure_supported_policy(&verified)?;
         Ok(verified)
     }
 
-    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<VerifiedSecurityEvent> {
+    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
         self.ensure_ready()?;
         let verified = self.verifier.verify_durable(event)?;
         self.ensure_supported_policy(&verified)?;
         Ok(verified)
     }
 
-    fn ensure_supported_policy(&self, verified: &VerifiedSecurityEvent) -> PortResult<()> {
+    fn ensure_supported_policy(&self, verified: &SecurityEventVerificationRecord) -> PortResult<()> {
         let body: SecurityEventBody = serde_json::from_slice(verified.canonical_body.as_bytes())
             .map_err(|_| PortError::integrity_failure())?;
         if self.correlation.accepts_policy(&body.policy_version) {
@@ -965,7 +965,7 @@ impl ProductionCorrelationConsumer {
 
     fn consume_verified(
         &self,
-        verified: &VerifiedSecurityEvent,
+        verified: &SecurityEventVerificationRecord,
     ) -> PortResult<CorrelationConsumption> {
         self.ensure_ready()?;
         self.consume_verified_after_ready(verified)
@@ -973,7 +973,7 @@ impl ProductionCorrelationConsumer {
 
     fn consume_verified_after_ready(
         &self,
-        verified: &VerifiedSecurityEvent,
+        verified: &SecurityEventVerificationRecord,
     ) -> PortResult<CorrelationConsumption> {
         let observed_at_unix_ms = self.verifier.now_unix_ms()?;
         let outcomes = self.correlation.correlate(verified, observed_at_unix_ms)?;

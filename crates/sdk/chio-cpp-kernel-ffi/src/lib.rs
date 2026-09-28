@@ -661,17 +661,17 @@ fn verify_capability_with_parts(
         }
     })?;
 
-    let scope_json = serde_json::to_string(&verified.scope)
+    let scope_json = serde_json::to_string(verified.scope())
         .map_err(|error| KernelFfiError::internal("serialize capability scope", error))?;
 
     serialize(&VerifiedCapabilityResponse {
-        id: verified.id,
-        subject_hex: verified.subject_hex,
-        issuer_hex: verified.issuer_hex,
+        id: verified.id().to_owned(),
+        subject_hex: verified.subject_hex().to_owned(),
+        issuer_hex: verified.issuer_hex().to_owned(),
         scope_json,
-        issued_at: verified.issued_at,
-        expires_at: verified.expires_at,
-        evaluated_at: verified.evaluated_at,
+        issued_at: verified.issued_at(),
+        expires_at: verified.expires_at(),
+        evaluated_at: verified.evaluated_at(),
     })
 }
 
@@ -722,12 +722,12 @@ fn verify_passport_json_str(
         })?;
 
     serialize(&PortablePassportResponse {
-        subject: verified.subject,
-        issuer_hex: verified.issuer.to_hex(),
-        issued_at: verified.issued_at,
-        expires_at: verified.expires_at,
-        evaluated_at: verified.evaluated_at,
-        payload_canonical_hex: hex::encode(&verified.payload_canonical_bytes),
+        subject: verified.subject().to_owned(),
+        issuer_hex: verified.issuer().to_hex(),
+        issued_at: verified.issued_at(),
+        expires_at: verified.expires_at(),
+        evaluated_at: verified.evaluated_at(),
+        payload_canonical_hex: hex::encode(verified.payload_canonical_bytes()),
     })
 }
 

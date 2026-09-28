@@ -418,16 +418,16 @@ fn finish_verified_evaluation(
     budgets: &mut dyn BudgetRegistry,
 ) -> EvaluationVerdict {
     // Step 2: subject binding.
-    if verified.subject_hex != input.request.agent_id {
+    if verified.subject_hex() != input.request.agent_id {
         let core_err = KernelCoreError::SubjectMismatch {
-            expected: verified.subject_hex.clone(),
+            expected: verified.subject_hex().to_string(),
             actual: input.request.agent_id.clone(),
         };
         return deny(core_err, None, Some(verified));
     }
 
     // Step 3: scope match.
-    let matched_grant_index = match resolve_matched_grant_index(&verified.scope, input.request) {
+    let matched_grant_index = match resolve_matched_grant_index(verified.scope(), input.request) {
         Ok(index) => index,
         Err(error) => return deny(error, None, Some(verified)),
     };
@@ -435,7 +435,7 @@ fn finish_verified_evaluation(
     // Step 4: guard pipeline.
     let ctx = GuardContext {
         request: input.request,
-        scope: &verified.scope,
+        scope: verified.scope(),
         agent_id: &input.request.agent_id,
         server_id: &input.request.server_id,
         session_filesystem_roots: input.session_filesystem_roots,

@@ -1,3 +1,7 @@
+// tenant-read-contract: chio_encrypted_blob_reference_mutations; class=administrative; principal=blob-mutation
+// tenant-read-contract: chio_encrypted_blob_references; class=tenant-predicate; principal=blob-mutation
+// tenant-read-contract: chio_encrypted_blobs; class=tenant-predicate; principal=blob-mutation
+// Contracts: docs/security/trust-boundary-inventory.json
 //! Tenant-scoped encrypted BLOB persistence for tee capture payloads.
 //!
 //! The tee stores redacted request and response bodies as opaque

@@ -324,6 +324,8 @@ pub struct AuthorizationReceiptConsumption {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReceiptStoreError {
+    #[error(transparent)]
+    UntrustedInput(std::sync::Arc<chio_core::canonical::UntrustedJsonError>),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
@@ -350,6 +352,8 @@ pub enum ReceiptStoreError {
 
     #[error("receipt read boundary error: {0}")]
     ReadBoundary(String),
+    #[error(transparent)]
+    ReadAuthorization(#[from] crate::receipt_query::ReceiptReadError),
 
     #[error("conflict: {0}")]
     Conflict(String),
@@ -511,6 +515,11 @@ pub trait ReceiptStore: Send + Sync {
     /// Load a chio receipt by id. The provided default returns `None`; a store
     /// backing a store-authoritative deployment MUST override this (and
     /// `load_child_receipt`) with a real point lookup.
+    ///
+    /// This is a privileged kernel provenance read, not a tenant query API.
+    /// Remote implementations must authenticate the service principal. HTTP
+    /// and operator query adapters use an explicit `ReceiptReadContext`; the
+    /// SQLite user-facing point reader is `load_chio_receipt_with_context`.
     ///
     /// The kernel consults this BEFORE the bounded in-memory receipt mirror and
     /// falls back to the mirror only on a genuine `Ok(None)` miss. An append-only
@@ -1060,14 +1069,14 @@ pub const ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND: &str =
 pub struct ThresholdApprovalReplayReservationV1 {
     proposal: chio_core::capability::governance::ThresholdApprovalProposal,
     tokens: Vec<chio_core::capability::governance::GovernedApprovalToken>,
-    verified_set: chio_core::capability::governance::VerifiedApprovalSetBody,
+    verified_set: chio_core::capability::governance::ApprovalSetBody,
 }
 
 impl ThresholdApprovalReplayReservationV1 {
     pub fn new(
         proposal: chio_core::capability::governance::ThresholdApprovalProposal,
         mut tokens: Vec<chio_core::capability::governance::GovernedApprovalToken>,
-        verified_set: chio_core::capability::governance::VerifiedApprovalSetBody,
+        verified_set: chio_core::capability::governance::ApprovalSetBody,
     ) -> Result<Self, crate::admission_operation::AdmissionOperationStoreError> {
         use std::collections::HashSet;
 
@@ -1153,7 +1162,7 @@ impl ThresholdApprovalReplayReservationV1 {
                 ),
             );
         }
-        let reconstructed = chio_core::capability::governance::VerifiedApprovalSetBody::new(
+        let reconstructed = chio_core::capability::governance::ApprovalSetBody::new(
             verified_set.token_digests.clone(),
             &proposal,
         )
@@ -1188,9 +1197,7 @@ impl ThresholdApprovalReplayReservationV1 {
     }
 
     #[must_use]
-    pub const fn verified_set(
-        &self,
-    ) -> &chio_core::capability::governance::VerifiedApprovalSetBody {
+    pub const fn verified_set(&self) -> &chio_core::capability::governance::ApprovalSetBody {
         &self.verified_set
     }
 }
@@ -1858,4 +1865,10 @@ pub struct FederatedEvidenceShareSummary {
     pub require_proofs: bool,
     pub tool_receipts: u64,
     pub capability_lineage: u64,
+}
+
+impl From<chio_core::canonical::UntrustedJsonError> for ReceiptStoreError {
+    fn from(error: chio_core::canonical::UntrustedJsonError) -> Self {
+        Self::UntrustedInput(std::sync::Arc::new(error))
+    }
 }

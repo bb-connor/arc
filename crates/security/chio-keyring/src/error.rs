@@ -5,6 +5,8 @@ pub type Result<T> = std::result::Result<T, KeyringError>;
 #[derive(Debug, Error)]
 pub enum KeyringError {
     #[error(transparent)]
+    UntrustedInput(#[from] chio_core_types::canonical::UntrustedJsonError),
+    #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("invalid {kind}: {reason}")]
     InvalidIdentifier {

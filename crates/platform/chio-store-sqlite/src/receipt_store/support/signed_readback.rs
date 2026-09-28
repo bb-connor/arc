@@ -3,13 +3,12 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use super::*;
 
-/// Decode established signed formats without losing duplicate keys or numeric
-/// precision. This preserves the historical ordinary and canonical writers.
+/// Decode native signed formats without losing duplicate keys or numeric precision.
 /// Signature verification and row binding remain the caller's responsibility.
 fn decode_signed_json<T: DeserializeOwned>(raw: &str) -> Result<T, ReceiptStoreError> {
-    let value = chio_core::canonical::parse_signed_json(raw)
-        .map_err(|error| ReceiptStoreError::Conflict(format!("signed JSON: {error}")))?;
-    serde_json::from_value(value).map_err(ReceiptStoreError::from)
+    chio_core::canonical::UntrustedJsonText::new(raw)
+        .decode_signed()
+        .map_err(ReceiptStoreError::from)
 }
 
 /// Recheck persisted economy artifacts before reports or workflow comparisons

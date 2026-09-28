@@ -118,12 +118,6 @@ pub struct SqliteReceiptStore {
     settlement_store_binding: Option<chio_settle::SettlementStoreBinding>,
     durable_sink_id: Option<String>,
     pub(crate) receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
-    /// Multi-tenant receipt isolation: when true, tenant-
-    /// scoped queries exclude the pre-multitenant NULL-tagged set. When
-    /// false, queries with `tenant_filter = Some(id)` return rows where
-    /// `tenant_id = id OR tenant_id IS NULL`, which keeps pre-multitenant
-    /// (NULL-tagged) receipts visible during explicit compatibility mode.
-    pub(crate) strict_tenant_isolation: std::sync::atomic::AtomicBool,
     /// Staged-rollout flag: read-only after open.
     pub(crate) incremental_verification: bool,
 }
@@ -3130,6 +3124,12 @@ fn execute_anchored_receipt_write(
 
 fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError {
     match error {
+        ReceiptStoreError::UntrustedInput(error) => {
+            ReceiptStoreError::UntrustedInput(Arc::clone(error))
+        }
+        ReceiptStoreError::ReadAuthorization(error) => {
+            ReceiptStoreError::ReadAuthorization(error.clone())
+        }
         ReceiptStoreError::Sqlite(error) => {
             ReceiptStoreError::Sqlite(rusqlite::Error::ToSqlConversionFailure(Box::new(
                 std::io::Error::other(error.to_string()),
@@ -3401,32 +3401,6 @@ impl SqliteReceiptStore {
             |row| row.get(0),
         )?;
         Ok(seq.max(0) as u64)
-    }
-
-    /// Multi-tenant receipt isolation: toggle strict-isolation
-    /// mode on tenant-scoped queries.
-    ///
-    /// When `strict = true`, a `tenant_filter = Some(id)` query returns
-    /// ONLY rows whose `tenant_id = id`. Pre-multitenant receipts with
-    /// `tenant_id IS NULL` are excluded.
-    ///
-    /// When `strict = false`, the same query also includes rows where
-    /// `tenant_id IS NULL` -- the pre-multitenant "public" fallback
-    /// set -- so pre-multitenant (NULL-tagged) receipts remain visible during
-    /// an explicit compatibility window.
-    ///
-    /// A `tenant_filter = None` admin / compat query always returns
-    /// every row regardless of this setting.
-    pub fn with_strict_tenant_isolation(&self, strict: bool) {
-        self.strict_tenant_isolation
-            .store(strict, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Read the current strict-tenant-isolation setting.
-    #[must_use]
-    pub fn strict_tenant_isolation_enabled(&self) -> bool {
-        self.strict_tenant_isolation
-            .load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Read-only after open (staged-rollout flag).

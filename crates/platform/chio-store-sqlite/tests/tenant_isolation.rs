@@ -1,19 +1,9 @@
 //! Multi-tenant receipt isolation tests for
 //! `chio_store_sqlite::SqliteReceiptStore`.
 //!
-//! The test scenario covers the following invariants:
-//!
-//!   Tenant A writes 5 receipts, tenant B writes 3, and an operator's
-//!   pre-migration session writes 2 untagged (NULL-tenant) rows. The store
-//!   must:
-//!     * return 5 rows for tenant A by default;
-//!     * return 3 rows for tenant B by default;
-//!     * return 5 + 2 (= 7) and 3 + 2 (= 5) rows respectively only when
-//!       explicit compatibility mode is enabled;
-//!     * return all 10 rows for explicit admin mode.
-//!
-//! The tenant_id is derived from the receipt body -- the store does not
-//! accept caller-injected tenant hints, per the multi-tenant threat model.
+//! Tenant reads return only the requested tenant, including local operator
+//! tenant reads. Only explicit administrative reads include unattributed rows.
+//! Tenant IDs come from signed receipt bodies.
 
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -26,6 +16,87 @@ use chio_kernel::receipt_query::ReceiptQuery;
 use chio_store_sqlite::SqliteReceiptStore;
 
 use chio_test_support::prelude::*;
+
+#[test]
+fn point_reads_bind_ids_to_authenticated_tenants() -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::{receipt_query::ReceiptReadError, ReceiptReadContext, ReceiptStoreError};
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("point-reads.sqlite");
+    let store = SqliteReceiptStore::open(&path)?;
+    let receipts = [
+        signed_receipt("a", "cap-a", Some("tenant-A")),
+        signed_receipt("b", "cap-b", Some("tenant-B")),
+        signed_receipt("unattributed", "cap-c", None),
+    ];
+    for receipt in &receipts {
+        store.append_chio_receipt_returning_seq(receipt)?;
+    }
+    for context in [
+        ReceiptReadContext::authenticated_tenant("tenant-A"),
+        ReceiptReadContext::local_operator_tenant("tenant-A"),
+    ] {
+        assert_eq!(
+            store
+                .load_chio_receipt_with_context(&receipts[0].id, &context)?
+                .map(|r| r.id),
+            Some(receipts[0].id.clone())
+        );
+        for id in [&receipts[1].id, &receipts[2].id, "absent"] {
+            assert!(store
+                .load_chio_receipt_with_context(id, &context)?
+                .is_none());
+        }
+    }
+    for receipt in &receipts {
+        assert!(store
+            .load_chio_receipt_with_context(&receipt.id, &ReceiptReadContext::admin_service())?
+            .is_some());
+    }
+    for tenant in ["", " tenant-A", "tenant-A "] {
+        assert!(matches!(
+            store.load_chio_receipt_with_context(
+                &receipts[0].id,
+                &ReceiptReadContext::authenticated_tenant(tenant)
+            ),
+            Err(ReceiptStoreError::ReadAuthorization(
+                ReceiptReadError::InvalidTenant
+            ))
+        ));
+    }
+    // Inject storage corruption past the immutability trigger. Restore the
+    // trigger before readback to test the signed tenant check independently.
+    let mut connection = rusqlite::Connection::open(path)?;
+    let transaction = connection.transaction()?;
+    let trigger: String = transaction.query_row(
+        "SELECT sql FROM sqlite_schema WHERE type = 'trigger' \
+         AND name = 'chio_tool_receipts_reject_update'",
+        [],
+        |row| row.get(0),
+    )?;
+    transaction.execute_batch("DROP TRIGGER chio_tool_receipts_reject_update")?;
+    transaction.execute(
+        "UPDATE chio_tool_receipts SET tenant_id = 'tenant-A' WHERE receipt_id = ?1",
+        [&receipts[1].id],
+    )?;
+    transaction.execute_batch(&trigger)?;
+    transaction.commit()?;
+    assert!(matches!(
+        store.load_chio_receipt_with_context(
+            &receipts[1].id,
+            &ReceiptReadContext::authenticated_tenant("tenant-A")
+        ),
+        Err(ReceiptStoreError::ReadAuthorization(
+            ReceiptReadError::TenantProjectionMismatch
+        ))
+    ));
+    assert!(matches!(
+        store.query_receipts(&basic_query(Some("tenant-A".to_string()))),
+        Err(ReceiptStoreError::ReadAuthorization(
+            ReceiptReadError::TenantProjectionMismatch
+        ))
+    ));
+    Ok(())
+}
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     let nonce = SystemTime::now()
@@ -86,7 +157,7 @@ fn basic_query(tenant: Option<String>) -> ReceiptQuery {
     }
 }
 
-fn compat_query(tenant: String) -> ReceiptQuery {
+fn operator_tenant_query(tenant: String) -> ReceiptQuery {
     ReceiptQuery {
         limit: chio_kernel::MAX_QUERY_LIMIT,
         tenant_filter: Some(tenant.clone()),
@@ -111,23 +182,20 @@ fn tenant_filter_without_read_context_fails_closed() {
         })
         .test_expect_err("tenant_filter without read context must fail closed");
 
-    assert!(
-        err.to_string()
-            .contains("receipt query requires an explicit read context"),
-        "unexpected error: {err}"
-    );
+    assert!(matches!(
+        err,
+        chio_kernel::ReceiptStoreError::ReadAuthorization(
+            chio_kernel::receipt_query::ReceiptReadError::MissingContext
+        )
+    ));
 
     cleanup(&path);
 }
 
 #[test]
-fn tenant_scoped_queries_respect_and_leak_only_null_tenant_rows() {
+fn tenant_scoped_queries_exclude_other_tenants_and_unattributed_rows() {
     let path = unique_db_path("tenant-isolation");
     let store = SqliteReceiptStore::open(&path).test_expect("open store");
-    assert!(
-        store.strict_tenant_isolation_enabled(),
-        "strict tenant isolation must be enabled by default"
-    );
 
     // 5 receipts for tenant A.
     for i in 0..5 {
@@ -151,8 +219,7 @@ fn tenant_scoped_queries_respect_and_leak_only_null_tenant_rows() {
             .append_chio_receipt_returning_seq(&r)
             .test_expect("append tenant-B receipt");
     }
-    // 2 pre-migration untagged receipts without a tenant_id. These land in
-    // the store with `tenant_id IS NULL`.
+    // Two unattributed receipts have tenant_id IS NULL.
     for i in 0..2 {
         let r = signed_receipt(
             &format!("rcpt-untagged-{i}"),
@@ -164,20 +231,20 @@ fn tenant_scoped_queries_respect_and_leak_only_null_tenant_rows() {
             .test_expect("append untagged receipt");
     }
 
-    // Default strict mode: tenant A only sees its own rows.
+    // Tenant A only sees its own rows.
     let a_page = store
         .query_receipts(&basic_query(Some("tenant-A".to_string())))
         .test_expect("query tenant-A");
     assert_eq!(
         a_page.total_count, 5,
-        "tenant A default visibility must exclude NULL-tenant rows"
+        "tenant A visibility must exclude NULL-tenant rows"
     );
     assert_eq!(a_page.receipts.len(), 5);
     for stored in &a_page.receipts {
         assert_eq!(stored.receipt.tenant_id.as_deref(), Some("tenant-A"));
     }
 
-    // Tenant B sees only its own rows by default.
+    // Tenant B sees only its own rows.
     let b_page = store
         .query_receipts(&basic_query(Some("tenant-B".to_string())))
         .test_expect("query tenant-B");
@@ -187,57 +254,23 @@ fn tenant_scoped_queries_respect_and_leak_only_null_tenant_rows() {
         assert_eq!(stored.receipt.tenant_id.as_deref(), Some("tenant-B"));
     }
 
-    // Explicit compatibility mode re-enables the NULL fallback set.
-    store.with_strict_tenant_isolation(false);
-    assert!(
-        !store.strict_tenant_isolation_enabled(),
-        "compatibility mode must be opt-in"
-    );
-
-    let a_compat = store
-        .query_receipts(&compat_query("tenant-A".to_string()))
-        .test_expect("query tenant-A compat");
-    assert_eq!(
-        a_compat.total_count, 7,
-        "compat mode must include NULL-tenant rows in tenant-A view"
-    );
-    assert_eq!(a_compat.receipts.len(), 7);
-    for stored in &a_compat.receipts {
-        let tid = stored.receipt.tenant_id.as_deref();
-        assert!(
-            tid == Some("tenant-A") || tid.is_none(),
-            "tenant A compat query must not leak tenant B rows; saw {tid:?}"
-        );
+    for (tenant, expected) in [("tenant-A", 5), ("tenant-B", 3)] {
+        let page = store
+            .query_receipts(&operator_tenant_query(tenant.to_string()))
+            .test_expect("operator tenant query");
+        assert_eq!(page.total_count, expected);
+        assert!(page
+            .receipts
+            .iter()
+            .all(|stored| stored.receipt.tenant_id.as_deref() == Some(tenant)));
     }
 
-    let b_compat = store
-        .query_receipts(&compat_query("tenant-B".to_string()))
-        .test_expect("query tenant-B compat");
-    assert_eq!(b_compat.total_count, 5);
-    for stored in &b_compat.receipts {
-        let tid = stored.receipt.tenant_id.as_deref();
-        assert!(
-            tid == Some("tenant-B") || tid.is_none(),
-            "tenant B compat query must not leak tenant A rows; saw {tid:?}"
-        );
-    }
-
-    // Explicit local-operator admin mode returns everything, regardless of
-    // strict toggle.
+    // Explicit local-operator admin mode returns everything.
     let admin = store
         .query_receipts(&basic_query(None))
         .test_expect("admin query");
     assert_eq!(admin.total_count, 10);
     assert_eq!(admin.receipts.len(), 10);
-
-    store.with_strict_tenant_isolation(true);
-
-    // Flip strict back on: tenant-scoped queries drop the NULL-tenant
-    // fallback set again.
-    let a_strict_again = store
-        .query_receipts(&basic_query(Some("tenant-A".to_string())))
-        .test_expect("query tenant-A strict again");
-    assert_eq!(a_strict_again.total_count, 5);
 
     cleanup(&path);
 }
@@ -270,23 +303,13 @@ fn explicit_admin_context_returns_all_rows_regardless_of_tags() {
     assert_eq!(page.total_count, 10);
     assert_eq!(page.receipts.len(), 10);
 
-    // Even with strict mode flipped on, the explicit admin context returns
-    // everything. Strict mode only controls tenant-scoped NULL-tenant-row
-    // compatibility.
-    store.with_strict_tenant_isolation(true);
-    let page_admin_strict = store
-        .query_receipts(&basic_query(None))
-        .test_expect("admin query under strict mode");
-    assert_eq!(page_admin_strict.total_count, 10);
-
     cleanup(&path);
 }
 
 #[test]
 fn tenant_a_queries_never_return_tenant_b_rows() {
     // Receipts from tenant A are invisible to tenant B queries.
-    // Verified from both directions and under strict isolation so the
-    // NULL-fallback cannot mask a regression.
+    // Verify isolation in both directions.
     let path = unique_db_path("tenant-isolation-cross");
     let store = SqliteReceiptStore::open(&path).test_expect("open store");
 
@@ -294,8 +317,6 @@ fn tenant_a_queries_never_return_tenant_b_rows() {
     let b = signed_receipt("rcpt-secret-b", "cap-b", Some("tenant-B"));
     store.append_chio_receipt_returning_seq(&a).test_unwrap();
     store.append_chio_receipt_returning_seq(&b).test_unwrap();
-
-    store.with_strict_tenant_isolation(true);
 
     let a_view = store
         .query_receipts(&basic_query(Some("tenant-A".to_string())))

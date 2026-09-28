@@ -90,13 +90,13 @@ fn imported(
 #[cfg(unix)]
 fn seed_isolation_history(path: &std::path::Path) -> AnchoredTestResult {
     use chio_security_types::ports::{
-        FlowStateStore, IsolationEpochEvidenceVerifierPort, IsolationEpochTransition, PortResult,
-        VerifiedIsolationEvidence,
+        FlowStateStore, IsolationEpochEvidenceVerifierPort, IsolationEpochTransition,
+        IsolationVerificationRecord, PortResult,
     };
     struct Verifier;
     impl IsolationEpochEvidenceVerifierPort for Verifier {
-        fn verify(&self, _: &IsolationEpochTransition) -> PortResult<VerifiedIsolationEvidence> {
-            Ok(VerifiedIsolationEvidence {
+        fn verify(&self, _: &IsolationEpochTransition) -> PortResult<IsolationVerificationRecord> {
+            Ok(IsolationVerificationRecord {
                 verifier_id: chio_security_types::ports::RecordId::new("native-fixture-verifier")?,
                 receipt_ref: chio_security_types::ports::OpaqueReceiptRef::new(
                     "native-fixture-receipt",

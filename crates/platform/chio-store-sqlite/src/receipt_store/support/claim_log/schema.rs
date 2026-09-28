@@ -1,3 +1,5 @@
+// tenant-read-contract: chio_tool_receipts; class=tenant-predicate; principal=receipt-read-adapter
+// Contracts: docs/security/trust-boundary-inventory.json
 use super::*;
 
 const RECEIPT_COST_CURRENCY_COLUMN: &str = r#"cost_currency TEXT CHECK (
@@ -440,17 +442,8 @@ pub(crate) fn ensure_tool_receipt_attribution_columns(
 
     // Multi-tenant receipt isolation: tenant_id column.
     //
-    // Pre-multitenant receipts migrate to NULL, which the
-    // tenant-scoped WHERE clause treats as a "public" fallback set (a
-    // tenant A query returns its own rows AND the NULL-tagged pre-multitenant
-    // set), so historical data remains visible under query modes that
-    // opt into backward compatibility. Operators that need strict
-    // isolation across the pre-multitenant set can enable
-    // [`SqliteReceiptStore::with_strict_tenant_isolation`].
-    //
-    // Migration fails closed: if the column cannot be added we bail
-    // out and the caller treats the store as unreadable, per the
-    // kernel's fail-closed convention.
+    // Unattributed rows remain operator-only. Tenant reads require an exact
+    // tenant_id and cannot opt into a NULL fallback.
     if !columns.iter().any(|column| column == "tenant_id") {
         connection.execute(
             "ALTER TABLE chio_tool_receipts ADD COLUMN tenant_id TEXT",

@@ -239,7 +239,10 @@ fn daemon_loader_rejects_a_standalone_runtime_projection() {
 
     let error = load_runtime_config(&path)
         .test_expect_err("daemon must require the complete combined deployment");
-    assert!(matches!(error, AuthorityError::InvalidConfig(_)));
+    assert!(matches!(
+        error,
+        AuthorityError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(_))
+    ));
 }
 
 #[cfg(unix)]

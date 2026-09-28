@@ -1,3 +1,13 @@
+// tenant-read-contract: security_attested_finding_batch_items; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_attested_finding_batches; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_attested_finding_response_outbox; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_ingress; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_outcomes; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_evidence_identity; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_receipt_outbox; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_tombstones; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_uses; class=tenant-predicate; principal=security-runtime
+// Contracts: docs/security/trust-boundary-inventory.json
 use std::collections::BTreeSet;
 use std::fs;
 #[cfg(unix)]
@@ -57,29 +67,30 @@ use chio_security_types::ports::{
     EgressRestrictionSessionKey, EgressRestrictionSnapshot, EgressRestrictionStore, ErrorCode,
     EventAppend, EventId, EventPartitionScan, FlowJoinRequest, FlowStateKey, FlowStateSnapshot,
     FlowStateStore, GrantId, IsolationEpochEvidenceVerifierPort, IsolationEpochTransition,
-    IssuanceFreezeStore, LeaseOwnerId, LineageFence, LineageFenceRelease, LineageFenceRenewal,
-    LineageFenceRequest, LineageFenceStore, LineageFenceTakeover, OpaqueReceiptRef,
-    OverlayApplyRequest, OverlayContribution, OverlayContributions, OverlayRemoveRequest,
-    OverlaySnapshot, PortError, PortResult, PreparedActiveResponseDispatchBinding, ProducerId,
-    ProducerTrustClass, ReceiptAppendRequest, RecordId, ResponseCasRequest,
-    ResponseDispatchApproval, ResponseDispatchAuthorization, ResponseDispatchAuthorizationBody,
-    ResponseDispatchCommitMode, ResponseDispatchCommitOutcome, ResponseDispatchCommitRequest,
-    ResponseDispatchKey, ResponseDispatchLease, ResponseDispatchLoadOutcome,
-    ResponseDispatchRecord, ResponseDispatchRecoveryOutcome, ResponseDispatchRecoveryRequest,
-    ResponseDispatchStore, ResponseEffectCasRequest, ResponseEffectKey, ResponseEffectRecord,
-    ResponsePlanKey, ResponsePlanRecord, ResponseReceiptCursor, ResponseReceiptCursorCasRequest,
-    ResponseScheduledMutationCasRequest, ResponseSchedulerStore, ResponseStore, RuleId,
-    ScheduledWork, SchedulerClaimRequest, SchedulerHealthAckRequest, SchedulerLeaseReleaseRequest,
-    SchedulerLeaseRenewRequest, SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey,
-    SecurityEventStore, SessionThrottleApplyRequest, SessionThrottleCommand,
+    IsolationVerificationRecord, IssuanceFreezeStore, LeaseOwnerId, LineageFence,
+    LineageFenceRelease, LineageFenceRenewal, LineageFenceRequest, LineageFenceStore,
+    LineageFenceTakeover, OpaqueReceiptRef, OverlayApplyRequest, OverlayContribution,
+    OverlayContributions, OverlayRemoveRequest, OverlaySnapshot, PortError, PortResult,
+    PreparedActiveResponseDispatchBinding, ProducerId, ProducerTrustClass, ReceiptAppendRequest,
+    RecordId, ResponseCasRequest, ResponseDispatchApproval, ResponseDispatchAuthorization,
+    ResponseDispatchAuthorizationBody, ResponseDispatchCommitMode, ResponseDispatchCommitOutcome,
+    ResponseDispatchCommitRequest, ResponseDispatchKey, ResponseDispatchLease,
+    ResponseDispatchLoadOutcome, ResponseDispatchRecord, ResponseDispatchRecoveryOutcome,
+    ResponseDispatchRecoveryRequest, ResponseDispatchStore, ResponseEffectCasRequest,
+    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
+    ResponseReceiptCursor, ResponseReceiptCursorCasRequest, ResponseScheduledMutationCasRequest,
+    ResponseSchedulerStore, ResponseStore, RuleId, ScheduledWork, SchedulerClaimRequest,
+    SchedulerHealthAckRequest, SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest,
+    SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey, SecurityEventStore,
+    SecurityEventVerificationRecord, SessionThrottleApplyRequest, SessionThrottleCommand,
     SessionThrottleConsumeRequest, SessionThrottleContribution, SessionThrottleContributions,
     SessionThrottleDecision, SessionThrottleKey, SessionThrottleLimits,
     SessionThrottleRemoveRequest, SessionThrottleSnapshot, SessionThrottleStore,
     SessionThrottleWindowUsage, SessionThrottleWindowUsages, TenantId, TenantScopedId,
-    UnverifiedEventBatch, UnverifiedSecurityEvent, VerifiedEventBatch, VerifiedIsolationEvidence,
-    VerifiedSecurityEvent, ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION,
-    LINEAGE_FENCE_RENEWAL_MARGIN_MS, MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN,
-    MAX_DECLASSIFICATION_EVIDENCE_BATCH, PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+    UnverifiedEventBatch, UnverifiedSecurityEvent, VerifiedEventBatch,
+    ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION, LINEAGE_FENCE_RENEWAL_MARGIN_MS,
+    MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
     RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
 };
 use chio_security_types::{
@@ -719,7 +730,7 @@ impl ActiveDefenseOverlayInventory {
 struct DenyIsolationEpochEvidence;
 
 impl IsolationEpochEvidenceVerifierPort for DenyIsolationEpochEvidence {
-    fn verify(&self, _: &IsolationEpochTransition) -> PortResult<VerifiedIsolationEvidence> {
+    fn verify(&self, _: &IsolationEpochTransition) -> PortResult<IsolationVerificationRecord> {
         Err(PortError::invalid_data())
     }
 }

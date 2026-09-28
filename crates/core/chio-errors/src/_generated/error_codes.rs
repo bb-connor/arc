@@ -2782,6 +2782,191 @@ pub const TRANSPORT_RESPONSE_AUTHORITY_SIGNATURE: ErrorCodeSpec = ErrorCodeSpec 
     consumed_by: &["chio-control-plane"],
 };
 
+pub const ATTEST_SIGNED_JSON_TOO_LARGE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-too-large",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON exceeds the owning byte bound.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-TOO-LARGE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_NOT_UTF8: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-not-utf8",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON is not UTF-8 text.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-NOT-UTF8",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_INVALID_INPUT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-invalid-input",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON contains duplicate keys or lossy numeric tokens.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-INVALID-INPUT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_INVALID_SHAPE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-invalid-shape",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON does not match the owning record shape.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-INVALID-SHAPE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_CANONICALIZATION: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-canonicalization",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON cannot be canonicalized under its numeric contract.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-CANONICALIZATION",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const ATTEST_SIGNED_JSON_NONCANONICAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:signed-json-noncanonical",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed JSON differs from its required canonical wire encoding.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-ATTEST-SIGNED-JSON-NONCANONICAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-core-types",
+        "chio-keyring",
+        "chio-secret-broker",
+        "chio-manifest",
+        "chio-store-sqlite",
+        "chio-active-response-authority",
+    ],
+};
+
+pub const KERNEL_RECEIPT_READ_CONTEXT_MISSING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-context-missing",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt read has no authenticated or local operator context.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-CONTEXT-MISSING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_RECEIPT_READ_TENANT_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-tenant-invalid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt read tenant is empty or has surrounding whitespace.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-TENANT-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_RECEIPT_READ_SCOPE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-scope-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt query attempts to widen the authenticated tenant scope.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-SCOPE-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_RECEIPT_READ_QUERY_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-query-invalid",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt read query has invalid cost or currency filters.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-QUERY-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
+pub const KERNEL_RECEIPT_READ_PROJECTION_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:receipt-read-projection-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Receipt tenant projection differs from its signed body.",
+    help: "Reject the input and check the original signed bytes and authenticated read context.",
+    string_code: "CHIO-KERNEL-RECEIPT-READ-PROJECTION-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-store-sqlite"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -2992,6 +3177,17 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSPORT_RESPONSE_AUTHORITY_CLIENT,
     TRANSPORT_RESPONSE_AUTHORITY_ALGORITHM,
     TRANSPORT_RESPONSE_AUTHORITY_SIGNATURE,
+    ATTEST_SIGNED_JSON_TOO_LARGE,
+    ATTEST_SIGNED_JSON_NOT_UTF8,
+    ATTEST_SIGNED_JSON_INVALID_INPUT,
+    ATTEST_SIGNED_JSON_INVALID_SHAPE,
+    ATTEST_SIGNED_JSON_CANONICALIZATION,
+    ATTEST_SIGNED_JSON_NONCANONICAL,
+    KERNEL_RECEIPT_READ_CONTEXT_MISSING,
+    KERNEL_RECEIPT_READ_TENANT_INVALID,
+    KERNEL_RECEIPT_READ_SCOPE_MISMATCH,
+    KERNEL_RECEIPT_READ_QUERY_INVALID,
+    KERNEL_RECEIPT_READ_PROJECTION_MISMATCH,
 ];
 
 #[must_use]

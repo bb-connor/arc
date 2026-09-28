@@ -539,7 +539,7 @@ pub(crate) struct VerifiedApprovalReservation {
 #[derive(Debug)]
 pub(crate) struct VerifiedThresholdApprovalSet {
     pub(crate) requirement: chio_core::capability::threshold_approval::ThresholdApprovalRequirement,
-    pub(crate) body: chio_core::capability::governance::VerifiedApprovalSetBody,
+    pub(crate) body: chio_core::capability::governance::ApprovalSetBody,
     pub(crate) replay: ThresholdApprovalReplayReservationV1,
 }
 

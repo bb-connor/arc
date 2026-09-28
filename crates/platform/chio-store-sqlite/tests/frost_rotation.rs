@@ -172,6 +172,15 @@ fn frost_rotation_ceremony_commits_each_round_before_replay_after_restart() {
         .unwrap_or_else(|error| panic!("persist round two: {error}"));
     assert_eq!(second.state, FrostCeremonyState::Round2Ready);
 
+    for package in &second.packages {
+        let secret = package.secret_bytes();
+        assert_database_files_exclude(&fixture.database, &secret);
+        assert_database_files_exclude(&fixture.database, hex::encode(&secret).as_bytes());
+        let encoded = serde_json::to_vec(&*secret)
+            .unwrap_or_else(|error| panic!("encode test needle: {error}"));
+        assert_database_files_exclude(&fixture.database, &encoded);
+    }
+
     (authority, frost) = reopen(&fixture, authority, frost);
     let replayed_second = frost
         .advance_ceremony(

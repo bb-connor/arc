@@ -27,6 +27,8 @@ pub use store::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum AuthorityError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("active-response authority configuration is invalid: {0}")]
     InvalidConfig(String),
     #[error("active-response authority custody failed: {0}")]

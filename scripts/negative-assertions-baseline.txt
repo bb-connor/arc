@@ -1092,7 +1092,6 @@
 1	crates/security/chio-secret-broker/src/service_parts/tests_03.rs	privileged_audit_socket_round_trip_retains_runner_reference_precommitment	mutated_open.validate().is_err()
 1	crates/security/chio-secret-broker/src/service_parts/tests_03.rs	privileged_audit_socket_round_trip_retains_runner_reference_precommitment	salt_rebound_open.validate().is_err()
 1	crates/security/chio-secret-broker/src/service_parts/tests_03.rs	privileged_audit_socket_round_trip_retains_runner_reference_precommitment	verify_broker_privileged_audit_challenge_reference( &evidence.challenge, &trusted_broker, &rebound_precommitment, ) .is_err()
-1	crates/security/chio-secret-broker/src/service_parts/tests_03.rs	response_envelope_rejects_malformed_or_tampered_execute_failures	validate_broker_ipc_response_envelope(candidate.operation, &candidate).is_err()
 1	crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs	prepared_connection_lifetime_respects_capability_and_nonce_expiry	prepared_connection_binding(&prepare.tenant_scope, &authenticated).is_err()
 1	crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs	prepared_connection_waits_without_blocking_control_and_executes_once	read_bounded_frame(&mut stream).is_err()
 1	crates/security/chio-secret-broker/src/sqlite.rs	state_machine_refuses_dispatch_without_capture	store .transition( &registration.ids.attempt_id, AttemptState::Prepared, AttemptState::DispatchCommitted, &AttemptTransitionEvidence::default(), 11, ) .is_err()

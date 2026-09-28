@@ -120,6 +120,13 @@ Final local evidence includes 607 distinct owning tests, a browser wasm target
 check, four actual-crate Kani proofs, nine lifecycle model outcomes and two
 bounded sanitizer campaigns. This does not close the unchecked broader claims.
 
+**Trust-boundary continuation (September 27):**
+[The execution record](../../reviews/2026-09-27-trust-boundary-execution.md)
+tracks constrained signed-input readers, sealed verification results, explicit
+tenant read contexts, the 85-table SQLite principal census and FROST's plaintext
+type/custody split. The broader decoder migration, full tenant runtime matrix
+and FROST transport sealing remain separate acceptance work.
+
 **Exit:** New campaigns explore the changed trust boundaries and model claims identify production linkage, bounds and remaining assumptions. All existing final acceptance inventories remain required.
 
 ### Packet 5: Remove the delivery blockers

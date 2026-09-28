@@ -614,12 +614,12 @@ pub use session::{
 pub use supplemental_quota::{
     supplemental_authorization_artifact_digest, supplemental_request_binding_hash,
     CanonicalRevocationSet, SupplementalQuotaError, SupplementalQuotaVerificationContext,
-    SupplementalQuotaVerifier, SupplementalQuotaVerifierBinding, SupplementalQuotaVerifierError,
-    VerifiedSupplementalQuotaClaim, BROKER_CAPABILITY_EXECUTION_PROFILE,
-    MAX_ADMISSION_REVOCATION_IDS, MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES,
-    MAX_SUPPLEMENTAL_CLAIM_FIELD_BYTES, MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES,
-    MAX_SUPPLEMENTAL_NEGOTIATED_FEATURES, MAX_SUPPLEMENTAL_REVOCATION_IDS,
-    MAX_SUPPLEMENTAL_REVOCATION_ID_BYTES,
+    SupplementalQuotaVerificationRecord, SupplementalQuotaVerifier,
+    SupplementalQuotaVerifierBinding, SupplementalQuotaVerifierError,
+    BROKER_CAPABILITY_EXECUTION_PROFILE, MAX_ADMISSION_REVOCATION_IDS,
+    MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES, MAX_SUPPLEMENTAL_CLAIM_FIELD_BYTES,
+    MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES, MAX_SUPPLEMENTAL_NEGOTIATED_FEATURES,
+    MAX_SUPPLEMENTAL_REVOCATION_IDS, MAX_SUPPLEMENTAL_REVOCATION_ID_BYTES,
 };
 #[cfg(not(loom))]
 pub use weights_binding::{evaluate_weights_binding, WeightsBindingError, WeightsBindingRequest};

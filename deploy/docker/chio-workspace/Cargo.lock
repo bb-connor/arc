@@ -3066,6 +3066,7 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror 1.0.69",
  "url",
+ "zeroize",
 ]
 
 [[package]]
@@ -3080,6 +3081,7 @@ dependencies = [
  "chio-fincred",
  "chio-reputation",
  "chio-revocation-oracle",
+ "chio-security-types",
  "chio-spec-validate",
  "chio-test-support",
  "chrono",
@@ -3604,6 +3606,7 @@ dependencies = [
  "chio-core",
  "chio-http-session",
  "chio-kernel",
+ "chio-security-types",
  "chio-store-sqlite",
  "glob",
  "lru 0.18.2",
@@ -3706,6 +3709,7 @@ dependencies = [
  "chio-log-redact",
  "chio-manifest",
  "chio-metrics-spec",
+ "chio-quarantine",
  "chio-security-types",
  "chio-settle",
  "chio-store-sqlite",
@@ -3764,6 +3768,7 @@ dependencies = [
  "arc-swap",
  "chio-adversarial-suite",
  "chio-core-types",
+ "chio-security-types",
  "dudect-bencher",
  "proptest",
  "serde",
@@ -3776,6 +3781,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-secure-ipc",
+ "chio-security-types",
  "chio-test-support",
  "rusqlite",
  "rustix",
@@ -4229,12 +4235,14 @@ name = "chio-quarantine"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-kernel",
  "chio-security-types",
  "hex",
  "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]

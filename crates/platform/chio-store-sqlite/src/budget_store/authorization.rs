@@ -370,7 +370,7 @@ impl SqliteBudgetStore {
         };
         if event.allowed == Some(true) {
             Ok(BudgetAuthorizeHoldDecision::Authorized(
-                AuthorizedBudgetHold {
+                BudgetHoldAuthorizationRecord {
                     hold_id: event.hold_id,
                     admission_binding: None,
                     authorized_exposure_units: event.exposure_units,

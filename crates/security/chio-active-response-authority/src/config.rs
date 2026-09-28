@@ -285,8 +285,9 @@ pub fn load_runtime_config(path: &Path) -> Result<AuthorityRuntimeConfig> {
             "deployment config changed while it was read".to_string(),
         ));
     }
-    let deployment: ActiveDefenseDeploymentConfig = serde_json::from_slice(&bytes)
-        .map_err(|error| AuthorityError::InvalidConfig(format!("config decode failed: {error}")))?;
+    let deployment: ActiveDefenseDeploymentConfig =
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 1_048_576)?
+            .decode_canonical()?;
     deployment.validate()?;
     #[cfg(unix)]
     if metadata.uid() != deployment.response_authority.trusted_service_uid
@@ -295,14 +296,6 @@ pub fn load_runtime_config(path: &Path) -> Result<AuthorityRuntimeConfig> {
     {
         return Err(AuthorityError::Custody(
             "deployment config ownership or permissions are invalid".to_string(),
-        ));
-    }
-    let canonical = chio_core::canonical_json_bytes(&deployment).map_err(|error| {
-        AuthorityError::InvalidConfig(format!("config canonicalization failed: {error}"))
-    })?;
-    if canonical != bytes {
-        return Err(AuthorityError::InvalidConfig(
-            "deployment config is not canonical JSON".to_string(),
         ));
     }
     Ok(deployment.response_authority)

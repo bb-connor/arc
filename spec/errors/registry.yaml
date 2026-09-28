@@ -2577,3 +2577,159 @@ codes:
     stability: stable
     consumed_by:
       - chio-control-plane
+
+  - urn: "urn:chio:error:attest:signed-json-too-large"
+    domain: attest
+    severity: error
+    summary: "Signed JSON exceeds the owning byte bound."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-ATTEST-SIGNED-JSON-TOO-LARGE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-core-types
+      - chio-keyring
+      - chio-secret-broker
+      - chio-manifest
+      - chio-store-sqlite
+      - chio-active-response-authority
+
+  - urn: "urn:chio:error:attest:signed-json-not-utf8"
+    domain: attest
+    severity: error
+    summary: "Signed JSON is not UTF-8 text."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-ATTEST-SIGNED-JSON-NOT-UTF8"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-core-types
+      - chio-keyring
+      - chio-secret-broker
+      - chio-manifest
+      - chio-store-sqlite
+      - chio-active-response-authority
+
+  - urn: "urn:chio:error:attest:signed-json-invalid-input"
+    domain: attest
+    severity: error
+    summary: "Signed JSON contains duplicate keys or lossy numeric tokens."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-ATTEST-SIGNED-JSON-INVALID-INPUT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-core-types
+      - chio-keyring
+      - chio-secret-broker
+      - chio-manifest
+      - chio-store-sqlite
+      - chio-active-response-authority
+
+  - urn: "urn:chio:error:attest:signed-json-invalid-shape"
+    domain: attest
+    severity: error
+    summary: "Signed JSON does not match the owning record shape."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-ATTEST-SIGNED-JSON-INVALID-SHAPE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-core-types
+      - chio-keyring
+      - chio-secret-broker
+      - chio-manifest
+      - chio-store-sqlite
+      - chio-active-response-authority
+
+  - urn: "urn:chio:error:attest:signed-json-canonicalization"
+    domain: attest
+    severity: error
+    summary: "Signed JSON cannot be canonicalized under its numeric contract."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-ATTEST-SIGNED-JSON-CANONICALIZATION"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-core-types
+      - chio-keyring
+      - chio-secret-broker
+      - chio-manifest
+      - chio-store-sqlite
+      - chio-active-response-authority
+
+  - urn: "urn:chio:error:attest:signed-json-noncanonical"
+    domain: attest
+    severity: error
+    summary: "Signed JSON differs from its required canonical wire encoding."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-ATTEST-SIGNED-JSON-NONCANONICAL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-core-types
+      - chio-keyring
+      - chio-secret-broker
+      - chio-manifest
+      - chio-store-sqlite
+      - chio-active-response-authority
+
+  - urn: "urn:chio:error:kernel:receipt-read-context-missing"
+    domain: kernel
+    severity: error
+    summary: "Receipt read has no authenticated or local operator context."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-KERNEL-RECEIPT-READ-CONTEXT-MISSING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:receipt-read-tenant-invalid"
+    domain: kernel
+    severity: error
+    summary: "Receipt read tenant is empty or has surrounding whitespace."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-KERNEL-RECEIPT-READ-TENANT-INVALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:receipt-read-scope-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Receipt query attempts to widen the authenticated tenant scope."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-KERNEL-RECEIPT-READ-SCOPE-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:receipt-read-query-invalid"
+    domain: kernel
+    severity: error
+    summary: "Receipt read query has invalid cost or currency filters."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-KERNEL-RECEIPT-READ-QUERY-INVALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite
+
+  - urn: "urn:chio:error:kernel:receipt-read-projection-mismatch"
+    domain: kernel
+    severity: error
+    summary: "Receipt tenant projection differs from its signed body."
+    help: "Reject the input and check the original signed bytes and authenticated read context."
+    string_code: "CHIO-KERNEL-RECEIPT-READ-PROJECTION-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-store-sqlite

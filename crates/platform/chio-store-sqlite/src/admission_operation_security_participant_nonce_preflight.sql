@@ -1,3 +1,5 @@
+-- tenant-read-contract: security_participant_nonce_preflight_events; class=administrative; principal=kernel-admission
+-- Contracts: docs/security/trust-boundary-inventory.json
 -- Nonce preflight history grants no dispatch or output-release authority.
 CREATE TABLE IF NOT EXISTS security_participant_nonce_preflight_events (
     security_authority_id TEXT NOT NULL REFERENCES security_participant_state_initializations(security_authority_id),

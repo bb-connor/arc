@@ -10,23 +10,23 @@ use chio_security_types::ports::{
     containment_installed_version_hash, containment_overlay_version_hash,
     containment_session_target, predict_containment_overlay_apply,
     predict_containment_overlay_remove, ActionId, AdvisorySecurityEvent, CanonicalBody,
-    CommittedEgressFence, ContainmentOverlayCommand,
-    ContainmentOverlayStore, CorrelationCasRequest, CorrelationDeleteRequest,
-    CorrelationEventAdmission, CorrelationEventAdmissionRequest, CorrelationEventIndexRequest,
+    CommittedEgressFence, ContainmentOverlayCommand, ContainmentOverlayStore,
+    CorrelationCasRequest, CorrelationDeleteRequest, CorrelationEventAdmission,
+    CorrelationEventAdmissionRequest, CorrelationEventIndexRequest,
     CorrelationOutcomeCommitRequest, CorrelationOutcomeKey, CorrelationOutcomePublication,
     CorrelationOutcomeStatus, CorrelationPartial, CorrelationPartitionKey, CorrelationScan,
-    CreateOutcome, Digest32,
-    EffectExecutionStatus, EffectId, EffectOperation, EffectRequest, EffectResult,
-    EffectResultQuery, EgressFence, EgressFenceCommit, EgressFenceRequest, EventAppend, EventId,
-    EventPartitionScan, FlowJoinRequest, FlowStateKey, FlowStateSnapshot, FlowStateStore,
-    IsolationEpochEvidenceVerifierPort, IsolationEpochId, IsolationEpochTransition, LeaseOwnerId,
-    LineageFence, LineageFenceRelease, LineageFenceRenewal, LineageFenceRequest, LineageFenceStore,
-    LineageId, OpaqueReceiptRef, OverlayApplyRequest, OverlayContribution, OverlayContributions,
-    OverlayRemoveRequest, OverlaySnapshot, PortError, PortErrorKind, PortResult, ProducerId,
-    ProducerTrustClass, RecordId, RequestId, ResponseCasRequest, ResponseEffectCasRequest,
-    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord, ResponseStore,
-    RuleId, ScheduledWork, SchedulerClaimRequest, SecurityEventStore, SessionId, TenantId,
-    TenantScopedId, VerifiedEventBatch, VerifiedIsolationEvidence, VerifiedSecurityEvent,
+    CreateOutcome, Digest32, EffectExecutionStatus, EffectId, EffectOperation, EffectRequest,
+    EffectResult, EffectResultQuery, EgressFence, EgressFenceCommit, EgressFenceRequest,
+    EventAppend, EventId, EventPartitionScan, FlowJoinRequest, FlowStateKey, FlowStateSnapshot,
+    FlowStateStore, IsolationEpochEvidenceVerifierPort, IsolationEpochId, IsolationEpochTransition,
+    IsolationVerificationRecord, LeaseOwnerId, LineageFence, LineageFenceRelease,
+    LineageFenceRenewal, LineageFenceRequest, LineageFenceStore, LineageId, OpaqueReceiptRef,
+    OverlayApplyRequest, OverlayContribution, OverlayContributions, OverlayRemoveRequest,
+    OverlaySnapshot, PortError, PortErrorKind, PortResult, ProducerId, ProducerTrustClass,
+    RecordId, RequestId, ResponseCasRequest, ResponseEffectCasRequest, ResponseEffectKey,
+    ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord, ResponseStore, RuleId,
+    ScheduledWork, SchedulerClaimRequest, SecurityEventStore, SecurityEventVerificationRecord,
+    SessionId, TenantId, TenantScopedId, VerifiedEventBatch,
 };
 use chio_security_types::{
     Compartment, InformationLabel, OperatorCapabilityBinding, PrincipalId,
@@ -139,7 +139,7 @@ impl<S: SecurityEventStore> SecurityEventStore for Faulting<S> {
         append_verified,
         SecurityEventStore,
         append_verified,
-        VerifiedSecurityEvent,
+        SecurityEventVerificationRecord,
         EventAppend
     );
     write_method!(
@@ -374,7 +374,7 @@ struct ModelState {
     flow_contexts: Vec<ModelContextGeneration>,
     flow_generation: u64,
     egress: Vec<(EgressFence, Option<CommittedEgressFence>)>,
-    verified: Vec<VerifiedSecurityEvent>,
+    verified: Vec<SecurityEventVerificationRecord>,
     advisory: Vec<AdvisorySecurityEvent>,
     correlation_index: Vec<(CorrelationEventIndexRequest, u64)>,
     correlations: Vec<(RecordId, CorrelationPartial)>,
@@ -843,7 +843,7 @@ impl SecurityEventStore for ModelStore {
         Ok(CorrelationEventAdmission { append, capacity })
     }
 
-    fn append_verified(&self, event: &VerifiedSecurityEvent) -> PortResult<EventAppend> {
+    fn append_verified(&self, event: &SecurityEventVerificationRecord) -> PortResult<EventAppend> {
         let mut state = self.state()?;
         if let Some(existing) = state.verified.iter().find(|existing| {
             existing.tenant_id == event.tenant_id && existing.event_id == event.event_id
@@ -1048,7 +1048,12 @@ impl SecurityEventStore for ModelStore {
         request: &CorrelationOutcomeCommitRequest,
     ) -> PortResult<CorrelationPartial> {
         let mut state = self.state()?;
-        if request.outcome.partition_hash.as_bytes().iter().all(|byte| *byte == 0)
+        if request
+            .outcome
+            .partition_hash
+            .as_bytes()
+            .iter()
+            .all(|byte| *byte == 0)
             || request.outcome.status == CorrelationOutcomeStatus::Deferred
             || request.outcome.partition_hash != request.correlation.partial.key.partition_hash
         {
@@ -1093,7 +1098,10 @@ impl SecurityEventStore for ModelStore {
             state: Mutex::new(state.clone()),
         };
         let partial = staged.compare_and_swap_correlation(&request.correlation)?;
-        staged.state()?.correlation_outcomes.push(request.outcome.clone());
+        staged
+            .state()?
+            .correlation_outcomes
+            .push(request.outcome.clone());
         *state = staged
             .state
             .into_inner()
@@ -1106,7 +1114,11 @@ impl SecurityEventStore for ModelStore {
         outcome: &CorrelationOutcomePublication,
     ) -> PortResult<CreateOutcome> {
         let mut state = self.state()?;
-        if outcome.partition_hash.as_bytes().iter().all(|byte| *byte == 0)
+        if outcome
+            .partition_hash
+            .as_bytes()
+            .iter()
+            .all(|byte| *byte == 0)
             || outcome.status == CorrelationOutcomeStatus::Deferred
         {
             return Err(PortError::invalid_data());
@@ -1132,8 +1144,7 @@ impl SecurityEventStore for ModelStore {
             .verified
             .iter()
             .find(|event| {
-                event.tenant_id == outcome.key.tenant_id
-                    && event.event_id == outcome.key.event_id
+                event.tenant_id == outcome.key.tenant_id && event.event_id == outcome.key.event_id
             })
             .ok_or_else(PortError::integrity_failure)?;
         if event.body_hash != outcome.event_body_hash
@@ -1247,8 +1258,8 @@ impl ResponseStore for ModelStore {
     }
 
     fn compare_and_swap(&self, request: &ResponseCasRequest) -> PortResult<ResponsePlanRecord> {
-        let candidate_snapshot = decode_response_record(&request.record)
-            .map_err(|_| PortError::invalid_data())?;
+        let candidate_snapshot =
+            decode_response_record(&request.record).map_err(|_| PortError::invalid_data())?;
         let candidate_mutations = candidate_snapshot.mutations.as_slice();
         let appended = candidate_mutations
             .last()
@@ -1268,15 +1279,11 @@ impl ResponseStore for ModelStore {
             return Err(PortError::invalid_data());
         }
         let mut state = self.state()?;
-        if let Some((transition, record)) = state
-            .response_plans
-            .iter()
-            .find(|(transition, _)| {
-                transition
-                    .as_ref()
-                    .is_some_and(|stored| stored.transition_id == request.transition_id)
-            })
-        {
+        if let Some((transition, record)) = state.response_plans.iter().find(|(transition, _)| {
+            transition
+                .as_ref()
+                .is_some_and(|stored| stored.transition_id == request.transition_id)
+        }) {
             if transition.as_ref() != Some(request) {
                 return Err(PortError::conflict());
             }
@@ -1296,8 +1303,8 @@ impl ResponseStore for ModelStore {
         {
             return Err(PortError::conflict());
         }
-        let current_snapshot = decode_response_record(current)
-            .map_err(|_| PortError::integrity_failure())?;
+        let current_snapshot =
+            decode_response_record(current).map_err(|_| PortError::integrity_failure())?;
         let current_mutations = current_snapshot.mutations.as_slice();
         let exact_prefix = current_mutations
             .len()
@@ -1313,8 +1320,7 @@ impl ResponseStore for ModelStore {
         {
             return Err(PortError::invalid_data());
         }
-        state.response_plans[position] =
-            (Some(request.clone()), request.record.clone());
+        state.response_plans[position] = (Some(request.clone()), request.record.clone());
         Ok(request.record.clone())
     }
 

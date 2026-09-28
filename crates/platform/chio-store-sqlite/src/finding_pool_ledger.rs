@@ -1,3 +1,5 @@
+// tenant-read-contract: finding_pool_debits; class=administrative; principal=kernel-admission
+// Contracts: docs/security/trust-boundary-inventory.json
 //! Qualifying SQLite ledger for authenticated cognition-market pool debits.
 //!
 //! Each mutation runs in a SQLite `BEGIN IMMEDIATE` transaction. The signed

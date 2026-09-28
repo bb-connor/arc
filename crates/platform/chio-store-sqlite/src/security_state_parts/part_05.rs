@@ -42,7 +42,7 @@ fn parse_correlation_outcome_status(value: &str) -> PortResult<CorrelationOutcom
 
 fn append_verified_in_transaction(
     connection: &Connection,
-    event: &VerifiedSecurityEvent,
+    event: &SecurityEventVerificationRecord,
 ) -> PortResult<EventAppend> {
     validate_canonical_json_body(&event.canonical_body, &event.body_hash)?;
     if let Some((tenant_id, event_class, body_hash)) = load_event_identity(
@@ -321,10 +321,10 @@ fn validate_correlation_outcome_publication(
         .all(|byte| *byte == 0)
         || publication.status == CorrelationOutcomeStatus::Deferred
         || publication
-        .rule_version_hash
-        .as_bytes()
-        .iter()
-        .all(|byte| *byte == 0)
+            .rule_version_hash
+            .as_bytes()
+            .iter()
+            .all(|byte| *byte == 0)
         || publication
             .event_body_hash
             .as_bytes()
@@ -460,7 +460,10 @@ fn validate_correlation_outcome_storage_binding(
             FROM security_verified_events
             WHERE tenant_id = ?1 AND event_id = ?2
             "#,
-            params![outcome.key.tenant_id.as_str(), outcome.key.event_id.as_str()],
+            params![
+                outcome.key.tenant_id.as_str(),
+                outcome.key.event_id.as_str()
+            ],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .map_err(sqlite_error)?;
@@ -546,7 +549,7 @@ impl SecurityEventStore for SqliteSecurityStateStore {
         Ok(CorrelationEventAdmission { append, capacity })
     }
 
-    fn append_verified(&self, event: &VerifiedSecurityEvent) -> PortResult<EventAppend> {
+    fn append_verified(&self, event: &SecurityEventVerificationRecord) -> PortResult<EventAppend> {
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -711,8 +714,7 @@ impl SecurityEventStore for SqliteSecurityStateStore {
             || request.outcome.key.rule_id != request.correlation.partial.key.rule_id
             || request.outcome.key.tenant_id != request.correlation.scan.tenant_id
             || request.outcome.key.rule_id != request.correlation.scan.rule_id
-            || request.outcome.partition_hash
-                != request.correlation.partial.key.partition_hash
+            || request.outcome.partition_hash != request.correlation.partial.key.partition_hash
             || request.correlation.partial.key.partition_hash
                 != request.correlation.scan.partition_hash
         {
@@ -722,8 +724,7 @@ impl SecurityEventStore for SqliteSecurityStateStore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
-        if let Some(existing) =
-            load_correlation_outcome_record(&transaction, &request.outcome.key)?
+        if let Some(existing) = load_correlation_outcome_record(&transaction, &request.outcome.key)?
         {
             if existing != request.outcome {
                 return Err(PortError::conflict());
@@ -744,10 +745,8 @@ impl SecurityEventStore for SqliteSecurityStateStore {
         if !validate_correlation_outcome_storage_binding(&transaction, &request.outcome, true)? {
             return Err(PortError::integrity_failure());
         }
-        let partial = compare_and_swap_correlation_in_transaction(
-            &transaction,
-            &request.correlation,
-        )?;
+        let partial =
+            compare_and_swap_correlation_in_transaction(&transaction, &request.correlation)?;
         insert_correlation_outcome_record(&transaction, &request.outcome)?;
         transaction.commit().map_err(sqlite_error)?;
         Ok(partial)
@@ -827,7 +826,7 @@ impl SecurityEventStore for SqliteSecurityStateStore {
 
 fn validate_correlation_ingress_binding(
     event: &UnverifiedSecurityEvent,
-    verified: &VerifiedSecurityEvent,
+    verified: &SecurityEventVerificationRecord,
 ) -> PortResult<()> {
     validate_canonical_json_body(&event.canonical_body, &event.body_hash)?;
     validate_correlation_source_evidence(
@@ -860,9 +859,8 @@ fn validate_correlation_source_evidence(
 ) -> PortResult<()> {
     let (canonical_source, domain) = match trust_class {
         ProducerTrustClass::InternalDetector => {
-            let signed: SignedSecurityEvent =
-                serde_json::from_slice(source_evidence.as_bytes())
-                    .map_err(|_| PortError::invalid_data())?;
+            let signed: SignedSecurityEvent = serde_json::from_slice(source_evidence.as_bytes())
+                .map_err(|_| PortError::invalid_data())?;
             (
                 canonical_json_bytes(&signed).map_err(|_| PortError::invalid_data())?,
                 EVENT_EVIDENCE_HASH_DOMAIN,
@@ -888,16 +886,7 @@ fn validate_correlation_source_evidence(
     Ok(())
 }
 
-type StoredCorrelationIngress = (
-    String,
-    i64,
-    i64,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    i64,
-);
+type StoredCorrelationIngress = (String, i64, i64, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, i64);
 
 fn load_correlation_ingress(
     connection: &Connection,
@@ -1018,8 +1007,8 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
             .map_err(sqlite_error)?;
         for row in rows {
             let (trust_class, source_evidence, evidence_hash) = row.map_err(sqlite_error)?;
-            let source_evidence = CanonicalBody::new(source_evidence)
-                .map_err(|_| PortError::integrity_failure())?;
+            let source_evidence =
+                CanonicalBody::new(source_evidence).map_err(|_| PortError::integrity_failure())?;
             validate_correlation_source_evidence(
                 parse_trust_class(&trust_class)?,
                 &source_evidence,
@@ -1049,8 +1038,7 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
         for row in outcome_keys {
             let (tenant_id, rule_id, event_id) = row.map_err(sqlite_error)?;
             let key = CorrelationOutcomeKey {
-                tenant_id: TenantId::new(tenant_id)
-                    .map_err(|_| PortError::integrity_failure())?,
+                tenant_id: TenantId::new(tenant_id).map_err(|_| PortError::integrity_failure())?,
                 rule_id: RuleId::new(rule_id).map_err(|_| PortError::integrity_failure())?,
                 event_id: EventId::new(event_id).map_err(|_| PortError::integrity_failure())?,
             };
@@ -1064,7 +1052,7 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
     fn enqueue_verified_correlation_event(
         &self,
         event: &UnverifiedSecurityEvent,
-        verified: &VerifiedSecurityEvent,
+        verified: &SecurityEventVerificationRecord,
     ) -> PortResult<EventAppend> {
         validate_correlation_ingress_binding(event, verified)?;
         let mut connection = self.connection()?;
@@ -1164,8 +1152,7 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
                 acknowledged,
             );
             let event = UnverifiedSecurityEvent {
-                tenant_id: TenantId::new(tenant_id)
-                    .map_err(|_| PortError::integrity_failure())?,
+                tenant_id: TenantId::new(tenant_id).map_err(|_| PortError::integrity_failure())?,
                 event_id: EventId::new(event_id).map_err(|_| PortError::integrity_failure())?,
                 producer_id: ProducerId::new(producer_id)
                     .map_err(|_| PortError::integrity_failure())?,
@@ -1177,11 +1164,8 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
                 source_evidence: CanonicalBody::new(source_evidence)
                     .map_err(|_| PortError::integrity_failure())?,
             };
-            if validate_stored_correlation_ingress(
-                &stored,
-                &event,
-                &decode_digest(evidence_hash)?,
-            )? {
+            if validate_stored_correlation_ingress(&stored, &event, &decode_digest(evidence_hash)?)?
+            {
                 return Err(PortError::integrity_failure());
             }
             events.push(event);
@@ -1192,7 +1176,7 @@ impl CorrelationIngressStore for SqliteSecurityStateStore {
     fn validate_pending_correlation_event(
         &self,
         event: &UnverifiedSecurityEvent,
-        verified: &VerifiedSecurityEvent,
+        verified: &SecurityEventVerificationRecord,
     ) -> PortResult<()> {
         validate_correlation_ingress_binding(event, verified)?;
         let mut connection = self.connection()?;
@@ -1324,7 +1308,7 @@ fn scan_verified_partition(
             CanonicalBody::new(body).map_err(|_| PortError::integrity_failure())?;
         validate_canonical_json_body(&canonical_body, &body_hash)
             .map_err(|_| PortError::integrity_failure())?;
-        events.push(VerifiedSecurityEvent {
+        events.push(SecurityEventVerificationRecord {
             tenant_id: scan.tenant_id.clone(),
             event_id: EventId::new(event_id).map_err(|_| PortError::integrity_failure())?,
             producer_id: ProducerId::new(producer_id)

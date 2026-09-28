@@ -5,8 +5,7 @@ use std::collections::{BTreeMap, HashSet};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::{
     governance::{
-        GovernedApprovalDecision, GovernedApprovalToken, ThresholdApprovalProposal,
-        VerifiedApprovalSetBody,
+        ApprovalSetBody, GovernedApprovalDecision, GovernedApprovalToken, ThresholdApprovalProposal,
     },
     threshold_approval::{
         ThresholdApprovalRequest, ThresholdApprovalRequirement, MAX_THRESHOLD_APPROVAL_TOKENS,
@@ -830,7 +829,7 @@ impl ThresholdApprovalProposalRecord {
                 "threshold proposal is not ready for replay reservation".to_string(),
             ));
         }
-        let body = VerifiedApprovalSetBody::new(
+        let body = ApprovalSetBody::new(
             self.votes
                 .iter()
                 .map(|vote| vote.token_digest.clone())

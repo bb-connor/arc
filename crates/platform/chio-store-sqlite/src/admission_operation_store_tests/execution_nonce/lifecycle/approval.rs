@@ -1,8 +1,7 @@
 use super::*;
 use chio_core::capability::governance::{
-    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+    ApprovalSetBody, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_kernel::ThresholdApprovalReplayReservationV1;
 
@@ -70,7 +69,7 @@ pub(in crate::admission_operation_store::tests::execution_nonce) fn reserve_appr
         .iter()
         .map(GovernedApprovalToken::artifact_digest)
         .collect::<Result<Vec<_>, _>>()?;
-    let set = VerifiedApprovalSetBody::new(digests, &proposal)?;
+    let set = ApprovalSetBody::new(digests, &proposal)?;
     let set_hash = set.approval_set_hash()?;
     let reservation = ThresholdApprovalReplayReservationV1::new(proposal, tokens, set)?;
     let command = nonce_command(

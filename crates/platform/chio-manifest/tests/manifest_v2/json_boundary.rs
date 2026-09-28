@@ -37,7 +37,7 @@ fn reject_alias(
     std::fs::remove_file(path)?;
     match aliased {
         Err(VerifiedManifestLoadError::CanonicalInput { source, .. }) => assert!(
-            source.to_string().contains(expected_reason),
+            matches!(&source, chio_core::canonical::UntrustedJsonError::SignedInput(error) if error.to_string().contains(expected_reason)),
             "wrong refusal for aliased signed input: {source}"
         ),
         Err(error) => panic!("wrong error class for ambiguous JSON: {error}"),

@@ -7,6 +7,109 @@ use chio_federation_authority::{
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 
+#[test]
+fn round_two_custody_restores_only_the_bound_outbound_package(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_federation_authority::{FrostRound1Package, FrostRound2Package};
+    let fixtures = fixtures();
+    let mut round1 = Vec::new();
+    let mut secrets = Vec::new();
+    for (index, fixture) in fixtures.iter().enumerate() {
+        let mut rng = ChaCha20Rng::from_seed([index as u8 + 41; 32]);
+        let transition = begin_frost_ceremony(&fixture.config, &fixture.transport_key, &mut rng)?;
+        let bytes = serde_json::to_vec(&transition.package)?;
+        assert_eq!(
+            serde_json::from_slice::<FrostRound1Package>(&bytes)?,
+            transition.package
+        );
+        let mut wrong_round = serde_json::to_value(&transition.package)?;
+        wrong_round["round"] = serde_json::json!("round2");
+        assert!(serde_json::from_value::<FrostRound1Package>(wrong_round).is_err());
+        round1.push(transition.package);
+        secrets.push(transition.secret);
+    }
+    let transition = advance_frost_ceremony(
+        &fixtures[0].config,
+        &fixtures[0].transport_key,
+        secrets.remove(0),
+        &round1,
+    )?;
+    let package = &transition.packages[0];
+    let restored = FrostRound2Package::from_custody(
+        &fixtures[0].config,
+        package.metadata(),
+        package.secret_bytes(),
+    )?;
+    assert_eq!(&restored, package);
+    let debug = format!("{transition:?}");
+    assert!(debug.contains("<redacted>"));
+    assert!(!debug.contains(&hex::encode(package.secret_bytes())));
+    assert!(!serde_json::to_string(&package.metadata())?.contains("secretBytes"));
+
+    let mut corrupt = package.secret_bytes();
+    corrupt[0] ^= 1;
+    assert!(matches!(
+        FrostRound2Package::from_custody(&fixtures[0].config, package.metadata(), corrupt),
+        Err(FrostCeremonyError::PackageAuthentication {
+            detail: "package digest does not match",
+            ..
+        })
+    ));
+    assert!(matches!(
+        FrostRound2Package::from_custody(
+            &fixtures[1].config,
+            package.metadata(),
+            package.secret_bytes()
+        ),
+        Err(FrostCeremonyError::PackageAuthentication {
+            detail: "custody package belongs to another participant",
+            ..
+        })
+    ));
+    for (field, replacement, expected) in [
+        (
+            "ceremonyId",
+            serde_json::json!("untrusted"),
+            "package ceremony binding does not match",
+        ),
+        (
+            "keyEpoch",
+            serde_json::json!(99),
+            "package ceremony binding does not match",
+        ),
+        (
+            "round",
+            serde_json::json!("round1"),
+            "package ceremony binding does not match",
+        ),
+        (
+            "recipientParticipantId",
+            serde_json::json!(fixtures[0].config.local_participant_id),
+            "round-two recipient is invalid",
+        ),
+        (
+            "transportSignature",
+            serde_json::json!("00".repeat(64)),
+            "transport signature does not verify",
+        ),
+    ] {
+        let mut metadata = serde_json::to_value(package.metadata())?;
+        metadata[field] = replacement;
+        let error = match FrostRound2Package::from_custody(
+            &fixtures[0].config,
+            serde_json::from_value(metadata)?,
+            package.secret_bytes(),
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("modified custody binding was accepted"),
+        };
+        assert!(
+            matches!(error, FrostCeremonyError::PackageAuthentication { detail, .. } if detail == expected)
+        );
+    }
+    Ok(())
+}
+
 struct ParticipantFixture {
     config: FrostCeremonyConfig,
     transport_key: Keypair,
@@ -160,19 +263,7 @@ fn frost_ceremony_rejects_participant_drift_duplicate_packages_and_tampering() {
     }
     let mut tampered = serde_json::to_value(&packages[1])
         .unwrap_or_else(|error| panic!("package must serialize: {error}"));
-    let package_hex = tampered
-        .get("packageHex")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_else(|| panic!("package hex must exist"))
-        .to_string();
-    let replacement = if package_hex.starts_with('0') {
-        '1'
-    } else {
-        '0'
-    };
-    let mut changed_hex = package_hex;
-    changed_hex.replace_range(0..1, &replacement.to_string());
-    tampered["packageHex"] = serde_json::Value::String(changed_hex);
+    tampered["packageDigest"] = serde_json::Value::String("00".repeat(32));
     packages[1] = serde_json::from_value(tampered)
         .unwrap_or_else(|error| panic!("tampered package must decode: {error}"));
     assert!(matches!(
@@ -182,6 +273,9 @@ fn frost_ceremony_rejects_participant_drift_duplicate_packages_and_tampering() {
             local.secret,
             &packages,
         ),
-        Err(FrostCeremonyError::PackageAuthentication { .. })
+        Err(FrostCeremonyError::PackageAuthentication {
+            detail: "package digest does not match",
+            ..
+        })
     ));
 }

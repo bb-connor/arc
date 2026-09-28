@@ -44,9 +44,9 @@ mod profile;
 pub use frost_ceremony::{
     advance_frost_ceremony, begin_frost_ceremony, complete_frost_ceremony,
     verify_frost_ceremony_round1_transcript, verify_frost_ceremony_transcript,
-    FrostAuthenticatedDkgPackage, FrostCeremonyCompletion, FrostCeremonyConfig, FrostCeremonyError,
-    FrostCeremonyParticipant, FrostCeremonySecret, FrostCeremonySecretKind, FrostDkgRound,
-    FrostRound1Transition, FrostRound2Transition,
+    FrostCeremonyCompletion, FrostCeremonyConfig, FrostCeremonyError, FrostCeremonyParticipant,
+    FrostCeremonySecret, FrostCeremonySecretKind, FrostDkgRound, FrostRound1Package,
+    FrostRound1Transition, FrostRound2Metadata, FrostRound2Package, FrostRound2Transition,
 };
 pub use frost_coordinator::{
     aggregate_frost_authorization, build_frost_signing_package, frost_participant_identifier_bytes,

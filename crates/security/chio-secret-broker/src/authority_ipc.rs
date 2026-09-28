@@ -330,21 +330,11 @@ impl AuthorityRpcClient {
         write_bounded_frame(&mut stream, &encoded)?;
         let response_bytes = read_bounded_frame(&mut stream)?;
         let response: SignedAuthorityResponse =
-            serde_json::from_slice(&response_bytes).map_err(|error| {
-                BrokerError::AuthorityUnavailable(format!(
-                    "authority response decoding failed: {error}"
-                ))
-            })?;
-        let canonical = canonical_json_bytes(&response).map_err(|error| {
-            BrokerError::AuthorityUnavailable(format!(
-                "authority response encoding failed: {error}"
-            ))
-        })?;
-        if canonical != response_bytes {
-            return Err(BrokerError::AuthorizationDenied(
-                "authority response is not canonical JSON".to_string(),
-            ));
-        }
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                &response_bytes,
+                chio_secure_ipc::DEFAULT_MAX_FRAME_BYTES,
+            )?
+            .decode_canonical()?;
         let result = response.body.result.clone();
         let exchange = verify_authority_exchange(
             request,
@@ -596,17 +586,11 @@ impl AuthorityRpcServer {
             })?;
         let request_bytes = read_bounded_frame(&mut stream)?;
         let request: SignedAuthorityRequest =
-            serde_json::from_slice(&request_bytes).map_err(|error| {
-                BrokerError::InvalidRequest(format!("authority request failed: {error}"))
-            })?;
-        let canonical = canonical_json_bytes(&request).map_err(|error| {
-            BrokerError::InvalidRequest(format!("authority request encoding failed: {error}"))
-        })?;
-        if canonical != request_bytes {
-            return Err(BrokerError::AuthorizationDenied(
-                "authority request is not canonical JSON".to_string(),
-            ));
-        }
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                &request_bytes,
+                chio_secure_ipc::DEFAULT_MAX_FRAME_BYTES,
+            )?
+            .decode_canonical()?;
         verify_authority_request(
             &request,
             &self.trusted_broker,

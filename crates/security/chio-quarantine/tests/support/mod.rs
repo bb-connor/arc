@@ -4,7 +4,7 @@ use chio_security_types::ports::{
     CorrelationOutcomeCommitRequest, CorrelationOutcomeKey, CorrelationOutcomePublication,
     CorrelationOutcomeStatus, CorrelationPartial, CorrelationPartitionKey, CorrelationScan,
     CreateOutcome, EventAppend, EventPartitionScan, PortError, PortResult, SecurityEventStore,
-    VerifiedSecurityEvent,
+    SecurityEventVerificationRecord,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,7 +17,7 @@ type OutcomeKey = (String, String, String);
 
 #[derive(Clone, Default)]
 struct State {
-    events: BTreeMap<EventKey, VerifiedSecurityEvent>,
+    events: BTreeMap<EventKey, SecurityEventVerificationRecord>,
     event_owners: BTreeMap<EventOwnerKey, [u8; 32]>,
     indexes: BTreeMap<PartitionKey, BTreeSet<String>>,
     partition_generations: BTreeMap<PartitionKey, u64>,
@@ -87,7 +87,7 @@ fn outcome_key(key: &CorrelationOutcomeKey) -> OutcomeKey {
 
 fn append_verified_state(
     state: &mut State,
-    event: &VerifiedSecurityEvent,
+    event: &SecurityEventVerificationRecord,
 ) -> PortResult<EventAppend> {
     let key = (
         event.tenant_id.as_str().to_owned(),
@@ -251,7 +251,7 @@ impl SecurityEventStore for TestStore {
         Ok(CorrelationEventAdmission { append, capacity })
     }
 
-    fn append_verified(&self, event: &VerifiedSecurityEvent) -> PortResult<EventAppend> {
+    fn append_verified(&self, event: &SecurityEventVerificationRecord) -> PortResult<EventAppend> {
         let mut state = self.lock()?;
         append_verified_state(&mut state, event)
     }

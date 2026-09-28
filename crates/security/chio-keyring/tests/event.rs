@@ -35,11 +35,12 @@ fn canonical_key_event_reader_rejects_alternate_encodings_of_a_signed_envelope()
             decoded.envelope_hash().test_unwrap(),
             event.envelope_hash().test_unwrap()
         );
-        assert!(
-            matches!(SignedKeyLogEvent::from_canonical_envelope_bytes(alternate.as_bytes()),
-            Err(chio_keyring::KeyringError::Canonical(message))
-                if message == "record is not canonical JSON")
-        );
+        assert!(matches!(
+            SignedKeyLogEvent::from_canonical_envelope_bytes(alternate.as_bytes()),
+            Err(chio_keyring::KeyringError::UntrustedInput(
+                chio_core_types::canonical::UntrustedJsonError::NonCanonical
+            ))
+        ));
     }
     assert_eq!(
         SignedKeyLogEvent::from_canonical_envelope_bytes(&canonical).test_unwrap(),

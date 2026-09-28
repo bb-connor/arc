@@ -1,3 +1,9 @@
+// tenant-read-contract: sealed_decoy_operation_owners_v1; class=tenant-predicate; principal=decoy-registry
+// tenant-read-contract: sealed_decoy_records_v1; class=tenant-predicate; principal=decoy-registry
+// tenant-read-contract: sealed_decoy_transitions_v1; class=tenant-predicate; principal=decoy-registry
+// tenant-read-contract: watermark_sequence_heads_v1; class=tenant-predicate; principal=decoy-registry
+// tenant-read-contract: watermark_sequence_operations_v1; class=tenant-predicate; principal=decoy-registry
+// Contracts: docs/security/trust-boundary-inventory.json
 use std::fs;
 use std::path::Path;
 use std::sync::MutexGuard;

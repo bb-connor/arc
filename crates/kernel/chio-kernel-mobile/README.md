@@ -53,7 +53,7 @@ with a matching UDL declaration.
 | `verify_play_integrity_evidence(token, expected_nonce, expected_package_name, expected_audience, jwks_json)` | Verify a Play Integrity JWS against the pinned Google JWKS. |
 | `verify_mobile_receipt(receipt_json, evidence_json)` | Shape-check a receipt against attestation evidence; returns a non-authoritative status. |
 
-Also exported: the `VerifiedCapability` and `PortablePassportMetadata` UDL
+Also exported: the `CapabilityVerificationRecord` and `PortablePassportMetadata` UDL
 records, the `ChioMobileError` error enum, and the `MobileClock` / `MobileRng`
 adapters.
 

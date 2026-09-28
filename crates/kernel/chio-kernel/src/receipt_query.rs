@@ -31,18 +31,18 @@ pub enum ReceiptReadContextSource {
     AuthenticatedTenant,
 }
 
-/// Fully resolved receipt read context. Remote/control-plane callers must
-/// construct this from authenticated context before reaching store queries.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+/// Receipt read authority resolved by a trusted local or service adapter.
+/// Never deserialize this from a request. Remote callers supply credentials;
+/// the adapter authenticates those credentials before selecting a constructor.
+///
+/// ```compile_fail
+/// use chio_kernel::ReceiptReadContext;
+/// let context: ReceiptReadContext = serde_json::from_str("{}").unwrap();
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReceiptReadContext {
-    pub boundary: ReceiptReadBoundary,
-    pub source: ReceiptReadContextSource,
-    /// Explicit switch for including untenanted (NULL tenant_id) rows.
-    /// Local-operator reads set this true; tenant-scoped remote reads
-    /// keep it false so NULL tenant rows stay hidden.
-    #[serde(default)]
-    pub include_null_tenant: bool,
+    boundary: ReceiptReadBoundary,
+    source: ReceiptReadContextSource,
 }
 
 impl ReceiptReadContext {
@@ -51,34 +51,64 @@ impl ReceiptReadContext {
         Self {
             boundary: ReceiptReadBoundary::AdminAll,
             source: ReceiptReadContextSource::LocalOperator,
-            include_null_tenant: true,
         }
     }
-
     #[must_use]
     pub fn admin_service() -> Self {
         Self {
             boundary: ReceiptReadBoundary::AdminAll,
             source: ReceiptReadContextSource::AdminService,
-            include_null_tenant: false,
         }
     }
-
     #[must_use]
     pub fn authenticated_tenant(tenant: impl Into<String>) -> Self {
         Self {
             boundary: ReceiptReadBoundary::tenant_scoped(tenant),
             source: ReceiptReadContextSource::AuthenticatedTenant,
-            include_null_tenant: false,
         }
     }
-
     #[must_use]
     pub fn local_operator_tenant(tenant: impl Into<String>) -> Self {
         Self {
             boundary: ReceiptReadBoundary::tenant_scoped(tenant),
             source: ReceiptReadContextSource::LocalOperator,
-            include_null_tenant: true,
+        }
+    }
+    #[must_use]
+    pub const fn boundary(&self) -> &ReceiptReadBoundary {
+        &self.boundary
+    }
+    #[must_use]
+    pub const fn source(&self) -> ReceiptReadContextSource {
+        self.source
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ReceiptReadError {
+    #[error("receipt query requires an explicit read context")]
+    MissingContext,
+    #[error("receipt query requires a non-empty tenant without surrounding whitespace")]
+    InvalidTenant,
+    #[error("receipt query tenant filter cannot widen authenticated tenant scope")]
+    TenantScopeMismatch,
+    #[error("receipt query is invalid: {0}")]
+    InvalidQuery(String),
+    #[error("stored receipt tenant projection differs from its signed body")]
+    TenantProjectionMismatch,
+}
+
+impl ReceiptReadError {
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::MissingContext => "urn:chio:error:kernel:receipt-read-context-missing",
+            Self::InvalidTenant => "urn:chio:error:kernel:receipt-read-tenant-invalid",
+            Self::TenantScopeMismatch => "urn:chio:error:kernel:receipt-read-scope-mismatch",
+            Self::InvalidQuery(_) => "urn:chio:error:kernel:receipt-read-query-invalid",
+            Self::TenantProjectionMismatch => {
+                "urn:chio:error:kernel:receipt-read-projection-mismatch"
+            }
         }
     }
 }
@@ -86,7 +116,6 @@ impl ReceiptReadContext {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectiveReceiptReadScope {
     pub tenant: Option<String>,
-    pub include_null_tenant: bool,
     pub is_admin_all: bool,
 }
 
@@ -168,56 +197,49 @@ impl ReceiptQuery {
         self
     }
 
-    pub fn effective_read_scope(&self) -> Result<EffectiveReceiptReadScope, String> {
-        self.validated_cost_currency()?;
-        if let Some(context) = &self.read_context {
-            return match &context.boundary {
-                ReceiptReadBoundary::AdminAll => {
-                    let tenant = self.tenant_filter.as_deref().map(str::trim);
-                    if tenant.is_some_and(str::is_empty) {
-                        return Err(
-                            "receipt query tenant filter requires a non-empty tenant".to_string()
-                        );
-                    }
-                    Ok(EffectiveReceiptReadScope {
-                        tenant: tenant.map(ToOwned::to_owned),
-                        include_null_tenant: tenant.is_none() && context.include_null_tenant,
-                        is_admin_all: true,
-                    })
-                }
-                ReceiptReadBoundary::TenantScoped { tenant } => {
-                    let tenant = tenant.trim();
-                    if tenant.is_empty() {
-                        return Err(
-                            "tenant-scoped receipt query requires a non-empty tenant".to_string()
-                        );
-                    }
-                    if self
-                        .tenant_filter
-                        .as_deref()
-                        .is_some_and(|filter| filter != tenant)
-                    {
-                        return Err(
-                            "receipt query tenant filter cannot widen authenticated tenant scope"
-                                .to_string(),
-                        );
-                    }
-                    Ok(EffectiveReceiptReadScope {
-                        tenant: Some(tenant.to_string()),
-                        include_null_tenant: context.include_null_tenant,
-                        is_admin_all: false,
-                    })
-                }
-            };
+    pub fn effective_read_scope(&self) -> Result<EffectiveReceiptReadScope, ReceiptReadError> {
+        self.validated_cost_currency()
+            .map_err(ReceiptReadError::InvalidQuery)?;
+        let context = self
+            .read_context
+            .as_ref()
+            .ok_or(ReceiptReadError::MissingContext)?;
+        let valid_tenant = |tenant: &str| !tenant.is_empty() && tenant.trim() == tenant;
+        if self
+            .tenant_filter
+            .as_deref()
+            .is_some_and(|tenant| !valid_tenant(tenant))
+        {
+            return Err(ReceiptReadError::InvalidTenant);
         }
-
-        Err("receipt query requires an explicit read context".to_string())
+        match context.boundary() {
+            ReceiptReadBoundary::AdminAll => Ok(EffectiveReceiptReadScope {
+                tenant: self.tenant_filter.clone(),
+                is_admin_all: true,
+            }),
+            ReceiptReadBoundary::TenantScoped { tenant } => {
+                if !valid_tenant(tenant) {
+                    return Err(ReceiptReadError::InvalidTenant);
+                }
+                if self
+                    .tenant_filter
+                    .as_ref()
+                    .is_some_and(|filter| filter != tenant)
+                {
+                    return Err(ReceiptReadError::TenantScopeMismatch);
+                }
+                Ok(EffectiveReceiptReadScope {
+                    tenant: Some(tenant.clone()),
+                    is_admin_all: false,
+                })
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ReceiptQuery, ReceiptReadBoundary, ReceiptReadContext, ReceiptReadContextSource};
+    use super::{ReceiptQuery, ReceiptReadContext, ReceiptReadError};
 
     #[test]
     fn tenant_filter_without_read_context_is_not_authority() {
@@ -230,7 +252,7 @@ mod tests {
             .effective_read_scope()
             .expect_err("tenant_filter must not authorize a receipt read by itself");
 
-        assert_eq!(err, "receipt query requires an explicit read context");
+        assert_eq!(err, ReceiptReadError::MissingContext);
     }
 
     #[test]
@@ -245,10 +267,7 @@ mod tests {
             .effective_read_scope()
             .expect_err("query filter must not widen authenticated tenant scope");
 
-        assert_eq!(
-            err,
-            "receipt query tenant filter cannot widen authenticated tenant scope"
-        );
+        assert_eq!(err, ReceiptReadError::TenantScopeMismatch);
     }
 
     #[test]
@@ -264,7 +283,6 @@ mod tests {
             .expect("admin tenant filter should narrow the query");
 
         assert_eq!(scope.tenant.as_deref(), Some("tenant-a"));
-        assert!(!scope.include_null_tenant);
         assert!(scope.is_admin_all);
     }
 
@@ -280,22 +298,13 @@ mod tests {
             .effective_read_scope()
             .expect_err("blank tenant filter must fail closed");
 
-        assert_eq!(
-            err,
-            "receipt query tenant filter requires a non-empty tenant"
-        );
+        assert_eq!(err, ReceiptReadError::InvalidTenant);
     }
 
     #[test]
     fn tenant_scoped_context_rejects_blank_boundary_tenant() {
         let query = ReceiptQuery {
-            read_context: Some(ReceiptReadContext {
-                boundary: ReceiptReadBoundary::TenantScoped {
-                    tenant: "   ".to_string(),
-                },
-                source: ReceiptReadContextSource::AuthenticatedTenant,
-                include_null_tenant: false,
-            }),
+            read_context: Some(ReceiptReadContext::authenticated_tenant("   ")),
             ..ReceiptQuery::default()
         };
 
@@ -303,10 +312,7 @@ mod tests {
             .effective_read_scope()
             .expect_err("blank tenant boundary must fail closed");
 
-        assert_eq!(
-            err,
-            "tenant-scoped receipt query requires a non-empty tenant"
-        );
+        assert_eq!(err, ReceiptReadError::InvalidTenant);
     }
 }
 

@@ -127,7 +127,7 @@ impl BrokerIpcClient {
         })?;
         let response = self.call(IpcOperation::RegisterAttempt, authorization, payload)?;
         let acknowledgement: RegisterAttemptAcknowledgement =
-            decode_canonical_response(&response.response, "register-attempt acknowledgement")?;
+            decode_canonical_response(&response.response)?;
         acknowledgement.validate_for(registration)?;
         Ok(acknowledgement)
     }
@@ -140,7 +140,7 @@ impl BrokerIpcClient {
         let (authorization, payload) = self.encode_preparation(registration, request)?;
         let response = self.call(IpcOperation::PrepareDispatch, authorization, payload)?;
         let acknowledgement: PrepareDispatchAcknowledgement =
-            decode_canonical_response(&response.response, "prepare-dispatch acknowledgement")?;
+            decode_canonical_response(&response.response)?;
         acknowledgement.validate_for(registration, request)?;
         Ok(acknowledgement)
     }
@@ -172,7 +172,7 @@ impl BrokerIpcClient {
             ));
         }
         let acknowledgement: PrepareDispatchAcknowledgement =
-            decode_canonical_response(&response.response, "prepare-dispatch acknowledgement")?;
+            decode_canonical_response(&response.response)?;
         acknowledgement.validate_for(registration, request)?;
         Ok(stream)
     }
@@ -234,7 +234,7 @@ impl BrokerIpcClient {
         })?;
         let response = self.call(IpcOperation::ReleaseAttempt, authorization, payload)?;
         let acknowledgement: ReleaseAttemptAcknowledgement =
-            decode_canonical_response(&response.response, "release-attempt acknowledgement")?;
+            decode_canonical_response(&response.response)?;
         acknowledgement.validate_for(registration)?;
         Ok(acknowledgement)
     }
@@ -512,7 +512,7 @@ fn exchange_ipc_envelope(
 
 #[cfg(unix)]
 fn decode_ipc_response_envelope(bytes: &[u8], operation: IpcOperation) -> Result<IpcResponse> {
-    let response: IpcResponse = decode_canonical_response(bytes, "broker IPC response")?;
+    let response: IpcResponse = decode_canonical_response(bytes)?;
     let valid = response.operation == operation
         && if response.accepted {
             !response.response.is_empty() && response.error_code.is_none()
@@ -558,13 +558,11 @@ fn decode_execute_outcome(
     trusted_receipt_signer: &PublicKey,
 ) -> Result<BrokerIpcExecutionOutcome> {
     if response.accepted {
-        let execution: BrokerExecuteResponse =
-            decode_canonical_response(&response.response, "broker execute response")?;
+        let execution: BrokerExecuteResponse = decode_canonical_response(&response.response)?;
         validate_execute_response(request, &execution, trusted_receipt_signer)?;
         Ok(BrokerIpcExecutionOutcome::Success(Box::new(execution)))
     } else {
-        let failure: BrokerExecuteFailure =
-            decode_canonical_response(&response.response, "broker execute failure")?;
+        let failure: BrokerExecuteFailure = decode_canonical_response(&response.response)?;
         validate_execute_failure(
             request,
             &failure,
@@ -688,20 +686,17 @@ fn validate_execute_failure(
     Ok(())
 }
 
-fn decode_canonical_response<T: for<'de> Deserialize<'de>>(bytes: &[u8], label: &str) -> Result<T> {
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
-        BrokerError::AuthorityUnavailable(format!("{label} decoding failed: {error}"))
-    })?;
-    let canonical = canonical_json_bytes(&value).map_err(|error| {
-        BrokerError::AuthorityUnavailable(format!("{label} encoding failed: {error}"))
-    })?;
-    if canonical != bytes {
-        return Err(BrokerError::AuthorizationDenied(format!(
-            "{label} is not canonical JSON"
-        )));
-    }
-    serde_json::from_slice(bytes)
-        .map_err(|error| BrokerError::AuthorityUnavailable(format!("{label} is invalid: {error}")))
+fn decode_canonical_response<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T> {
+    let value: serde_json::Value = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        bytes,
+        chio_secure_ipc::DEFAULT_MAX_FRAME_BYTES,
+    )?
+    .decode_canonical()?;
+    serde_json::from_value(value).map_err(|error| {
+        BrokerError::UntrustedInput(chio_core_types::canonical::UntrustedJsonError::Decode(
+            error,
+        ))
+    })
 }
 
 fn now_unix_seconds() -> Result<u64> {
@@ -764,11 +759,8 @@ mod preconnected_execution_tests {
         assert_eq!(transcript.canonical_response_frame, expected_response_frame);
         assert_eq!(
             canonical_json_bytes(
-                &decode_canonical_response::<IpcResponse>(
-                    &transcript.canonical_response_frame,
-                    "transcript response",
-                )
-                .test_expect("canonical transcript response")
+                &decode_canonical_response::<IpcResponse>(&transcript.canonical_response_frame,)
+                    .test_expect("canonical transcript response")
             )
             .test_expect("canonical response bytes"),
             transcript.canonical_response_frame

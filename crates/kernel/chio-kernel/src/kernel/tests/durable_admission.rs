@@ -1837,7 +1837,7 @@ fn durable_admission_passes_opaque_supplemental_bytes_to_installed_verifier() {
             signed_extension: &[u8],
             context: &crate::supplemental_quota::SupplementalQuotaVerificationContext,
         ) -> Result<
-            crate::supplemental_quota::VerifiedSupplementalQuotaClaim,
+            crate::supplemental_quota::SupplementalQuotaVerificationRecord,
             crate::supplemental_quota::SupplementalQuotaVerifierError,
         > {
             let request_binding_hash =
@@ -1848,29 +1848,32 @@ fn durable_admission_passes_opaque_supplemental_bytes_to_installed_verifier() {
                         )
                     },
                 )?;
-            Ok(crate::supplemental_quota::VerifiedSupplementalQuotaClaim {
-                profile: crate::supplemental_quota::BROKER_CAPABILITY_EXECUTION_PROFILE.to_string(),
-                broker_capability_id: "broker-capability-7".to_string(),
-                issuer: context.subject.clone(),
-                request_constraint_digest: "a".repeat(64),
-                max_invocations: 7,
-                authorization_artifact_digest:
-                    crate::supplemental_quota::supplemental_authorization_artifact_digest(
-                        signed_extension,
-                    ),
-                supplemental_revocation_ids: vec!["broker-capability-7".to_string()],
-                expires_at: current_unix_timestamp() + 300,
-                request_binding_hash,
-                capability_id: context.capability_id.clone(),
-                capability_digest: context.capability_digest.clone(),
-                request_namespace_digest: context.request_namespace_digest.clone(),
-                operation_id: context.operation_id.clone(),
-                subject: context.subject.clone(),
-                request_id: context.request_id.clone(),
-                normalized_destination: context.normalized_destination.clone(),
-                arguments_hash: context.arguments_hash.clone(),
-                negotiated_features: context.negotiated_features.clone(),
-            })
+            Ok(
+                crate::supplemental_quota::SupplementalQuotaVerificationRecord {
+                    profile: crate::supplemental_quota::BROKER_CAPABILITY_EXECUTION_PROFILE
+                        .to_string(),
+                    broker_capability_id: "broker-capability-7".to_string(),
+                    issuer: context.subject.clone(),
+                    request_constraint_digest: "a".repeat(64),
+                    max_invocations: 7,
+                    authorization_artifact_digest:
+                        crate::supplemental_quota::supplemental_authorization_artifact_digest(
+                            signed_extension,
+                        ),
+                    supplemental_revocation_ids: vec!["broker-capability-7".to_string()],
+                    expires_at: current_unix_timestamp() + 300,
+                    request_binding_hash,
+                    capability_id: context.capability_id.clone(),
+                    capability_digest: context.capability_digest.clone(),
+                    request_namespace_digest: context.request_namespace_digest.clone(),
+                    operation_id: context.operation_id.clone(),
+                    subject: context.subject.clone(),
+                    request_id: context.request_id.clone(),
+                    normalized_destination: context.normalized_destination.clone(),
+                    arguments_hash: context.arguments_hash.clone(),
+                    negotiated_features: context.negotiated_features.clone(),
+                },
+            )
         }
     }
 

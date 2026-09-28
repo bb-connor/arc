@@ -146,7 +146,11 @@ pub fn load_audit_service_config(path: impl AsRef<Path>) -> Result<AuditServiceC
 
 fn load_bounded_json_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
     let (bytes, _) = crate::service::read_bounded_regular_file(path, MAX_CANONICAL_RECORD_BYTES)?;
-    Ok(serde_json::from_slice(&bytes)?)
+    Ok(chio_core_types::canonical::UntrustedJsonText::from_wire(
+        &bytes,
+        MAX_CANONICAL_RECORD_BYTES,
+    )?
+    .decode_signed()?)
 }
 
 fn require_absolute_paths<'a>(paths: impl IntoIterator<Item = &'a Path>) -> Result<()> {
@@ -207,13 +211,11 @@ where
     }
     let mut bytes = vec![0_u8; length];
     reader.read_exact(&mut bytes)?;
-    let value: T = serde_json::from_slice(&bytes)?;
-    if canonical_json_bytes(&value)? != bytes {
-        return Err(KeyringError::Canonical(
-            "IPC frame payload is not canonical JSON".to_string(),
-        ));
-    }
-    Ok(value)
+    Ok(chio_core_types::canonical::UntrustedJsonText::from_wire(
+        &bytes,
+        MAX_KEY_LOG_IPC_FRAME_BYTES,
+    )?
+    .decode_canonical()?)
 }
 
 pub fn read_single_canonical_frame<R, T>(reader: &mut R) -> Result<T>

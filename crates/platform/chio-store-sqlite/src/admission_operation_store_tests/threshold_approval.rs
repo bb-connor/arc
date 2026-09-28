@@ -1,8 +1,7 @@
 use super::*;
 use chio_core::capability::governance::{
-    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
-    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+    ApprovalSetBody, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_kernel::ThresholdApprovalReplayReservationV1;
 
@@ -81,7 +80,7 @@ fn replay_reservation_with_token_window(
         .iter()
         .map(|token| token.artifact_digest().expect("token digest"))
         .collect();
-    let verified = VerifiedApprovalSetBody::new(token_digests, &proposal).expect("verified set");
+    let verified = ApprovalSetBody::new(token_digests, &proposal).expect("verified set");
     ThresholdApprovalReplayReservationV1::new(proposal, tokens, verified)
         .expect("replay reservation")
 }

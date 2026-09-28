@@ -686,7 +686,7 @@ fn retry_backoff_ms(base_backoff_ms: u64, attempt: u32) -> u64 {
 }
 
 fn validate_admin_read_context(read_context: &ReceiptReadContext) -> Result<(), SiemError> {
-    if matches!(read_context.boundary, ReceiptReadBoundary::AdminAll) {
+    if matches!(read_context.boundary(), ReceiptReadBoundary::AdminAll) {
         Ok(())
     } else {
         Err(SiemError::ConfigError(

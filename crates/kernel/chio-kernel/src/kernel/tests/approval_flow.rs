@@ -744,7 +744,7 @@ fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch()
     assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
     assert_eq!(admitted.requirement(), &requirement);
     assert_eq!(
-        admitted.operator_capability().capability_id,
+        admitted.operator_capability().capability_id(),
         request.operator_capability.id
     );
     assert_eq!(

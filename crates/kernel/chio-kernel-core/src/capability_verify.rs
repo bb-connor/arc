@@ -49,22 +49,62 @@ use crate::normalized::{NormalizationError, NormalizedVerifiedCapability};
 /// revocation membership) and avoids returning a reference into the token
 /// so adapters that drop the token after verification can still act on
 /// the captured scope.
+/// Only the owning verifier can construct this result. Projections may expose
+/// its values, but cannot be converted back into verification evidence.
+///
+/// ```compile_fail
+/// use chio_kernel_core::VerifiedCapability;
+/// fn forge(bytes: &[u8]) {
+///     let _ = serde_json::from_slice::<VerifiedCapability>(bytes);
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct VerifiedCapability {
     /// The capability ID.
-    pub id: String,
+    id: String,
     /// The subject hex-encoded public key.
-    pub subject_hex: String,
+    subject_hex: String,
     /// The issuer hex-encoded public key.
-    pub issuer_hex: String,
+    issuer_hex: String,
     /// The authorized scope.
-    pub scope: ChioScope,
+    scope: ChioScope,
     /// `issued_at` timestamp (Unix seconds).
-    pub issued_at: u64,
+    issued_at: u64,
     /// `expires_at` timestamp (Unix seconds).
-    pub expires_at: u64,
+    expires_at: u64,
     /// The clock value used for time-bound enforcement.
-    pub evaluated_at: u64,
+    evaluated_at: u64,
+}
+
+impl VerifiedCapability {
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    #[must_use]
+    pub fn subject_hex(&self) -> &str {
+        &self.subject_hex
+    }
+    #[must_use]
+    pub fn issuer_hex(&self) -> &str {
+        &self.issuer_hex
+    }
+    #[must_use]
+    pub fn scope(&self) -> &ChioScope {
+        &self.scope
+    }
+    #[must_use]
+    pub fn issued_at(&self) -> u64 {
+        self.issued_at
+    }
+    #[must_use]
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+    #[must_use]
+    pub fn evaluated_at(&self) -> u64 {
+        self.evaluated_at
+    }
 }
 
 impl VerifiedCapability {

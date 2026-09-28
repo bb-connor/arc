@@ -1,3 +1,5 @@
+// tenant-read-contract: chio_authorization_receipt_consumptions; class=administrative; principal=kernel-admission
+// Contracts: docs/security/trust-boundary-inventory.json
 use super::*;
 
 use std::path::PathBuf;
@@ -521,7 +523,6 @@ impl SqliteReceiptStore {
                 settlement_store_binding,
                 durable_sink_id,
                 receipt_sink_qualification,
-                strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
             });
         }
@@ -1439,7 +1440,6 @@ impl SqliteReceiptStore {
             settlement_store_binding,
             durable_sink_id,
             receipt_sink_qualification,
-            strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
             incremental_verification: options.incremental_verification,
         })
     }

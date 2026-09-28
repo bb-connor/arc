@@ -108,24 +108,20 @@ impl OperatorReportQuery {
     }
 
     pub fn to_evidence_export_query(&self) -> Result<EvidenceExportQuery, String> {
-        let (tenant, read_boundary) = match self.read_context.as_ref() {
-            Some(ReceiptReadContext {
-                boundary: ReceiptReadBoundary::AdminAll,
-                ..
-            }) => (None, Some(ReceiptReadBoundary::AdminAll)),
-            Some(ReceiptReadContext {
-                boundary: ReceiptReadBoundary::TenantScoped { tenant },
-                ..
-            }) => (
-                Some(tenant.clone()),
-                Some(ReceiptReadBoundary::tenant_scoped(tenant.clone())),
-            ),
-            None => {
-                return Err(
-                    "operator report evidence export requires an explicit read context".to_string(),
-                );
-            }
-        };
+        let (tenant, read_boundary) =
+            match self.read_context.as_ref().map(ReceiptReadContext::boundary) {
+                Some(ReceiptReadBoundary::AdminAll) => (None, Some(ReceiptReadBoundary::AdminAll)),
+                Some(ReceiptReadBoundary::TenantScoped { tenant }) => (
+                    Some(tenant.clone()),
+                    Some(ReceiptReadBoundary::tenant_scoped(tenant.clone())),
+                ),
+                None => {
+                    return Err(
+                        "operator report evidence export requires an explicit read context"
+                            .to_string(),
+                    );
+                }
+            };
         Ok(EvidenceExportQuery {
             capability_id: self.capability_id.clone(),
             agent_subject: self.agent_subject.clone(),

@@ -347,7 +347,7 @@ fn assert_registration_authorization_digest_binding(root: &Path) {
 fn verify_semantics(id: &str, bytes: &[u8]) -> Result<()> {
     match id {
         "capability_noncanonical_trailing_newline" => {
-            decode_canonical_response::<SignedBrokerCapability>(bytes, "broker capability")?;
+            decode_canonical_response::<SignedBrokerCapability>(bytes)?;
             Ok(())
         }
         "capability_parent_self_binding"

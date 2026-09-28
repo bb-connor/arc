@@ -81,22 +81,58 @@ pub struct PortablePassportEnvelope {
 
 /// The subset of a verified portable passport that callers actually
 /// need downstream. Mirrors [`crate::VerifiedCapability`] in shape.
+/// Only the owning verifier can construct this result. Projections may expose
+/// its values, but cannot be converted back into verification evidence.
+///
+/// ```compile_fail
+/// use chio_kernel_core::VerifiedPassport;
+/// fn forge(bytes: &[u8]) {
+///     let _ = serde_json::from_slice::<VerifiedPassport>(bytes);
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedPassport {
     /// Subject identifier the envelope binds to.
-    pub subject: String,
+    subject: String,
     /// Issuer public key that signed the envelope.
-    pub issuer: PublicKey,
+    issuer: PublicKey,
     /// Unix timestamp the envelope was issued at.
-    pub issued_at: u64,
+    issued_at: u64,
     /// Unix timestamp the envelope expires at.
-    pub expires_at: u64,
+    expires_at: u64,
     /// Clock value at which verification succeeded.
-    pub evaluated_at: u64,
+    evaluated_at: u64,
     /// Canonical-JSON bytes of the authenticated payload (caller may
     /// decode these into the native `AgentPassport` or any other
     /// projection downstream).
-    pub payload_canonical_bytes: Vec<u8>,
+    payload_canonical_bytes: Vec<u8>,
+}
+
+impl VerifiedPassport {
+    #[must_use]
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+    #[must_use]
+    pub fn issuer(&self) -> &PublicKey {
+        &self.issuer
+    }
+    #[must_use]
+    pub fn issued_at(&self) -> u64 {
+        self.issued_at
+    }
+    #[must_use]
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+    #[must_use]
+    pub fn evaluated_at(&self) -> u64 {
+        self.evaluated_at
+    }
+    #[must_use]
+    pub fn payload_canonical_bytes(&self) -> &[u8] {
+        &self.payload_canonical_bytes
+    }
 }
 
 /// Errors raised by [`verify_passport`].

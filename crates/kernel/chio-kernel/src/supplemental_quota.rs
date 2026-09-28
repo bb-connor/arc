@@ -89,7 +89,7 @@ impl SupplementalQuotaVerifierBinding {
 /// This value is not admission authority by itself. The kernel accepts it only
 /// as the immediate result of its composition-installed verifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerifiedSupplementalQuotaClaim {
+pub struct SupplementalQuotaVerificationRecord {
     pub profile: String,
     pub broker_capability_id: String,
     pub issuer: PublicKey,
@@ -223,7 +223,7 @@ pub trait SupplementalQuotaVerifier: Send + Sync {
         &self,
         signed_extension: &[u8],
         context: &SupplementalQuotaVerificationContext,
-    ) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaVerifierError>;
+    ) -> Result<SupplementalQuotaVerificationRecord, SupplementalQuotaVerifierError>;
 }
 
 pub(crate) struct SupplementalQuotaVerifierRuntime {
@@ -508,7 +508,7 @@ fn ensure_context_bounds(
 }
 
 fn ensure_claim_bounds(
-    claim: &VerifiedSupplementalQuotaClaim,
+    claim: &SupplementalQuotaVerificationRecord,
 ) -> Result<(), SupplementalQuotaError> {
     for (name, value) in [
         ("broker_capability_id", claim.broker_capability_id.as_str()),

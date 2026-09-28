@@ -78,7 +78,7 @@ mod tests {
         IssuanceFreezeAdmissionQuery, LeaseOwnerId, OpaqueReceiptRef, PortError, PortErrorKind,
         PortResult, PreparedActiveResponseDispatchBinding, ProducerId, ProducerTrustClass,
         RecordId, RuleId, SecurityAlert, SecurityAlertPort, SecurityEventVerifierPort, SessionId,
-        TenantId, UnverifiedEventBatch, UnverifiedSecurityEvent, VerifiedSecurityEvent,
+        TenantId, UnverifiedEventBatch, UnverifiedSecurityEvent, SecurityEventVerificationRecord,
     };
     use chio_security_types::{
         OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
@@ -589,7 +589,7 @@ mod tests {
 
         fn correlate(
             &self,
-            _: &chio_security_types::ports::VerifiedSecurityEvent,
+            _: &chio_security_types::ports::SecurityEventVerificationRecord,
             _: u64,
         ) -> PortResult<Vec<RuleCorrelationOutcome>> {
             Ok(["rule-one", "rule-two"]
@@ -627,7 +627,7 @@ mod tests {
 
         fn correlate(
             &self,
-            _: &chio_security_types::ports::VerifiedSecurityEvent,
+            _: &chio_security_types::ports::SecurityEventVerificationRecord,
             _: u64,
         ) -> PortResult<Vec<RuleCorrelationOutcome>> {
             Ok(Vec::new())
@@ -1082,7 +1082,7 @@ mod tests {
 
         fn correlate(
             &self,
-            _: &chio_security_types::ports::VerifiedSecurityEvent,
+            _: &chio_security_types::ports::SecurityEventVerificationRecord,
             _: u64,
         ) -> PortResult<Vec<RuleCorrelationOutcome>> {
             Ok(vec![RuleCorrelationOutcome {
@@ -1147,7 +1147,7 @@ mod tests {
         fn enqueue_verified_correlation_event(
             &self,
             event: &UnverifiedSecurityEvent,
-            verified: &VerifiedSecurityEvent,
+            verified: &SecurityEventVerificationRecord,
         ) -> PortResult<EventAppend> {
             self.inner
                 .enqueue_verified_correlation_event(event, verified)
@@ -1163,7 +1163,7 @@ mod tests {
         fn validate_pending_correlation_event(
             &self,
             event: &UnverifiedSecurityEvent,
-            verified: &VerifiedSecurityEvent,
+            verified: &SecurityEventVerificationRecord,
         ) -> PortResult<()> {
             self.inner
                 .validate_pending_correlation_event(event, verified)

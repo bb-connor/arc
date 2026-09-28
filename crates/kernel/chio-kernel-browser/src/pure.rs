@@ -14,8 +14,8 @@ use chio_kernel_core::{
 };
 
 use crate::wire::{
-    BindingError, EvaluateRequestJson, EvaluationVerdictJson, ParentBudgetSnapshotJson,
-    SignReceiptRequestJson, VerifiedCapabilityJson, VerifyCapabilityRequestJson,
+    BindingError, CapabilityVerificationJson, EvaluateRequestJson, EvaluationVerdictJson,
+    ParentBudgetSnapshotJson, SignReceiptRequestJson, VerifyCapabilityRequestJson,
     VerifyReceiptResultJson,
 };
 
@@ -218,7 +218,7 @@ pub fn sign_receipt_relaying_trusted_body_pure(
 pub fn verify_capability_pure(
     input: VerifyCapabilityRequestJson,
     clock: &dyn chio_kernel_core::Clock,
-) -> Result<VerifiedCapabilityJson, BindingError> {
+) -> Result<CapabilityVerificationJson, BindingError> {
     let trusted = decode_trusted_issuers(&input.trusted_issuers_hex)?;
     let crypto_floor =
         chio_core_types::capability::crypto_floor::CapabilityCryptoFloor::AllowClassical;
@@ -264,7 +264,7 @@ pub fn verify_capability_pure(
     };
 
     match result {
-        Ok(verified) => Ok(VerifiedCapabilityJson::from(verified)),
+        Ok(verified) => Ok(CapabilityVerificationJson::from(verified)),
         Err(error) => Err(BindingError::new(
             "capability_verification_failed",
             capability_error_message(&error),

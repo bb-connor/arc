@@ -1,0 +1,2663 @@
+{
+  "schema": "chio.trust-boundary-inventory.v1",
+  "scope": "SQLite tenant tables, migrated signed JSON owners, and verifier proof types. PostgreSQL tables are outside this inventory.",
+  "signed_input_files": [
+    "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs",
+    "crates/platform/chio-control-plane/src/security/active_response_authority/validation.rs",
+    "crates/platform/chio-manifest/src/admission.rs",
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs",
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs",
+    "crates/security/chio-active-response-authority/src/config.rs",
+    "crates/security/chio-active-response-authority/src/store.rs",
+    "crates/security/chio-keyring/src/enterprise_receipt.rs",
+    "crates/security/chio-keyring/src/ipc.rs",
+    "crates/security/chio-keyring/src/lib.rs",
+    "crates/security/chio-keyring/src/service.rs",
+    "crates/security/chio-secret-broker/src/authority_ipc.rs",
+    "crates/security/chio-secret-broker/src/daemon.rs",
+    "crates/security/chio-secret-broker/src/daemon_runtime.rs",
+    "crates/security/chio-secret-broker/src/ipc_client.rs"
+  ],
+  "tables": {
+    "admission_operation_authorization_consumptions": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "chio_authorization_receipt_consumptions": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Kernel-owned admission and accounting; receipt and request bindings are rechecked before mutation."
+    },
+    "chio_encrypted_blob_reference_mutations": {
+      "class": "administrative",
+      "principal": "blob-mutation",
+      "contract": "Internal deduplication compares tenant, namespace, reference key, kind and digest before returning any result."
+    },
+    "chio_encrypted_blob_references": {
+      "class": "tenant-predicate",
+      "principal": "blob-mutation",
+      "contract": "BlobHandle or BlobReference supplies the exact tenant predicate; TenantKey authenticates ciphertext."
+    },
+    "chio_encrypted_blobs": {
+      "class": "tenant-predicate",
+      "principal": "blob-mutation",
+      "contract": "BlobHandle or BlobReference supplies the exact tenant predicate; TenantKey authenticates ciphertext."
+    },
+    "chio_finding_payloads": {
+      "class": "tenant-predicate",
+      "principal": "finding-delivery",
+      "contract": "TenantId plus TenantKey and tenant-bound AEAD; privileged seller capacity accounting returns lengths only."
+    },
+    "chio_tool_receipts": {
+      "class": "tenant-predicate",
+      "principal": "receipt-read-adapter",
+      "contract": "Authenticated ReceiptReadContext binds user reads; separate named admin reporting and kernel integrity contracts are enumerated below."
+    },
+    "finding_pool_debits": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Kernel-owned admission and accounting; receipt and request bindings are rechecked before mutation."
+    },
+    "iou_envelope": {
+      "class": "administrative",
+      "principal": "settlement-worker",
+      "contract": "Settlement service or local operator reads signed IOUs; receipt IDs grant no tenant read authority."
+    },
+    "sealed_decoy_operation_owners_v1": {
+      "class": "tenant-predicate",
+      "principal": "decoy-registry",
+      "contract": "Typed lookup includes authenticated tenant and the keyed artifact/marker reference."
+    },
+    "sealed_decoy_records_v1": {
+      "class": "tenant-predicate",
+      "principal": "decoy-registry",
+      "contract": "Typed lookup includes authenticated tenant and the keyed artifact/marker reference."
+    },
+    "sealed_decoy_transitions_v1": {
+      "class": "tenant-predicate",
+      "principal": "decoy-registry",
+      "contract": "Typed lookup includes authenticated tenant and the keyed artifact/marker reference."
+    },
+    "security_advisory_events": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_attested_finding_batch_items": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_attested_finding_batches": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_attested_finding_response_outbox": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_capability_set_suspension_commands": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_capability_set_suspension_effects": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_capability_set_suspension_members": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_capability_set_suspension_state": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_containment_overlay_commands": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_correlation_events": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_correlation_ingress": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_correlation_outcomes": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_correlation_partials": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_correlation_partition_heads": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_declassification_evidence_identity": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_declassification_receipt_outbox": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_declassification_tombstones": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_declassification_uses": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_effect_contributions": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_egress_fences": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_egress_restriction_commands": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_egress_restriction_destinations": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_egress_restriction_effects": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_egress_restriction_state": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_event_ids": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_flow_contexts": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_flow_sequences": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_isolation_epochs": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_issuance_freeze_commands": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_issuance_freeze_effects": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_issuance_freeze_state": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_lineage_fences": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_lineage_flow_state": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_overlay_state": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_participant_egress_events": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_nonce_preflight_events": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_output_events": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_declassification_evidence_identity": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_declassification_receipt_outbox": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_declassification_tombstones": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_declassification_uses": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_egress_fences": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_flow_contexts": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_flow_sequences": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_isolation_epochs": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_lineage_flow_state": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_mutations": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_principal_flow_state": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_session_flow_state": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_session_memberships": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_participant_state_transitions": {
+      "class": "administrative",
+      "principal": "kernel-admission",
+      "contract": "Fenced admission operation coordinator; history is authority-wide and is never a tenant read API."
+    },
+    "security_principal_flow_state": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_response_dispatch_fences": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_response_dispatch_recoveries": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_response_dispatches": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_response_effects": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_response_plans": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_response_receipt_cursors": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_scheduler_claims": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_scheduler_fence_sequences": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_scheduler_leases": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_scheduler_retries": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_session_flow_state": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_session_memberships": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_session_throttle_commands": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_session_throttle_effects": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_session_throttle_invocations": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_session_throttle_state": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_session_throttle_windows": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_transitions": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "security_verified_events": {
+      "class": "tenant-predicate",
+      "principal": "security-runtime",
+      "contract": "Trusted security runtime passes tenant-scoped port keys; global readiness, recovery, compaction and scheduler scans have named privileged contracts."
+    },
+    "watermark_sequence_heads_v1": {
+      "class": "tenant-predicate",
+      "principal": "decoy-registry",
+      "contract": "Typed lookup includes authenticated tenant and the keyed artifact/marker reference."
+    },
+    "watermark_sequence_operations_v1": {
+      "class": "tenant-predicate",
+      "principal": "decoy-registry",
+      "contract": "Typed lookup includes authenticated tenant and the keyed artifact/marker reference."
+    }
+  },
+  "principals": {
+    "kernel-admission": "ChioKernel / durable admission coordinator holding the qualified store and mutation fence; no remote tenant store handle.",
+    "receipt-read-adapter": "Authenticated service or local operator selecting sealed ReceiptReadContext. Tenant ID and receipt ID alone are not authority.",
+    "receipt-operator": "Local operator or AdminService read context checked by require_admin_receipt_read_context / require_admin_read_context. Mutations require the service token.",
+    "receipt-integrity": "Kernel receipt persistence, startup verification and retention owner. These internal scans authenticate whole logs across tenants.",
+    "settlement-worker": "Composition-installed IOU settlement store; external retrieval requires service authentication.",
+    "blob-mutation": "Internal encrypted-store mutation coordinator; exact_reference_mutation checks all requested tenant/reference bindings before a replay result escapes.",
+    "finding-delivery": "Composition-installed seller/delivery store. Tenant payload retrieval uses tenant predicate and key; global quota accounting exposes lengths only.",
+    "security-runtime": "Composition-installed security state service, scheduler or recovery coordinator. Tenant requests enter typed port methods; global reads are control operations.",
+    "decoy-registry": "Composition-installed sealed decoy registry using tenant-scoped keyed references."
+  },
+  "constructors": [
+    "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs::call::from_wire",
+    "crates/platform/chio-control-plane/src/security/active_response_authority/validation.rs::decode_authority_request::from_wire",
+    "crates/platform/chio-manifest/src/admission.rs::read_existing_signed_manifest::new",
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_stored_json::new",
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new",
+    "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire",
+    "crates/security/chio-active-response-authority/src/store.rs::decode_canonical::from_wire",
+    "crates/security/chio-keyring/src/enterprise_receipt.rs::from_canonical_bytes::from_wire",
+    "crates/security/chio-keyring/src/ipc.rs::load_bounded_json_file::from_wire",
+    "crates/security/chio-keyring/src/ipc.rs::read_canonical_frame::from_wire",
+    "crates/security/chio-keyring/src/lib.rs::from_bounded_json::from_wire",
+    "crates/security/chio-keyring/src/service.rs::load_key_log_policy::from_wire",
+    "crates/security/chio-keyring/src/service.rs::read_bounded_json_line::from_wire",
+    "crates/security/chio-secret-broker/src/authority_ipc.rs::call_with_exchange::from_wire",
+    "crates/security/chio-secret-broker/src/authority_ipc.rs::serve_stream::from_wire",
+    "crates/security/chio-secret-broker/src/daemon.rs::decode_canonical_payload::from_wire",
+    "crates/security/chio-secret-broker/src/daemon_runtime.rs::load::from_wire",
+    "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_wire"
+  ],
+  "raw_decoders": [
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value",
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value",
+    "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice",
+    "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value",
+    "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value",
+    "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_value",
+    "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice"
+  ],
+  "schemas": {
+    "security_participant_egress_events": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_egress.sql"
+    ],
+    "security_participant_state_mutations": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_mutations.sql"
+    ],
+    "security_participant_nonce_preflight_events": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_nonce_preflight.sql"
+    ],
+    "security_participant_output_events": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_output.sql"
+    ],
+    "security_participant_state_declassification_evidence_identity": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_declassification_receipt_outbox": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_declassification_tombstones": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_declassification_uses": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_egress_fences": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_flow_contexts": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_flow_sequences": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_isolation_epochs": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_lineage_flow_state": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_principal_flow_state": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_session_flow_state": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_session_memberships": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "security_participant_state_transitions": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_security_participant_state.sql"
+    ],
+    "admission_operation_authorization_consumptions": [
+      "crates/platform/chio-store-sqlite/src/admission_operation_store.sql"
+    ],
+    "chio_encrypted_blobs": [
+      "crates/platform/chio-store-sqlite/src/encrypted_blob.rs"
+    ],
+    "chio_encrypted_blob_references": [
+      "crates/platform/chio-store-sqlite/src/encrypted_blob.rs"
+    ],
+    "chio_encrypted_blob_reference_mutations": [
+      "crates/platform/chio-store-sqlite/src/encrypted_blob.rs"
+    ],
+    "chio_finding_payloads": [
+      "crates/platform/chio-store-sqlite/src/finding_payload_store.rs"
+    ],
+    "finding_pool_debits": [
+      "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs"
+    ],
+    "iou_envelope": [
+      "crates/platform/chio-store-sqlite/src/iou_store.rs"
+    ],
+    "chio_authorization_receipt_consumptions": [
+      "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs"
+    ],
+    "chio_tool_receipts": [
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs"
+    ],
+    "sealed_decoy_records_v1": [
+      "crates/platform/chio-store-sqlite/src/sealed_decoy_registry.rs"
+    ],
+    "sealed_decoy_operation_owners_v1": [
+      "crates/platform/chio-store-sqlite/src/sealed_decoy_registry.rs"
+    ],
+    "sealed_decoy_transitions_v1": [
+      "crates/platform/chio-store-sqlite/src/sealed_decoy_registry.rs"
+    ],
+    "watermark_sequence_heads_v1": [
+      "crates/platform/chio-store-sqlite/src/sealed_decoy_registry.rs"
+    ],
+    "watermark_sequence_operations_v1": [
+      "crates/platform/chio-store-sqlite/src/sealed_decoy_registry.rs"
+    ],
+    "security_declassification_uses": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_declassification_evidence_identity": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_declassification_receipt_outbox": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_declassification_tombstones": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_attested_finding_batches": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_correlation_ingress": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_correlation_outcomes": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_attested_finding_batch_items": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_attested_finding_response_outbox": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs"
+    ],
+    "security_isolation_epochs": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_principal_flow_state": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_lineage_flow_state": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_session_flow_state": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_session_memberships": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_flow_contexts": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_flow_sequences": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_egress_fences": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_event_ids": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_verified_events": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_advisory_events": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_correlation_events": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_correlation_partition_heads": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_correlation_partials": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_response_plans": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_response_receipt_cursors": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_response_dispatches": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_response_dispatch_fences": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_response_effects": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_effect_contributions": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_overlay_state": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_containment_overlay_commands": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_session_throttle_state": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_session_throttle_effects": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_session_throttle_windows": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_session_throttle_invocations": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_session_throttle_commands": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_capability_set_suspension_state": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_capability_set_suspension_effects": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_capability_set_suspension_members": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_capability_set_suspension_commands": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_issuance_freeze_state": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_issuance_freeze_effects": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_issuance_freeze_commands": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_egress_restriction_state": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_egress_restriction_effects": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_egress_restriction_destinations": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_egress_restriction_commands": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_lineage_fences": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_scheduler_claims": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_scheduler_leases": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_scheduler_fence_sequences": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_scheduler_retries": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_response_dispatch_recoveries": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ],
+    "security_transitions": [
+      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+    ]
+  },
+  "unscoped_sql": [
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+      "owner": "ensure_projection_absent",
+      "sha256": "048b98ac317a882d0cc69395e227775500e6b6f82b2986d7b36b27aad5e08519",
+      "tables": [
+        "admission_operation_authorization_consumptions"
+      ],
+      "sql": "SELECT EXISTS( SELECT 1 FROM admission_operation_terminal_projections WHERE operation_id = ?1 UNION ALL SELECT 1 FROM admission_operation_terminal_records WHERE operation_id = ?1 UNION ALL SELECT 1 FROM admission_operation_authorization_consumptions WHERE operation_id = ?1 UNION ALL SELECT 1 FROM admission_operation_observer_attempts WHERE operation_id = ?1 UNION ALL SELECT 1 FROM obligation_atoms WHERE operation_id = ?1 UNION ALL SELECT 1 FROM obligation_disposition_records WHERE operation_id = ?1 )",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+      "owner": "projection_sidecar_count",
+      "sha256": "b6e105a8d199ae1fb4905ab92616326042599bb73db97c92923838ec33e55af3",
+      "tables": [
+        "admission_operation_authorization_consumptions"
+      ],
+      "sql": "SELECT (SELECT COUNT(*) FROM admission_operation_terminal_records WHERE operation_id = ?1) + (SELECT COUNT(*) FROM admission_operation_authorization_consumptions WHERE operation_id = ?1) + (SELECT COUNT(*) FROM admission_operation_observer_attempts WHERE operation_id = ?1) + (SELECT COUNT(*) FROM obligation_atoms WHERE operation_id = ?1) + (SELECT COUNT(*) FROM obligation_disposition_records WHERE operation_id = ?1)",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+      "owner": "verify_exact_typed_projection_rows",
+      "sha256": "79f141be2182b71ad6d1084b34e698925aadae13e70a4962c275b169620a5668",
+      "tables": [
+        "admission_operation_authorization_consumptions"
+      ],
+      "sql": "SELECT authorization_receipt_id, consumer_receipt_id, request_id, session_id, tool_call_id, tenant_id, parameter_hash, consumed_at_unix_ms, record_digest, record_json FROM admission_operation_authorization_consumptions WHERE operation_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
+      "owner": "verify_stored_authorization_projection",
+      "sha256": "79f141be2182b71ad6d1084b34e698925aadae13e70a4962c275b169620a5668",
+      "tables": [
+        "admission_operation_authorization_consumptions"
+      ],
+      "sql": "SELECT authorization_receipt_id, consumer_receipt_id, request_id, session_id, tool_call_id, tenant_id, parameter_hash, consumed_at_unix_ms, record_digest, record_json FROM admission_operation_authorization_consumptions WHERE operation_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
+      "owner": "observed_time",
+      "sha256": "40eeddce06ccf369dc92a2d9c1c2f22cde26e85d46ccd5e1779854f0c3c2adb6",
+      "tables": [
+        "security_participant_egress_events"
+      ],
+      "sql": "SELECT COALESCE(MAX(observed_at),0) FROM security_participant_egress_events",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
+      "owner": "observed_time",
+      "sha256": "54a723f0838efaed670f9ee6059b8bb29fda2c720574213ef353c809e65b6846",
+      "tables": [
+        "security_participant_output_events"
+      ],
+      "sql": "SELECT COALESCE(MAX(observed_at),0) FROM security_participant_output_events",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
+      "owner": "observed_time",
+      "sha256": "cc99c4322e1455808ff82109d5040b0258141a3f6986a9c1a172d2bb9a133dcd",
+      "tables": [
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT MAX(value) FROM ( SELECT COALESCE(MAX(initialized_at), 0) AS value FROM security_participant_state_initializations UNION ALL SELECT COALESCE(MAX(observed_at_unix_ms), 0) FROM security_participant_migration_events UNION ALL SELECT COALESCE(MAX(observed_at), 0) FROM security_participant_state_mutations)",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/integrity.rs",
+      "owner": "verify_coverage",
+      "sha256": "cbe36578ccb5173bc7e6997bcfde935fbb526d1dc1e57e643afb0f7ec1fda7e4",
+      "tables": [
+        "security_participant_egress_events"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_participant_egress_events AS event WHERE NOT EXISTS(SELECT 1 FROM security_participant_state_initializations AS initialization WHERE initialization.security_authority_id = event.security_authority_id))",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/integrity.rs",
+      "owner": "verify_coverage",
+      "sha256": "f80ef0e80731f0fc980df307680e4a7ced2c4ce99c9df46d3e63f9c7a9adf143",
+      "tables": [
+        "security_participant_egress_events"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_participant_egress_events",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
+      "owner": "head",
+      "sha256": "ffd3fa26856d0a9c50eaa7c28dfb57852acba3ef4de08994016e79e6a87b4d3c",
+      "tables": [
+        "security_participant_egress_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(MIN(sequence),0), COALESCE(MAX(sequence),0), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_egress_events WHERE security_authority_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
+      "owner": "load",
+      "sha256": "652f4cc27289c283d5c839120dc04c29fd80fa9dd28da7d862a8de6641564269",
+      "tables": [
+        "security_participant_egress_events"
+      ],
+      "sql": "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216 AND length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512 THEN canonical_record END FROM security_participant_egress_events WHERE security_authority_id = ?1 AND sequence = ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
+      "owner": "load_operation",
+      "sha256": "c8ad86eaeede8effa88b12cc5535732fe8faffa56d191ae3c394ba1dd069eed2",
+      "tables": [
+        "security_participant_egress_events"
+      ],
+      "sql": "SELECT CASE WHEN length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512 THEN security_authority_id END, sequence FROM security_participant_egress_events WHERE operation_id = ?1 AND phase = ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/write.rs",
+      "owner": "footprint",
+      "sha256": "dd4a25ef51cc6a6c6fb9267f7cd8634a97f48de6bd76c5ea5cc512f5a17e889f",
+      "tables": [
+        "security_participant_egress_events",
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT (SELECT COUNT(*) FROM security_participant_state_initializations), (SELECT COUNT(*) FROM security_participant_state_mutations), (SELECT COUNT(*) FROM security_participant_egress_events), (SELECT COUNT(*) FROM authority_global_commits)",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/write.rs",
+      "owner": "mutate_security_participant_egress",
+      "sha256": "2b55d16ef5930a4e6c9fbc6d894e7868a2db4b851691fa516441440b8c6fa42d",
+      "tables": [
+        "security_participant_state_egress_fences"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_participant_state_egress_fences WHERE security_authority_id = ?1 AND ((tenant_id = ?2 AND request_id = ?3) OR fence_id = ?4))",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
+      "owner": "head",
+      "sha256": "c7c38885d498f26f8511eeab1f4226da56df0d3aff5ce230144f916677f22fbf",
+      "tables": [
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(MAX(sequence), 1), COALESCE(SUM(length(canonical_record)), 0) FROM security_participant_state_mutations WHERE security_authority_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
+      "owner": "load",
+      "sha256": "3616a18da83b9264111488912746a61533a3536fb65f7196a983e79d73de0c19",
+      "tables": [
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216 AND length(CAST(mutation_digest AS BLOB)) = 64 AND length(CAST(operation_id AS BLOB)) BETWEEN 1 AND 512 AND length(CAST(tenant_id AS BLOB)) BETWEEN 1 AND 512 AND length(CAST(transition_id AS BLOB)) BETWEEN 1 AND 512 THEN canonical_record END FROM security_participant_state_mutations WHERE security_authority_id = ?1 AND sequence = ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
+      "owner": "load_for_operation",
+      "sha256": "5f2f5daec8dff3556de63d2180576f10b42618d9b47775d0488fb77acac9be0d",
+      "tables": [
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT CASE WHEN length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512 THEN security_authority_id END, sequence FROM security_participant_state_mutations WHERE operation_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+      "owner": "validate_history_bounds",
+      "sha256": "19058470cbf661e94acd76df0cea8f0cf41fd705d26f5baeb39d670186818969",
+      "tables": [
+        "security_participant_egress_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_egress_events WHERE security_authority_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+      "owner": "validate_history_bounds",
+      "sha256": "42cbd083cba1785e78ff867d5ee1ea95af2b2365f0268a0d6edbe60a5c366fd2",
+      "tables": [
+        "security_participant_output_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_output_events WHERE security_authority_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+      "owner": "validate_history_bounds",
+      "sha256": "b61e10e91728d506f6cceb8dde52229ae2fff5b32116af944e485c1d5d1fea1b",
+      "tables": [
+        "security_participant_nonce_preflight_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+      "owner": "validate_history_bounds",
+      "sha256": "e7e721545ee413751ad99321d37ede67ea0c9d13ffc23a0848b8043aeefc58d6",
+      "tables": [
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_state_mutations WHERE security_authority_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs",
+      "owner": "verify_coverage",
+      "sha256": "b468da5dc30cb7be0926c40a9139ec71aad922672ca4af494f3c449162e4109e",
+      "tables": [
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_participant_state_mutations",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs",
+      "owner": "verify_coverage",
+      "sha256": "e629d39e9043526464610b99eb9d2df4b443865aeeaf4b37bd4fd2de91266bca",
+      "tables": [
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_participant_state_mutations AS mutation WHERE NOT EXISTS(SELECT 1 FROM security_participant_state_initializations AS initialization WHERE initialization.security_authority_id = mutation.security_authority_id))",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/integrity.rs",
+      "owner": "verify_coverage",
+      "sha256": "5453c322a617b41cf699a1f8a4bf547b5e89679d1977ef426db05b80b81da035",
+      "tables": [
+        "security_participant_nonce_preflight_events"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_participant_nonce_preflight_events",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/integrity.rs",
+      "owner": "verify_coverage",
+      "sha256": "bd53ff68b21f68d6dc456559e77b53374ce1c0d57f390a77f2f05320dbcbebba",
+      "tables": [
+        "security_participant_nonce_preflight_events"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_participant_nonce_preflight_events AS event WHERE NOT EXISTS(SELECT 1 FROM security_participant_state_initializations AS initialization WHERE initialization.security_authority_id = event.security_authority_id))",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
+      "owner": "head",
+      "sha256": "d7fbe8592394bf2e302f781153650811573e75a7a4baadcd5b643264599f316c",
+      "tables": [
+        "security_participant_nonce_preflight_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(MIN(sequence),0), COALESCE(MAX(sequence),0), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
+      "owner": "load",
+      "sha256": "fc0570a1cdcc1c74b384f76376137353d9f4f674fd5ec3974db0dbd27d5b6889",
+      "tables": [
+        "security_participant_nonce_preflight_events"
+      ],
+      "sql": "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216 THEN canonical_record END FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1 AND sequence = ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
+      "owner": "load_operation",
+      "sha256": "a0c5c59b3bac35ac0c02f6ddf1ff17aa559f05fa9cdf1455b1bdf334aced3e05",
+      "tables": [
+        "security_participant_nonce_preflight_events"
+      ],
+      "sql": "SELECT CASE WHEN length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512 THEN security_authority_id END, sequence FROM security_participant_nonce_preflight_events WHERE operation_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/write.rs",
+      "owner": "footprint",
+      "sha256": "f69acb167b32f91687c2b932e2892b7d0bba77c14b611b0e3e5466e51a0736b2",
+      "tables": [
+        "security_participant_egress_events",
+        "security_participant_nonce_preflight_events",
+        "security_participant_output_events",
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT (SELECT COUNT(*) FROM security_participant_state_initializations), (SELECT COUNT(*) FROM security_participant_state_mutations), (SELECT COUNT(*) FROM security_participant_egress_events), (SELECT COUNT(*) FROM security_participant_output_events), (SELECT COUNT(*) FROM security_participant_nonce_preflight_events), (SELECT COUNT(*) FROM authority_global_commits)",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/integrity.rs",
+      "owner": "verify_coverage",
+      "sha256": "ba7d00f887f89a8ef6ba733752245f4eb31b5ad2260e41020c199573dde1f124",
+      "tables": [
+        "security_participant_output_events"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_participant_output_events AS event WHERE NOT EXISTS(SELECT 1 FROM security_participant_state_initializations AS initialization WHERE initialization.security_authority_id = event.security_authority_id))",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/integrity.rs",
+      "owner": "verify_coverage",
+      "sha256": "f5952321b74628188d15e4fbf27c9ec632d15eda4e9f13423e113f634176683f",
+      "tables": [
+        "security_participant_output_events"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_participant_output_events",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
+      "owner": "head",
+      "sha256": "abe9abc3d9eb907cf2a6e60f42970568c37c15174682dc841ad5d8c329a5275e",
+      "tables": [
+        "security_participant_output_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(MIN(sequence),0), COALESCE(MAX(sequence),0), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_output_events WHERE security_authority_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
+      "owner": "load",
+      "sha256": "e44bc844514cf9733112cae3816ab77c96087e8cc37c0bef246508571e84ee00",
+      "tables": [
+        "security_participant_output_events"
+      ],
+      "sql": "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216 THEN canonical_record END FROM security_participant_output_events WHERE security_authority_id = ?1 AND sequence = ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
+      "owner": "load_operation",
+      "sha256": "6276b9d3c6c455c88a4eb19a8e0cfc1eb7480eb2ae61fd2bb918014e70d4ad33",
+      "tables": [
+        "security_participant_output_events"
+      ],
+      "sql": "SELECT CASE WHEN length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512 THEN security_authority_id END, sequence FROM security_participant_output_events WHERE operation_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/write.rs",
+      "owner": "footprint",
+      "sha256": "cca5c9a57429bff845c5c072251efa1c986befec694c91cd40edfeefb961a0a7",
+      "tables": [
+        "security_participant_egress_events",
+        "security_participant_output_events",
+        "security_participant_state_mutations"
+      ],
+      "sql": "SELECT (SELECT COUNT(*) FROM security_participant_state_initializations), (SELECT COUNT(*) FROM security_participant_state_mutations), (SELECT COUNT(*) FROM security_participant_egress_events), (SELECT COUNT(*) FROM security_participant_output_events), (SELECT COUNT(*) FROM authority_global_commits)",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/encrypted_blob.rs",
+      "owner": "exact_reference_mutation",
+      "sha256": "d0333d7e930cd7993c4f24a53fffdd721844c7acbcbccf6292fc4543250387dd",
+      "tables": [
+        "chio_encrypted_blob_reference_mutations"
+      ],
+      "sql": "SELECT mutation_digest, mutation_kind, namespace, tenant_id, reference_key, result_blob_id FROM chio_encrypted_blob_reference_mutations WHERE operation_id = ?1",
+      "principal": "blob-mutation",
+      "contract": "Global operation deduplication must compare stored tenant, namespace, reference key, mutation kind and digest before returning a replay."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs",
+      "owner": "seller_finding_artifact_bytes",
+      "sha256": "64e55e154454505e99995c78dfdcdf2d39b235be8500e5c78c2f569a4348a0de",
+      "tables": [
+        "chio_finding_payloads"
+      ],
+      "sql": "SELECT length(ciphertext) FROM chio_finding_payloads WHERE finding_id = ?1",
+      "principal": "finding-delivery",
+      "contract": "Seller capacity accounting reads encrypted byte length only inside the qualified seller store."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "claim",
+      "sha256": "0d7c7913affb2b412e7b89483bdce5a1d6d962d27cb239b3e62b8086635ce533",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "UPDATE finding_pool_debits SET claimed_at_unix_ms = ?2, durable_admission_operation_id = ?3 WHERE purchase_id = ?1 AND state = 'reserved' AND claimed_at_unix_ms IS NULL AND durable_admission_operation_id IS NULL",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "claim",
+      "sha256": "602760df1cac324cf81bc30fecb2cad681a0203df3f41cfead81f25002ec7174",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT allocation_envelope_sha256, tenant_id, finding_id, listing_id, reservation_id, authoritative_payment_operation_id, accepted_bid_envelope_sha256, venue_admission_envelope_sha256, amount_units, currency, state, claim_deadline_unix_ms, claimed_at_unix_ms, durable_admission_operation_id FROM finding_pool_debits WHERE purchase_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "contains_purchase",
+      "sha256": "a158a19bec9eb6ad0b67d801f1505401f059e538c7685da6e9d3f4cd27890a03",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT 1 FROM finding_pool_debits WHERE purchase_id = ?1 LIMIT 1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "debit",
+      "sha256": "fdb08c0d741da8a42bfcbb6441b1beafecf92d2fdfa50c15d6ce722800696bb6",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT d.allocation_envelope_sha256, a.allocation_id, d.debit_request_binding_sha256, d.tenant_id, d.finding_id, d.listing_id, d.reservation_id, d.authoritative_payment_operation_id, d.accepted_bid_envelope_sha256, d.venue_admission_envelope_sha256, d.amount_units, d.currency, d.state, d.reserved_after_units, d.spent_after_units, a.signed_amount_units FROM finding_pool_debits d JOIN finding_pool_allocations a ON a.allocation_envelope_sha256 = d.allocation_envelope_sha256 WHERE d.purchase_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "finalize_claimed_after_unknown_dispatch_by_operation",
+      "sha256": "71d2516740343f488a86ea5c63c812ea07415ea4d4102df0fe7bf5c6a84b98f9",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "UPDATE finding_pool_debits SET state = 'finalized', reserved_after_units = ?2, spent_after_units = ?3 WHERE purchase_id = ?1 AND state = 'reserved' AND durable_admission_operation_id = ?4",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "finalize_claimed_after_unknown_dispatch_by_operation",
+      "sha256": "85fc663e02eb0879b6611e2d18ca03a60e79fa101265ebcb7b32d291c5cd91ca",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT d.purchase_id, d.allocation_envelope_sha256, d.state, d.amount_units, d.reserved_after_units, d.spent_after_units, a.signed_amount_units, a.reserved_units, a.spent_units, d.claimed_at_unix_ms FROM finding_pool_debits d JOIN finding_pool_allocations a ON a.allocation_envelope_sha256 = d.allocation_envelope_sha256 WHERE d.durable_admission_operation_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "list_claimed_admission_operations",
+      "sha256": "cca61243ea292d36ec3e5a58ad2cd3c69a7725aee7eab379404bc9d40d41c03d",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT durable_admission_operation_id FROM finding_pool_debits WHERE state = 'reserved' AND claimed_at_unix_ms IS NOT NULL AND durable_admission_operation_id IS NOT NULL AND (?1 IS NULL OR durable_admission_operation_id > ?1) ORDER BY durable_admission_operation_id ASC LIMIT ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "mutation_for_purchase",
+      "sha256": "3bda3bacc8aaa713356ed4f65ef78303ece90777ed3002dbccf218a5132bca5c",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT d.purchase_id, d.tenant_id, a.allocation_id, d.allocation_envelope_sha256, d.amount_units, d.currency, d.state, a.reserved_units, a.spent_units, a.signed_amount_units, d.durable_admission_operation_id FROM finding_pool_debits d JOIN finding_pool_allocations a ON a.allocation_envelope_sha256 = d.allocation_envelope_sha256 WHERE d.purchase_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "reclaim_expired_unclaimed",
+      "sha256": "c77fa34fe96be2620d07941471332b026a510cf402fc48bd92d56045b55ae75b",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "UPDATE finding_pool_debits SET state = 'released', reserved_after_units = ?2, spent_after_units = ?3 WHERE purchase_id = ?1 AND state = 'reserved' AND claimed_at_unix_ms IS NULL",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "release_claimed_before_dispatch",
+      "sha256": "85fc663e02eb0879b6611e2d18ca03a60e79fa101265ebcb7b32d291c5cd91ca",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT d.purchase_id, d.allocation_envelope_sha256, d.state, d.amount_units, d.reserved_after_units, d.spent_after_units, a.signed_amount_units, a.reserved_units, a.spent_units, d.claimed_at_unix_ms FROM finding_pool_debits d JOIN finding_pool_allocations a ON a.allocation_envelope_sha256 = d.allocation_envelope_sha256 WHERE d.durable_admission_operation_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "release_claimed_before_dispatch",
+      "sha256": "9d795c2f0aa7868fd290f87d42ce2aaf67cf0a6519e3b88cfa2730f6afc1c4d7",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "UPDATE finding_pool_debits SET state = 'released', reserved_after_units = ?2, spent_after_units = ?3 WHERE purchase_id = ?1 AND state = 'reserved' AND durable_admission_operation_id = ?4",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "replay_debit",
+      "sha256": "7b15632ecd157ed2a6919b68e37f1334e59717679a7ed4d731256017bc39b7ca",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT d.allocation_envelope_sha256, a.allocation_id, d.debit_request_binding_sha256, d.tenant_id, d.amount_units, d.currency, d.state, d.reserved_after_units, d.spent_after_units, a.signed_amount_units FROM finding_pool_debits d JOIN finding_pool_allocations a ON a.allocation_envelope_sha256 = d.allocation_envelope_sha256 WHERE d.purchase_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "settle",
+      "sha256": "2c23525c5c11c4c9c08bd1e32704f663f347452a5a242603d0507d8f2c00991f",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "UPDATE finding_pool_debits SET state = ?2, reserved_after_units = ?3, spent_after_units = ?4 WHERE purchase_id = ?1 AND state = 'reserved' AND claimed_at_unix_ms IS NOT NULL AND durable_admission_operation_id = ?5",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs",
+      "owner": "settle",
+      "sha256": "5bba548dc8cea86d4ad18d85f323d0f5242fbce472d28e004ac3fd95750e8ee8",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT d.allocation_envelope_sha256, a.allocation_id, d.finding_id, d.listing_id, d.reservation_id, d.authoritative_payment_operation_id, d.amount_units, d.currency, d.state, d.reserved_after_units, d.spent_after_units, a.signed_amount_units, a.reserved_units, a.spent_units, d.claimed_at_unix_ms, d.durable_admission_operation_id FROM finding_pool_debits d JOIN finding_pool_allocations a ON a.allocation_envelope_sha256 = d.allocation_envelope_sha256 WHERE d.purchase_id = ?1",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger/expiration.rs",
+      "owner": "expired_unclaimed_reservations",
+      "sha256": "21fdc6d8f98bc14a885f16e3027f578122d6df08241c4e2cf2c0740a07ac7ff0",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT purchase_id, amount_units, claim_deadline_unix_ms FROM finding_pool_debits WHERE allocation_envelope_sha256 = ?1 AND state = 'reserved' AND claimed_at_unix_ms IS NULL AND claim_deadline_unix_ms <> '' AND claim_deadline_unix_ms NOT GLOB '*[^0-9]*' AND (length(claim_deadline_unix_ms) < length(?2) OR (length(claim_deadline_unix_ms) = length(?2) AND claim_deadline_unix_ms <= ?2)) AND (?3 = '' OR purchase_id <> ?3) ORDER BY length(claim_deadline_unix_ms), claim_deadline_unix_ms, purchase_id LIMIT ?4",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger/expiration.rs",
+      "owner": "expired_unclaimed_reservations",
+      "sha256": "292881516dfa3d97318024cc1b57c6dbf05ea0cbb5d38c29dba6cf16608eedb9",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT purchase_id, amount_units, claim_deadline_unix_ms FROM finding_pool_debits WHERE purchase_id = ?1 AND allocation_envelope_sha256 = ?2 AND state = 'reserved' AND claimed_at_unix_ms IS NULL AND claim_deadline_unix_ms <> '' AND claim_deadline_unix_ms NOT GLOB '*[^0-9]*' AND (length(claim_deadline_unix_ms) < length(?3) OR (length(claim_deadline_unix_ms) = length(?3) AND claim_deadline_unix_ms <= ?3))",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs",
+      "owner": "bind_rollback_anchor",
+      "sha256": "7c8b3c89a5f6add9ae28220ea020b27360328804bcd9b5e6fa751a0f599a0ef8",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM finding_pool_allocations LIMIT 1) OR EXISTS(SELECT 1 FROM finding_pool_debits LIMIT 1) OR EXISTS(SELECT 1 FROM finding_pool_receipt_outbox LIMIT 1)",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger/schema.rs",
+      "owner": "ensure_lifecycle_columns",
+      "sha256": "0746bb760db082a9e540fed8394704caefdef992cf307274caff737e07ac6f5f",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "UPDATE finding_pool_debits SET claimed_at_unix_ms = '0' WHERE state = 'reserved' AND claim_deadline_unix_ms = '0' AND claimed_at_unix_ms IS NULL",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger/schema.rs",
+      "owner": "ensure_lifecycle_columns",
+      "sha256": "acc0edc3f39597da5ddeb764217cf910684cfbc2f34a085b8b0a3fd3e7793a07",
+      "tables": [
+        "finding_pool_debits"
+      ],
+      "sql": "SELECT COUNT(*) FROM finding_pool_debits WHERE state = 'reserved' AND claimed_at_unix_ms IS NOT NULL AND durable_admission_operation_id IS NULL",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/iou_store.rs",
+      "owner": "get_by_receipt_id",
+      "sha256": "25a07d27d46cab3ef635bd1917d6409174adc64373871aacac3b20d20388cafd",
+      "tables": [
+        "iou_envelope"
+      ],
+      "sql": "SELECT canonical_json FROM iou_envelope WHERE receipt_id = ?1",
+      "principal": "settlement-worker",
+      "contract": "IOU verification and settlement replay under the installed settlement store; no tenant endpoint accepts an identifier as authority."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/iou_store.rs",
+      "owner": "insert_envelope_on_connection",
+      "sha256": "25a07d27d46cab3ef635bd1917d6409174adc64373871aacac3b20d20388cafd",
+      "tables": [
+        "iou_envelope"
+      ],
+      "sql": "SELECT canonical_json FROM iou_envelope WHERE receipt_id = ?1",
+      "principal": "settlement-worker",
+      "contract": "IOU verification and settlement replay under the installed settlement store; no tenant endpoint accepts an identifier as authority."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store.rs",
+      "owner": "claim_log_entry_seq_for_source_tx",
+      "sha256": "64f336f3fff876e0c416c6c2e9efde2f628432aca8bd667b5552b30ea6839b9a",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT l.entry_seq, l.receipt_id, l.raw_json, r.receipt_id, r.raw_json FROM claim_receipt_log_entries l JOIN chio_tool_receipts r ON r.seq = l.source_seq WHERE l.receipt_kind = ?1 AND l.source_seq = ?2",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store.rs",
+      "owner": "consume_authorization_receipt_tx",
+      "sha256": "82ac136db9521066f2037f320414ba6c8a9a23b90fd3a36215e818263eb7e70f",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT tenant_id FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store.rs",
+      "owner": "max_tool_receipt_seq",
+      "sha256": "7728e18b0d94639f58da1a4aab1e4420dd0c039fb8b1e55ab37f62612e942b60",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COALESCE(MAX(seq), 0) FROM chio_tool_receipts",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store.rs",
+      "owner": "receipt_store_has_receipts",
+      "sha256": "788e9390229cdab460a749d18f7841f8e36602a8da8dd9eb29d2bc1010ad6cae",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT EXISTS( SELECT 1 FROM claim_receipt_log_entries UNION ALL SELECT 1 FROM chio_tool_receipts UNION ALL SELECT 1 FROM chio_child_receipts UNION ALL SELECT 1 FROM kernel_checkpoints UNION ALL SELECT 1 FROM receipt_retention_watermark WHERE archived_through_entry_seq > 0 UNION ALL SELECT 1 FROM receipt_retention_tombstones )",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/append.rs",
+      "owner": "append_chio_receipt_tx_with_insert_status",
+      "sha256": "fd1a52a142b39187d61b4e0ad28a5fb46b683d3148a4b7fd103a54166072152e",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json, cost_currency, cost_charged_be, attempted_cost_be FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/listing.rs",
+      "owner": "list_tool_receipts",
+      "sha256": "52614f71879bdedf7c063a7a76bf80d9b161f384804f8d5768cbca6f4f5ecb16",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE (?1 IS NULL OR capability_id = ?1) AND (?2 IS NULL OR tool_server = ?2) AND (?3 IS NULL OR tool_name = ?3) AND (?4 IS NULL OR decision_kind = ?4) ORDER BY seq DESC LIMIT ?5",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/listing.rs",
+      "owner": "list_tool_receipts_after_seq",
+      "sha256": "dc60af54bb579030c9f7dc391f2d31327264e6889c06abaf13647b32e351dca9",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE seq > ?1 ORDER BY seq ASC LIMIT ?2",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/listing.rs",
+      "owner": "list_tool_receipts_for_subject",
+      "sha256": "f4594bc20ee15558179bb8b08d70652f8c99f60711efac160b7e637024a6505d",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.raw_json FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE COALESCE(r.subject_key, cl.subject_key) = ?1 ORDER BY r.timestamp ASC, r.seq ASC",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/listing.rs",
+      "owner": "tool_receipt_count",
+      "sha256": "882361fe5bdef9da1a92e35ae82c30d49f0cbacf62e9114b924822abd6c3c7b9",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM chio_tool_receipts",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "compute_archival_watermark",
+      "sha256": "204bc5c47488640c43b920857feea7b74688994b77538b7a63fdd238bf80bd84",
+      "tables": [
+        "chio_authorization_receipt_consumptions"
+      ],
+      "sql": "SELECT COALESCE(MAX(kc.batch_end_seq), 0) FROM kernel_checkpoints kc WHERE NOT EXISTS ( SELECT 1 FROM claim_receipt_log_entries e WHERE e.entry_seq <= kc.batch_end_seq AND e.timestamp >= ?1 ) AND NOT EXISTS ( SELECT 1 FROM chio_authorization_receipt_consumptions ac JOIN claim_receipt_log_entries ae ON ae.receipt_id = ac.authorization_receipt_id JOIN claim_receipt_log_entries ce ON ce.receipt_id = ac.consumer_receipt_id WHERE ae.entry_seq <= kc.batch_end_seq AND ce.entry_seq > kc.batch_end_seq ) AND NOT EXISTS ( SELECT 1 FROM receipt_lineage_statements ls JOIN claim_receipt_log_entries pe ON pe.receipt_id = ls.parent_receipt_id JOIN claim_receipt_log_entries ce ON ce.receipt_id = ls.receipt_id WHERE pe.entry_seq <= kc.batch_end_seq AND ce.entry_seq > kc.batch_end_seq ) AND NOT EXISTS ( SELECT 1 FROM settlement_reconciliations sr JOIN claim_receipt_log_entries e ON e.receipt_id = sr.receipt_id WHERE e.entry_seq <= kc.batch_end_seq AND sr.reconciliation_state IN ('open', 'retry_scheduled') ) AND NOT EXISTS ( SELECT 1 FROM metered_billing_reconciliations mbr JOIN claim_receipt_log_entries e ON e.receipt_id = mbr.receipt_id WHERE e.entry_seq <= kc.batch_end_seq AND mbr.reconciliation_state IN ('open', 'retry_scheduled') ) {active_settlement_guard}",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "copy_archived_prefix",
+      "sha256": "ace7d77a6c5315bfc328e6cf85ad8c8673356eb043849e0249664c1f2406a2d7",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM archive.chio_tool_receipts",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "copy_archived_prefix",
+      "sha256": "ace7d77a6c5315bfc328e6cf85ad8c8673356eb043849e0249664c1f2406a2d7",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM archive.chio_tool_receipts",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "delete_archived_prefix_in_tx",
+      "sha256": "b020a17baf9f7e4993f75b792fb5afb242e38785e2c0c2fb6ead847189a9b192",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "DELETE FROM chio_tool_receipts WHERE seq IN ( SELECT source_seq FROM claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "delete_archived_prefix_in_tx",
+      "sha256": "cb30be9f95be8fc54d562bfc2bd7ce9e083c3b91619cb446778e50df6568cfb0",
+      "tables": [
+        "chio_authorization_receipt_consumptions"
+      ],
+      "sql": "DELETE FROM chio_authorization_receipt_consumptions WHERE authorization_receipt_id IN ( SELECT receipt_id FROM claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "oldest_receipt_timestamp",
+      "sha256": "7036cdded9f5813e53c21ab7550e464366cb5fa928e2b7ddc7e525ea37c8cd49",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT MIN(timestamp) FROM chio_tool_receipts",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "retention_repair_on_writer",
+      "sha256": "5171b698f15925f9d64898776697c19396d7c94f7447fda5af585f2b1e425ee6",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM claim_receipt_log_entries e WHERE e.entry_seq <= ?1 AND (EXISTS (SELECT 1 FROM chio_tool_receipts t WHERE t.receipt_id = e.receipt_id) OR EXISTS (SELECT 1 FROM chio_child_receipts c WHERE c.receipt_id = e.receipt_id))",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "retention_repair_on_writer",
+      "sha256": "f8dd345af975496b14cc1f16ce640fdab8eb0315b1774b5cf11078046a6b3a2e",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT e.entry_seq, e.receipt_id FROM claim_receipt_log_entries e WHERE NOT EXISTS (SELECT 1 FROM chio_tool_receipts t WHERE t.receipt_id = e.receipt_id) AND NOT EXISTS (SELECT 1 FROM chio_child_receipts c WHERE c.receipt_id = e.receipt_id) ORDER BY e.entry_seq",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "verify_co_archival_complete",
+      "sha256": "081f47169a28888ab852e123decfb8dda782f1fb324cc9251f65dbf770c8fe89",
+      "tables": [
+        "chio_authorization_receipt_consumptions"
+      ],
+      "sql": "SELECT COUNT(*) FROM main.chio_authorization_receipt_consumptions m WHERE m.authorization_receipt_id IN (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt') AND EXISTS (SELECT 1 FROM archive.chio_authorization_receipt_consumptions a WHERE a.authorization_receipt_id = m.authorization_receipt_id AND a.consumer_receipt_id IS m.consumer_receipt_id AND a.request_id IS m.request_id AND a.session_id IS m.session_id AND a.tool_call_id IS m.tool_call_id AND a.tenant_id IS m.tenant_id AND a.parameter_hash IS m.parameter_hash AND a.consumed_at_unix_ms IS m.consumed_at_unix_ms)",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "verify_co_archival_complete",
+      "sha256": "8abc8c456489f1fa887d733f9615848c49cb8356df32bcd61f715a1c458c6eb6",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM main.capability_lineage m WHERE m.capability_id IN (SELECT r.capability_id FROM main.chio_tool_receipts r WHERE r.seq IN (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')) AND EXISTS (SELECT 1 FROM archive.capability_lineage a WHERE a.capability_id = m.capability_id AND a.subject_key IS m.subject_key AND a.issuer_key IS m.issuer_key AND a.issued_at IS m.issued_at AND a.expires_at IS m.expires_at AND a.grants_json IS m.grants_json AND a.delegation_depth IS m.delegation_depth AND a.parent_capability_id IS m.parent_capability_id AND a.federated_parent_capability_id IS m.federated_parent_capability_id AND a.provenance IS m.provenance AND a.signed_capability_json IS m.signed_capability_json)",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "verify_co_archival_complete",
+      "sha256": "9503a24ba4571728582bd0d93f6f7f2f1d0d0faf4c9defc78d36d7b562bb7b68",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM main.chio_tool_receipts m WHERE m.seq IN (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt') AND EXISTS (SELECT 1 FROM archive.chio_tool_receipts a WHERE a.seq = m.seq AND a.receipt_id IS m.receipt_id AND a.timestamp IS m.timestamp AND a.capability_id IS m.capability_id AND a.subject_key IS m.subject_key AND a.issuer_key IS m.issuer_key AND a.grant_index IS m.grant_index AND a.tool_server IS m.tool_server AND a.tool_name IS m.tool_name AND a.decision_kind IS m.decision_kind AND a.policy_hash IS m.policy_hash AND a.content_hash IS m.content_hash AND a.raw_json IS m.raw_json AND a.tenant_id IS m.tenant_id AND a.cost_currency IS m.cost_currency AND a.cost_charged_be IS m.cost_charged_be AND a.attempted_cost_be IS m.attempted_cost_be)",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "verify_co_archival_complete",
+      "sha256": "a6a458fbbc36aee548f8421c936687a1bb7a73521288aaa7ee866f7981316af5",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM main.capability_lineage m WHERE m.capability_id IN (SELECT r.capability_id FROM main.chio_tool_receipts r WHERE r.seq IN (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt'))",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "verify_co_archival_complete",
+      "sha256": "d890e5e7bce80de728b929e7dea3d4b55da88024aae4639bc345aec1b0e16dfd",
+      "tables": [
+        "chio_authorization_receipt_consumptions"
+      ],
+      "sql": "SELECT COUNT(*) FROM main.chio_authorization_receipt_consumptions WHERE authorization_receipt_id IN (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "owner": "verify_co_archival_complete",
+      "sha256": "f747873b83b4f9909fa8eb9ef2864dc37f7902a8baceedba42e467c4baf8fc8c",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM main.chio_tool_receipts WHERE seq IN (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/liability_claims.rs",
+      "owner": "record_liability_claim_package",
+      "sha256": "8a46ddf99a9c1175dc4a933b77896d74ef06a2275d1c952bcd3f5f7e82b369f3",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT 1 FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/authorization.rs",
+      "owner": "query_authorization_context_report",
+      "sha256": "2bf734ccc8196fb2d9677d99932269ede14e64a333ea02fbeca4de95fe252026",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.raw_json, r.subject_key, r.issuer_key, cl.subject_key, cl.issuer_key, r.grant_index, cl.grants_json, rls.statement_id, rls.session_anchor_id FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN receipt_lineage_statements rls ON r.receipt_id = rls.receipt_id WHERE json_type(r.raw_json, '$.metadata.governed_transaction') = 'object' AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) ORDER BY r.timestamp DESC, r.seq DESC",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/authorization.rs",
+      "owner": "query_authorization_context_report",
+      "sha256": "a97818d65fa748ac053e7680bf164e82c696b433b79acd8713852bc832e2152d",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.approval') = 'object' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_extract(r.raw_json, '$.metadata.governed_transaction.approval.approved') = 1 THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.commerce') = 'object' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.metered_billing') = 'object' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.runtime_assurance') = 'object' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.call_chain') = 'object' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.max_amount') = 'object' THEN 1 ELSE 0 END ), 0) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE json_type(r.raw_json, '$.metadata.governed_transaction') = 'object' AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/authorization.rs",
+      "owner": "query_authorization_review_pack",
+      "sha256": "64a0804960ba1dd8c0b9b9b6b5e62d1dec304e37aaf6901f1460057195122cc6",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/behavioral.rs",
+      "owner": "query_behavioral_feed_receipts",
+      "sha256": "66c7c70fe158166663230861e23c78c3675257b8e5b9a69b352df92c28292234",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.raw_json FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) ORDER BY r.timestamp DESC, r.seq DESC LIMIT ?7",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/behavioral.rs",
+      "owner": "query_behavioral_feed_receipts",
+      "sha256": "838cc90158b0f0d61653dc4d2c976c69cc6331fb4a16b0d3df32e6bfa0fcbe00",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/behavioral.rs",
+      "owner": "query_behavioral_feed_receipts",
+      "sha256": "b17cc7b166ab59a776d6fb1df9928518b32537778f09176b563b87d613988a31",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COALESCE(SUM( CASE WHEN COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') = 'pending' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') = 'settled' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') = 'failed' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') = 'not_applicable' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') IN ('pending', 'failed') AND COALESCE(sr.reconciliation_state, 'open') NOT IN ('reconciled', 'ignored') THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN COALESCE(sr.reconciliation_state, 'open') = 'reconciled' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction') IS NOT NULL THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.approval') IS NOT NULL THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_extract(r.raw_json, '$.metadata.governed_transaction.approval.approved') = 1 THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.commerce') IS NOT NULL THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN json_type(r.raw_json, '$.metadata.governed_transaction.max_amount') IS NOT NULL THEN 1 ELSE 0 END ), 0) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN settlement_reconciliations sr ON r.receipt_id = sr.receipt_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/behavioral.rs",
+      "owner": "query_recent_credit_loss_receipts",
+      "sha256": "834b06d2c1ff408ef959cde0f8c2864fe9e7e61e2a6642f88f2adc60259ebe45",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN settlement_reconciliations sr ON r.receipt_id = sr.receipt_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) AND ( COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') = 'failed' OR ( COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') IN ('pending', 'failed') AND COALESCE(sr.reconciliation_state, 'open') NOT IN ('reconciled', 'ignored') ) )",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/behavioral.rs",
+      "owner": "query_recent_credit_loss_receipts",
+      "sha256": "ea0934f5e1a00984e5e78a4198565b792a4c48d2b00e601390974a4228611cfa",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.raw_json FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN settlement_reconciliations sr ON r.receipt_id = sr.receipt_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) AND ( COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') = 'failed' OR ( COALESCE(json_extract(r.raw_json, '$.metadata.financial.settlement_status'), 'not_applicable') IN ('pending', 'failed') AND COALESCE(sr.reconciliation_state, 'open') NOT IN ('reconciled', 'ignored') ) ) ORDER BY r.timestamp DESC, r.seq DESC LIMIT ?7",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/billing.rs",
+      "owner": "query_metered_billing_summary",
+      "sha256": "9dd937a9400cd4801a035f5f1ceaceab221c1a57517bc26043b11fcf3bd08fb8",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) AS matching_receipts, COALESCE(SUM(CASE WHEN mbr.receipt_id IS NOT NULL THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN mbr.receipt_id IS NULL THEN 1 ELSE 0 END), 0), COALESCE(SUM( CASE WHEN mbr.receipt_id IS NOT NULL AND mbr.observed_units > CAST(json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.quote.quotedUnits') AS INTEGER) THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN mbr.receipt_id IS NOT NULL AND json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.maxBilledUnits') IS NOT NULL AND mbr.observed_units > CAST(json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.maxBilledUnits') AS INTEGER) THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN mbr.receipt_id IS NOT NULL AND ( mbr.billed_cost_currency != json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.quote.quotedCost.currency') OR mbr.billed_cost_units > CAST(json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.quote.quotedCost.units') AS INTEGER) ) THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN mbr.receipt_id IS NOT NULL AND json_type(r.raw_json, '$.metadata.financial') = 'object' AND ( mbr.billed_cost_currency != json_extract(r.raw_json, '$.metadata.financial.currency') OR mbr.billed_cost_units != CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) ) THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN COALESCE(mbr.reconciliation_state, 'open') = 'reconciled' THEN 1 ELSE 0 END ), 0), COALESCE(SUM( CASE WHEN COALESCE(mbr.reconciliation_state, 'open') NOT IN ('reconciled', 'ignored') AND ( mbr.receipt_id IS NULL OR mbr.observed_units > CAST(json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.quote.quotedUnits') AS INTEGER) OR ( json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.maxBilledUnits') IS NOT NULL AND mbr.observed_units > CAST(json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.maxBilledUnits') AS INTEGER) ) OR mbr.billed_cost_currency != json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.quote.quotedCost.currency') OR mbr.billed_cost_units > CAST(json_extract(r.raw_json, '$.metadata.governed_transaction.metered_billing.quote.quotedCost.units') AS INTEGER) OR ( json_type(r.raw_json, '$.metadata.financial') = 'object' AND ( mbr.billed_cost_currency != json_extract(r.raw_json, '$.metadata.financial.currency') OR mbr.billed_cost_units != CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) ) ) ) THEN 1 ELSE 0 END ), 0) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN metered_billing_reconciliations mbr ON r.receipt_id = mbr.receipt_id WHERE json_type(r.raw_json, '$.metadata.governed_transaction.metered_billing') = 'object' AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/compliance.rs",
+      "owner": "query_compliance_report",
+      "sha256": "3e2aea65e6651b18940218e5e51b85f62726d96c8240dc5cb4d5e2a430ef5415",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) AS matching_receipts, COALESCE(SUM( CASE WHEN EXISTS( SELECT 1 FROM kernel_checkpoints kc WHERE r.seq BETWEEN kc.batch_start_seq AND kc.batch_end_seq ) THEN 1 ELSE 0 END ), 0) AS evidence_ready_receipts, COALESCE(SUM(CASE WHEN cl.capability_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS lineage_covered_receipts, COALESCE(SUM( CASE WHEN json_extract(r.raw_json, '$.metadata.financial.settlement_status') = 'pending' THEN 1 ELSE 0 END ), 0) AS pending_settlement_receipts, COALESCE(SUM( CASE WHEN json_extract(r.raw_json, '$.metadata.financial.settlement_status') = 'failed' THEN 1 ELSE 0 END ), 0) AS failed_settlement_receipts FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs",
+      "owner": "query_cost_attribution_report",
+      "sha256": "23248f6f8ac5d1f69651355f58d0255586d7e87c7610a604c8fe3aa83fbf9e69",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) AND json_type(r.raw_json, '$.metadata.financial') = 'object'",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs",
+      "owner": "query_cost_attribution_report",
+      "sha256": "a45631597479a19a776de4219bacaaf005207de8f4ab10ab7c66d58fe615d021",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.raw_json FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) AND json_type(r.raw_json, '$.metadata.financial') = 'object' ORDER BY r.seq ASC",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs",
+      "owner": "query_economic_receipt_projection_report",
+      "sha256": "9a982dd453048e75fb684339497a0d98a5fdaf44fc1b24996bac073c09cc3dcc",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE json_type(r.raw_json, '$.metadata.governed_transaction.economic_authorization') = 'object' AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs",
+      "owner": "query_economic_receipt_projection_report",
+      "sha256": "cd227809b531088308c2d6459c02cd6fd44fed5210b39df00540ada664e93a6a",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.receipt_id, r.timestamp, r.capability_id, COALESCE(r.subject_key, cl.subject_key), r.tool_server, r.tool_name, COALESCE(sr.reconciliation_state, 'open'), sr.note, sr.updated_at, COALESCE(mbr.reconciliation_state, 'open'), mbr.note, mbr.updated_at, mbr.adapter_kind, mbr.evidence_id, mbr.observed_units, mbr.billed_cost_units, mbr.billed_cost_currency, mbr.evidence_sha256, mbr.recorded_at, r.raw_json FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN settlement_reconciliations sr ON r.receipt_id = sr.receipt_id LEFT JOIN metered_billing_reconciliations mbr ON r.receipt_id = mbr.receipt_id WHERE json_type(r.raw_json, '$.metadata.governed_transaction.economic_authorization') = 'object' AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) ORDER BY r.timestamp DESC, r.seq DESC LIMIT ?7",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/reconciliation.rs",
+      "owner": "query_metered_billing_reconciliation_report",
+      "sha256": "dfe17e802091282a481d3df852ac36f4a47d9a104f38d77a739c69f60041c81b",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.raw_json, COALESCE(r.subject_key, cl.subject_key), mbr.adapter_kind, mbr.evidence_id, mbr.observed_units, mbr.billed_cost_units, mbr.billed_cost_currency, mbr.evidence_sha256, mbr.recorded_at, COALESCE(mbr.reconciliation_state, 'open'), mbr.note, mbr.updated_at FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN metered_billing_reconciliations mbr ON r.receipt_id = mbr.receipt_id WHERE json_type(r.raw_json, '$.metadata.governed_transaction.metered_billing') = 'object' AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) ORDER BY r.timestamp DESC, r.seq DESC LIMIT ?7",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/reconciliation.rs",
+      "owner": "upsert_metered_billing_reconciliation",
+      "sha256": "64a0804960ba1dd8c0b9b9b6b5e62d1dec304e37aaf6901f1460057195122cc6",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/reconciliation.rs",
+      "owner": "upsert_settlement_reconciliation",
+      "sha256": "8a46ddf99a9c1175dc4a933b77896d74ef06a2275d1c952bcd3f5f7e82b369f3",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT 1 FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/settlement.rs",
+      "owner": "query_settlement_reconciliation_report",
+      "sha256": "2a3d5d9c72c46a7ad4ac83bced379b4c6585f779ddaaaa04ba04cecfcaf02319",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) AS matching_receipts, COALESCE(SUM( CASE WHEN json_extract(r.raw_json, '$.metadata.financial.settlement_status') = 'pending' THEN 1 ELSE 0 END ), 0) AS pending_receipts, COALESCE(SUM( CASE WHEN json_extract(r.raw_json, '$.metadata.financial.settlement_status') = 'failed' THEN 1 ELSE 0 END ), 0) AS failed_receipts, COALESCE(SUM( CASE WHEN COALESCE(sr.reconciliation_state, 'open') NOT IN ('reconciled', 'ignored') THEN 1 ELSE 0 END ), 0) AS actionable_receipts, COALESCE(SUM( CASE WHEN COALESCE(sr.reconciliation_state, 'open') = 'reconciled' THEN 1 ELSE 0 END ), 0) AS reconciled_receipts FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN settlement_reconciliations sr ON r.receipt_id = sr.receipt_id WHERE json_extract(r.raw_json, '$.metadata.financial.settlement_status') IN ('pending', 'failed') AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/settlement.rs",
+      "owner": "query_settlement_reconciliation_report",
+      "sha256": "fd657922f0a39b01118cb43ddf2ab11255ab9406600dbfd1f90d7bf3073d0c5f",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.receipt_id, r.timestamp, r.capability_id, COALESCE(r.subject_key, cl.subject_key), r.tool_server, r.tool_name, json_extract(r.raw_json, '$.metadata.financial.payment_reference'), json_extract(r.raw_json, '$.metadata.financial.settlement_status'), CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER), json_extract(r.raw_json, '$.metadata.financial.currency'), COALESCE(sr.reconciliation_state, 'open'), sr.note, sr.updated_at, r.raw_json FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN settlement_reconciliations sr ON r.receipt_id = sr.receipt_id WHERE json_extract(r.raw_json, '$.metadata.financial.settlement_status') IN ('pending', 'failed') AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) ORDER BY r.timestamp DESC, r.seq DESC LIMIT ?7",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/shared_evidence.rs",
+      "owner": "query_shared_evidence_report",
+      "sha256": "a0a66c9b5c1d79b5ee7fc35eab29a4517c147e78ac6d454234c981636e5787e1",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.receipt_id, r.timestamp, r.capability_id, r.decision_kind FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) ORDER BY r.seq ASC",
+      "principal": "receipt-operator",
+      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs",
+      "owner": "load_tool_claim_receipt_projection_row_by_id",
+      "sha256": "63b4eb3257cb5e0be1fce3b887aaf7dce5119af6b57987e98338e97b9e7ecbd0",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT receipt_id, seq, timestamp, capability_id, subject_key, issuer_key, tool_server, tool_name, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs",
+      "owner": "load_tool_claim_receipt_projection_rows",
+      "sha256": "4817d53fe5b8565e5b7ad7655559269de22ce71791de45448cea84bae312fa9d",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT receipt_id, seq, timestamp, capability_id, subject_key, issuer_key, tool_server, tool_name, raw_json FROM chio_tool_receipts ORDER BY timestamp ASC, seq ASC",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
+      "owner": "backfill_tool_receipt_attribution_columns",
+      "sha256": "24caaab20e6cd3474344dcb931c4000a753db9eae7304d899482ce91f42100d0",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "UPDATE chio_tool_receipts SET grant_index = CAST(COALESCE( json_extract(raw_json, '$.metadata.attribution.grant_index'), json_extract(raw_json, '$.metadata.financial.grant_index') ) AS INTEGER) WHERE grant_index IS NULL AND COALESCE( json_extract(raw_json, '$.metadata.attribution.grant_index'), json_extract(raw_json, '$.metadata.financial.grant_index') ) IS NOT NULL",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
+      "owner": "backfill_tool_receipt_attribution_columns",
+      "sha256": "70c8cc09b03aa9ec62532f6e9cb4d6a4027894082e7a8943d6a81e7986604ea4",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "UPDATE chio_tool_receipts SET tenant_id = CAST(json_extract(raw_json, '$.tenant_id') AS TEXT) WHERE tenant_id IS NULL AND json_extract(raw_json, '$.tenant_id') IS NOT NULL",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
+      "owner": "backfill_tool_receipt_attribution_columns",
+      "sha256": "8c6b6788289e422aaf9f58d985cae1dcef182e19eb23de16edc7d4e651ef7075",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "UPDATE chio_tool_receipts SET subject_key = COALESCE( subject_key, CAST(json_extract(raw_json, '$.metadata.attribution.subject_key') AS TEXT), (SELECT cl.subject_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id) ) WHERE subject_key IS NULL AND COALESCE( CAST(json_extract(raw_json, '$.metadata.attribution.subject_key') AS TEXT), (SELECT cl.subject_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id) ) IS NOT NULL",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
+      "owner": "backfill_tool_receipt_attribution_columns",
+      "sha256": "bab2f84a92a8be09bf214af58ab557d1ac7039620e7ca37dc968704dc10859cc",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "UPDATE chio_tool_receipts SET issuer_key = COALESCE( issuer_key, CAST(json_extract(raw_json, '$.metadata.attribution.issuer_key') AS TEXT), (SELECT cl.issuer_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id) ) WHERE issuer_key IS NULL AND COALESCE( CAST(json_extract(raw_json, '$.metadata.attribution.issuer_key') AS TEXT), (SELECT cl.issuer_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id) ) IS NOT NULL",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs",
+      "owner": "backfill_provenance_lineage_tables",
+      "sha256": "45af9378bee1a5ca07e74b7f1cf0899b47a630540a7c4c8790349038df2fb4d5",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT receipt_id FROM chio_tool_receipts ORDER BY timestamp ASC, seq ASC",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs",
+      "owner": "ensure_receipt_lineage_statement_for_receipt_id_tx",
+      "sha256": "64a0804960ba1dd8c0b9b9b6b5e62d1dec304e37aaf6901f1460057195122cc6",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs",
+      "owner": "receipt_id_exists_tx",
+      "sha256": "afbcccc10090f78d30bea88d5b4557ecae2b85a493caf4e3e5e7728acdd255e5",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT 1 FROM ( SELECT receipt_id FROM chio_tool_receipts UNION ALL SELECT receipt_id FROM chio_child_receipts ) WHERE receipt_id = ?1 LIMIT 1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
+      "owner": "append_indexed_security_evidence",
+      "sha256": "7f2b6f2552ed185b1638d0eea3fccb8712f431c72bab2d4aa0f5f3056e6d0780",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
+      "owner": "load_chio_receipt",
+      "sha256": "64a0804960ba1dd8c0b9b9b6b5e62d1dec304e37aaf6901f1460057195122cc6",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
+      "owner": "load_chio_receipt_row",
+      "sha256": "64a0804960ba1dd8c0b9b9b6b5e62d1dec304e37aaf6901f1460057195122cc6",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+      "principal": "receipt-integrity",
+      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
+      "owner": "load_chio_receipt_with_context",
+      "sha256": "008c3389cbbb180e72699968e5259ad70f9bbc352cc16d54e42c1998d94eceec",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1 AND (?2 IS NULL OR tenant_id = ?2)",
+      "principal": "receipt-read-adapter",
+      "contract": "The optional SQL tenant comes only from effective_read_scope; None requires an explicit administrative context. Signed tenant is rechecked after decode."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs",
+      "owner": "ensure_capability_set_suspensions_ready",
+      "sha256": "3fce703a92ee0880603d30e50bdd1e88f573ff693894ddcaf62dd67bf4c88f1b",
+      "tables": [
+        "security_capability_set_suspension_state"
+      ],
+      "sql": "SELECT tenant_id, affected_set_hash FROM security_capability_set_suspension_state ORDER BY tenant_id, affected_set_hash",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs",
+      "owner": "ensure_capability_set_suspensions_ready",
+      "sha256": "ba4eabd03e39b8b6c012f228cb5b64ce034dd1f9841606a61e51d113b9d31cde",
+      "tables": [
+        "security_capability_set_suspension_commands"
+      ],
+      "sql": "SELECT tenant_id, idempotency_key FROM security_capability_set_suspension_commands ORDER BY tenant_id, idempotency_key",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs",
+      "owner": "ensure_issuance_freezes_ready",
+      "sha256": "b3dedda66ec4e8b79055cb8951a16ab94631da762a7817ac7f4e31aa97fe38e3",
+      "tables": [
+        "security_issuance_freeze_commands"
+      ],
+      "sql": "SELECT tenant_id, idempotency_key FROM security_issuance_freeze_commands ORDER BY tenant_id, idempotency_key",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/participant_source/inventory.rs",
+      "owner": "validate_domain",
+      "sha256": "9eee10ee5f303001334f0060737e806c652eca6296e05d43e3fd9b509d3a46d9",
+      "tables": [
+        "security_flow_contexts"
+      ],
+      "sql": "SELECT tenant_id, principal_id, lineage_id, session_id, isolation_epoch_id, generation FROM security_flow_contexts",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/compaction.rs",
+      "owner": "schema",
+      "sha256": "14c6dbe1419dfc1803ecad0df3dcf56eab1ca66a321a66739bd6f612748701b1",
+      "tables": [
+        "security_declassification_uses"
+      ],
+      "sql": "SELECT tenant_id, grant_id FROM security_declassification_uses WHERE state IN ('released', 'dispatch_failed') AND retain_until <= ?1 ORDER BY tenant_id, grant_id LIMIT ?2",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/compaction.rs",
+      "owner": "schema",
+      "sha256": "22fdaa55b310d57e22adc470c364fa37d35caa2bdbf351b10abe4bdae4b38da4",
+      "tables": [
+        "security_declassification_uses"
+      ],
+      "sql": "SELECT tenant_id, grant_id FROM security_declassification_uses WHERE state IN ('released', 'dispatch_failed') AND retain_until <= ?1 AND (tenant_id > ?2 OR (tenant_id = ?2 AND grant_id > ?3)) ORDER BY tenant_id, grant_id LIMIT ?4",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/compaction.rs",
+      "owner": "schema",
+      "sha256": "4cfc6316508597d781dd7c26e3165077535cf42ce594e7d093ab348b4594aa3f",
+      "tables": [
+        "security_participant_state_declassification_uses"
+      ],
+      "sql": "SELECT tenant_id, grant_id FROM security_participant_state_declassification_uses WHERE security_authority_id = ?1 AND state IN ('released', 'dispatch_failed') AND retain_until <= ?2 ORDER BY tenant_id, grant_id LIMIT ?3",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/compaction.rs",
+      "owner": "schema",
+      "sha256": "bb9fba27ccae7d5603b4c1d3f611d4059ad888bff489c639fc13c2db24c60962",
+      "tables": [
+        "security_participant_state_declassification_uses"
+      ],
+      "sql": "SELECT tenant_id, grant_id FROM security_participant_state_declassification_uses WHERE security_authority_id = ?1 AND state IN ('released', 'dispatch_failed') AND retain_until <= ?2 AND (tenant_id > ?3 OR (tenant_id = ?3 AND grant_id > ?4)) ORDER BY tenant_id, grant_id LIMIT ?5",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/integrity.rs",
+      "owner": "schema",
+      "sha256": "0c150794a86ffafee8181d5b4049a9fb9d2e76ed6b02c222b02fc86906fbe53b",
+      "tables": [
+        "security_participant_state_declassification_uses"
+      ],
+      "sql": "SELECT tenant_id, grant_id FROM security_participant_state_declassification_uses WHERE security_authority_id = ?1 ORDER BY tenant_id, grant_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/integrity.rs",
+      "owner": "schema",
+      "sha256": "12e1aa9b483556a0767232a5fe93b6ccb7a4cfc93e7424f37d4bd8b249e3fb62",
+      "tables": [
+        "security_participant_state_declassification_evidence_identity"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_participant_state_declassification_evidence_identity WHERE security_authority_id = ?1",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/integrity.rs",
+      "owner": "schema",
+      "sha256": "4ec9c7155584cd16d994998285e0f937103922ba43dbd17597422404b29caf48",
+      "tables": [
+        "security_participant_state_declassification_tombstones"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_participant_state_declassification_tombstones WHERE security_authority_id = ?1",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/integrity.rs",
+      "owner": "schema",
+      "sha256": "5d3c79b7129c787233b0ab81a8951b37055a0ea9e6eb628712c9468d37186add",
+      "tables": [
+        "security_declassification_uses"
+      ],
+      "sql": "SELECT tenant_id, grant_id FROM security_declassification_uses ORDER BY tenant_id, grant_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/integrity.rs",
+      "owner": "schema",
+      "sha256": "7c3d6ca2ea004fcb921a7c06c5d24fcb4c54aa950b37a49ec25664a3f5e52480",
+      "tables": [
+        "security_participant_state_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_participant_state_declassification_receipt_outbox WHERE security_authority_id = ?1",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/integrity.rs",
+      "owner": "schema",
+      "sha256": "84c2705c3a930636a2c58e020c41a236a7d5d0caee63f5ad1a085835c00f09d9",
+      "tables": [
+        "security_declassification_evidence_identity"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_evidence_identity",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/integrity.rs",
+      "owner": "schema",
+      "sha256": "a2f242d7fb09a6882cb19e68e500467d630cff70a3d40bd9cbffa42e8d91fed5",
+      "tables": [
+        "security_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_receipt_outbox",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/integrity.rs",
+      "owner": "schema",
+      "sha256": "f60f397bbfe3c073388193b9b574ba0157d9c77ce1258f19e2a6bb0e69074828",
+      "tables": [
+        "security_declassification_tombstones"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_tombstones",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/outbox.rs",
+      "owner": "schema",
+      "sha256": "9e9b11e7199a69b38e98364d8ec7b97dea7856642e27955d74794981ee63ecf9",
+      "tables": [
+        "security_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_receipt_outbox WHERE acknowledged = 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/outbox.rs",
+      "owner": "schema",
+      "sha256": "fe16ccf37b97c01006d27153825b1d4d0fb456b3aab171e6b3ae629352b91818",
+      "tables": [
+        "security_participant_state_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_participant_state_declassification_receipt_outbox WHERE security_authority_id = ?1 AND acknowledged = 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/flow/egress.rs",
+      "owner": "schema",
+      "sha256": "37f8b8f465029e74c6cecbf9f1ea47d45d64362ab60fb278a2fff59c2f3e27c9",
+      "tables": [
+        "security_egress_fences"
+      ],
+      "sql": "SELECT fence_id, tenant_id, principal_id, lineage_id, session_id, isolation_epoch_id, request_id, request_hash, context_generation, expires_at, dispatch_commitment_id, committed_at FROM security_egress_fences",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/flow/egress.rs",
+      "owner": "schema",
+      "sha256": "b605da86a08b94bff9d5b0341f5d8d6f4139ca7b3de0134371555167cafe5120",
+      "tables": [
+        "security_participant_state_egress_fences"
+      ],
+      "sql": "SELECT fence_id, tenant_id, principal_id, lineage_id, session_id, isolation_epoch_id, request_id, request_hash, context_generation, expires_at, dispatch_commitment_id, committed_at FROM security_participant_state_egress_fences WHERE security_authority_id = ?1",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/flow/labels.rs",
+      "owner": "schema",
+      "sha256": "9541a6ee71d010f5b3757c53ea785ba67977b31cea2e0a84a238b780a6092a11",
+      "tables": [
+        "security_participant_state_flow_contexts"
+      ],
+      "sql": "SELECT tenant_id, principal_id, lineage_id, session_id, isolation_epoch_id, generation FROM security_participant_state_flow_contexts WHERE security_authority_id = ?1",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/flow/labels.rs",
+      "owner": "schema",
+      "sha256": "9eee10ee5f303001334f0060737e806c652eca6296e05d43e3fd9b509d3a46d9",
+      "tables": [
+        "security_flow_contexts"
+      ],
+      "sql": "SELECT tenant_id, principal_id, lineage_id, session_id, isolation_epoch_id, generation FROM security_flow_contexts",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "owner": "active_defense_overlay_inventory",
+      "sha256": "b004a2156d3dcec3ffa3e2c2f04b2242e1fec84f9d5eab49e6df879aa72b1f94",
+      "tables": [
+        "security_capability_set_suspension_effects",
+        "security_effect_contributions",
+        "security_egress_restriction_effects",
+        "security_issuance_freeze_effects",
+        "security_session_throttle_effects"
+      ],
+      "sql": "SELECT (SELECT COUNT(*) FROM security_effect_contributions), (SELECT COUNT(*) FROM security_session_throttle_effects), (SELECT COUNT(*) FROM security_capability_set_suspension_effects), (SELECT COUNT(*) FROM security_issuance_freeze_effects), (SELECT COUNT(*) FROM security_egress_restriction_effects)",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "owner": "migrate_declassification_tenant_keys",
+      "sha256": "84c2705c3a930636a2c58e020c41a236a7d5d0caee63f5ad1a085835c00f09d9",
+      "tables": [
+        "security_declassification_evidence_identity"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_evidence_identity",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "owner": "migrate_declassification_tenant_keys",
+      "sha256": "a2f242d7fb09a6882cb19e68e500467d630cff70a3d40bd9cbffa42e8d91fed5",
+      "tables": [
+        "security_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_receipt_outbox",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
+      "owner": "migrate_declassification_tenant_keys",
+      "sha256": "f60f397bbfe3c073388193b9b574ba0157d9c77ce1258f19e2a6bb0e69074828",
+      "tables": [
+        "security_declassification_tombstones"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_tombstones",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
+      "owner": "ensure_response_effect_generation_column",
+      "sha256": "dedee0c3b14fc6fe9540c7a13304e9b425707485dd228c27ab45970d7c4ac0b8",
+      "tables": [
+        "security_response_effects"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_response_effects WHERE scheduler_lease_owner_id IS NULL OR scheduler_lease_owner_id = '')",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
+      "owner": "ensure_scheduler_lease_body_hash_column",
+      "sha256": "779361a4363cbfb1926cad20beae83cc1fac0bc479e99b5735aa5b4e8d0bfe74",
+      "tables": [
+        "security_scheduler_leases"
+      ],
+      "sql": "SELECT EXISTS( SELECT 1 FROM security_scheduler_leases WHERE lease_body_hash IS NULL OR length(lease_body_hash) != 32 )",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
+      "owner": "ensure_scheduler_lease_body_hash_column",
+      "sha256": "a8aefd147e8606376bad3f5cba020153eff8e365e31fa164554f1d288c0c7c48",
+      "tables": [
+        "security_scheduler_leases"
+      ],
+      "sql": "SELECT tenant_id, action_id, claim_id, claim_ordinal, lease_owner_id, lease_expires_at, fencing_token, lease_body_hash FROM security_scheduler_leases ORDER BY tenant_id, action_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
+      "owner": "validate_attested_finding_batch_records",
+      "sha256": "6b492ca9ef00e195f2255a3efbdea6e8b751e4889e4e4b051d039d996a879004",
+      "tables": [
+        "security_attested_finding_batches"
+      ],
+      "sql": "SELECT tenant_id, batch_id FROM security_attested_finding_batches WHERE ?1 IS NULL OR tenant_id > ?1 OR (tenant_id = ?1 AND batch_id > ?2) ORDER BY tenant_id, batch_id LIMIT 256",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
+      "owner": "count_pending_correlation_events",
+      "sha256": "65b8836535c75187fa018b59949492cea37280c00f3c31f78f1681b38a95ee32",
+      "tables": [
+        "security_correlation_ingress"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_correlation_ingress WHERE acknowledged = 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
+      "owner": "ensure_attested_finding_batches_ready",
+      "sha256": "30c7783fefc2a950a486b395a2d559f6ee8f47945b01dcecd1d1e17eeb9f5341",
+      "tables": [
+        "security_attested_finding_batch_items"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_attested_finding_batch_items WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
+      "owner": "ensure_attested_finding_batches_ready",
+      "sha256": "48cf42a6e7d8cd6d508ee8317a64ad26b83ce161a0dce439bcf3033eeda4af19",
+      "tables": [
+        "security_attested_finding_batches"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_attested_finding_batches WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
+      "owner": "ensure_correlation_ingress_ready",
+      "sha256": "ebc4b4f5d1e84ca05d865ce167c2b7899a72e5a372e419e56cd8101955b2416b",
+      "tables": [
+        "security_correlation_outcomes"
+      ],
+      "sql": "SELECT tenant_id, rule_id, event_id FROM security_correlation_outcomes ORDER BY tenant_id, rule_id, event_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
+      "owner": "load_pending_correlation_events",
+      "sha256": "2eb6d90ece50046ce51347b944fa0d5cafc7c8a4464f1c4185406aa526bb9344",
+      "tables": [
+        "security_correlation_ingress"
+      ],
+      "sql": "SELECT tenant_id, event_id, producer_id, event_time, received_at, body, body_hash, source_evidence, evidence_hash, acknowledged FROM security_correlation_ingress WHERE acknowledged = 0 ORDER BY event_time, sequence LIMIT ?1",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "26ad3854e58cd6bc1f4299d165ee8ab4fd703e3ab47e6a21307152c13d3928b2",
+      "tables": [
+        "security_response_dispatch_recoveries"
+      ],
+      "sql": "SELECT recovery_id, tenant_id, dispatch_id, action_id, request_hash, outcome, lease_owner_id, lease_expires_at, fencing_token FROM security_response_dispatch_recoveries LIMIT 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "2b16d6997e7c54f183a958a413f1f6f955c139e46585659bb1b7bcfeae5ddfd2",
+      "tables": [
+        "security_response_plans"
+      ],
+      "sql": "UPDATE security_response_plans SET generation = generation WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "48898599af35c1e51cf9ebc54dd5779dc29ad150e8c213ee7069e4c6cb7287a6",
+      "tables": [
+        "security_response_dispatch_fences"
+      ],
+      "sql": "UPDATE security_response_dispatch_fences SET fenced_at = fenced_at WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "6aaebce69c275c5f7d0b9c2547c6d74adeb9a822fe85d4f218bf3d83ccdb9b1c",
+      "tables": [
+        "security_scheduler_leases"
+      ],
+      "sql": "UPDATE security_scheduler_leases SET fencing_token = fencing_token WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "79144c57bcfa7f3bfc89976fa0ba4b6edc000d4baee6b3c982fd3f9f61939b58",
+      "tables": [
+        "security_response_dispatch_recoveries"
+      ],
+      "sql": "UPDATE security_response_dispatch_recoveries SET fencing_token = fencing_token WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "a6cdf46f88bd98c464adcd386985241d4515fa147c2ddb4c891895c43cbe9ce0",
+      "tables": [
+        "security_response_dispatches"
+      ],
+      "sql": "UPDATE security_response_dispatches SET initial_fencing_token = initial_fencing_token WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "a8c138e2e7e8bbecbfec1e9bf53d560cea9d49468f43214802bdc1bb66a1b3ac",
+      "tables": [
+        "security_response_dispatch_fences"
+      ],
+      "sql": "SELECT dispatch_id, tenant_id, action_id, prepared_binding_body, prepared_binding_hash, fenced_at FROM security_response_dispatch_fences LIMIT 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "d3f9cb1f61dbceb7cc453e8ac2fb190efc50de46db9e64e649c2456fc9ce094f",
+      "tables": [
+        "security_response_receipt_cursors"
+      ],
+      "sql": "SELECT tenant_id, action_id, plan_hash, generation, current_evidence_id FROM security_response_receipt_cursors LIMIT 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "d45879dbdc942e7044d718a63952c145c3f2c005cbdbb0821d844e03e41949e2",
+      "tables": [
+        "security_response_receipt_cursors"
+      ],
+      "sql": "UPDATE security_response_receipt_cursors SET generation = generation WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs",
+      "owner": "ensure_containment_overlays_ready",
+      "sha256": "26ebddf637ecfa4303da0c668e47b877680a504d1641b2953995ae449e2b55d9",
+      "tables": [
+        "security_containment_overlay_commands"
+      ],
+      "sql": "SELECT tenant_id, idempotency_key FROM security_containment_overlay_commands ORDER BY tenant_id, idempotency_key",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs",
+      "owner": "ensure_containment_overlays_ready",
+      "sha256": "38056d66958c3f1e96ad6a593efc1a7e94d86b598e04fcfb23a5289ae5954397",
+      "tables": [
+        "security_overlay_state"
+      ],
+      "sql": "SELECT tenant_id, target_id FROM security_overlay_state ORDER BY tenant_id, target_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs",
+      "owner": "validate_all_automatic_response_dispatch_fences",
+      "sha256": "8eb1509b3bee471b9235ad79ac153823a9139e4b221a98814b0f1b8cc299b91b",
+      "tables": [
+        "security_response_dispatch_fences"
+      ],
+      "sql": "SELECT tenant_id, action_id, dispatch_id FROM security_response_dispatch_fences ORDER BY tenant_id ASC, action_id ASC, dispatch_id ASC",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
+      "owner": "ensure_egress_restrictions_ready",
+      "sha256": "5643b4354d37de329d32438b5d983dbf5eae24611b9f5cda946895377dac18b1",
+      "tables": [
+        "security_egress_restriction_state"
+      ],
+      "sql": "SELECT tenant_id, session_id FROM security_egress_restriction_state ORDER BY tenant_id, session_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
+      "owner": "ensure_egress_restrictions_ready",
+      "sha256": "e7062192d302b7208327f8c9d7ceea5c6289fb1ecb64c2ae2cf6d0a6a1e82d2a",
+      "tables": [
+        "security_egress_restriction_commands"
+      ],
+      "sql": "SELECT tenant_id, idempotency_key FROM security_egress_restriction_commands ORDER BY tenant_id, idempotency_key",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
+      "owner": "ensure_session_throttles_ready",
+      "sha256": "5fc683a3f569a6a6303b008808629546087092d18ab1af3bc5880faad5e91576",
+      "tables": [
+        "security_session_throttle_commands"
+      ],
+      "sql": "SELECT tenant_id, idempotency_key FROM security_session_throttle_commands ORDER BY tenant_id, idempotency_key",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
+      "owner": "ensure_session_throttles_ready",
+      "sha256": "b63311fd2e9baffb03f793fb76e8118b6debaa01bf0e57a6a71240e80b84ea56",
+      "tables": [
+        "security_session_throttle_state"
+      ],
+      "sql": "SELECT tenant_id, session_id FROM security_session_throttle_state ORDER BY tenant_id, session_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs",
+      "owner": "attested_finding_response_outbox_health",
+      "sha256": "dc23e9f74c4ae2ab9802e57e632c30b5fbaa089ed9eac4c52c4b87c54f999b1a",
+      "tables": [
+        "security_attested_finding_response_outbox"
+      ],
+      "sql": "SELECT COALESCE(SUM(CASE WHEN planning_state = 'pending' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'planned' AND admission_state = 'pending' AND completion_state = 'not_started' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'planned' AND admission_state = 'pending' AND completion_state = 'not_started' AND admission_artifact_digest IS NULL THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'pending' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'outcome_unknown_after_dispatch' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'failed' OR admission_state = 'rejected' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN admission_state = 'expired' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'activated' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'failed_before_effect' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'rolled_back_after_partial' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'simulated' THEN 1 ELSE 0 END), 0) FROM security_attested_finding_response_outbox",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs",
+      "owner": "ensure_attested_finding_response_outbox_ready",
+      "sha256": "25b3a980d91ead000757cd0f0534372a3f45f3f29eb060a424874ee64e243d7f",
+      "tables": [
+        "security_attested_finding_response_outbox"
+      ],
+      "sql": "SELECT tenant_id, action_id FROM security_attested_finding_response_outbox ORDER BY tenant_id, action_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs",
+      "owner": "scan_attested_finding_response_outbox",
+      "sha256": "2c615cb2a32e2f38eb6d53a1e5adf3ba9b323d393a00d1be2ea1e8482382d0b3",
+      "tables": [
+        "security_attested_finding_response_outbox"
+      ],
+      "sql": "SELECT {ATTESTED_FINDING_RESPONSE_OUTBOX_COLUMNS} FROM security_attested_finding_response_outbox WHERE {predicate} AND next_attempt_at <= ?1 ORDER BY CASE WHEN completion_state = 'outcome_unknown_after_dispatch' THEN 0 WHEN admission_state = 'prepared' THEN 1 WHEN planning_state = 'planned' THEN 2 ELSE 3 END ASC, rowid ASC LIMIT ?2",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_10.rs",
+      "owner": "ensure_response_dispatch_commit_mode_column",
+      "sha256": "672a479bf737d8a5ceb89d653e2cce4f1b883041bbe7560b689a612dc998c747",
+      "tables": [
+        "security_response_dispatches"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_response_dispatches WHERE commit_mode NOT IN ('fresh', 'governed_committed_resume', 'governed_committed_expired_resume')",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    }
+  ],
+  "raw_decoder_contracts": {
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice": "This-process canonical serialization replay; no external raw bytes.",
+    "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes."
+  },
+  "proofs": [
+    {
+      "type": "VerifiedCapability",
+      "path": "crates/kernel/chio-kernel-core/src/capability_verify.rs"
+    },
+    {
+      "type": "VerifiedPassport",
+      "path": "crates/kernel/chio-kernel-core/src/passport_verify.rs"
+    },
+    {
+      "type": "VerifiedActiveResponseOperatorCapability",
+      "path": "crates/kernel/chio-kernel/src/governed_active_response.rs"
+    },
+    {
+      "type": "ReceiptReadContext",
+      "path": "crates/kernel/chio-kernel/src/receipt_query.rs"
+    }
+  ],
+  "frost_secret_owner": "crates/platform/chio-store-sqlite/src/frost_store/ceremony/custody_output.rs"
+}

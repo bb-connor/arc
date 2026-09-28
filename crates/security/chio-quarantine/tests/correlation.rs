@@ -6,7 +6,7 @@ use chio_quarantine::{
 };
 use chio_security_types::ports::{
     CanonicalBody, Digest32, EventId, LineageId, OpaqueReceiptRef, ProducerId, ProducerTrustClass,
-    RecordId, SessionId, TenantId, VerifiedSecurityEvent,
+    RecordId, SecurityEventVerificationRecord, SessionId, TenantId,
 };
 use chio_security_types::{
     DetectorHealthKind, SecurityEventBody, SecurityEventBodyInput, SecurityEventKind,
@@ -59,7 +59,7 @@ fn event(
     kind: SecurityEventKind,
     time: u64,
     trust_class: ProducerTrustClass,
-) -> VerifiedSecurityEvent {
+) -> SecurityEventVerificationRecord {
     event_with_ingest(TestEventInput {
         tenant_id,
         event_id,
@@ -83,7 +83,7 @@ struct TestEventInput<'a> {
     trust_class: ProducerTrustClass,
 }
 
-fn event_with_ingest(input: TestEventInput<'_>) -> VerifiedSecurityEvent {
+fn event_with_ingest(input: TestEventInput<'_>) -> SecurityEventVerificationRecord {
     let TestEventInput {
         tenant_id,
         event_id,
@@ -123,7 +123,7 @@ fn event_with_ingest(input: TestEventInput<'_>) -> VerifiedSecurityEvent {
     let canonical = canonical_json_bytes(&body)
         .unwrap_or_else(|error| panic!("canonical event serialization failed: {error}"));
     let evidence = sha256(format!("evidence:{event_id}").as_bytes());
-    VerifiedSecurityEvent {
+    SecurityEventVerificationRecord {
         tenant_id: body.tenant_id.clone(),
         event_id: body.event_id.clone(),
         producer_id: body.producer_id.clone(),
@@ -198,9 +198,9 @@ fn correlation_windows_use_event_time_independently_of_ingest_time() {
 }
 
 fn rebind_source_receipt(
-    mut event: VerifiedSecurityEvent,
+    mut event: SecurityEventVerificationRecord,
     source_receipt_id: &str,
-) -> VerifiedSecurityEvent {
+) -> SecurityEventVerificationRecord {
     let mut body: SecurityEventBody = serde_json::from_slice(event.canonical_body.as_bytes())
         .unwrap_or_else(|error| panic!("decode event body: {error}"));
     body.source_receipt_id = OpaqueReceiptRef::new(source_receipt_id)
@@ -390,7 +390,7 @@ fn run_permutation(
     String,
     Vec<String>,
     Arc<TestStore>,
-    Vec<VerifiedSecurityEvent>,
+    Vec<SecurityEventVerificationRecord>,
 ) {
     let store = Arc::new(TestStore::default());
     let engine = TemporalCorrelator::new(Arc::clone(&store), policy(10));

@@ -1,3 +1,5 @@
+// tenant-read-contract: iou_envelope; class=administrative; principal=settlement-worker
+// Contracts: docs/security/trust-boundary-inventory.json
 //! SQLite-backed persistence for IOU envelopes.
 //!
 //! The `iou_envelope` table is keyed by `receipt_id` so a finalized

@@ -210,15 +210,9 @@ fn require_admin_receipt_read_context(
     context: Option<&ReceiptReadContext>,
     surface: &str,
 ) -> Result<(), ReceiptStoreError> {
-    match context {
-        Some(ReceiptReadContext {
-            boundary: ReceiptReadBoundary::AdminAll,
-            ..
-        }) => Ok(()),
-        Some(ReceiptReadContext {
-            boundary: ReceiptReadBoundary::TenantScoped { .. },
-            ..
-        }) => Err(ReceiptStoreError::ReadBoundary(format!(
+    match context.map(ReceiptReadContext::boundary) {
+        Some(ReceiptReadBoundary::AdminAll) => Ok(()),
+        Some(ReceiptReadBoundary::TenantScoped { .. }) => Err(ReceiptStoreError::ReadBoundary(format!(
             "{surface} requires admin receipt read authority until tenant-scoped report filtering is implemented"
         ))),
         None => Err(ReceiptStoreError::ReadBoundary(format!(

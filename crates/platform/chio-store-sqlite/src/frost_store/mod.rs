@@ -1,7 +1,8 @@
+use chio_federation_authority::FrostRound2Package;
 use std::sync::{Arc, MutexGuard};
 
 use chio_core::StoreMutationFence;
-use chio_federation_authority::{FrostAuthenticatedDkgPackage, FrostCeremonySecret};
+use chio_federation_authority::{FrostCeremonySecret, FrostRound1Package};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
@@ -136,7 +137,7 @@ pub struct FrostCeremonyRound1Record {
     pub ceremony_id: String,
     pub state: FrostCeremonyState,
     pub state_version: u64,
-    pub package: FrostAuthenticatedDkgPackage,
+    pub package: FrostRound1Package,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,7 +145,7 @@ pub struct FrostCeremonyRound2Record {
     pub ceremony_id: String,
     pub state: FrostCeremonyState,
     pub state_version: u64,
-    pub packages: Vec<FrostAuthenticatedDkgPackage>,
+    pub packages: Vec<FrostRound2Package>,
     pub round1_transcript_digest: String,
 }
 
@@ -554,11 +555,9 @@ fn owner_error(
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "state", content = "output", rename_all = "snake_case")]
 enum StoredCeremonyOutput {
-    Round1(Box<FrostAuthenticatedDkgPackage>),
-    Round2(Vec<FrostAuthenticatedDkgPackage>),
+    Round1(Box<FrostRound1Package>),
+    Round2(Vec<FrostRound2Package>),
 }
 
 pub(super) fn secret_kind_name(secret: &FrostCeremonySecret) -> &'static str {

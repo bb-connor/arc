@@ -18,15 +18,23 @@ pub(super) fn decode_authority_request(
     config: &ActiveResponseAuthorityProtocolServerConfig,
     now_unix_seconds: u64,
 ) -> PortResult<VerifiedAuthorityRequest> {
-    if bytes.len() > MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES {
-        return Err(rejected("frame_bound"));
-    }
+    use chio_core::canonical::{UntrustedJsonError, UntrustedJsonText};
+    // The wire error is a deliberately redacted code projection. The local
+    // constrained decoder retains its structured source for non-wire owners.
     let request: SignedActiveResponseAuthorityRequest =
-        serde_json::from_slice(bytes).map_err(|_| rejected("decode"))?;
-    let canonical = canonical_json_bytes(&request).map_err(|_| rejected("canonical"))?;
-    if canonical != bytes {
-        return Err(rejected("canonical"));
-    }
+        UntrustedJsonText::from_wire(bytes, MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES)
+            .and_then(|text| text.decode_canonical())
+            .map_err(|error| {
+                rejected(match error {
+                    UntrustedJsonError::TooLarge { .. } => "frame_bound",
+                    UntrustedJsonError::NotUtf8(_)
+                    | UntrustedJsonError::Decode(_)
+                    | UntrustedJsonError::SignedInput(_) => "decode",
+                    UntrustedJsonError::Canonicalization(_) | UntrustedJsonError::NonCanonical => {
+                        "canonical"
+                    }
+                })
+            })?;
     validate_authority_request(&request, config, now_unix_seconds)?;
     Ok(VerifiedAuthorityRequest(request))
 }

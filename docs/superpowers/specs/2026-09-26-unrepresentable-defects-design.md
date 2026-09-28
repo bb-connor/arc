@@ -255,6 +255,13 @@ wire, and that exit is greppable.
 
 **Sketch: untrusted text (S2).**
 
+Implementation checkpoint (2026-09-27): the implemented type borrows the owner's
+bounded buffer as `UntrustedJsonText<'a>` and has no raw-storage escape hatch.
+Its distinct methods preserve strict external I-JSON, lossless native signed
+JSON (including full-width `u64`) and exact canonical-byte contracts. This
+refines the ownership and numeric-domain assumptions in the original sketch
+below. See [signed JSON boundaries](../../security/signed-json-boundaries.md).
+
 ```rust
 /// JSON text whose bytes originated outside this process. The only path from
 /// here to canonical bytes is the strict parser; the permissive typed-value

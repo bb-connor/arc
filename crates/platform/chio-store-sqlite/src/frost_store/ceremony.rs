@@ -1,12 +1,12 @@
+use chio_federation_authority::FrostRound2Package;
 use std::collections::BTreeMap;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_federation_authority::{
     advance_frost_ceremony, begin_frost_ceremony, complete_frost_ceremony,
-    verify_frost_ceremony_round1_transcript, verify_frost_ceremony_transcript,
-    FrostAuthenticatedDkgPackage, FrostCeremonyConfig, FrostCeremonySecret,
-    FrostCeremonySecretKind,
+    verify_frost_ceremony_round1_transcript, verify_frost_ceremony_transcript, FrostCeremonyConfig,
+    FrostCeremonySecret, FrostCeremonySecretKind, FrostRound1Package,
 };
 use rand_core::{CryptoRng, RngCore};
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
@@ -22,6 +22,8 @@ use super::{
     StoredFrostCeremonyCompletion,
 };
 use crate::encrypted_blob::{decrypt_blob_with_aad, try_encrypt_blob_with_aad, EncryptedBlob};
+
+mod custody_output;
 
 const CUSTODY_AAD_FORMAT: &str = "chio.frost.ceremony-custody-aad.v1";
 const RECORD_DIGEST_PREFIX: &[u8] = b"chio.frost.ceremony-record.digest.v1\0";
@@ -220,14 +222,8 @@ impl SqliteFrostStore {
             custody,
             &custody_aad("secret", &custody_binding)?,
         )?;
-        let output_bytes = Zeroizing::new(
-            canonical_json_bytes(&StoredCeremonyOutput::Round1(Box::new(
-                transition.package.clone(),
-            )))
-            .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?,
-        );
-        let output = encrypt_material(
-            &output_bytes,
+        let output = custody_output::encrypt(
+            StoredCeremonyOutput::Round1(Box::new(transition.package.clone())),
             custody,
             &custody_aad("output", &custody_binding)?,
         )?;
@@ -283,7 +279,7 @@ impl SqliteFrostStore {
         config: &FrostCeremonyConfig,
         transport_key: &chio_core::Keypair,
         custody: &FrostCustodyKey,
-        round1_packages: &[FrostAuthenticatedDkgPackage],
+        round1_packages: &[FrostRound1Package],
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<FrostCeremonyRound2Record, FrostStoreError> {
@@ -347,12 +343,8 @@ impl SqliteFrostStore {
             custody,
             &custody_aad("secret", &custody_binding)?,
         )?;
-        let output_bytes = Zeroizing::new(
-            canonical_json_bytes(&StoredCeremonyOutput::Round2(transition.packages.clone()))
-                .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?,
-        );
-        let output = encrypt_material(
-            &output_bytes,
+        let output = custody_output::encrypt(
+            StoredCeremonyOutput::Round2(transition.packages.clone()),
             custody,
             &custody_aad("output", &custody_binding)?,
         )?;
@@ -407,8 +399,8 @@ impl SqliteFrostStore {
         &self,
         config: &FrostCeremonyConfig,
         custody: &FrostCustodyKey,
-        round1_packages: &[FrostAuthenticatedDkgPackage],
-        round2_packages: &[FrostAuthenticatedDkgPackage],
+        round1_packages: &[FrostRound1Package],
+        round2_packages: &[FrostRound2Package],
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<StoredFrostCeremonyCompletion, FrostStoreError> {
@@ -888,16 +880,14 @@ fn decrypt_output(
         .output
         .as_ref()
         .ok_or_else(|| invalid("ceremony output is absent"))?;
-    let plaintext = Zeroizing::new(
-        decrypt_blob_with_aad(
-            custody.key(),
-            output,
-            &custody_aad("output", &stored.custody_binding())?,
-        )
-        .map_err(|_| FrostStoreError::Custody("ceremony output authentication failed"))?,
-    );
-    serde_json::from_slice(&plaintext)
-        .map_err(|error| invalid(format!("ceremony output does not decode: {error}")))
+    let config: FrostCeremonyConfig = serde_json::from_slice(&stored.config_json)
+        .map_err(|_| FrostStoreError::Custody("ceremony configuration does not decode"))?;
+    custody_output::decrypt(
+        output,
+        custody,
+        &custody_aad("output", &stored.custody_binding())?,
+        &config,
+    )
 }
 
 fn completion_from_row(

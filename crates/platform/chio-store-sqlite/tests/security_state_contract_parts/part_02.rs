@@ -174,9 +174,9 @@ fn require_error_kind<T>(result: PortResult<T>, expected: PortErrorKind) {
     assert!(!error.code().as_str().is_empty());
 }
 
-fn verified_event(value: &str, event_time: u64) -> VerifiedSecurityEvent {
+fn verified_event(value: &str, event_time: u64) -> SecurityEventVerificationRecord {
     let canonical_body = body(b"{}");
-    VerifiedSecurityEvent {
+    SecurityEventVerificationRecord {
         tenant_id: tenant(),
         event_id: EventId::new(value).unwrap_or_else(|error| panic!("event id: {error}")),
         producer_id: ProducerId::new("producer-verified")
@@ -216,7 +216,9 @@ fn response_plan_for_tenant(
         .unwrap_or_else(|| panic!("response expiry is below the fixture TTL"));
     let canonical_contribution = body(b"{}");
     let plan = build_response_plan(ResponsePlanInput {
-        execution: chio_security_types::ResponseExecutionBinding::new(chio_security_types::ResponseExecutionMode::Live),
+        execution: chio_security_types::ResponseExecutionBinding::new(
+            chio_security_types::ResponseExecutionMode::Live,
+        ),
         action_id: action(value),
         trigger_finding_id: record(&format!("finding-{value}")),
         trigger_finding_hash: digest(format!("finding:{value}").as_bytes()),
@@ -252,7 +254,10 @@ fn response_plan_for_tenant(
     let store = Arc::new(ModelStore::default());
     let machine = ResponseStateMachine::new(Arc::clone(&store));
     let planned = machine
-        .create(chio_security_types::FreshLiveAdmission::new(plan).unwrap_or_else(|error| panic!("live fixture plan: {error}")))
+        .create(
+            chio_security_types::FreshLiveAdmission::new(plan)
+                .unwrap_or_else(|error| panic!("live fixture plan: {error}")),
+        )
         .unwrap_or_else(|error| panic!("planned response: {error}"));
     match generation {
         0 => planned,
@@ -293,11 +298,11 @@ impl IsolationEpochEvidenceVerifierPort for AcceptIsolationEvidence {
     fn verify(
         &self,
         transition: &IsolationEpochTransition,
-    ) -> PortResult<VerifiedIsolationEvidence> {
+    ) -> PortResult<IsolationVerificationRecord> {
         if transition.verification_evidence_hash != Digest32::new([8_u8; 32]) {
             return Err(PortError::invalid_data());
         }
-        Ok(VerifiedIsolationEvidence {
+        Ok(IsolationVerificationRecord {
             verifier_id: record("contract-verifier"),
             receipt_ref: OpaqueReceiptRef::new("contract-receipt").map_err(PortError::from)?,
         })
@@ -506,7 +511,7 @@ fn partial(key: &CorrelationPartitionKey, generation: u64, watermark: u64) -> Co
 
 fn correlation_outcome_publication(
     key: &CorrelationPartitionKey,
-    event: &VerifiedSecurityEvent,
+    event: &SecurityEventVerificationRecord,
     rule_version_byte: u8,
 ) -> CorrelationOutcomePublication {
     let canonical_body = body(b"{}");
@@ -664,11 +669,7 @@ fn exercise_events<S: SecurityEventStore>(store: &Faulting<S>, clock: u64) {
             expected_generation: None,
             transition_id: record("correlation-outcome-before"),
         },
-        outcome: correlation_outcome_publication(
-            &outcome_before_key,
-            &outcome_before_event,
-            21,
-        ),
+        outcome: correlation_outcome_publication(&outcome_before_key, &outcome_before_event, 21),
     };
     store.arm(FaultMoment::BeforeWrite);
     require_unavailable(store.commit_correlation_outcome(&outcome_before));
@@ -720,11 +721,7 @@ fn exercise_events<S: SecurityEventStore>(store: &Faulting<S>, clock: u64) {
             expected_generation: None,
             transition_id: record("correlation-outcome-after"),
         },
-        outcome: correlation_outcome_publication(
-            &outcome_after_key,
-            &outcome_after_event,
-            22,
-        ),
+        outcome: correlation_outcome_publication(&outcome_after_key, &outcome_after_event, 22),
     };
     store.arm(FaultMoment::AfterCommit);
     require_unavailable(store.commit_correlation_outcome(&outcome_after));

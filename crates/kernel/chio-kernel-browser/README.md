@@ -56,7 +56,7 @@ Portable Rust API (all targets, re-exported from the crate root):
   `hex_encode_lower`, `parse_authority_input` - the logic the `wasm` entry
   points call.
 - `wire::{EvaluateRequestJson, EvaluationVerdictJson, SignReceiptRequestJson,
-  VerifyCapabilityRequestJson, VerifiedCapabilityJson, VerifyReceiptResultJson,
+  VerifyCapabilityRequestJson, CapabilityVerificationJson, VerifyReceiptResultJson,
   ToolCallRequestJson, ParentBudgetSnapshotJson, AdmittedChildBudgetJson,
   BindingError}` - the JSON wire DTOs.
 

@@ -1,6 +1,6 @@
 use chio_core::capability::governance::{
-    GovernedApprovalToken, GovernedTransactionIntent, GovernedTransactionIntentBody,
-    ThresholdApprovalProposal, VerifiedApprovalSetBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
+    ApprovalSetBody, GovernedApprovalToken, GovernedTransactionIntent,
+    GovernedTransactionIntentBody, ThresholdApprovalProposal, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
     ACTIVE_RESPONSE_SERVER_ID,
 };
 use chio_core::capability::threshold_approval::ThresholdApprovalRequirement;
@@ -31,16 +31,44 @@ pub struct GovernedActiveResponseAdmission {
     governed_intent_hash: String,
     operator_capability: VerifiedActiveResponseOperatorCapability,
     requirement: ThresholdApprovalRequirement,
-    approval_set: VerifiedApprovalSetBody,
+    approval_set: ApprovalSetBody,
     approval_set_hash: String,
 }
 
+/// Only the owning verifier can construct this result. Projections may expose
+/// its values, but cannot be converted back into verification evidence.
+///
+/// ```compile_fail
+/// use chio_kernel::governed_active_response::VerifiedActiveResponseOperatorCapability;
+/// fn forge(bytes: &[u8]) {
+///     let _ = serde_json::from_slice::<VerifiedActiveResponseOperatorCapability>(bytes);
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedActiveResponseOperatorCapability {
-    pub capability_id: String,
-    pub capability_digest: String,
-    pub expires_at: u64,
-    pub executor_subject: PublicKey,
+    capability_id: String,
+    capability_digest: String,
+    expires_at: u64,
+    executor_subject: PublicKey,
+}
+
+impl VerifiedActiveResponseOperatorCapability {
+    #[must_use]
+    pub fn capability_id(&self) -> &str {
+        &self.capability_id
+    }
+    #[must_use]
+    pub fn capability_digest(&self) -> &str {
+        &self.capability_digest
+    }
+    #[must_use]
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
+    }
+    #[must_use]
+    pub fn executor_subject(&self) -> &PublicKey {
+        &self.executor_subject
+    }
 }
 
 impl core::fmt::Debug for GovernedActiveResponseAdmission {
@@ -95,7 +123,7 @@ impl GovernedActiveResponseAdmission {
     }
 
     #[must_use]
-    pub const fn approval_set(&self) -> &VerifiedApprovalSetBody {
+    pub const fn approval_set(&self) -> &ApprovalSetBody {
         &self.approval_set
     }
 }

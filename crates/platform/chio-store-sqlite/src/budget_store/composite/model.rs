@@ -1606,7 +1606,7 @@ pub(super) fn authorization_decision(
             }),
         ),
         BudgetAuthorizationOutcome::Authorized => Ok(BudgetAuthorizeHoldDecision::Authorized(
-            AuthorizedBudgetHold {
+            BudgetHoldAuthorizationRecord {
                 hold_id: request.hold_id,
                 admission_binding: request.admission_binding,
                 authorized_exposure_units: request.requested_exposure_units,

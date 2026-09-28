@@ -156,13 +156,12 @@ impl SignedKeyEnterpriseReceipt {
                 "key enterprise receipt has invalid canonical byte length".to_string(),
             ));
         }
-        let receipt: Self = serde_json::from_slice(bytes)?;
+        let receipt: Self = chio_core_types::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            MAX_CANONICAL_RECORD_BYTES,
+        )?
+        .decode_canonical()?;
         receipt.body.validate()?;
-        if receipt.canonical_bytes()? != bytes {
-            return Err(KeyringError::Canonical(
-                "key enterprise receipt is not canonical JSON".to_string(),
-            ));
-        }
         Ok(receipt)
     }
 

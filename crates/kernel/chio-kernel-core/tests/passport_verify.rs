@@ -49,13 +49,13 @@ fn verify_passport_happy_path() {
 
     let verified =
         verify_passport(&serialize_envelope(&envelope), &trusted, &clock).expect("verified");
-    assert_eq!(verified.subject, "did:chio:agent-1");
-    assert_eq!(verified.issuer, issuer.public_key());
-    assert_eq!(verified.issued_at, ISSUED_AT);
-    assert_eq!(verified.expires_at, EXPIRES_AT);
-    assert_eq!(verified.evaluated_at, ISSUED_AT + 1);
+    assert_eq!(verified.subject(), "did:chio:agent-1");
+    assert_eq!(verified.issuer(), &issuer.public_key());
+    assert_eq!(verified.issued_at(), ISSUED_AT);
+    assert_eq!(verified.expires_at(), EXPIRES_AT);
+    assert_eq!(verified.evaluated_at(), ISSUED_AT + 1);
     assert_eq!(
-        verified.payload_canonical_bytes,
+        verified.payload_canonical_bytes(),
         envelope.body.payload_canonical_bytes
     );
 }

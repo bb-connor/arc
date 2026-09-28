@@ -574,7 +574,7 @@ where
 }
 
 pub type ClassificationFindings = BoundedVec<ClassificationFinding, 256>;
-pub type VerifiedEventBatch = BoundedVec<VerifiedSecurityEvent, 4_096>;
+pub type VerifiedEventBatch = BoundedVec<SecurityEventVerificationRecord, 4_096>;
 pub type UnverifiedEventBatch = BoundedVec<UnverifiedSecurityEvent, 4_096>;
 pub type OverlayContributions = BoundedVec<OverlayContribution, 256>;
 pub type SessionThrottleContributions = BoundedVec<SessionThrottleContribution, 256>;
@@ -831,9 +831,12 @@ pub struct IsolationEpochTransition {
     pub effective_at_unix_ms: u64,
 }
 
+/// A record returned by the installed isolation-evidence verifier.
+/// Flow-state mutation invokes that verifier itself; request deserialization
+/// cannot supply this record as authority.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct VerifiedIsolationEvidence {
+pub struct IsolationVerificationRecord {
     pub verifier_id: RecordId,
     pub receipt_ref: OpaqueReceiptRef,
 }
@@ -1536,9 +1539,12 @@ pub struct UnverifiedSecurityEvent {
     pub source_evidence: CanonicalBody,
 }
 
+/// A trusted verifier/store projection, not a cryptographic proof token.
+/// Event ingress must call the composition-installed SecurityEventVerifierPort;
+/// deserializing this record never substitutes for that call.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct VerifiedSecurityEvent {
+pub struct SecurityEventVerificationRecord {
     pub tenant_id: TenantId,
     pub event_id: EventId,
     pub producer_id: ProducerId,
@@ -1595,7 +1601,7 @@ pub struct CorrelationEventIndexRequest {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CorrelationEventAdmissionRequest {
-    pub event: VerifiedSecurityEvent,
+    pub event: SecurityEventVerificationRecord,
     pub index: CorrelationEventIndexRequest,
     pub capacity: Option<CorrelationCasRequest>,
 }

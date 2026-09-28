@@ -33,9 +33,9 @@ pub(crate) async fn handle_list_tool_receipts(
     // Point-load by receipt id: resolve exactly one receipt from the durable
     // store (bounded to one row) so a bounded in-memory mirror eviction on the
     // kernel does not cause a false denial of a governed call-chain
-    // continuation. A by-id load is not tenant-scoped, so it is restricted to
-    // the admin service principal (fail-closed): a tenant read token must use
-    // the tenant-filtered list surface instead.
+    // continuation. This endpoint retains its admin service contract and
+    // passes that authenticated context to the store. Tenant read tokens use
+    // the tenant-filtered list surface.
     if let Some(receipt_id) = query.receipt_id.as_deref() {
         if !matches!(principal, ResolvedControlReadPrincipal::AdminService) {
             return plain_http_error(
@@ -43,7 +43,9 @@ pub(crate) async fn handle_list_tool_receipts(
                 "receipt point-load by id requires the admin service token",
             );
         }
-        let receipts = match store.load_chio_receipt(receipt_id) {
+        let receipts = match store
+            .load_chio_receipt_with_context(receipt_id, &principal.receipt_read_context())
+        {
             Ok(Some(receipt)) => match serde_json::to_value(receipt) {
                 Ok(value) => vec![value],
                 Err(error) => {

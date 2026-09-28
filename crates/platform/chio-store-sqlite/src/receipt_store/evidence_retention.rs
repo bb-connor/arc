@@ -248,19 +248,13 @@ impl SqliteReceiptStore {
 
         let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
 
-        // Receipt read isolation: admin contexts can read all rows, tenant
-        // contexts see exact tenant rows by default, and local compatibility
-        // mode may include NULL-tenant (pre-multitenant) rows.
+        // Tenant reads always exclude rows without that exact signed tenant.
         let read_scope = query
             .effective_read_scope()
-            .map_err(ReceiptStoreError::ReadBoundary)?;
-        let tenant_fragment = match (
-            read_scope.tenant.as_deref(),
-            read_scope.include_null_tenant && !self.strict_tenant_isolation_enabled(),
-        ) {
-            (None, _) => "(?12 IS NULL)",
-            (Some(_), true) => "(r.tenant_id = ?12 OR r.tenant_id IS NULL)",
-            (Some(_), false) => "(r.tenant_id = ?12)",
+            .map_err(ReceiptStoreError::from)?;
+        let tenant_fragment = match read_scope.tenant.as_deref() {
+            None => "(?12 IS NULL)",
+            Some(_) => "(r.tenant_id = ?12)",
         };
 
         let (data_sql, count_sql) = receipt_query_sql(query, tenant_fragment)?;
@@ -355,6 +349,12 @@ impl SqliteReceiptStore {
                 let seq = seq.max(0) as u64;
                 let receipt =
                     decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
+                if tenant.is_some_and(|tenant| receipt.tenant_id.as_deref() != Some(tenant)) {
+                    return Err(
+                        chio_kernel::receipt_query::ReceiptReadError::TenantProjectionMismatch
+                            .into(),
+                    );
+                }
                 receipts.push(StoredToolReceipt { seq, receipt });
             }
             receipts

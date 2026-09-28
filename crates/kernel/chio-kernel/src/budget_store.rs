@@ -514,8 +514,11 @@ pub struct BudgetCaptureHoldRequest {
     pub authority: Option<BudgetEventAuthority>,
 }
 
+/// A decision record returned by the composition-installed budget store.
+/// Only the kernel-owned authorize-hold call admits this result; caller-built
+/// records are not an entry point to reserve, consume, or dispatch budget.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AuthorizedBudgetHold {
+pub struct BudgetHoldAuthorizationRecord {
     pub hold_id: Option<String>,
     pub admission_binding: Option<BudgetAdmissionBinding>,
     pub authorized_exposure_units: u64,
@@ -558,7 +561,7 @@ pub struct DeniedBudgetHold {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BudgetAuthorizeHoldDecision {
-    Authorized(AuthorizedBudgetHold),
+    Authorized(BudgetHoldAuthorizationRecord),
     ApprovalRequired(ApprovalRequiredBudgetHold),
     Denied(DeniedBudgetHold),
     AlreadyCaptured(BudgetHoldMutationDecision),
@@ -972,7 +975,7 @@ pub trait BudgetStore: Send + Sync {
 
         if allowed {
             Ok(BudgetAuthorizeHoldDecision::Authorized(
-                AuthorizedBudgetHold {
+                BudgetHoldAuthorizationRecord {
                     hold_id: request.hold_id,
                     admission_binding: request.admission_binding,
                     authorized_exposure_units: request.requested_exposure_units,

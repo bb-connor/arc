@@ -298,7 +298,9 @@ fn schema_valid_key_log_mutations_are_rejected_by_native_semantics() {
                 );
                 assert!(matches!(
                     SignedKeyEnterpriseReceipt::from_canonical_bytes(&mutated),
-                    Err(KeyringError::Canonical(_))
+                    Err(KeyringError::UntrustedInput(
+                        chio_core_types::canonical::UntrustedJsonError::NonCanonical
+                    ))
                 ));
             }
             "event_old_signature_tampered" => {
@@ -335,7 +337,8 @@ fn schema_valid_key_log_mutations_are_rejected_by_native_semantics() {
                 );
                 assert!(matches!(
                     SignedKeyLogCheckpoint::from_canonical_bytes(&mutated),
-                    Err(KeyringError::Canonical(_))
+                    Err(KeyringError::UntrustedInput(chio_core_types::canonical::UntrustedJsonError::Decode(source)))
+                        if source.to_string().starts_with("witness signatures must be unique and sorted by witness identifier")
                 ));
             }
             "activation_witness_set_hash_tampered" => {

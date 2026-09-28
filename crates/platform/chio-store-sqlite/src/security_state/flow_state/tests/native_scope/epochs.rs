@@ -23,11 +23,11 @@ fn verified_epochs_and_lineage_copy_never_borrow_another_authority() -> TestResu
             transition_id: RecordId::new("same-epoch-transition")?,
             effective_at_unix_ms: 1_000,
         };
-        let verified_a = VerifiedIsolationEvidence {
+        let verified_a = IsolationVerificationRecord {
             verifier_id: RecordId::new("verifier-a")?,
             receipt_ref: OpaqueReceiptRef::new("receipt-a")?,
         };
-        let verified_b = VerifiedIsolationEvidence {
+        let verified_b = IsolationVerificationRecord {
             verifier_id: RecordId::new("verifier-b")?,
             receipt_ref: OpaqueReceiptRef::new("receipt-b")?,
         };

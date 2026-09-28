@@ -988,18 +988,12 @@ fn validate_artifact_records(
     Ok(validated)
 }
 
-fn decode_canonical<T: DeserializeOwned + Serialize>(bytes: &[u8], label: &str) -> Result<T> {
+fn decode_canonical<T: DeserializeOwned + Serialize>(bytes: &[u8], _label: &str) -> Result<T> {
     validate_payload_size(bytes)?;
-    let value: T = serde_json::from_slice(bytes)
-        .map_err(|error| AuthorityError::Custody(format!("{label} decode failed: {error}")))?;
-    let canonical = canonical_json_bytes(&value)
-        .map_err(|error| AuthorityError::Custody(format!("{label} encoding failed: {error}")))?;
-    if canonical != bytes {
-        return Err(AuthorityError::Custody(format!(
-            "{label} is not canonical JSON"
-        )));
-    }
-    Ok(value)
+    Ok(
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_STORE_PAYLOAD_BYTES)?
+            .decode_canonical()?,
+    )
 }
 
 fn validate_payload_size(payload: &[u8]) -> Result<()> {

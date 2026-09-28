@@ -87,7 +87,7 @@ use chio_kernel_core::{
 };
 
 // ---------------------------------------------------------------------------
-// UniFFI record types (mirror `VerifiedCapability` / `VerifiedPassport`).
+// UniFFI record types (mirror `CapabilityVerificationRecord` / `VerifiedPassport`).
 // ---------------------------------------------------------------------------
 
 /// Verified capability snapshot projected across the FFI.
@@ -97,7 +97,7 @@ use chio_kernel_core::{
 /// callers that want to inspect the scope pass `scope_json` through
 /// their host-side Chio SDK decoder.
 #[derive(Debug, Clone)]
-pub struct VerifiedCapability {
+pub struct CapabilityVerificationRecord {
     pub id: String,
     pub subject_hex: String,
     pub issuer_hex: String,
@@ -571,7 +571,7 @@ pub fn sign_receipt_relaying_trusted_body(
 pub fn verify_capability(
     token_json: String,
     authority_pub_hex: String,
-) -> Result<VerifiedCapability, ChioMobileError> {
+) -> Result<CapabilityVerificationRecord, ChioMobileError> {
     let token: CapabilityToken =
         serde_json::from_str(&token_json).map_err(|error| ChioMobileError::InvalidJson {
             message: format!("capability token: {error}"),
@@ -600,7 +600,7 @@ pub fn verify_capability(
 /// delegated tokens.
 pub fn verify_capability_with_context(
     request_json: String,
-) -> Result<VerifiedCapability, ChioMobileError> {
+) -> Result<CapabilityVerificationRecord, ChioMobileError> {
     let parsed: VerifyCapabilityRequest =
         serde_json::from_str(&request_json).map_err(|error| ChioMobileError::InvalidJson {
             message: format!("verify capability request: {error}"),
@@ -641,7 +641,7 @@ fn verify_capability_with_parts(
     direct_root_capability: Option<CapabilityToken>,
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
     parent_budget_snapshots: &[ParentBudgetSnapshot],
-) -> Result<VerifiedCapability, ChioMobileError> {
+) -> Result<CapabilityVerificationRecord, ChioMobileError> {
     let fixed_clock = now_secs.and_then(fixed_clock_from_secs);
     let mobile_clock = MobileClock::new();
     let clock: &dyn Clock = match &fixed_clock {
@@ -693,18 +693,18 @@ fn verify_capability_with_parts(
     })?;
 
     let scope_json =
-        serde_json::to_string(&verified.scope).map_err(|error| ChioMobileError::Internal {
+        serde_json::to_string(verified.scope()).map_err(|error| ChioMobileError::Internal {
             message: format!("serialize capability scope: {error}"),
         })?;
 
-    Ok(VerifiedCapability {
-        id: verified.id,
-        subject_hex: verified.subject_hex,
-        issuer_hex: verified.issuer_hex,
+    Ok(CapabilityVerificationRecord {
+        id: verified.id().to_owned(),
+        subject_hex: verified.subject_hex().to_owned(),
+        issuer_hex: verified.issuer_hex().to_owned(),
         scope_json,
-        issued_at: verified.issued_at,
-        expires_at: verified.expires_at,
-        evaluated_at: verified.evaluated_at,
+        issued_at: verified.issued_at(),
+        expires_at: verified.expires_at(),
+        evaluated_at: verified.evaluated_at(),
     })
 }
 
@@ -768,12 +768,12 @@ pub fn verify_passport(
         })?;
 
     Ok(PortablePassportMetadata {
-        subject: verified.subject,
-        issuer_hex: verified.issuer.to_hex(),
-        issued_at: verified.issued_at,
-        expires_at: verified.expires_at,
-        evaluated_at: verified.evaluated_at,
-        payload_canonical_hex: hex::encode(&verified.payload_canonical_bytes),
+        subject: verified.subject().to_owned(),
+        issuer_hex: verified.issuer().to_hex(),
+        issued_at: verified.issued_at(),
+        expires_at: verified.expires_at(),
+        evaluated_at: verified.evaluated_at(),
+        payload_canonical_hex: hex::encode(verified.payload_canonical_bytes()),
     })
 }
 

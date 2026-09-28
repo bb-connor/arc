@@ -289,7 +289,7 @@ impl RemoteBudgetStore {
                         "structured remote authorization response returned an invalid authorized state",
                     ));
                 }
-                BudgetAuthorizeHoldDecision::Authorized(AuthorizedBudgetHold {
+                BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
                     hold_id: mutation.hold_id.clone(),
                     admission_binding: mutation.admission_binding.clone(),
                     authorized_exposure_units: mutation.exposure_units,

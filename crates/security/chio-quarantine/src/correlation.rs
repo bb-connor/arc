@@ -6,7 +6,7 @@ use chio_security_types::ports::{
     CorrelationEventIndexRequest, CorrelationOutcomeCommitRequest, CorrelationOutcomeKey,
     CorrelationOutcomePublication, CorrelationPartial, CorrelationPartitionKey, Digest32,
     EventAppend, EventId, EventPartitionScan, PortError, PortErrorKind, ProducerTrustClass,
-    RecordId, SecurityEventStore, VerifiedSecurityEvent,
+    RecordId, SecurityEventStore, SecurityEventVerificationRecord,
 };
 use chio_security_types::{
     CorrelatedFinding, CorrelatedFindingInput, DetectorGroupBindingEvidence,
@@ -122,7 +122,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     pub fn load_durable_outcome(
         &self,
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
     ) -> Result<Option<CorrelationOutcome>, PortError> {
         let key = CorrelationOutcomeKey {
             tenant_id: event.tenant_id.clone(),
@@ -166,7 +166,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
 
     fn outcome_publication(
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         partition_hash: Digest32,
         outcome: &CorrelationOutcome,
     ) -> Result<CorrelationOutcomePublication, PortError> {
@@ -202,7 +202,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     fn finalize_plain_outcome(
         &self,
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         group_hash: Digest32,
         group_watermark: GroupWatermarkKnowledge,
         outcome: CorrelationOutcome,
@@ -236,7 +236,11 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
         }
     }
 
-    pub fn ingest(&self, rule: &TemporalRule, event: &VerifiedSecurityEvent) -> CorrelationOutcome {
+    pub fn ingest(
+        &self,
+        rule: &TemporalRule,
+        event: &SecurityEventVerificationRecord,
+    ) -> CorrelationOutcome {
         self.ingest_with_idle_watermark(rule, event, None, event.received_at_unix_ms)
     }
 
@@ -247,7 +251,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     pub fn ingest_observed_at(
         &self,
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         observed_at_unix_ms: u64,
     ) -> CorrelationOutcome {
         let idle_watermark_unix_ms =
@@ -263,7 +267,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     fn ingest_with_idle_watermark(
         &self,
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         idle_watermark_unix_ms: Option<u64>,
         observed_at_unix_ms: u64,
     ) -> CorrelationOutcome {
@@ -488,7 +492,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     fn advance_partition(
         &self,
         rule: &TemporalRule,
-        trigger: &VerifiedSecurityEvent,
+        trigger: &SecurityEventVerificationRecord,
         append: EventAppend,
         key: CorrelationPartitionKey,
         context: PartitionAdvanceContext,
@@ -814,7 +818,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     fn prepare_group_reservation(
         &self,
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         group_hash: Digest32,
     ) -> CapacityReservation {
         let key = match capacity_key(rule, event) {
@@ -937,7 +941,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     fn port_health_outcome(
         &self,
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         group_hash: Digest32,
         watermark: GroupWatermarkKnowledge,
         error: &PortError,
@@ -948,7 +952,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     fn known_health_outcome(
         &self,
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         group_hash: Digest32,
         kind: DetectorHealthKind,
         watermark: GroupWatermarkKnowledge,
@@ -970,7 +974,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
     fn health_outcome(
         &self,
         rule: &TemporalRule,
-        event: &VerifiedSecurityEvent,
+        event: &SecurityEventVerificationRecord,
         group_binding: DetectorGroupBindingEvidence,
         kind: DetectorHealthKind,
         watermark: DetectorWatermarkEvidence,
@@ -1171,7 +1175,7 @@ enum CapacityReservation {
 fn process_events(
     rule: &TemporalRule,
     state: &mut PartitionState,
-    events: &[VerifiedSecurityEvent],
+    events: &[SecurityEventVerificationRecord],
     group_key_hash: Digest32,
     next_watermark: u64,
     bounded_lateness_ms: u64,
@@ -1386,7 +1390,7 @@ fn partition_expiry(rule: &TemporalRule, state: &PartitionState, bounded_latenes
         .saturating_add(bounded_lateness_ms)
 }
 
-fn parse_verified_event(event: &VerifiedSecurityEvent) -> Result<SecurityEventBody, ()> {
+fn parse_verified_event(event: &SecurityEventVerificationRecord) -> Result<SecurityEventBody, ()> {
     let body: SecurityEventBody =
         serde_json::from_slice(event.canonical_body.as_bytes()).map_err(|_| ())?;
     body.validate().map_err(|_| ())?;
@@ -1443,7 +1447,7 @@ struct CapacityKeyCommitment<'a> {
 
 fn capacity_key(
     rule: &TemporalRule,
-    event: &VerifiedSecurityEvent,
+    event: &SecurityEventVerificationRecord,
 ) -> Result<CorrelationPartitionKey, ()> {
     Ok(CorrelationPartitionKey {
         tenant_id: event.tenant_id.clone(),

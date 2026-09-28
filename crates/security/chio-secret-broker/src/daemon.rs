@@ -826,18 +826,11 @@ impl BrokerIpcHandler for BrokerDaemonHandler {
 }
 
 fn decode_canonical_payload<T: DeserializeOwned + Serialize>(bytes: &[u8]) -> Result<T> {
-    let decoded: T = serde_json::from_slice(bytes).map_err(|error| {
-        BrokerError::InvalidRequest(format!("IPC payload decoding failed: {error}"))
-    })?;
-    let canonical = Zeroizing::new(canonical_json_bytes(&decoded).map_err(|error| {
-        BrokerError::InvalidRequest(format!("IPC payload encoding failed: {error}"))
-    })?);
-    if canonical.as_slice() != bytes {
-        return Err(BrokerError::InvalidRequest(
-            "IPC payload is not canonical JSON".to_string(),
-        ));
-    }
-    Ok(decoded)
+    Ok(chio_core_types::canonical::UntrustedJsonText::from_wire(
+        bytes,
+        chio_secure_ipc::DEFAULT_MAX_FRAME_BYTES,
+    )?
+    .decode_canonical()?)
 }
 
 fn accepted_response<T: Serialize>(operation: IpcOperation, response: &T) -> Result<IpcResponse> {

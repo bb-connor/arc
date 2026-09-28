@@ -77,10 +77,9 @@ use chio_security_types::ports::{
     ProducerTrustClass, ReceiptAppendRequest, RecordId, RequestId, ResponseDispatchApproval,
     ResponseDispatchCommitOutcome, ResponseDispatchLease, ResponseDispatchStore, ResponsePlanKey,
     ResponsePlanRecord, ResponseSchedulerStore, ResponseStore, SchedulerClaimRequest,
-    SchedulerLeaseRenewRequest, SecurityAlert, SecurityAlertPort, SecurityEventVerifierPort,
-    SecurityReceiptSink, SessionId, TenantId, TenantScopedId, TripwireDecision,
-    TripwireDetectorPort, TripwireInput, TripwireKind, UnverifiedSecurityEvent,
-    VerifiedSecurityEvent,
+    SchedulerLeaseRenewRequest, SecurityAlert, SecurityAlertPort, SecurityEventVerificationRecord,
+    SecurityEventVerifierPort, SecurityReceiptSink, SessionId, TenantId, TenantScopedId,
+    TripwireDecision, TripwireDetectorPort, TripwireInput, TripwireKind, UnverifiedSecurityEvent,
 };
 use chio_security_types::{
     Compartment, DeclassificationGrantBody, DeclassificationGrantClaims, DecoyOperationAttempt,
@@ -647,7 +646,7 @@ fn verified_event(
     event_time_unix_ms: u64,
     ingest_time_unix_ms: u64,
     trust_class: ProducerTrustClass,
-) -> VerifiedSecurityEvent {
+) -> SecurityEventVerificationRecord {
     let body = security_event_body(
         event_id_value,
         kind,
@@ -656,7 +655,7 @@ fn verified_event(
         trust_class,
     );
     let canonical = canonical_json_bytes(&body).test_expect("canonical event body");
-    VerifiedSecurityEvent {
+    SecurityEventVerificationRecord {
         tenant_id: body.tenant_id.clone(),
         event_id: body.event_id.clone(),
         producer_id: body.producer_id.clone(),

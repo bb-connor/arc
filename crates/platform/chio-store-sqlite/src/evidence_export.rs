@@ -846,7 +846,6 @@ mod tests {
     fn tenant_scoped_evidence_export_cannot_see_other_tenants() {
         let path = unique_db_path("evidence-export-tenant");
         let store = SqliteReceiptStore::open(&path).unwrap();
-        store.with_strict_tenant_isolation(true);
         store
             .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
                 "rcpt-a",
@@ -884,7 +883,6 @@ mod tests {
     fn tenant_scoped_evidence_export_omits_child_receipts_without_tenant_join() {
         let path = unique_db_path("evidence-export-tenant-child");
         let store = SqliteReceiptStore::open(&path).unwrap();
-        store.with_strict_tenant_isolation(true);
         store
             .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
                 "rcpt-a",
