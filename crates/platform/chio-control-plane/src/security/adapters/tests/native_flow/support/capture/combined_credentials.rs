@@ -319,5 +319,3 @@ fn native_combined_credentials_deny_missing_proof_or_changed_approved_intent_bef
     }
     Ok(())
 }
-
-

@@ -1,30 +1,9 @@
-
-
-
-use super::SecurityEventIngress;
-use super::CorrelationIngressStore;
-use super::PortError;
-use super::PortResult;
-use super::SecurityEventVerifierPort;
-use super::UnverifiedSecurityEvent;
-use super::SecurityEventVerificationRecord;
-
-
-use super::SqliteSecurityStateStore;
-use super::Arc;
-use super::Instant;
-
-use super::CorrelationConsumerReport;
-use super::ProductionCorrelationConsumer;
-
-
-
-
-
-
-use super::AttestedFindingResponseRecoveryLimits;
-use super::NativeSecurityEventVerifier;
-
+use super::{
+    Arc, AttestedFindingResponseRecoveryLimits, CorrelationConsumerReport, CorrelationIngressStore,
+    Instant, NativeSecurityEventVerifier, PortError, PortResult, ProductionCorrelationConsumer,
+    SecurityEventIngress, SecurityEventVerificationRecord, SecurityEventVerifierPort,
+    SqliteSecurityStateStore, UnverifiedSecurityEvent,
+};
 
 /// Production adapter that publishes the complete ordered finding batch and a
 /// durable response outbox. Batch bindings reserve planning identities only.
@@ -152,6 +131,12 @@ impl DurableCorrelationIngress {
 pub(super) trait CorrelationEventVerifier: Send + Sync {
     fn ensure_ready(&self) -> PortResult<()>;
     fn now_unix_ms(&self) -> PortResult<u64>;
-    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord>;
-    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord>;
+    fn verify(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord>;
+    fn verify_durable(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord>;
 }

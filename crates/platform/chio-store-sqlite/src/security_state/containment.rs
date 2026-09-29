@@ -1,49 +1,18 @@
-use super::canonical_json_bytes;
-use super::containment_installed_version_hash;
-use super::containment_overlay_version_hash;
-use super::containment_session_target;
-use super::predict_containment_overlay_apply;
-use super::predict_containment_overlay_remove;
-use super::validate_containment_overlay_snapshot;
-use super::ContainmentOverlayCommand;
-use super::ContainmentOverlayStore;
-use super::Digest32;
-use super::EffectExecutionStatus;
-use super::EffectId;
-use super::EffectOperation;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::OverlayApplyRequest;
-use super::OverlayContribution;
-use super::OverlayContributions;
-use super::OverlayRemoveRequest;
-use super::OverlaySnapshot;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::TenantScopedId;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::Transaction;
-use super::TransactionBehavior;
-use super::Deserialize;
-use super::Serialize;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::body_hash;
-use super::validate_canonical_json_body;
-use super::decode_digest;
-use super::effect_request_matches_query;
-use super::validate_scheduler_fence;
-
+use super::{
+    body_hash, canonical_json_bytes, containment_installed_version_hash,
+    containment_overlay_version_hash, containment_session_target, decode_digest,
+    effect_request_matches_query, from_i64, params, predict_containment_overlay_apply,
+    predict_containment_overlay_remove, sqlite_error, to_i64, validate_canonical_json_body,
+    validate_containment_overlay_snapshot, validate_scheduler_fence, Connection,
+    ContainmentOverlayCommand, ContainmentOverlayStore, Deserialize, Digest32,
+    EffectExecutionStatus, EffectId, EffectOperation, EffectRequest, EffectResult,
+    EffectResultQuery, OptionalExtension, OverlayApplyRequest, OverlayContribution,
+    OverlayContributions, OverlayRemoveRequest, OverlaySnapshot, PortError, PortResult, RecordId,
+    ResponseEffectKind, ResponseTarget, Serialize, SqliteSecurityStateStore, TenantScopedId,
+    Transaction, TransactionBehavior,
+};
 
 impl ContainmentOverlayStore for SqliteSecurityStateStore {
     fn ensure_containment_overlays_ready(&self) -> PortResult<()> {
@@ -546,9 +515,12 @@ fn decode_containment_command_contribution(
 ) -> PortResult<ContainmentCommandContributionBody> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
     let contribution: ContainmentCommandContributionBody =
-        chio_core::canonical::UntrustedJsonText::from_wire(request.canonical_contribution.as_bytes(), 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-            .map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            request.canonical_contribution.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| PortError::invalid_data())?;
     let canonical =
         canonical_json_bytes(&contribution).map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != request.canonical_contribution.as_bytes() {
@@ -557,7 +529,8 @@ fn decode_containment_command_contribution(
     Ok(contribution)
 }
 
-pub(super) type StoredEffectCommandProjection = (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
+pub(super) type StoredEffectCommandProjection =
+    (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 
 fn load_containment_overlay_command(
     connection: &Connection,
@@ -600,9 +573,12 @@ fn load_containment_overlay_command(
                 if body_hash(&request_body).as_slice() != request_hash.as_bytes() {
                     return Err(PortError::integrity_failure());
                 }
-                let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(&request_body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-                    .map_err(|_| PortError::integrity_failure())?;
+                let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(
+                    &request_body,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| PortError::integrity_failure())?;
                 let canonical_request =
                     canonical_json_bytes(&request).map_err(|_| PortError::integrity_failure())?;
                 if canonical_request.as_slice() != request_body.as_slice() {
@@ -612,17 +588,24 @@ fn load_containment_overlay_command(
                 if body_hash(&result_body).as_slice() != result_hash.as_bytes() {
                     return Err(PortError::integrity_failure());
                 }
-                let result: EffectResult = chio_core::canonical::UntrustedJsonText::from_wire(&result_body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-                    .map_err(|_| PortError::integrity_failure())?;
+                let result: EffectResult = chio_core::canonical::UntrustedJsonText::from_wire(
+                    &result_body,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| PortError::integrity_failure())?;
                 let canonical_result =
                     canonical_json_bytes(&result).map_err(|_| PortError::integrity_failure())?;
                 let snapshot_hash = decode_digest(snapshot_hash)?;
                 if body_hash(&snapshot_body).as_slice() != snapshot_hash.as_bytes() {
                     return Err(PortError::integrity_failure());
                 }
-                let resulting_snapshot: OverlaySnapshot = chio_core::canonical::UntrustedJsonText::from_wire(&snapshot_body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
+                let resulting_snapshot: OverlaySnapshot =
+                    chio_core::canonical::UntrustedJsonText::from_wire(
+                        &snapshot_body,
+                        64 * 1024 * 1024,
+                    )
+                    .and_then(|input| input.decode_signed())
                     .map_err(|_| PortError::integrity_failure())?;
                 let canonical_snapshot = canonical_json_bytes(&resulting_snapshot)
                     .map_err(|_| PortError::integrity_failure())?;

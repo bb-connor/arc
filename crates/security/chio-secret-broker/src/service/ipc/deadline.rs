@@ -1,20 +1,6 @@
-use super::Read;
-use super::Write;
-use super::Duration;
-# [cfg (unix)]
+#[cfg(unix)]
 use super::Instant;
-
-
-
-
-
-use super::BrokerError;
-use super::Result;
-
-
-
-
-
+use super::{BrokerError, Duration, Read, Result, Write};
 
 pub(super) const DEFAULT_BROKER_IPC_DEADLINE_MS: u64 = 5_000;
 pub(super) const MAX_BROKER_IPC_DEADLINE_MS: u64 = 30_000;

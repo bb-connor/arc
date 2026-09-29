@@ -1,33 +1,11 @@
-use super::ResponseWorkerTickError;
-use super::ErrorCode;
-use super::PortError;
-use super::catch_unwind;
-use super::AssertUnwindSafe;
-use super::AtomicBool;
-use super::AtomicU64;
-use super::Ordering;
-use super::Arc;
-use super::Mutex;
-use super::Duration;
-use super::Instant;
-use super::oneshot;
-use super::watch;
-use super::MissedTickBehavior;
-use super::ResponseWorkerTick;
-use super::ResponseWorkerPort;
-use super::ResponseWorkerLifecycle;
-use super::ResponseWorkerHealth;
-
-use super::acquire_response_worker_join_permit;
-use super::ResponseWorkerTaskLiveness;
-
-
-use super::ProductionResponseWorker;
-use super::ProductionResponseWorkerHandle;
-use super::ResponseWorkerStartupGuard;
-use super::ResponseWorkerJoinOwnership;
-use super::ResponseWorkerThreadCompletion;
-
+use super::{
+    acquire_response_worker_join_permit, catch_unwind, oneshot, watch, Arc, AssertUnwindSafe,
+    AtomicBool, AtomicU64, Duration, ErrorCode, Instant, MissedTickBehavior, Mutex, Ordering,
+    PortError, ProductionResponseWorker, ProductionResponseWorkerHandle, ResponseWorkerHealth,
+    ResponseWorkerJoinOwnership, ResponseWorkerLifecycle, ResponseWorkerPort,
+    ResponseWorkerStartupGuard, ResponseWorkerTaskLiveness, ResponseWorkerThreadCompletion,
+    ResponseWorkerTick, ResponseWorkerTickError,
+};
 
 pub(super) const WORKER_CLAIM_DOMAIN: &[u8] = b"chio.active-defense-worker-claim.v1\0";
 pub(super) const MIN_WORKER_PROGRESS_DEADLINE: Duration = Duration::from_secs(1);
@@ -108,7 +86,9 @@ impl ProductionResponseWorker {
         Ok(lifecycle)
     }
 
-    pub(in crate::security) fn ensure_bootstrap_ready(&self) -> Result<(), ResponseWorkerTickError> {
+    pub(in crate::security) fn ensure_bootstrap_ready(
+        &self,
+    ) -> Result<(), ResponseWorkerTickError> {
         self.live_lifecycle()?;
         self.port.ensure_ready()
     }
@@ -194,7 +174,9 @@ impl ProductionResponseWorker {
         }
     }
 
-    pub(super) fn tick_once_catching_crash(&self) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
+    pub(super) fn tick_once_catching_crash(
+        &self,
+    ) -> Result<ResponseWorkerTick, ResponseWorkerTickError> {
         catch_unwind(AssertUnwindSafe(|| self.tick_once())).unwrap_or_else(|_| {
             let error = worker_task_crash_error();
             // Cleanup can fail too. Publish the terminal crash before trying
@@ -610,4 +592,3 @@ pub(super) fn worker_task_crash_error() -> ResponseWorkerTickError {
         ResponseWorkerTickError::WorkerCrash,
     )
 }
-

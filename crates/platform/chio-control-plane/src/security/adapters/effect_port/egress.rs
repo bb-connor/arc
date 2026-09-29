@@ -1,38 +1,14 @@
-use super::Arc;
-use super::egress_snapshot_version_hash;
-use super::empty_egress_restriction_snapshot;
-use super::predict_egress_apply;
-use super::predict_egress_removal;
-use super::validate_egress_restriction_snapshot;
-use super::CanonicalBody;
-use super::Digest32;
-use super::EffectExecutionStatus;
-use super::EffectOperation;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::EgressDestinationSet;
-use super::EgressRestrictionApplyRequest;
-use super::EgressRestrictionCommand;
-use super::EgressRestrictionContribution;
-use super::EgressRestrictionRemoveRequest;
-use super::EgressRestrictionSessionKey;
-use super::EgressRestrictionSnapshot;
-use super::EgressRestrictionStore;
-use super::PortError;
-use super::PortResult;
-use super::TenantId;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::Serialize;
-use super::RestrictEgressContribution;
-use super::ResponseEffectBackend;
-use super::validate_request_binding;
-use super::effect_query_from_request;
-use super::verify_contribution_hash;
-use super::domain_hash;
-
-
+use super::{
+    domain_hash, effect_query_from_request, egress_snapshot_version_hash,
+    empty_egress_restriction_snapshot, predict_egress_apply, predict_egress_removal,
+    validate_egress_restriction_snapshot, validate_request_binding, verify_contribution_hash, Arc,
+    CanonicalBody, Digest32, EffectExecutionStatus, EffectOperation, EffectRequest, EffectResult,
+    EffectResultQuery, EgressDestinationSet, EgressRestrictionApplyRequest,
+    EgressRestrictionCommand, EgressRestrictionContribution, EgressRestrictionRemoveRequest,
+    EgressRestrictionSessionKey, EgressRestrictionSnapshot, EgressRestrictionStore, PortError,
+    PortResult, ResponseEffectBackend, ResponseEffectKind, ResponseTarget,
+    RestrictEgressContribution, Serialize, TenantId,
+};
 
 pub(super) const INSTALLED_EGRESS_CONTRIBUTION_DOMAIN: &[u8] =
     b"chio.response-effect-egress-contribution.v1\0";
@@ -120,7 +96,9 @@ impl RestrictEgressOverlayBackend {
                     },
                 })?;
         validate_egress_restriction_snapshot(&applied, &key)?;
-        if applied != predicted { return Err(PortError::integrity_failure()); }
+        if applied != predicted {
+            return Err(PortError::integrity_failure());
+        }
         let stored = applied
             .contributions
             .as_slice()
@@ -293,9 +271,19 @@ pub fn egress_restriction_version_hash(
     egress_snapshot_version_hash(&snapshot)
 }
 
-pub(super) fn decode_egress_restriction(body: &CanonicalBody) -> PortResult<RestrictEgressContribution> {
+pub(super) fn decode_egress_restriction(
+    body: &CanonicalBody,
+) -> PortResult<RestrictEgressContribution> {
     let contribution: RestrictEgressContribution =
-        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                PortError::with_source(
+                    chio_security_types::ports::PortErrorKind::InvalidData,
+                    error.code(),
+                    error,
+                )
+            })?;
     let canonical = chio_core::canonical_json_bytes(&contribution)
         .map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != body.as_bytes() {

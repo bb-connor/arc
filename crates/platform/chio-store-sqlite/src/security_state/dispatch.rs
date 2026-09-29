@@ -1,65 +1,24 @@
-
-use super::canonical_json_bytes;
-use super::sha256;
-use super::ActionId;
-use super::AutomaticResponseDispatchFenceOutcome;
-use super::AutomaticResponseDispatchFenceRecord;
-use super::AutomaticResponseDispatchFenceRequest;
-use super::CanonicalBody;
-use super::Digest32;
-use super::PortError;
-use super::PortResult;
-use super::PreparedActiveResponseDispatchBinding;
-use super::RecordId;
-use super::ResponseDispatchApproval;
-use super::ResponseDispatchAuthorization;
-use super::ResponseDispatchAuthorizationBody;
-use super::ResponseDispatchCommitMode;
-use super::ResponseDispatchCommitOutcome;
-use super::ResponseDispatchCommitRequest;
-use super::ResponseDispatchKey;
-use super::ResponseDispatchLease;
-use super::ResponseDispatchLoadOutcome;
-use super::ResponseDispatchRecord;
-use super::ResponseDispatchRecoveryOutcome;
-use super::ResponseDispatchRecoveryRequest;
-use super::ResponseDispatchStore;
-use super::ResponsePlanRecord;
-use super::ScheduledWork;
-use super::SchedulerWorkKey;
-use super::TenantId;
-use super::PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION;
-use super::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION;
-use super::ResponseApprovalRequirement;
-use super::ResponseMutationRecord;
-use super::ResponseSnapshot;
-use super::ResponseState;
-use super::ResponseTransitionCause;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::Transaction;
-use super::TransactionBehavior;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::body_hash;
-use super::validate_canonical_json_body;
-use super::decode_digest;
-use super::canonical_request_hash;
-use super::validate_attested_response_execution_dispatch;
-use super::decode_response_snapshot;
-use super::load_response_plan;
-use super::MAX_CLOCK_SKEW_MS;
-use super::scheduler_lease_body_hash;
-use super::load_valid_scheduler_lease;
-use super::load_scheduler_retry;
-use super::load_scheduler_lease;
-use super::next_scheduler_fencing_token;
-
+use super::{
+    body_hash, canonical_json_bytes, canonical_request_hash, decode_digest,
+    decode_response_snapshot, from_i64, load_response_plan, load_scheduler_lease,
+    load_scheduler_retry, load_valid_scheduler_lease, next_scheduler_fencing_token, params,
+    scheduler_lease_body_hash, sha256, sqlite_error, to_i64,
+    validate_attested_response_execution_dispatch, validate_canonical_json_body, ActionId,
+    AutomaticResponseDispatchFenceOutcome, AutomaticResponseDispatchFenceRecord,
+    AutomaticResponseDispatchFenceRequest, CanonicalBody, Connection, Digest32, OptionalExtension,
+    PortError, PortResult, PreparedActiveResponseDispatchBinding, RecordId,
+    ResponseApprovalRequirement, ResponseDispatchApproval, ResponseDispatchAuthorization,
+    ResponseDispatchAuthorizationBody, ResponseDispatchCommitMode, ResponseDispatchCommitOutcome,
+    ResponseDispatchCommitRequest, ResponseDispatchKey, ResponseDispatchLease,
+    ResponseDispatchLoadOutcome, ResponseDispatchRecord, ResponseDispatchRecoveryOutcome,
+    ResponseDispatchRecoveryRequest, ResponseDispatchStore, ResponseMutationRecord,
+    ResponsePlanRecord, ResponseSnapshot, ResponseState, ResponseTransitionCause, ScheduledWork,
+    SchedulerWorkKey, SqliteSecurityStateStore, TenantId, Transaction, TransactionBehavior,
+    MAX_CLOCK_SKEW_MS, PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+    RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
+};
 
 impl ResponseDispatchStore for SqliteSecurityStateStore {
     fn ensure_dispatch_ready(&self) -> PortResult<()> {
@@ -827,8 +786,6 @@ fn validate_response_dispatch_request(
     Ok(snapshot)
 }
 
-
-
 pub(super) fn load_response_dispatch(
     connection: &Connection,
     key: &ResponseDispatchKey,
@@ -901,9 +858,12 @@ pub(super) fn load_response_dispatch(
     validate_canonical_json_body(&canonical_authorization, &authorization_body_hash)
         .map_err(|_| PortError::integrity_failure())?;
     let authorization_body: ResponseDispatchAuthorizationBody =
-        chio_core::canonical::UntrustedJsonText::from_wire(canonical_authorization.as_bytes(), 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-            .map_err(|_| PortError::integrity_failure())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            canonical_authorization.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| PortError::integrity_failure())?;
     let response_body_hash = decode_digest(response_body_hash)?;
     let canonical_response =
         CanonicalBody::new(response_body).map_err(|_| PortError::integrity_failure())?;
@@ -1087,7 +1047,7 @@ fn load_automatic_response_dispatch_fence(
         return Ok(None);
     };
     let binding = chio_core::canonical::UntrustedJsonText::from_wire(&body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed::<PreparedActiveResponseDispatchBinding>())
+        .and_then(|input| input.decode_signed::<PreparedActiveResponseDispatchBinding>())
         .map_err(|_| PortError::integrity_failure())?;
     validate_automatic_response_dispatch_fence_binding_shape(&binding)?;
     let (canonical_body, canonical_hash) = canonical_prepared_dispatch_binding(&binding)

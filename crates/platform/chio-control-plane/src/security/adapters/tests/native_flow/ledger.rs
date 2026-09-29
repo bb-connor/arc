@@ -296,5 +296,3 @@ fn native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen() 
     }
     Ok(())
 }
-
-

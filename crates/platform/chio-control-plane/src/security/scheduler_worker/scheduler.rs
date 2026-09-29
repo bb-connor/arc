@@ -1,43 +1,13 @@
-use super::ResponseWorkerTickError;
-use super::canonical_json_bytes;
-use super::sha256;
-use super::ResponseExecutor;
-use super::ResponseScheduler;
-use super::ScheduledResponseExecutor;
-use super::SchedulerError;
-use super::SchedulerPolicy;
-use super::SchedulerTickRequest;
-use super::SchedulerWorkOutcome;
-use super::Clock;
-use super::ActionId;
-use super::EffectPort;
-use super::LeaseOwnerId;
-use super::PortError;
-use super::PortErrorKind;
-use super::RecordId;
-use super::ResponseDispatchStore;
-use super::ResponseSchedulerStore;
-use super::ScheduledWork;
-use super::SchedulerHealthPort;
-use super::SecurityAlertPort;
-use super::SecurityReceiptSink;
-use super::TenantId;
-use super::SqliteSecurityStateStore;
-use super::OsRng;
-use super::RngCore;
-use super::Serialize;
-use super::BTreeMap;
-use super::Arc;
-use super::Mutex;
-use super::ResponseWorkerTick;
-use super::ResponseWorkerPort;
-use super::DeclassificationOutboxHealth;
-use super::ProductionDeclassificationReceiptOutbox;
-
-use super::WORKER_CLAIM_DOMAIN;
-
-
-
+use super::{
+    canonical_json_bytes, sha256, ActionId, Arc, BTreeMap, Clock, DeclassificationOutboxHealth,
+    EffectPort, LeaseOwnerId, Mutex, OsRng, PortError, PortErrorKind,
+    ProductionDeclassificationReceiptOutbox, RecordId, ResponseDispatchStore, ResponseExecutor,
+    ResponseScheduler, ResponseSchedulerStore, ResponseWorkerPort, ResponseWorkerTick,
+    ResponseWorkerTickError, RngCore, ScheduledResponseExecutor, ScheduledWork, SchedulerError,
+    SchedulerHealthPort, SchedulerPolicy, SchedulerTickRequest, SchedulerWorkOutcome,
+    SecurityAlertPort, SecurityReceiptSink, Serialize, SqliteSecurityStateStore, TenantId,
+    WORKER_CLAIM_DOMAIN,
+};
 
 #[derive(Clone, Debug)]
 pub struct ProductionResponseSchedulerConfig {
@@ -205,7 +175,10 @@ impl SqliteResponseWorkerPort {
         Ok(worker)
     }
 
-    pub(super) fn claim(&self, tick_sequence: u64) -> Result<Vec<ScheduledWork>, ResponseWorkerTickError> {
+    pub(super) fn claim(
+        &self,
+        tick_sequence: u64,
+    ) -> Result<Vec<ScheduledWork>, ResponseWorkerTickError> {
         if self.cleanup_expired_terminal_leases()? {
             return Err(ResponseWorkerTickError::TerminalSchedulerCleanupPending);
         }
@@ -213,7 +186,7 @@ impl SqliteResponseWorkerPort {
             .clock
             .unix_millis()
             .map(chio_security_types::clock::UnixMillis::get)
-                    .map_err(PortError::from)?;
+            .map_err(PortError::from)?;
         let claim_id = worker_claim_id(
             &self.config.tenant_id,
             &self.config.lease_owner_id,
@@ -266,7 +239,7 @@ impl SqliteResponseWorkerPort {
             .clock
             .unix_millis()
             .map(chio_security_types::clock::UnixMillis::get)
-                    .map_err(PortError::from)?;
+            .map_err(PortError::from)?;
         let mut current = work.clone();
         if current.lease_expires_at_unix_ms.saturating_sub(now_unix_ms)
             <= self.config.renewal_margin_ms

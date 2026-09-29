@@ -1,37 +1,14 @@
-use super::Arc;
-use super::containment_installed_version_hash;
-use super::containment_overlay_version_hash;
-use super::containment_session_target;
-use super::predict_containment_overlay_apply;
-use super::predict_containment_overlay_remove;
-use super::validate_containment_overlay_snapshot;
-use super::CanonicalBody;
-use super::ContainmentOverlayCommand;
-use super::ContainmentOverlayStore;
-use super::Digest32;
-use super::EffectExecutionStatus;
-use super::EffectOperation;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::OverlayApplyRequest;
-use super::OverlayContribution;
-use super::OverlayRemoveRequest;
-use super::OverlaySnapshot;
-use super::PortError;
-use super::PortResult;
-use super::SessionId;
-use super::TenantId;
-use super::TenantScopedId;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::SessionSuspensionContribution;
-use super::ResponseEffectBackend;
-use super::validate_request_binding;
-use super::effect_query_from_request;
-use super::verify_contribution_hash;
-
-
+use super::{
+    containment_installed_version_hash, containment_overlay_version_hash,
+    containment_session_target, effect_query_from_request, predict_containment_overlay_apply,
+    predict_containment_overlay_remove, validate_containment_overlay_snapshot,
+    validate_request_binding, verify_contribution_hash, Arc, CanonicalBody,
+    ContainmentOverlayCommand, ContainmentOverlayStore, Digest32, EffectExecutionStatus,
+    EffectOperation, EffectRequest, EffectResult, EffectResultQuery, OverlayApplyRequest,
+    OverlayContribution, OverlayRemoveRequest, OverlaySnapshot, PortError, PortResult,
+    ResponseEffectBackend, ResponseEffectKind, ResponseTarget, SessionId,
+    SessionSuspensionContribution, TenantId, TenantScopedId,
+};
 
 /// Exact `SuspendSession` backend backed by the durable containment overlay.
 ///
@@ -304,9 +281,19 @@ pub(super) fn empty_overlay_snapshot(target: TenantScopedId) -> PortResult<Overl
     })
 }
 
-pub(super) fn decode_session_suspension(body: &CanonicalBody) -> PortResult<SessionSuspensionContribution> {
+pub(super) fn decode_session_suspension(
+    body: &CanonicalBody,
+) -> PortResult<SessionSuspensionContribution> {
     let contribution: SessionSuspensionContribution =
-        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                PortError::with_source(
+                    chio_security_types::ports::PortErrorKind::InvalidData,
+                    error.code(),
+                    error,
+                )
+            })?;
     if contribution.posture_rank == 0 {
         return Err(PortError::invalid_data());
     }

@@ -1,30 +1,12 @@
-use super::ActiveDefensePolicyBinding;
-use super::ActiveDefenseReceiptBody;
-use super::ActiveDefenseReceiptHeader;
-use super::DeclassificationConsumptionReceiptBody;
-use super::DeclassificationOutcomeReceiptBody;
-use super::FlowDenial;
-use super::derive_declassification_event_id;
-use super::derive_declassification_transition_id;
-use super::CanonicalBody;
-use super::DeclassificationTransitionBinding;
-use super::DeclassificationUseState;
-use super::Digest32;
-use super::EventId;
-use super::ExactReceiptRecord;
-use super::ExactSecurityReceiptSink;
-use super::GrantId;
-use super::OpaqueReceiptRef;
-use super::PortError;
-use super::PortResult;
-use super::ReceiptAppendRequest;
-use super::RecordId;
-use super::SecurityReceiptSink;
-use super::TenantId;
-
-
-use super::DeclassificationOutcomeBodyInput;
-
+use super::{
+    derive_declassification_event_id, derive_declassification_transition_id,
+    ActiveDefensePolicyBinding, ActiveDefenseReceiptBody, ActiveDefenseReceiptHeader,
+    CanonicalBody, DeclassificationConsumptionReceiptBody, DeclassificationOutcomeBodyInput,
+    DeclassificationOutcomeReceiptBody, DeclassificationTransitionBinding,
+    DeclassificationUseState, Digest32, EventId, ExactReceiptRecord, ExactSecurityReceiptSink,
+    FlowDenial, GrantId, OpaqueReceiptRef, PortError, PortResult, ReceiptAppendRequest, RecordId,
+    SecurityReceiptSink, TenantId,
+};
 
 pub(super) fn canonical_body(value: &serde_json::Value) -> Result<CanonicalBody, FlowDenial> {
     let bytes =
@@ -36,7 +18,9 @@ pub(super) fn digest(bytes: &[u8]) -> Digest32 {
     Digest32::new(*chio_core::sha256(bytes).as_bytes())
 }
 
-pub(super) fn declassification_grant_hash<T: serde::Serialize>(grant: &T) -> Result<Digest32, FlowDenial> {
+pub(super) fn declassification_grant_hash<T: serde::Serialize>(
+    grant: &T,
+) -> Result<Digest32, FlowDenial> {
     let canonical = chio_core::canonical_json_bytes(grant)
         .map_err(|_| FlowDenial::DeclassificationBindingMismatch)?;
     Ok(digest(&canonical))
@@ -232,4 +216,3 @@ pub(super) fn transition_id(domain: &str, binding: &[u8]) -> Result<RecordId, Fl
     ))
     .map_err(|_| FlowDenial::StateOverflow)
 }
-

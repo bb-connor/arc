@@ -415,5 +415,3 @@ fn public_nested_declassification_proof_reaches_native_untrusted_issuer_denial()
     }
     Ok(())
 }
-
-

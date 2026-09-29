@@ -1,12 +1,7 @@
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::CanonicalBody;
-use super::TenantId;
-use super::RecordId;
-use super::OpaqueReceiptRef;
-use super::PortResult;
-
+use super::{
+    CanonicalBody, Deserialize, Digest32, OpaqueReceiptRef, PortResult, RecordId, Serialize,
+    TenantId,
+};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

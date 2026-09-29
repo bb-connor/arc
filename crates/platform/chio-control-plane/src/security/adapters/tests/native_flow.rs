@@ -431,5 +431,3 @@ fn native_policy_rejects_clock_failure_before_egress_acquisition() -> TestResult
     ));
     Ok(())
 }
-
-

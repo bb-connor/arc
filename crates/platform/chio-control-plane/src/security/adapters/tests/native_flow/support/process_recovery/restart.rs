@@ -22,8 +22,7 @@ pub(super) fn configure_original_selection(
     original: &RetainedToolAdmissionRequestV1,
     witness: &Witness,
 ) -> TestResult {
-    let profile = original
-        .authority_profile();
+    let profile = original.authority_profile();
     if let Some(binding) = profile.runtime() {
         use chio_runtime_core::*;
         let source =
@@ -523,5 +522,3 @@ fn caller_lookup_waits_for_original_coordinator(
         Ok(())
     })
 }
-
-

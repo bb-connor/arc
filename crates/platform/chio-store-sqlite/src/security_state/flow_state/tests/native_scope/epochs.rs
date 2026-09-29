@@ -1,5 +1,5 @@
-use chio_security_types::ports::OpaqueReceiptRef;
 use super::*;
+use chio_security_types::ports::OpaqueReceiptRef;
 
 #[test]
 fn verified_epochs_and_lineage_copy_never_borrow_another_authority() -> TestResult {

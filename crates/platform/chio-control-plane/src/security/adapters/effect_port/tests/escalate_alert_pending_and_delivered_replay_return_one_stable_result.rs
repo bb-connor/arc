@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn escalate_alert_pending_and_delivered_replay_return_one_stable_result() {
     let store = Arc::new(RecordingAlertStore::default());

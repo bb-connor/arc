@@ -1,16 +1,8 @@
-use super::DecoyArtifactLookup;
-use super::DecoyScan;
-use super::SealedDecoyCasRequest;
-use super::SealedDecoyPage;
-use super::SealedDecoyRecord;
-use super::SealedMarkerLookup;
-use super::SealedPublicRefLookup;
-use super::WatermarkObservation;
-use super::WatermarkObservationResult;
-use super::WatermarkSequenceReservation;
-use super::WatermarkSequenceReservationResult;
-use super::PortResult;
-
+use super::{
+    DecoyArtifactLookup, DecoyScan, PortResult, SealedDecoyCasRequest, SealedDecoyPage,
+    SealedDecoyRecord, SealedMarkerLookup, SealedPublicRefLookup, WatermarkObservation,
+    WatermarkObservationResult, WatermarkSequenceReservation, WatermarkSequenceReservationResult,
+};
 
 #[cfg(feature = "std")]
 pub trait SealedDecoyRegistryStore: Send + Sync {

@@ -1,26 +1,11 @@
-use super::ActionId;
-use super::LeaseOwnerId;
-use super::LineageFence;
-use super::LineageFenceRelease;
-use super::LineageFenceRenewal;
-use super::LineageFenceRequest;
-use super::LineageFenceStore;
-use super::LineageFenceTakeover;
-use super::PortError;
-use super::PortResult;
-use super::TenantScopedId;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::TransactionBehavior;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::decode_digest;
-
+use super::{
+    decode_digest, from_i64, params, sqlite_error, to_i64, ActionId, Connection, LeaseOwnerId,
+    LineageFence, LineageFenceRelease, LineageFenceRenewal, LineageFenceRequest, LineageFenceStore,
+    LineageFenceTakeover, OptionalExtension, PortError, PortResult, SqliteSecurityStateStore,
+    TenantScopedId, TransactionBehavior,
+};
 
 pub(super) fn load_lineage_fence(
     connection: &Connection,

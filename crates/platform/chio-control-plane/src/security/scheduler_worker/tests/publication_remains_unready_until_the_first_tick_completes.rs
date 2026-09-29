@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn publication_remains_unready_until_the_first_tick_completes() {
     let port = Arc::new(BlockingWorkerPort::blocking_initial_tick());

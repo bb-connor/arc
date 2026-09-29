@@ -729,5 +729,3 @@ impl ToolServerConnection for CountingServer {
         Ok(arguments)
     }
 }
-
-

@@ -1,23 +1,11 @@
+use super::{
+    catch_unwind, worker_task_crash_error, Arc, AssertUnwindSafe, Condvar, Duration, Mutex,
+    OnceLock, Ordering, ProductionResponseWorker, ProductionResponseWorkerHandle,
+    ResponseWorkerJoinOwnership, ResponseWorkerStartupGuard, ResponseWorkerThreadCompletion,
+    ResponseWorkerTickError, VecDeque,
+};
 #[cfg(test)]
 use std::sync::atomic::AtomicBool;
-use super::ResponseWorkerTickError;
-use super::VecDeque;
-use super::catch_unwind;
-use super::AssertUnwindSafe;
-use super::Ordering;
-use super::Arc;
-use super::Condvar;
-use super::Mutex;
-use super::OnceLock;
-use super::Duration;
-
-use super::worker_task_crash_error;
-
-use super::ProductionResponseWorker;
-use super::ProductionResponseWorkerHandle;
-use super::ResponseWorkerStartupGuard;
-use super::ResponseWorkerJoinOwnership;
-use super::ResponseWorkerThreadCompletion;
 
 pub(super) const MAX_RESPONSE_WORKER_JOIN_OWNERS: usize = 64;
 pub(super) const RESPONSE_WORKER_REAPER_POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -238,8 +226,8 @@ impl Drop for ResponseWorkerJoinPermit {
     }
 }
 
-pub(super) fn acquire_response_worker_join_permit() -> Result<ResponseWorkerJoinPermit, ResponseWorkerTickError>
-{
+pub(super) fn acquire_response_worker_join_permit(
+) -> Result<ResponseWorkerJoinPermit, ResponseWorkerTickError> {
     let registry = Arc::clone(
         RESPONSE_WORKER_REAPER_REGISTRY
             .get_or_init(|| Arc::new(ResponseWorkerReaperRegistry::new())),
@@ -263,7 +251,9 @@ pub(super) fn join_response_worker_thread(
 }
 
 impl ResponseWorkerStartupGuard {
-    pub(super) fn take_join(&mut self) -> Result<ResponseWorkerJoinOwnership, ResponseWorkerTickError> {
+    pub(super) fn take_join(
+        &mut self,
+    ) -> Result<ResponseWorkerJoinOwnership, ResponseWorkerTickError> {
         let join = self.join.take().ok_or_else(worker_task_crash_error)?;
         self.active = false;
         Ok(join)
@@ -337,7 +327,9 @@ impl ProductionResponseWorkerHandle {
             .map_err(|_| ResponseWorkerTickError::WorkerArmHandshake)
     }
 
-    pub(in crate::security) fn release_publication(&mut self) -> Result<(), ResponseWorkerTickError> {
+    pub(in crate::security) fn release_publication(
+        &mut self,
+    ) -> Result<(), ResponseWorkerTickError> {
         let publication_gate = self
             .publication_gate
             .take()
@@ -422,7 +414,6 @@ impl Drop for ProductionResponseWorkerHandle {
         permit.transfer(join, Arc::clone(&self.worker));
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/reaper_spawn_failure_retains_join_ownership_for_later_recovery.rs"]

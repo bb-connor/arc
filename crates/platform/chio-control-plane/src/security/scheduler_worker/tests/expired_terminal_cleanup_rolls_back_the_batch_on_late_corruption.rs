@@ -1,7 +1,6 @@
 use super::*;
 
-
-    #[test]
+#[test]
 fn expired_terminal_cleanup_rolls_back_the_batch_on_late_corruption() {
     let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("terminal-cleanup-rollback.sqlite");
@@ -16,9 +15,7 @@ fn expired_terminal_cleanup_rolls_back_the_batch_on_late_corruption() {
     );
     let plans = ["action-cleanup-rollback-a", "action-cleanup-rollback-b"]
         .into_iter()
-        .map(|action_id| {
-            install_due_sqlite_plan(&store, action_id, now_unix_ms.saturating_sub(1))
-        })
+        .map(|action_id| install_due_sqlite_plan(&store, action_id, now_unix_ms.saturating_sub(1)))
         .collect::<Vec<_>>();
     let port = sqlite_worker_port(
         Arc::clone(&store),

@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn service_publication_can_precede_operational_kernel_binding() {
     let registry = ActiveDefenseServiceRegistry::default();

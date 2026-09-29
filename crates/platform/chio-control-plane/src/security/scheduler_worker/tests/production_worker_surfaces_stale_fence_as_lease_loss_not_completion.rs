@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn production_worker_surfaces_stale_fence_as_lease_loss_not_completion() {
     let stale = ResponseWorkerTick {

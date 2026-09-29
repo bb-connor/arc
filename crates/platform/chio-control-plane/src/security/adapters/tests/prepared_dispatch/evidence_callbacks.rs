@@ -144,5 +144,3 @@ fn expiry_during_evidence_lookup_rejects_before_consumption() {
         Err(chio_flow::FlowDenial::DeclassificationExpired)
     ));
 }
-
-

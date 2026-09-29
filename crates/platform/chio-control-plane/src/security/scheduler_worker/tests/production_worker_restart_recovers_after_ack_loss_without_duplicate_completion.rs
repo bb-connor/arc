@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn production_worker_restart_recovers_after_ack_loss_without_duplicate_completion() {
     let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![

@@ -1,48 +1,11 @@
-
-
-use super::canonical_json_bytes;
-use super::sha256;
-use super::PublicKey;
-use super::ChioReceipt;
-use super::ToolCallAction;
-use super::BoundaryClass;
-use super::ObservationOutcome;
-use super::ReceiptKind;
-use super::RedactionMode;
-use super::ToolOrigin;
-use super::TrustLevel;
-use super::SignedSecurityEvent;
-
-use super::Clock;
-use super::Digest32;
-use super::PortError;
-use super::PortResult;
-use super::ProducerId;
-use super::ProducerTrustClass;
-use super::RecordId;
-use super::SecurityEventVerifierPort;
-use super::TenantId;
-use super::UnverifiedSecurityEvent;
-use super::SecurityEventVerificationRecord;
-
-
-use super::SecurityEventBody;
-use super::Deserialize;
-use super::Serialize;
-use super::json;
-use super::BTreeMap;
-use super::Arc;
-use super::Error;
-
-use super::CorrelationEventVerifier;
-
-
-
-
-
-
-use super::NativeSecurityEventVerifier;
-
+use super::{
+    canonical_json_bytes, json, sha256, Arc, BTreeMap, BoundaryClass, ChioReceipt, Clock,
+    CorrelationEventVerifier, Deserialize, Digest32, Error, NativeSecurityEventVerifier,
+    ObservationOutcome, PortError, PortResult, ProducerId, ProducerTrustClass, PublicKey,
+    ReceiptKind, RecordId, RedactionMode, SecurityEventBody, SecurityEventVerificationRecord,
+    SecurityEventVerifierPort, Serialize, SignedSecurityEvent, TenantId, ToolCallAction,
+    ToolOrigin, TrustLevel, UnverifiedSecurityEvent,
+};
 
 pub(super) const EVENT_EVIDENCE_HASH_DOMAIN: &[u8] = b"chio.verified-security-event-evidence.v1\0";
 pub(super) const RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN: &[u8] =
@@ -176,7 +139,18 @@ impl NativeSecurityEventVerifier {
     }
 
     fn parse_bound_body(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventBody> {
-        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(event.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(
+            event.canonical_body.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| {
+            PortError::with_source(
+                chio_security_types::ports::PortErrorKind::InvalidData,
+                error.code(),
+                error,
+            )
+        })?;
         body.validate().map_err(|_| PortError::invalid_data())?;
         let canonical_body = canonical_json_bytes(&body).map_err(|_| PortError::invalid_data())?;
         let body_hash = Digest32::new(*sha256(&canonical_body).as_bytes());
@@ -199,7 +173,18 @@ impl NativeSecurityEventVerifier {
         body: &SecurityEventBody,
         enforce_freshness: bool,
     ) -> PortResult<SecurityEventVerificationRecord> {
-        let signed: SignedSecurityEvent = chio_core::canonical::UntrustedJsonText::from_wire(event.source_evidence.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+        let signed: SignedSecurityEvent = chio_core::canonical::UntrustedJsonText::from_wire(
+            event.source_evidence.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| {
+            PortError::with_source(
+                chio_security_types::ports::PortErrorKind::InvalidData,
+                error.code(),
+                error,
+            )
+        })?;
         let canonical_signed =
             canonical_json_bytes(&signed).map_err(|_| PortError::invalid_data())?;
         let trusted = self
@@ -237,7 +222,18 @@ impl NativeSecurityEventVerifier {
         body: &SecurityEventBody,
         enforce_freshness: bool,
     ) -> PortResult<SecurityEventVerificationRecord> {
-        let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(event.source_evidence.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+        let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(
+            event.source_evidence.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| {
+            PortError::with_source(
+                chio_security_types::ports::PortErrorKind::InvalidData,
+                error.code(),
+                error,
+            )
+        })?;
         let canonical_receipt =
             canonical_json_bytes(&receipt).map_err(|_| PortError::invalid_data())?;
         let trusted = self
@@ -303,7 +299,10 @@ impl NativeSecurityEventVerifier {
         ))
     }
 
-    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
+    fn verify_durable(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord> {
         self.ensure_ready()?;
         let body = self.parse_bound_body(event)?;
         match body.trust_class {
@@ -314,7 +313,10 @@ impl NativeSecurityEventVerifier {
 }
 
 impl SecurityEventVerifierPort for NativeSecurityEventVerifier {
-    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
+    fn verify(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord> {
         self.ensure_ready()?;
         let body = self.parse_bound_body(event)?;
         match body.trust_class {
@@ -343,11 +345,17 @@ impl CorrelationEventVerifier for NativeSecurityEventVerifier {
             .map_err(PortError::from)
     }
 
-    fn verify(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
+    fn verify(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord> {
         SecurityEventVerifierPort::verify(self, event)
     }
 
-    fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
+    fn verify_durable(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord> {
         NativeSecurityEventVerifier::verify_durable(self, event)
     }
 }

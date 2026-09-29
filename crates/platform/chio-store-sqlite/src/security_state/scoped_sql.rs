@@ -3,16 +3,11 @@
 //! Native inspection cannot construct a writer. Native joins, egress and use
 //! transitions require their affine admission-owned transaction and exact
 //! bounded row-change capture. Other mutations retain the legacy owner.
+#[cfg(target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::{sqlite_error, Connection, PortResult, Transaction};
 #[cfg(test)]
 use rusqlite::params;
-
-
-use super::PortResult;
-use super::Connection;
-use super::Transaction;
-# [cfg (target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
 use rusqlite::{params_from_iter, Row, Statement, ToSql};
 
 pub(super) mod declassification;

@@ -4,21 +4,6 @@ mod flow_policy;
 mod native_evidence;
 mod native_flow;
 
-pub use flow_dispatch::PreparedFlowDispatch;
-pub use native_flow::{
-    NativeFlowCustody, NativeFlowError, NativeFlowPolicyEvidence, NativeFlowResolver,
-    PreparedNativeFlowDispatch,
-};
-
-pub use native_evidence::{
-    AlertDispatchReport, AlertOutboxConfig, NativeActiveResponseFindingAuthority,
-    NativeFindingAuthorityConfigError, NativeSchedulerHealthPort, NativeSecurityReceiptSink,
-    SqliteSiemOutbox,
-};
-
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
-
 use chio_core::crypto::PublicKey;
 use chio_core::receipt::security::{
     ActiveDefensePolicyBinding, ActiveDefenseReceiptBody, ActiveDefenseReceiptHeader,
@@ -56,57 +41,57 @@ use chio_security_types::ports::{
     TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 use chio_security_types::InformationLabel;
+pub use flow_dispatch::PreparedFlowDispatch;
+pub use native_evidence::{
+    AlertDispatchReport, AlertOutboxConfig, NativeActiveResponseFindingAuthority,
+    NativeFindingAuthorityConfigError, NativeSchedulerHealthPort, NativeSecurityReceiptSink,
+    SqliteSiemOutbox,
+};
+pub use native_flow::{
+    NativeFlowCustody, NativeFlowError, NativeFlowPolicyEvidence, NativeFlowResolver,
+    PreparedNativeFlowDispatch,
+};
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 #[cfg(test)]
 #[path = "adapters/test_clocks.rs"]
 mod test_clocks;
-
 
 mod classification;
 pub use classification::StructuredClassificationAdapter;
 
 mod flow_resolution;
 pub use flow_resolution::FlowResolverConfigError;
-use flow_resolution::flow_key;
-use flow_resolution::flow_transition_id;
-use flow_resolution::non_egress_declaration;
-use flow_resolution::map_declassification_error;
+use flow_resolution::{
+    flow_key, flow_transition_id, map_declassification_error, non_egress_declaration,
+};
 
 mod declassification_outbox;
-pub use declassification_outbox::DeclassificationReceiptDrainReport;
-pub use declassification_outbox::DeclassificationReconciliationReport;
-pub use declassification_outbox::DeclassificationCompactionReport;
-pub use declassification_outbox::DeclassificationReceiptOutboxDrainer;
-
 use declassification_outbox::append_and_ack_exact_evidence;
+pub use declassification_outbox::{
+    DeclassificationCompactionReport, DeclassificationReceiptDrainReport,
+    DeclassificationReceiptOutboxDrainer, DeclassificationReconciliationReport,
+};
 
 mod declassification_outcome;
-use declassification_outcome::PendingDeclassificationOutcome;
-use declassification_outcome::prepare_declassification_outcome_evidence;
-use declassification_outcome::commit_terminal_declassification_evidence;
+use declassification_outcome::{
+    commit_terminal_declassification_evidence, prepare_declassification_outcome_evidence,
+    PendingDeclassificationOutcome,
+};
 
 mod flow_denial;
 use flow_denial::FlowDenialReceiptContext;
 
-
 mod receipt_projection;
-use receipt_projection::canonical_body;
-use receipt_projection::digest;
-use receipt_projection::declassification_grant_hash;
-use receipt_projection::active_defense_header;
-use receipt_projection::append_active_defense_body;
-use receipt_projection::active_defense_receipt_request;
-use receipt_projection::append_exact_receipt;
-use receipt_projection::declassification_consumption_body;
-use receipt_projection::declassification_outcome_body;
-use receipt_projection::event_id;
-use receipt_projection::transition_id;
+use receipt_projection::{
+    active_defense_header, active_defense_receipt_request, append_active_defense_body,
+    append_exact_receipt, canonical_body, declassification_consumption_body,
+    declassification_grant_hash, declassification_outcome_body, digest, event_id, transition_id,
+};
 
 #[cfg(test)]
 mod tests;
-
-
-
 
 #[derive(Clone)]
 pub struct FlowResolverConfig {
@@ -139,9 +124,6 @@ pub struct PersistentFlowResolver {
     config: FlowResolverConfig,
 }
 
-
-
-
 pub(super) struct AtomicDeclassificationConsumptionStore {
     store: Arc<dyn DeclassificationEvidenceCommitStore>,
     commit: DeclassificationConsumptionEvidenceCommit,
@@ -158,8 +140,6 @@ pub(super) struct PersistentDeclassificationOutcomeRecorder {
     pending_outcome: Option<PendingDeclassificationOutcome>,
     completed_outcome: Option<DeclassificationDispatchOutcome>,
 }
-
-
 
 pub(super) struct DeclassificationOutcomeBodyInput {
     tenant_id: TenantId,

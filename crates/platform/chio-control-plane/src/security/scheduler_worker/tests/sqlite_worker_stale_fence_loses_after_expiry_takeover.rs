@@ -1,6 +1,5 @@
-use crate::security::scheduler_worker::tests::*;
 use super::*;
-
+use crate::security::scheduler_worker::tests::*;
 
 #[test]
 fn sqlite_worker_stale_fence_loses_after_expiry_takeover() {

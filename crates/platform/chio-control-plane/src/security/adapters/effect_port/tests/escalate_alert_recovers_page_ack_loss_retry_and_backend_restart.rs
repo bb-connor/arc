@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn escalate_alert_recovers_page_ack_loss_retry_and_backend_restart() {
     let store = Arc::new(RecordingAlertStore::default());

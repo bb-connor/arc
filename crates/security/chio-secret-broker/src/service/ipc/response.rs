@@ -1,31 +1,12 @@
-use super::Write;
-# [cfg (unix)]
-use super::UnixStream;
-use super::canonical_json_bytes;
-
-
-
-
-
-# [cfg (unix)]
-use super::is_well_formed_broker_execute_diagnostic_code;
-use super::BrokerExecuteFailure;
-use super::MAX_WIRE_BYTES;
-use super::failure_receipt_digest;
-use super::verify_failure_receipt;
-use super::BrokerError;
-use super::Result;
-use super::IpcOperation;
-use super::IpcResponse;
-
-
-
-# [cfg (unix)]
-use super::BrokerIpcServeFailure;
-# [cfg (unix)]
-use super::BrokerIpcDeadlineIo;
-
-
+use super::{
+    canonical_json_bytes, failure_receipt_digest, verify_failure_receipt, BrokerError,
+    BrokerExecuteFailure, IpcOperation, IpcResponse, Result, Write, MAX_WIRE_BYTES,
+};
+#[cfg(unix)]
+use super::{
+    is_well_formed_broker_execute_diagnostic_code, BrokerIpcDeadlineIo, BrokerIpcServeFailure,
+    UnixStream,
+};
 
 #[cfg(unix)]
 pub(in crate::service) fn classify_broker_ipc_handler_result(
@@ -91,7 +72,9 @@ pub(in crate::service) fn validate_broker_ipc_response_envelope(
 #[cfg(unix)]
 pub(in crate::service) fn is_well_formed_broker_ipc_error_code(code: &str) -> bool {
     let bytes = code.as_bytes();
-    let (Some(first), Some(last)) = (bytes.first(), bytes.last()) else { return false; };
+    let (Some(first), Some(last)) = (bytes.first(), bytes.last()) else {
+        return false;
+    };
     if bytes.len() > MAX_BROKER_IPC_ERROR_CODE_BYTES
         || !first.is_ascii_lowercase()
         || !(last.is_ascii_lowercase() || last.is_ascii_digit())
@@ -112,7 +95,11 @@ pub(in crate::service) fn validate_signed_broker_execute_failure(response: &IpcR
     if !is_well_formed_broker_execute_diagnostic_code(error_code) {
         return false;
     }
-    let Ok(failure) = chio_core_types::canonical::UntrustedJsonText::from_wire(&response.response, MAX_WIRE_BYTES).and_then(|input| input.decode_canonical::<BrokerExecuteFailure>()) else {
+    let Ok(failure) = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        &response.response,
+        MAX_WIRE_BYTES,
+    )
+    .and_then(|input| input.decode_canonical::<BrokerExecuteFailure>()) else {
         return false;
     };
     let Ok(canonical) = canonical_json_bytes(&failure) else {

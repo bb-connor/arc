@@ -266,5 +266,3 @@ fn native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery()
     }
     Ok(())
 }
-
-

@@ -1,54 +1,14 @@
-
-
-
-
-use super::SecretBackend;
-
-
-use super::capability_digest;
-use super::verify_capability;
-
-use super::proof_digest;
-use super::verify_request_proof;
-use super::BrokerExecuteRequest;
-use super::ProviderAdapter;
-use super::AdminAuthorization;
-use super::GovernedAdminAuthorizer;
-use super::broker_execute_request_registration_digest;
-use super::validate_parent_liveness;
-use super::validate_revocation_snapshot;
-use super::BrokerRevocationRequest;
-
-use super::CanonicalBrokerRevocationSet;
-
-use super::CapabilityLivenessRequest;
-use super::derive_attempt_ids_for_operation;
-use super::AttemptRegistration;
-use super::validate_identifier;
-use super::BrokerError;
-use super::Result;
-use super::BrokerService;
-use super::ValidatedBrokerAuthorities;
-use super::ValidatedBrokerAuditAuthorities;
-
-
-use super::broker_request_digest;
-
-
-
-
-
-
-
-
-
-
-
-
+use super::{
+    broker_execute_request_registration_digest, broker_request_digest, capability_digest,
+    derive_attempt_ids_for_operation, proof_digest, validate_identifier, validate_parent_liveness,
+    validate_revocation_snapshot, verify_capability, verify_request_proof, AdminAuthorization,
+    AttemptRegistration, BrokerError, BrokerExecuteRequest, BrokerRevocationRequest, BrokerService,
+    CanonicalBrokerRevocationSet, CapabilityLivenessRequest, GovernedAdminAuthorizer,
+    ProviderAdapter, Result, SecretBackend, ValidatedBrokerAuditAuthorities,
+    ValidatedBrokerAuthorities,
+};
 
 impl BrokerService {
-
-
     pub(super) fn authority_observation_time(&self, previous: u64) -> Result<u64> {
         let observed = match &self.authority_clock {
             Some(clock) => clock
@@ -440,4 +400,3 @@ impl BrokerService {
         .map(|authorities| authorities.revocation_set)
     }
 }
-

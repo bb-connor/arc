@@ -1,53 +1,20 @@
-use super::validate_response_snapshot_lifecycle;
-use super::ActionId;
-use super::CanonicalBody;
-use super::CreateOutcome;
-use super::EffectId;
-use super::LeaseOwnerId;
-use super::OpaqueReceiptRef;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::ResponseCasRequest;
-use super::ResponseEffectCasRequest;
-use super::ResponseEffectKey;
-use super::ResponseEffectRecord;
-use super::ResponsePlanKey;
-use super::ResponsePlanRecord;
-use super::ResponseReceiptCursor;
-use super::ResponseReceiptCursorCasRequest;
-use super::ResponseStore;
-use super::ScheduledWork;
-use super::SchedulerClaimRequest;
-use super::LINEAGE_FENCE_RENEWAL_MARGIN_MS;
-use super::ResponseMutationRecord;
-use super::ResponseSnapshot;
-use super::RESPONSE_STATE_SCHEMA_VERSION;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::TransactionBehavior;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::validate_canonical_json_body;
-use super::decode_digest;
-use super::canonical_request_hash;
-use super::validate_encrypted_blob_reference;
-use super::MAX_SCHEDULER_CLAIMS;
-use super::MAX_CLOCK_SKEW_MS;
-use super::scheduler_lease_body_hash;
-use super::load_valid_scheduler_lease;
-use super::load_scheduler_claim;
-use super::next_scheduler_fencing_token;
-use super::validate_scheduler_fence;
-use super::validate_scheduler_lease_binding;
-use super::transition_status;
-use super::record_transition;
-
+use super::{
+    canonical_request_hash, decode_digest, from_i64, load_scheduler_claim,
+    load_valid_scheduler_lease, next_scheduler_fencing_token, params, record_transition,
+    scheduler_lease_body_hash, sqlite_error, to_i64, transition_status,
+    validate_canonical_json_body, validate_encrypted_blob_reference,
+    validate_response_snapshot_lifecycle, validate_scheduler_fence,
+    validate_scheduler_lease_binding, ActionId, CanonicalBody, Connection, CreateOutcome, EffectId,
+    LeaseOwnerId, OpaqueReceiptRef, OptionalExtension, PortError, PortResult, RecordId,
+    ResponseCasRequest, ResponseEffectCasRequest, ResponseEffectKey, ResponseEffectRecord,
+    ResponseMutationRecord, ResponsePlanKey, ResponsePlanRecord, ResponseReceiptCursor,
+    ResponseReceiptCursorCasRequest, ResponseSnapshot, ResponseStore, ScheduledWork,
+    SchedulerClaimRequest, SqliteSecurityStateStore, TransactionBehavior,
+    LINEAGE_FENCE_RENEWAL_MARGIN_MS, MAX_CLOCK_SKEW_MS, MAX_SCHEDULER_CLAIMS,
+    RESPONSE_STATE_SCHEMA_VERSION,
+};
 
 impl ResponseStore for SqliteSecurityStateStore {
     fn load_plan(&self, key: &ResponsePlanKey) -> PortResult<Option<ResponsePlanRecord>> {
@@ -755,7 +722,9 @@ impl ResponseStore for SqliteSecurityStateStore {
     }
 }
 
-pub(super) fn decode_response_snapshot(record: &ResponsePlanRecord) -> PortResult<ResponseSnapshot> {
+pub(super) fn decode_response_snapshot(
+    record: &ResponsePlanRecord,
+) -> PortResult<ResponseSnapshot> {
     validate_canonical_json_body(&record.canonical_body, &record.body_hash)?;
     let snapshot: ResponseSnapshot = chio_core::canonical::UntrustedJsonText::from_wire(
         record.canonical_body.as_bytes(),

@@ -1,19 +1,9 @@
-# [cfg (feature = "std")]
+#[cfg(feature = "std")]
 use super::format;
-use super::String;
-use super::Vec;
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::CanonicalBody;
-use super::BoundedVec;
-use super::CreateOutcome;
-use super::TenantId;
-use super::RecordId;
-use super::ActionId;
-use super::OpaqueReceiptRef;
-use super::PortError;
-use super::PortResult;
+use super::{
+    ActionId, BoundedVec, CanonicalBody, CreateOutcome, Deserialize, Digest32, OpaqueReceiptRef,
+    PortError, PortResult, RecordId, Serialize, String, TenantId, Vec,
+};
 
 pub const ATTESTED_FINDING_BATCH_SCHEMA_VERSION: u8 = 1;
 pub const MAX_ATTESTED_FINDING_BATCH_SIZE: usize = 4_096;
@@ -90,9 +80,15 @@ fn attested_finding_derived_id(
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut suffix = String::with_capacity(digest.len().saturating_mul(2));
     for byte in digest {
-        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
+        #[allow(
+            clippy::indexing_slicing,
+            reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries."
+        )]
         suffix.push(char::from(HEX[usize::from(byte >> 4)]));
-        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
+        #[allow(
+            clippy::indexing_slicing,
+            reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries."
+        )]
         suffix.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     Ok(format!("{prefix}-{suffix}"))

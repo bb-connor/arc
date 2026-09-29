@@ -1,14 +1,12 @@
 //! Explicit retirement of legacy flow and declassification writers. A source
 //! fingerprint is not an admission owner, transferred inventory or activation.
 
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-
+use crate::store_connection::StoreConnection;
 use chio_security_types::ports::{PortError, PortResult};
 use chio_sqlite_file_identity::{main_database_file_identity, SqliteFileIdentity};
 use rusqlite::{params, Connection, OpenFlags, TransactionBehavior};
-
-use crate::store_connection::StoreConnection;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 mod evidence;
 mod inventory;

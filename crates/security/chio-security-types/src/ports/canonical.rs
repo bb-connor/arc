@@ -1,8 +1,4 @@
-use super::Serialize;
-use super::Digest32;
-use super::PortError;
-use super::PortResult;
-
+use super::{Digest32, PortError, PortResult, Serialize};
 
 #[cfg(feature = "std")]
 pub(super) fn sort_json_object_keys(value: &mut serde_json::Value) {
@@ -22,9 +18,11 @@ pub(super) fn sort_json_object_keys(value: &mut serde_json::Value) {
     }
 }
 
-
 #[cfg(feature = "std")]
-pub(super) fn issuance_freeze_domain_hash(domain: &[u8], commitment: &impl Serialize) -> PortResult<Digest32> {
+pub(super) fn issuance_freeze_domain_hash(
+    domain: &[u8],
+    commitment: &impl Serialize,
+) -> PortResult<Digest32> {
     use sha2::{Digest as _, Sha256};
 
     let mut value = serde_json::to_value(commitment).map_err(|_| PortError::integrity_failure())?;

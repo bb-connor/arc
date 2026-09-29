@@ -123,5 +123,3 @@ fn ledger_write_failures_preserve_committed_egress_through_compensation_and_reop
     }
     Ok(())
 }
-
-

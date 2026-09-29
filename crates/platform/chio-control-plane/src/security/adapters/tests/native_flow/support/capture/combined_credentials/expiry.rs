@@ -126,5 +126,3 @@ fn runtime_expiry_after_native_verification_rolls_back_physical_capture() -> Tes
     );
     Ok(())
 }
-
-

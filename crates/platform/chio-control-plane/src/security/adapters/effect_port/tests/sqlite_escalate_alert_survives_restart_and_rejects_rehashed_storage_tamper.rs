@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper() {
     let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -20,8 +19,7 @@ fn sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper() 
         .unwrap_or_else(|error| panic!("open alert outbox: {error}")),
     );
     let alert_store: Arc<dyn EscalateAlertStore> = outbox.clone();
-    let backend: Arc<dyn ResponseEffectBackend> =
-        Arc::new(EscalateAlertBackend::new(alert_store));
+    let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(alert_store));
     let port = ActiveResponseEffectPort::from_backends(vec![backend])
         .unwrap_or_else(|error| panic!("SQLite alert router: {error}"));
     let result = port
@@ -39,8 +37,7 @@ fn sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper() 
         .unwrap_or_else(|error| panic!("reopen alert outbox: {error}")),
     );
     let alert_store: Arc<dyn EscalateAlertStore> = reopened.clone();
-    let backend: Arc<dyn ResponseEffectBackend> =
-        Arc::new(EscalateAlertBackend::new(alert_store));
+    let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(alert_store));
     let restarted = ActiveResponseEffectPort::from_backends(vec![backend])
         .unwrap_or_else(|error| panic!("restarted alert router: {error}"));
     assert_eq!(

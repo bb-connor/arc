@@ -1,12 +1,6 @@
-use super::PortError;
-use super::PortResult;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-
+use super::{params, sqlite_error, Connection, OptionalExtension, PortError, PortResult};
 
 pub(super) fn transition_status(
     connection: &Connection,

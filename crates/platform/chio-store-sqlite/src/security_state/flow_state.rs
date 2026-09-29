@@ -5,47 +5,22 @@
 //! imported participant or establish admission-operation custody. The native
 //! admission command currently exposes only monotone label joins.
 
-use super::participant_source;
-use super::trusted_time_in_transaction;
-use super::SecurityStateWriteTransaction;
-use super::CommittedEgressFence;
-use super::Digest32;
-use super::EgressFence;
-use super::EgressFenceCommit;
-use super::EgressFenceRequest;
-use super::FlowJoinRequest;
-use super::FlowStateKey;
-use super::FlowStateSnapshot;
-use super::FlowStateStore;
-#[cfg(test)]
-use super::IsolationEpochEvidenceVerifierPort;
-use super::IsolationEpochTransition;
-use super::IsolationVerificationRecord;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::TenantId;
-use super::InformationLabel;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::TransactionBehavior;
-use super::Clock;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::canonical_request_hash;
-use super::encode_label;
-use super::decode_label;
-# [cfg (test)]
-use super::load_declassification_use_record;
-# [cfg (test)]
-use super::load_declassification_evidence_record;
-use super::MAX_CLOCK_SKEW_MS;
-use super::check_transition_replay;
+use super::{
+    canonical_request_hash, check_transition_replay, decode_label, encode_label, from_i64, params,
+    participant_source, sqlite_error, to_i64, trusted_time_in_transaction, Clock,
+    CommittedEgressFence, Connection, Digest32, EgressFence, EgressFenceCommit, EgressFenceRequest,
+    FlowJoinRequest, FlowStateKey, FlowStateSnapshot, FlowStateStore, InformationLabel,
+    IsolationEpochTransition, IsolationVerificationRecord, OptionalExtension, PortError,
+    PortResult, RecordId, SecurityStateWriteTransaction, SqliteSecurityStateStore, TenantId,
+    TransactionBehavior, MAX_CLOCK_SKEW_MS,
+};
+#[cfg(test)]
+use super::{
+    load_declassification_evidence_record, load_declassification_use_record,
+    IsolationEpochEvidenceVerifierPort,
+};
 
 mod egress;
 mod egress_history;
@@ -62,19 +37,15 @@ use super::scoped_sql::{flow as sql, ScopedMutation as FlowMutation, ScopedReade
 use egress::validate_fence;
 pub(super) use egress_history::{verify_retained_egress_history, verify_retained_egress_values};
 use epochs::{ensure_epoch_for_join, load_isolation_transition, validate_isolation_transition};
-use generations::next_flow_generation;
-use generations::invalidate_related_flow_contexts;
-use generations::store_context_generation;
+use generations::{
+    invalidate_related_flow_contexts, next_flow_generation, store_context_generation,
+};
 pub(crate) use input_join::{resolve_native_input_join, resolve_native_label_join};
-use labels::load_scoped_flow_snapshot;
-use labels::store_principal_label;
-use labels::store_lineage_label;
-use labels::store_session_label;
-use labels::load_principal_label;
-use labels::load_lineage_label;
-use labels::load_session_label;
-use labels::load_context_generation;
-use labels::session_membership_exists;
+use labels::{
+    load_context_generation, load_lineage_label, load_principal_label, load_scoped_flow_snapshot,
+    load_session_label, session_membership_exists, store_lineage_label, store_principal_label,
+    store_session_label,
+};
 use transitions::{scoped_record_transition, scoped_transition_status};
 
 pub(crate) fn planned_native_egress_fence(request: &EgressFenceRequest) -> PortResult<EgressFence> {

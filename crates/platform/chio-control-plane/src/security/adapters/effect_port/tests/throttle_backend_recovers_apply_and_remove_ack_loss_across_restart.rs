@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn throttle_backend_recovers_apply_and_remove_ack_loss_across_restart() {
     let store = Arc::new(RecordingThrottleStore::default());

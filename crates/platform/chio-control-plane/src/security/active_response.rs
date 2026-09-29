@@ -6,7 +6,6 @@ mod request;
 
 use self::config::{readiness, validate_lease_duration};
 use self::request::{ActiveResponseRequestSource, RawActiveResponseExecutionRequest};
-
 use super::active_response_validation::{
     decode_lower_hex_digest, digest_is_zero, has_durable_execution_proof, recovery_id,
     valid_prefixed_digest_id,

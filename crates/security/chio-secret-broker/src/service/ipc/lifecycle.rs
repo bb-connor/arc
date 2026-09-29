@@ -1,31 +1,6 @@
-# [cfg (unix)]
-use super::File;
-# [cfg (unix)]
-use super::OpenOptions;
-
-
-# [cfg (unix)]
-use super::OpenOptionsExt;
-
-use super::Path;
-# [cfg (unix)]
-use super::PathBuf;
-
-
-
-
-
-use super::BrokerError;
-use super::Result;
-
-
-
-# [cfg (unix)]
-use super::BrokerSocketIdentity;
-# [cfg (unix)]
-use super::UnixBrokerEndpoint;
-
-
+use super::{BrokerError, Path, Result};
+#[cfg(unix)]
+use super::{BrokerSocketIdentity, File, OpenOptions, OpenOptionsExt, PathBuf, UnixBrokerEndpoint};
 
 #[cfg(unix)]
 pub(in crate::service) struct ProvisionalBrokerSocketCleanup {
@@ -122,7 +97,10 @@ pub(in crate::service) fn validate_broker_socket_identity(
 }
 
 #[cfg(unix)]
-pub(in crate::service) fn acquire_broker_socket_lifecycle_lock(path: &Path, trusted_service_uid: u32) -> Result<File> {
+pub(in crate::service) fn acquire_broker_socket_lifecycle_lock(
+    path: &Path,
+    trusted_service_uid: u32,
+) -> Result<File> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
     let mut lock_path = path.as_os_str().to_os_string();
@@ -155,15 +133,13 @@ pub(in crate::service) fn acquire_broker_socket_lifecycle_lock(path: &Path, trus
             "IPC lifecycle lock identity or permissions are invalid".to_string(),
         ));
     }
-    rustix::fs::flock(
-        &lock,
-        rustix::fs::FlockOperation::NonBlockingLockExclusive,
-    )
-    .map_err(|error| {
-        BrokerError::AuthorityUnavailable(format!(
-            "broker IPC socket is owned by another daemon: {error}"
-        ))
-    })?;
+    rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive).map_err(
+        |error| {
+            BrokerError::AuthorityUnavailable(format!(
+                "broker IPC socket is owned by another daemon: {error}"
+            ))
+        },
+    )?;
     let retained_metadata = std::fs::symlink_metadata(&lock_path).map_err(|error| {
         BrokerError::Storage(format!("IPC lifecycle lock revalidation failed: {error}"))
     })?;

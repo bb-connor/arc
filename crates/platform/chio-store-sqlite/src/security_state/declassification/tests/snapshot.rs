@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use super::*;
+use std::sync::Arc;
 
 struct FixedClock;
 impl chio_security_types::clock::Clock for FixedClock {

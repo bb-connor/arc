@@ -1,4 +1,3 @@
-
 use super::{
     egress_restriction_version_hash, session_containment_target, session_overlay_version_hash,
     ActiveResponseEffectPort, EscalateAlertBackend, EscalateAlertStore, ResponseEffectBackend,
@@ -11,15 +10,14 @@ use chio_kernel::SecurityInvocationContextV1;
 use chio_security_kernel::{containment_target, ContainmentTargetKind};
 use chio_security_types::ports::{
     containment_installed_version_hash, containment_overlay_version_hash,
-    empty_session_throttle_snapshot, session_throttle_version_hash, ActionId,
-    AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, ContainmentOverlayCommand,
-    ContainmentOverlayStore, Digest32, EffectExecutionStatus, EffectId, EffectOperation,
-    EffectPort, EffectRequest, EffectResultQuery, EgressRestrictionSessionKey,
-    EgressRestrictionStore, IsolationEpochId, LeaseOwnerId, LineageId, OverlayApplyRequest,
-    OverlayContribution, OverlayContributions, OverlayRemoveRequest, OverlaySnapshot,
-    PortError, PortErrorKind, PortResult, RecordId, ResponsePlanRecord, ResponseStore,
-    SchedulerClaimRequest, SecurityAlert, SecurityAlertPort, SessionId,
-    SessionThrottleApplyRequest, SessionThrottleConsumeRequest, SessionThrottleDecision,
+    empty_session_throttle_snapshot, session_throttle_version_hash, ActionId, AlertDeliveryQuery,
+    AlertDeliveryStatus, CanonicalBody, ContainmentOverlayCommand, ContainmentOverlayStore,
+    Digest32, EffectExecutionStatus, EffectId, EffectOperation, EffectPort, EffectRequest,
+    EffectResultQuery, EgressRestrictionSessionKey, EgressRestrictionStore, IsolationEpochId,
+    LeaseOwnerId, LineageId, OverlayApplyRequest, OverlayContribution, OverlayContributions,
+    OverlayRemoveRequest, OverlaySnapshot, PortError, PortErrorKind, PortResult, RecordId,
+    ResponsePlanRecord, ResponseStore, SchedulerClaimRequest, SecurityAlert, SecurityAlertPort,
+    SessionId, SessionThrottleApplyRequest, SessionThrottleConsumeRequest, SessionThrottleDecision,
     SessionThrottleKey, SessionThrottleRemoveRequest, SessionThrottleSnapshot,
     SessionThrottleStore, TenantId, TenantScopedId,
 };
@@ -197,10 +195,7 @@ impl SecurityAlertPort for RecordingAlertStore {
         Ok(status)
     }
 
-    fn load_delivery(
-        &self,
-        query: &AlertDeliveryQuery,
-    ) -> PortResult<Option<AlertDeliveryStatus>> {
+    fn load_delivery(&self, query: &AlertDeliveryQuery) -> PortResult<Option<AlertDeliveryStatus>> {
         let mut state = self.state();
         state.exact_load_calls = state.exact_load_calls.saturating_add(1);
         if state.unavailable {
@@ -465,10 +460,7 @@ impl ContainmentOverlayStore for RecordingOverlayStore {
         Ok(snapshot)
     }
 
-    fn remove_contribution(
-        &self,
-        request: &OverlayRemoveRequest,
-    ) -> PortResult<OverlaySnapshot> {
+    fn remove_contribution(&self, request: &OverlayRemoveRequest) -> PortResult<OverlaySnapshot> {
         let mut state = self.require_state();
         state.remove_calls = state.remove_calls.saturating_add(1);
         if state.unavailable {
@@ -596,8 +588,7 @@ fn contribution(rank: u32) -> (CanonicalBody, Digest32) {
     let bytes = format!("{{\"posture_rank\":{rank}}}").into_bytes();
     let hash = Digest32::new(*chio_core::sha256(&bytes).as_bytes());
     (
-        CanonicalBody::new(bytes)
-            .unwrap_or_else(|error| panic!("canonical contribution: {error}")),
+        CanonicalBody::new(bytes).unwrap_or_else(|error| panic!("canonical contribution: {error}")),
         hash,
     )
 }
@@ -645,8 +636,7 @@ fn egress_request(
         tenant_id: tenant(),
         action_id: ActionId::new("action-a").unwrap_or_else(|error| panic!("action: {error}")),
         plan_hash: Digest32::new([17; 32]),
-        effect_id: EffectId::new("effect-egress")
-            .unwrap_or_else(|error| panic!("effect: {error}")),
+        effect_id: EffectId::new("effect-egress").unwrap_or_else(|error| panic!("effect: {error}")),
         effect_kind: ResponseEffectKind::RestrictEgress,
         target: ResponseTarget::Session {
             session_id: session(),
@@ -692,10 +682,7 @@ fn alert_request() -> EffectRequest {
     }
 }
 
-fn throttle_request(
-    operation: EffectOperation,
-    expected_version_hash: Digest32,
-) -> EffectRequest {
+fn throttle_request(operation: EffectOperation, expected_version_hash: Digest32) -> EffectRequest {
     let limits = super::SessionThrottleLimits {
         window_ms: 5_000,
         max_invocations: 3,
@@ -753,8 +740,7 @@ fn port(store: Arc<RecordingOverlayStore>) -> ActiveResponseEffectPort {
 
 fn alert_port(store: Arc<RecordingAlertStore>) -> ActiveResponseEffectPort {
     let alert_store: Arc<dyn EscalateAlertStore> = store;
-    let backend: Arc<dyn ResponseEffectBackend> =
-        Arc::new(EscalateAlertBackend::new(alert_store));
+    let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(alert_store));
     ActiveResponseEffectPort::from_backends(vec![backend])
         .unwrap_or_else(|error| panic!("alert router: {error}"))
 }
@@ -815,4 +801,3 @@ mod unsupported_effects_fail_closed_before_overlay_mutation;
 mod global_readiness_probes_installed_backend_but_rejects_incomplete_matrix;
 
 mod malformed_or_rebound_session_effects_fail_before_mutation;
-

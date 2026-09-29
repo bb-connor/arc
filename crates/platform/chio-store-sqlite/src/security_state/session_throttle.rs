@@ -1,53 +1,20 @@
-use super::canonical_json_bytes;
-use super::predict_session_throttle_apply;
-use super::predict_session_throttle_remove;
-use super::session_throttle_installed_version_hash;
-use super::session_throttle_version_hash;
-use super::session_throttle_window_identity;
-use super::validate_session_throttle_snapshot;
-use super::ActionId;
-use super::Digest32;
-use super::EffectExecutionStatus;
-use super::EffectId;
-use super::EffectOperation;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::PortError;
-use super::PortResult;
-use super::SessionThrottleApplyRequest;
-use super::SessionThrottleCommand;
-use super::SessionThrottleConsumeRequest;
-use super::SessionThrottleContribution;
-use super::SessionThrottleContributions;
-use super::SessionThrottleDecision;
-use super::SessionThrottleKey;
-use super::SessionThrottleLimits;
-use super::SessionThrottleRemoveRequest;
-use super::SessionThrottleSnapshot;
-use super::SessionThrottleStore;
-use super::SessionThrottleWindowUsage;
-use super::SessionThrottleWindowUsages;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::Transaction;
-use super::TransactionBehavior;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::body_hash;
-use super::validate_canonical_json_body;
-use super::decode_digest;
-use super::StoredEffectCommandProjection;
-use super::effect_request_matches_query;
-use super::validate_scheduler_fence;
-
+use super::{
+    body_hash, canonical_json_bytes, decode_digest, effect_request_matches_query, from_i64, params,
+    predict_session_throttle_apply, predict_session_throttle_remove,
+    session_throttle_installed_version_hash, session_throttle_version_hash,
+    session_throttle_window_identity, sqlite_error, to_i64, validate_canonical_json_body,
+    validate_scheduler_fence, validate_session_throttle_snapshot, ActionId, Connection, Digest32,
+    EffectExecutionStatus, EffectId, EffectOperation, EffectRequest, EffectResult,
+    EffectResultQuery, OptionalExtension, PortError, PortResult, ResponseEffectKind,
+    ResponseTarget, SessionThrottleApplyRequest, SessionThrottleCommand,
+    SessionThrottleConsumeRequest, SessionThrottleContribution, SessionThrottleContributions,
+    SessionThrottleDecision, SessionThrottleKey, SessionThrottleLimits,
+    SessionThrottleRemoveRequest, SessionThrottleSnapshot, SessionThrottleStore,
+    SessionThrottleWindowUsage, SessionThrottleWindowUsages, SqliteSecurityStateStore,
+    StoredEffectCommandProjection, Transaction, TransactionBehavior,
+};
 
 fn validate_stored_session_throttle_command(command: &SessionThrottleCommand) -> PortResult<()> {
     validate_session_throttle_command_common(command).map_err(|_| PortError::integrity_failure())
@@ -162,10 +129,12 @@ fn session_throttle_command_key(request: &EffectRequest) -> PortResult<SessionTh
 
 fn decode_session_throttle_limits(request: &EffectRequest) -> PortResult<SessionThrottleLimits> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
-    let limits: SessionThrottleLimits =
-        chio_core::canonical::UntrustedJsonText::from_wire(request.canonical_contribution.as_bytes(), 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-            .map_err(|_| PortError::invalid_data())?;
+    let limits: SessionThrottleLimits = chio_core::canonical::UntrustedJsonText::from_wire(
+        request.canonical_contribution.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|_| PortError::invalid_data())?;
     limits.validate()?;
     let canonical = canonical_json_bytes(&limits).map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != request.canonical_contribution.as_bytes() {
@@ -220,16 +189,25 @@ fn load_session_throttle_command(
                 {
                     return Err(PortError::integrity_failure());
                 }
-                let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(&request_body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-                    .map_err(|_| PortError::integrity_failure())?;
-                let result: EffectResult = chio_core::canonical::UntrustedJsonText::from_wire(&result_body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-                    .map_err(|_| PortError::integrity_failure())?;
+                let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(
+                    &request_body,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| PortError::integrity_failure())?;
+                let result: EffectResult = chio_core::canonical::UntrustedJsonText::from_wire(
+                    &result_body,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| PortError::integrity_failure())?;
                 let resulting_snapshot: SessionThrottleSnapshot =
-                    chio_core::canonical::UntrustedJsonText::from_wire(&snapshot_body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-                        .map_err(|_| PortError::integrity_failure())?;
+                    chio_core::canonical::UntrustedJsonText::from_wire(
+                        &snapshot_body,
+                        64 * 1024 * 1024,
+                    )
+                    .and_then(|input| input.decode_signed())
+                    .map_err(|_| PortError::integrity_failure())?;
                 let canonical_request =
                     canonical_json_bytes(&request).map_err(|_| PortError::integrity_failure())?;
                 let canonical_result =

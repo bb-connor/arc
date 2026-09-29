@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn escalate_alert_distinguishes_tamper_from_outbox_unavailability() {
     let request = alert_request();

@@ -335,5 +335,3 @@ fn native_captured_lifecycle_rechecks_revocation_and_stop_after_output_join() ->
     fault_case(Fault::RevokeAfterOutputJoin)?;
     fault_case(Fault::StopAfterOutputJoin)
 }
-
-

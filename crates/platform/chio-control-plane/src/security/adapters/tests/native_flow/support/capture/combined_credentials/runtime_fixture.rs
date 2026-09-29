@@ -126,5 +126,3 @@ pub(super) fn install(fixture: &mut Fixture) -> TestResult {
     fixture.kernel.set_runtime_admission_hook(Arc::new(hook));
     Ok(())
 }
-
-

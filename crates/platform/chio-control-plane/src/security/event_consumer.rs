@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 #[path = "event_consumer/tenant_isolation_tests.rs"]
 mod tenant_isolation_tests;
@@ -47,8 +46,8 @@ use chio_security_types::ports::{
     ErrorCode, EventPartitionScan, GovernedApprovalRequest, GovernedApprovalReservation,
     GovernedApprovalReservationMutation, OpaqueReceiptRef, PortError, PortErrorKind, PortResult,
     PreparedActiveResponseDispatchBinding, ProducerId, ProducerTrustClass, RecordId, RuleId,
-    SecurityEventStore, SecurityEventVerifierPort, TenantId, UnverifiedSecurityEvent,
-    SecurityEventVerificationRecord, ATTESTED_FINDING_BATCH_SCHEMA_VERSION,
+    SecurityEventStore, SecurityEventVerificationRecord, SecurityEventVerifierPort, TenantId,
+    UnverifiedSecurityEvent, ATTESTED_FINDING_BATCH_SCHEMA_VERSION,
     ATTESTED_FINDING_RESPONSE_INITIAL_RETRY_MS, ATTESTED_FINDING_RESPONSE_MAX_RETRY_MS,
     ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION, MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN,
 };
@@ -56,10 +55,9 @@ use chio_security_types::ports::{
 use chio_security_types::ports::{
     ResponseDispatchApproval, PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
 };
-use chio_security_types::SecurityEventBody;
 use chio_security_types::{
     OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectSpec, ResponsePlan,
-    ResponsePlanInput,
+    ResponsePlanInput, SecurityEventBody,
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
 use serde::{Deserialize, Serialize};
@@ -70,95 +68,60 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 
 mod verification;
-pub use verification::SECURITY_EVENT_RECEIPT_PROJECTION_VERSION;
-pub use verification::TrustedSecurityEventProducer;
-pub use verification::TrustedSecurityEventReceiptProducer;
-pub use verification::SecurityEventReceiptProjection;
-pub use verification::SecurityEventVerifierConfigError;
-
-
-
+pub use verification::{
+    SecurityEventReceiptProjection, SecurityEventVerifierConfigError, TrustedSecurityEventProducer,
+    TrustedSecurityEventReceiptProducer, SECURITY_EVENT_RECEIPT_PROJECTION_VERSION,
+};
 
 mod finding_publication;
 pub use finding_publication::AttestedFindingBatchPlanner;
-use finding_publication::build_attested_finding_batch_publication;
-use finding_publication::build_reserved_response_plan;
-use finding_publication::validate_authoritative_finding_binding;
-use finding_publication::build_attested_finding_response_plan_publication;
+use finding_publication::{
+    build_attested_finding_batch_publication, build_attested_finding_response_plan_publication,
+    build_reserved_response_plan, validate_authoritative_finding_binding,
+};
 
 mod ingress;
-pub use ingress::VerifiedSecurityEventIngress;
-pub(crate) use ingress::DurableCorrelationIngress;
 use ingress::CorrelationEventVerifier;
+pub(crate) use ingress::DurableCorrelationIngress;
+pub use ingress::VerifiedSecurityEventIngress;
 
 mod correlation;
-pub use correlation::CorrelationRuleReport;
-pub use correlation::CorrelationConsumerReport;
-pub use correlation::ProductionCorrelationConsumer;
 #[cfg(test)]
-use correlation::CorrelationPort;
-#[cfg(test)]
-use correlation::CorrelationAttestor;
-#[cfg(test)]
-use correlation::RuleCorrelationOutcome;
-
-#[cfg(test)]
-use correlation::SqliteTemporalCorrelationPort;
+use correlation::{
+    CorrelationAttestor, CorrelationPort, RuleCorrelationOutcome, SqliteTemporalCorrelationPort,
+};
+pub use correlation::{
+    CorrelationConsumerReport, CorrelationRuleReport, ProductionCorrelationConsumer,
+};
 
 mod admission;
-pub use admission::AttestedFindingResponsePolicySelection;
-pub use admission::AttestedFindingAdmissionArtifacts;
-
-
-
-#[cfg(test)]
-use admission::AttestedFindingAdmissionArtifactPayload;
-
 use admission::governed_approval_request_from_native;
-
 #[cfg(test)]
-use admission::digest_from_canonical_hex;
-
+use admission::{digest_from_canonical_hex, AttestedFindingAdmissionArtifactPayload};
+pub use admission::{AttestedFindingAdmissionArtifacts, AttestedFindingResponsePolicySelection};
 
 mod reservation;
-pub use reservation::ReservedAttestedFindingResponseBatch;
-pub use reservation::AttestedFindingResponsePolicyPlanner;
+pub use reservation::{AttestedFindingResponsePolicyPlanner, ReservedAttestedFindingResponseBatch};
 
 mod coordinator;
-pub use coordinator::KernelAttestedFindingResponseCoordinator;
-#[cfg(test)]
-pub (crate) use coordinator::PreparedAttestedFindingResponse;
-
-pub(crate) use coordinator::AttestedFindingResponseCompletionProof;
-pub(crate) use coordinator::AttestedFindingDispatchCommittedResume;
-pub(crate) use coordinator::AttestedFindingPreDispatchReconstruction;
-pub(crate) use coordinator::AttestedFindingResponseCoordinator;
-
-
+use coordinator::map_approval_coordinator_error;
 #[cfg(test)]
 use coordinator::KernelActiveResponseApprovalVerifier;
-
-use coordinator::map_approval_coordinator_error;
+pub use coordinator::KernelAttestedFindingResponseCoordinator;
+#[cfg(test)]
+pub(crate) use coordinator::PreparedAttestedFindingResponse;
+pub(crate) use coordinator::{
+    AttestedFindingDispatchCommittedResume, AttestedFindingPreDispatchReconstruction,
+    AttestedFindingResponseCompletionProof, AttestedFindingResponseCoordinator,
+};
 
 mod recovery;
-pub use recovery::DurableAttestedFindingBatchPlanner;
-
-
-
-
-
-
-
-
 #[cfg(test)]
 use recovery::response_recovery_backlog;
-
-
+pub use recovery::DurableAttestedFindingBatchPlanner;
 
 #[cfg(test)]
 mod tests;
-
-
 
 /// Hard operational bounds for synchronous startup reconciliation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -167,7 +130,6 @@ pub struct AttestedFindingResponseRecoveryLimits {
     max_startup_records: u64,
     max_startup_wall_clock_ms: u64,
 }
-
 
 pub struct NativeSecurityEventVerifier {
     clock: Arc<dyn Clock>,
@@ -179,14 +141,10 @@ pub struct NativeSecurityEventVerifier {
 
 pub(super) use coordinator::map_active_response_kernel_error;
 
-
 pub(super) struct CorrelationConsumption {
     report: CorrelationConsumerReport,
     finalized: bool,
 }
-
-
-
 
 /// Trusted response plan assembled from one durable reserved identity and one
 /// policy selection.

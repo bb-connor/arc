@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn production_worker_allows_only_one_background_loop() {
     let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![Ok(tick(

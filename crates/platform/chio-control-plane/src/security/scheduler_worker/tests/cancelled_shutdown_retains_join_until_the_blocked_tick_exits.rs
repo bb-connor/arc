@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn cancelled_shutdown_retains_join_until_the_blocked_tick_exits() {
     let port = Arc::new(BlockingWorkerPort::new());

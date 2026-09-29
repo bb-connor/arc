@@ -1,30 +1,6 @@
-use super::Read;
-use super::Write;
-
-
-use super::Deserialize;
-use super::Serialize;
-
-use super::Zeroize;
-use super::Zeroizing;
-
-
-use super::MAX_WIRE_BYTES;
-use super::BrokerError;
-use super::Result;
-
-
-
-
-
-
-
-
-
-
-
-
-
+use super::{
+    BrokerError, Deserialize, Read, Result, Serialize, Write, Zeroize, Zeroizing, MAX_WIRE_BYTES,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -551,8 +527,11 @@ impl ZeroizingCanonicalJsonWriter {
         Ok(())
     }
 
-    #[allow(clippy::as_conversions, clippy::indexing_slicing,
-        reason = "Only checked ASCII chars are narrowed; masked nibbles index a fixed 16-byte alphabet.")]
+    #[allow(
+        clippy::as_conversions,
+        clippy::indexing_slicing,
+        reason = "Only checked ASCII chars are narrowed; masked nibbles index a fixed 16-byte alphabet."
+    )]
     pub(crate) fn write_string(&mut self, value: &str) -> Result<()> {
         self.push(b'"')?;
         for character in value.chars() {
@@ -721,7 +700,6 @@ pub struct IpcResponse {
     pub error_code: Option<String>,
 }
 
-
 pub(super) fn read_bounded_sensitive_frame(reader: &mut impl Read) -> Result<Zeroizing<Vec<u8>>> {
     let mut prefix = [0_u8; 4];
     reader.read_exact(&mut prefix).map_err(|error| {
@@ -739,7 +717,10 @@ pub(super) fn read_bounded_sensitive_frame(reader: &mut impl Read) -> Result<Zer
     Ok(frame)
 }
 
-pub(super) fn read_sensitive_frame_body(reader: &mut impl Read, frame: &mut Zeroizing<Vec<u8>>) -> Result<()> {
+pub(super) fn read_sensitive_frame_body(
+    reader: &mut impl Read,
+    frame: &mut Zeroizing<Vec<u8>>,
+) -> Result<()> {
     if let Err(error) = reader.read_exact(frame.as_mut_slice()) {
         frame.zeroize();
         return Err(BrokerError::InvalidRequest(format!(

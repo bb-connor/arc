@@ -1,179 +1,20 @@
-
-# [cfg (unix)]
-use super::File;
-# [cfg (unix)]
-use super::OpenOptions;
-use super::Read;
-use super::Write;
-# [cfg (unix)]
-use super::OpenOptionsExt;
-# [cfg (unix)]
-use super::PermissionsExt;
-# [cfg (unix)]
-use super::UnixListener;
-# [cfg (unix)]
-use super::UnixStream;
-use super::Path;
-# [cfg (unix)]
-use super::PathBuf;
-
-use super::Ordering;
-use super::Arc;
-use super::Mutex;
-
-use super::Duration;
-# [cfg (unix)]
-use super::Instant;
-use super::canonical_json_bytes;
-
-
-# [cfg (test)]
-use super::Ed25519Backend;
-# [cfg (test)]
-use super::Keypair;
-
-
-use super::Digest;
-use super::Sha256;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# [cfg (unix)]
-use super::is_well_formed_broker_execute_diagnostic_code;
-use super::BrokerExecuteFailure;
-
-
-
-
-use super::MAX_WIRE_BYTES;
-
-
-
-
-
-use super::failure_receipt_digest;
-
-
+use super::{
+    canonical_ipc_request_bytes, canonical_json_bytes, decode_canonical_ipc_request,
+    failure_receipt_digest, read_bounded_sensitive_frame, validate_identifier,
+    verify_failure_receipt, Arc, AuthenticatedIpcRequest, BrokerError, BrokerExecuteFailure,
+    Digest, Duration, IpcOperation, IpcResponse, Mutex, Ordering, Path,
+    PrepareDispatchAcknowledgement, Read, Result, Sha256, Write, MAX_WIRE_BYTES,
+};
+#[cfg(unix)]
+use super::{
+    is_well_formed_broker_execute_diagnostic_code, File, Instant, OpenOptions, OpenOptionsExt,
+    PathBuf, PermissionsExt, UnixListener, UnixStream,
+};
 #[cfg(test)]
-use super::sign_failure_receipt;
-
-use super::verify_failure_receipt;
-#[cfg(test)]
-use super::BrokerDispatchKnowledge;
-
-#[cfg(test)]
-use super::BrokerFailureOutcome;
-#[cfg(test)]
-use super::BrokerFailureReceiptBody;
-#[cfg(test)]
-use super::BrokerFailureStage;
-
-
-#[cfg(test)]
-use super::BROKER_FAILURE_RECEIPT_SCHEMA;
-
-
-
-use super::PrepareDispatchAcknowledgement;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-use super::validate_identifier;
-use super::BrokerError;
-use super::Result;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-use super::IpcOperation;
-
-use super::AuthenticatedIpcRequest;
-use super::canonical_ipc_request_bytes;
-use super::IpcResponse;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-use super::read_bounded_sensitive_frame;
-
-
-
-
-
-
-
-
-
-
-
-use super::decode_canonical_ipc_request;
-
-
+use super::{
+    sign_failure_receipt, BrokerDispatchKnowledge, BrokerFailureOutcome, BrokerFailureReceiptBody,
+    BrokerFailureStage, Ed25519Backend, Keypair, BROKER_FAILURE_RECEIPT_SCHEMA,
+};
 
 pub trait BrokerIpcHandler: Send + Sync {
     fn register_attempt(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse>;
@@ -193,7 +34,6 @@ pub trait BrokerIpcHandler: Send + Sync {
     fn disable(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse>;
     fn delete(&self, request: AuthenticatedIpcRequest) -> Result<IpcResponse>;
 }
-
 
 #[cfg(unix)]
 #[derive(Debug)]
@@ -402,7 +242,6 @@ impl UnixBrokerEndpoint {
     }
 }
 
-
 #[cfg(target_os = "linux")]
 pub(super) fn validate_broker_peer_uid(
     stream: &std::os::unix::net::UnixStream,
@@ -440,58 +279,37 @@ fn fs_permissions(path: &Path, mode: u32) -> Result<()> {
 
 mod deadline;
 
-use deadline::MAX_BROKER_IPC_DEADLINE_MS;
-pub use deadline::BrokerIpcDeadlines;
-pub use deadline::BrokerIpcServeOutcome;
-
-# [cfg (unix)]
+#[cfg(unix)]
 use deadline::BrokerIpcDeadlineIo;
+use deadline::MAX_BROKER_IPC_DEADLINE_MS;
+pub use deadline::{BrokerIpcDeadlines, BrokerIpcServeOutcome};
 
 mod prepared;
-# [cfg (unix)]
+#[cfg(unix)]
 use prepared::PreparedIpcSlot;
-
-
-
-
-
 
 mod response;
 
-
-
-
-
-# [cfg (unix)]
+#[cfg(unix)]
 use response::write_broker_ipc_response;
-
-
 
 mod lifecycle;
 
-
-# [cfg (unix)]
+#[cfg(unix)]
 use lifecycle::acquire_broker_socket_lifecycle_lock;
-
 
 #[cfg(all(test, unix))]
 #[path = "error_wire_tests.rs"]
 mod error_wire_tests;
 
-# [cfg (unix)]
-pub (super) use response::classify_broker_ipc_handler_result;
-# [cfg (unix)]
-pub (super) use response::validate_broker_ipc_response_envelope;
-# [cfg (unix)]
-#[cfg(test)]
-pub (super) use response::classify_broker_ipc_write_error;
-# [cfg (unix)]
-#[cfg(test)]
-pub (super) use response::BrokerIpcWriteFailureClass;
 #[cfg(unix)]
-pub(super) use lifecycle::ProvisionalBrokerSocketCleanup;
-
+pub(super) use lifecycle::{validate_broker_socket_identity, ProvisionalBrokerSocketCleanup};
 #[cfg(test)]
 pub(super) use response::is_well_formed_broker_ipc_error_code;
 #[cfg(unix)]
-pub(super) use lifecycle::validate_broker_socket_identity;
+pub(super) use response::{
+    classify_broker_ipc_handler_result, validate_broker_ipc_response_envelope,
+};
+#[cfg(unix)]
+#[cfg(test)]
+pub(super) use response::{classify_broker_ipc_write_error, BrokerIpcWriteFailureClass};

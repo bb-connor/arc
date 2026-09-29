@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn panicking_worker_preserves_its_crash_when_cleanup_also_fails() {
     struct CrashThenCleanupFailure;

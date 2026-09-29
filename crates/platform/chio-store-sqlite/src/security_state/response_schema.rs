@@ -1,23 +1,11 @@
 // tenant-read-contract: security_attested_finding_response_outbox; class=tenant-predicate; principal=security-runtime
-use super::BTreeSet;
-use super::ActionId;
-use super::LeaseOwnerId;
-
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::TenantId;
-use super::params;
-use super::Connection;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::from_i64;
-use super::table_definition_is_exact;
-use super::schema_object_definition_is_exact;
-use super::table_has_foreign_key_violation;
-use super::scheduler_lease_body_hash;
-
+use super::{
+    from_i64, params, scheduler_lease_body_hash, schema_object_definition_is_exact, sqlite_error,
+    table_definition_is_exact, table_has_foreign_key_violation, ActionId, BTreeSet, Connection,
+    LeaseOwnerId, PortError, PortResult, RecordId, TenantId,
+};
 
 pub(super) const ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_attested_finding_response_outbox (
@@ -491,7 +479,9 @@ pub(super) fn ensure_scheduler_retry_health_columns(connection: &Connection) -> 
     Ok(())
 }
 
-pub(super) fn ensure_response_dispatch_commit_mode_column(connection: &Connection) -> PortResult<()> {
+pub(super) fn ensure_response_dispatch_commit_mode_column(
+    connection: &Connection,
+) -> PortResult<()> {
     let mut statement = connection
         .prepare("PRAGMA table_info(security_response_dispatches)")
         .map_err(sqlite_error)?;
@@ -522,7 +512,9 @@ pub(super) fn ensure_response_dispatch_commit_mode_column(connection: &Connectio
     Ok(())
 }
 
-pub(super) fn ensure_attested_finding_response_outbox_schema(connection: &Connection) -> PortResult<()> {
+pub(super) fn ensure_attested_finding_response_outbox_schema(
+    connection: &Connection,
+) -> PortResult<()> {
     let table_ddl = ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL.replacen(
         "CREATE TABLE ",
         "CREATE TABLE IF NOT EXISTS ",
@@ -596,7 +588,8 @@ pub(super) fn ensure_attested_finding_response_outbox_schema(connection: &Connec
     )? || table_has_foreign_key_violation(
         connection,
         "security_attested_finding_response_outbox",
-    )? || !attested_finding_response_outbox_is_one_to_one(connection)? {
+    )? || !attested_finding_response_outbox_is_one_to_one(connection)?
+    {
         return Err(PortError::integrity_failure());
     }
     Ok(())
@@ -631,5 +624,3 @@ pub(super) fn attested_finding_response_outbox_is_one_to_one(
         .map_err(sqlite_error)?;
     Ok(batch_items == outbox_rows && batch_items == exact_matches)
 }
-
-

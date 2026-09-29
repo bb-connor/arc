@@ -92,5 +92,3 @@ fn native_caller_original_delivery_survives_restart_and_authority_expiry() -> Te
     }
     Ok(())
 }
-
-

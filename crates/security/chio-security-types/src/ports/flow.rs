@@ -1,16 +1,7 @@
-use super::InformationLabel;
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::TenantId;
-use super::RecordId;
-use super::LineageId;
-use super::SessionId;
-use super::IsolationEpochId;
-use super::RequestId;
-use super::OpaqueReceiptRef;
-use super::PortResult;
-
+use super::{
+    Deserialize, Digest32, InformationLabel, IsolationEpochId, LineageId, OpaqueReceiptRef,
+    PortResult, RecordId, RequestId, Serialize, SessionId, TenantId,
+};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

@@ -1,18 +1,18 @@
-use std::path::Path;
-use std::sync::atomic::AtomicU64;
-use chio_core_types::SigningBackend;
-use crate::service::{IpcResponse, read_bounded_frame, write_bounded_frame};
-use crate::service::tests::{fixture, execution, test_attempt_registration};
+use super::*;
 use crate::capability::issue_capability;
 use crate::proof::issue_request_proof;
-use crate::service::tests::{endpoint_test_handler_method, endpoint_test_request};
-use chio_test_support::prelude::*;
-use std::thread;
-use super::*;
 use crate::registration::{
     sign_register_attempt_authorization, verify_register_attempt_authorization,
     AuthenticatedAttemptRequest, RegisterAttemptAction, SignedRegisterAttemptAuthorization,
 };
+use crate::service::tests::{endpoint_test_handler_method, endpoint_test_request};
+use crate::service::tests::{execution, fixture, test_attempt_registration};
+use crate::service::{read_bounded_frame, write_bounded_frame, IpcResponse};
+use chio_core_types::SigningBackend;
+use chio_test_support::prelude::*;
+use std::path::Path;
+use std::sync::atomic::AtomicU64;
+use std::thread;
 
 // These tests exercise framing and descriptor lifetime. The native process
 // tests separately require the production daemon and original kernel capture.

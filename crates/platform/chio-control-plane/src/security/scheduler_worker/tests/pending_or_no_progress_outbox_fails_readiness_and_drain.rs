@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn pending_or_no_progress_outbox_fails_readiness_and_drain() {
     let scripted = Arc::new(ScriptedDeclassificationOutboxPort::new(

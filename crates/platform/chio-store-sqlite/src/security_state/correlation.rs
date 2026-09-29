@@ -1,52 +1,18 @@
-use super::canonical_json_bytes;
-use super::ChioReceipt;
-use super::SignedSecurityEvent;
-use super::CanonicalBody;
-use super::CorrelationCasRequest;
-use super::CorrelationEventIndexRequest;
-use super::CorrelationIngressStore;
-use super::CorrelationOutcomeKey;
-use super::CorrelationOutcomePublication;
-use super::CorrelationOutcomeStatus;
-use super::CorrelationPartial;
-use super::CorrelationPartitionKey;
-use super::Digest32;
-use super::EventAppend;
-use super::EventId;
-use super::PortError;
-use super::PortResult;
-use super::ProducerId;
-use super::ProducerTrustClass;
-use super::RuleId;
-use super::SecurityEventVerificationRecord;
-use super::TenantId;
-use super::UnverifiedEventBatch;
-use super::UnverifiedSecurityEvent;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::TransactionBehavior;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::body_hash;
-use super::validate_canonical_json_body;
-use super::decode_digest;
-use super::canonical_request_hash;
-use super::validate_correlation_durable_schema;
-use super::MAX_EVENT_SCAN_RESULTS;
-use super::EVENT_EVIDENCE_HASH_DOMAIN;
-use super::RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN;
-use super::parse_trust_class;
-use super::append_verified_in_transaction;
-use super::scan_verified_partition;
-use super::load_event_identity;
-use super::transition_status;
-use super::record_transition;
-
+use super::{
+    append_verified_in_transaction, body_hash, canonical_json_bytes, canonical_request_hash,
+    decode_digest, from_i64, load_event_identity, params, parse_trust_class, record_transition,
+    scan_verified_partition, sqlite_error, to_i64, transition_status, validate_canonical_json_body,
+    validate_correlation_durable_schema, CanonicalBody, ChioReceipt, Connection,
+    CorrelationCasRequest, CorrelationEventIndexRequest, CorrelationIngressStore,
+    CorrelationOutcomeKey, CorrelationOutcomePublication, CorrelationOutcomeStatus,
+    CorrelationPartial, CorrelationPartitionKey, Digest32, EventAppend, EventId, OptionalExtension,
+    PortError, PortResult, ProducerId, ProducerTrustClass, RuleId, SecurityEventVerificationRecord,
+    SignedSecurityEvent, SqliteSecurityStateStore, TenantId, TransactionBehavior,
+    UnverifiedEventBatch, UnverifiedSecurityEvent, EVENT_EVIDENCE_HASH_DOMAIN,
+    MAX_EVENT_SCAN_RESULTS, RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN,
+};
 
 fn correlation_outcome_status_name(value: CorrelationOutcomeStatus) -> &'static str {
     match value {
@@ -554,7 +520,8 @@ fn validate_correlation_source_evidence(
     Ok(())
 }
 
-pub(super) type StoredCorrelationIngress = (String, i64, i64, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, i64);
+pub(super) type StoredCorrelationIngress =
+    (String, i64, i64, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, i64);
 
 fn load_correlation_ingress(
     connection: &Connection,

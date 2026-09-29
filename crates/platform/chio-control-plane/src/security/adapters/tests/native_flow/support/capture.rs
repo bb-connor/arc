@@ -315,5 +315,3 @@ fn native_atomic_capture_faults_roll_back_budget_and_operation_together() -> Tes
     }
     Ok(())
 }
-
-

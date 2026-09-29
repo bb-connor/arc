@@ -1,21 +1,8 @@
-use super::Arc;
-use super::FindingLocation;
-use super::StructuredClassifier;
-use super::BoundedVec;
-use super::ByteRange;
-use super::ClassificationFinding;
-use super::ClassificationPort;
-use super::ClassificationRequest;
-use super::ClassificationResult;
-use super::ClassifierId;
-use super::ClassifierVersion;
-use super::Digest32;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-
-
-
+use super::{
+    Arc, BoundedVec, ByteRange, ClassificationFinding, ClassificationPort, ClassificationRequest,
+    ClassificationResult, ClassifierId, ClassifierVersion, Digest32, FindingLocation, PortError,
+    PortResult, RecordId, StructuredClassifier,
+};
 
 pub struct StructuredClassificationAdapter {
     classifier: Arc<dyn StructuredClassifier>,

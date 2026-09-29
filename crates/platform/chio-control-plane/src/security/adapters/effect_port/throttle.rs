@@ -1,35 +1,13 @@
-use super::Arc;
-use super::empty_session_throttle_snapshot;
-use super::predict_session_throttle_apply;
-use super::predict_session_throttle_remove;
-use super::session_throttle_installed_version_hash;
-use super::session_throttle_version_hash;
-use super::validate_session_throttle_snapshot;
-use super::CanonicalBody;
-use super::EffectExecutionStatus;
-use super::EffectOperation;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::PortError;
-use super::PortResult;
-use super::SessionThrottleApplyRequest;
-use super::SessionThrottleCommand;
-use super::SessionThrottleContribution;
-use super::SessionThrottleKey;
-use super::SessionThrottleLimits;
-use super::SessionThrottleRemoveRequest;
-use super::SessionThrottleSnapshot;
-use super::SessionThrottleStore;
-use super::TenantId;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::ResponseEffectBackend;
-use super::validate_request_binding;
-use super::effect_query_from_request;
-use super::verify_contribution_hash;
-
-
+use super::{
+    effect_query_from_request, empty_session_throttle_snapshot, predict_session_throttle_apply,
+    predict_session_throttle_remove, session_throttle_installed_version_hash,
+    session_throttle_version_hash, validate_request_binding, validate_session_throttle_snapshot,
+    verify_contribution_hash, Arc, CanonicalBody, EffectExecutionStatus, EffectOperation,
+    EffectRequest, EffectResult, EffectResultQuery, PortError, PortResult, ResponseEffectBackend,
+    ResponseEffectKind, ResponseTarget, SessionThrottleApplyRequest, SessionThrottleCommand,
+    SessionThrottleContribution, SessionThrottleKey, SessionThrottleLimits,
+    SessionThrottleRemoveRequest, SessionThrottleSnapshot, SessionThrottleStore, TenantId,
+};
 
 /// Exact `ThrottleSession` backend backed by independent durable windows.
 ///
@@ -302,9 +280,19 @@ impl ResponseEffectBackend for SessionThrottleBackend {
     }
 }
 
-pub(super) fn decode_session_throttle_limits(body: &CanonicalBody) -> PortResult<SessionThrottleLimits> {
+pub(super) fn decode_session_throttle_limits(
+    body: &CanonicalBody,
+) -> PortResult<SessionThrottleLimits> {
     let limits: SessionThrottleLimits =
-        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                PortError::with_source(
+                    chio_security_types::ports::PortErrorKind::InvalidData,
+                    error.code(),
+                    error,
+                )
+            })?;
     limits.validate()?;
     let canonical =
         chio_core::canonical_json_bytes(&limits).map_err(|_| PortError::invalid_data())?;

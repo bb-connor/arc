@@ -1,16 +1,6 @@
+use super::{watch, Arc, PortError, ResponseWorkerHealth, ResponseWorkerTickError, RwLock};
 #[cfg(test)]
 use std::sync::Mutex;
-use super::ResponseWorkerTickError;
-
-use super::PortError;
-use super::Arc;
-use super::RwLock;
-use super::watch;
-
-use super::ResponseWorkerHealth;
-
-
-
 
 pub trait ActiveDefenseServices: Send + Sync {
     fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError>;

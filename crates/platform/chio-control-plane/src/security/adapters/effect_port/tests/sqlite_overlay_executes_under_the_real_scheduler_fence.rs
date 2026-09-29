@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn sqlite_overlay_executes_under_the_real_scheduler_fence() {
     let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -9,8 +8,7 @@ fn sqlite_overlay_executes_under_the_real_scheduler_fence() {
             .unwrap_or_else(|error| panic!("open SQLite store: {error}")),
     );
     let now = now_unix_ms();
-    let action_id =
-        ActionId::new("action-a").unwrap_or_else(|error| panic!("action id: {error}"));
+    let action_id = ActionId::new("action-a").unwrap_or_else(|error| panic!("action id: {error}"));
     let plan_body =
         CanonicalBody::new(b"{}".to_vec()).unwrap_or_else(|error| panic!("plan body: {error}"));
     let plan = ResponsePlanRecord {

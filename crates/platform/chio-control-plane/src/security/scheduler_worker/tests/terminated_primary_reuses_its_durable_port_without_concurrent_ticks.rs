@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn terminated_primary_reuses_its_durable_port_without_concurrent_ticks() {
     let failure = ResponseWorkerTickError::WorkerCrash(

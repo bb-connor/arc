@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn progress_deadline_begins_when_the_worker_reaches_publication_readiness() {
     let port = Arc::new(ScriptedWorkerPort::with_ticks(Vec::new()));

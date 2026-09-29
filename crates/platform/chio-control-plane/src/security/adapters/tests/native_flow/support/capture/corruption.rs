@@ -92,5 +92,3 @@ fn native_capture_physical_corruption_denies_readback_and_reopen() -> TestResult
     }
     Ok(())
 }
-
-

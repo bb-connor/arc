@@ -1,23 +1,9 @@
-use super::ActiveDefensePolicyBinding;
-use super::ActiveDefenseReceiptBody;
-use super::FlowDenialReceiptBody;
-use super::information_label_hash;
-use super::FlowDenial;
-use super::InformationFlowLattice;
-use super::ResolvedFlowRequest;
-use super::Digest32;
-use super::ErrorCode;
-
-use super::RecordId;
-use super::TenantId;
-
-use super::map_declassification_error;
-use super::digest;
-use super::active_defense_header;
-use super::event_id;
-use super::transition_id;
-
-
+use super::{
+    active_defense_header, digest, event_id, information_label_hash, map_declassification_error,
+    transition_id, ActiveDefensePolicyBinding, ActiveDefenseReceiptBody, Digest32, ErrorCode,
+    FlowDenial, FlowDenialReceiptBody, InformationFlowLattice, RecordId, ResolvedFlowRequest,
+    TenantId,
+};
 
 pub(super) struct FlowDenialReceiptContext {
     tenant_id: TenantId,

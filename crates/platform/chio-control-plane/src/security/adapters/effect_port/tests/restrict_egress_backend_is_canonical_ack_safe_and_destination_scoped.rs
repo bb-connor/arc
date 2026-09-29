@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped() {
     let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
@@ -9,8 +8,7 @@ fn restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped() {
             .unwrap_or_else(|error| panic!("open SQLite store: {error}")),
     );
     let now = now_unix_ms();
-    let action_id =
-        ActionId::new("action-a").unwrap_or_else(|error| panic!("action id: {error}"));
+    let action_id = ActionId::new("action-a").unwrap_or_else(|error| panic!("action id: {error}"));
     let plan_body =
         CanonicalBody::new(b"{}".to_vec()).unwrap_or_else(|error| panic!("plan body: {error}"));
     store
@@ -18,8 +16,7 @@ fn restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped() {
             tenant_id: tenant(),
             action_id: action_id.clone(),
             generation: 0,
-            state: RecordId::new("active")
-                .unwrap_or_else(|error| panic!("plan state: {error}")),
+            state: RecordId::new("active").unwrap_or_else(|error| panic!("plan state: {error}")),
             canonical_body: plan_body.clone(),
             body_hash: Digest32::new(*chio_core::sha256(plan_body.as_bytes()).as_bytes()),
             due_at_unix_ms: Some(now.saturating_sub(1)),
@@ -89,8 +86,8 @@ fn restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped() {
     assert!(!nonmatching.denied);
 
     let mut rebound = apply.clone();
-    rebound.effect_id = EffectId::new("effect-rebound")
-        .unwrap_or_else(|error| panic!("rebound effect: {error}"));
+    rebound.effect_id =
+        EffectId::new("effect-rebound").unwrap_or_else(|error| panic!("rebound effect: {error}"));
     rebound.target = ResponseTarget::Session {
         session_id: SessionId::new("session-rebound")
             .unwrap_or_else(|error| panic!("rebound session: {error}")),

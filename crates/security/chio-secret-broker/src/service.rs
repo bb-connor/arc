@@ -1,27 +1,3 @@
-use std::collections::BTreeMap;
-#[cfg(unix)]
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
-#[cfg(unix)]
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-#[cfg(unix)]
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::Path;
-#[cfg(unix)]
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
-#[cfg(unix)]
-use std::time::Instant;
-
-use chio_core_types::{canonical_json_bytes, PublicKey, SigningBackend};
-#[cfg(test)]
-use chio_core_types::{Ed25519Backend, Keypair};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use zeroize::{Zeroize, Zeroizing};
-
 use crate::backend::{SecretBackend, SecretMaterial};
 use crate::budget::{
     canonicalize_quotas, BrokerExecutionBudget, CaptureExecutionHoldRequest, ExecutionHoldState,
@@ -65,6 +41,28 @@ use crate::store::{
     AttemptState, AttemptStore, AttemptTransitionEvidence, RegisterAttemptOutcome,
 };
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
+use chio_core_types::{canonical_json_bytes, PublicKey, SigningBackend};
+#[cfg(test)]
+use chio_core_types::{Ed25519Backend, Keypair};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+#[cfg(unix)]
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+#[cfg(unix)]
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::Path;
+#[cfg(unix)]
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
+#[cfg(unix)]
+use std::time::Instant;
+use zeroize::{Zeroize, Zeroizing};
 const MAX_RETAINED_PREPARED_DISPATCHES: usize = 4_096;
 const ATTEMPT_OPERATION_GATE_COUNT: usize = 256;
 
@@ -239,13 +237,10 @@ mod execution;
 
 mod failure;
 
-
 mod ipc;
-pub use ipc::BrokerIpcHandler;
-# [cfg (unix)]
+#[cfg(unix)]
 pub use ipc::UnixBrokerEndpoint;
-pub use ipc::BrokerIpcDeadlines;
-pub use ipc::BrokerIpcServeOutcome;
+pub use ipc::{BrokerIpcDeadlines, BrokerIpcHandler, BrokerIpcServeOutcome};
 
 mod lifecycle;
 
@@ -255,59 +250,34 @@ mod request_digest;
 pub use request_digest::broker_request_digest;
 
 mod wire;
-pub use wire::IpcOperation;
-pub use wire::SensitiveIpcBytes;
-pub use wire::AuthenticatedIpcRequest;
-pub use wire::canonical_ipc_request_bytes;
-pub use wire::IpcResponse;
-pub use wire::read_bounded_frame;
-pub use wire::write_bounded_frame;
-use failure::FailureOrigin;
-use failure::FailureProjection;
-use failure::ExecutionFailure;
-use failure::ExecutionResult;
-use failure::execution_failure_after_capture_release;
-
-
-
-
-
-
-
-use failure::failure_receipt_key_digest;
-
-
-
-use request_digest::FAILURE_RECEIPT_REQUEST_DOMAIN;
-use request_digest::attempt_operation_gate_index;
-
+use failure::{
+    execution_failure_after_capture_release, failure_receipt_key_digest, ExecutionFailure,
+    ExecutionResult, FailureOrigin, FailureProjection,
+};
+use request_digest::{attempt_operation_gate_index, FAILURE_RECEIPT_REQUEST_DOMAIN};
 use wire::read_bounded_sensitive_frame;
 #[cfg(test)]
 use wire::read_sensitive_frame_body;
+pub use wire::{
+    canonical_ipc_request_bytes, read_bounded_frame, write_bounded_frame, AuthenticatedIpcRequest,
+    IpcOperation, IpcResponse, SensitiveIpcBytes,
+};
+pub(crate) use wire::{
+    canonical_json_byte_array_length, canonical_json_string_length, canonical_json_u64_length,
+    checked_canonical_length, decode_canonical_ipc_request, BoundedZeroizingByteArray,
+    SensitiveJsonParser, ZeroizingCanonicalJsonWriter,
+};
 #[cfg(test)]
-pub(crate) use wire::reset_sensitive_drop_observer;
-#[cfg(test)]
-pub(crate) use wire::sensitive_drop_observation;
-pub(crate) use wire::BoundedZeroizingByteArray;
-
-pub(crate) use wire::SensitiveJsonParser;
-pub(crate) use wire::checked_canonical_length;
-pub(crate) use wire::canonical_json_string_length;
-pub(crate) use wire::canonical_json_byte_array_length;
-pub(crate) use wire::canonical_json_u64_length;
-pub(crate) use wire::ZeroizingCanonicalJsonWriter;
-pub(crate) use wire::decode_canonical_ipc_request;
+pub(crate) use wire::{reset_sensitive_drop_observer, sensitive_drop_observation};
 
 #[cfg(test)]
 mod tests;
 
-#[cfg(all(test, unix))]
-use ipc::{classify_broker_ipc_handler_result, classify_broker_ipc_write_error, validate_broker_ipc_response_envelope, BrokerIpcServeFailure, BrokerIpcWriteFailureClass, ProvisionalBrokerSocketCleanup};
-
-#[cfg(all(test, unix))]
-use ipc::validate_broker_peer_uid;
-
-#[cfg(all(test, unix))]
-use ipc::{is_well_formed_broker_ipc_error_code, validate_broker_socket_identity};
-
 pub(crate) use failure::failure_receipt_id_for_canonical_request_digest;
+#[cfg(all(test, unix))]
+use ipc::{
+    classify_broker_ipc_handler_result, classify_broker_ipc_write_error,
+    is_well_formed_broker_ipc_error_code, validate_broker_ipc_response_envelope,
+    validate_broker_peer_uid, validate_broker_socket_identity, BrokerIpcServeFailure,
+    BrokerIpcWriteFailureClass, ProvisionalBrokerSocketCleanup,
+};

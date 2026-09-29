@@ -418,5 +418,3 @@ fn racing_prepared_commits_consume_the_grant_once() {
     assert_eq!(fixture.classifier.calls.load(Ordering::SeqCst), 2);
     assert_eq!(fixture.receipts.bodies().len(), 2);
 }
-
-

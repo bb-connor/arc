@@ -1253,4 +1253,3 @@ fn audit_comparison_requires_exact_runner_and_durable_one_shot_governance() {
         .test_expect("observed authorization lock")
         .is_empty());
 }
-

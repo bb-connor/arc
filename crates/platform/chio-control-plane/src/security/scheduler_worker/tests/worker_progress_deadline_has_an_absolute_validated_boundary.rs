@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn worker_progress_deadline_has_an_absolute_validated_boundary() {
     let rapid = ProductionResponseWorkerLoopConfig {

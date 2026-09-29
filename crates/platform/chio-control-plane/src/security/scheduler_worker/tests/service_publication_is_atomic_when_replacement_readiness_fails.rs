@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn service_publication_is_atomic_when_replacement_readiness_fails() {
     let registry = ActiveDefenseServiceRegistry::default();

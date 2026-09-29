@@ -129,5 +129,3 @@ fn native_declassification_output_fault_rolls_back_outcome_without_refunding_use
     assert_eq!(usage.captured_invocations, 1);
     Ok(())
 }
-
-

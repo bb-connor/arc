@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn initial_tick_retries_non_crash_failures_on_the_configured_cadence() {
     let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![

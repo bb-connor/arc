@@ -1,28 +1,17 @@
 //! Closed egress commands and exact row policies, not mutation authority.
-use super::flow_state;
-use super::NativeRowChange;
-use super::encode_retained_security_values;
-use super::ActiveDefenseReceiptBody;
-use super::CommittedEgressFence;
-use super::DeclassificationConsumptionEvidenceCommit;
-use super::DeclassificationTransitionBinding;
-use super::Digest32;
-use super::EgressFence;
-use super::EgressFenceCommit;
-use super::EgressFenceRequest;
-use super::PortError;
-use super::PortResult;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::to_i64;
-use super::decode_declassification_receipt;
-use super::validate_declassification_consumption_evidence;
-use super::MAX_CLOCK_SKEW_MS;
+use super::{
+    decode_declassification_receipt, encode_retained_security_values, flow_state,
+    native_declassification as declassification, to_i64,
+    validate_declassification_consumption_evidence, ActiveDefenseReceiptBody, CommittedEgressFence,
+    DeclassificationConsumptionEvidenceCommit, DeclassificationTransitionBinding, Digest32,
+    EgressFence, EgressFenceCommit, EgressFenceRequest, NativeRowChange, PortError, PortResult,
+    MAX_CLOCK_SKEW_MS,
+};
 use chio_kernel::admission_operation::NativeSecurityDeclassificationGrantV1;
 use rusqlite::types::{Value, ValueRef};
 use serde::{Deserialize, Serialize};
-
-use super::native_declassification as declassification;
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(

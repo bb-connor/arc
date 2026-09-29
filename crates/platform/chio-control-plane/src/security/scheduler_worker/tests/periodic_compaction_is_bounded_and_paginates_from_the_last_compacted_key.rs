@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn periodic_compaction_is_bounded_and_paginates_from_the_last_compacted_key() {
     let first_tenant = TenantId::new("tenant-compaction-a")

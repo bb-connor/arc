@@ -146,9 +146,9 @@ fn post_capture_migration_change_preserves_truthful_failure_evidence() {
     let fixture = fixture(1, false, false);
     let (request, trusted) = execution(&fixture, 92, 1);
     let ids = register_prepared_execution(&fixture, &request, &trusted, 20);
-    fixture.authority.deny_migration_after_next_capture(Arc::clone(
-        &fixture.migration_enforcer,
-    ));
+    fixture
+        .authority
+        .deny_migration_after_next_capture(Arc::clone(&fixture.migration_enforcer));
 
     let outcome = fixture
         .service
@@ -238,8 +238,8 @@ fn sensitive_ipc_envelope_is_strictly_canonical_and_zeroizing() {
     let canonical_escaped =
         r#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":"tenant-\"-\\-😀"}"#
             .as_bytes();
-    let escaped = decode_canonical_ipc_request(canonical_escaped)
-        .test_expect("canonical escaped request");
+    let escaped =
+        decode_canonical_ipc_request(canonical_escaped).test_expect("canonical escaped request");
     assert_eq!(escaped.tenant_scope.as_str(), "tenant-\"-\\-😀");
     assert_eq!(
         canonical_ipc_request_bytes(&escaped)
@@ -270,8 +270,7 @@ fn sensitive_ipc_envelope_is_strictly_canonical_and_zeroizing() {
     assert!(decode_canonical_ipc_request(deep_nesting).is_err());
 
     let mut malformed_utf8 = Zeroizing::new(
-        br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":""#
-            .to_vec(),
+        br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":""#.to_vec(),
     );
     malformed_utf8.push(0xff);
     malformed_utf8.extend_from_slice(br#""}"#);
@@ -305,8 +304,7 @@ fn stalled_same_uid_client_is_bounded_and_next_request_is_served() {
     let directory = crate::private_tempdir().test_expect("IPC directory");
     let socket_path = directory.path().join("broker.sock");
     let uid = rustix::process::geteuid().as_raw();
-    let deadlines =
-        BrokerIpcDeadlines::from_millis(100, 1_000).test_expect("bounded deadlines");
+    let deadlines = BrokerIpcDeadlines::from_millis(100, 1_000).test_expect("bounded deadlines");
     let endpoint = UnixBrokerEndpoint::bind_with_deadlines(
         &socket_path,
         Arc::new(EndpointTestHandler {
@@ -327,20 +325,17 @@ fn stalled_same_uid_client_is_bounded_and_next_request_is_served() {
 
     let stalled = UnixStream::connect(&socket_path).test_expect("connect stalled client");
     thread::sleep(Duration::from_millis(250));
-    let mut responsive =
-        UnixStream::connect(&socket_path).test_expect("connect responsive client");
+    let mut responsive = UnixStream::connect(&socket_path).test_expect("connect responsive client");
     responsive
         .set_read_timeout(Some(Duration::from_secs(2)))
         .test_expect("responsive read timeout");
     send_endpoint_test_request(&mut responsive);
-    let response_frame =
-        read_bounded_frame(&mut responsive).test_expect("structured IPC response");
+    let response_frame = read_bounded_frame(&mut responsive).test_expect("structured IPC response");
     let response: IpcResponse =
         serde_json::from_slice(&response_frame).test_expect("decode IPC response");
     drop(stalled);
 
-    let (stalled_outcome, responsive_outcome) =
-        server.join().test_expect("endpoint server thread");
+    let (stalled_outcome, responsive_outcome) = server.join().test_expect("endpoint server thread");
     assert_eq!(
         stalled_outcome.test_expect("stalled client is contained"),
         BrokerIpcServeOutcome::ClientFault {
@@ -595,9 +590,8 @@ fn invalid_provider_registration_failure_can_be_durably_tombstoned() {
     let (mut request, trusted) = execution(&fixture, 92, 1);
     let mut body = request.capability.body.clone();
     body.provider_adapter_id = "unselected-provider".to_string();
-    request.capability =
-        issue_capability(body, &Ed25519Backend::new(fixture.issuer.clone()), true)
-            .test_expect("issue unsupported-provider capability");
+    request.capability = issue_capability(body, &Ed25519Backend::new(fixture.issuer.clone()), true)
+        .test_expect("issue unsupported-provider capability");
     request.proof = issue_request_proof(
         &request.capability,
         &request.request,
@@ -967,4 +961,3 @@ fn held_or_transient_admission_failure_remains_nonterminal_and_retryable() {
 
     assert!(fixture.service.execute(&request, &trusted, 33).is_ok());
 }
-

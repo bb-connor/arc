@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn escalate_alert_exact_query_rejects_wrong_bindings_and_remove() {
     let store = Arc::new(RecordingAlertStore::default());

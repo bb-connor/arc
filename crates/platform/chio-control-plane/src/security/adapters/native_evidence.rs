@@ -1,7 +1,3 @@
-use std::collections::BTreeSet;
-use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
-
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{PublicKey, SigningBackend};
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
@@ -28,6 +24,9 @@ use chio_security_types::ports::{
 use chio_siem::{Alert, AlertBackend, AlertSeverity};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde_json::json;
+use std::collections::BTreeSet;
+use std::path::Path;
+use std::sync::{Arc, Mutex, MutexGuard};
 use tokio::sync::Mutex as AsyncMutex;
 
 const RECEIPT_READINESS_DOMAIN: &[u8] = b"chio.native-security-receipt-readiness.v1\0";

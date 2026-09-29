@@ -1,22 +1,9 @@
 use super::identifiers::validate_nonzero_id;
-use super::Box;
-use super::Vec;
-use super::fmt;
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::CanonicalBody;
-use super::ResponseDispatchApproval;
-use super::CreateOutcome;
-use super::AttestedFindingBatchBinding;
-use super::TenantId;
-use super::RecordId;
-use super::AdmissionArtifactRef;
-use super::ActionId;
-use super::ErrorCode;
-use super::OpaqueReceiptRef;
-use super::PortResult;
-
+use super::{
+    fmt, ActionId, AdmissionArtifactRef, AttestedFindingBatchBinding, Box, CanonicalBody,
+    CreateOutcome, Deserialize, Digest32, ErrorCode, OpaqueReceiptRef, PortResult, RecordId,
+    ResponseDispatchApproval, Serialize, TenantId, Vec,
+};
 
 pub const ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION: u8 = 1;
 pub const PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION: u8 = 1;

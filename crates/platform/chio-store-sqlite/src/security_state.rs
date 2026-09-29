@@ -12,55 +12,8 @@ mod native_mutation;
 mod participant_source;
 mod scoped_sql;
 mod transaction;
-pub(crate) use declassification::verify_native_declassification_state;
-pub(crate) use declassification::verify_native_pending_declassification;
-use flow_state::load_flow_snapshot;
-pub(crate) use flow_state::{
-    observe_native_flow_state, resolve_native_input_join, resolve_native_label_join,
-    verify_native_flow_state,
-};
-pub(crate) use native_egress::{NativeEgressCommand, NativeEgressResult};
-pub(crate) use native_mutation::{
-    deny_native_mutations, is_native_flow_join_table, join_native_flow,
-    join_native_nonce_preflight, join_native_output, mutate_native_egress, NativeRowChange,
-};
-#[cfg(all(test, unix))]
-pub(crate) use participant_source::seeded_security_history;
-pub(crate) use participant_source::{
-    decode_retained_security_row, encode_retained_security_values, retained_security_columns,
-    RetainedSecuritySourceRows, TableHasher,
-};
-use transaction::{trusted_time_in_transaction, SecurityStateWriteTransaction};
-
-pub use participant_source::{
-    SecurityParticipantSourceBinding, SecurityParticipantSourceError,
-    SecurityParticipantSourceSeal, SecurityParticipantSourceSnapshot,
-    SqliteSecurityParticipantSource,
-};
-
-// tenant-read-contract: security_attested_finding_batch_items; class=tenant-predicate; principal=security-runtime
-// tenant-read-contract: security_attested_finding_batches; class=tenant-predicate; principal=security-runtime
-// tenant-read-contract: security_attested_finding_response_outbox; class=tenant-predicate; principal=security-runtime
-// tenant-read-contract: security_correlation_ingress; class=tenant-predicate; principal=security-runtime
-// tenant-read-contract: security_correlation_outcomes; class=tenant-predicate; principal=security-runtime
-// tenant-read-contract: security_declassification_evidence_identity; class=tenant-predicate; principal=security-runtime
-// tenant-read-contract: security_declassification_receipt_outbox; class=tenant-predicate; principal=security-runtime
-// tenant-read-contract: security_declassification_tombstones; class=tenant-predicate; principal=security-runtime
-// tenant-read-contract: security_declassification_uses; class=tenant-predicate; principal=security-runtime
-// Contracts: docs/security/trust-boundary-inventory.json
-use std::collections::BTreeSet;
-use std::fs;
-#[cfg(unix)]
-use std::fs::File;
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
-use std::path::Path;
-#[cfg(unix)]
-use std::path::PathBuf;
-use std::sync::{Arc, MutexGuard};
-use std::time::Duration;
-
-use crate::{encrypted_blob::SqliteEncryptedBlobStore, store_connection::StoreConnection};
+use crate::encrypted_blob::SqliteEncryptedBlobStore;
+use crate::store_connection::StoreConnection;
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::hashing::sha256;
 use chio_core::receipt::body::ChioReceipt;
@@ -68,6 +21,7 @@ use chio_core::receipt::security::{
     validate_response_snapshot_lifecycle, ActiveDefenseReceiptBody,
 };
 use chio_core::SignedSecurityEvent;
+pub use chio_security_types::clock::{Clock, SystemClock};
 use chio_security_types::ports::{
     containment_installed_version_hash, containment_overlay_version_hash,
     containment_session_target, declassification_retain_until_unix_ms,
@@ -138,18 +92,44 @@ use chio_security_types::{
     ResponseSnapshot, ResponseState, ResponseTarget, ResponseTransitionCause,
     RESPONSE_STATE_SCHEMA_VERSION,
 };
+pub(crate) use declassification::{
+    verify_native_declassification_state, verify_native_pending_declassification,
+};
+use flow_state::load_flow_snapshot;
+pub(crate) use flow_state::{
+    observe_native_flow_state, resolve_native_input_join, resolve_native_label_join,
+    verify_native_flow_state,
+};
+pub(crate) use native_egress::{NativeEgressCommand, NativeEgressResult};
+pub(crate) use native_mutation::{
+    deny_native_mutations, is_native_flow_join_table, join_native_flow,
+    join_native_nonce_preflight, join_native_output, mutate_native_egress, NativeRowChange,
+};
+#[cfg(all(test, unix))]
+pub(crate) use participant_source::seeded_security_history;
+pub(crate) use participant_source::{
+    decode_retained_security_row, encode_retained_security_values, retained_security_columns,
+    RetainedSecuritySourceRows, TableHasher,
+};
+pub use participant_source::{
+    SecurityParticipantSourceBinding, SecurityParticipantSourceError,
+    SecurityParticipantSourceSeal, SecurityParticipantSourceSnapshot,
+    SqliteSecurityParticipantSource,
+};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
-
-/// Trusted time source for security-state lease and recovery decisions.
-///
-/// Production callers should use [`SqliteSecurityStateStore::open`], which is
-/// pinned to the system clock. The explicit constructor exists for runtimes
-/// that already own an authenticated clock and for deterministic tests. This
-/// boundary must never be implemented from request-controlled timestamps.
-/// Implementations must be bounded and must not reenter the store: reads occur
-/// while the connection and its security-state transaction are held.
-pub use chio_security_types::clock::{Clock, SystemClock};
+use std::collections::BTreeSet;
+use std::fs;
+#[cfg(unix)]
+use std::fs::File;
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+use std::path::Path;
+#[cfg(unix)]
+use std::path::PathBuf;
+use std::sync::{Arc, MutexGuard};
+use std::time::Duration;
+use transaction::{trusted_time_in_transaction, SecurityStateWriteTransaction};
 
 pub struct SqliteSecurityStateStore {
     connection: StoreConnection,
@@ -521,129 +501,104 @@ fn validate_security_state_database_binding(
 }
 
 mod codec;
-use codec::sqlite_error;
-use codec::schema_version_error;
-use codec::to_i64;
-use codec::from_i64;
-use codec::body_hash;
-use codec::validate_canonical_json_body;
-use codec::decode_digest;
-use codec::canonical_request_hash;
-use codec::validate_encrypted_blob_reference;
-use codec::encode_label;
-use codec::decode_label;
-use codec::normalize_sql;
-use codec::table_definition_is_exact;
-use codec::schema_object_definition_is_exact;
+use codec::{
+    body_hash, canonical_request_hash, decode_digest, decode_label, encode_label, from_i64,
+    normalize_sql, schema_object_definition_is_exact, schema_version_error, sqlite_error,
+    table_definition_is_exact, to_i64, validate_canonical_json_body,
+    validate_encrypted_blob_reference,
+};
 
 mod containment;
-use containment::StoredEffectCommandProjection;
-use containment::load_overlay_snapshot;
+use containment::{load_overlay_snapshot, StoredEffectCommandProjection};
 
 mod correlation;
-use correlation::index_partition_event_in_transaction;
-use correlation::compare_and_swap_correlation_in_transaction;
-use correlation::validate_correlation_outcome_publication;
-use correlation::load_correlation_outcome_record;
-use correlation::insert_correlation_outcome_record;
-use correlation::validate_correlation_outcome_storage_binding;
-use correlation::load_correlation_partition_generation;
-use correlation::load_correlation_partial;
+use correlation::{
+    compare_and_swap_correlation_in_transaction, index_partition_event_in_transaction,
+    insert_correlation_outcome_record, load_correlation_outcome_record, load_correlation_partial,
+    load_correlation_partition_generation, validate_correlation_outcome_publication,
+    validate_correlation_outcome_storage_binding,
+};
 
 mod correlation_schema;
-use correlation_schema::validate_attested_finding_batch_tenant_keys;
-use correlation_schema::table_has_foreign_key_violation;
-use correlation_schema::ensure_attested_finding_batch_tenant_keys;
-use correlation_schema::validate_correlation_durable_schema;
-use correlation_schema::upgrade_correlation_ingress_pending_index;
+use correlation_schema::{
+    ensure_attested_finding_batch_tenant_keys, table_has_foreign_key_violation,
+    upgrade_correlation_ingress_pending_index, validate_attested_finding_batch_tenant_keys,
+    validate_correlation_durable_schema,
+};
 
 mod declassification_codec;
-use declassification_codec::declassification_state_name;
-use declassification_codec::parse_declassification_state;
-use declassification_codec::encode_declassification_binding;
-use declassification_codec::decode_declassification_binding;
-use declassification_codec::declassification_phase_name;
-use declassification_codec::decode_declassification_receipt;
-use declassification_codec::validate_declassification_consumption_evidence;
-use declassification_codec::validate_declassification_outcome_evidence;
-use declassification_codec::decode_declassification_evidence_row;
-use declassification_codec::declassification_evidence_row;
-use declassification_codec::DeclassificationEvidenceCommit;
-use declassification_codec::declassification_evidence_matches;
-# [cfg (test)]
-use declassification_codec::load_declassification_use_record;
-# [cfg (test)]
-use declassification_codec::load_declassification_evidence_record;
+use declassification_codec::{
+    declassification_evidence_matches, declassification_evidence_row, declassification_phase_name,
+    declassification_state_name, decode_declassification_binding,
+    decode_declassification_evidence_row, decode_declassification_receipt,
+    encode_declassification_binding, parse_declassification_state,
+    validate_declassification_consumption_evidence, validate_declassification_outcome_evidence,
+    DeclassificationEvidenceCommit,
+};
+#[cfg(test)]
+use declassification_codec::{
+    load_declassification_evidence_record, load_declassification_use_record,
+};
 
 mod declassification_schema;
-use declassification_schema::DECLASSIFICATION_READINESS_CURSOR;
-use declassification_schema::prepare_declassification_schema_migration;
-use declassification_schema::validate_declassification_evidence_schema;
-use declassification_schema::validate_declassification_evidence_integrity;
+use declassification_schema::{
+    prepare_declassification_schema_migration, validate_declassification_evidence_integrity,
+    validate_declassification_evidence_schema, DECLASSIFICATION_READINESS_CURSOR,
+};
 
 mod dispatch;
 use dispatch::load_response_dispatch;
 
 mod egress_restriction;
-use egress_restriction::effect_request_matches_query;
-use egress_restriction::empty_egress_restriction_snapshot;
-use egress_restriction::load_egress_restriction_snapshot;
+use egress_restriction::{
+    effect_request_matches_query, empty_egress_restriction_snapshot,
+    load_egress_restriction_snapshot,
+};
 
 mod events;
-use events::MAX_EVENT_SCAN_RESULTS;
-use events::EVENT_EVIDENCE_HASH_DOMAIN;
-use events::RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN;
-use events::parse_trust_class;
-use events::append_verified_in_transaction;
-use events::scan_verified_partition;
-use events::load_event_identity;
+use events::{
+    append_verified_in_transaction, load_event_identity, parse_trust_class,
+    scan_verified_partition, EVENT_EVIDENCE_HASH_DOMAIN, MAX_EVENT_SCAN_RESULTS,
+    RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN,
+};
 
 mod finding_batches;
-use finding_batches::load_attested_finding_batch_record;
-use finding_batches::validate_attested_response_execution_dispatch;
+use finding_batches::{
+    load_attested_finding_batch_record, validate_attested_response_execution_dispatch,
+};
 
 mod lineage_fence;
 
 mod response_journal;
-use response_journal::decode_response_snapshot;
-use response_journal::response_mutation_scheduler_fence;
-use response_journal::load_response_plan;
+use response_journal::{
+    decode_response_snapshot, load_response_plan, response_mutation_scheduler_fence,
+};
 
 mod response_outbox;
 
 mod response_schema;
-use response_schema::ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL;
-use response_schema::ATTESTED_FINDING_RESPONSE_OUTBOX_DUE_INDEX_DDL;
-use response_schema::ATTESTED_FINDING_RESPONSE_OUTBOX_IMMUTABLE_TRIGGER_DDL;
-use response_schema::ATTESTED_FINDING_RESPONSE_OUTBOX_DELETE_TRIGGER_DDL;
-use response_schema::ensure_lineage_fence_binding_columns;
-use response_schema::ensure_response_effect_generation_column;
-use response_schema::ensure_scheduler_lease_body_hash_column;
-use response_schema::ensure_scheduler_retry_health_columns;
-use response_schema::ensure_response_dispatch_commit_mode_column;
-use response_schema::ensure_attested_finding_response_outbox_schema;
-use response_schema::attested_finding_response_outbox_is_one_to_one;
+use response_schema::{
+    attested_finding_response_outbox_is_one_to_one, ensure_attested_finding_response_outbox_schema,
+    ensure_lineage_fence_binding_columns, ensure_response_dispatch_commit_mode_column,
+    ensure_response_effect_generation_column, ensure_scheduler_lease_body_hash_column,
+    ensure_scheduler_retry_health_columns, ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL,
+    ATTESTED_FINDING_RESPONSE_OUTBOX_DELETE_TRIGGER_DDL,
+    ATTESTED_FINDING_RESPONSE_OUTBOX_DUE_INDEX_DDL,
+    ATTESTED_FINDING_RESPONSE_OUTBOX_IMMUTABLE_TRIGGER_DDL,
+};
 
 mod scheduler;
-use scheduler::MAX_SCHEDULER_CLAIMS;
-use scheduler::MAX_CLOCK_SKEW_MS;
-use scheduler::scheduler_lease_body_hash;
-use scheduler::load_valid_scheduler_lease;
-use scheduler::load_scheduler_retry;
-use scheduler::load_scheduler_lease;
-use scheduler::load_scheduler_claim;
-use scheduler::next_scheduler_fencing_token;
-use scheduler::validate_scheduler_fence;
-use scheduler::validate_scheduler_lease_binding;
+use scheduler::{
+    load_scheduler_claim, load_scheduler_lease, load_scheduler_retry, load_valid_scheduler_lease,
+    next_scheduler_fencing_token, scheduler_lease_body_hash, validate_scheduler_fence,
+    validate_scheduler_lease_binding, MAX_CLOCK_SKEW_MS, MAX_SCHEDULER_CLAIMS,
+};
 
 mod schema;
-use schema::SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION;
-use schema::migrate;
+use schema::{migrate, SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION};
 
 mod session_throttle;
 use session_throttle::load_session_throttle_snapshot;
 
 mod transition_journal;
-use transition_journal::transition_status;
-use transition_journal::check_transition_replay;
-use transition_journal::record_transition;
+use transition_journal::{check_transition_replay, record_transition, transition_status};

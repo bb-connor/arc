@@ -1,7 +1,6 @@
+use super::{DurableActiveResponseExecutorConfigError, MAX_ACTIVE_RESPONSE_LEASE_DURATION_MS};
 use chio_kernel::ActiveResponseExecutorError;
 use chio_security_types::ports::PortResult;
-
-use super::{DurableActiveResponseExecutorConfigError, MAX_ACTIVE_RESPONSE_LEASE_DURATION_MS};
 
 pub(super) fn validate_lease_duration(
     lease_duration_ms: u64,

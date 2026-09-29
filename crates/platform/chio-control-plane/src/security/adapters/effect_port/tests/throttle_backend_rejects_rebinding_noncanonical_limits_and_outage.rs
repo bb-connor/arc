@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn throttle_backend_rejects_rebinding_noncanonical_limits_and_outage() {
     let store = Arc::new(RecordingThrottleStore::default());
@@ -60,9 +59,8 @@ fn throttle_backend_rejects_rebinding_noncanonical_limits_and_outage() {
     noncanonical.canonical_contribution = CanonicalBody::new(bytes.clone())
         .unwrap_or_else(|error| panic!("noncanonical throttle limits: {error}"));
     noncanonical.contribution_hash = Digest32::new(*chio_core::sha256(&bytes).as_bytes());
-    noncanonical.idempotency_key =
-        RecordId::new("response_effect_command:throttle-noncanonical")
-            .unwrap_or_else(|error| panic!("noncanonical throttle command: {error}"));
+    noncanonical.idempotency_key = RecordId::new("response_effect_command:throttle-noncanonical")
+        .unwrap_or_else(|error| panic!("noncanonical throttle command: {error}"));
     assert_eq!(
         require_error(port.execute(&noncanonical)).kind(),
         PortErrorKind::IntegrityFailure

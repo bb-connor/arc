@@ -1,5 +1,5 @@
-use chio_security_types::ports::DeclassificationTransitionBinding;
 use super::*;
+use chio_security_types::ports::DeclassificationTransitionBinding;
 
 #[test]
 fn recovery_requires_its_own_lifecycle_and_unknown_outcomes_are_never_compacted() -> TestResult {

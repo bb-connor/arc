@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn initial_tick_deadline_exhaustion_fails_publication_and_joins_the_thread() {
     let failures = (0..8)

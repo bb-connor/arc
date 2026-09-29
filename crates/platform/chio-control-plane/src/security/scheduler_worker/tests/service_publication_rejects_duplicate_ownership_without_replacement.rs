@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn service_publication_rejects_duplicate_ownership_without_replacement() {
     let registry = ActiveDefenseServiceRegistry::default();
@@ -23,5 +22,3 @@ fn service_publication_rejects_duplicate_ownership_without_replacement() {
         .unwrap_or_else(|| panic!("installed services missing"));
     assert!(Arc::ptr_eq(&installed, &first));
 }
-
-

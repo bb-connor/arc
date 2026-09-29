@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn dropping_handle_signals_stop_without_concurrent_drain_or_zombie_tick() {
     let port = Arc::new(BlockingWorkerPort::new());

@@ -1,36 +1,14 @@
 //! Shared read-only policy and classification. State custody belongs to the caller.
 
-
-use super::canonical_request_hash;
-use super::verify_declassification;
-use super::DeclassificationVerificationRequest;
-use super::FlowDenial;
-use super::InformationFlowLattice;
-use super::ResolvedFlowRequest;
-use super::AdmittedToolSecurity;
-use super::BridgeSecurityMetadata;
-use super::VerifiedManifestRegistry;
-use super::Clock;
-use super::FlowPreInvocationInput;
-use super::DeclassificationPurpose;
-use super::BoundedVec;
-use super::ClassificationPort;
-use super::ClassificationRequest;
-use super::DestinationId;
-use super::FlowStateSnapshot;
-
-use super::RecordId;
-use super::RequestId;
-use super::InformationLabel;
-
-use super::flow_key;
-use super::flow_transition_id;
-use super::non_egress_declaration;
-use super::map_declassification_error;
-use super::canonical_body;
-use super::digest;
-
-use super::FlowResolverConfig;
+use super::{
+    canonical_body, canonical_request_hash, digest, flow_key, flow_transition_id,
+    map_declassification_error, non_egress_declaration, verify_declassification,
+    AdmittedToolSecurity, BoundedVec, BridgeSecurityMetadata, ClassificationPort,
+    ClassificationRequest, Clock, DeclassificationPurpose, DeclassificationVerificationRequest,
+    DestinationId, FlowDenial, FlowPreInvocationInput, FlowResolverConfig, FlowStateSnapshot,
+    InformationFlowLattice, InformationLabel, RecordId, RequestId, ResolvedFlowRequest,
+    VerifiedManifestRegistry,
+};
 
 pub(super) struct FlowPolicyView<'a> {
     pub manifests: &'a VerifiedManifestRegistry,

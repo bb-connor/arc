@@ -35,8 +35,9 @@ pub(super) struct InFlightActiveDefenseCleanup {
     job: Option<RetainedActiveDefenseCleanup>,
 }
 
-pub(super) static ACTIVE_DEFENSE_TEARDOWN_SUPERVISOR: OnceLock<Arc<ActiveDefenseTeardownSupervisor>> =
-    OnceLock::new();
+pub(super) static ACTIVE_DEFENSE_TEARDOWN_SUPERVISOR: OnceLock<
+    Arc<ActiveDefenseTeardownSupervisor>,
+> = OnceLock::new();
 
 impl ActiveDefenseTeardownSupervisor {
     pub(super) fn new() -> Self {
@@ -54,7 +55,9 @@ impl ActiveDefenseTeardownSupervisor {
         }
     }
 
-    pub(super) fn lock_state(&self) -> std::sync::MutexGuard<'_, ActiveDefenseTeardownSupervisorState> {
+    pub(super) fn lock_state(
+        &self,
+    ) -> std::sync::MutexGuard<'_, ActiveDefenseTeardownSupervisorState> {
         match self.state.lock() {
             Ok(state) => state,
             Err(poisoned) => poisoned.into_inner(),
@@ -97,7 +100,10 @@ impl ActiveDefenseTeardownSupervisor {
         self.wake.notify_one();
     }
 
-    pub(super) fn ensure_service_bounded(self: &Arc<Self>, max_attempts: usize) -> Result<(), String> {
+    pub(super) fn ensure_service_bounded(
+        self: &Arc<Self>,
+        max_attempts: usize,
+    ) -> Result<(), String> {
         let mut attempts = 0_usize;
         loop {
             let mut state = self.lock_state();
@@ -439,8 +445,9 @@ impl ReservedProductionActiveDefenseStartup {
                     .cancel_reserved_exact(&self.published_services)
                 {
                     Ok(()) => self.reservation_active = false,
-                    Err(error) => rollback_errors
-                        .push(format!("cancel active-defense reservation: {error}")),
+                    Err(error) => {
+                        rollback_errors.push(format!("cancel active-defense reservation: {error}"))
+                    }
                 }
             }
         }
@@ -451,7 +458,9 @@ impl ReservedProductionActiveDefenseStartup {
         }
     }
 
-    pub(super) fn into_reserved_cleanup(self) -> (ReservedActiveDefenseCleanup, ActiveDefenseTeardownPermit) {
+    pub(super) fn into_reserved_cleanup(
+        self,
+    ) -> (ReservedActiveDefenseCleanup, ActiveDefenseTeardownPermit) {
         let Self {
             registry,
             declassification_lifecycle,
@@ -575,7 +584,9 @@ impl ProductionActiveDefenseStartupGuard {
         Ok(())
     }
 
-    pub(super) fn mark_registry_published(&mut self) -> Result<(), ProductionActiveDefenseHostError> {
+    pub(super) fn mark_registry_published(
+        &mut self,
+    ) -> Result<(), ProductionActiveDefenseHostError> {
         let reserved = self.reserved_mut()?;
         reserved.registry_published = true;
         reserved.reservation_active = false;
@@ -1093,9 +1104,9 @@ impl DetachedActiveDefenseTeardown {
                 lifecycle.drain_to_zero()?;
                 let inventory = store.active_defense_overlay_inventory()?;
                 if inventory.has_active_contributions() {
-                    return Err(ProductionActiveDefenseHostError::ActiveOverlayContributions {
-                        inventory,
-                    });
+                    return Err(
+                        ProductionActiveDefenseHostError::ActiveOverlayContributions { inventory },
+                    );
                 }
                 Ok(())
             }));

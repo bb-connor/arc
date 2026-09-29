@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test(flavor = "current_thread")]
 async fn worker_owned_thread_survives_caller_starvation_and_joins_before_restart() {
     let ticks = (0..64)

@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn service_publication_rechecks_readiness_at_commit_time() {
     let registry = ActiveDefenseServiceRegistry::default();

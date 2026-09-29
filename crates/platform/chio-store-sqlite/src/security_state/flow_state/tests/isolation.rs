@@ -2,8 +2,8 @@ use crate::security_state::SecurityParticipantSourceBinding;
 use chio_security_types::ports::OpaqueReceiptRef;
 use participant_source::SqliteSecurityParticipantSource;
 use std::collections::BTreeSet;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::sync::{Mutex, Weak};
 
 use super::*;

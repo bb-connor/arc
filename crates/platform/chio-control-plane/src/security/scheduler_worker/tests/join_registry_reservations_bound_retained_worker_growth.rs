@@ -1,7 +1,6 @@
 use super::*;
 use crate::security::scheduler_worker::tests::*;
 
-
 #[test]
 fn join_registry_reservations_bound_retained_worker_growth() {
     let registry = Arc::new(ResponseWorkerReaperRegistry::new());

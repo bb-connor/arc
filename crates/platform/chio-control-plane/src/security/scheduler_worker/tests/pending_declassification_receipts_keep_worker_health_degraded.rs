@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn pending_declassification_receipts_keep_worker_health_degraded() {
     let mut pending = tick("action-with-pending-evidence");

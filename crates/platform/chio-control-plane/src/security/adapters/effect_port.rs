@@ -1,8 +1,6 @@
-use chio_security_types::clock::{Clock, SystemClock};
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
-
+use super::native_evidence::SqliteSiemOutbox;
 use chio_quarantine::decode_response_record;
+use chio_security_types::clock::{Clock, SystemClock};
 use chio_security_types::ports::{
     capability_set_suspension_installed_version_hash, capability_set_suspension_version_hash,
     containment_installed_version_hash, containment_overlay_version_hash,
@@ -40,89 +38,49 @@ use chio_security_types::ports::{
     SessionThrottleRemoveRequest, SessionThrottleSnapshot, SessionThrottleStore, TenantId,
     TenantScopedId, LINEAGE_FENCE_MAX_LEASE_MS,
 };
+use chio_security_types::response_simulation::{
+    EgressRestrictionSpec as RestrictEgressContribution,
+    SessionSuspensionSpec as SessionSuspensionContribution,
+};
 use chio_security_types::{
     ResponseEffectKind, ResponseEffectProgress, ResponseSnapshot, ResponseState, ResponseTarget,
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
 use serde::Serialize;
-
-use super::native_evidence::SqliteSiemOutbox;
-
-use chio_security_types::response_simulation::SessionSuspensionSpec as SessionSuspensionContribution;
-
-use chio_security_types::response_simulation::EgressRestrictionSpec as RestrictEgressContribution;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 mod dispatch;
-pub use dispatch::ResponseEffectBackend;
-pub use dispatch::LineageFenceMaintenanceResult;
-pub use dispatch::ActiveResponseEffectPortConfigError;
-pub use dispatch::ActiveResponseEffectPort;
-
 use dispatch::validate_request_binding;
+pub use dispatch::{
+    ActiveResponseEffectPort, ActiveResponseEffectPortConfigError, LineageFenceMaintenanceResult,
+    ResponseEffectBackend,
+};
 
 mod alert;
-pub use alert::EscalateAlertStore;
-pub use alert::EscalateAlertBackend;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+pub use alert::{EscalateAlertBackend, EscalateAlertStore};
 
 mod throttle;
 pub use throttle::SessionThrottleBackend;
 
-
-
 mod suspension;
 pub use suspension::CapabilitySetSuspensionBackend;
-
-
 
 mod issuance;
 pub use issuance::IssuanceFreezeBackend;
 
-
 mod containment;
-pub use containment::SessionSuspensionOverlayBackend;
-pub use containment::session_containment_target;
-pub use containment::session_overlay_version_hash;
-
-
-
-
-
-
-
+pub use containment::{
+    session_containment_target, session_overlay_version_hash, SessionSuspensionOverlayBackend,
+};
 
 mod egress;
-pub use egress::RestrictEgressOverlayBackend;
-pub use egress::egress_restriction_version_hash;
-
-
-
-
-
-
-
+pub use egress::{egress_restriction_version_hash, RestrictEgressOverlayBackend};
 
 mod evidence;
-use evidence::EFFECT_COMMAND_ID_PREFIX;
-use evidence::effect_query_from_request;
-use evidence::verify_contribution_hash;
-use evidence::domain_hash;
+use evidence::{
+    domain_hash, effect_query_from_request, verify_contribution_hash, EFFECT_COMMAND_ID_PREFIX,
+};
 
 #[cfg(test)]
 mod tests;

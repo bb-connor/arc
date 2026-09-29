@@ -1,22 +1,9 @@
-# [cfg (feature = "std")]
-use super::format;
-use super::String;
-# [cfg (feature = "std")]
-use super::vec;
-use super::Vec;
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::TenantId;
-use super::RecordId;
-use super::RequestId;
-use super::EventId;
-use super::GrantId;
-use super::ErrorCode;
-use super::OpaqueReceiptRef;
-use super::PortError;
-use super::PortResult;
-use super::ReceiptAppendRequest;
+#[cfg(feature = "std")]
+use super::{format, vec};
+use super::{
+    Deserialize, Digest32, ErrorCode, EventId, GrantId, OpaqueReceiptRef, PortError, PortResult,
+    ReceiptAppendRequest, RecordId, RequestId, Serialize, String, TenantId, Vec,
+};
 
 pub const DECLASSIFICATION_EVIDENCE_SCHEMA_VERSION: u8 = 2;
 pub const DECLASSIFICATION_EVIDENCE_INITIAL_RETRY_MS: u64 = 1_000;
@@ -364,9 +351,15 @@ fn declassification_hex(bytes: &[u8; 32]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(64);
     for byte in bytes {
-        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
+        #[allow(
+            clippy::indexing_slicing,
+            reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries."
+        )]
         encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
+        #[allow(
+            clippy::indexing_slicing,
+            reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries."
+        )]
         encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     encoded

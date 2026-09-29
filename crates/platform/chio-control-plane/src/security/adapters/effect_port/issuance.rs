@@ -1,68 +1,20 @@
-use super::Clock;
-use super::SystemClock;
-use super::Arc;
-use super::decode_response_record;
-use super::empty_issuance_freeze_snapshot;
-use super::issuance_freeze_installed_version_hash;
-use super::issuance_freeze_version_hash;
-use super::predict_issuance_freeze_apply;
-use super::predict_issuance_freeze_remove;
-use super::validate_issuance_freeze_contribution;
-use super::validate_issuance_freeze_snapshot;
-use super::BlastRadiusPort;
-use super::BlastRadiusResult;
-
-
-use super::Digest32;
-use super::EffectExecutionStatus;
-use super::EffectId;
-use super::EffectOperation;
-
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-
-use super::IssuanceFreezeApplyRequest;
-use super::IssuanceFreezeCommand;
-use super::IssuanceFreezeContribution;
-use super::IssuanceFreezeFenceMaintenanceRequest;
-use super::IssuanceFreezeKey;
-use super::IssuanceFreezeOperationStatus;
-use super::IssuanceFreezePendingRelease;
-use super::IssuanceFreezeRemoveRequest;
-use super::IssuanceFreezeSnapshot;
-use super::IssuanceFreezeSpec;
-use super::IssuanceFreezeStore;
-use super::LineageFence;
-use super::LineageFenceMaintenanceRequest;
-use super::LineageFenceRelease;
-use super::LineageFenceRenewal;
-use super::LineageFenceRequest;
-use super::LineageFenceTakeover;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::ResponsePlanKey;
-use super::ResponseSchedulerStore;
-use super::ScheduledWork;
-
-
-use super::TenantId;
-use super::LINEAGE_FENCE_MAX_LEASE_MS;
-use super::ResponseEffectKind;
-use super::ResponseEffectProgress;
-use super::ResponseSnapshot;
-use super::ResponseState;
-use super::ResponseTarget;
-
-use super::ResponseEffectBackend;
-use super::LineageFenceMaintenanceResult;
-use super::validate_request_binding;
-
-use super::effect_query_from_request;
-use super::verify_contribution_hash;
-
-
+use super::{
+    decode_response_record, effect_query_from_request, empty_issuance_freeze_snapshot,
+    issuance_freeze_installed_version_hash, issuance_freeze_version_hash,
+    predict_issuance_freeze_apply, predict_issuance_freeze_remove,
+    validate_issuance_freeze_contribution, validate_issuance_freeze_snapshot,
+    validate_request_binding, verify_contribution_hash, Arc, BlastRadiusPort, BlastRadiusResult,
+    Clock, Digest32, EffectExecutionStatus, EffectId, EffectOperation, EffectRequest, EffectResult,
+    EffectResultQuery, IssuanceFreezeApplyRequest, IssuanceFreezeCommand,
+    IssuanceFreezeContribution, IssuanceFreezeFenceMaintenanceRequest, IssuanceFreezeKey,
+    IssuanceFreezeOperationStatus, IssuanceFreezePendingRelease, IssuanceFreezeRemoveRequest,
+    IssuanceFreezeSnapshot, IssuanceFreezeSpec, IssuanceFreezeStore, LineageFence,
+    LineageFenceMaintenanceRequest, LineageFenceMaintenanceResult, LineageFenceRelease,
+    LineageFenceRenewal, LineageFenceRequest, LineageFenceTakeover, PortError, PortResult,
+    RecordId, ResponseEffectBackend, ResponseEffectKind, ResponseEffectProgress, ResponsePlanKey,
+    ResponseSchedulerStore, ResponseSnapshot, ResponseState, ResponseTarget, ScheduledWork,
+    SystemClock, TenantId, LINEAGE_FENCE_MAX_LEASE_MS,
+};
 
 /// Exact `FreezeIssuance` backend over a commit-indexed causal fence.
 ///
@@ -812,7 +764,13 @@ impl IssuanceFreezeBackend {
         ) {
             return Err(PortError::conflict());
         }
-        for effect in response.plan.effects.as_slice().iter().skip(effect_index.saturating_add(1)) {
+        for effect in response
+            .plan
+            .effects
+            .as_slice()
+            .iter()
+            .skip(effect_index.saturating_add(1))
+        {
             if !effect.kind.is_reversible() {
                 continue;
             }
@@ -1250,8 +1208,18 @@ pub(super) fn decode_issuance_freeze_spec(
     request: &EffectRequest,
     key: &IssuanceFreezeKey,
 ) -> PortResult<IssuanceFreezeSpec> {
-    let spec: IssuanceFreezeSpec =
-        chio_core::canonical::UntrustedJsonText::from_wire(request.canonical_contribution.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+    let spec: IssuanceFreezeSpec = chio_core::canonical::UntrustedJsonText::from_wire(
+        request.canonical_contribution.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|error| {
+        PortError::with_source(
+            chio_security_types::ports::PortErrorKind::InvalidData,
+            error.code(),
+            error,
+        )
+    })?;
     let canonical =
         chio_core::canonical_json_bytes(&spec).map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != request.canonical_contribution.as_bytes() {

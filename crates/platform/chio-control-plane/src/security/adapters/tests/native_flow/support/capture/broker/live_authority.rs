@@ -196,5 +196,3 @@ impl Drop for ServingAuthority {
         let _ = self.stop();
     }
 }
-
-

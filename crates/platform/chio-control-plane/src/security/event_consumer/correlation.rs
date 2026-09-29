@@ -1,44 +1,14 @@
-
-
-use super::AttestedCorrelationWriter;
-
-use super::AuthoritativeCorrelatedFindingEvidence;
-use super::CorrelationOutcome;
-use super::CorrelationPolicy;
-use super::CorrelationStatus;
-use super::TemporalCorrelator;
-use super::TemporalRule;
-use super::AttestedFindingBatchKey;
-use super::Digest32;
-use super::EventPartitionScan;
-use super::OpaqueReceiptRef;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::RuleId;
-use super::SecurityEventStore;
 #[cfg(test)]
 use super::SecurityEventVerifierPort;
-use super::TenantId;
-use super::UnverifiedSecurityEvent;
-use super::SecurityEventVerificationRecord;
-
-
-use super::SecurityEventBody;
-use super::SqliteSecurityStateStore;
-use super::BTreeSet;
-use super::Arc;
-use super::AttestedFindingBatchPlanner;
-use super::build_attested_finding_batch_publication;
-use super::CorrelationEventVerifier;
-
-
-
-use super::DurableAttestedFindingBatchPlanner;
-
-use super::NativeSecurityEventVerifier;
-use super::CorrelationConsumption;
-
+use super::{
+    build_attested_finding_batch_publication, Arc, AttestedCorrelationWriter,
+    AttestedFindingBatchKey, AttestedFindingBatchPlanner, AuthoritativeCorrelatedFindingEvidence,
+    BTreeSet, CorrelationConsumption, CorrelationEventVerifier, CorrelationOutcome,
+    CorrelationPolicy, CorrelationStatus, Digest32, DurableAttestedFindingBatchPlanner,
+    EventPartitionScan, NativeSecurityEventVerifier, OpaqueReceiptRef, PortError, PortResult,
+    RecordId, RuleId, SecurityEventBody, SecurityEventStore, SecurityEventVerificationRecord,
+    SqliteSecurityStateStore, TemporalCorrelator, TemporalRule, TenantId, UnverifiedSecurityEvent,
+};
 
 pub(super) trait CorrelationPort: Send + Sync {
     fn ensure_ready(&self) -> PortResult<()>;
@@ -167,7 +137,18 @@ impl CorrelationPort for SqliteTemporalCorrelationPort {
         event: &SecurityEventVerificationRecord,
         observed_at_unix_ms: u64,
     ) -> PortResult<Vec<RuleCorrelationOutcome>> {
-        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(event.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::IntegrityFailure, error.code(), error))?;
+        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(
+            event.canonical_body.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| {
+            PortError::with_source(
+                chio_security_types::ports::PortErrorKind::IntegrityFailure,
+                error.code(),
+                error,
+            )
+        })?;
         body.validate()
             .map_err(|_| PortError::integrity_failure())?;
         let mut outcomes = Vec::new();
@@ -289,28 +270,51 @@ impl ProductionCorrelationConsumer {
     }
 
     #[cfg(test)]
-    pub(super) fn consume(&self, event: &UnverifiedSecurityEvent) -> PortResult<CorrelationConsumerReport> {
+    pub(super) fn consume(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<CorrelationConsumerReport> {
         self.ensure_ready()?;
         let verified = self.verifier.verify(event)?;
         self.consume_verified_after_ready(&verified)
             .map(|consumed| consumed.report)
     }
 
-    pub(super) fn verify_live(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
+    pub(super) fn verify_live(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord> {
         let verified = self.verifier.verify(event)?;
         self.ensure_supported_policy(&verified)?;
         Ok(verified)
     }
 
-    pub(super) fn verify_durable(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventVerificationRecord> {
+    pub(super) fn verify_durable(
+        &self,
+        event: &UnverifiedSecurityEvent,
+    ) -> PortResult<SecurityEventVerificationRecord> {
         self.ensure_ready()?;
         let verified = self.verifier.verify_durable(event)?;
         self.ensure_supported_policy(&verified)?;
         Ok(verified)
     }
 
-    fn ensure_supported_policy(&self, verified: &SecurityEventVerificationRecord) -> PortResult<()> {
-        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(verified.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::IntegrityFailure, error.code(), error))?;
+    fn ensure_supported_policy(
+        &self,
+        verified: &SecurityEventVerificationRecord,
+    ) -> PortResult<()> {
+        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(
+            verified.canonical_body.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| {
+            PortError::with_source(
+                chio_security_types::ports::PortErrorKind::IntegrityFailure,
+                error.code(),
+                error,
+            )
+        })?;
         if self.correlation.accepts_policy(&body.policy_version) {
             Ok(())
         } else {

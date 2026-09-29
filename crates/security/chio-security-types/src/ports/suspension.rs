@@ -1,22 +1,10 @@
-use super::Vec;
-use super::Deserialize;
-use super::Serialize;
-use super::RESPONSE_AFFECTED_SET_DOMAIN;
-use super::Digest32;
-use super::BoundedVec;
-use super::RecordIdSet;
-# [cfg (feature = "std")]
+#[cfg(feature = "std")]
 use super::sort_json_object_keys;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::EffectExecutionStatus;
-use super::TenantId;
-use super::RecordId;
-use super::ActionId;
-use super::EffectId;
-use super::PortError;
-use super::PortResult;
+use super::{
+    ActionId, BoundedVec, Deserialize, Digest32, EffectExecutionStatus, EffectId, EffectRequest,
+    EffectResult, EffectResultQuery, PortError, PortResult, RecordId, RecordIdSet, Serialize,
+    TenantId, Vec, RESPONSE_AFFECTED_SET_DOMAIN,
+};
 
 pub const CAPABILITY_SET_SUSPENSION_VERSION_DOMAIN: &[u8] =
     b"chio.response-effect-capability-set-suspension-state.v1\0";
@@ -329,17 +317,21 @@ pub fn validate_capability_suspension_decision(
     if decision.tenant_id != query.tenant_id
         || decision.capability_id != query.capability_id
         || decision.denied == decision.active_matches.is_empty()
-        || decision.active_matches.as_slice().array_windows::<2>().any(|pair| {
-            (
-                pair[0].action_id.as_str(),
-                pair[0].effect_id.as_str(),
-                pair[0].affected_set_hash,
-            ) >= (
-                pair[1].action_id.as_str(),
-                pair[1].effect_id.as_str(),
-                pair[1].affected_set_hash,
-            )
-        })
+        || decision
+            .active_matches
+            .as_slice()
+            .array_windows::<2>()
+            .any(|pair| {
+                (
+                    pair[0].action_id.as_str(),
+                    pair[0].effect_id.as_str(),
+                    pair[0].affected_set_hash,
+                ) >= (
+                    pair[1].action_id.as_str(),
+                    pair[1].effect_id.as_str(),
+                    pair[1].affected_set_hash,
+                )
+            })
         || decision
             .active_matches
             .as_slice()

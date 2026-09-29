@@ -1,14 +1,7 @@
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::CanonicalBody;
-use super::BoundedVec;
-use super::TenantId;
-use super::RecordId;
-use super::EventId;
-use super::RuleId;
-use super::ProducerId;
-use super::PortResult;
+use super::{
+    BoundedVec, CanonicalBody, Deserialize, Digest32, EventId, PortResult, ProducerId, RecordId,
+    RuleId, Serialize, TenantId,
+};
 
 pub type VerifiedEventBatch = BoundedVec<SecurityEventVerificationRecord, 4_096>;
 pub type UnverifiedEventBatch = BoundedVec<UnverifiedSecurityEvent, 4_096>;

@@ -1,38 +1,15 @@
-use super::Arc;
-use super::ActiveDefenseReceiptBody;
-use super::FlowDenial;
-use super::Clock;
-use super::SystemClock;
-use super::derive_declassification_transition_id;
-use super::DeclassificationCompactionQuery;
-use super::DeclassificationCompactionRequest;
-use super::DeclassificationEvidenceAckRequest;
-use super::DeclassificationEvidenceCommitStore;
-use super::DeclassificationEvidencePhase;
-use super::DeclassificationEvidenceQuery;
-use super::DeclassificationEvidenceRecord;
-use super::DeclassificationEvidenceRetryRequest;
-use super::DeclassificationOutcomeEvidenceCommit;
-use super::DeclassificationOutcomeRequest;
-use super::DeclassificationTransitionBinding;
-use super::DeclassificationUseState;
-use super::Digest32;
-use super::ExactSecurityReceiptSink;
-use super::GrantId;
-use super::PortError;
-use super::PortErrorKind;
-use super::PortResult;
-use super::ReceiptAppendRequest;
-
-use super::TenantId;
-use super::MAX_DECLASSIFICATION_EVIDENCE_BATCH;
-
-use super::active_defense_receipt_request;
-use super::append_exact_receipt;
-use super::declassification_outcome_body;
-
-use super::DeclassificationOutcomeBodyInput;
-
+use super::{
+    active_defense_receipt_request, append_exact_receipt, declassification_outcome_body,
+    derive_declassification_transition_id, ActiveDefenseReceiptBody, Arc, Clock,
+    DeclassificationCompactionQuery, DeclassificationCompactionRequest,
+    DeclassificationEvidenceAckRequest, DeclassificationEvidenceCommitStore,
+    DeclassificationEvidencePhase, DeclassificationEvidenceQuery, DeclassificationEvidenceRecord,
+    DeclassificationEvidenceRetryRequest, DeclassificationOutcomeBodyInput,
+    DeclassificationOutcomeEvidenceCommit, DeclassificationOutcomeRequest,
+    DeclassificationTransitionBinding, DeclassificationUseState, Digest32,
+    ExactSecurityReceiptSink, FlowDenial, GrantId, PortError, PortErrorKind, PortResult,
+    ReceiptAppendRequest, SystemClock, TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct DeclassificationReceiptDrainReport {
@@ -118,7 +95,18 @@ impl DeclassificationReceiptOutboxDrainer {
             .load_stranded_declassification_consumptions_batch(max_records)?;
         let mut reconciled = 0_u32;
         for consumption in stranded {
-            let body = chio_core::canonical::UntrustedJsonText::from_wire(consumption.receipt.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::IntegrityFailure, error.code(), error))?;
+            let body = chio_core::canonical::UntrustedJsonText::from_wire(
+                consumption.receipt.canonical_body.as_bytes(),
+                64 * 1024 * 1024,
+            )
+            .and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>())
+            .map_err(|error| {
+                PortError::with_source(
+                    chio_security_types::ports::PortErrorKind::IntegrityFailure,
+                    error.code(),
+                    error,
+                )
+            })?;
             let ActiveDefenseReceiptBody::DeclassificationConsumption(body) = body else {
                 return Err(PortError::integrity_failure());
             };
@@ -346,7 +334,18 @@ impl DeclassificationReceiptOutboxDrainer {
             {
                 return Err(PortError::integrity_failure());
             }
-            let consumption_body = chio_core::canonical::UntrustedJsonText::from_wire(candidate.consumption.receipt.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::IntegrityFailure, error.code(), error))?;
+            let consumption_body = chio_core::canonical::UntrustedJsonText::from_wire(
+                candidate.consumption.receipt.canonical_body.as_bytes(),
+                64 * 1024 * 1024,
+            )
+            .and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>())
+            .map_err(|error| {
+                PortError::with_source(
+                    chio_security_types::ports::PortErrorKind::IntegrityFailure,
+                    error.code(),
+                    error,
+                )
+            })?;
             let ActiveDefenseReceiptBody::DeclassificationConsumption(consumption_body) =
                 consumption_body
             else {

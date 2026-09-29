@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn completed_remove_can_be_retried_without_false_mutation() {
     let store = Arc::new(RecordingOverlayStore::default());

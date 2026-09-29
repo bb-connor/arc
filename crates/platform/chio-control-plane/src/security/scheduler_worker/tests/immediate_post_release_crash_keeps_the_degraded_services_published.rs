@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn immediate_post_release_crash_keeps_the_degraded_services_published() {
     let failure = ResponseWorkerTickError::WorkerCrash(

@@ -1,6 +1,5 @@
-use crate::security::scheduler_worker::tests::*;
 use super::*;
-
+use crate::security::scheduler_worker::tests::*;
 
 #[test]
 fn sqlite_worker_restart_replays_lost_claim_ack_and_shutdown_releases_lease() {

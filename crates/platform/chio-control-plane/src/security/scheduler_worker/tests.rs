@@ -1,41 +1,39 @@
-
-pub (super) use super::ActiveDefenseServiceRegistry;
-pub (super) use super::ActiveDefenseServices;
-pub (super) use super::DeclassificationCompactionReport;
-pub (super) use super::DeclassificationOutboxHealth;
-pub (super) use super::DeclassificationReceiptDrainReport;
-pub (super) use super::DeclassificationReceiptOutboxPort;
-pub (super) use super::DeclassificationReconciliationReport;
-pub (super) use super::ProductionDeclassificationReceiptOutbox;
-pub (super) use super::ProductionResponseSchedulerConfig;
-pub (super) use super::ProductionResponseWorker;
-pub (super) use super::ProductionResponseWorkerHandle;
-pub (super) use super::ProductionResponseWorkerLoopConfig;
-pub (super) use super::ResponseWorkerHealth;
-pub (super) use super::ResponseWorkerLifecycle;
-pub (super) use super::ResponseWorkerPort;
-pub (super) use super::ResponseWorkerTick;
-pub (super) use super::ResponseWorkerTickError;
-pub (super) use super::SqliteResponseWorkerPort;
-pub (super) use super::MAX_WORKER_PROGRESS_DEADLINE;
-pub (super) use super::MIN_WORKER_PROGRESS_DEADLINE;
-pub (super) use chio_quarantine::build_response_plan;
-pub (super) use chio_quarantine::ResponseStateMachine;
-pub (super) use chio_quarantine::ResponseTransitionRequest;
-pub (super) use chio_quarantine::SchedulerPolicy;
+pub(super) use super::ActiveDefenseServiceRegistry;
+pub(super) use super::ActiveDefenseServices;
+pub(super) use super::DeclassificationCompactionReport;
+pub(super) use super::DeclassificationOutboxHealth;
+pub(super) use super::DeclassificationReceiptDrainReport;
+pub(super) use super::DeclassificationReceiptOutboxPort;
+pub(super) use super::DeclassificationReconciliationReport;
+pub(super) use super::ProductionDeclassificationReceiptOutbox;
+pub(super) use super::ProductionResponseSchedulerConfig;
+pub(super) use super::ProductionResponseWorker;
+pub(super) use super::ProductionResponseWorkerHandle;
+pub(super) use super::ProductionResponseWorkerLoopConfig;
+pub(super) use super::ResponseWorkerHealth;
+pub(super) use super::ResponseWorkerLifecycle;
+pub(super) use super::ResponseWorkerPort;
+pub(super) use super::ResponseWorkerTick;
+pub(super) use super::ResponseWorkerTickError;
+pub(super) use super::SqliteResponseWorkerPort;
+pub(super) use super::MAX_WORKER_PROGRESS_DEADLINE;
+pub(super) use super::MIN_WORKER_PROGRESS_DEADLINE;
+pub(super) use chio_quarantine::build_response_plan;
+pub(super) use chio_quarantine::ResponseStateMachine;
+pub(super) use chio_quarantine::ResponseTransitionRequest;
+pub(super) use chio_quarantine::SchedulerPolicy;
 pub(super) use chio_security_kernel::Clock;
 pub(super) use chio_security_types::ports::{
     ActionId, AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, EffectExecutionStatus,
-    EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode, GrantId,
-    LeaseOwnerId, OpaqueReceiptRef, PortError, PortResult, ReceiptAppendRequest, RecordId,
-    ResponsePlanRecord, ResponseSchedulerStore, ResponseStore, ScheduledWork,
-    SchedulerHealthPageRequest, SchedulerHealthPort, SchedulerRetryRequest, SecurityAlert,
-    SecurityAlertPort, SecurityReceiptSink, SessionId, TenantId,
-    MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode, GrantId, LeaseOwnerId,
+    OpaqueReceiptRef, PortError, PortResult, ReceiptAppendRequest, RecordId, ResponsePlanRecord,
+    ResponseSchedulerStore, ResponseStore, ScheduledWork, SchedulerHealthPageRequest,
+    SchedulerHealthPort, SchedulerRetryRequest, SecurityAlert, SecurityAlertPort,
+    SecurityReceiptSink, SessionId, TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 pub(super) use chio_security_types::{
-    OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
-    ResponseEffectSpec, ResponsePlanInput, ResponseState, ResponseTarget,
+    OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectSpec,
+    ResponsePlanInput, ResponseState, ResponseTarget,
 };
 pub(super) use chio_store_sqlite::security_state::SqliteSecurityStateStore;
 pub(super) use std::collections::VecDeque;
@@ -49,7 +47,8 @@ pub(super) struct ScriptedDeclassificationOutboxPort {
     pub(super) available: AtomicBool,
     pub(super) pending: AtomicU64,
     pub(super) stranded: AtomicU64,
-    pub(super) reconciliations: Mutex<VecDeque<Result<DeclassificationReconciliationReport, PortError>>>,
+    pub(super) reconciliations:
+        Mutex<VecDeque<Result<DeclassificationReconciliationReport, PortError>>>,
     pub(super) drains: Mutex<VecDeque<Result<DeclassificationReceiptDrainReport, PortError>>>,
     pub(super) compactions: Mutex<VecDeque<Result<DeclassificationCompactionReport, PortError>>>,
     pub(super) requested_batches: Mutex<Vec<u32>>,
@@ -211,7 +210,9 @@ pub(super) struct ScriptedWorkerPort {
 }
 
 impl ScriptedWorkerPort {
-    pub(super) fn with_ticks(ticks: Vec<Result<ResponseWorkerTick, ResponseWorkerTickError>>) -> Self {
+    pub(super) fn with_ticks(
+        ticks: Vec<Result<ResponseWorkerTick, ResponseWorkerTickError>>,
+    ) -> Self {
         Self {
             ticks: Mutex::new(ticks.into()),
             tick_calls: AtomicU64::new(0),
@@ -376,7 +377,6 @@ mod periodic_compaction_failure_fails_maintenance_and_outbox_health;
 
 mod pending_or_no_progress_outbox_fails_readiness_and_drain;
 
-
 pub(super) fn tick(action: &str) -> ResponseWorkerTick {
     ResponseWorkerTick {
         tenant_id: tenant(),
@@ -483,10 +483,7 @@ impl SecurityAlertPort for SqliteTestPorts {
         })
     }
 
-    fn load_delivery(
-        &self,
-        query: &AlertDeliveryQuery,
-    ) -> PortResult<Option<AlertDeliveryStatus>> {
+    fn load_delivery(&self, query: &AlertDeliveryQuery) -> PortResult<Option<AlertDeliveryStatus>> {
         Ok(Some(AlertDeliveryStatus::Delivered {
             attempts: 1,
             delivered_at_unix_ms: query.alert.occurred_at_unix_ms,
@@ -499,20 +496,14 @@ impl SchedulerHealthPort for SqliteTestPorts {
         Ok(())
     }
 
-    fn page_once(
-        &self,
-        request: &SchedulerHealthPageRequest,
-    ) -> PortResult<AlertDeliveryStatus> {
+    fn page_once(&self, request: &SchedulerHealthPageRequest) -> PortResult<AlertDeliveryStatus> {
         Ok(AlertDeliveryStatus::Delivered {
             attempts: 1,
             delivered_at_unix_ms: request.occurred_at_unix_ms,
         })
     }
 
-    fn load_delivery(
-        &self,
-        query: &AlertDeliveryQuery,
-    ) -> PortResult<Option<AlertDeliveryStatus>> {
+    fn load_delivery(&self, query: &AlertDeliveryQuery) -> PortResult<Option<AlertDeliveryStatus>> {
         Ok(Some(AlertDeliveryStatus::Delivered {
             attempts: 1,
             delivered_at_unix_ms: query.alert.occurred_at_unix_ms,
@@ -544,8 +535,7 @@ pub(super) fn install_due_sqlite_plan(
         execution: chio_security_types::ResponseExecutionBinding::new(
             chio_security_types::ResponseExecutionMode::Live,
         ),
-        action_id: ActionId::new(action_id)
-            .unwrap_or_else(|error| panic!("action id: {error}")),
+        action_id: ActionId::new(action_id).unwrap_or_else(|error| panic!("action id: {error}")),
         trigger_finding_id: RecordId::new("finding-scheduler-worker")
             .unwrap_or_else(|error| panic!("finding id: {error}")),
         trigger_finding_hash: chio_security_types::ports::Digest32::new([11; 32]),
@@ -660,18 +650,11 @@ pub(super) fn record_retry_and_reclaim(
     reclaimed[0].clone()
 }
 
-
-
-
 mod periodic_tick_claims_recovery_before_one_bounded_outbox_batch;
-
-
 
 mod expired_terminal_cleanup_rolls_back_the_batch_on_late_corruption;
 
 mod sqlite_worker_claims_simultaneously_due_actions_transactionally_in_deterministic_order;
-
-
 
 mod production_worker_restart_recovers_after_ack_loss_without_duplicate_completion;
 
@@ -682,10 +665,6 @@ mod worker_progress_deadline_has_an_absolute_validated_boundary;
 mod pending_declassification_receipts_keep_worker_health_degraded;
 
 mod post_loop_cleanup_releases_owned_work_and_is_idempotent;
-
-
-
-
 
 mod production_worker_allows_only_one_background_loop;
 
@@ -721,7 +700,6 @@ mod worker_crash_marks_health_failed_and_restart_can_take_over;
 
 mod terminated_primary_reuses_its_durable_port_without_concurrent_ticks;
 
-
 pub(super) struct TestServices {
     pub(super) ready: Mutex<bool>,
 }
@@ -748,9 +726,7 @@ impl ActiveDefenseServices for SequencedServices {
         match self.readiness.lock() {
             Ok(mut readiness) => match readiness.pop_front() {
                 Some(true) => Ok(()),
-                Some(false) | None => {
-                    Err(ResponseWorkerTickError::Port(PortError::unavailable()))
-                }
+                Some(false) | None => Err(ResponseWorkerTickError::Port(PortError::unavailable())),
             },
             Err(_) => Err(ResponseWorkerTickError::Port(PortError::unavailable())),
         }
@@ -783,5 +759,3 @@ mod service_publication_is_atomic_when_replacement_readiness_fails;
 mod service_publication_rechecks_readiness_at_commit_time;
 
 mod service_publication_rejects_duplicate_ownership_without_replacement;
-
-

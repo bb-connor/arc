@@ -1,54 +1,12 @@
-use super::canonical_json_bytes;
-
-
-
-use super::Digest;
-use super::Sha256;
-
-use super::ExecutionHoldState;
-use super::QueryExecutionHoldRequest;
-
-
-use super::capability_digest;
-use super::BrokerExecuteFailure;
-use super::BrokerExecuteRequest;
-use super::failure_receipt_digest;
-use super::sign_failure_receipt;
-use super::verify_failure_receipt;
-use super::BrokerDispatchKnowledge;
-use super::BrokerFailureOutcome;
-use super::BrokerFailureReceiptBody;
-use super::BrokerFailureStage;
-
-use super::BROKER_FAILURE_RECEIPT_SCHEMA;
-use super::broker_execute_request_registration_digest;
-use super::derive_attempt_ids;
-use super::AttemptRecord;
-use super::AttemptState;
-
-use super::AttemptTransitionEvidence;
-use super::validate_digest;
-use super::validate_identifier;
-use super::BrokerError;
-use super::Result;
-use super::BrokerService;
-
-
-use super::broker_request_digest;
-use super::FAILURE_RECEIPT_REQUEST_DOMAIN;
-
-
-
-
-
-
-
-
-
-
-
-
-
+use super::{
+    broker_execute_request_registration_digest, broker_request_digest, canonical_json_bytes,
+    capability_digest, derive_attempt_ids, failure_receipt_digest, sign_failure_receipt,
+    validate_digest, validate_identifier, verify_failure_receipt, AttemptRecord, AttemptState,
+    AttemptTransitionEvidence, BrokerDispatchKnowledge, BrokerError, BrokerExecuteFailure,
+    BrokerExecuteRequest, BrokerFailureOutcome, BrokerFailureReceiptBody, BrokerFailureStage,
+    BrokerService, Digest, ExecutionHoldState, QueryExecutionHoldRequest, Result, Sha256,
+    BROKER_FAILURE_RECEIPT_SCHEMA, FAILURE_RECEIPT_REQUEST_DOMAIN,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum FailureOrigin {
@@ -88,7 +46,6 @@ impl From<BrokerError> for ExecutionFailure {
 }
 
 pub(super) type ExecutionResult<T> = std::result::Result<T, ExecutionFailure>;
-
 
 pub(super) fn execution_failure_after_capture_release(
     error: BrokerError,
@@ -278,7 +235,10 @@ pub(super) fn pre_dispatch_authority_projection(
     })
 }
 
-pub(super) fn failure_state_projection(state: AttemptState, error: &BrokerError) -> Result<FailureProjection> {
+pub(super) fn failure_state_projection(
+    state: AttemptState,
+    error: &BrokerError,
+) -> Result<FailureProjection> {
     Ok(match state {
         AttemptState::Registered => FailureProjection {
             stage: BrokerFailureStage::Admission,
@@ -357,8 +317,6 @@ pub(super) fn failure_outcome_before_dispatch(error: &BrokerError) -> BrokerFail
     }
 }
 impl BrokerService {
-
-
     /// Recover the exact first durable failure before consulting live
     /// admission authorities or allowing another dispatch attempt. The
     /// deterministic receipt ID binds the complete canonical execute request,
@@ -891,4 +849,3 @@ impl BrokerService {
         Ok(())
     }
 }
-

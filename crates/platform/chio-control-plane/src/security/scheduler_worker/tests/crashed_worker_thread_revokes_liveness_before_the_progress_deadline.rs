@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn crashed_worker_thread_revokes_liveness_before_the_progress_deadline() {
     let crash = ResponseWorkerTickError::WorkerCrash(

@@ -1,6 +1,5 @@
-use crate::security::scheduler_worker::tests::*;
 use super::*;
-
+use crate::security::scheduler_worker::tests::*;
 
 #[test]
 fn sqlite_worker_shutdown_forgets_a_naturally_expired_safe_lease() {

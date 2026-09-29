@@ -2,19 +2,12 @@
 // tenant-read-contract: security_declassification_receipt_outbox; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_declassification_evidence_identity; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_declassification_uses; class=tenant-predicate; principal=security-runtime
-use super::declassification;
-use super::sha256;
-
-
-use super::PortError;
-use super::PortResult;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::normalize_sql;
+use super::{
+    declassification, normalize_sql, params, sha256, sqlite_error, Connection, OptionalExtension,
+    PortError, PortResult,
+};
 
 pub(super) const DECLASSIFICATION_READINESS_CURSOR: &str = "declassification-evidence-schema-v2";
 const DECLASSIFICATION_LIFECYCLE_CANONICAL_DDL: &str = r#"
@@ -718,6 +711,8 @@ pub(super) fn validate_declassification_evidence_schema(connection: &Connection)
     declassification::verify_legacy_lifecycle(connection)
 }
 
-pub(super) fn validate_declassification_evidence_integrity(connection: &Connection) -> PortResult<()> {
+pub(super) fn validate_declassification_evidence_integrity(
+    connection: &Connection,
+) -> PortResult<()> {
     declassification::verify_legacy_integrity(connection)
 }

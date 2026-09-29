@@ -1,7 +1,9 @@
 mod error;
 
-pub use error::ResponseWorkerTickError;
-
+use super::adapters::{
+    DeclassificationCompactionReport, DeclassificationReceiptDrainReport,
+    DeclassificationReceiptOutboxDrainer, DeclassificationReconciliationReport,
+};
 use chio_core::{canonical_json_bytes, sha256};
 use chio_quarantine::{
     ResponseExecutor, ResponseScheduler, ScheduledResponseExecutor, SchedulerError,
@@ -15,6 +17,7 @@ use chio_security_types::ports::{
     MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
+pub use error::ResponseWorkerTickError;
 use rand_core::{OsRng, RngCore};
 use serde::Serialize;
 use std::collections::{BTreeMap, VecDeque};
@@ -24,11 +27,6 @@ use std::sync::{Arc, Condvar, Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant};
 use tokio::sync::{oneshot, watch};
 use tokio::time::MissedTickBehavior;
-
-use super::adapters::{
-    DeclassificationCompactionReport, DeclassificationReceiptDrainReport,
-    DeclassificationReceiptOutboxDrainer, DeclassificationReconciliationReport,
-};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResponseWorkerTick {
@@ -113,59 +111,35 @@ impl ResponseWorkerHealth {
 
 mod outbox;
 
-pub(in crate::security) use outbox::ProductionDeclassificationReceiptOutbox;
 #[cfg(test)]
 use outbox::DeclassificationReceiptOutboxPort;
-
+pub(in crate::security) use outbox::ProductionDeclassificationReceiptOutbox;
 
 mod worker;
 pub use worker::ProductionResponseWorkerLoopConfig;
-use worker::WORKER_CLAIM_DOMAIN;
+use worker::{worker_task_crash_error, ResponseWorkerProgress, WORKER_CLAIM_DOMAIN};
 #[cfg(test)]
-use worker::MIN_WORKER_PROGRESS_DEADLINE;
-#[cfg(test)]
-use worker::MAX_WORKER_PROGRESS_DEADLINE;
-
-use worker::ResponseWorkerProgress;
-
-use worker::worker_task_crash_error;
+use worker::{MAX_WORKER_PROGRESS_DEADLINE, MIN_WORKER_PROGRESS_DEADLINE};
 
 mod custody;
 
+use custody::{
+    acquire_response_worker_join_permit, ResponseWorkerJoinPermit, ResponseWorkerTaskLiveness,
+};
 #[cfg(test)]
-use custody::MAX_RESPONSE_WORKER_JOIN_OWNERS;
-
-use custody::ResponseWorkerJoinPermit;
-#[cfg(test)]
-use custody::ResponseWorkerJoinJob;
-
-#[cfg(test)]
-use custody::ResponseWorkerReaperRegistry;
-
-use custody::acquire_response_worker_join_permit;
-#[cfg(test)]
-use custody::join_response_worker_thread;
-use custody::ResponseWorkerTaskLiveness;
+use custody::{
+    join_response_worker_thread, ResponseWorkerJoinJob, ResponseWorkerReaperRegistry,
+    MAX_RESPONSE_WORKER_JOIN_OWNERS,
+};
 
 mod scheduler;
-pub use scheduler::ProductionResponseSchedulerConfig;
-pub use scheduler::SqliteResponseWorkerPort;
-
-
-
-
-
-
+pub use scheduler::{ProductionResponseSchedulerConfig, SqliteResponseWorkerPort};
 
 mod registry;
-pub use registry::ActiveDefenseServices;
-pub use registry::ActiveDefenseServiceRegistry;
-
+pub use registry::{ActiveDefenseServiceRegistry, ActiveDefenseServices};
 
 #[cfg(test)]
 mod tests;
-
-
 
 pub struct ProductionResponseWorker {
     port: Arc<dyn ResponseWorkerPort>,
@@ -180,9 +154,6 @@ pub struct ProductionResponseWorker {
     health: Mutex<ResponseWorkerHealth>,
     progress: Mutex<ResponseWorkerProgress>,
 }
-
-
-
 
 pub struct ProductionResponseWorkerHandle {
     shutdown: watch::Sender<bool>,

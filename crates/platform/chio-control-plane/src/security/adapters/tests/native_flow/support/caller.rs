@@ -373,5 +373,3 @@ fn assert_native_original_evidence(
     }
     Ok(())
 }
-
-

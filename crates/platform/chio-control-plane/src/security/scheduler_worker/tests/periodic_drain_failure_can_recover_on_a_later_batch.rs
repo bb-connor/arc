@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn periodic_drain_failure_can_recover_on_a_later_batch() {
     let scripted = Arc::new(ScriptedDeclassificationOutboxPort::new(

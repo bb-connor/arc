@@ -1,14 +1,7 @@
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::CanonicalBody;
-use super::TenantId;
-use super::RecordId;
-use super::AdmissionArtifactRef;
-use super::ActionId;
-use super::PortResult;
-use super::PreparedActiveResponseDispatchBinding;
-
+use super::{
+    ActionId, AdmissionArtifactRef, CanonicalBody, Deserialize, Digest32, PortResult,
+    PreparedActiveResponseDispatchBinding, RecordId, Serialize, TenantId,
+};
 
 pub const OPAQUE_APPROVAL_ADMISSION_ARTIFACT_SCHEMA_VERSION: u8 = 1;
 

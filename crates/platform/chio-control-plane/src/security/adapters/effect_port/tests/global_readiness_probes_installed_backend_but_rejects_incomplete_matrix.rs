@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn global_readiness_probes_installed_backend_but_rejects_incomplete_matrix() {
     let store = Arc::new(RecordingOverlayStore::default());

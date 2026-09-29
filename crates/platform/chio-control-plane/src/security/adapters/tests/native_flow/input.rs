@@ -256,5 +256,3 @@ fn native_input_untrusted_declassification_denies_before_classification_or_join(
     assert_eq!(classifier.calls.load(Ordering::SeqCst), 0);
     Ok(())
 }
-
-

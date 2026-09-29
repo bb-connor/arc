@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn wedged_tick_fails_readiness_and_awaited_shutdown_never_drains_concurrently() {
     let port = Arc::new(BlockingWorkerPort::new());

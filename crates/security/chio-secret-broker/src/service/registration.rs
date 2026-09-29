@@ -1,43 +1,11 @@
-
-
-
-
-
-
-use super::BrokerExecuteRequest;
-
-use super::prepared_dispatch_id;
-use super::PrepareDispatchAcknowledgement;
-use super::RegisterAttemptAcknowledgement;
-use super::ReleaseAttemptAcknowledgement;
-use super::AttemptRegistration;
-use super::AttemptState;
-
-use super::AttemptTransitionEvidence;
-use super::RegisterAttemptOutcome;
-use super::BrokerError;
-use super::Result;
-use super::MAX_RETAINED_PREPARED_DISPATCHES;
-use super::BrokerService;
-use super::RetainedPreparedDispatch;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+use super::{
+    prepared_dispatch_id, AttemptRegistration, AttemptState, AttemptTransitionEvidence,
+    BrokerError, BrokerExecuteRequest, BrokerService, PrepareDispatchAcknowledgement,
+    RegisterAttemptAcknowledgement, RegisterAttemptOutcome, ReleaseAttemptAcknowledgement, Result,
+    RetainedPreparedDispatch, MAX_RETAINED_PREPARED_DISPATCHES,
+};
 
 impl BrokerService {
-
-
     /// Persist and fsync a kernel-authorized attempt before any budget
     /// authority mutation or credential materialization.
     pub fn register_attempt(
@@ -258,4 +226,3 @@ impl BrokerService {
         ReleaseAttemptAcknowledgement::new(registration, tombstone.updated_at_unix_seconds)
     }
 }
-

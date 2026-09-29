@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn neutral_containment_commitments_match_the_legacy_adapter_domains() {
     #[derive(Serialize)]

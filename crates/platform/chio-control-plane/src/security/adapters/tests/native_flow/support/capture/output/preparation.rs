@@ -357,5 +357,3 @@ fn native_output_preparation_rejects_missing_double_suppressed_and_panicking_joi
     }
     Ok(())
 }
-
-

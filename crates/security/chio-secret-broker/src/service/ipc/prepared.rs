@@ -1,53 +1,18 @@
-use super::Read;
+use super::{
+    canonical_ipc_request_bytes, canonical_json_bytes, decode_canonical_ipc_request,
+    read_bounded_sensitive_frame, Arc, AuthenticatedIpcRequest, BrokerError, BrokerIpcDeadlines,
+    BrokerIpcServeOutcome, Digest, Duration, IpcOperation, Mutex, Ordering,
+    PrepareDispatchAcknowledgement, Read, Result, Sha256, MAX_BROKER_IPC_DEADLINE_MS,
+    MAX_WIRE_BYTES,
+};
+#[cfg(unix)]
+use super::{
+    classify_broker_ipc_handler_result, validate_broker_ipc_response_envelope,
+    write_broker_ipc_response, BrokerIpcDeadlineIo, BrokerIpcServeFailure, Instant,
+    UnixBrokerEndpoint, UnixStream,
+};
 #[cfg(test)]
-use super::Write;
-# [cfg (unix)]
-use super::UnixStream;
-use super::Ordering;
-use super::Arc;
-use super::Mutex;
-use super::Duration;
-# [cfg (unix)]
-use super::Instant;
-use super::canonical_json_bytes;
-# [cfg (test)]
-use super::Ed25519Backend;
-# [cfg (test)]
-use super::Keypair;
-use super::Digest;
-use super::Sha256;
-
-
-use super::MAX_WIRE_BYTES;
-use super::PrepareDispatchAcknowledgement;
-use super::BrokerError;
-use super::Result;
-use super::IpcOperation;
-use super::AuthenticatedIpcRequest;
-use super::canonical_ipc_request_bytes;
-use super::read_bounded_sensitive_frame;
-
-
-use super::decode_canonical_ipc_request;
-#[cfg(test)]
-use super::BrokerIpcHandler;
-# [cfg (unix)]
-use super::BrokerIpcServeFailure;
-# [cfg (unix)]
-use super::UnixBrokerEndpoint;
-use super::MAX_BROKER_IPC_DEADLINE_MS;
-use super::BrokerIpcDeadlines;
-use super::BrokerIpcServeOutcome;
-# [cfg (unix)]
-use super::BrokerIpcDeadlineIo;
-# [cfg (unix)]
-use super::classify_broker_ipc_handler_result;
-# [cfg (unix)]
-use super::validate_broker_ipc_response_envelope;
-# [cfg (unix)]
-use super::write_broker_ipc_response;
-
-
+use super::{BrokerIpcHandler, Ed25519Backend, Keypair, Write};
 
 /// A privileged preparation may retain one descriptor while the kernel performs
 /// final authorization and capture. This is separate from the ordinary frame
@@ -100,7 +65,12 @@ impl UnixBrokerEndpoint {
         let operation = IpcOperation::PrepareConnection;
         let permit = self.prepared.reserve();
         let authenticated: crate::registration::AuthenticatedAttemptRequest =
-            chio_core_types::canonical::UntrustedJsonText::from_wire(&request.payload, MAX_WIRE_BYTES).and_then(|input| input.decode_signed()).map_err(|error| BrokerIpcServeFailure::Client(error.into()))?;
+            chio_core_types::canonical::UntrustedJsonText::from_wire(
+                &request.payload,
+                MAX_WIRE_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| BrokerIpcServeFailure::Client(error.into()))?;
         let tenant = request.tenant_scope.clone();
         let handled = match &permit {
             Ok(_) => self.handler.prepare_connection(request),
@@ -113,7 +83,12 @@ impl UnixBrokerEndpoint {
             .map_err(BrokerIpcServeFailure::Internal)?;
         let binding = if response.accepted {
             let acknowledgement: PrepareDispatchAcknowledgement =
-                chio_core_types::canonical::UntrustedJsonText::from_wire(&response.response, MAX_WIRE_BYTES).and_then(|input| input.decode_signed()).map_err(|error| BrokerIpcServeFailure::Internal(error.into()))?;
+                chio_core_types::canonical::UntrustedJsonText::from_wire(
+                    &response.response,
+                    MAX_WIRE_BYTES,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| BrokerIpcServeFailure::Internal(error.into()))?;
             acknowledgement
                 .validate_for(&authenticated.registration, &authenticated.request)
                 .map_err(BrokerIpcServeFailure::Internal)?;

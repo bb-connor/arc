@@ -1,5 +1,5 @@
-use crate::security_state::lineage_fence::load_lineage_fence;
 use super::*;
+use crate::security_state::lineage_fence::load_lineage_fence;
 use chio_security_types::ports::PortErrorKind;
 
 #[test]

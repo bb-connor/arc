@@ -9,7 +9,6 @@ use std::process::{Child, Command, Stdio};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-
 struct OwnedChild(Child);
 impl Drop for OwnedChild {
     fn drop(&mut self) {
@@ -151,7 +150,10 @@ fn response_process_child() -> TestResult {
 }
 
 fn spawn(root: &Path, phase: &str) -> TestResult<OwnedChild> {
-    let module = module_path!().split_once("::").ok_or("test module lacks crate prefix")?.1;
+    let module = module_path!()
+        .split_once("::")
+        .ok_or("test module lacks crate prefix")?
+        .1;
     let child_test = format!("{module}::response_process_child");
     Ok(OwnedChild(
         Command::new(std::env::current_exe()?)

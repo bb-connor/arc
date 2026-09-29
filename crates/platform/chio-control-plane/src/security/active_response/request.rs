@@ -1,7 +1,6 @@
-use chio_kernel::ActiveResponseExecutorError;
 use chio_kernel::{
     ActiveResponseExecutionApproval, ActiveResponseExecutionOrigin, ActiveResponseExecutionRequest,
-    ActiveResponseExecutorAuthorityIdentity,
+    ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
 };
 use chio_security_types::ports::{RecordId, ResponseDispatchCommitRequest, ResponseDispatchLease};
 use chio_security_types::ResponsePlan;

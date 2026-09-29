@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn overlapping_session_suspensions_remove_only_their_own_contribution() {
     let store = Arc::new(RecordingOverlayStore::default());

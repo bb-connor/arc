@@ -358,5 +358,3 @@ fn capture(
         authority_metadata_digest: registration.authority_metadata_digest.clone(),
     })
 }
-
-

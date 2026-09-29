@@ -421,5 +421,3 @@ fn native_output_journal_inherits_all_current_labels_when_output_is_public() -> 
     assert_eq!(counts(&fixture)?, (1, 1, 0));
     reopen(fixture, &output)
 }
-
-

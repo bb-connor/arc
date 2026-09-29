@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn periodic_compaction_failure_fails_maintenance_and_outbox_health() {
     let scripted = Arc::new(

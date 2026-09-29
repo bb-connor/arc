@@ -1,47 +1,17 @@
-use super::canonical_json_bytes;
-use super::ActionId;
-use super::ErrorCode;
-use super::LeaseOwnerId;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::ResponseDispatchKey;
-use super::ResponsePlanRecord;
-use super::ResponseScheduledMutationCasRequest;
-use super::ResponseSchedulerStore;
-use super::ScheduledWork;
-use super::SchedulerClaimRequest;
-use super::SchedulerHealthAckRequest;
-use super::SchedulerLeaseReleaseRequest;
-use super::SchedulerLeaseRenewRequest;
-use super::SchedulerRetryRequest;
-use super::SchedulerRetryState;
-use super::SchedulerWorkKey;
-use super::TenantId;
-use super::ResponseMutationRecord;
-use super::ResponseState;
-use super::ResponseTransitionCause;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::Transaction;
-use super::TransactionBehavior;
-use super::Serialize;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::body_hash;
-use super::validate_canonical_json_body;
-use super::canonical_request_hash;
-use super::load_response_dispatch;
-use super::decode_response_snapshot;
-use super::response_mutation_scheduler_fence;
-use super::load_response_plan;
-use super::transition_status;
-use super::record_transition;
+use super::{
+    body_hash, canonical_json_bytes, canonical_request_hash, decode_response_snapshot, from_i64,
+    load_response_dispatch, load_response_plan, params, record_transition,
+    response_mutation_scheduler_fence, sqlite_error, to_i64, transition_status,
+    validate_canonical_json_body, ActionId, Connection, ErrorCode, LeaseOwnerId, OptionalExtension,
+    PortError, PortResult, RecordId, ResponseDispatchKey, ResponseMutationRecord,
+    ResponsePlanRecord, ResponseScheduledMutationCasRequest, ResponseSchedulerStore, ResponseState,
+    ResponseTransitionCause, ScheduledWork, SchedulerClaimRequest, SchedulerHealthAckRequest,
+    SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest, SchedulerRetryRequest,
+    SchedulerRetryState, SchedulerWorkKey, Serialize, SqliteSecurityStateStore, TenantId,
+    Transaction, TransactionBehavior,
+};
 
 pub(super) const MAX_SCHEDULER_CLAIMS: u32 = 1_024;
 pub(super) const MAX_CLOCK_SKEW_MS: u64 = 5_000;
@@ -375,7 +345,8 @@ impl SqliteSecurityStateStore {
             durable_leases.push(row.map_err(sqlite_error)?);
         }
         drop(statement);
-        let terminal_remaining = durable_leases.len() > crate::integer::checked::<_, usize>(max_leases)?;
+        let terminal_remaining =
+            durable_leases.len() > crate::integer::checked::<_, usize>(max_leases)?;
         durable_leases.truncate(crate::integer::checked::<_, usize>(max_leases)?);
         let mut cleaned = 0_u32;
         for action_id in durable_leases {
@@ -1327,7 +1298,10 @@ pub(super) fn load_scheduler_claim(
     Ok(Some(claimed))
 }
 
-pub(super) fn next_scheduler_fencing_token(transaction: &Transaction<'_>, tenant_id: &str) -> PortResult<u64> {
+pub(super) fn next_scheduler_fencing_token(
+    transaction: &Transaction<'_>,
+    tenant_id: &str,
+) -> PortResult<u64> {
     let sequence_token: Option<i64> = transaction
         .query_row(
             "SELECT last_fencing_token FROM security_scheduler_fence_sequences WHERE tenant_id = ?1",

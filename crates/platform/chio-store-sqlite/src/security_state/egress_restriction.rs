@@ -1,48 +1,17 @@
-use super::BTreeSet;
-use super::canonical_json_bytes;
-use super::ActionId;
-use super::DestinationId;
-use super::EffectExecutionStatus;
-use super::EffectId;
-use super::EffectOperation;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::EgressDeniedDestinations;
-use super::EgressDestinationQuery;
-use super::EgressDestinationSet;
-use super::EgressRestrictionApplyRequest;
-use super::EgressRestrictionCommand;
-use super::EgressRestrictionContribution;
-use super::EgressRestrictionContributions;
-use super::EgressRestrictionDecision;
-use super::EgressRestrictionEffectIds;
-use super::EgressRestrictionRemoveRequest;
-use super::EgressRestrictionSessionKey;
-use super::EgressRestrictionSnapshot;
-use super::EgressRestrictionStore;
-use super::PortError;
-use super::PortResult;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::Transaction;
-use super::TransactionBehavior;
-use super::Deserialize;
-use super::Serialize;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::body_hash;
-use super::validate_canonical_json_body;
-use super::decode_digest;
-use super::validate_scheduler_fence;
-
+use super::{
+    body_hash, canonical_json_bytes, decode_digest, from_i64, params, sqlite_error, to_i64,
+    validate_canonical_json_body, validate_scheduler_fence, ActionId, BTreeSet, Connection,
+    Deserialize, DestinationId, EffectExecutionStatus, EffectId, EffectOperation, EffectRequest,
+    EffectResult, EffectResultQuery, EgressDeniedDestinations, EgressDestinationQuery,
+    EgressDestinationSet, EgressRestrictionApplyRequest, EgressRestrictionCommand,
+    EgressRestrictionContribution, EgressRestrictionContributions, EgressRestrictionDecision,
+    EgressRestrictionEffectIds, EgressRestrictionRemoveRequest, EgressRestrictionSessionKey,
+    EgressRestrictionSnapshot, EgressRestrictionStore, OptionalExtension, PortError, PortResult,
+    ResponseEffectKind, ResponseTarget, Serialize, SqliteSecurityStateStore, Transaction,
+    TransactionBehavior,
+};
 
 impl EgressRestrictionStore for SqliteSecurityStateStore {
     fn ensure_egress_restrictions_ready(&self) -> PortResult<()> {
@@ -544,9 +513,12 @@ fn decode_egress_command_contribution(
 ) -> PortResult<EgressCommandContributionBody> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
     let contribution: EgressCommandContributionBody =
-        chio_core::canonical::UntrustedJsonText::from_wire(request.canonical_contribution.as_bytes(), 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-            .map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            request.canonical_contribution.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| PortError::invalid_data())?;
     let canonical =
         canonical_json_bytes(&contribution).map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != request.canonical_contribution.as_bytes() {
@@ -555,7 +527,10 @@ fn decode_egress_command_contribution(
     Ok(contribution)
 }
 
-pub(super) fn effect_request_matches_query(request: &EffectRequest, query: &EffectResultQuery) -> bool {
+pub(super) fn effect_request_matches_query(
+    request: &EffectRequest,
+    query: &EffectResultQuery,
+) -> bool {
     request.tenant_id == query.tenant_id
         && request.action_id == query.action_id
         && request.plan_hash == query.plan_hash
@@ -596,9 +571,10 @@ fn load_egress_restriction_command(
             if body_hash(&request_body).as_slice() != request_hash.as_bytes() {
                 return Err(PortError::integrity_failure());
             }
-            let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(&request_body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed())
-                .map_err(|_| PortError::integrity_failure())?;
+            let request: EffectRequest =
+                chio_core::canonical::UntrustedJsonText::from_wire(&request_body, 64 * 1024 * 1024)
+                    .and_then(|input| input.decode_signed())
+                    .map_err(|_| PortError::integrity_failure())?;
             let canonical_request =
                 canonical_json_bytes(&request).map_err(|_| PortError::integrity_failure())?;
             if canonical_request.as_slice() != request_body.as_slice() {
@@ -610,7 +586,8 @@ fn load_egress_restriction_command(
             }
             let result: EffectResult =
                 chio_core::canonical::UntrustedJsonText::from_wire(&result_body, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed()).map_err(|_| PortError::integrity_failure())?;
+                    .and_then(|input| input.decode_signed())
+                    .map_err(|_| PortError::integrity_failure())?;
             let canonical_result =
                 canonical_json_bytes(&result).map_err(|_| PortError::integrity_failure())?;
             if canonical_result.as_slice() != result_body.as_slice()

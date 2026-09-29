@@ -1,17 +1,9 @@
-use super::canonical_json_bytes;
-use super::sha256;
-use super::CanonicalBody;
-use super::Digest32;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::InformationLabel;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-
+use super::{
+    canonical_json_bytes, params, sha256, CanonicalBody, Connection, Digest32, InformationLabel,
+    OptionalExtension, PortError, PortResult, RecordId,
+};
 
 pub(super) fn sqlite_error(error: rusqlite::Error) -> PortError {
     match error {
@@ -59,7 +51,10 @@ fn validate_body(body: &CanonicalBody, expected: &Digest32) -> PortResult<()> {
     Ok(())
 }
 
-pub(super) fn validate_canonical_json_body(body: &CanonicalBody, expected: &Digest32) -> PortResult<()> {
+pub(super) fn validate_canonical_json_body(
+    body: &CanonicalBody,
+    expected: &Digest32,
+) -> PortResult<()> {
     validate_body(body, expected)?;
     let value: serde_json::Value =
         chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024)
@@ -130,8 +125,6 @@ pub(super) fn decode_label(body: Vec<u8>, stored_hash: Vec<u8>) -> PortResult<In
     }
     Ok(label)
 }
-
-
 
 pub(super) fn normalize_sql(value: &str) -> String {
     let mut normalized = String::with_capacity(value.len());

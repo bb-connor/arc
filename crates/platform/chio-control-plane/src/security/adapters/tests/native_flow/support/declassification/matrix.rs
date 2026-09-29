@@ -51,5 +51,3 @@ fn native_declassification_composes_nonce_runtime_approval_and_dpop_sync_and_asy
     }
     Ok(())
 }
-
-

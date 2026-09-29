@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn worker_crash_marks_health_failed_and_restart_can_take_over() {
     let failure = ResponseWorkerTickError::WorkerCrash(

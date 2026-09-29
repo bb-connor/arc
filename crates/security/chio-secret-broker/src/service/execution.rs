@@ -1,70 +1,17 @@
-
-
-
-
-
-use super::CaptureExecutionHoldRequest;
-use super::ExecutionHoldState;
-
-
-use super::capability_digest;
-use super::response_digest;
-use super::HttpsDispatchFailure;
-use super::BrokerExecuteRequest;
-use super::BrokerExecuteResponse;
-use super::BrokerExecutionEvidence;
-use super::BROKER_EVIDENCE_SCHEMA;
-use super::credential_reference_hash;
-use super::receipt_digest;
-use super::sign_execution_receipt;
-use super::verify_execution_receipt;
-use super::BrokerDispatchKnowledge;
-use super::BrokerExecutionOutcome;
-use super::BrokerFailureOutcome;
-use super::BrokerFailureStage;
-use super::BrokerReceiptBody;
-
-use super::BROKER_RECEIPT_SCHEMA;
-use super::prepared_dispatch_id;
-use super::validate_revocation_snapshot;
-use super::BrokerRevocationRequest;
-
-use super::derive_attempt_ids;
-use super::derive_attempt_ids_for_operation;
-use super::AttemptState;
-
-use super::AttemptTransitionEvidence;
-use super::validate_identifier;
-use super::BrokerError;
-use super::Result;
-use super::TrustedExecutionContext;
-use super::BrokerService;
-use super::BrokerExecuteOutcome;
-
-
-
-use super::broker_request_digest;
-use super::FailureOrigin;
-use super::FailureProjection;
-use super::ExecutionFailure;
-use super::ExecutionResult;
-use super::execution_failure_after_capture_release;
-
-
-
-
-
-
-
-
-
-
-
-
+use super::{
+    broker_request_digest, capability_digest, credential_reference_hash, derive_attempt_ids,
+    derive_attempt_ids_for_operation, execution_failure_after_capture_release,
+    prepared_dispatch_id, receipt_digest, response_digest, sign_execution_receipt,
+    validate_identifier, validate_revocation_snapshot, verify_execution_receipt, AttemptState,
+    AttemptTransitionEvidence, BrokerDispatchKnowledge, BrokerError, BrokerExecuteOutcome,
+    BrokerExecuteRequest, BrokerExecuteResponse, BrokerExecutionEvidence, BrokerExecutionOutcome,
+    BrokerFailureOutcome, BrokerFailureStage, BrokerReceiptBody, BrokerRevocationRequest,
+    BrokerService, CaptureExecutionHoldRequest, ExecutionFailure, ExecutionHoldState,
+    ExecutionResult, FailureOrigin, FailureProjection, HttpsDispatchFailure, Result,
+    TrustedExecutionContext, BROKER_EVIDENCE_SCHEMA, BROKER_RECEIPT_SCHEMA,
+};
 
 impl BrokerService {
-
-
     pub fn execute(
         &self,
         request: &BrokerExecuteRequest,
@@ -218,7 +165,8 @@ impl BrokerService {
             return Ok(self.receipt_sink.load_completed(&ids.attempt_id)?.is_some());
         }
         Ok(false)
-    }pub(super) fn execute_inner(
+    }
+    pub(super) fn execute_inner(
         &self,
         request: &BrokerExecuteRequest,
         trusted: &TrustedExecutionContext,
@@ -693,7 +641,9 @@ impl BrokerService {
                     leader_epoch: commit.leader_epoch,
                     upstream_status: status,
                     response_body_sha256: response_body_sha256.clone(),
-                    response_headers_sha256: crate::generic_https::response_header_digest(&headers)?,
+                    response_headers_sha256: crate::generic_https::response_header_digest(
+                        &headers,
+                    )?,
                 };
                 let receipt_id = format!("broker-receipt-{}", ids.attempt_id);
                 let receipt = sign_execution_receipt(
@@ -903,4 +853,3 @@ impl BrokerService {
         Ok(())
     }
 }
-

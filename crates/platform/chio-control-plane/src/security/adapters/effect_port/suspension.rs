@@ -1,37 +1,16 @@
-use super::Arc;
-use super::capability_set_suspension_installed_version_hash;
-use super::capability_set_suspension_version_hash;
-use super::empty_capability_set_suspension_snapshot;
-use super::predict_capability_set_suspension_apply;
-use super::predict_capability_set_suspension_remove;
-use super::response_affected_set_hash;
-use super::validate_capability_set_suspension_snapshot;
-use super::CanonicalBody;
-use super::CapabilitySetSuspensionApplyRequest;
-use super::CapabilitySetSuspensionCommand;
-use super::CapabilitySetSuspensionContribution;
-use super::CapabilitySetSuspensionKey;
-use super::CapabilitySetSuspensionRemoveRequest;
-use super::CapabilitySetSuspensionSnapshot;
-use super::CapabilitySetSuspensionSpec;
-use super::CapabilitySetSuspensionStore;
-use super::Digest32;
-use super::EffectExecutionStatus;
-use super::EffectOperation;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::PortError;
-use super::PortResult;
-use super::TenantId;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::ResponseEffectBackend;
-use super::validate_request_binding;
-use super::effect_query_from_request;
-use super::verify_contribution_hash;
-
-
+use super::{
+    capability_set_suspension_installed_version_hash, capability_set_suspension_version_hash,
+    effect_query_from_request, empty_capability_set_suspension_snapshot,
+    predict_capability_set_suspension_apply, predict_capability_set_suspension_remove,
+    response_affected_set_hash, validate_capability_set_suspension_snapshot,
+    validate_request_binding, verify_contribution_hash, Arc, CanonicalBody,
+    CapabilitySetSuspensionApplyRequest, CapabilitySetSuspensionCommand,
+    CapabilitySetSuspensionContribution, CapabilitySetSuspensionKey,
+    CapabilitySetSuspensionRemoveRequest, CapabilitySetSuspensionSnapshot,
+    CapabilitySetSuspensionSpec, CapabilitySetSuspensionStore, Digest32, EffectExecutionStatus,
+    EffectOperation, EffectRequest, EffectResult, EffectResultQuery, PortError, PortResult,
+    ResponseEffectBackend, ResponseEffectKind, ResponseTarget, TenantId,
+};
 
 /// Exact `SuspendCapabilitySet` backend backed by immutable affected sets.
 ///
@@ -356,7 +335,15 @@ pub(super) fn decode_capability_set_suspension_spec(
     body: &CanonicalBody,
 ) -> PortResult<CapabilitySetSuspensionSpec> {
     let spec: CapabilitySetSuspensionSpec =
-        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                PortError::with_source(
+                    chio_security_types::ports::PortErrorKind::InvalidData,
+                    error.code(),
+                    error,
+                )
+            })?;
     if spec.affected_ids.as_slice().is_empty() {
         return Err(PortError::invalid_data());
     }

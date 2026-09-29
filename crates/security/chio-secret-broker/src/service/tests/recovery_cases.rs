@@ -153,14 +153,10 @@ fn lost_completed_response_replays_exactly_after_service_and_store_restart() {
     let attempt_path = trusted_directory.join("attempts.sqlite3");
     let receipt_path = trusted_directory.join("receipts.sqlite3");
     let receipt_signer = Keypair::from_seed(&[3; 32]);
-    let attempts =
-        Arc::new(SqliteAttemptStore::open(&attempt_path).test_expect("attempt store"));
+    let attempts = Arc::new(SqliteAttemptStore::open(&attempt_path).test_expect("attempt store"));
     let receipt_sink = Arc::new(
-        crate::receipt::SqliteBrokerReceiptSink::open(
-            &receipt_path,
-            receipt_signer.public_key(),
-        )
-        .test_expect("receipt sink"),
+        crate::receipt::SqliteBrokerReceiptSink::open(&receipt_path, receipt_signer.public_key())
+            .test_expect("receipt sink"),
     );
     let fixture = fixture_with_stores(
         1,
@@ -203,11 +199,8 @@ fn lost_completed_response_replays_exactly_after_service_and_store_restart() {
     let reopened_attempts =
         Arc::new(SqliteAttemptStore::open(&attempt_path).test_expect("reopened attempt store"));
     let reopened_receipts = Arc::new(
-        crate::receipt::SqliteBrokerReceiptSink::open(
-            &receipt_path,
-            receipt_signer.public_key(),
-        )
-        .test_expect("reopened receipt sink"),
+        crate::receipt::SqliteBrokerReceiptSink::open(&receipt_path, receipt_signer.public_key())
+            .test_expect("reopened receipt sink"),
     );
     let audit_authority_broker_signer: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[71; 32])));
@@ -607,4 +600,3 @@ fn denied_combined_capture_never_dispatches() {
         .test_expect("observed lock")
         .is_empty());
 }
-

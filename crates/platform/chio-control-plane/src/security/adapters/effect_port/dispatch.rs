@@ -1,42 +1,15 @@
-use super::BTreeMap;
-use super::BTreeSet;
-use super::Arc;
-use super::BlastRadiusPort;
-use super::CapabilitySetSuspensionStore;
-use super::ContainmentOverlayStore;
-use super::EffectExecutionStatus;
-use super::EffectId;
-use super::EffectPort;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::EgressRestrictionStore;
-use super::IssuanceFreezeStore;
-use super::LineageFence;
-use super::LineageFenceMaintenanceOutcome;
-use super::LineageFenceMaintenanceRequest;
-use super::MaintainedLineageFence;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::ResponseSchedulerStore;
-use super::SessionThrottleStore;
-use super::TenantId;
-use super::LINEAGE_FENCE_MAX_LEASE_MS;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::SqliteSecurityStateStore;
-use super::SqliteSiemOutbox;
-use super::EscalateAlertStore;
-use super::EscalateAlertBackend;
-use super::SessionThrottleBackend;
-use super::CapabilitySetSuspensionBackend;
-use super::IssuanceFreezeBackend;
-use super::SessionSuspensionOverlayBackend;
-use super::RestrictEgressOverlayBackend;
-use super::EFFECT_COMMAND_ID_PREFIX;
-
-
+use super::{
+    Arc, BTreeMap, BTreeSet, BlastRadiusPort, CapabilitySetSuspensionBackend,
+    CapabilitySetSuspensionStore, ContainmentOverlayStore, EffectExecutionStatus, EffectId,
+    EffectPort, EffectRequest, EffectResult, EffectResultQuery, EgressRestrictionStore,
+    EscalateAlertBackend, EscalateAlertStore, IssuanceFreezeBackend, IssuanceFreezeStore,
+    LineageFence, LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest,
+    MaintainedLineageFence, PortError, PortResult, RecordId, ResponseEffectKind,
+    ResponseSchedulerStore, ResponseTarget, RestrictEgressOverlayBackend,
+    SessionSuspensionOverlayBackend, SessionThrottleBackend, SessionThrottleStore,
+    SqliteSecurityStateStore, SqliteSiemOutbox, TenantId, EFFECT_COMMAND_ID_PREFIX,
+    LINEAGE_FENCE_MAX_LEASE_MS,
+};
 
 pub(super) const REQUIRED_EFFECT_KINDS: [ResponseEffectKind; 6] = [
     ResponseEffectKind::EscalateAlert,
@@ -113,7 +86,8 @@ impl ActiveResponseEffectPort {
         let throttle_store: Arc<dyn SessionThrottleStore> = security_store.clone();
         let egress_store: Arc<dyn EgressRestrictionStore> = security_store.clone();
         let session_suspension_store: Arc<dyn ContainmentOverlayStore> = security_store.clone();
-        let capability_suspension_store: Arc<dyn CapabilitySetSuspensionStore> = security_store.clone();
+        let capability_suspension_store: Arc<dyn CapabilitySetSuspensionStore> =
+            security_store.clone();
         let issuance_freeze_store: Arc<dyn IssuanceFreezeStore> = security_store.clone();
         let scheduler_store: Arc<dyn ResponseSchedulerStore> = security_store.clone();
         let backends: Vec<Arc<dyn ResponseEffectBackend>> = vec![

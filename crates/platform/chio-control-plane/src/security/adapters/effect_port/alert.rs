@@ -1,31 +1,10 @@
-use super::Clock;
-use super::SystemClock;
-use super::Arc;
-use super::AlertDeliveryQuery;
-use super::AlertDeliveryStatus;
-use super::CanonicalBody;
-use super::Digest32;
-use super::EffectExecutionStatus;
-use super::EffectId;
-use super::EffectOperation;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::SecurityAlert;
-use super::SecurityAlertPort;
-use super::TenantId;
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::Serialize;
-use super::SqliteSiemOutbox;
-use super::ResponseEffectBackend;
-use super::validate_request_binding;
-use super::verify_contribution_hash;
-use super::domain_hash;
-
+use super::{
+    domain_hash, validate_request_binding, verify_contribution_hash, AlertDeliveryQuery,
+    AlertDeliveryStatus, Arc, CanonicalBody, Clock, Digest32, EffectExecutionStatus, EffectId,
+    EffectOperation, EffectRequest, EffectResult, EffectResultQuery, PortError, PortResult,
+    RecordId, ResponseEffectBackend, ResponseEffectKind, ResponseTarget, SecurityAlert,
+    SecurityAlertPort, Serialize, SqliteSiemOutbox, SystemClock, TenantId,
+};
 
 pub(super) const ESCALATE_ALERT_SCHEMA_VERSION: u8 = 1;
 pub(super) const ESCALATE_ALERT_TYPE: &str = "active_response_effect_escalation";
@@ -33,7 +12,8 @@ pub(super) const ESCALATE_ALERT_EVENT_DOMAIN: &[u8] = b"chio.response-effect-ale
 pub(super) const ESCALATE_ALERT_COMMAND_DOMAIN: &[u8] = b"chio.response-effect-alert-command.v1\0";
 pub(super) const ESCALATE_ALERT_FINDING_DOMAIN: &[u8] = b"chio.response-effect-alert-finding.v1\0";
 pub(super) const ESCALATE_ALERT_ACTION_DOMAIN: &[u8] = b"chio.response-effect-alert-action.v1\0";
-pub(super) const ESCALATE_ALERT_EVIDENCE_DOMAIN: &[u8] = b"chio.response-effect-alert-evidence.v1\0";
+pub(super) const ESCALATE_ALERT_EVIDENCE_DOMAIN: &[u8] =
+    b"chio.response-effect-alert-evidence.v1\0";
 pub(super) const ESCALATE_ALERT_RESULT_DOMAIN: &[u8] = b"chio.response-effect-alert-result.v1\0";
 
 /// Alert outbox contract needed for exact effect reconciliation after restart.
@@ -255,10 +235,21 @@ pub(super) fn validate_escalate_alert_query(query: &EffectResultQuery) -> PortRe
     Ok(())
 }
 
-pub(super) fn verify_canonical_json_contribution(body: &CanonicalBody, declared: Digest32) -> PortResult<()> {
+pub(super) fn verify_canonical_json_contribution(
+    body: &CanonicalBody,
+    declared: Digest32,
+) -> PortResult<()> {
     verify_contribution_hash(body, declared)?;
     let value: serde_json::Value =
-        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                PortError::with_source(
+                    chio_security_types::ports::PortErrorKind::InvalidData,
+                    error.code(),
+                    error,
+                )
+            })?;
     let canonical =
         chio_core::canonical_json_bytes(&value).map_err(|_| PortError::invalid_data())?;
     if canonical.as_slice() != body.as_bytes() {
@@ -324,7 +315,9 @@ pub(super) fn validate_alert_delivery_status(status: AlertDeliveryStatus) -> Por
     Ok(())
 }
 
-pub(super) fn escalate_alert_result(commitment: &EscalateAlertCommitment<'_>) -> PortResult<EffectResult> {
+pub(super) fn escalate_alert_result(
+    commitment: &EscalateAlertCommitment<'_>,
+) -> PortResult<EffectResult> {
     Ok(EffectResult {
         effect_id: EffectId::new(commitment.effect_id).map_err(PortError::from)?,
         resulting_version_hash: domain_hash(ESCALATE_ALERT_RESULT_DOMAIN, commitment)?,

@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn suspend_session_apply_and_ack_loss_query_bind_the_exact_contribution() {
     let store = Arc::new(RecordingOverlayStore::default());
@@ -33,11 +32,8 @@ fn suspend_session_apply_and_ack_loss_query_bind_the_exact_contribution() {
     );
     assert_eq!(
         result.resulting_version_hash,
-        containment_installed_version_hash(
-            &target,
-            &snapshot.active_contributions.as_slice()[0]
-        )
-        .unwrap_or_else(|error| panic!("installed result hash: {error}"))
+        containment_installed_version_hash(&target, &snapshot.active_contributions.as_slice()[0])
+            .unwrap_or_else(|error| panic!("installed result hash: {error}"))
     );
     assert_eq!(
         port.load_result(&query(&apply)),

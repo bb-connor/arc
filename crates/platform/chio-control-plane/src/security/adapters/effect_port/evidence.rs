@@ -1,12 +1,6 @@
-use super::CanonicalBody;
-use super::Digest32;
-use super::EffectRequest;
-use super::EffectResultQuery;
-use super::PortError;
-use super::PortResult;
-use super::Serialize;
-
-
+use super::{
+    CanonicalBody, Digest32, EffectRequest, EffectResultQuery, PortError, PortResult, Serialize,
+};
 
 pub(super) const EFFECT_COMMAND_ID_PREFIX: &str = "response_effect_command:";
 

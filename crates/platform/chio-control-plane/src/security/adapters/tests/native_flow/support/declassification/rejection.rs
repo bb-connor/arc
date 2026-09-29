@@ -137,5 +137,3 @@ fn native_declassification_refuses_unselected_lifecycle_without_activation() -> 
     );
     Ok(())
 }
-
-

@@ -1,3 +1,4 @@
+use super::*;
 use chio_security_types::ports::DeclassificationConsume;
 use chio_security_types::ports::DeclassificationEvidencePhase;
 use chio_security_types::ports::DeclassificationEvidenceQuery;
@@ -5,7 +6,6 @@ use chio_security_types::ports::DeclassificationUseQuery;
 use chio_security_types::ports::DeclassificationUseState;
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use super::*;
 
 struct FixedClock;
 

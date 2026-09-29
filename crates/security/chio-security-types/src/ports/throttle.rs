@@ -1,24 +1,10 @@
-# [cfg (feature = "std")]
-use super::format;
-use super::String;
-use super::Vec;
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::BoundedVec;
-# [cfg (feature = "std")]
-use super::sort_json_object_keys;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::EffectExecutionStatus;
-use super::TenantId;
-use super::RecordId;
-use super::SessionId;
-use super::ActionId;
-use super::EffectId;
-use super::PortError;
-use super::PortResult;
+#[cfg(feature = "std")]
+use super::{format, sort_json_object_keys};
+use super::{
+    ActionId, BoundedVec, Deserialize, Digest32, EffectExecutionStatus, EffectId, EffectRequest,
+    EffectResult, EffectResultQuery, PortError, PortResult, RecordId, Serialize, SessionId, String,
+    TenantId, Vec,
+};
 
 pub const SESSION_THROTTLE_VERSION_DOMAIN: &[u8] =
     b"chio.response-effect-session-throttle-state.v1\0";
@@ -400,9 +386,15 @@ fn session_throttle_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
     for byte in bytes {
-        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
+        #[allow(
+            clippy::indexing_slicing,
+            reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries."
+        )]
         encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
+        #[allow(
+            clippy::indexing_slicing,
+            reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries."
+        )]
         encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     encoded

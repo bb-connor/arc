@@ -491,5 +491,3 @@ fn broker_revocations(
     assert_eq!(set.ids(), ids);
     Ok(set)
 }
-
-

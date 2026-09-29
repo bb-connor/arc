@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn unsupported_effects_fail_closed_before_overlay_mutation() {
     let store = Arc::new(RecordingOverlayStore::default());

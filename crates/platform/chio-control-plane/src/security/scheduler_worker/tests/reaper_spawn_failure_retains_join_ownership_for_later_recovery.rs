@@ -1,6 +1,5 @@
-use crate::security::scheduler_worker::tests::*;
 use super::*;
-
+use crate::security::scheduler_worker::tests::*;
 
 #[test]
 fn reaper_spawn_failure_retains_join_ownership_for_later_recovery() {

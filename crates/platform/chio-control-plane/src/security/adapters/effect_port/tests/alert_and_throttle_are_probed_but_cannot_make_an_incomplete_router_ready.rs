@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn alert_and_throttle_are_probed_but_cannot_make_an_incomplete_router_ready() {
     let alerts = Arc::new(RecordingAlertStore::default());

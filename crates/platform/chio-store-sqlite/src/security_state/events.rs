@@ -1,51 +1,20 @@
-use super::AdvisorySecurityEvent;
-use super::CanonicalBody;
-use super::CorrelationCasRequest;
-use super::CorrelationDeleteRequest;
-use super::CorrelationEventAdmission;
-use super::CorrelationEventAdmissionRequest;
-use super::CorrelationEventIndexRequest;
-use super::CorrelationOutcomeCommitRequest;
-use super::CorrelationOutcomeKey;
-use super::CorrelationOutcomePublication;
-use super::CorrelationPartial;
-use super::CorrelationPartitionKey;
-use super::CorrelationScan;
-use super::CreateOutcome;
-use super::Digest32;
-use super::EventAppend;
-use super::EventId;
-use super::EventPartitionScan;
-use super::PortError;
-use super::PortResult;
-use super::ProducerId;
-use super::ProducerTrustClass;
-use super::SecurityEventStore;
-use super::SecurityEventVerificationRecord;
-use super::VerifiedEventBatch;
-use super::params;
-use super::Connection;
-use super::OptionalExtension;
-use super::TransactionBehavior;
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::to_i64;
-use super::from_i64;
-use super::validate_canonical_json_body;
-use super::decode_digest;
-use super::canonical_request_hash;
-use super::index_partition_event_in_transaction;
-use super::compare_and_swap_correlation_in_transaction;
-use super::validate_correlation_outcome_publication;
-use super::load_correlation_outcome_record;
-use super::insert_correlation_outcome_record;
-use super::validate_correlation_outcome_storage_binding;
-use super::load_correlation_partition_generation;
-use super::load_correlation_partial;
-use super::transition_status;
-use super::record_transition;
+use super::{
+    canonical_request_hash, compare_and_swap_correlation_in_transaction, decode_digest, from_i64,
+    index_partition_event_in_transaction, insert_correlation_outcome_record,
+    load_correlation_outcome_record, load_correlation_partial,
+    load_correlation_partition_generation, params, record_transition, sqlite_error, to_i64,
+    transition_status, validate_canonical_json_body, validate_correlation_outcome_publication,
+    validate_correlation_outcome_storage_binding, AdvisorySecurityEvent, CanonicalBody, Connection,
+    CorrelationCasRequest, CorrelationDeleteRequest, CorrelationEventAdmission,
+    CorrelationEventAdmissionRequest, CorrelationEventIndexRequest,
+    CorrelationOutcomeCommitRequest, CorrelationOutcomeKey, CorrelationOutcomePublication,
+    CorrelationPartial, CorrelationPartitionKey, CorrelationScan, CreateOutcome, Digest32,
+    EventAppend, EventId, EventPartitionScan, OptionalExtension, PortError, PortResult, ProducerId,
+    ProducerTrustClass, SecurityEventStore, SecurityEventVerificationRecord,
+    SqliteSecurityStateStore, TransactionBehavior, VerifiedEventBatch,
+};
 
 pub(super) const MAX_EVENT_SCAN_RESULTS: u32 = 4_096;
 pub(super) const EVENT_EVIDENCE_HASH_DOMAIN: &[u8] = b"chio.verified-security-event-evidence.v1\0";

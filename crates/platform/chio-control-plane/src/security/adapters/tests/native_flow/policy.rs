@@ -177,5 +177,3 @@ fn oversized_native_policy_evidence_denies_before_any_egress_custody() -> TestRe
     ));
     Ok(())
 }
-
-

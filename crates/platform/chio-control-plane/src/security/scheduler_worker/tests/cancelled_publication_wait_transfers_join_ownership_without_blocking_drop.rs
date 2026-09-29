@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn cancelled_publication_wait_transfers_join_ownership_without_blocking_drop() {
     let port = Arc::new(BlockingWorkerPort::blocking_initial_tick());

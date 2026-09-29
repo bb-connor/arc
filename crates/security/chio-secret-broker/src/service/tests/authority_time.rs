@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn authority_rpc_completion_uses_current_trusted_time() {
     let fixture = advancing_authority_fixture("normal");
@@ -81,4 +80,3 @@ fn authority_rpc_completion_time_is_bound_into_independently_verified_audit() {
     verify_completed_audit(&completed, &signed_runner, &admin, context)
         .test_expect("independent verification preserves original request times");
 }
-

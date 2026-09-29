@@ -1,8 +1,6 @@
-use serde::{Deserialize, Serialize};
+use super::{ErrorCode, IdError};
 use core::fmt;
-use super::IdError;
-use super::ErrorCode;
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -23,7 +21,11 @@ pub struct PortError {
 impl PortError {
     #[must_use]
     pub const fn new(kind: PortErrorKind, code: ErrorCode) -> Self {
-        Self { kind, code, source: None }
+        Self {
+            kind,
+            code,
+            source: None,
+        }
     }
 
     /// Preserve a private cause while exposing only the registered rule.
@@ -32,7 +34,11 @@ impl PortError {
         code: &'static str,
         source: impl core::error::Error + Send + Sync + 'static,
     ) -> Self {
-        Self { kind, code: ErrorCode(code.to_string()), source: Some(alloc::sync::Arc::new(source)) }
+        Self {
+            kind,
+            code: ErrorCode(code.to_string()),
+            source: Some(alloc::sync::Arc::new(source)),
+        }
     }
 
     #[must_use]
@@ -95,18 +101,25 @@ impl fmt::Display for PortError {
 
 impl core::error::Error for PortError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        self.source.as_deref().map(|source| -> &(dyn core::error::Error + 'static) { source })
+        self.source
+            .as_deref()
+            .map(|source| -> &(dyn core::error::Error + 'static) { source })
     }
 }
 
 impl fmt::Debug for PortError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PortError").field("kind", &self.kind).field("code", &self.code).finish_non_exhaustive()
+        f.debug_struct("PortError")
+            .field("kind", &self.kind)
+            .field("code", &self.code)
+            .finish_non_exhaustive()
     }
 }
 
 impl PartialEq for PortError {
-    fn eq(&self, other: &Self) -> bool { self.kind == other.kind && self.code == other.code }
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.code == other.code
+    }
 }
 impl Eq for PortError {}
 

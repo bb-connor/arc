@@ -2,20 +2,13 @@
 // tenant-read-contract: security_correlation_outcomes; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_correlation_ingress; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_attested_finding_batches; class=tenant-predicate; principal=security-runtime
-use super::AttestedFindingBatchKey;
-
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-use super::TenantId;
-use super::params;
-use super::Connection;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::table_definition_is_exact;
-use super::schema_object_definition_is_exact;
-use super::load_attested_finding_batch_record;
+use super::{
+    load_attested_finding_batch_record, params, schema_object_definition_is_exact, sqlite_error,
+    table_definition_is_exact, AttestedFindingBatchKey, Connection, PortError, PortResult,
+    RecordId, TenantId,
+};
 
 const ATTESTED_FINDING_BATCH_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_attested_finding_batches (
@@ -264,7 +257,9 @@ fn validate_attested_finding_batch_records(connection: &Connection) -> PortResul
     Ok(())
 }
 
-pub(super) fn validate_attested_finding_batch_tenant_keys(connection: &Connection) -> PortResult<()> {
+pub(super) fn validate_attested_finding_batch_tenant_keys(
+    connection: &Connection,
+) -> PortResult<()> {
     if !table_definition_is_exact(
         connection,
         "security_attested_finding_batches",
@@ -300,7 +295,10 @@ pub(super) fn count_rows(connection: &Connection, table: &str) -> PortResult<i64
         .map_err(sqlite_error)
 }
 
-pub(super) fn table_has_foreign_key_violation(connection: &Connection, table: &str) -> PortResult<bool> {
+pub(super) fn table_has_foreign_key_violation(
+    connection: &Connection,
+    table: &str,
+) -> PortResult<bool> {
     let mut statement = connection
         .prepare(&format!("PRAGMA foreign_key_check(\"{table}\")"))
         .map_err(sqlite_error)?;

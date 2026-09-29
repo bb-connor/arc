@@ -233,5 +233,3 @@ fn revocation_after_native_capture_fences_connector_handoff() -> TestResult {
 fn duplicate_native_start_cannot_steal_the_live_operation() -> TestResult {
     race(Pause::BeforeCapture, false)
 }
-
-

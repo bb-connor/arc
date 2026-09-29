@@ -1,21 +1,8 @@
-
-
-use super::PublicKey;
-use super::AuthoritativeCorrelatedFindingEvidence;
-use super::AdmissionArtifactRef;
-use super::AttestedFindingBatchBinding;
-use super::Digest32;
-use super::PortError;
-use super::PortResult;
-use super::RecordId;
-
-
-use super::ResponsePlan;
-use super::AttestedFindingResponsePolicySelection;
-use super::AttestedFindingAdmissionArtifacts;
-
-
-use super::ReservedAttestedFindingResponsePlan;
+use super::{
+    AdmissionArtifactRef, AttestedFindingAdmissionArtifacts, AttestedFindingBatchBinding,
+    AttestedFindingResponsePolicySelection, AuthoritativeCorrelatedFindingEvidence, Digest32,
+    PortError, PortResult, PublicKey, RecordId, ReservedAttestedFindingResponsePlan, ResponsePlan,
+};
 
 impl ReservedAttestedFindingResponsePlan {
     #[must_use]
@@ -106,4 +93,3 @@ pub trait AttestedFindingResponsePolicyPlanner: Send + Sync {
         Err(PortError::integrity_failure())
     }
 }
-

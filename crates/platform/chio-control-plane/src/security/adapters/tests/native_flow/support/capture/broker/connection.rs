@@ -310,5 +310,3 @@ fn accept_control(listener: &UnixListener) -> TestResult<UnixStream> {
     stream.set_write_timeout(Some(Duration::from_secs(2)))?;
     Ok(stream)
 }
-
-

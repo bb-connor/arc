@@ -138,5 +138,3 @@ fn native_output_journal_locally_rehashed_history_cannot_replace_the_global_anch
     );
     Ok(())
 }
-
-

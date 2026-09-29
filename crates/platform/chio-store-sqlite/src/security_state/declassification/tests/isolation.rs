@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use super::*;
+use std::sync::Arc;
 
 fn assert_exact_tenant_reads(
     reader: ScopedReader<'_>,

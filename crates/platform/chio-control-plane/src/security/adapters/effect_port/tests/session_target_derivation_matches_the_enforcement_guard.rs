@@ -1,14 +1,12 @@
 use super::*;
 
-
 #[test]
 fn session_target_derivation_matches_the_enforcement_guard() {
     let context = SecurityInvocationContextV1::new(
         tenant(),
         session(),
         PrincipalId::new("principal-a").unwrap_or_else(|error| panic!("principal: {error}")),
-        IsolationEpochId::new("epoch-a")
-            .unwrap_or_else(|error| panic!("isolation epoch: {error}")),
+        IsolationEpochId::new("epoch-a").unwrap_or_else(|error| panic!("isolation epoch: {error}")),
         LineageId::new("lineage-a").unwrap_or_else(|error| panic!("lineage: {error}")),
         1,
     );

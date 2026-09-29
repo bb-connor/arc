@@ -1,10 +1,4 @@
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::TenantId;
-use super::RecordId;
-use super::PortResult;
-
+use super::{Deserialize, Digest32, PortResult, RecordId, Serialize, TenantId};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

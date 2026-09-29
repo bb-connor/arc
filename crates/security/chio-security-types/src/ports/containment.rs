@@ -1,25 +1,11 @@
 use super::identifiers::MAX_ID_BYTES;
-# [cfg (feature = "std")]
-use super::format;
-use super::String;
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::BoundedVec;
-# [cfg (feature = "std")]
-use super::sort_json_object_keys;
-use super::EffectRequest;
-use super::EffectResult;
-use super::EffectResultQuery;
-use super::EffectExecutionStatus;
-use super::TenantScopedId;
-use super::TenantId;
-use super::RecordId;
-use super::SessionId;
-use super::ActionId;
-use super::EffectId;
-use super::PortError;
-use super::PortResult;
+#[cfg(feature = "std")]
+use super::{format, sort_json_object_keys};
+use super::{
+    ActionId, BoundedVec, Deserialize, Digest32, EffectExecutionStatus, EffectId, EffectRequest,
+    EffectResult, EffectResultQuery, PortError, PortResult, RecordId, Serialize, SessionId, String,
+    TenantId, TenantScopedId,
+};
 
 pub const CONTAINMENT_TARGET_DOMAIN: &[u8] = b"chio.security.containment-target.v1\0";
 pub const CONTAINMENT_OVERLAY_VERSION_DOMAIN: &[u8] = b"chio.response-effect-overlay-state.v1\0";
@@ -140,9 +126,15 @@ pub fn containment_target(
     let mut target_hex = String::with_capacity(digest.len().saturating_mul(2));
     const HEX: &[u8; 16] = b"0123456789abcdef";
     for byte in digest {
-        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
+        #[allow(
+            clippy::indexing_slicing,
+            reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries."
+        )]
         target_hex.push(char::from(HEX[usize::from(byte >> 4)]));
-        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
+        #[allow(
+            clippy::indexing_slicing,
+            reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries."
+        )]
         target_hex.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     Ok(TenantScopedId {

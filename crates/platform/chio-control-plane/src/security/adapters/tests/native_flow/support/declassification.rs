@@ -193,5 +193,3 @@ fn native_declassification_executes_once_without_lowering_inherited_state() -> T
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
-
-

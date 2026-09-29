@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[tokio::test]
 async fn parked_worker_commit_failure_stops_with_zero_ticks() {
     let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![Ok(tick(

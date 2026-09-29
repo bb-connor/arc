@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn unavailable_sink_blocks_startup_before_reconcile_or_drain() {
     let scripted = Arc::new(ScriptedDeclassificationOutboxPort::new(

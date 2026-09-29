@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn startup_reconciles_then_drains_to_zero_before_readiness() {
     let scripted = Arc::new(ScriptedDeclassificationOutboxPort::new(

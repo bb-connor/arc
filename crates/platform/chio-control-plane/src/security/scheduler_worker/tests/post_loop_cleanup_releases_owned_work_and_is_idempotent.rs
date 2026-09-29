@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn post_loop_cleanup_releases_owned_work_and_is_idempotent() {
     let port = Arc::new(ScriptedWorkerPort::with_ticks(Vec::new()));

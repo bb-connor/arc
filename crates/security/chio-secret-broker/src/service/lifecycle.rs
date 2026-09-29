@@ -1,43 +1,12 @@
-use super::BTreeMap;
-use super::AtomicU64;
-use super::Ordering;
-use super::Arc;
-use super::Mutex;
-use super::MutexGuard;
-
-
-
-
-
-
-use super::BrokerExecuteRequest;
-use super::ProductionSqliteAttemptStore;
-use super::AttemptStore;
-use super::BrokerError;
-use super::Result;
-use super::BrokerServiceConfig;
-use super::BrokerServiceAuthorityBundle;
-use super::BrokerService;
-use super::RetainedPreparedDispatch;
-
-
-use super::failure_receipt_key_digest;
-use super::attempt_operation_gate_index;
-
-
-
-
-
-
-
-
-
-
-
-
+use super::{
+    attempt_operation_gate_index, failure_receipt_key_digest, Arc, AtomicU64, AttemptStore,
+    BTreeMap, BrokerError, BrokerExecuteRequest, BrokerService, BrokerServiceAuthorityBundle,
+    BrokerServiceConfig, Mutex, MutexGuard, Ordering, ProductionSqliteAttemptStore, Result,
+    RetainedPreparedDispatch,
+};
 
 impl BrokerService {
-pub(crate) fn new_production(
+    pub(crate) fn new_production(
         config: BrokerServiceConfig,
         attempts: ProductionSqliteAttemptStore,
         authorities: BrokerServiceAuthorityBundle,
@@ -108,8 +77,11 @@ pub(crate) fn new_production(
 
     fn attempt_operation_guard_for_digest(&self, digest: &str) -> Result<MutexGuard<'_, ()>> {
         let gate_index = attempt_operation_gate_index(digest)?;
-        self.attempt_operation_gates.get(gate_index).ok_or_else(||
-            BrokerError::Invariant("broker attempt gate index is invalid".to_owned()))?
+        self.attempt_operation_gates
+            .get(gate_index)
+            .ok_or_else(|| {
+                BrokerError::Invariant("broker attempt gate index is invalid".to_owned())
+            })?
             .lock()
             .map_err(|_| {
                 BrokerError::Invariant("broker attempt operation gate is poisoned".to_string())
@@ -142,4 +114,3 @@ pub(crate) fn new_production(
             .require_provider_enforced(credential_provider)
     }
 }
-

@@ -1,41 +1,21 @@
 #[cfg(test)]
 use super::declassification;
+#[cfg(target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::{
+    canonical_json_bytes, decode_digest, derive_declassification_event_id,
+    derive_declassification_transition_id, from_i64, ActiveDefenseReceiptBody, CanonicalBody,
+    DeclassificationConsumptionEvidenceCommit, DeclassificationEvidencePhase,
+    DeclassificationEvidenceRecord, DeclassificationOutcomeEvidenceCommit,
+    DeclassificationTransitionBinding, DeclassificationUseState, Digest32, ErrorCode, EventId,
+    GrantId, OpaqueReceiptRef, PortError, PortResult, ReceiptAppendRequest, RecordId, TenantId,
+};
 #[cfg(test)]
-use chio_security_types::ports::DeclassificationEvidenceQuery;
-#[cfg(test)]
-use chio_security_types::ports::DeclassificationUseQuery;
-#[cfg(test)]
-use chio_security_types::ports::DeclassificationUseRecord;
+use chio_security_types::ports::{
+    DeclassificationEvidenceQuery, DeclassificationUseQuery, DeclassificationUseRecord,
+};
 #[cfg(test)]
 use rusqlite::Connection;
-use super::canonical_json_bytes;
-use super::ActiveDefenseReceiptBody;
-use super::derive_declassification_event_id;
-use super::derive_declassification_transition_id;
-use super::CanonicalBody;
-use super::DeclassificationConsumptionEvidenceCommit;
-use super::DeclassificationEvidencePhase;
-use super::DeclassificationEvidenceRecord;
-use super::DeclassificationOutcomeEvidenceCommit;
-use super::DeclassificationTransitionBinding;
-use super::DeclassificationUseState;
-use super::Digest32;
-use super::ErrorCode;
-use super::EventId;
-use super::GrantId;
-use super::OpaqueReceiptRef;
-use super::PortError;
-use super::PortResult;
-use super::ReceiptAppendRequest;
-use super::RecordId;
-use super::TenantId;
-# [cfg (target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
-use super::from_i64;
-use super::decode_digest;
-
-
-
 
 pub(super) fn declassification_state_name(state: DeclassificationUseState) -> &'static str {
     match state {
@@ -66,12 +46,14 @@ pub(super) fn encode_declassification_binding(
     Ok(canonical)
 }
 
-pub(super) fn decode_declassification_binding(bytes: &[u8]) -> PortResult<DeclassificationTransitionBinding> {
+pub(super) fn decode_declassification_binding(
+    bytes: &[u8],
+) -> PortResult<DeclassificationTransitionBinding> {
     if bytes.len() > 4_096 {
         return Err(PortError::integrity_failure());
     }
     let binding = chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed::<DeclassificationTransitionBinding>())
+        .and_then(|input| input.decode_signed::<DeclassificationTransitionBinding>())
         .map_err(|_| PortError::integrity_failure())?;
     let canonical = canonical_json_bytes(&binding).map_err(|_| PortError::integrity_failure())?;
     if canonical != bytes {
@@ -119,10 +101,12 @@ fn parse_declassification_phase(value: &str) -> PortResult<DeclassificationEvide
 pub(super) fn decode_declassification_receipt(
     receipt: &ReceiptAppendRequest,
 ) -> Result<ActiveDefenseReceiptBody, ()> {
-    let body =
-        chio_core::canonical::UntrustedJsonText::from_wire(receipt.canonical_body.as_bytes(), 64 * 1024 * 1024)
-.and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>())
-            .map_err(|_| ())?;
+    let body = chio_core::canonical::UntrustedJsonText::from_wire(
+        receipt.canonical_body.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>())
+    .map_err(|_| ())?;
     body.validate().map_err(|_| ())?;
     let canonical = canonical_json_bytes(&body).map_err(|_| ())?;
     let body_hash = body.body_digest().map_err(|_| ())?;
@@ -203,8 +187,6 @@ pub(super) fn validate_declassification_outcome_evidence(
     }
     Ok(())
 }
-
-
 
 pub(super) type DeclassificationEvidenceRow = (
     String,
@@ -405,8 +387,6 @@ pub(super) struct DeclassificationEvidenceCommit<'a> {
     pub(super) receipt: &'a ReceiptAppendRequest,
 }
 
-
-
 pub(super) fn declassification_evidence_matches(
     record: &DeclassificationEvidenceRecord,
     expected: &DeclassificationEvidenceCommit<'_>,
@@ -422,11 +402,17 @@ pub(super) fn declassification_evidence_matches(
 }
 
 #[cfg(test)]
-pub(super) fn load_declassification_use_record(connection: &Connection, query: &DeclassificationUseQuery) -> PortResult<Option<DeclassificationUseRecord>> {
+pub(super) fn load_declassification_use_record(
+    connection: &Connection,
+    query: &DeclassificationUseQuery,
+) -> PortResult<Option<DeclassificationUseRecord>> {
     declassification::load_legacy_use(connection, query)
 }
 
 #[cfg(test)]
-pub(super) fn load_declassification_evidence_record(connection: &Connection, query: &DeclassificationEvidenceQuery) -> PortResult<Option<DeclassificationEvidenceRecord>> {
+pub(super) fn load_declassification_evidence_record(
+    connection: &Connection,
+    query: &DeclassificationEvidenceQuery,
+) -> PortResult<Option<DeclassificationEvidenceRecord>> {
     declassification::load_legacy_evidence(connection, query)
 }

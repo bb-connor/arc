@@ -16,8 +16,7 @@ use crate::budget::{
 };
 use crate::capability::issue_capability;
 use crate::generic_https::{
-    DestinationResolver, NetworkPolicy, PinnedHttpsRequest, PinnedHttpsTransport,
-    RawHttpsResponse,
+    DestinationResolver, NetworkPolicy, PinnedHttpsRequest, PinnedHttpsTransport, RawHttpsResponse,
 };
 use crate::proof::{body_digest, issue_request_proof};
 use crate::protocol::{
@@ -95,8 +94,7 @@ struct AuthorityState {
 struct AtomicAuthority {
     state: Mutex<AuthorityState>,
     deny_capture: bool,
-    deny_migration_after_capture:
-        Mutex<Option<Arc<crate::migration::TestBrokerMigrationEnforcer>>>,
+    deny_migration_after_capture: Mutex<Option<Arc<crate::migration::TestBrokerMigrationEnforcer>>>,
 }
 
 impl AtomicAuthority {
@@ -214,13 +212,15 @@ impl BrokerExecutionBudget for AtomicAuthority {
                 ))
             }
         }
-        let quotas = state.hold_quotas.remove(&request.hold_id).ok_or_else(|| {
-            BrokerError::Invariant("test authority lost hold quotas".to_string())
-        })?;
+        let quotas = state
+            .hold_quotas
+            .remove(&request.hold_id)
+            .ok_or_else(|| BrokerError::Invariant("test authority lost hold quotas".to_string()))?;
         for quota in quotas {
-            let count = state.quotas.get_mut(&quota.key_id).ok_or_else(|| {
-                BrokerError::Invariant("test authority lost quota".to_string())
-            })?;
+            let count = state
+                .quotas
+                .get_mut(&quota.key_id)
+                .ok_or_else(|| BrokerError::Invariant("test authority lost quota".to_string()))?;
             *count = count.checked_sub(1).ok_or_else(|| {
                 BrokerError::Invariant("test authority quota underflow".to_string())
             })?;
@@ -359,9 +359,7 @@ impl BrokerRevocations for LiveRevocations {
     ) -> Result<crate::authority_ipc::VerifiedAuthorityExchange> {
         let snapshot = self.check_broker_revocation(request)?;
         crate::authority_ipc::sign_test_authority_exchange(
-            crate::authority_ipc::AuthorityOperation::CheckBrokerRevocation(
-                request.clone(),
-            ),
+            crate::authority_ipc::AuthorityOperation::CheckBrokerRevocation(request.clone()),
             crate::authority_ipc::AuthorityResult::Revocation(snapshot),
             request.now_unix_seconds,
             self.broker_signer.as_ref(),
@@ -459,9 +457,8 @@ impl BrokerReceiptSink for InspectingReceiptSink {
                 "injected completed-response persistence failure".to_string(),
             ));
         }
-        let encoded = canonical_json_bytes(response).map_err(|error| {
-            BrokerError::Storage(format!("test completed response: {error}"))
-        })?;
+        let encoded = canonical_json_bytes(response)
+            .map_err(|error| BrokerError::Storage(format!("test completed response: {error}")))?;
         if encoded
             .windows(self.canary.len())
             .any(|window| window == self.canary.as_slice())
@@ -563,7 +560,11 @@ struct FixtureServiceOptions {
     receipt_signer: Arc<dyn SigningBackend>,
 }
 
-pub(super) fn fixture(maximum_executions: u32, fail_transport: bool, deny_capture: bool) -> Fixture {
+pub(super) fn fixture(
+    maximum_executions: u32,
+    fail_transport: bool,
+    deny_capture: bool,
+) -> Fixture {
     let attempts = Arc::new(SqliteAttemptStore::open_in_memory().test_expect("attempt store"));
     let receipts = Arc::new(Mutex::new(Vec::new()));
     let receipt_sink = Arc::new(InspectingReceiptSink {
@@ -689,9 +690,8 @@ fn fixture_with_receipt_signer(
         )
         .test_expect("provider"),
     );
-    let migration_enforcer = crate::migration::TestBrokerMigrationEnforcer::new(vec![
-        "generic-https".to_string(),
-    ]);
+    let migration_enforcer =
+        crate::migration::TestBrokerMigrationEnforcer::new(vec!["generic-https".to_string()]);
     let service = BrokerService::new_for_test(
         BrokerServiceConfig {
             audience: "broker-service".to_string(),
@@ -756,10 +756,7 @@ fn fixture_with_receipt_signer(
     }
 }
 
-fn governed_audit_authorization(
-    fixture: &Fixture,
-    intent_digest: &str,
-) -> AdminAuthorization {
+fn governed_audit_authorization(fixture: &Fixture, intent_digest: &str) -> AdminAuthorization {
     let sequence = fixture
         .audit_approval_sequence
         .fetch_add(1, Ordering::SeqCst)
@@ -1122,46 +1119,31 @@ fn captured_attempt_evidence(
     )
 }
 
-
-
-
-
-
-
-
-
 pub(super) struct SensitiveIpcTraitProbe<T>(std::marker::PhantomData<T>);
-
 
 pub(super) trait SensitiveIpcDebugAmbiguity<Marker> {
     fn assert_absent() {}
 }
 
-
 impl<T> SensitiveIpcDebugAmbiguity<()> for SensitiveIpcTraitProbe<T> {}
 
 impl<T: std::fmt::Debug> SensitiveIpcDebugAmbiguity<u8> for SensitiveIpcTraitProbe<T> {}
-
 
 pub(super) trait SensitiveIpcCloneAmbiguity<Marker> {
     fn assert_absent() {}
 }
 
-
 impl<T> SensitiveIpcCloneAmbiguity<()> for SensitiveIpcTraitProbe<T> {}
 
 impl<T: Clone> SensitiveIpcCloneAmbiguity<u8> for SensitiveIpcTraitProbe<T> {}
-
 
 pub(super) trait SensitiveIpcSerializeAmbiguity<Marker> {
     fn assert_absent() {}
 }
 
-
 impl<T> SensitiveIpcSerializeAmbiguity<()> for SensitiveIpcTraitProbe<T> {}
 
 impl<T: serde::Serialize> SensitiveIpcSerializeAmbiguity<u8> for SensitiveIpcTraitProbe<T> {}
-
 
 #[cfg(target_os = "linux")]
 pub(super) struct EndpointTestHandler {
@@ -1169,7 +1151,6 @@ pub(super) struct EndpointTestHandler {
     response_gate: Option<Arc<Barrier>>,
     response_bytes: Option<usize>,
 }
-
 
 #[cfg(target_os = "linux")]
 impl EndpointTestHandler {
@@ -1199,7 +1180,6 @@ impl EndpointTestHandler {
     }
 }
 
-
 #[cfg(target_os = "linux")]
 macro_rules! endpoint_test_handler_method {
     ($name:ident) => {
@@ -1208,7 +1188,6 @@ macro_rules! endpoint_test_handler_method {
         }
     };
 }
-
 
 #[cfg(target_os = "linux")]
 impl BrokerIpcHandler for EndpointTestHandler {
@@ -1225,7 +1204,6 @@ impl BrokerIpcHandler for EndpointTestHandler {
     endpoint_test_handler_method!(delete);
 }
 
-
 #[cfg(target_os = "linux")]
 pub(super) fn endpoint_test_request() -> AuthenticatedIpcRequest {
     AuthenticatedIpcRequest {
@@ -1236,14 +1214,11 @@ pub(super) fn endpoint_test_request() -> AuthenticatedIpcRequest {
     }
 }
 
-
 #[cfg(target_os = "linux")]
 pub(super) fn send_endpoint_test_request(stream: &mut std::os::unix::net::UnixStream) {
-    let encoded =
-        canonical_ipc_request_bytes(&endpoint_test_request()).test_expect("IPC request");
+    let encoded = canonical_ipc_request_bytes(&endpoint_test_request()).test_expect("IPC request");
     write_bounded_frame(stream, &encoded).test_expect("write IPC request");
 }
-
 
 pub(super) fn audit_reference_for_execution(
     fixture: &Fixture,
@@ -1257,7 +1232,6 @@ pub(super) fn audit_reference_for_execution(
     crate::audit::BrokerAuditReferenceRequest::new_with_precommitment(request_head, request_body)
         .test_expect("audit reference request")
 }
-
 
 pub(super) fn audit_reference_parts(
     fixture: &Fixture,
@@ -1302,7 +1276,6 @@ pub(super) fn audit_reference_parts(
     (request_head, request.request.body.clone())
 }
 
-
 pub(super) fn audit_trust(fixture: &Fixture) -> crate::audit::BrokerAuditTrustConfiguration<'_> {
     crate::audit::BrokerAuditTrustConfiguration {
         trusted_capability_issuer: &fixture.audit_trusted_issuer,
@@ -1324,14 +1297,12 @@ pub(super) fn audit_trust(fixture: &Fixture) -> crate::audit::BrokerAuditTrustCo
     }
 }
 
-
 #[cfg(target_os = "linux")]
 pub(super) struct SocketAuditHandler {
     service: Arc<BrokerService>,
     admin: Arc<GovernedAdminAuthorizer>,
     trusted_runner: PublicKey,
 }
-
 
 #[cfg(target_os = "linux")]
 impl crate::privileged_audit::BrokerPrivilegedAuditHandler for SocketAuditHandler {
@@ -1370,10 +1341,8 @@ impl crate::privileged_audit::BrokerPrivilegedAuditHandler for SocketAuditHandle
     }
 }
 
-
 #[cfg(target_os = "linux")]
 pub(super) struct TerminalPersistenceFailureAuditHandler;
-
 
 #[cfg(target_os = "linux")]
 impl crate::privileged_audit::BrokerPrivilegedAuditHandler
@@ -1396,7 +1365,6 @@ impl crate::privileged_audit::BrokerPrivilegedAuditHandler
     }
 }
 
-
 pub(super) fn verify_completed_audit(
     completed: &crate::audit::CompletedBrokerAuditComparison,
     runner: &crate::audit::SignedBrokerAuditRunnerAuthorization,
@@ -1413,7 +1381,6 @@ pub(super) fn verify_completed_audit(
         expected,
     )
 }
-
 
 pub(super) fn completed_audit_context<'a>(
     request: &'a BrokerExecuteRequest,
@@ -1451,7 +1418,6 @@ impl trusted_time::Clock for AuthorityTestClock {
         trusted_time::Clock::read(&trusted_time::FixedClock::new(value))
     }
 }
-
 
 pub(super) struct AdvancingAuthority {
     clock: Arc<AuthorityTestClock>,
@@ -1525,7 +1491,6 @@ impl BrokerRevocations for AdvancingAuthority {
     }
 }
 
-
 pub(super) fn advancing_authority_fixture(mode: &'static str) -> Fixture {
     let mut fixture = fixture(1, false, false);
     let clock = Arc::new(AuthorityTestClock {
@@ -1545,7 +1510,7 @@ pub(super) fn advancing_authority_fixture(mode: &'static str) -> Fixture {
     fixture
 }
 pub(super) use endpoint_test_handler_method;
-mod execution_cases;
-mod recovery_cases;
-mod ipc_audit_cases;
 mod authority_time;
+mod execution_cases;
+mod ipc_audit_cases;
+mod recovery_cases;

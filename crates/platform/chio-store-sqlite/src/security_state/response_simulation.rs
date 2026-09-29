@@ -1,19 +1,11 @@
-use super::capability_set_suspension;
-use super::issuance_freeze;
-use super::EgressRestrictionSessionKey;
-use super::PortError;
-use super::PortResult;
-use super::SessionThrottleKey;
-use super::TransactionBehavior;
-
-use super::SqliteSecurityStateStore;
-# [cfg (target_os = "macos")]
+#[cfg(target_os = "macos")]
 use super::security_state_lifecycle_lock_path;
-use super::sqlite_error;
-use super::load_overlay_snapshot;
-use super::empty_egress_restriction_snapshot;
-use super::load_egress_restriction_snapshot;
-use super::load_session_throttle_snapshot;
+use super::{
+    capability_set_suspension, empty_egress_restriction_snapshot, issuance_freeze,
+    load_egress_restriction_snapshot, load_overlay_snapshot, load_session_throttle_snapshot,
+    sqlite_error, EgressRestrictionSessionKey, PortError, PortResult, SessionThrottleKey,
+    SqliteSecurityStateStore, TransactionBehavior,
+};
 use chio_security_types::response_simulation::{
     ResponseSimulationSnapshot, ResponseSimulationState,
 };

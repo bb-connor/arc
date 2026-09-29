@@ -1,6 +1,5 @@
-use crate::security::scheduler_worker::tests::*;
 use super::*;
-
+use crate::security::scheduler_worker::tests::*;
 
 #[test]
 fn sqlite_worker_operation_gate_recovers_after_panic_for_cleanup() {

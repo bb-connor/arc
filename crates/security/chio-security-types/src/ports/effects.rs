@@ -1,20 +1,8 @@
-use super::ResponseEffectKind;
-use super::ResponseTarget;
-use super::Deserialize;
-use super::Serialize;
-use super::Digest32;
-use super::CanonicalBody;
-use super::TenantId;
-use super::RecordId;
-use super::ActionId;
-use super::EffectId;
-use super::LeaseOwnerId;
-use super::ErrorCode;
-use super::PortError;
-use super::PortResult;
-use super::LineageFenceMaintenanceRequest;
-use super::LineageFenceMaintenanceOutcome;
-
+use super::{
+    ActionId, CanonicalBody, Deserialize, Digest32, EffectId, ErrorCode, LeaseOwnerId,
+    LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest, PortError, PortResult,
+    RecordId, ResponseEffectKind, ResponseTarget, Serialize, TenantId,
+};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

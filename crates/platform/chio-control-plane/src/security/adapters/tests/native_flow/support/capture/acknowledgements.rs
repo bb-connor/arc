@@ -329,5 +329,3 @@ fn reopen_capture(
     );
     Ok(())
 }
-
-
