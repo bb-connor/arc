@@ -111,6 +111,8 @@ impl From<ApprovalStoreError> for ApprovalHandlerError {
             ApprovalStoreError::Replay(m) => Self::ReplayDetected(m),
             ApprovalStoreError::Backend(m) => Self::Internal(m),
             ApprovalStoreError::Serialization(m) => Self::Internal(m),
+            ApprovalStoreError::Clock(error) => Self::Internal(error.code().into()),
+            ApprovalStoreError::UntrustedInput(error) => Self::Internal(error.code().into()),
         }
     }
 }
@@ -133,6 +135,9 @@ impl From<KernelError> for ApprovalHandlerError {
 impl From<ThresholdApprovalCollectorStoreError> for ApprovalHandlerError {
     fn from(error: ThresholdApprovalCollectorStoreError) -> Self {
         match error {
+            ThresholdApprovalCollectorStoreError::UntrustedInput(error) => {
+                Self::Internal(error.code().into())
+            }
             ThresholdApprovalCollectorStoreError::NotFound(message) => Self::NotFound(message),
             ThresholdApprovalCollectorStoreError::Conflict(message) => Self::Conflict(message),
             ThresholdApprovalCollectorStoreError::Backend(message)

@@ -166,8 +166,12 @@ impl GovernedApprovalReplaySourceSnapshot {
         if bytes.is_empty() || bytes.len() > MAX_GOVERNED_APPROVAL_REPLAY_SOURCE_BYTES {
             return Err(invalid("inventory has invalid byte length"));
         }
-        let envelope: Envelope =
-            serde_json::from_slice(bytes).map_err(|_| invalid("inventory decoding failed"))?;
+        let envelope: Envelope = chio_core::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            MAX_GOVERNED_APPROVAL_REPLAY_SOURCE_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| invalid("inventory decoding failed"))?;
         envelope.body.validate()?;
         if digest(&envelope.body)? != envelope.inventory_sha256 {
             return Err(invalid("inventory digest mismatch"));

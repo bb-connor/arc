@@ -6,11 +6,16 @@ fn authenticated(principal: &str) -> SessionAuthContext {
 }
 
 fn at_epoch(epoch: u64) -> Result<Session, SessionError> {
-    let session = Session::new(SessionId::new("epoch-boundary"), "agent".into(), vec![]);
+    let session = Session::new(SessionId::new("epoch-boundary"), "agent".into(), vec![])?;
     session.activate()?;
     session.auth_state.replace_with(|current| {
         let mut next = current.clone();
-        next.session_anchor = SessionAnchorState::new(&session.id, &next.auth_context, epoch);
+        next.session_anchor = SessionAnchorState::new(
+            &session.id,
+            &next.auth_context,
+            epoch,
+            next.session_anchor.issued_at(),
+        );
         (Some(next), ())
     });
     Ok(session)

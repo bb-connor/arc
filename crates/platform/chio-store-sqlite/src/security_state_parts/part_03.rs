@@ -32,7 +32,8 @@ fn decode_declassification_binding(bytes: &[u8]) -> PortResult<DeclassificationT
     if bytes.len() > 4_096 {
         return Err(PortError::integrity_failure());
     }
-    let binding = serde_json::from_slice::<DeclassificationTransitionBinding>(bytes)
+    let binding = chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed::<DeclassificationTransitionBinding>())
         .map_err(|_| PortError::integrity_failure())?;
     let canonical = canonical_json_bytes(&binding).map_err(|_| PortError::integrity_failure())?;
     if canonical != bytes {
@@ -81,7 +82,8 @@ fn decode_declassification_receipt(
     receipt: &ReceiptAppendRequest,
 ) -> Result<ActiveDefenseReceiptBody, ()> {
     let body =
-        serde_json::from_slice::<ActiveDefenseReceiptBody>(receipt.canonical_body.as_bytes())
+        chio_core::canonical::UntrustedJsonText::from_wire(receipt.canonical_body.as_bytes(), 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>())
             .map_err(|_| ())?;
     body.validate().map_err(|_| ())?;
     let canonical = canonical_json_bytes(&body).map_err(|_| ())?;

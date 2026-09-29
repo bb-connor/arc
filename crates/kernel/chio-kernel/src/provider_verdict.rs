@@ -42,7 +42,7 @@ pub enum ProviderVerdictError {
     /// canonical-JSON bytes (RFC 8785); a parse failure here is a contract
     /// violation by the upstream adapter.
     #[error("fabric arguments payload is not valid JSON: {0}")]
-    InvalidArguments(#[source] serde_json::Error),
+    InvalidArguments(#[source] chio_core::canonical::UntrustedJsonError),
     /// Decoded arguments must satisfy the registry-admitted schema.
     #[error("provider arguments do not satisfy the registry-admitted input schema: {0}")]
     ManifestArguments(String),
@@ -90,7 +90,8 @@ pub fn build_tool_call_request(
     let arguments = if invocation.arguments.is_empty() {
         serde_json::Value::Null
     } else {
-        serde_json::from_slice(&invocation.arguments)
+        chio_core::canonical::UntrustedJsonText::from_wire(&invocation.arguments, 16 * 1024 * 1024)
+            .and_then(|input| input.decode_canonical())
             .map_err(ProviderVerdictError::InvalidArguments)?
     };
     registry

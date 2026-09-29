@@ -242,7 +242,7 @@ impl ChioKernel {
                 content_hash: receipt_content.content_hash,
                 canonical_content: receipt_content.canonical_content,
                 metadata,
-                timestamp: current_unix_timestamp(),
+                timestamp: read_unix_timestamp()?,
                 trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
                 tenant_id: None,
             },
@@ -432,7 +432,7 @@ impl ChioKernel {
             content_hash: receipt_content.content_hash,
             canonical_content: receipt_content.canonical_content,
             metadata: Some(security_admission_operation_metadata(terminal)),
-            timestamp: current_unix_timestamp(),
+            timestamp: read_unix_timestamp()?,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
         })?;
@@ -491,12 +491,13 @@ impl ChioKernel {
                 "staged compensation receipt changed its action binding".to_string(),
             ));
         }
-        let payload: TerminalReceiptOutboxPayload = serde_json::from_str(action.payload_json())
-            .map_err(|error| {
-                KernelError::Internal(format!(
-                    "staged compensation receipt payload is invalid: {error}"
-                ))
-            })?;
+        let payload: TerminalReceiptOutboxPayload =
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                (action.payload_json()).as_bytes(),
+                crate::security_admission_operation::MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(crate::KernelError::from)?;
         validate_terminal_receipt_payload(&terminal, &payload, &self.public_key())?;
         Ok(payload)
     }
@@ -536,12 +537,13 @@ impl ChioKernel {
                 "compensated operation changed its terminal receipt action binding".to_string(),
             ));
         }
-        let payload: TerminalReceiptOutboxPayload = serde_json::from_str(action.payload_json())
-            .map_err(|error| {
-                KernelError::Internal(format!(
-                    "compensated terminal receipt payload is invalid: {error}"
-                ))
-            })?;
+        let payload: TerminalReceiptOutboxPayload =
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                (action.payload_json()).as_bytes(),
+                crate::security_admission_operation::MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(crate::KernelError::from)?;
         self.validate_terminal_receipt_payload_with_store(store, terminal, &payload)?;
         Ok(payload)
     }
@@ -575,12 +577,13 @@ impl ChioKernel {
                 "terminal operation changed its signed receipt action binding".to_string(),
             ));
         }
-        let payload: TerminalReceiptOutboxPayload = serde_json::from_str(action.payload_json())
-            .map_err(|error| {
-                KernelError::Internal(format!(
-                    "terminal receipt action payload is invalid: {error}"
-                ))
-            })?;
+        let payload: TerminalReceiptOutboxPayload =
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                (action.payload_json()).as_bytes(),
+                crate::security_admission_operation::MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(crate::KernelError::from)?;
         self.validate_terminal_receipt_payload_with_store(store, terminal, &payload)
     }
 
@@ -666,7 +669,7 @@ impl ChioKernel {
             content_hash: sha256_hex(&executor_receipt_bytes),
             canonical_content: executor_receipt_bytes,
             metadata,
-            timestamp: current_unix_timestamp(),
+            timestamp: read_unix_timestamp()?,
             trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
             tenant_id: executor_receipt.tenant_id.clone(),
         })?;
@@ -1020,11 +1023,12 @@ impl ChioKernel {
                     )));
                 }
                 let payload: TerminalReceiptOutboxPayload =
-                    serde_json::from_str(action.payload_json()).map_err(|error| {
-                        KernelError::Internal(format!(
-                            "terminal receipt outbox payload is invalid: {error}"
-                        ))
-                    })?;
+                    chio_core::canonical::UntrustedJsonText::from_wire(
+                        (action.payload_json()).as_bytes(),
+                        crate::security_admission_operation::MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES,
+                    )
+                    .and_then(|input| input.decode_signed())
+                    .map_err(crate::KernelError::from)?;
                 self.persist_and_acknowledge_terminal_receipt(store, &operation, &payload)
             })();
             match result {

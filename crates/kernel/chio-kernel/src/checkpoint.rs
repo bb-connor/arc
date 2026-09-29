@@ -7,7 +7,6 @@
 //! Issuance schema: "chio.checkpoint_statement.v2"
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm};
@@ -75,6 +74,8 @@ where
 /// Error type for checkpoint operations.
 #[derive(Debug, thiserror::Error)]
 pub enum CheckpointError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("merkle error: {0}")]
     Merkle(#[from] chio_core::Error),
     #[error("serialization error: {0}")]
@@ -1580,11 +1581,11 @@ pub fn verify_checkpoint_continuity(
 }
 
 /// Return the current Unix timestamp in seconds.
-fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+fn unix_now() -> Result<u64, CheckpointError> {
+    Ok(
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
+            .as_secs(),
+    )
 }
 
 /// Build a signed kernel checkpoint from a batch of canonical receipt bytes.
@@ -1731,7 +1732,7 @@ pub fn build_checkpoint_with_chain_frontier(
         batch_end_seq,
         tree_size: tree.leaf_count(),
         merkle_root,
-        issued_at: unix_now(),
+        issued_at: unix_now()?,
         kernel_key: keypair.public_key(),
         previous_checkpoint_sha256: previous_checkpoint
             .map(|checkpoint| checkpoint_body_sha256(&checkpoint.body))

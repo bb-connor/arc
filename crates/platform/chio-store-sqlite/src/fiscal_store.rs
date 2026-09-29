@@ -26,6 +26,8 @@ const ZERO_DIGEST: &str = "00000000000000000000000000000000000000000000000000000
 
 #[derive(Debug, thiserror::Error)]
 pub enum FiscalStoreError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("fiscal store is unavailable: {0}")]
     Unavailable(String),
     #[error("fiscal store mutation was fenced")]
@@ -652,9 +654,9 @@ impl SqliteFiscalStore {
             .map_err(sqlite_error)?
             .ok_or(FiscalStoreError::NotFound)?;
         let policy: FiscalGenesisPolicy =
-            serde_json::from_slice(&policy_json).map_err(|error| {
-                invariant(format!("stored fiscal genesis policy is invalid: {error}"))
-            })?;
+            chio_core::canonical::UntrustedJsonText::from_wire(&policy_json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(FiscalStoreError::from)?;
         if canonical_json_bytes(&policy).map_err(canonical_error)? != policy_json
             || policy.policy_id != policy_id
             || policy.digest()? != policy_digest
@@ -739,10 +741,10 @@ impl SqliteFiscalStore {
                 .optional()
                 .map_err(sqlite_error)?
                 .ok_or(FiscalStoreError::NotFound)?;
-            let signed: chio_fiscal::SignedFiscalSchedule = serde_json::from_slice(&bytes)
-                .map_err(|error| {
-                    invariant(format!("stored fiscal schedule is invalid: {error}"))
-                })?;
+            let signed: chio_fiscal::SignedFiscalSchedule =
+                chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                    .and_then(|input| input.decode_signed())
+                    .map_err(FiscalStoreError::from)?;
             if canonical_json_bytes(&signed).map_err(canonical_error)? != bytes
                 || signed.body.schedule_id != id
             {
@@ -810,8 +812,10 @@ impl SqliteFiscalStore {
             .map_err(sqlite_error)?
             .map(|row| {
                 let bytes = row.map_err(sqlite_error)?;
-                let artifact: T = serde_json::from_slice(&bytes)
-                    .map_err(|error| invariant(format!("{label} is invalid: {error}")))?;
+                let artifact: T =
+                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                        .and_then(|input| input.decode_signed())
+                        .map_err(FiscalStoreError::from)?;
                 if canonical_json_bytes(&artifact).map_err(canonical_error)? != bytes {
                     return Err(invariant(format!("{label} is not canonical")));
                 }
@@ -889,9 +893,9 @@ impl SqliteFiscalStore {
             .map_err(sqlite_error)?
             .ok_or(FiscalStoreError::NotFound)?;
         let state: FiscalProposalAdmissionState =
-            serde_json::from_slice(&json).map_err(|error| {
-                invariant(format!("stored fiscal admission state is invalid: {error}"))
-            })?;
+            chio_core::canonical::UntrustedJsonText::from_wire(&json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(FiscalStoreError::from)?;
         let expected_status = match state.status {
             FiscalProposalAdmissionStatus::Admitted => "admitted",
             FiscalProposalAdmissionStatus::Activated => "activated",
@@ -1523,8 +1527,10 @@ impl SqliteFiscalStore {
             .optional()
             .map_err(sqlite_error)?
             .ok_or(FiscalStoreError::NotFound)?;
-        let state: FiscalAuthorityState = serde_json::from_slice(&json)
-            .map_err(|error| invariant(format!("stored fiscal authority is invalid: {error}")))?;
+        let state: FiscalAuthorityState =
+            chio_core::canonical::UntrustedJsonText::from_wire(&json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(FiscalStoreError::from)?;
         state.validate()?;
         if canonical_json_bytes(&state).map_err(canonical_error)? != json {
             return Err(invariant("stored fiscal authority is not canonical"));
@@ -2899,38 +2905,8 @@ fn verify_owner(
     )
 }
 
-fn canonical_digest(value: &impl Serialize) -> Result<String, FiscalStoreError> {
-    canonical_json_bytes(value)
-        .map(|bytes| sha256_hex(&bytes))
-        .map_err(canonical_error)
-}
-
-fn canonical_error(error: impl std::fmt::Display) -> FiscalStoreError {
-    invariant(format!("canonical fiscal encoding failed: {error}"))
-}
-
-fn sqlite_error(error: rusqlite::Error) -> FiscalStoreError {
-    FiscalStoreError::Unavailable(error.to_string())
-}
-
-fn map_owner_error(error: SqliteServingOwnerError) -> FiscalStoreError {
-    match error {
-        SqliteServingOwnerError::OutcomeUnknown(detail) => FiscalStoreError::OutcomeUnknown(detail),
-        other => FiscalStoreError::Unavailable(other.to_string()),
-    }
-}
-
-fn invariant(detail: impl Into<String>) -> FiscalStoreError {
-    FiscalStoreError::Invariant(detail.into())
-}
-
-fn sqlite_i64(value: u64, field: &str) -> Result<i64, FiscalStoreError> {
-    i64::try_from(value).map_err(|_| invariant(format!("{field} exceeds SQLite INTEGER")))
-}
-
-fn read_u64(value: i64, field: &str) -> Result<u64, FiscalStoreError> {
-    u64::try_from(value).map_err(|_| invariant(format!("{field} is negative")))
-}
+mod boundary;
+use boundary::*;
 
 #[cfg(test)]
 #[path = "fiscal_store_tests.rs"]

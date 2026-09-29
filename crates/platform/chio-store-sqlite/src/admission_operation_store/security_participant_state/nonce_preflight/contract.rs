@@ -32,11 +32,6 @@ pub(super) fn require_original(
             .ok_or_else(|| invalid("native nonce preflight lacks its original retained request"))?;
     original.validate_native_security_authority(&initialized.admission_binding()?)?;
     original.validate_native_security_context(context)?;
-    if original.authority_profile().is_none() {
-        return Err(invalid(
-            "native nonce preflight lacks its original authority profile",
-        ));
-    }
     let context = context.as_v1();
     let key = intent.key();
     if &key.tenant_id != context.tenant_id()

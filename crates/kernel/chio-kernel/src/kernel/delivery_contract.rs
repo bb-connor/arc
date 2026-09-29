@@ -11,7 +11,7 @@ use base64::Engine as _;
 use serde::Deserialize;
 
 /// Strict two-field reveal envelope a purchased delivery must resolve to.
-#[derive(Deserialize)]
+#[derive(serde::Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RevealEnvelopeWire {
     media_type: String,
@@ -41,7 +41,11 @@ pub(crate) fn check_reveal_envelope(
     canonical_content: &[u8],
     advertised_media_type: &str,
 ) -> RevealEnvelopeCheck {
-    let Ok(envelope) = serde_json::from_slice::<RevealEnvelopeWire>(canonical_content) else {
+    let Ok(envelope) = chio_core::canonical::UntrustedJsonText::from_wire(
+        canonical_content,
+        crate::tool_outcome::MAX_RESOLVED_OUTPUT_BYTES,
+    )
+    .and_then(|input| input.decode_canonical::<RevealEnvelopeWire>()) else {
         return RevealEnvelopeCheck::EnvelopeMalformed;
     };
     if envelope.media_type.is_empty()

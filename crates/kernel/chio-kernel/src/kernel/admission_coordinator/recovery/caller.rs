@@ -32,7 +32,7 @@ impl ChioKernel {
         let original = self.load_original_request_for_finalization(operation, now)?;
         if original
             .as_ref()
-            .and_then(|original| original.authority_profile())
+            .map(|original| original.authority_profile())
             .and_then(|profile| profile.caller_executor())
             .is_none()
         {

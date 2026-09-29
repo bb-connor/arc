@@ -172,15 +172,39 @@ pub(crate) fn current_post_invocation_guard_evidence() -> Vec<GuardEvidence> {
     POST_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.borrow().clone())
 }
 
-pub(super) fn next_fixed_runtime_receipt_id(prefix: &str) -> Option<String> {
+pub(super) fn next_fixed_runtime_receipt_id(
+    prefix: &str,
+) -> Result<Option<String>, crate::KernelError> {
     FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
         let mut fixed = slot.borrow_mut();
-        let fixed = fixed.as_mut()?;
+        let Some(fixed) = fixed.as_mut() else {
+            return Ok(None);
+        };
         if let Some(id) = fixed.ids.pop_front() {
-            return Some(id);
+            return Ok(Some(id));
         }
         let id = format!("{prefix}-fixed-runtime-{}", fixed.counter);
-        fixed.counter = fixed.counter.saturating_add(1);
-        Some(id)
+        fixed.counter = fixed.counter.checked_add(1).ok_or_else(|| {
+            crate::KernelError::ReceiptSigningFailed(
+                "fixed runtime receipt counter exhausted".into(),
+            )
+        })?;
+        Ok(Some(id))
     })
+}
+
+#[cfg(test)]
+mod counter_tests {
+    use super::*;
+    #[test]
+    fn deterministic_receipt_counter_refuses_exhaustion() {
+        let _scope = scope_fixed_runtime_for_current_thread(1, []);
+        FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
+            if let Some(fixed) = slot.borrow_mut().as_mut() {
+                fixed.counter = u64::MAX;
+            }
+        });
+        assert!(matches!(next_fixed_runtime_receipt_id("receipt"),
+            Err(crate::KernelError::ReceiptSigningFailed(message)) if message == "fixed runtime receipt counter exhausted"));
+    }
 }

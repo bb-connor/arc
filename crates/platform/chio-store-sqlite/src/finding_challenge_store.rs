@@ -73,6 +73,9 @@
 //! are not part of it, so a retry issued from a later clock replays rather
 //! than stranding the durable row it is retrying.
 
+mod input_validation;
+use input_validation::*;
+
 use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
@@ -156,6 +159,8 @@ const MAX_LIST_ROWS: usize = 512;
 /// rejection denies the mutation and rolls the transaction back.
 #[derive(Debug, Error)]
 pub enum FindingChallengeStoreError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("finding challenge store is unavailable: {0}")]
     Unavailable(String),
     #[error("finding challenge store fence rejected the caller")]

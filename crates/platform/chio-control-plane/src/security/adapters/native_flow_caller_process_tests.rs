@@ -252,7 +252,6 @@ fn verify_restart(root: &Path, witness: &Witness, cut: Cut) -> TestResult {
     let key = Keypair::from_seed_hex(&std::fs::read_to_string(root.join("executor-key"))?)?;
     let executor = original
         .authority_profile()
-        .ok_or("profile")?
         .caller_executor()
         .ok_or("executor pin")?
         .clone();

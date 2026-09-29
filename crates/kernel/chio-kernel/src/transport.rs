@@ -19,8 +19,8 @@ pub enum TransportError {
     #[error("message too large: {size} bytes (max {max})")]
     MessageTooLarge { size: u32, max: u32 },
 
-    #[error("json deserialization error: {0}")]
-    Deserialize(#[from] serde_json::Error),
+    #[error(transparent)]
+    Deserialize(#[from] chio_core::canonical::UntrustedJsonError),
 
     #[error("canonical json serialization error: {0}")]
     Serialize(String),
@@ -57,7 +57,9 @@ impl<R: Read, W: Write> ChioTransport<R, W> {
     /// a complete frame is read.
     pub fn recv(&mut self) -> Result<AgentMessage, TransportError> {
         let bytes = read_frame(&mut self.reader)?;
-        let msg: AgentMessage = serde_json::from_slice(&bytes)?;
+        let msg: AgentMessage =
+            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_MESSAGE_SIZE as usize)
+                .and_then(|input| input.decode_canonical())?;
         Ok(msg)
     }
 

@@ -170,8 +170,12 @@ pub(super) fn claim_pending_mutation_receipts(
         let receipt_json = row
             .get::<_, String>(1)
             .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-        let receipt: ChioReceipt = serde_json::from_str(&receipt_json)
-            .map_err(|error| FindingPoolLedgerError::Receipt(error.to_string()))?;
+        let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(
+            receipt_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(FindingPoolLedgerError::from)?;
         if receipt.id != receipt_id {
             return Err(FindingPoolLedgerError::Receipt(
                 "stored receipt id does not match its signed body".to_string(),

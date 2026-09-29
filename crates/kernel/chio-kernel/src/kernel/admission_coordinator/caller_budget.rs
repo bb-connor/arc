@@ -23,7 +23,9 @@ impl ChioKernel {
         let _mutation_guard = runtime
             .lock_mutations()
             .map_err(|error| error.to_string())?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime
+            .refresh_trusted_time(0)
+            .map_err(|error| error.to_string())?;
         let shares = runtime
             .store
             .load_caller_budget_shares(

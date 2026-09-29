@@ -735,10 +735,10 @@ pub(crate) async fn handle_authorization_profile_metadata_report(
         Err(response) => return response,
     };
 
-    Json::<ChioOAuthAuthorizationMetadataReport>(
-        receipt_store.authorization_profile_metadata_report(),
-    )
-    .into_response()
+    match receipt_store.authorization_profile_metadata_report() {
+        Ok(report) => Json::<ChioOAuthAuthorizationMetadataReport>(report).into_response(),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
 }
 
 pub(crate) async fn handle_authorization_review_pack_report(

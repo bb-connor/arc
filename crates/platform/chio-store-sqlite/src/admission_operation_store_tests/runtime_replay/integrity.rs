@@ -142,7 +142,7 @@ fn pinned_source_decoder_rejects_noncanonical_corrupt_and_oversized_evidence() -
     ] {
         let mut changed = value.clone();
         *changed.pointer_mut(pointer).expect("fixture field") = serde_json::json!("0".repeat(64));
-        bad_values.push(canonical_json_bytes(&changed)?);
+        bad_values.push((canonical_json_bytes(&changed)?, false));
     }
     for (pointer, replacement) in [
         ("/body/linkCount", serde_json::json!(2)),
@@ -156,27 +156,42 @@ fn pinned_source_decoder_rejects_noncanonical_corrupt_and_oversized_evidence() -
     ] {
         let mut changed = value.clone();
         *changed.pointer_mut(pointer).expect("fixture field") = replacement;
-        bad_values.push(canonical_json_bytes(&changed)?);
+        bad_values.push((
+            canonical_json_bytes(&changed)?,
+            matches!(
+                pointer,
+                "/body/markers/0/resourceId" | "/body/markers/0/admissionId"
+            ),
+        ));
     }
     let mut changed = value;
     changed["unknownField"] = serde_json::json!(true);
-    bad_values.push(canonical_json_bytes(&changed)?);
+    bad_values.push((canonical_json_bytes(&changed)?, true));
     let mut noncanonical = original.canonical_bytes().to_vec();
     noncanonical.push(b'\n');
-    bad_values.push(noncanonical);
-    bad_values.push(Vec::new());
-    bad_values.push(vec![
-        b' ';
-        chio_kernel::admission_operation::MAX_RUNTIME_REPLAY_SOURCE_BYTES
-            + 1
-    ]);
-    for bytes in bad_values {
+    bad_values.push((noncanonical, false));
+    bad_values.push((Vec::new(), false));
+    bad_values.push((
+        vec![b' '; chio_kernel::admission_operation::MAX_RUNTIME_REPLAY_SOURCE_BYTES + 1],
+        false,
+    ));
+    for (bytes, decode_failure) in bad_values {
         let error = RuntimeReplaySourceSnapshotV1::from_canonical_bytes(&bytes)
             .expect_err("untrusted evidence must reject");
-        assert!(
-            matches!(error, AdmissionOperationStoreError::Invariant(ref message) if message.starts_with("runtime replay source:")),
-            "{error:?}"
-        );
+        if decode_failure {
+            assert!(
+                matches!(error, AdmissionOperationStoreError::Operation(
+                chio_kernel::admission_operation::AdmissionOperationError::UntrustedInput(ref cause))
+                if cause.code() == "urn:chio:error:attest:signed-json-invalid-shape"),
+                "{error:?}"
+            );
+        } else {
+            assert!(
+                matches!(error, AdmissionOperationStoreError::Invariant(ref message)
+                if message.starts_with("runtime replay source:")),
+                "{error:?}"
+            );
+        }
     }
     assert!(!format!("{original:?}").contains("historical-admission"));
     Ok(())

@@ -74,6 +74,8 @@ END;
 
 #[derive(Debug, thiserror::Error)]
 pub enum EconomicStateCacheError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("economic state cache is unavailable: {0}")]
     Unavailable(String),
     #[error("economic state cache mutation was fenced")]

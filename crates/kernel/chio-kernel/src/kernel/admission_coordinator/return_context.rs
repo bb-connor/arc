@@ -141,7 +141,11 @@ impl ChioKernel {
         budget_mutation: &mut PreExecutionBudgetMutation,
         mut input: DurableToolReturnContextInput<'_>,
     ) -> Result<DurableToolReturnContext, DurableDispatchCommitError> {
-        input.trusted_now_unix_ms = current_unix_timestamp_ms().max(input.trusted_now_unix_ms);
+        input.trusted_now_unix_ms = self
+            .trusted_now_millis()
+            .map_err(DurableDispatchCommitError::RejectedBeforeCommit)?
+            .get()
+            .max(input.trusted_now_unix_ms);
         let now = input.trusted_now_unix_ms;
         let request = input.request;
         let context = self

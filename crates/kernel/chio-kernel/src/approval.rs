@@ -266,6 +266,10 @@ impl ApprovalToken {
 /// Errors emitted by approval stores.
 #[derive(Debug, thiserror::Error)]
 pub enum ApprovalStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("invalid approval reservation: {0}")]
     Invalid(String),
     #[error("approval request not found: {0}")]

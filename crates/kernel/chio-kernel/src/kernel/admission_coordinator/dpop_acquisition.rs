@@ -38,7 +38,7 @@ impl ChioKernel {
     ) -> Result<u64, KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let activated = store_call("activation", || {
             runtime
                 .store
@@ -120,7 +120,7 @@ impl ChioKernel {
         .map_err(durable_store_error)?;
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(now);
+        let now = runtime.refresh_trusted_time(now)?;
         let lease = self.claim_dpop_recovery(&admission.operation, now)?;
         self.release_retained_dpop(&admission.operation, &lease, now)?;
         let original = admission.operation.clone();
@@ -173,7 +173,7 @@ impl ChioKernel {
             .ok_or_else(|| error("DPoP authority is not configured"))?;
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let history = load_exact_history(runtime, operation, now)?;
         validate_recovery_history(operation, &history)?;
         credential.validate_at(now).map_err(durable_store_error)?;
@@ -206,7 +206,7 @@ impl ChioKernel {
         };
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let lease = self.claim_dpop_recovery(operation, now)?;
         self.release_retained_dpop(operation, &lease, now)
     }
@@ -217,7 +217,7 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let (operation, mut history) = store_call("reservation history", || {
             runtime.store.load_dpop_replay_claim_history(
                 reference.operation_id(),

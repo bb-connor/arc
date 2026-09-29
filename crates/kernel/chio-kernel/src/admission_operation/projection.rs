@@ -384,8 +384,12 @@ pub struct AdmissionProjectionManifestV1 {
 
 impl AdmissionProjectionManifestV1 {
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, AdmissionOperationError> {
-        let manifest: Self = serde_json::from_slice(bytes)
-            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+        let manifest: Self = chio_core::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            crate::admission_operation::MAX_ADMISSION_TERMINAL_MANIFEST_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationError::from)?;
         manifest.validate()?;
         if canonical_json_bytes(&manifest)
             .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
@@ -412,8 +416,12 @@ impl AdmissionProjectionManifestV1 {
     }
 
     pub fn verify_projection_body(&self, bytes: &[u8]) -> Result<(), AdmissionOperationError> {
-        let value: serde_json::Value = serde_json::from_slice(bytes)
-            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+        let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            crate::admission_operation::MAX_ADMISSION_TERMINAL_PROJECTION_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationError::from)?;
         if canonical_json_bytes(&value)
             .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
             != bytes
@@ -936,111 +944,8 @@ impl VerifiedEconomicMutationNotApplied {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct VerifiedAuthorizationReceiptConsumption {
-    binding: AdmissionExactProjectionBindingV1,
-    consumption: AuthorizationReceiptConsumption,
-    source_receipt_digest: AdmissionDigest,
-    authorization_capability_hash: AdmissionDigest,
-    outcome_id: AdmissionDigest,
-    outcome_version: u64,
-}
-
-impl VerifiedAuthorizationReceiptConsumption {
-    #[cfg(test)]
-    #[allow(clippy::too_many_arguments, dead_code)]
-    pub(crate) fn from_source_verified(
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-        receipt: &VerifiedAdmissionReceipt,
-        consumption: AuthorizationReceiptConsumption,
-        source_authorization_receipt_id: &AdmissionIdentifier,
-        source_session_id: &AdmissionIdentifier,
-        source_tool_call_id: &AdmissionIdentifier,
-        source_tenant_id: Option<&AdmissionIdentifier>,
-        source_parameter_hash: &AdmissionDigest,
-        source_receipt_digest: AdmissionDigest,
-        outcome_id: AdmissionDigest,
-        outcome_version: u64,
-    ) -> Result<Self, AdmissionOperationError> {
-        let receipt = receipt.receipt();
-        let expected_tenant = expected_receipt_tenant(operation);
-        if consumption.authorization_receipt_id != source_authorization_receipt_id.as_str()
-            || consumption.consumer_receipt_id != receipt.id
-            || consumption.request_id != operation.binding.request_id.as_str()
-            || consumption.session_id != source_session_id.as_str()
-            || consumption.tool_call_id != source_tool_call_id.as_str()
-            || consumption.tenant_id.as_deref() != source_tenant_id.map(AdmissionIdentifier::as_str)
-            || consumption.tenant_id.as_deref() != expected_tenant
-            || receipt.tenant_id.as_deref() != expected_tenant
-            || consumption.parameter_hash != source_parameter_hash.as_str()
-            || consumption.consumed_at_unix_ms != context.trusted_time_unix_ms
-        {
-            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
-        }
-        validate_positive_ijson("authorization_outcome_version", outcome_version)?;
-        operation.validate_completed_tool_outcome_attachment(&outcome_id)?;
-        Ok(Self {
-            binding: AdmissionExactProjectionBindingV1::from_verified(
-                operation,
-                context,
-                AdmissionOperationState::Completed,
-            )?,
-            consumption,
-            source_receipt_digest,
-            authorization_capability_hash: operation.binding.authorization_capability_hash.clone(),
-            outcome_id,
-            outcome_version,
-        })
-    }
-
-    pub(super) fn validate_against(
-        &self,
-        operation: &AdmissionOperationV1,
-        context: &AdmissionProjectionContext,
-        receipt: &VerifiedAdmissionReceipt,
-        outcome_id: &AdmissionDigest,
-        outcome_version: u64,
-    ) -> Result<(), AdmissionOperationError> {
-        let receipt = receipt.receipt();
-        self.binding
-            .validate_against(operation, context, AdmissionOperationState::Completed)?;
-        validate_positive_ijson("authorization_outcome_version", self.outcome_version)?;
-        operation.validate_completed_tool_outcome_attachment(outcome_id)?;
-        let expected_tenant = expected_receipt_tenant(operation);
-        if AdmissionIdentifier::try_new(
-            "authorization_receipt_id",
-            self.consumption.authorization_receipt_id.clone(),
-        )
-        .is_err()
-            || AdmissionIdentifier::try_new("session_id", self.consumption.session_id.clone())
-                .is_err()
-            || AdmissionIdentifier::try_new("tool_call_id", self.consumption.tool_call_id.clone())
-                .is_err()
-            || AdmissionDigest::try_new(
-                "authorization_parameter_hash",
-                self.consumption.parameter_hash.clone(),
-            )
-            .is_err()
-            || self.consumption.consumer_receipt_id != receipt.id
-            || self.consumption.request_id != operation.binding.request_id.as_str()
-            || self.consumption.tenant_id.as_deref() != expected_tenant
-            || receipt.tenant_id.as_deref() != expected_tenant
-            || self.consumption.consumed_at_unix_ms != context.trusted_time_unix_ms
-            || self.authorization_capability_hash != operation.binding.authorization_capability_hash
-            || self.outcome_id != *outcome_id
-            || self.outcome_version != outcome_version
-        {
-            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
-        }
-        Ok(())
-    }
-
-    #[must_use]
-    pub fn consumption(&self) -> &AuthorizationReceiptConsumption {
-        &self.consumption
-    }
-}
+mod authorization;
+pub use authorization::VerifiedAuthorizationReceiptConsumption;
 
 fn expected_receipt_tenant(operation: &AdmissionOperationV1) -> Option<&str> {
     (operation.binding.authenticated_tenant_id.as_str() != LOCAL_SYSTEM_TENANT_ID)
@@ -1536,7 +1441,7 @@ impl AdmissionTerminalProjection {
                             "projection_authorization_receipt_id",
                             authorization.consumption().authorization_receipt_id.clone(),
                         )?,
-                        authorization.consumption(),
+                        authorization,
                     )?);
                 }
                 if let Some(eligibility) = &completed.eligibility {

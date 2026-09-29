@@ -38,12 +38,9 @@ pub(in crate::admission_operation_store) fn observe_authority_time(
             .checked_mul(1_000)
             .ok_or_else(|| invariant("authority clock exceeds the persisted trusted-time range"))?,
         None => {
-            let elapsed = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_err(|_| invariant("system clock precedes the Unix epoch"))?;
-            u64::try_from(elapsed.as_millis()).map_err(|_| {
-                invariant("authority clock exceeds the persisted trusted-time range")
-            })?
+            chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+                .map_err(|error| invariant(error.code()))?
+                .get()
         }
     };
     validate_trusted_time(observed, "observed_at_unix_ms")?;

@@ -25,11 +25,6 @@ pub(super) fn require_original(
         super::super::super::retained_request::load_retained_request_tx(connection, operation)?
             .ok_or_else(|| invalid("native output lacks its original retained request"))?;
     original.validate_native_security_authority(&initialized.admission_binding()?)?;
-    if original.authority_profile().is_none() {
-        return Err(invalid(
-            "native output lacks its original authority profile",
-        ));
-    }
     let joined =
         super::super::history::load_for_operation(connection, operation.binding().operation_id())?
             .ok_or_else(|| invalid("native output cannot adopt an absent input join"))?;

@@ -1151,7 +1151,7 @@ impl SqliteReceiptStore {
 
         Ok(LiabilityClaimWorkflowReport {
             schema: LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now()?,
             query: normalized,
             summary: LiabilityClaimWorkflowSummary {
                 matching_claims,

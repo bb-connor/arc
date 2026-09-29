@@ -96,8 +96,12 @@ pub(super) fn require_current_participation_admission_tx(
         &envelope_sha256,
         "admission envelope",
     )?;
-    let admission: SignedFindingAdmission = serde_json::from_str(&envelope_json)
-        .map_err(|error| invariant(format!("stored admission envelope decode failed: {error}")))?;
+    let admission: SignedFindingAdmission = chio_core::canonical::UntrustedJsonText::from_wire(
+        envelope_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(FindingMarketStoreError::from)?;
     admission
         .body
         .validate()

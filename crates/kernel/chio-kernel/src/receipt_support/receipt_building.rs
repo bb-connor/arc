@@ -21,8 +21,8 @@ pub(crate) fn build_child_request_receipt(
     })?;
 
     let body = ChildRequestReceiptBody {
-        id: next_receipt_id("child-rcpt"),
-        timestamp: current_unix_timestamp(),
+        id: next_receipt_id("child-rcpt")?,
+        timestamp: read_unix_timestamp()?,
         session_id: context.session_id.clone(),
         parent_request_id,
         request_id: context.request_id.clone(),
@@ -38,11 +38,11 @@ pub(crate) fn build_child_request_receipt(
         .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
 }
 
-pub(crate) fn next_receipt_id(prefix: &str) -> String {
-    if let Some(id) = next_fixed_runtime_receipt_id(prefix) {
-        return id;
+pub(crate) fn next_receipt_id(prefix: &str) -> Result<String, KernelError> {
+    if let Some(id) = next_fixed_runtime_receipt_id(prefix)? {
+        return Ok(id);
     }
-    format!("{prefix}-{}", Uuid::now_v7())
+    Ok(format!("{prefix}-{}", Uuid::now_v7()))
 }
 
 fn child_receipt_metadata(outcome_payload: &serde_json::Value) -> Option<serde_json::Value> {

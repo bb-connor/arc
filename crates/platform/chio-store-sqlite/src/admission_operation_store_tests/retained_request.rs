@@ -69,19 +69,16 @@ pub(super) fn original_with_intent_and_signer(
         "arguments": {"private_argument": "must-not-appear-in-debug"},
         "governed_intent": governed_intent,
     }))?;
-    // Independently reconstruct the established v1 admission hash. Its spelling
-    // must remain compatible with operations committed before request retention.
+    let profile = authority_profile::selection(None, None, None)?;
     let immutable = serde_json::json!({
-        "schema": "chio.tool-admission-request.v1", "server_id": request.server_id,
-        "tool_name": request.tool_name, "agent_id": request.agent_id,
-        "arguments": request.arguments, "governed_intent": request.governed_intent,
-        "model_metadata": null, "federated_origin_kernel_id": null,
-        "matching_grants": [{"index": 0, "grant": &request.capability.scope.grants[0]}],
-        "post_return_steps": [],
+        "schema": "chio.tool-admission-request.v4",
+        "prior_request_hash": base_request_hash(&request)?,
+        "authority_profile": profile,
     });
     let retained = RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(
         &serde_json::json!({
-            "schema": "chio.retained-tool-admission-request.v1", "request": request,
+            "schema": "chio.retained-tool-admission-request.v4", "request": request,
+            "authority_profile": profile,
             "matching_grant_indices": [0], "post_return_steps": [],
         }),
     )?)?;
@@ -113,6 +110,20 @@ pub(super) fn original_with_intent_and_signer(
         AdmissionOperationV1::prepare(binding, fence.owner_epoch)?,
         retained,
     ))
+}
+
+// Independently reconstruct the current hash's inner request domain. The outer
+// v4 domain binds the explicit authority selection before the operation begins.
+pub(crate) fn base_request_hash(request: &chio_kernel::ToolCallRequest) -> TestResult<String> {
+    Ok(sha256_hex(&canonical_json_bytes(&serde_json::json!({
+        "schema": "chio.tool-admission-request.v1", "server_id": request.server_id,
+        "tool_name": request.tool_name, "agent_id": request.agent_id,
+        "arguments": request.arguments, "governed_intent": request.governed_intent,
+        "model_metadata": request.model_metadata,
+        "federated_origin_kernel_id": request.federated_origin_kernel_id,
+        "matching_grants": [{"index": 0, "grant": &request.capability.scope.grants[0]}],
+        "post_return_steps": [],
+    }))?))
 }
 
 #[test]

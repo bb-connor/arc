@@ -717,8 +717,13 @@ impl VerifiedPreDispatchNoEffect {
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
     ) -> Result<Self, ToolOutcomeError> {
-        let UntrustedPreDispatchNoEffectWireV1(proof) = serde_json::from_slice(bytes)
-            .map_err(|_| ToolOutcomeError::Invalid("predispatch.release_proof"))?;
+        let UntrustedPreDispatchNoEffectWireV1(proof) =
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                bytes,
+                MAX_MONETARY_RELEASE_EVIDENCE_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(ToolOutcomeError::from)?;
         let canonical = canonical_json_bytes(&proof)
             .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
         if canonical != bytes {
@@ -1132,8 +1137,13 @@ impl VerifiedTransportNotAccepted {
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
     ) -> Result<Self, ToolOutcomeError> {
-        let UntrustedTransportNotAcceptedWireV1(proof) = serde_json::from_slice(bytes)
-            .map_err(|_| ToolOutcomeError::Invalid("transport_not_accepted.release_proof"))?;
+        let UntrustedTransportNotAcceptedWireV1(proof) =
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                bytes,
+                MAX_MONETARY_RELEASE_EVIDENCE_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(ToolOutcomeError::from)?;
         let canonical = canonical_json_bytes(&proof)
             .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
         if canonical != bytes {

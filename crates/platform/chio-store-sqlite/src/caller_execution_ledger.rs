@@ -7,7 +7,6 @@
 
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::AdmissionIdentifier;
@@ -507,11 +506,11 @@ fn read_clock(connection: &Connection) -> Result<i64> {
 }
 
 fn now_ms() -> Result<i64> {
-    let value = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(storage)?
-        .as_millis();
-    if value == 0 || value >= (1_u128 << 53) {
+    let value =
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+            .map_err(storage)?
+            .get();
+    if value == 0 || value >= (1_u64 << 53) {
         return Err(invalid("executor clock is outside I-JSON range"));
     }
     i64::try_from(value).map_err(storage)

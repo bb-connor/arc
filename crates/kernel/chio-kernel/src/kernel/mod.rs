@@ -1551,12 +1551,12 @@ fn extract_guard_name(message: &str) -> Option<String> {
 fn scope_from_capability_snapshot(
     snapshot: &crate::capability_lineage::CapabilitySnapshot,
 ) -> Result<ChioScope, KernelError> {
-    serde_json::from_str(&snapshot.grants_json).map_err(|error| {
-        KernelError::Internal(format!(
-            "invalid capability snapshot scope for {}: {error}",
-            snapshot.capability_id
-        ))
-    })
+    chio_core::canonical::UntrustedJsonText::from_wire(
+        snapshot.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(crate::KernelError::from)
 }
 
 fn validate_delegation_scope_step(
@@ -1784,24 +1784,27 @@ pub(crate) struct ReceiptParams<'a> {
     tenant_id: Option<String>,
 }
 
-pub(crate) fn current_unix_timestamp() -> u64 {
-    if let Some(now) = fixed_runtime_unix_secs_for_current_thread() {
-        return now;
-    }
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+pub(crate) fn read_unix_timestamp() -> Result<u64, chio_security_types::clock::ClockError> {
+    read_unix_timestamp_ms().map(|millis| millis / 1_000)
 }
 
-pub(crate) fn current_unix_timestamp_ms() -> u64 {
+pub(crate) fn read_unix_timestamp_ms() -> Result<u64, chio_security_types::clock::ClockError> {
     if let Some(now) = fixed_runtime_unix_secs_for_current_thread() {
-        return now.saturating_mul(1000);
+        return now
+            .checked_mul(1_000)
+            .ok_or(chio_security_types::clock::ClockError::Overflow);
     }
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| u64::try_from(duration.as_millis()).unwrap_or(u64::MAX))
-        .unwrap_or(0)
+    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+        .map(|value| value.get())
+}
+
+#[cfg(test)]
+pub(crate) fn current_unix_timestamp() -> u64 {
+    read_unix_timestamp().expect("fixture clock")
+}
+#[cfg(test)]
+pub(crate) fn current_unix_timestamp_ms() -> u64 {
+    read_unix_timestamp_ms().expect("fixture clock")
 }
 
 #[cfg(feature = "delegation")]

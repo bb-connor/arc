@@ -312,10 +312,12 @@ impl SqliteReceiptStore {
         })
     }
 
-    pub fn authorization_profile_metadata_report(&self) -> ChioOAuthAuthorizationMetadataReport {
-        ChioOAuthAuthorizationMetadataReport {
+    pub fn authorization_profile_metadata_report(
+        &self,
+    ) -> Result<ChioOAuthAuthorizationMetadataReport, ReceiptStoreError> {
+        Ok(ChioOAuthAuthorizationMetadataReport {
             schema: CHIO_OAUTH_AUTHORIZATION_METADATA_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now()?,
             profile: ChioOAuthAuthorizationProfile::default(),
             report_schema: CHIO_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA.to_string(),
             discovery: ChioOAuthAuthorizationDiscoveryMetadata {
@@ -366,7 +368,7 @@ impl SqliteReceiptStore {
                     "delegatedCallChainBound".to_string(),
                 ],
             },
-        }
+        })
     }
 
     pub fn query_authorization_review_pack(
@@ -378,7 +380,7 @@ impl SqliteReceiptStore {
             "authorization review pack",
         )?;
         let authorization_context = self.query_authorization_context_report(query)?;
-        let metadata = self.authorization_profile_metadata_report();
+        let metadata = self.authorization_profile_metadata_report()?;
         let mut records = Vec::with_capacity(authorization_context.receipts.len());
 
         for row in authorization_context.receipts {
@@ -425,7 +427,7 @@ impl SqliteReceiptStore {
 
         Ok(ChioOAuthAuthorizationReviewPack {
             schema: CHIO_OAUTH_AUTHORIZATION_REVIEW_PACK_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now()?,
             filters: query.clone(),
             metadata,
             summary: ChioOAuthAuthorizationReviewPackSummary {

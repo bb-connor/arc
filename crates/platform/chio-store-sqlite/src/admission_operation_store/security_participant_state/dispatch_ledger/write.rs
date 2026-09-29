@@ -26,9 +26,7 @@ impl SqliteAdmissionOperationStore {
         original.validate_request_material(custody.request)?;
         original.validate_native_security_context(custody.security_context)?;
         original.validate_native_security_authority(custody.binding)?;
-        if original.authority_profile().is_none()
-            || policy.inputs.native_authority != *custody.binding
-        {
+        if policy.inputs.native_authority != *custody.binding {
             return Err(invalid(
                 "native dispatch ledger lacks its supported original authority profile",
             ));

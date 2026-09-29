@@ -33,8 +33,9 @@ fn encode_collector<T: serde::Serialize>(
 fn decode_collector(
     bytes: &[u8],
 ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
-    serde_json::from_slice(bytes)
-        .map_err(|error| ThresholdApprovalCollectorStoreError::Serialization(error.to_string()))
+    chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ThresholdApprovalCollectorStoreError::from)
 }
 
 impl ThresholdApprovalCollectorStore for SqliteApprovalStore {

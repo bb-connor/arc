@@ -301,11 +301,7 @@ fn require_intent(
     let retained = retained_request::load_retained_request_tx(connection, operation)?
         .ok_or_else(|| invariant("dpop claims require the retained original request"))?;
     retained.validate_binding(operation.binding())?;
-    if retained
-        .authority_profile()
-        .and_then(|profile| profile.dpop())
-        != Some(intent.credential().authority())
-    {
+    if retained.authority_profile().dpop() != Some(intent.credential().authority()) {
         return Err(invariant(
             "DPoP claim changed or lacks its original authority profile",
         ));

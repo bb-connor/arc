@@ -7,7 +7,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::sha256_hex;
 use r2d2::Pool;
@@ -213,6 +212,8 @@ pub enum FindingOperatorSellerArtifactCapacityOutcome {
 
 #[derive(Debug, Error)]
 pub enum FindingOperatorBundleStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding operator bundle store is unavailable: {0}")]
     Unavailable(String),
     #[error("finding operator bundle is invalid: {0}")]
@@ -478,7 +479,7 @@ impl SqliteFindingOperatorBundleStore {
             }
             tx.execute(
                 "INSERT INTO chio_finding_operator_bundles (finding_id, bundle_sha256, bundle_json, created_at) VALUES (?1, ?2, ?3, ?4)",
-                params![finding_id, bundle_sha256, bundle_json, now_secs()],
+                params![finding_id, bundle_sha256, bundle_json, now_secs()?],
             )
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
             FindingOperatorBundleWriteOutcome::Inserted
@@ -700,7 +701,7 @@ impl SqliteFindingOperatorBundleStore {
                     policy_role.as_str(),
                     policy_sha256,
                     policy_json,
-                    now_secs()
+                    now_secs()?
                 ],
             )
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
@@ -804,7 +805,7 @@ impl SqliteFindingOperatorBundleStore {
             }
             tx.execute(
                 "INSERT INTO chio_finding_operator_audit_rounds (epoch_envelope_sha256, round_sha256, round_json, created_at) VALUES (?1, ?2, ?3, ?4)",
-                params![epoch_envelope_sha256, round_sha256, round_json, now_secs()],
+                params![epoch_envelope_sha256, round_sha256, round_json, now_secs()?],
             )
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
             FindingOperatorBundleWriteOutcome::Inserted
@@ -1036,7 +1037,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_proofs (finding_id, proof_sha256, proof_json, created_at) VALUES (?1, ?2, ?3, ?4)",
-            params![finding_id, proof_sha256, proof_json, now_secs()],
+            params![finding_id, proof_sha256, proof_json, now_secs()?],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.commit()
@@ -1143,7 +1144,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_purchase_jobs (request_id, principal_id, request_sha256, job_sha256, job_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![request_id, principal_id, request_sha256, job_sha256, job_json, now_secs()],
+            params![request_id, principal_id, request_sha256, job_sha256, job_json, now_secs()?],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.commit()
@@ -1235,7 +1236,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_terminals (request_id, principal_id, request_sha256, result_sha256, result_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![request_id, principal_id, request_sha256, result_sha256, result_json, now_secs()],
+            params![request_id, principal_id, request_sha256, result_sha256, result_json, now_secs()?],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.execute(
@@ -1346,7 +1347,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_terminal_capacity (request_id, principal_id, request_sha256, reserved_bytes, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![request_id, principal_id, request_sha256, requested_bytes, now_secs()],
+            params![request_id, principal_id, request_sha256, requested_bytes, now_secs()?],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.commit()
@@ -1606,7 +1607,7 @@ impl SqliteFindingOperatorBundleStore {
         }
         tx.execute(
             "INSERT INTO chio_finding_operator_seller_artifact_capacity (request_id, principal_id, request_sha256, reserved_bytes, committed_finding_id, created_at) VALUES (?1, ?2, ?3, ?4, NULL, ?5)",
-            params![request_id, principal_id, request_sha256, requested_bytes, now_secs()],
+            params![request_id, principal_id, request_sha256, requested_bytes, now_secs()?],
         )
         .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         tx.commit()
@@ -1958,11 +1959,12 @@ fn validate_identifier(
     Ok(())
 }
 
-fn now_secs() -> i64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
-        Err(_) => 0,
-    }
+fn now_secs() -> Result<i64, FindingOperatorBundleStoreError> {
+    Ok(i64::try_from(
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
+            .as_secs(),
+    )
+    .map_err(|_| chio_security_types::clock::ClockError::Overflow)?)
 }
 
 #[cfg(test)]

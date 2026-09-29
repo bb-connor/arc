@@ -39,7 +39,10 @@ fn sqlite_nonce_preflight_retains_security_identity_across_restart() -> TestResu
         .ok_or("retained request")?;
     let encoded: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v4");
-    assert!(retained.authority_profile().is_some());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
+        "chio.retained-tool-admission-request.v4"
+    );
     assert_eq!(
         encoded["security_binding"]["context"]["context_generation"],
         1

@@ -69,6 +69,7 @@ uuid = { workspace = true, features = ["v7"] }
 zeroize = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
+base64.workspace = true
 async-trait = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-quarantine = { workspace = true }

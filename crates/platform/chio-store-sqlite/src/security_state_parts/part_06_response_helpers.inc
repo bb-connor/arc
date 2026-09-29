@@ -310,8 +310,12 @@ fn next_scheduler_fencing_token(transaction: &Transaction<'_>, tenant_id: &str) 
 
 fn decode_response_snapshot(record: &ResponsePlanRecord) -> PortResult<ResponseSnapshot> {
     validate_canonical_json_body(&record.canonical_body, &record.body_hash)?;
-    let snapshot: ResponseSnapshot = serde_json::from_slice(record.canonical_body.as_bytes())
-        .map_err(|_| PortError::invalid_data())?;
+    let snapshot: ResponseSnapshot = chio_core::canonical::UntrustedJsonText::from_wire(
+        record.canonical_body.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|_| PortError::invalid_data())?;
     if snapshot.schema_version != RESPONSE_STATE_SCHEMA_VERSION
         || snapshot.plan.tenant_id != record.tenant_id
         || snapshot.plan.action_id != record.action_id
@@ -448,8 +452,12 @@ fn validate_response_dispatch_request(
         &request.authorization.body_hash,
     )?;
     let decoded_authorization: ResponseDispatchAuthorizationBody =
-        serde_json::from_slice(request.authorization.canonical_body.as_bytes())
-            .map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            request.authorization.canonical_body.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| PortError::invalid_data())?;
     if decoded_authorization != request.authorization.body
         || decoded_authorization.schema_version != RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
         || decoded_authorization.key.tenant_id != request.response_plan.tenant_id

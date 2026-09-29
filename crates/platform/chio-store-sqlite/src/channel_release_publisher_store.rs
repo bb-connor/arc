@@ -61,6 +61,8 @@ struct ChannelRootPublicationResultV1 {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChannelReleasePublisherError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("channel release publisher store is unavailable: {0}")]
     Unavailable(String),
     #[error("channel release publisher mutation was fenced")]

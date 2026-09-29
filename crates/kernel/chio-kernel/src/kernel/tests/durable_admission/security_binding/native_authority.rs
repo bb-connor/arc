@@ -160,7 +160,10 @@ fn replay(nested: bool) -> TestResult {
         serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
         "chio.retained-tool-admission-request.v4"
     );
-    assert!(retained.authority_profile().is_some());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
+        "chio.retained-tool-admission-request.v4"
+    );
     for changed in [
         None,
         Some(binding("different-store", "source", b"initialization")?),
@@ -313,7 +316,10 @@ fn native_selection_requires_retained_admission_outside_mode_coverage() -> TestR
             .clone()
             .ok_or("original native request missing")?;
         retained.validate_native_security_authority(&selected)?;
-        assert!(retained.authority_profile().is_some());
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
+            "chio.retained-tool-admission-request.v4"
+        );
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
     }
     Ok(())

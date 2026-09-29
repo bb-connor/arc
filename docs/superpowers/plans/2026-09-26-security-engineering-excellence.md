@@ -50,9 +50,28 @@ rejection provenance in signed evidence. The next batch is recorded in
 It moves process-local DPoP, governed approval, source sealing and Finding commit
 time onto the shared fallible clock; preserves precise DPoP denial codes; and
 replaces receipt accounting clamps and uncapped sentinels with checked arithmetic
-and explicit nullable grant ceilings. The arithmetic census now has 252
-classified sites (117 repaired, 386 pending); the ambient-clock gate pins 179
-remaining sites. These are bounded advances in 3A/4A/4B and Packet 8.
+and explicit nullable grant ceilings. That checkpoint had 252 classified
+arithmetic sites (117 repaired, 386 pending) and 179 remaining ambient-clock
+occurrences. These are bounded advances in 3A/4A/4B and Packet 8.
+
+The signed-reader and tenant batch is committed at `f16d4e781c`. Its
+[execution record](../../reviews/2026-09-28-signed-reader-tenant-execution.md)
+is the baseline for the implemented
+[kernel and SQLite correctness batch](2026-09-28-kernel-admission-reader-closure.md).
+That continuation classifies all 73 scoped baseline reader files and 264 pending
+arithmetic entries, migrates 22 production clock reads and dispositions 90 fixture
+occurrences, removes old retained-request format acceptance, and exercises signed
+authorization consumption through SQLite commit, replay, reopen and substitutions.
+The [batch record](../../reviews/2026-09-28-kernel-admission-reader-execution.md)
+contains its bounded local verification and mutation evidence.
+
+The current remaining inventories are 374 baseline decoder files, 122 pending
+arithmetic entries (516 classified, including 132 repaired), and 157 ambient-clock
+occurrences at 152 keys. All 85 SQLite tables have exercised runtime-family
+mappings; exhaustive per-statement/principal evidence is still separate work.
+The [remaining-work reconciliation](../../reviews/2026-09-28-remaining-security-work.md)
+groups the broader review/spec backlog. Remaining authority readers and rejection
+semantics are the next source batch; full candidate qualification remains open.
 
 ## Revised execution order
 
@@ -475,8 +494,9 @@ launch regression typechecks there and requires x86_64 to execute.
 - [x] Retain the `saturating_*` and `wrapping_*` inventory in the security crates,
       kernel and stores: 638 source lines at `4c35ce7867`, including fixtures.
 - [ ] Finish classifying each site as correct-by-intent or defect. The retained
-      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 252
-      sites (117 repaired sites); 386 remain explicitly pending.
+      [inventory](../../reviews/2026-09-27-arithmetic-inventory.tsv) classifies 516
+      sites (132 repaired sites); 122 remain explicitly pending. All previously
+      pending kernel/SQLite rows now have evidenced dispositions.
 - [ ] A `wrapping_*` in an accounting, quota, counter or deadline path is a defect:
       fix it and add the regression.
 - [ ] A `saturating_sub` in an accounting path silently clamps to zero, hiding the
@@ -529,7 +549,9 @@ depend on a deterministically drivable time source.
 
 **Checkpoint (September 27):** The shared contract, three original trait
 migrations, response deadlines, regression gate and bounded proofs are delivered.
-The September 28 gate pins 179 remaining sites including fixtures. The independent
+The September 28 gate pins 157 remaining occurrences including fixtures. The
+kernel/SQLite continuation migrated 22 production reads and classified its 90
+remaining fixture occurrences. The independent
 Finding commit clock has been removed; its shared fallible replacement samples
 inside the durable transaction and propagates clock faults without publishing a row. The [execution record](../../reviews/2026-09-27-shared-clock-response-assurance.md)
 records the migrated consumers and deadline classification. Repository-wide
@@ -851,7 +873,9 @@ adds constrained canonical readers for every FROST store record. The
 adds 22 more constructor sites, private canonical custody and proof-result sealing.
 The [signed-reader batch](../../reviews/2026-09-28-signed-reader-tenant-execution.md)
 adds the workspace source inventory and named owner migrations. Semantic review
-of its 447 raw-input-baseline files remains open; a lexical baseline is not
+of the remaining 374 raw-input-baseline files stays open after all 73 scoped
+kernel/SQLite owners were classified. The current gate pins 240 constrained
+constructors across 162 registered files. A lexical baseline does not establish
 completion of signed-reader migration.
 
 #### 10.3 Classify tenant scoping by the enforcing principal (S3, corrected by the external review's R4)
@@ -870,9 +894,10 @@ completion of signed-reader migration.
 - [ ] Every isolation test gives tenant B the exact valid identifier belonging to
       tenant A and requires denial, for every table in every class. Receipt point
       and list tests cover exact IDs, unattributed rows, invalid contexts and
-      forged tenant projections. The matrix maps 84 tables to runtime families
-      and explicitly leaves `admission_operation_authorization_consumptions`
-      without a production SQLite fixture. The full runtime item remains open.
+      forged tenant projections. All 85 tables now map to exercised families;
+      authorization consumption has genuine signed commit/replay/reopen and
+      substitution tests. The full item remains open for exhaustive statement
+      and principal coverage; shared family witnesses alone do not close it.
 - [x] Give all 85 tables a machine-checked runtime-family or explicit-gap mapping,
       with enforcing entry points and source test references. Extend exact-ID,
       restart, replay and native-principal negatives across the mapped families.

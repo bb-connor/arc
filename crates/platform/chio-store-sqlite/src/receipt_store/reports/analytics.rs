@@ -146,15 +146,16 @@ fn metrics_from_row(
     row: &rusqlite::Row<'_>,
     first: usize,
 ) -> rusqlite::Result<ReceiptAnalyticsMetrics> {
-    Ok(ReceiptAnalyticsMetrics::from_raw(
-        row.get::<_, i64>(first)?.max(0) as u64,
-        row.get::<_, i64>(first + 1)?.max(0) as u64,
-        row.get::<_, i64>(first + 2)?.max(0) as u64,
-        row.get::<_, i64>(first + 3)?.max(0) as u64,
-        row.get::<_, i64>(first + 4)?.max(0) as u64,
+    ReceiptAnalyticsMetrics::from_raw(
+        nonnegative_count(row, first)?,
+        nonnegative_count(row, first + 1)?,
+        nonnegative_count(row, first + 2)?,
+        nonnegative_count(row, first + 3)?,
+        nonnegative_count(row, first + 4)?,
         decoded_cost_total(row, first + 5, CostMetric::Charged)?,
         decoded_cost_total(row, first + 6, CostMetric::Attempted)?,
-    ))
+    )
+    .map_err(|error| rusqlite::Error::UserFunctionError(Box::new(error)))
 }
 
 /// One read snapshot for every dimension of a report.
@@ -498,3 +499,8 @@ impl SqliteReceiptStore {
 #[cfg(test)]
 #[path = "analytics_tests.rs"]
 mod analytics_tests;
+
+fn nonnegative_count(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
+    let value = row.get::<_, i64>(index)?;
+    u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, value))
+}

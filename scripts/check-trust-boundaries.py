@@ -172,6 +172,11 @@ def check(root, catalog):
     if found["decoder_census"] != catalog.get("decoder_census"):
         errors.append("workspace decoder census changed; classify new files and entry points")
     contracts = catalog.get("decoder_file_contracts", {})
+    for path, review in catalog.get("reviewed_kernel_sqlite_owners", {}).items():
+        if path not in files or path not in catalog["signed_input_files"] or not review.get("contract"):
+            errors.append(f"reviewed kernel/SQLite owner is unregistered: {path}")
+        if contracts.get(path, {}).get("kind") == "raw-input-baseline":
+            errors.append(f"reviewed kernel/SQLite owner regressed to baseline: {path}")
     if set(contracts) != set(found["decoder_census"]) or any(
         not contract.get("kind") or not contract.get("contract") for contract in contracts.values()
     ):

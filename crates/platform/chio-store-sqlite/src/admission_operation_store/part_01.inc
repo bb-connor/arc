@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::MutexGuard;
 
+use crate::store_connection::StoreConnection;
 use chio_kernel::{
     AdmissionCleanupAction, AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
     AdmissionCleanupActionCreateOutcome, AdmissionCleanupActionKind, AdmissionCleanupActionState,
@@ -10,8 +11,8 @@ use chio_kernel::{
     AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
     AdmissionOperationStoreProfile, PersistedAdmissionCleanupAction, PersistedAdmissionOperation,
 };
+use chio_security_types::clock::{Clock, SystemClock};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
-use crate::store_connection::StoreConnection;
 
 pub struct SqliteAdmissionOperationStore {
     connection: StoreConnection,
@@ -582,7 +583,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
                         "claimed coordinator lease epoch"
                     )?,
                     sqlite_integer(claimed.version(), "claimed version")?,
-                    unix_now(),
+                    unix_now()?,
                 ],
             )
             .map_err(sqlite_error)?;
@@ -717,7 +718,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
                     )?,
                     sqlite_integer(next.version(), "next version")?,
                     next.last_error(),
-                    unix_now(),
+                    unix_now()?,
                 ],
             )
             .map_err(sqlite_error)?;
@@ -849,7 +850,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
                     )?,
                     sqlite_integer(next.version(), "next version")?,
                     next.last_error(),
-                    unix_now(),
+                    unix_now()?,
                 ],
             )
             .map_err(sqlite_error)?;
@@ -1162,7 +1163,7 @@ fn insert_operation(
                 )?,
                 sqlite_integer(operation.version(), "version")?,
                 operation.last_error(),
-                unix_now(),
+                unix_now()?,
             ],
         )
         .map_err(sqlite_error)?;
@@ -1438,7 +1439,7 @@ fn insert_cleanup_action(
                     .transpose()?,
                 sqlite_integer(action.version(), "cleanup version")?,
                 action.last_error(),
-                unix_now(),
+                unix_now()?,
             ],
         )
         .map_err(sqlite_error)?;
@@ -1476,7 +1477,7 @@ fn persist_cleanup_transition(
                     .transpose()?,
                 sqlite_integer(next.version(), "cleanup next version")?,
                 next.last_error(),
-                unix_now(),
+                unix_now()?,
             ],
         )
         .map_err(sqlite_error)?;
@@ -1516,9 +1517,7 @@ fn reject_volatile_database_path(path: &Path) -> Result<(), AdmissionOperationEr
     Ok(())
 }
 
-fn unix_now() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
+fn unix_now() -> Result<i64, AdmissionOperationError> {
+    let seconds = SystemClock.unix_millis()?.as_secs();
+    sqlite_integer(seconds, "authority clock seconds")
 }

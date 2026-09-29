@@ -8,12 +8,8 @@
     "crates/guards/chio-wasm-guards/src/host.rs::core_module_get_time_unix_secs": 1,
     "crates/guards/chio-wasm-guards/src/host.rs::get_time_unix_secs": 1,
     "crates/guards/chio-wasm-guards/src/incident.rs::utc_timestamp": 1,
-    "crates/kernel/chio-kernel/src/checkpoint.rs::unix_now": 1,
     "crates/kernel/chio-kernel/src/dpop.rs::signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input": 1,
     "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::inventory_preserves_every_retention_kind_owner_and_inclusive_horizon": 1,
-    "crates/kernel/chio-kernel/src/kernel/mod.rs::current_unix_timestamp": 1,
-    "crates/kernel/chio-kernel/src/kernel/mod.rs::current_unix_timestamp_ms": 1,
-    "crates/kernel/chio-kernel/src/kernel/session_ops/reports.rs::record_session_report": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/budget_cross_currency.rs::cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs::chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs::federated_origin_without_runtime_hook_or_context_fails_closed": 1,
@@ -30,8 +26,6 @@
     "crates/kernel/chio-kernel/src/kernel/tests/support.rs::unique_receipt_db_path": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs::make_dpop_proof": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs::signed_nonce_for_request": 1,
-    "crates/kernel/chio-kernel/src/request_matching.rs::nested_child_request_id": 1,
-    "crates/kernel/chio-kernel/src/session.rs::current_unix_timestamp": 1,
     "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_after_local_ttl_is_rejected": 1,
     "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_within_ttl_rejected": 1,
     "crates/kernel/chio-kernel/tests/dpop.rs::dpop_wrong_agent_key_rejected": 1,
@@ -91,48 +85,32 @@
     "crates/platform/chio-store-sqlite/benches/store_authorization_path.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/benches/store_receipt_analytics_report.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/benches/store_receipt_write_throughput.rs::unique_db_path": 1,
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/part_01.inc::unix_now": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/part_02.inc::unique_db_path": 1,
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs::observe_authority_time": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture/expiry_test_support.rs::now": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs::now_ms": 1,
     "crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs::unix_now": 1,
     "crates/platform/chio-store-sqlite/src/approval_store.rs::open_colocated_creates_parent_dirs_for_a_file_uri_with_query": 1,
     "crates/platform/chio-store-sqlite/src/authority.rs::unique_db_path": 1,
-    "crates/platform/chio-store-sqlite/src/authority.rs::unix_now": 1,
     "crates/platform/chio-store-sqlite/src/budget_store/tests.rs::unique_db_path": 1,
-    "crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs::now_ms": 1,
     "crates/platform/chio-store-sqlite/src/capability_lineage_tests.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests.rs::now_ms": 1,
     "crates/platform/chio-store-sqlite/src/economic_state_cache_tests.rs::now_ms": 1,
-    "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::now_secs": 1,
     "crates/platform/chio-store-sqlite/src/evidence_export.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs::unique_db_path": 1,
-    "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::now_secs": 1,
-    "crates/platform/chio-store-sqlite/src/finding_operator_payment.rs::now_secs": 1,
-    "crates/platform/chio-store-sqlite/src/finding_payload_store.rs::now_secs": 1,
     "crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query/tests/support.rs::unique_db_path": 1,
-    "crates/platform/chio-store-sqlite/src/receipt_store.rs::current_unix_ms": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::disconnected_reseed_flips_writer_liveness_dead_immediately": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::earlier_success_does_not_clear_a_later_queued_timeout": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::run_write_executes_jobs_serially_on_the_writer_thread": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::write_decrements_inflight_before_returning_to_caller": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::write_job_holds_inflight_for_its_duration": 1,
-    "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/federated.rs::import_federated_evidence_share": 1,
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::delete_archived_prefix_in_tx": 1,
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::resolve_rotation_cutoff": 1,
-    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::retention_repair_on_writer": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics_tests.rs::unique_db_path": 1,
-    "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/query_matching.rs::unix_now": 1,
-    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::unix_timestamp_now_i64": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/retained_commitments.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs::size_trigger_applies_when_time_cutoff_is_a_noop": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/schema_archive.rs::unique_archive_path": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/revocation_store.rs::open_creates_parent_dirs_for_a_file_uri_with_query": 1,
-    "crates/platform/chio-store-sqlite/src/revocation_store.rs::revoke": 1,
     "crates/platform/chio-store-sqlite/src/revocation_store.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs::now_ms": 1,
     "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs::joint_capture_replays_after_supplemental_authorization_expires": 2,
@@ -176,5 +154,552 @@
     "crates/security/chio-secret-broker/src/process_boundary_tests/native_response_tests.rs::reject_signed_capture_substitutions": 1,
     "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::now": 1,
     "crates/security/chio-secret-broker/tests/no_secret_crossing.rs::exercise_brokerd_process": 1
+  },
+  "kernel_sqlite_review_2026_09_28": {
+    "crates/kernel/chio-kernel/src/checkpoint.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/kernel/chio-kernel/src/dpop.rs::signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::inventory_preserves_every_retention_kind_owner_and_inclusive_horizon": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/mod.rs::current_unix_timestamp": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/kernel/chio-kernel/src/kernel/mod.rs::current_unix_timestamp_ms": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/kernel/chio-kernel/src/kernel/session_ops/reports.rs::record_session_report": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/budget_cross_currency.rs::cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs::chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs::federated_origin_without_runtime_hook_or_context_fails_closed": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs::completed_federated_replay_remains_closed_until_cosign_succeeds": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::bounded_in_memory_artifact_store_loses_evidence_when_both_layers_evict": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_dispatch": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_without_receipt_store_denies_before_dispatch_or_cosign": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_cosigner_not_called_when_local_persistence_fails": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_receipt_context_fixture": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::installed_artifact_store_preserves_cosign_evidence_across_cache_eviction": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/support.rs::revoke": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/support.rs::unique_receipt_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs::make_dpop_proof": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs::signed_nonce_for_request": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/src/request_matching.rs::nested_child_request_id": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Wall time removed; child identifier uses UUID v4 entropy and existing parent/request binding."
+    },
+    "crates/kernel/chio-kernel/src/session.rs::current_unix_timestamp": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Session uses the kernel-injected shared Clock and a shared fence across clones. Outage/regression rejects before anchor rotation, close or request tracking."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_after_local_ttl_is_rejected": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_within_ttl_rejected": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_wrong_agent_key_rejected": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::make_capability": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/dpop.rs::make_proof_body": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/kernel/chio-kernel/tests/retention.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/benches/store_authorization_path.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/benches/store_authorization_path.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/benches/store_receipt_analytics_report.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/benches/store_receipt_write_throughput.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/part_01.inc::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/part_02.inc::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs::observe_authority_time": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture/expiry_test_support.rs::now": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/approval_store.rs::open_colocated_creates_parent_dirs_for_a_file_uri_with_query": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/authority.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/authority.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/budget_store/tests.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/caller_execution_ledger.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/capability_lineage_tests.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/channel_lifecycle_store_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/economic_state_cache_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/encrypted_blob.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/evidence_export.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/finding_operator_payment.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/finding_payload_store.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/governed_approval_replay_store.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_query/tests/support.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::current_unix_ms": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::disconnected_reseed_flips_writer_liveness_dead_immediately": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::earlier_success_does_not_clear_a_later_queued_timeout": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::run_write_executes_jobs_serially_on_the_writer_thread": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::write_decrements_inflight_before_returning_to_caller": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs::write_job_holds_inflight_for_its_duration": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/federated.rs::import_federated_evidence_share": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::delete_archived_prefix_in_tx": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::resolve_rotation_cutoff": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::retention_repair_on_writer": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/reports/analytics_tests.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/query_matching.rs::unix_now": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::unix_timestamp_now_i64": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retained_commitments.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs::size_trigger_applies_when_time_cutoff_is_a_noop": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/schema_archive.rs::unique_archive_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/support.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::open_creates_parent_dirs_for_a_file_uri_with_query": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::revoke": {
+      "occurrences": 1,
+      "disposition": "migrated",
+      "contract": "Shared fallible UnixMillis clock and existing monotonic fence; explicit epoch seconds conversion where required, no zero/default fallback. Mutation reads preserve transaction and recovery fencing."
+    },
+    "crates/platform/chio-store-sqlite/src/revocation_store.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs::joint_capture_replays_after_supplemental_authorization_expires": {
+      "occurrences": 2,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/approval_store.rs::unique_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs::expired_permission_can_replay_a_retained_report_but_cannot_execute": {
+      "occurrences": 3,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs::fixture": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/capability_set_suspensions.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/containment_overlay_commands.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/egress_restrictions.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution.rs::restart_keeps_a_live_caller_reservation": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share.rs::an_expired_caller_share_stays_owned_until_recovery_compensates_it": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share.rs::caller_share_snapshot_is_complete_scoped_and_fenced": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/delegated_share/boundaries.rs::an_out_of_band_terminal_edit_cannot_hide_a_live_caller_share": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/dispatch_context.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_caller_execution/external_delivery.rs::an_external_effect_with_a_lost_report_cannot_be_refunded_at_nonce_expiry": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle.rs::expired_issuance_denies_execution_and_is_compensated_by_startup_recovery": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle.rs::live_issuance_survives_startup_recovery_until_it_expires": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/execution_nonce_kernel_lifecycle/security_binding.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/formal_projection.rs::temp_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/governed_approval_kernel_replay.rs::now_secs": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/integration_smoke.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/issuance_freezes.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/memory_provenance_store.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/native_authority_binding.rs::now_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/response_dispatch.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/security_release_recovery/integrity.rs::ensure_final_release": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/security_state_contract_parts/part_01.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/security_state_parts/part_01.rs::current_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/session_throttles.rs::now_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/tenant_isolation.rs::unique_db_path": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    },
+    "crates/platform/chio-store-sqlite/tests/threshold_kernel_lifecycle/support.rs::now": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
+    }
   }
 }

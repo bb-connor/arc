@@ -16,7 +16,7 @@ use chio_security_types::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{current_unix_timestamp_ms, ChioKernel, KernelCryptoFloor, KernelError};
+use super::{read_unix_timestamp_ms, ChioKernel, KernelCryptoFloor, KernelError};
 
 pub const ACTIVE_RESPONSE_SUBMISSION_SCHEMA: &str = "chio.active-response-submission.v1";
 const ACTIVE_RESPONSE_SUBMISSION_SIGNATURE_DOMAIN: &[u8] = b"chio.active-response-submission.v1\0";
@@ -460,7 +460,7 @@ impl ChioKernel {
         &self,
         request: &ActiveResponseAuthorizationRequest,
     ) -> Result<VerifiedActiveResponseBindings, KernelError> {
-        let now_unix_ms = current_unix_timestamp_ms();
+        let now_unix_ms = read_unix_timestamp_ms()?;
         self.verify_active_response_authorization_at(request, now_unix_ms)
     }
 

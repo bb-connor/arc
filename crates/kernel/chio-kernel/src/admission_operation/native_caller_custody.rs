@@ -50,15 +50,17 @@ impl NativeCallerReleaseCustodyV1 {
         if self.ledger_json.is_empty() || self.ledger_json.len() > MAX_LEDGER_BYTES {
             return Err(invalid("native caller ledger exceeds its bound"));
         }
-        let value: serde_json::Value = serde_json::from_str(&self.ledger_json).map_err(invalid)?;
+        let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+            self.ledger_json.as_bytes(),
+            MAX_LEDGER_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationStoreError::from)?;
         if !value.is_object()
             || canonical_json_bytes(&value).map_err(invalid)? != self.ledger_json.as_bytes()
             || sha256_hex(self.ledger_json.as_bytes()) != self.ledger_digest.as_str()
             || self.release_request_digest != release_request_digest(original)?
-            || original
-                .authority_profile()
-                .and_then(|profile| profile.caller_executor())
-                .is_none()
+            || original.authority_profile().caller_executor().is_none()
             || original.native_security_authority_binding().is_none()
         {
             return Err(invalid(
@@ -90,8 +92,12 @@ impl AdmissionCallerDispatchContextV1 {
         operation: &AdmissionOperationV1,
         original: &RetainedToolAdmissionRequestV1,
     ) -> Result<Option<NativeCallerReleaseCustodyV1>, AdmissionOperationStoreError> {
-        let payload: serde_json::Value =
-            serde_json::from_slice(self.kernel_context_json()).map_err(invalid)?;
+        let payload: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+            self.kernel_context_json(),
+            AdmissionCallerDispatchContextV1::MAX_KERNEL_CONTEXT_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationStoreError::from)?;
         let native = operation
             .provider_attempt()
             .is_some_and(ProviderAttemptBindingV1::is_native_caller_report);

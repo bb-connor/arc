@@ -390,3 +390,33 @@ fn checkpoint_archive_upgrades_and_reopens_with_exact_typed_predecessors() -> Te
     tx.rollback()?;
     Ok(())
 }
+
+#[test]
+fn overflowing_retention_duration_refuses_before_archiving_or_deleting() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("live.sqlite");
+    let archive = directory.path().join("archive.sqlite");
+    let store = SqliteReceiptStore::open(&path)?;
+    store.append_chio_receipt(&sample_receipt_with_id("duration-overflow"))?;
+    store.flush_receipt_writes()?;
+    let config = chio_kernel::RetentionConfig {
+        retention_days: u64::MAX,
+        archive_path: archive.to_str().ok_or("archive path")?.to_owned(),
+        ..Default::default()
+    };
+    assert!(matches!(store.rotate_if_needed(&config),
+        Err(ReceiptStoreError::ReadBoundary(message)) if message == "retention duration overflow"));
+    let count: i64 = Connection::open(&path)?.query_row(
+        "SELECT COUNT(*) FROM chio_tool_receipts",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(count, 1);
+    assert!(!archive.exists());
+    let valid = chio_kernel::RetentionConfig {
+        retention_days: 36_500,
+        ..config
+    };
+    assert_eq!(store.rotate_if_needed(&valid)?, 0);
+    Ok(())
+}

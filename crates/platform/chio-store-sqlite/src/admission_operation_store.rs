@@ -1,5 +1,4 @@
 use std::sync::{Arc, MutexGuard};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance;
@@ -33,8 +32,7 @@ use chio_kernel::budget_store::{
 use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalTransition};
 use chio_kernel::receipt_store::{
     AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
-    AdmissionPaymentSettlementBegin, AuthorizationReceiptConsumption, PendingSettlementObservation,
-    ReceiptStore, ReceiptStoreError,
+    AdmissionPaymentSettlementBegin, PendingSettlementObservation, ReceiptStore, ReceiptStoreError,
 };
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};

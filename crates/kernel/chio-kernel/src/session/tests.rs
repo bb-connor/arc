@@ -15,7 +15,8 @@ fn make_context(request_id: &str) -> OperationContext {
 
 #[test]
 fn lifecycle_transitions_cover_ready_draining_closed() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
 
     assert_eq!(session.state(), SessionState::Initializing);
     session.activate().unwrap();
@@ -28,7 +29,8 @@ fn lifecycle_transitions_cover_ready_draining_closed() {
 
 #[test]
 fn lifecycle_transitions_do_not_require_exclusive_session_borrow() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let shared = &session;
 
     shared.activate().unwrap();
@@ -39,11 +41,10 @@ fn lifecycle_transitions_do_not_require_exclusive_session_borrow() {
 
 #[test]
 fn operation_boundary_holds_ready_state_until_the_effect_finishes() {
-    let session = Arc::new(Session::new(
-        SessionId::new("sess-1"),
-        "agent-1".to_string(),
-        Vec::new(),
-    ));
+    let session = Arc::new(
+        Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+            .expect("fixture session clock"),
+    );
     session.activate().unwrap();
     let effect_entered = Arc::new(Barrier::new(2));
     let release_effect = Arc::new(Barrier::new(2));
@@ -86,7 +87,8 @@ fn operation_boundary_holds_ready_state_until_the_effect_finishes() {
 
 #[test]
 fn close_refuses_to_clear_active_requests_until_drained() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let context = make_context("req-close-drain");
 
     session.activate().unwrap();
@@ -128,7 +130,8 @@ fn close_refuses_to_clear_active_requests_until_drained() {
 
 #[test]
 fn tool_calls_not_allowed_during_initializing_or_draining() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
 
     let err = session
         .ensure_operation_allowed(OperationKind::ToolCall)
@@ -146,7 +149,8 @@ fn tool_calls_not_allowed_during_initializing_or_draining() {
 
 #[test]
 fn peer_capabilities_and_roots_are_session_scoped() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
 
     session.set_peer_capabilities(PeerCapabilities {
         authorization: None,
@@ -189,7 +193,8 @@ fn peer_capabilities_and_roots_are_session_scoped() {
 
 #[test]
 fn mixed_roots_preserve_metadata_without_widening_enforceable_set() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     session.replace_roots(vec![
         RootDefinition {
             uri: "file:///workspace/project/src".to_string(),
@@ -227,7 +232,8 @@ fn mixed_roots_preserve_metadata_without_widening_enforceable_set() {
 
 #[test]
 fn inflight_registry_tracks_and_completes_requests() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let context = make_context("req-1");
 
     session.activate().unwrap();
@@ -249,7 +255,8 @@ fn inflight_registry_tracks_and_completes_requests() {
 
 #[test]
 fn child_request_requires_parent_inflight() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let mut child_context = make_context("req-child");
     child_context.parent_request_id = Some(RequestId::new("req-parent"));
 
@@ -262,7 +269,8 @@ fn child_request_requires_parent_inflight() {
 
 #[test]
 fn duplicate_inflight_request_is_rejected() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let context = make_context("req-1");
 
     session.activate().unwrap();
@@ -278,7 +286,8 @@ fn duplicate_inflight_request_is_rejected() {
 
 #[test]
 fn cancellation_marks_cancellable_request() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let context = make_context("req-1");
 
     session.activate().unwrap();
@@ -476,7 +485,8 @@ fn cancellation_and_dispatch_start_preserve_atomic_pre_dispatch_boundary() {
 
 #[test]
 fn cancelled_dispatching_parent_cannot_start_another_child() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let parent_context = make_context("req-parent-cancelled");
     let mut child_context = make_context("req-child-after-cancel");
     child_context.parent_request_id = Some(parent_context.request_id.clone());
@@ -508,7 +518,8 @@ fn cancelled_dispatching_parent_cannot_start_another_child() {
 
 #[test]
 fn inflight_request_reports_request_owned_semantics() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let context = make_context("req-1");
 
     session.activate().unwrap();
@@ -531,7 +542,8 @@ fn inflight_request_reports_request_owned_semantics() {
 
 #[test]
 fn complete_request_can_record_cancelled_terminal_state() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let context = make_context("req-1");
 
     session.activate().unwrap();
@@ -577,7 +589,8 @@ fn terminal_registry_keeps_first_terminal_state() {
 
 #[test]
 fn terminal_marking_accepts_shared_session_borrow_and_updates_lineage() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let context = make_context("req-terminal-shared");
     let terminal_state = OperationTerminalState::Incomplete {
         reason: "upstream closed".to_string(),
@@ -603,7 +616,8 @@ fn terminal_marking_accepts_shared_session_borrow_and_updates_lineage() {
 
 #[test]
 fn inflight_request_lifecycle_accepts_shared_session_borrow() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let context = make_context("req-shared");
     let shared = &session;
 
@@ -647,7 +661,8 @@ fn inflight_registry_complete_missing_request_keeps_zero_count() {
 
 #[test]
 fn resource_subscriptions_are_cleared_on_close() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
 
     session.activate().unwrap();
     session.subscribe_resource("repo://docs/roadmap");
@@ -663,11 +678,10 @@ fn resource_subscriptions_are_cleared_on_close() {
 
 #[test]
 fn resource_subscriptions_accept_shared_arc_session() {
-    let session = Arc::new(Session::new(
-        SessionId::new("sess-1"),
-        "agent-1".to_string(),
-        Vec::new(),
-    ));
+    let session = Arc::new(
+        Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+            .expect("fixture session clock"),
+    );
     let subscriber = Arc::clone(&session);
     let observer = Arc::clone(&session);
 
@@ -684,7 +698,8 @@ fn resource_subscriptions_accept_shared_arc_session() {
 
 #[test]
 fn session_anchor_rotates_on_auth_context_change() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let initial_anchor = session.session_anchor().clone();
     assert_eq!(
         session.auth_context(),
@@ -716,7 +731,8 @@ fn session_anchor_rotates_on_auth_context_change() {
 
 #[test]
 fn session_anchor_does_not_rotate_when_auth_context_is_unchanged() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let auth_context = SessionAuthContext::streamable_http_static_bearer(
         "static-bearer:abcd1234",
         "cafebabe",
@@ -739,7 +755,8 @@ fn session_anchor_does_not_rotate_when_auth_context_is_unchanged() {
 
 #[test]
 fn close_persisted_appends_terminal_anchor_with_supersedes_link() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let initial_anchor = session.session_anchor().clone();
     let (rotated, _snapshot, supersedes_anchor_id) = session
         .set_auth_context(SessionAuthContext::streamable_http_static_bearer(
@@ -779,7 +796,8 @@ fn close_persisted_appends_terminal_anchor_with_supersedes_link() {
 
 #[test]
 fn close_persisted_is_idempotent_once_closed() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     session
         .set_auth_context(SessionAuthContext::streamable_http_static_bearer(
             "static-bearer:abcd1234",
@@ -816,7 +834,8 @@ fn close_persisted_is_idempotent_once_closed() {
 
 #[test]
 fn child_request_is_rejected_after_parent_anchor_rotation() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     let parent_context = make_context("req-parent");
     let mut child_context = make_context("req-child");
     child_context.parent_request_id = Some(parent_context.request_id.clone());
@@ -847,7 +866,8 @@ fn child_request_is_rejected_after_parent_anchor_rotation() {
 
 #[test]
 fn url_elicitation_completions_become_session_late_events() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     session.register_pending_url_elicitation("elicit-1", Some("task-7".to_string()));
 
     session.queue_elicitation_completion("elicit-1");
@@ -865,7 +885,8 @@ fn url_elicitation_completions_become_session_late_events() {
 
 #[test]
 fn tool_server_events_are_filtered_and_stored_per_session() {
-    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+    let session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new())
+        .expect("fixture session clock");
     session.activate().unwrap();
     session.subscribe_resource("repo://docs/roadmap");
     session.register_pending_url_elicitation("elicit-2", None);
@@ -894,4 +915,55 @@ fn tool_server_events_are_filtered_and_stored_per_session() {
             },
         ]
     );
+}
+
+#[test]
+fn clock_outage_and_regression_leave_session_authority_and_inflight_unchanged(
+) -> Result<(), SessionError> {
+    use chio_security_types::clock::{
+        Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis,
+    };
+    struct ControlledClock(std::sync::Mutex<Result<ClockReading, ClockError>>);
+    impl Clock for ControlledClock {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            *self.0.lock().map_err(|_| ClockError::Unavailable)?
+        }
+    }
+    let clock = Arc::new(ControlledClock(std::sync::Mutex::new(Ok(
+        ClockReading::new(UnixMillis::new(10_000), MonotonicInstant::from_nanos(1_000)),
+    ))));
+    let session = Session::new_with_clock(
+        SessionId::new("sess-1"),
+        "agent-1".into(),
+        vec![],
+        clock.clone(),
+    )?;
+    session.activate()?;
+    let anchor = session.session_anchor();
+    for failure in [
+        Err(ClockError::Unavailable),
+        Ok(ClockReading::new(
+            UnixMillis::new(9_000),
+            MonotonicInstant::from_nanos(2_000),
+        )),
+    ] {
+        *clock.0.lock().map_err(|_| ClockError::Unavailable)? = failure;
+        let expected = if failure.is_err() {
+            ClockError::Unavailable
+        } else {
+            ClockError::WallClockRegression
+        };
+        assert!(
+            matches!(session.track_request(&make_context("failed-clock"), OperationKind::ToolCall, true), Err(SessionError::Clock(error)) if error == expected)
+        );
+        assert!(session
+            .request_lineage(&RequestId::new("failed-clock"))
+            .is_none());
+        assert_eq!(session.inflight.len(), 0);
+        assert!(matches!(session.close(), Err(SessionError::Clock(error)) if error == expected));
+        assert_eq!(session.state(), SessionState::Ready);
+        assert_eq!(session.session_anchor().id(), anchor.id());
+        assert_eq!(session.session_anchor().auth_epoch(), anchor.auth_epoch());
+    }
+    Ok(())
 }

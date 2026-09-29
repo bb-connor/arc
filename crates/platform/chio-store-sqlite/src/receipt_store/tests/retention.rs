@@ -760,7 +760,7 @@ fn size_rotation_converges_below_threshold() -> Result<(), Box<dyn std::error::E
     // Force the size branch: threshold just under the current live size.
     let before = store.live_db_size_bytes()?;
     let config = RetentionConfig {
-        retention_days: u64::MAX, // disable the time branch
+        retention_days: 36_500, // a century keeps these fixtures outside the time cutoff
         max_size_bytes: before.saturating_sub(1),
         archive_path: archive.to_str().ok_or("archive path invalid")?.to_string(),
         ..RetentionConfig::default()
@@ -813,7 +813,7 @@ fn size_rotation_archives_when_median_timestamp_is_shared() -> Result<(), Box<dy
 
     let before = store.live_db_size_bytes()?;
     let config = RetentionConfig {
-        retention_days: u64::MAX, // disable the time branch
+        retention_days: 36_500, // a century keeps these fixtures outside the time cutoff
         max_size_bytes: before.saturating_sub(1),
         archive_path: archive.to_str().ok_or("archive path invalid")?.to_string(),
         ..RetentionConfig::default()

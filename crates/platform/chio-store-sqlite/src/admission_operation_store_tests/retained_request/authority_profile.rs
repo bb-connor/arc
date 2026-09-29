@@ -33,14 +33,20 @@ pub(crate) fn prepare_with_profile(
 ) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
     assert_eq!(operation.state(), AdmissionOperationState::Prepared);
     assert_eq!(operation.version(), 1);
-    assert!(original.authority_profile().is_none());
     original.validate_binding(operation.binding())?;
+    let mut wire: serde_json::Value = serde_json::from_slice(original.canonical_bytes())?;
+    let mut prior = super::base_request_hash(original.request_for_revalidation())?;
+    if let Some(binding) = wire.get("security_binding") {
+        prior = sha256_hex(&canonical_json_bytes(&serde_json::json!({
+            "schema": if binding.get("native_authority").is_some() { "chio.tool-admission-request.v3" } else { "chio.tool-admission-request.v2" },
+            "unbound_request_hash": prior, "security_binding": binding,
+        }))?);
+    }
     let immutable = sha256_hex(&canonical_json_bytes(&serde_json::json!({
         "schema": "chio.tool-admission-request.v4",
-        "prior_request_hash": operation.binding().immutable_request_hash(),
+        "prior_request_hash": prior,
         "authority_profile": profile,
     }))?);
-    let mut wire: serde_json::Value = serde_json::from_slice(original.canonical_bytes())?;
     wire["schema"] = "chio.retained-tool-admission-request.v4".into();
     wire["authority_profile"] = serde_json::to_value(profile)?;
     let retained =

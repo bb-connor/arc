@@ -187,8 +187,15 @@ impl DurableAdmissionRuntime {
         self.channel_terminal_authority = Some(authority);
     }
 
-    fn refresh_trusted_time(&self, requested_unix_ms: u64) -> u64 {
-        requested_unix_ms.max(current_unix_timestamp_ms()).max(1)
+    fn refresh_trusted_time(
+        &self,
+        requested_unix_ms: u64,
+    ) -> Result<u64, chio_security_types::clock::ClockError> {
+        let now = read_unix_timestamp_ms()?;
+        if now == 0 {
+            return Err(chio_security_types::clock::ClockError::InvalidWindow);
+        }
+        Ok(requested_unix_ms.max(now))
     }
 
     fn authority(&self) -> BudgetEventAuthority {
@@ -721,19 +728,21 @@ impl ChioKernel {
                     "operation already has a live evaluation or recovery owner".into(),
                 )
             })?;
-        let retained_request = authority_profile.as_ref().map(|profile| {
-            crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission_with_profile(
-                request,
-                matching_grants,
-                &post_return_plan.frozen_steps,
-                security_binding.as_ref(),
-                Some(profile),
-            )
-        })
-        .transpose()
-        .map_err(durable_store_error)?;
+        let retained_request = authority_profile
+            .as_ref()
+            .map(|profile| {
+                crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission(
+                    request,
+                    matching_grants,
+                    &post_return_plan.frozen_steps,
+                    security_binding.as_ref(),
+                    profile,
+                )
+            })
+            .transpose()
+            .map_err(durable_store_error)?;
         let mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let begun = match retained_request.as_ref() {
             Some(retained) => runtime.store.begin_with_retained_tool_request(
                 &prepared,
@@ -1032,7 +1041,7 @@ impl ChioKernel {
         })?;
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let (operation, created_by_this_attempt) = match runtime
             .store
             .begin(&prepared, &runtime.fence, trusted_now_unix_ms)
@@ -1329,7 +1338,7 @@ impl ChioKernel {
         self.register_supplemental_admission(admission, &request, trusted_now_unix_ms)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let expected = admission.operation.clone();
         let hold_id = request.hold_id.clone().ok_or_else(|| {
             KernelError::DurableAdmission(
@@ -1452,7 +1461,7 @@ impl ChioKernel {
         }
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let attachments = vec![
             AdmissionAttachment::ThresholdProposalHash(proposal_hash),
             AdmissionAttachment::ApprovalSetHash(approval_set_hash),
@@ -1513,7 +1522,7 @@ impl ChioKernel {
         }
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if matches!(
             admission.operation.state(),
             AdmissionOperationState::BudgetAuthorized | AdmissionOperationState::ApprovalReserved
@@ -1549,7 +1558,7 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if admission.operation.state() == AdmissionOperationState::DispatchCommitted {
             return Ok(());
         }
@@ -1598,7 +1607,7 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let current = runtime
             .store
             .load_by_operation_id(operation.binding().operation_id())
@@ -1806,7 +1815,7 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let charge = budget_mutation.durable_hold_result_mut().ok_or_else(|| {
             KernelError::DurableAdmission(
                 "combined dispatch commit requires an authorized budget hold".to_owned(),
@@ -1914,7 +1923,7 @@ impl ChioKernel {
     ) -> Result<u64, KernelError> {
         Ok(self
             .durable_runtime()?
-            .refresh_trusted_time(requested_unix_ms))
+            .refresh_trusted_time(requested_unix_ms)?)
     }
 
     fn durable_runtime(&self) -> Result<&DurableAdmissionRuntime, KernelError> {

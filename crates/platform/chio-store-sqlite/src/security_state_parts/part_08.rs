@@ -1164,7 +1164,8 @@ fn decode_egress_command_contribution(
 ) -> PortResult<EgressCommandContributionBody> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
     let contribution: EgressCommandContributionBody =
-        serde_json::from_slice(request.canonical_contribution.as_bytes())
+        chio_core::canonical::UntrustedJsonText::from_wire(request.canonical_contribution.as_bytes(), 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
             .map_err(|_| PortError::invalid_data())?;
     let canonical =
         canonical_json_bytes(&contribution).map_err(|_| PortError::integrity_failure())?;
@@ -1215,7 +1216,8 @@ fn load_egress_restriction_command(
             if body_hash(&request_body).as_slice() != request_hash.as_bytes() {
                 return Err(PortError::integrity_failure());
             }
-            let request: EffectRequest = serde_json::from_slice(&request_body)
+            let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(&request_body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
                 .map_err(|_| PortError::integrity_failure())?;
             let canonical_request =
                 canonical_json_bytes(&request).map_err(|_| PortError::integrity_failure())?;
@@ -1227,7 +1229,8 @@ fn load_egress_restriction_command(
                 return Err(PortError::integrity_failure());
             }
             let result: EffectResult =
-                serde_json::from_slice(&result_body).map_err(|_| PortError::integrity_failure())?;
+                chio_core::canonical::UntrustedJsonText::from_wire(&result_body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed()).map_err(|_| PortError::integrity_failure())?;
             let canonical_result =
                 canonical_json_bytes(&result).map_err(|_| PortError::integrity_failure())?;
             if canonical_result.as_slice() != result_body.as_slice()

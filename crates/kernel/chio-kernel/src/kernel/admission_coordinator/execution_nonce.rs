@@ -196,7 +196,7 @@ impl ChioKernel {
         self.register_supplemental_admission(admission, &request, trusted_now_unix_ms)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if request.authority.as_ref() != Some(&runtime.authority()) {
             return Err(KernelError::DurableAdmission(
                 "nonce preflight authority does not match the admission fence".to_owned(),
@@ -318,7 +318,7 @@ impl ChioKernel {
         })?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if admission
             .operation
             .runtime_participant_ledger_digest()
@@ -421,7 +421,7 @@ impl ChioKernel {
         })?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if matches!(
             admission.operation.state(),
             AdmissionOperationState::BudgetAuthorized | AdmissionOperationState::ApprovalReserved
@@ -512,7 +512,7 @@ impl ChioKernel {
         // Select trusted time after recovery's mutations, not before waiting
         // for their SQLite transaction. The retained lookup checks row time.
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let selector = AdmissionIdentifier::try_new("request_id", request_id.to_owned())
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
         let (operation, retained) = runtime
@@ -543,7 +543,7 @@ impl ChioKernel {
         self.reserve_durable_execution_nonce(admission, trusted_now_unix_ms)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if admission.operation.state() == AdmissionOperationState::ReadyToDispatch {
             let expected = admission.operation.clone();
             let lease = self.claim_admission_recovery(&expected, trusted_now_unix_ms)?;

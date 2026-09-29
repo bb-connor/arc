@@ -135,6 +135,8 @@ pub struct CollectedThresholdApprovalSet {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ThresholdApprovalCollectorStoreError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("threshold approval proposal not found: {0}")]
     NotFound(String),
     #[error("threshold approval collector conflict: {0}")]

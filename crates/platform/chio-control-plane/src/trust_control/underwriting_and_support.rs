@@ -1519,7 +1519,8 @@ mod underwriting_and_support_tests {
     #[test]
     fn underwriting_compliance_evidence_rejects_subject_mismatch() {
         let activity = chio_kernel::ReceiptAnalyticsResponse {
-            summary: chio_kernel::ReceiptAnalyticsMetrics::from_raw(5, 4, 1, 0, 0, 10, 2),
+            summary: chio_kernel::ReceiptAnalyticsMetrics::from_raw(5, 4, 1, 0, 0, 10, 2)
+                .test_unwrap(),
             by_agent: Vec::new(),
             by_tool: Vec::new(),
             by_time: Vec::new(),

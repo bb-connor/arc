@@ -21,13 +21,14 @@ fn native_retained_codec_is_strict_and_hash_domain_is_versioned() -> TestResult 
         &matching,
         &[],
         security.as_ref(),
+        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
     )?;
     retained.validate_native_security_context(&context)?;
     retained.validate_native_security_authority(&selected)?;
     let original: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     assert_eq!(
         original["schema"],
-        "chio.retained-tool-admission-request.v3"
+        "chio.retained-tool-admission-request.v4"
     );
     let unbound = immutable_tool_request_hash(&request, &matching, &[], None)?;
     let independent = serde_json::json!({"schema": "chio.tool-admission-request.v3", "unbound_request_hash": unbound, "security_binding": original["security_binding"]});
@@ -90,8 +91,8 @@ fn native_retained_codec_is_strict_and_hash_domain_is_versioned() -> TestResult 
 }
 
 #[test]
-fn context_only_v2_keeps_its_exact_historical_bytes_and_hash() -> TestResult {
-    let (_, request, _, _) = durable_admission_fixture("native-v2-compatibility");
+fn current_profile_with_context_only_binding_has_exact_bytes_and_hash() -> TestResult {
+    let (_, request, _, _) = durable_admission_fixture("native-context-only");
     let context = context(&request, 1)?;
     let security = AdmissionSecurityBindingV1::from_trusted_context(Some(&context), true, true)?;
     let matching = matching(&request)?;
@@ -100,6 +101,7 @@ fn context_only_v2_keeps_its_exact_historical_bytes_and_hash() -> TestResult {
         &matching,
         &[],
         security.as_ref(),
+        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
     )?;
     let mut independent: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     let context = context.as_v1();
@@ -110,7 +112,7 @@ fn context_only_v2_keeps_its_exact_historical_bytes_and_hash() -> TestResult {
             "lineage_root_id": context.lineage_root_id(), "context_generation": context.context_generation() },
         "pre_dispatch_required": true, "pre_dispatch_hook_installed": true
     });
-    independent["schema"] = "chio.retained-tool-admission-request.v2".into();
+    independent["schema"] = "chio.retained-tool-admission-request.v4".into();
     assert_eq!(
         retained.canonical_bytes(),
         canonical_json_bytes(&independent)?
@@ -123,8 +125,13 @@ fn context_only_v2_keeps_its_exact_historical_bytes_and_hash() -> TestResult {
         sha256_hex(&canonical_json_bytes(&hash)?)
     );
     assert!(retained.native_security_authority_binding().is_none());
-    assert!(retained
-        .validate_native_security_authority(&binding("native-store", "source", b"initialization")?)
-        .is_err());
+    assert!(matches!(
+        retained.validate_native_security_authority(&binding(
+            "native-store",
+            "source",
+            b"initialization"
+        )?),
+        Err(crate::admission_operation::AdmissionOperationStoreError::Invariant(_))
+    ));
     Ok(())
 }

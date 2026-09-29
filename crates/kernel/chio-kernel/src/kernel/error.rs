@@ -111,6 +111,8 @@ impl std::fmt::Display for ReplayClockDirection {
 /// Errors that can occur during kernel operations.
 #[derive(Debug, thiserror::Error)]
 pub enum KernelError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("unknown session: {0}")]
     UnknownSession(SessionId),
 
@@ -769,6 +771,11 @@ impl KernelError {
                 report.message = self.to_string();
                 report
             }
+            Self::UntrustedInput(error) => self.report_with_context(
+                error.code(),
+                serde_json::json!({ "rejection": error.code() }),
+                "Supply valid bounded JSON matching the admitted input contract.",
+            ),
             Self::Clock(error) => self.report_with_context(
                 error.code(),
                 serde_json::json!({ "rejection": error.code() }),

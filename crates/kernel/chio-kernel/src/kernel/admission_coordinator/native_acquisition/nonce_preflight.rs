@@ -123,8 +123,7 @@ impl ChioKernel {
             original.ok_or_else(|| invalid("native preparation requires original request"))?;
         let context =
             context.ok_or_else(|| invalid("native preparation requires trusted context"))?;
-        if original.authority_profile().is_none()
-            || admission.operation.state() != AdmissionOperationState::Prepared
+        if admission.operation.state() != AdmissionOperationState::Prepared
             || !admission.requires_execution_nonce()
             || request.execution_nonce.is_some()
             || admission

@@ -205,3 +205,18 @@ fn invalid(message: &str) -> AdmissionOperationStoreError {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+impl AdmissionAuthorityProfileV1 {
+    pub(crate) fn unconfigured_for_test() -> Result<Self, AdmissionOperationStoreError> {
+        Self::new(AdmissionAuthoritySelectionV1 {
+            runtime_hook_installed: false,
+            swarm_admission_required: false,
+            runtime_enforces_swarm_authority: false,
+            runtime_requires_dispatch_revalidation: false,
+            runtime: None,
+            approval: None,
+            dpop: None,
+        })
+    }
+}

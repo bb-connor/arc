@@ -325,6 +325,8 @@ pub struct AuthorizationReceiptConsumption {
 #[derive(Debug, thiserror::Error)]
 pub enum ReceiptStoreError {
     #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error(transparent)]
     UntrustedInput(std::sync::Arc<chio_core::canonical::UntrustedJsonError>),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),

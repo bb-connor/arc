@@ -26,8 +26,12 @@ impl CallerDeliveryEvidenceV1 {
             .native_release_custody(operation, original)
             .map_err(invalid)?
             .ok_or(CallerDeliveryError::Binding)?;
-        let payload: serde_json::Value = serde_json::from_slice(frame.kernel_context_json())
-            .map_err(|_| CallerDeliveryError::Shape)?;
+        let payload: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+            frame.kernel_context_json(),
+            crate::admission_operation::AdmissionCallerDispatchContextV1::MAX_KERNEL_CONTEXT_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| CallerDeliveryError::Shape)?;
         let not_before_unix_ms = payload
             .get("frozen_at_unix_ms")
             .and_then(serde_json::Value::as_u64)
@@ -35,7 +39,7 @@ impl CallerDeliveryEvidenceV1 {
         let request = original.request_for_revalidation();
         let executor = original
             .authority_profile()
-            .and_then(|profile| profile.caller_executor())
+            .caller_executor()
             .ok_or(CallerDeliveryError::Binding)?;
         let expires_at_unix_ms = u64::try_from(nonce.signed_nonce().expires_at())
             .ok()

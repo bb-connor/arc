@@ -125,8 +125,10 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
         if policy_json.is_empty() || policy_json.len() > 256 * 1024 {
             return Err(invalid("native dispatch policy exceeds its bound"));
         }
-        let policy: serde_json::Value = serde_json::from_slice(policy_json)
-            .map_err(|_| invalid("native dispatch policy is not JSON"))?;
+        let policy: serde_json::Value =
+            chio_core::canonical::UntrustedJsonText::from_wire(policy_json, 256 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(crate::KernelError::from)?;
         if canonical_json_bytes(&policy)
             .map_err(|_| invalid("native dispatch policy is not canonical"))?
             != policy_json
@@ -144,7 +146,7 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
         let policy = self.validate_ledger_input(grant_index, policy_json)?;
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(self.observation.observed_at_unix_ms());
+        let now = runtime.refresh_trusted_time(self.observation.observed_at_unix_ms())?;
         self.revalidate(runtime, now)?;
         let lease = self.kernel.claim_admission_recovery(&self.operation, now)?;
         let acknowledged = store_call(|| {
@@ -171,7 +173,7 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
             ));
         }
         self.validate_ledger(&loaded, grant_index, &policy)?;
-        let after = runtime.refresh_trusted_time(now);
+        let after = runtime.refresh_trusted_time(now)?;
         self.revalidate(runtime, after)?;
         if store_call(|| {
             runtime
@@ -203,8 +205,12 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
                 "native dispatch ledger returned invalid bounded evidence",
             ));
         }
-        let value: serde_json::Value = serde_json::from_slice(&record.canonical_record)
-            .map_err(|_| invalid("native dispatch ledger is not JSON"))?;
+        let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+            &record.canonical_record,
+            256 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(crate::KernelError::from)?;
         let operation = serde_json::to_value(self.operation.to_persisted())
             .map_err(|_| invalid("native dispatch operation cannot encode"))?;
         let context = serde_json::to_value(&self.context)

@@ -100,7 +100,10 @@ impl AdmissionCallerDispatchContextV1 {
         }
         operation.validate()?;
         original.validate_binding(operation.binding())?;
-        let wire: ContextWire = serde_json::from_slice(bytes).map_err(invalid)?;
+        let wire: ContextWire =
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_BYTES)
+                .and_then(|input| input.decode_signed())
+                .map_err(AdmissionOperationStoreError::from)?;
         let requirements = operation.binding().participant_requirements();
         if wire.schema != SCHEMA
             || !requirements.budget_capture
@@ -175,7 +178,12 @@ fn validate_payload(bytes: &[u8]) -> Result<(), AdmissionOperationStoreError> {
     {
         return Err(invalid("kernel caller context exceeds its payload bound"));
     }
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(invalid)?;
+    let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        bytes,
+        AdmissionCallerDispatchContextV1::MAX_KERNEL_CONTEXT_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(AdmissionOperationStoreError::from)?;
     if !value.is_object() || canonical_json_bytes(&value).map_err(invalid)? != bytes {
         return Err(invalid(
             "kernel caller context must be a canonical JSON object",

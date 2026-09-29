@@ -38,7 +38,7 @@ impl ChioKernel {
     ) -> Result<crate::payment::PaymentJournalRecord, KernelError> {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let recovery_lease =
             self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
         let journal = runtime

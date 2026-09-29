@@ -136,7 +136,11 @@ impl CapabilitySnapshot {
             return Err(self.conflict("contains a signed token with an invalid signature"));
         }
 
-        let persisted_scope: ChioScope = serde_json::from_str(&self.grants_json)?;
+        let persisted_scope: ChioScope = chio_core::canonical::UntrustedJsonText::from_wire(
+            self.grants_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())?;
         let scope_matches =
             serde_json::to_value(&persisted_scope)? == serde_json::to_value(&token.scope)?;
         let fields_match = self.capability_id == token.id
@@ -184,7 +188,11 @@ impl CapabilitySnapshot {
             .map_err(|error| self.conflict(&format!("has an invalid subject key: {error}")))?;
         PublicKey::from_hex(&self.issuer_key)
             .map_err(|error| self.conflict(&format!("has an invalid issuer key: {error}")))?;
-        let _: ChioScope = serde_json::from_str(&self.grants_json)?;
+        let _: ChioScope = chio_core::canonical::UntrustedJsonText::from_wire(
+            self.grants_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())?;
         Ok(())
     }
 

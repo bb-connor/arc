@@ -23,7 +23,7 @@ impl SqliteReceiptStore {
             )));
         }
 
-        let updated_at = unix_timestamp_now_i64();
+        let updated_at = unix_timestamp_now_i64()?;
         let receipt_id_owned = receipt_id.to_string();
         let note_owned = note.map(ToString::to_string);
         self.writer_handle().run_write(move |connection| {
@@ -113,7 +113,7 @@ impl SqliteReceiptStore {
             }
         }
 
-        let updated_at = unix_timestamp_now_i64();
+        let updated_at = unix_timestamp_now_i64()?;
         let receipt_id_owned = receipt_id.to_string();
         let evidence_owned = evidence.clone();
         let note_owned = note.map(ToString::to_string);

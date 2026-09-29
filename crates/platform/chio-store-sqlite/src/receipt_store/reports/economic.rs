@@ -358,7 +358,7 @@ impl SqliteReceiptStore {
 
         Ok(EconomicCompletionFlowReport {
             schema: ECONOMIC_COMPLETION_FLOW_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now()?,
             filters: normalized,
             summary: EconomicCompletionFlowSummary {
                 matching_receipts: economic_receipts.summary.matching_receipts,

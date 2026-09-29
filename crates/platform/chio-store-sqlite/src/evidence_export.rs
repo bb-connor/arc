@@ -444,7 +444,10 @@ fn load_checkpoint_publication_trust_anchor_binding(
         )
         .optional()?;
     binding_json
-        .map(|value| serde_json::from_str::<CheckpointPublicationTrustAnchorBinding>(&value))
+        .map(|value| {
+            chio_core::canonical::UntrustedJsonText::from_wire(value.as_bytes(), 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed::<CheckpointPublicationTrustAnchorBinding>())
+        })
         .transpose()
         .map_err(EvidenceExportError::from)
 }

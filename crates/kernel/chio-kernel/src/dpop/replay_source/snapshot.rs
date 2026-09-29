@@ -202,7 +202,9 @@ impl DpopReplaySourceSnapshot {
             return Err(invalid("snapshot has invalid byte length"));
         }
         let envelope: Envelope =
-            serde_json::from_slice(bytes).map_err(|_| invalid("snapshot decoding failed"))?;
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_DPOP_REPLAY_SOURCE_BYTES)
+                .and_then(|input| input.decode_signed())
+                .map_err(crate::KernelError::from)?;
         envelope.body.validate()?;
         if digest(&envelope.body)? != envelope.inventory_sha256 {
             return Err(invalid("snapshot digest mismatch"));

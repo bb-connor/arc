@@ -21,8 +21,7 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
             return Ok(AdmissionOperationCreateOutcome::Existing(existing.clone()));
         }
         if let Some(existing) = state.operations.values().find(|existing| {
-            existing.kind() == operation.kind()
-                && existing.request_id() == operation.request_id()
+            existing.kind() == operation.kind() && existing.request_id() == operation.request_id()
         }) {
             if existing.has_same_prepared_binding(&operation) {
                 return Ok(AdmissionOperationCreateOutcome::Existing(existing.clone()));
@@ -71,9 +70,7 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
             .lock()?
             .operations
             .values()
-            .filter(|operation| {
-                operation.kind() == kind && operation.request_id() == request_id
-            })
+            .filter(|operation| operation.kind() == kind && operation.request_id() == request_id)
             .cloned()
             .collect::<Vec<_>>();
         operations.sort_unstable_by(|left, right| left.operation_id().cmp(right.operation_id()));
@@ -205,9 +202,7 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
             })
             .cloned()
             .collect::<Vec<_>>();
-        operations.sort_unstable_by(|left, right| {
-            left.operation_id().cmp(right.operation_id())
-        });
+        operations.sort_unstable_by(|left, right| left.operation_id().cmp(right.operation_id()));
         operations.truncate(limit);
         Ok(operations)
     }
@@ -386,8 +381,7 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
         }
         if action.kind() == AdmissionCleanupActionKind::CallerReservationHandoff
             && (current.kind() != AdmissionOperationKind::ToolDispatch
-                || current.state()
-                    != AdmissionOperationState::CallerReservationCapturePending
+                || current.state() != AdmissionOperationState::CallerReservationCapturePending
                 || current.dispatch_state() != AdmissionDispatchState::NotStarted
                 || next_state != AdmissionOperationState::CallerReserved
                 || next_dispatch_state != AdmissionDispatchState::Committed)
@@ -519,8 +513,7 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
                     operation.state(),
                     AdmissionOperationState::CompensationPending
                         | AdmissionOperationState::CompensatedBeforeDispatch
-                )
-                    && kind.is_none_or(|kind| operation.kind() == kind)
+                ) && kind.is_none_or(|kind| operation.kind() == kind)
                     && state.cleanup_actions.values().any(|action| {
                         action.operation_id() == operation.operation_id()
                             && !matches!(
@@ -733,11 +726,12 @@ fn validate_cleanup_payload(
         )));
     }
     validate_digest(payload_hash, "cleanup payload_hash")?;
-    let value: serde_json::Value = serde_json::from_str(payload_json).map_err(|error| {
-        AdmissionOperationError::Invalid(format!(
-            "persisted cleanup payload is invalid JSON: {error}"
-        ))
-    })?;
+    let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        (payload_json).as_bytes(),
+        MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(AdmissionOperationError::from)?;
     let canonical = canonical_json_bytes(&value).map_err(|error| {
         AdmissionOperationError::Invalid(format!(
             "persisted cleanup payload cannot be canonicalized: {error}"

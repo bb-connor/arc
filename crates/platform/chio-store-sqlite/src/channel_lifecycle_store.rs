@@ -54,6 +54,8 @@ const MAX_CHANNEL_PREPARED_PLAN_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChannelLifecycleStoreError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("channel lifecycle store is unavailable: {0}")]
     Unavailable(String),
     #[error("channel lifecycle store mutation was fenced")]

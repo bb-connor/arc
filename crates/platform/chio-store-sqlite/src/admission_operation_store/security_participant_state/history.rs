@@ -142,9 +142,7 @@ impl Record {
                 // Only raw v1 history may predate original native selection.
                 // A new-format event must retain the writer's original custody
                 // requirements when reopened, not just its resolved labels.
-                if original.native_security_authority_binding().is_none()
-                    || original.authority_profile().is_none()
-                {
+                if original.native_security_authority_binding().is_none() {
                     return Err(invalid(
                         "native input history lacks original authority custody",
                     ));

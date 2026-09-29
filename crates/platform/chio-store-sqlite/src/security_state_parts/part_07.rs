@@ -70,7 +70,8 @@ fn load_response_dispatch(
     validate_canonical_json_body(&canonical_authorization, &authorization_body_hash)
         .map_err(|_| PortError::integrity_failure())?;
     let authorization_body: ResponseDispatchAuthorizationBody =
-        serde_json::from_slice(canonical_authorization.as_bytes())
+        chio_core::canonical::UntrustedJsonText::from_wire(canonical_authorization.as_bytes(), 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
             .map_err(|_| PortError::integrity_failure())?;
     let response_body_hash = decode_digest(response_body_hash)?;
     let canonical_response =
@@ -254,7 +255,8 @@ fn load_automatic_response_dispatch_fence(
     else {
         return Ok(None);
     };
-    let binding = serde_json::from_slice::<PreparedActiveResponseDispatchBinding>(&body)
+    let binding = chio_core::canonical::UntrustedJsonText::from_wire(&body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed::<PreparedActiveResponseDispatchBinding>())
         .map_err(|_| PortError::integrity_failure())?;
     validate_automatic_response_dispatch_fence_binding_shape(&binding)?;
     let (canonical_body, canonical_hash) = canonical_prepared_dispatch_binding(&binding)
@@ -1216,7 +1218,8 @@ fn decode_containment_command_contribution(
 ) -> PortResult<ContainmentCommandContributionBody> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
     let contribution: ContainmentCommandContributionBody =
-        serde_json::from_slice(request.canonical_contribution.as_bytes())
+        chio_core::canonical::UntrustedJsonText::from_wire(request.canonical_contribution.as_bytes(), 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
             .map_err(|_| PortError::invalid_data())?;
     let canonical =
         canonical_json_bytes(&contribution).map_err(|_| PortError::integrity_failure())?;
@@ -1269,7 +1272,8 @@ fn load_containment_overlay_command(
                 if body_hash(&request_body).as_slice() != request_hash.as_bytes() {
                     return Err(PortError::integrity_failure());
                 }
-                let request: EffectRequest = serde_json::from_slice(&request_body)
+                let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(&request_body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
                     .map_err(|_| PortError::integrity_failure())?;
                 let canonical_request =
                     canonical_json_bytes(&request).map_err(|_| PortError::integrity_failure())?;
@@ -1280,7 +1284,8 @@ fn load_containment_overlay_command(
                 if body_hash(&result_body).as_slice() != result_hash.as_bytes() {
                     return Err(PortError::integrity_failure());
                 }
-                let result: EffectResult = serde_json::from_slice(&result_body)
+                let result: EffectResult = chio_core::canonical::UntrustedJsonText::from_wire(&result_body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
                     .map_err(|_| PortError::integrity_failure())?;
                 let canonical_result =
                     canonical_json_bytes(&result).map_err(|_| PortError::integrity_failure())?;
@@ -1288,7 +1293,8 @@ fn load_containment_overlay_command(
                 if body_hash(&snapshot_body).as_slice() != snapshot_hash.as_bytes() {
                     return Err(PortError::integrity_failure());
                 }
-                let resulting_snapshot: OverlaySnapshot = serde_json::from_slice(&snapshot_body)
+                let resulting_snapshot: OverlaySnapshot = chio_core::canonical::UntrustedJsonText::from_wire(&snapshot_body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
                     .map_err(|_| PortError::integrity_failure())?;
                 let canonical_snapshot = canonical_json_bytes(&resulting_snapshot)
                     .map_err(|_| PortError::integrity_failure())?;
@@ -1606,7 +1612,8 @@ fn session_throttle_command_key(request: &EffectRequest) -> PortResult<SessionTh
 fn decode_session_throttle_limits(request: &EffectRequest) -> PortResult<SessionThrottleLimits> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
     let limits: SessionThrottleLimits =
-        serde_json::from_slice(request.canonical_contribution.as_bytes())
+        chio_core::canonical::UntrustedJsonText::from_wire(request.canonical_contribution.as_bytes(), 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
             .map_err(|_| PortError::invalid_data())?;
     limits.validate()?;
     let canonical = canonical_json_bytes(&limits).map_err(|_| PortError::integrity_failure())?;
@@ -1662,12 +1669,15 @@ fn load_session_throttle_command(
                 {
                     return Err(PortError::integrity_failure());
                 }
-                let request: EffectRequest = serde_json::from_slice(&request_body)
+                let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(&request_body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
                     .map_err(|_| PortError::integrity_failure())?;
-                let result: EffectResult = serde_json::from_slice(&result_body)
+                let result: EffectResult = chio_core::canonical::UntrustedJsonText::from_wire(&result_body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
                     .map_err(|_| PortError::integrity_failure())?;
                 let resulting_snapshot: SessionThrottleSnapshot =
-                    serde_json::from_slice(&snapshot_body)
+                    chio_core::canonical::UntrustedJsonText::from_wire(&snapshot_body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
                         .map_err(|_| PortError::integrity_failure())?;
                 let canonical_request =
                     canonical_json_bytes(&request).map_err(|_| PortError::integrity_failure())?;

@@ -958,3 +958,15 @@ pub trait QualifiedAdmissionTransitionExt: QualifiedAdmissionOperationStore {
 }
 
 impl<T: QualifiedAdmissionOperationStore + ?Sized> QualifiedAdmissionTransitionExt for T {}
+
+impl From<chio_core::canonical::UntrustedJsonError> for AdmissionOperationStoreError {
+    fn from(error: chio_core::canonical::UntrustedJsonError) -> Self {
+        Self::Operation(super::AdmissionOperationError::UntrustedInput(error.into()))
+    }
+}
+
+impl From<chio_security_types::clock::ClockError> for AdmissionOperationStoreError {
+    fn from(error: chio_security_types::clock::ClockError) -> Self {
+        Self::Operation(super::AdmissionOperationError::Clock(error))
+    }
+}

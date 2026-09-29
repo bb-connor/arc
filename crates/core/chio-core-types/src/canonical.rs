@@ -32,7 +32,7 @@ mod signed_json;
 pub use secret::canonical_json_bytes_zeroizing;
 #[path = "canonical/untrusted.rs"]
 mod untrusted;
-pub use untrusted::{UntrustedJsonError, UntrustedJsonText};
+pub use untrusted::{SharedUntrustedJsonError, UntrustedJsonError, UntrustedJsonText};
 
 /// Largest integer magnitude permitted for interoperable JSON exchange
 /// (`2^53 - 1`). RFC 7493 (I-JSON) §2.2 requires integers to fall within

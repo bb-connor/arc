@@ -418,7 +418,9 @@ fn decode<T: Serialize + DeserializeOwned>(
     if bytes.is_empty() || bytes.len() > maximum {
         return Err(CallerDeliveryError::Shape);
     }
-    let value = serde_json::from_slice(bytes).map_err(|_| CallerDeliveryError::Shape)?;
+    let value = chio_core::canonical::UntrustedJsonText::from_wire(bytes, maximum)
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| CallerDeliveryError::Shape)?;
     if bounded_canonical(&value, maximum)? != bytes {
         return Err(CallerDeliveryError::Shape);
     }

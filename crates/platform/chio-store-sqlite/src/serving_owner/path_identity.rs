@@ -92,11 +92,10 @@ pub(super) fn inspect(
             "local path identity continuity marker changed while reading",
         ));
     }
-    let record: PathIdentityRecord = serde_json::from_slice(&encoded).map_err(|error| {
-        invalid(format!(
-            "local path identity continuity marker is not canonical JSON: {error}"
-        ))
-    })?;
+    let record: PathIdentityRecord =
+        chio_core::canonical::UntrustedJsonText::from_wire(&encoded, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(SqliteServingOwnerError::from)?;
     validate_record(
         &record,
         canonical_database_path,
@@ -212,7 +211,9 @@ pub(super) fn remove_for_relocation(
         return Err(invalid("oversized relocation marker"));
     }
     let record: PathIdentityRecord =
-        serde_json::from_slice(&bytes).map_err(|_| invalid("invalid relocation marker"))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(SqliteServingOwnerError::from)?;
     if record.format != FORMAT
         || record.store_uuid != store_uuid
         || record.canonical_database_path != path_text(database_path)?

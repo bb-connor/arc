@@ -601,7 +601,9 @@ fn validate_body(body: &CanonicalBody, expected: &Digest32) -> PortResult<()> {
 fn validate_canonical_json_body(body: &CanonicalBody, expected: &Digest32) -> PortResult<()> {
     validate_body(body, expected)?;
     let value: serde_json::Value =
-        serde_json::from_slice(body.as_bytes()).map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| PortError::invalid_data())?;
     let canonical = canonical_json_bytes(&value).map_err(|_| PortError::invalid_data())?;
     if canonical.as_slice() != body.as_bytes() {
         return Err(PortError::invalid_data());
@@ -693,7 +695,9 @@ fn decode_label(body: Vec<u8>, stored_hash: Vec<u8>) -> PortResult<InformationLa
         return Err(PortError::integrity_failure());
     }
     let label: InformationLabel =
-        serde_json::from_slice(&body).map_err(|_| PortError::integrity_failure())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(&body, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| PortError::integrity_failure())?;
     let canonical = canonical_json_bytes(&label).map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != body.as_slice() {
         return Err(PortError::integrity_failure());

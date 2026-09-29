@@ -317,8 +317,13 @@ pub(super) fn load_channel_reservation_tx(
             "retained channel reservation authority pins differ from configuration",
         ));
     }
-    let reservation: SignedChannelReservationV1 = serde_json::from_slice(&stored.reservation_json)
-        .map_err(|error| invalid(error.to_string()))?;
+    let reservation: SignedChannelReservationV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            &stored.reservation_json,
+            MAX_CHANNEL_ARTIFACT_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(ChannelLifecycleStoreError::from)?;
     if encode(
         &reservation,
         MAX_CHANNEL_ARTIFACT_BYTES,

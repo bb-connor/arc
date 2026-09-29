@@ -495,8 +495,10 @@ impl RollbackGenerationAnchor {
         if slot[CHECKSUM_OFFSET..PAYLOAD_OFFSET] != sha256_hex(payload).as_bytes()[..] {
             return Err("rollback anchor checksum is invalid".to_string());
         }
-        let record: GenerationRecord = serde_json::from_slice(payload)
-            .map_err(|error| format!("rollback anchor is invalid JSON: {error}"))?;
+        let record: GenerationRecord =
+            chio_core::canonical::UntrustedJsonText::from_wire(payload, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| format!("rollback anchor is invalid JSON: {error}"))?;
         if canonical_json_bytes(&record)
             .map_err(|error| format!("rollback anchor encoding failed: {error}"))?
             != payload

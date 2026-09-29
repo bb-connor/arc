@@ -40,6 +40,20 @@ class BoundaryGateCalibration(unittest.TestCase):
     def test_current_sources_match(self):
         self.assertEqual(self.errors(), [])
 
+    def test_reviewed_kernel_sqlite_owner_cannot_be_unregistered(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        path = next(iter(catalog["reviewed_kernel_sqlite_owners"]))
+        catalog["signed_input_files"].remove(path)
+        with patch.object(self, "catalog", catalog):
+            self.assertTrue(any("reviewed kernel/SQLite owner is unregistered" in error for error in self.errors()))
+
+    def test_reviewed_kernel_sqlite_owner_cannot_return_to_baseline(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        path = next(path for path in catalog["reviewed_kernel_sqlite_owners"] if path in catalog["decoder_file_contracts"])
+        catalog["decoder_file_contracts"][path]["kind"] = "raw-input-baseline"
+        with patch.object(self, "catalog", catalog):
+            self.assertTrue(any("regressed to baseline" in error for error in self.errors()))
+
     def test_unscoped_sql_is_rejected_even_with_a_known_identifier(self):
         path = gate.STORE + "/receipt_store/support/store_impl.rs"
         errors = self.errors(path, lambda text: text + '\nfn leak() { query("SELECT raw_json FROM chio_tool_receipts WHERE receipt_id = ?1"); }')

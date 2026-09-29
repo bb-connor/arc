@@ -83,7 +83,7 @@ impl CapturedLifecycle {
         self.context.validate_binding(admission, request)?;
         let runtime = kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         if now >= self.valid_until_unix_ms || admission.operation() != &self.operation {
             return Err(invalid("native lifecycle capture expired or changed"));
         }
@@ -108,7 +108,7 @@ impl CapturedLifecycle {
         )?;
         if observed.snapshot() != self.observation.snapshot()
             || observed.stored_context_generation() != self.observation.stored_context_generation()
-            || runtime.refresh_trusted_time(now) >= self.valid_until_unix_ms
+            || runtime.refresh_trusted_time(now)? >= self.valid_until_unix_ms
         {
             return Err(invalid(
                 "native lifecycle lost current flow or capture time",
@@ -242,7 +242,9 @@ pub(super) fn policy_deadline(bytes: &[u8]) -> Result<u64, KernelError> {
         return Err(invalid("native lifecycle policy exceeds its bound"));
     }
     let value: serde_json::Value =
-        serde_json::from_slice(bytes).map_err(|_| invalid("native lifecycle policy is invalid"))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, 256 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(crate::KernelError::from)?;
     if !matches!(
         value.get("schema").and_then(serde_json::Value::as_str),
         Some("chio.native-flow-dispatch-policy.v1" | "chio.native-flow-dispatch-policy.v2")

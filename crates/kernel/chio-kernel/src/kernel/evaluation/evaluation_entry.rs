@@ -69,7 +69,7 @@ impl ChioKernel {
                 resource: crate::OverloadResource::Allocation,
             });
         }
-        let now_unix_ms = current_unix_timestamp_ms();
+        let now_unix_ms = read_unix_timestamp_ms()?;
         let now = now_unix_ms / 1000;
         self.verify_capability_full_pre_admit(capability, None, now)
             .map_err(KernelError::GuardDenied)?;
@@ -173,7 +173,7 @@ impl ChioKernel {
         self.build_deny_response_with_metadata(
             request,
             reason,
-            current_unix_timestamp(),
+            read_unix_timestamp()?,
             None,
             extra_metadata,
         )
@@ -251,7 +251,7 @@ impl ChioKernel {
         self.build_deny_response_with_metadata(
             request,
             reason,
-            current_unix_timestamp(),
+            read_unix_timestamp()?,
             None,
             Some(metadata),
         )
@@ -393,7 +393,17 @@ impl ChioKernel {
     ) -> chio_core_types::StepVerdict {
         use chio_core_types::{StepVerdict, StepVerdictKind};
 
-        let now = current_unix_timestamp();
+        let now = match self.trusted_now_millis() {
+            Ok(value) => value.as_secs(),
+            Err(error) => {
+                return StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(error.to_string()),
+                    guard: None,
+                }
+            }
+        };
         let cap = &req.planner_capability;
 
         // Design note: plan-evaluation is a PREVIEW path -- it answers

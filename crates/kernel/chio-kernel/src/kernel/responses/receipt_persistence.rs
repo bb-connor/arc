@@ -148,7 +148,7 @@ impl ChioKernel {
         evidence.extend(current_post_invocation_guard_evidence());
 
         let body = ChioReceiptBody {
-            id: next_receipt_id("rcpt"),
+            id: next_receipt_id("rcpt")?,
             timestamp: params.timestamp,
             capability_id: params.capability_id.to_string(),
             tool_server: params.server_id.to_string(),
@@ -370,7 +370,8 @@ impl ChioKernel {
         let settlement_visible_at_ms = if settlement_eligible {
             self.settlement_observer
                 .as_ref()
-                .map(|_| current_unix_timestamp_ms())
+                .map(|_| self.trusted_now_millis().map(|value| value.get()))
+                .transpose()?
         } else {
             None
         };
@@ -463,7 +464,7 @@ impl ChioKernel {
         let Some(next_visible_at_ms) = settlement_visible_at_ms else {
             return Ok(());
         };
-        let claim_now_ms = current_unix_timestamp_ms().max(next_visible_at_ms);
+        let claim_now_ms = read_unix_timestamp_ms()?.max(next_visible_at_ms);
         let claim = match runtime.claim_receipt(&receipt.id, receipt.timestamp, claim_now_ms) {
             Ok(Some(claim)) => claim,
             Ok(None) => {
@@ -483,11 +484,7 @@ impl ChioKernel {
             row_version: claim.row_version,
         };
         let status = self.run_settlement_observer(receipt, &idempotency_key);
-        runtime.record_claimed_status(
-            &claim,
-            &status,
-            current_unix_timestamp_ms().max(claim_now_ms),
-        );
+        runtime.record_claimed_status(&claim, &status, read_unix_timestamp_ms()?.max(claim_now_ms));
         Ok(())
     }
 
@@ -544,7 +541,8 @@ impl ChioKernel {
         let settlement_visible_at_ms = self
             .settlement_observer
             .as_ref()
-            .map(|_| current_unix_timestamp_ms());
+            .map(|_| self.trusted_now_millis().map(|value| value.get()))
+            .transpose()?;
         let _receipt_store_write = self
             .receipt_store_write_lock
             .lock()

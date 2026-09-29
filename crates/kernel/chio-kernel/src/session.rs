@@ -3,7 +3,8 @@ use loom::sync::atomic::{AtomicU64, Ordering};
 use std::collections::{HashMap, HashSet, VecDeque};
 #[cfg(not(loom))]
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::time::Instant;
 
 use chio_core::crypto::{canonical_json_bytes, sha256_hex};
 use chio_core::session::{
@@ -565,6 +566,8 @@ impl TerminalRegistry {
 /// Errors for session lifecycle and in-flight management.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum SessionError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("session {session_id} authentication epoch is exhausted")]
     AuthEpochExhausted { session_id: SessionId },
 
@@ -677,14 +680,19 @@ pub struct SessionAnchorState {
 }
 
 impl SessionAnchorState {
-    fn new(session_id: &SessionId, auth_context: &SessionAuthContext, auth_epoch: u64) -> Self {
+    fn new(
+        session_id: &SessionId,
+        auth_context: &SessionAuthContext,
+        auth_epoch: u64,
+        issued_at: u64,
+    ) -> Self {
         let auth_context_hash = auth_context_hash(auth_context);
         let hash_prefix = &auth_context_hash[..12.min(auth_context_hash.len())];
         Self {
             id: format!("{session_id}:anchor:{auth_epoch}:{hash_prefix}"),
             auth_epoch,
             auth_context_hash,
-            issued_at: current_unix_timestamp(),
+            issued_at,
         }
     }
 
@@ -752,8 +760,9 @@ pub struct SessionRequestStart {
 }
 
 /// Session host object owned by the kernel.
-#[derive(Debug)]
 pub struct Session {
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+    clock_fence: Arc<std::sync::Mutex<chio_security_types::clock::ClockFence>>,
     id: SessionId,
     agent_id: AgentId,
     inner: RwLock<SessionInner>,
@@ -830,6 +839,8 @@ impl Clone for Session {
             (inner.clone(), self.auth_state.clone())
         };
         Self {
+            clock: self.clock.clone(),
+            clock_fence: self.clock_fence.clone(),
             id: self.id.clone(),
             agent_id: self.agent_id.clone(),
             inner: RwLock::new(inner),
@@ -852,10 +863,28 @@ impl Session {
         id: SessionId,
         agent_id: AgentId,
         issued_capabilities: Vec<CapabilityToken>,
-    ) -> Self {
+    ) -> Result<Self, SessionError> {
+        Self::new_with_clock(
+            id,
+            agent_id,
+            issued_capabilities,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn new_with_clock(
+        id: SessionId,
+        agent_id: AgentId,
+        issued_capabilities: Vec<CapabilityToken>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, SessionError> {
+        let mut fence = chio_security_types::clock::ClockFence::default();
+        let issued_at = fence.observe(clock.read()?)?.unix_millis().as_secs();
         let auth_context = SessionAuthContext::in_process_anonymous();
-        let session_anchor = SessionAnchorState::new(&id, &auth_context, 0);
-        Self {
+        let session_anchor = SessionAnchorState::new(&id, &auth_context, 0, issued_at);
+        Ok(Self {
+            clock,
+            clock_fence: Arc::new(std::sync::Mutex::new(fence)),
             id,
             agent_id,
             inner: RwLock::new(SessionInner {
@@ -877,7 +906,15 @@ impl Session {
             request_lineage: RwLock::new(HashMap::new()),
             pending_url_elicitations: RwLock::new(HashMap::new()),
             late_events: RwLock::new(VecDeque::new()),
-        }
+        })
+    }
+
+    fn trusted_timestamp(&self) -> Result<u64, SessionError> {
+        let mut fence = self
+            .clock_fence
+            .lock()
+            .map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        Ok(fence.observe(self.clock.read()?)?.unix_millis().as_secs())
     }
 
     fn read_inner(&self) -> RwLockReadGuard<'_, SessionInner> {
@@ -1143,6 +1180,9 @@ impl Session {
         auth_context: SessionAuthContext,
         persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
     ) -> Result<(bool, SessionAnchorSnapshot, Option<String>), SessionPersistError<E>> {
+        let issued_at = self
+            .trusted_timestamp()
+            .map_err(SessionPersistError::Session)?;
         let state_guard = self.write_inner();
         if state_guard.state == SessionState::Closed {
             return Err(SessionPersistError::Session(
@@ -1163,7 +1203,8 @@ impl Session {
                         Ok(epoch) => epoch,
                         Err(error) => return (None, Err(SessionPersistError::Session(error))),
                     };
-                let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+                let session_anchor =
+                    SessionAnchorState::new(&self.id, &auth_context, next_epoch, issued_at);
                 let snapshot = SessionAnchorSnapshot {
                     session_id: self.id.clone(),
                     agent_id: self.agent_id.clone(),
@@ -1231,6 +1272,9 @@ impl Session {
         &self,
         persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
     ) -> Result<(), SessionPersistError<E>> {
+        let issued_at = self
+            .trusted_timestamp()
+            .map_err(SessionPersistError::Session)?;
         let mut inner = self.write_inner();
         if inner.state == SessionState::Closed {
             return Ok(());
@@ -1257,7 +1301,8 @@ impl Session {
                     Ok(epoch) => epoch,
                     Err(error) => return (None, Err(SessionPersistError::Session(error))),
                 };
-            let session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+            let session_anchor =
+                SessionAnchorState::new(&self.id, &auth_context, next_epoch, issued_at);
             let snapshot = SessionAnchorSnapshot {
                 session_id: self.id.clone(),
                 agent_id: self.agent_id.clone(),
@@ -1376,6 +1421,7 @@ impl Session {
                     request_id: context.request_id.clone(),
                 });
             }
+            let started_at = self.trusted_timestamp()?;
             self.inflight.track_locked(
                 &mut requests,
                 context,
@@ -1389,7 +1435,7 @@ impl Session {
                 auth_epoch: auth_state.session_anchor.auth_epoch(),
                 parent_request_id: context.parent_request_id.clone(),
                 operation_kind,
-                started_at: current_unix_timestamp(),
+                started_at,
                 terminal_state: None,
             };
             request_lineage.insert(context.request_id.clone(), lineage.clone());
@@ -1532,13 +1578,6 @@ impl Session {
     }
 }
 
-fn current_unix_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
-}
-
 fn auth_context_hash(auth_context: &SessionAuthContext) -> String {
     canonical_json_bytes(auth_context)
         .map(|bytes| sha256_hex(&bytes))
@@ -1587,3 +1626,12 @@ mod tests;
 #[cfg(all(test, not(loom)))]
 #[path = "session/auth_epoch_tests.rs"]
 mod auth_epoch_tests;
+
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session")
+            .field("id", &self.id)
+            .field("agent_id", &self.agent_id)
+            .finish_non_exhaustive()
+    }
+}

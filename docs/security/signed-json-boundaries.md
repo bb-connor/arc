@@ -101,7 +101,7 @@ expands the reviewed owners, not the claim to every decoder in the workspace.
 
 ## Signed-reader batch (2026-09-28)
 
-The source gate now pins 114 constrained-reader constructor occurrences in 88
+At the preceding `f16d4e781c` checkpoint, the source gate pinned 114 constrained-reader constructor occurrences in 88
 registered signed-reader files. Its wider lexical census contains 556 files and
 1,881 decoder spellings, including imported serde aliases, `from_reader`,
 `Deserializer` and custom `Deserialize` implementations. Multiplicity is retained.
@@ -109,11 +109,11 @@ New decoder files fail until their disposition is recorded. The source filter
 excludes named test modules and masks `cfg(test)` items; it is not Rust name
 resolution and can include test fragments with unconventional names.
 
-The file dispositions deliberately separate 447 `raw-input-baseline` files,
+That checkpoint separated 447 `raw-input-baseline` files,
 86 typed-value conversion files, 14 example/fuzz files and nine reviewed signed
 owners that still contain individually classified raw conversions. A baseline
 entry does not establish that input is unsigned, authenticated or safe. Those 447
-files remain semantic review work; packet 10.2 is open.
+files formed the semantic review queue; the continuation below reduces it. Packet 10.2 remains open.
 
 | Migrated owner | Enforced boundary |
 | --- | --- |
@@ -130,3 +130,31 @@ files remain semantic review work; packet 10.2 is open.
 The [execution record](../reviews/2026-09-28-signed-reader-tenant-execution.md)
 records focused tests and calibrated production-reader bypasses. No hosted or
 workspace-wide qualification follows from this reader migration.
+
+## Kernel and SQLite continuation (2026-09-28)
+
+All 73 baseline reader files in the kernel and SQLite store now have semantic
+contracts. Original-byte inputs use bounded native or exact canonical decoding;
+retained typed conversions, strict I-JSON preflights and closed checkpoint
+readers retain explicit owner contracts. The gate pins 240 constrained-reader
+constructors across 162 registered files and rejects unregistering a reviewed
+owner or returning it to the raw-input baseline. The remaining baseline is 374
+files in other owners, not 374 demonstrated vulnerabilities.
+
+Retained admission requests require the v4 authority profile. Old persisted
+schema acceptance and optional-profile branches are removed from these readers
+and their producers. Current cryptographic hash layers retain their original
+domain strings. Transient credentials remain excluded; retained evidence still
+requires fresh authority verification before dispatch.
+
+Terminal authorization consumption retains the signed source receipt and checks
+its source/consumer signatures, exact operation and context, capability, request,
+tenant, parameter hash, outcome and version. The proof has private fields and no
+Deserialize implementation. Its private wire DTO must pass source verification
+and exact canonical equality before a proof is constructed. SQLite readback
+reconstructs only the historical predecessor and repeats verification.
+
+Touched local parser errors preserve structured causes with redacted display
+and debug output. String-only external adapters retain registered redacted
+projections. The [execution record](../reviews/2026-09-28-kernel-admission-reader-execution.md)
+records runtime checks and the deliberate parser and tenant-binding mutations.

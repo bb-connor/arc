@@ -1430,7 +1430,7 @@ impl ChioKernel {
         &self,
         receipt_id: &str,
     ) -> Option<chio_federation::bilateral::DualSignedReceipt> {
-        let now = current_unix_timestamp();
+        let now = self.trusted_now_millis().ok()?.as_secs();
         {
             let mut cache = match self.federation_dual_receipts.lock() {
                 Ok(g) => g,
@@ -1463,7 +1463,7 @@ impl ChioKernel {
         &self,
         receipt_id: &str,
     ) -> Option<chio_federation::bilateral_dsse::DsseEnvelope> {
-        let now = current_unix_timestamp();
+        let now = self.trusted_now_millis().ok()?.as_secs();
         {
             let mut cache = match self.federation_dsse_envelopes.lock() {
                 Ok(g) => g,
@@ -1586,7 +1586,7 @@ impl ChioKernel {
             cosigner.as_ref(),
         )
         .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
-        let timestamp_unix_ms = current_unix_timestamp().saturating_mul(1000);
+        let timestamp_unix_ms = self.trusted_now_millis()?.get();
         let dsse_envelope =
             chio_federation::bilateral_dsse::sign_chio_bilateral_dsse_envelope_with_cosigner(
                 receipt,
@@ -1615,7 +1615,7 @@ impl ChioKernel {
             store.put_dual_signed(&receipt.id, &dual)?;
             store.put_dsse(&receipt.id, &dsse_envelope)?;
         }
-        let now = current_unix_timestamp();
+        let now = read_unix_timestamp()?;
         {
             let mut cache = match self.federation_dual_receipts.lock() {
                 Ok(g) => g,
@@ -1665,7 +1665,7 @@ impl ChioKernel {
     /// this method should call it; until then, capability revocation is
     /// delegated to natural expiration.
     pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
-        let now_unix_ms = current_unix_timestamp_ms();
+        let now_unix_ms = read_unix_timestamp_ms()?;
         let now = now_unix_ms / 1000;
         // Record the timestamp first so any concurrent reader that observes
         // `emergency_stopped == true` sees a non-zero `since` value.

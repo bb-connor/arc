@@ -1080,7 +1080,12 @@ pub(super) fn verify_stored_terminal_projection(
             ));
         }
     }
-    verify_stored_authorization_projection(connection, operation, &records)?;
+    verify_stored_authorization_projection(
+        connection,
+        operation,
+        &projection.projection_json,
+        &records,
+    )?;
     verify_stored_observer_projection(connection, operation, &projection, &records)?;
     let obligation_record = projection_record(&records, AdmissionProjectionRecordKind::Obligation)?
         .map(|record| record.record_json.as_slice());
@@ -1312,6 +1317,7 @@ fn verify_stored_denied_record_shape(
 fn verify_stored_authorization_projection(
     connection: &Connection,
     operation: &AdmissionOperationV1,
+    projection_json: &[u8],
     records: &[StoredProjectionRecord],
 ) -> Result<(), AdmissionOperationStoreError> {
     let record = projection_record(
@@ -1348,15 +1354,41 @@ fn verify_stored_authorization_projection(
     match (record, stored) {
         (None, None) => Ok(()),
         (Some(record), Some(stored)) => {
-            let consumption: AuthorizationReceiptConsumption =
+            if operation.state() != AdmissionOperationState::Completed {
+                return Err(invariant(
+                    "authorization consumption requires a completed operation",
+                ));
+            }
+            let body: StoredTerminalProjectionBody =
                 chio_core::canonical::UntrustedJsonText::from_wire(
-                    &record.record_json,
-                    64 * 1024 * 1024,
-                )
-                .and_then(|input| input.decode_signed())
-                .map_err(|error| {
-                    invariant(format!("authorization consumption is invalid: {error}"))
-                })?;
+                    projection_json,
+                    MAX_TERMINAL_PROJECTION_BYTES,
+                )?
+                .decode_signed()?;
+            let receipt_record =
+                projection_record(records, AdmissionProjectionRecordKind::Receipt)?
+                    .ok_or_else(|| invariant("authorization consumer receipt is absent"))?;
+            let receipt: chio_core::receipt::body::ChioReceipt =
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    &receipt_record.record_json,
+                    MAX_TERMINAL_RECORD_BYTES,
+                )?
+                .decode_canonical()?;
+            // Reconstruct only the historical predecessor for evidence checks.
+            // This value never participates in a fresh claim or mutation.
+            let mut predecessor = operation.to_persisted();
+            predecessor.state = AdmissionOperationState::Finalizing;
+            predecessor.dispatch_state =
+                chio_kernel::admission_operation::AdmissionDispatchState::Finalizing;
+            predecessor.version = predecessor
+                .version
+                .checked_sub(1)
+                .ok_or_else(|| invariant("authorization predecessor version underflow"))?;
+            predecessor.terminal_replay = None;
+            let predecessor = AdmissionOperationV1::from_persisted(predecessor)?;
+            let proof = chio_kernel::admission_operation::VerifiedAuthorizationReceiptConsumption::from_canonical_record_verified(
+                &record.record_json, &predecessor, &body.context, &receipt, &receipt.kernel_key)?;
+            let consumption = proof.consumption();
             if stored.0 != consumption.authorization_receipt_id
                 || stored.0 != record.record_id
                 || stored.1 != consumption.consumer_receipt_id

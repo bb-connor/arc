@@ -136,7 +136,7 @@ impl ChioKernel {
         let Some(runtime) = self.durable_admission_runtime.as_ref() else {
             return Ok(0);
         };
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(0)?;
         let mut reconciled = 0_usize;
         // An operation that cannot be reconciled is recorded and skipped rather
         // than abandoning the sweep, so one wedged operation cannot hold up every
@@ -406,7 +406,7 @@ impl ChioKernel {
         let _mutation_guard = runtime.lock_mutations()?;
         // Dispatch may have advanced durable time since evaluation began.
         // Claim and project with one fresh authority observation under the lock.
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if runtime
             .outcome_store
             .lookup_by_operation(operation.binding().operation_id())

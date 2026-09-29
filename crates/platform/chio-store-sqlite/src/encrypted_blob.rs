@@ -12,7 +12,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chacha20poly1305::aead::rand_core::RngCore;
 use chacha20poly1305::aead::{Aead, KeyInit, OsRng, Payload};
@@ -200,6 +199,8 @@ impl std::error::Error for DecryptError {}
 /// Errors returned by SQLite encrypted BLOB persistence.
 #[derive(Debug)]
 pub enum BlobStoreError {
+    /// The trusted timestamp could not be observed.
+    Clock(chio_security_types::clock::ClockError),
     /// SQLite connection pool acquisition failed.
     Pool(String),
     /// SQLite returned an error.
@@ -225,6 +226,7 @@ pub enum BlobStoreError {
 impl std::fmt::Display for BlobStoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Clock(error) => std::fmt::Display::fmt(error, f),
             Self::Pool(error) => write!(f, "sqlite encrypted blob pool error: {error}"),
             Self::Sqlite(error) => write!(f, "sqlite encrypted blob error: {error}"),
             Self::Io(error) => write!(f, "sqlite encrypted blob io error: {error}"),
@@ -480,7 +482,7 @@ impl SqliteEncryptedBlobStore {
     ) -> Result<BlobHandle, BlobStoreError> {
         validate_tenant_id(tenant_id)?;
         let blob_id = format!("blob-{}", Uuid::now_v7());
-        let created_at = now_secs();
+        let created_at = now_secs()?;
         let aad = blob_aad(&blob_id, tenant_id.as_str(), created_at);
         let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
             .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
@@ -512,7 +514,7 @@ impl SqliteEncryptedBlobStore {
     ) -> Result<BlobHandle, BlobStoreError> {
         validate_tenant_id(reference.tenant_id())?;
         let blob_id = format!("blob-{}", Uuid::now_v7());
-        let created_at = now_secs();
+        let created_at = now_secs()?;
         let aad = blob_aad(&blob_id, reference.tenant_id().as_str(), created_at);
         let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
             .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
@@ -582,7 +584,7 @@ impl SqliteEncryptedBlobStore {
         }
 
         let blob_id = format!("blob-{}", Uuid::now_v7());
-        let created_at = now_secs();
+        let created_at = now_secs()?;
         let aad = blob_aad(&blob_id, reference.tenant_id().as_str(), created_at);
         let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
             .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
@@ -736,7 +738,7 @@ impl SqliteEncryptedBlobStore {
                 mutation_kind: "disable",
                 reference,
                 result_blob_id: None,
-                applied_at: now_secs(),
+                applied_at: now_secs()?,
             },
         )?;
         transaction.commit()?;
@@ -851,7 +853,7 @@ impl SqliteEncryptedBlobStore {
                 mutation_kind: "delete",
                 reference,
                 result_blob_id: None,
-                applied_at: now_secs(),
+                applied_at: now_secs()?,
             },
         )?;
         transaction.commit()?;
@@ -1074,11 +1076,12 @@ fn validate_tenant_id(tenant_id: &TenantId) -> Result<(), BlobStoreError> {
     Ok(())
 }
 
-fn now_secs() -> i64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
-        Err(_) => 0,
-    }
+fn now_secs() -> Result<i64, BlobStoreError> {
+    Ok(i64::try_from(
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
+            .as_secs(),
+    )
+    .map_err(|_| chio_security_types::clock::ClockError::Overflow)?)
 }
 
 #[cfg(test)]
@@ -1372,5 +1375,11 @@ mod tests {
                 .unwrap(),
             BlobReferenceMutationOutcome::Replayed
         );
+    }
+}
+
+impl From<chio_security_types::clock::ClockError> for BlobStoreError {
+    fn from(error: chio_security_types::clock::ClockError) -> Self {
+        Self::Clock(error)
     }
 }

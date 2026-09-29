@@ -216,7 +216,7 @@ impl ChioKernel {
         }
         let verified = self.verify_active_response_admission_with_authorized_at(
             request,
-            super::current_unix_timestamp_ms(),
+            super::read_unix_timestamp_ms()?,
             binding.authorized_at_unix_ms,
         )?;
         let preflight = match &verified {
@@ -575,7 +575,7 @@ impl ChioKernel {
         let _dispatch_gate = installed.dispatch_gate.lock().map_err(|_| {
             never_committed_internal("active-response executor dispatch gate is poisoned")
         })?;
-        if super::current_unix_timestamp_ms() < response_plan.expires_at_unix_ms {
+        if super::read_unix_timestamp_ms()? < response_plan.expires_at_unix_ms {
             let request = current_request.ok_or_else(|| {
                 never_committed_denied(
                     "an exact current admission request is required before plan expiry",
@@ -1205,12 +1205,12 @@ fn validate_committed_dispatch(
     }
 
     let response_record = committed.committed_response_record();
-    let snapshot: ResponseSnapshot =
-        serde_json::from_slice(response_record.canonical_body.as_bytes()).map_err(|error| {
-            committed_recovery_denied(format!(
-                "committed response record is not decodable: {error}"
-            ))
-        })?;
+    let snapshot: ResponseSnapshot = chio_core::canonical::UntrustedJsonText::from_wire(
+        response_record.canonical_body.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(crate::KernelError::from)?;
     let canonical_response = canonical_json_bytes(&snapshot).map_err(|error| {
         committed_recovery_internal(format!(
             "committed response canonicalization failed: {error}"

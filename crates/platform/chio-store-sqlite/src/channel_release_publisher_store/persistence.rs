@@ -189,8 +189,10 @@ pub(super) fn encode(
 }
 
 pub(super) fn canonicalize_json(bytes: &[u8]) -> Result<Vec<u8>, ChannelReleasePublisherError> {
-    let value: serde_json::Value = serde_json::from_slice(bytes)
-        .map_err(|error| invalid(format!("channel release authorization is invalid: {error}")))?;
+    let value: serde_json::Value =
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(ChannelReleasePublisherError::from)?;
     canonical_json_bytes(&value)
         .map_err(|error| invalid(format!("channel release authorization is invalid: {error}")))
 }

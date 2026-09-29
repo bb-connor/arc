@@ -132,9 +132,12 @@ pub(super) fn validate_candidate(
     let release = parse_base_units(&candidate.release_token_base_units)?;
     let refund = parse_base_units(&candidate.refund_token_base_units)?;
     let prepared_call: chio_settle::PreparedEvmCall =
-        serde_json::from_slice(&candidate.prepared_call_json).map_err(|error| {
-            invalid(format!("prepared channel release call is invalid: {error}"))
-        })?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            &candidate.prepared_call_json,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(ChannelReleasePublisherError::from)?;
     let canonical_call = encode(&prepared_call, "prepared channel release call")?;
     let canonical_authorization = canonicalize_json(&candidate.authorization_json)?;
     if candidate.closing_lifecycle.status != ChannelLifecycleStatusV1::Closing
@@ -361,8 +364,10 @@ pub(super) fn load_finalized_effect_head(
     if stored_key != key_json || current_digest != staged_digest || current_head != staged_head {
         return Err(ChannelReleasePublisherError::Fenced);
     }
-    let head: EconomicResourceHeadV1 = serde_json::from_slice(&current_head)
-        .map_err(|error| invalid(format!("channel release effect head is invalid: {error}")))?;
+    let head: EconomicResourceHeadV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(&current_head, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(ChannelReleasePublisherError::from)?;
     if encode(&head, "channel release effect head")? != current_head
         || head.resource_key != key
         || head.digest().map_err(|error| invalid(error.to_string()))? != current_digest

@@ -325,7 +325,7 @@ fn require_intent(
     retained.validate_binding(operation.binding())?;
     let selected = retained
         .authority_profile()
-        .and_then(|profile| profile.runtime())
+        .runtime()
         .ok_or_else(|| invariant("runtime claim lacks an original authority profile"))?;
     if selected.runtime_authority_id() != intent.runtime_authority_id()
         || selected.expectation_id() != intent.expectation_id()

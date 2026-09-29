@@ -600,6 +600,7 @@ fn expected_metrics<'row>(rows: impl Iterator<Item = &'row StoredRow>) -> Receip
         u64::try_from(charged).test_expect("charged total fits the report"),
         attempted,
     )
+    .test_expect("fixture decision counts fit the total")
 }
 
 type RowPredicate = Box<dyn Fn(&StoredRow) -> bool>;

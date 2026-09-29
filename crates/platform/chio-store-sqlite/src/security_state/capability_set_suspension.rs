@@ -31,9 +31,12 @@ fn suspension_key(request: &EffectRequest) -> PortResult<CapabilitySetSuspension
 
 fn decode_suspension_spec(request: &EffectRequest) -> PortResult<CapabilitySetSuspensionSpec> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
-    let spec: CapabilitySetSuspensionSpec =
-        serde_json::from_slice(request.canonical_contribution.as_bytes())
-            .map_err(|_| PortError::invalid_data())?;
+    let spec: CapabilitySetSuspensionSpec = chio_core::canonical::UntrustedJsonText::from_wire(
+        request.canonical_contribution.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|_| PortError::invalid_data())?;
     let canonical = canonical_json_bytes(&spec).map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != request.canonical_contribution.as_bytes()
         || spec.affected_ids.as_slice().is_empty()
@@ -195,13 +198,25 @@ fn load_command(
                 {
                     return Err(PortError::integrity_failure());
                 }
-                let request: EffectRequest = serde_json::from_slice(&request_body)
-                    .map_err(|_| PortError::integrity_failure())?;
-                let result: EffectResult = serde_json::from_slice(&result_body)
-                    .map_err(|_| PortError::integrity_failure())?;
+                let request: EffectRequest = chio_core::canonical::UntrustedJsonText::from_wire(
+                    &request_body,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| PortError::integrity_failure())?;
+                let result: EffectResult = chio_core::canonical::UntrustedJsonText::from_wire(
+                    &result_body,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| PortError::integrity_failure())?;
                 let resulting_snapshot: CapabilitySetSuspensionSnapshot =
-                    serde_json::from_slice(&snapshot_body)
-                        .map_err(|_| PortError::integrity_failure())?;
+                    chio_core::canonical::UntrustedJsonText::from_wire(
+                        &snapshot_body,
+                        64 * 1024 * 1024,
+                    )
+                    .and_then(|input| input.decode_signed())
+                    .map_err(|_| PortError::integrity_failure())?;
                 if canonical_json_bytes(&request).map_err(|_| PortError::integrity_failure())?
                     != request_body
                     || canonical_json_bytes(&result).map_err(|_| PortError::integrity_failure())?
@@ -392,8 +407,12 @@ pub(super) fn load_snapshot(
         ) = row.map_err(sqlite_error)?;
         let action_id = ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?;
         let effect_id = EffectId::new(effect_id).map_err(|_| PortError::integrity_failure())?;
-        let affected_ids: RecordIdSet = serde_json::from_slice(&affected_ids_body)
-            .map_err(|_| PortError::integrity_failure())?;
+        let affected_ids: RecordIdSet = chio_core::canonical::UntrustedJsonText::from_wire(
+            &affected_ids_body,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| PortError::integrity_failure())?;
         if affected_ids.as_slice().is_empty()
             || canonical_json_bytes(&affected_ids).map_err(|_| PortError::integrity_failure())?
                 != affected_ids_body

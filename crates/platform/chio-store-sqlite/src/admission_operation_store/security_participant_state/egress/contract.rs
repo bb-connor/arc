@@ -25,9 +25,6 @@ pub(super) fn require_original(
             .ok_or_else(|| invalid("native egress lacks original retained request"))?;
     original.validate_native_security_context(context)?;
     original.validate_native_security_authority(binding)?;
-    if original.authority_profile().is_none() {
-        return Err(invalid("native egress requires original authority profile"));
-    }
     let trusted = context.as_v1();
     let key = &fence.key;
     if &key.tenant_id != trusted.tenant_id()

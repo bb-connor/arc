@@ -46,6 +46,8 @@ CREATE INDEX IF NOT EXISTS idx_settle_dead_letters_finalized_at
 /// Errors surfaced from the SQLite-backed dead-letter store.
 #[derive(Debug, Error)]
 pub enum DeadLetterStoreError {
+    #[error(transparent)]
+    UntrustedInput(std::sync::Arc<chio_core::canonical::UntrustedJsonError>),
     /// Connection-pool or SQLite error.
     #[error("dead letter backend error: {0}")]
     Backend(String),
@@ -153,15 +155,23 @@ fn decode_stored_dead_letter(
                 "persisted attempts is outside the u32 range".to_string(),
             )
         })?;
-    let schema: DeadLetterSchemaProbe = serde_json::from_str(&row.canonical)
-        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
+    let schema: DeadLetterSchemaProbe = chio_core::canonical::UntrustedJsonText::from_wire(
+        row.canonical.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(DeadLetterStoreError::from)?;
     if schema.schema != SETTLE_DEAD_LETTER_SCHEMA {
         return Err(DeadLetterStoreError::InvalidRecord(
             "unsupported persisted settlement dead-letter schema".to_string(),
         ));
     }
-    let record: DeadLetterRecord = serde_json::from_str(&row.canonical)
-        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
+    let record: DeadLetterRecord = chio_core::canonical::UntrustedJsonText::from_wire(
+        row.canonical.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(DeadLetterStoreError::from)?;
     let (_, canonical) = encode_dead_letter(&record)?;
     let columns_match = record.receipt_id == row.receipt_id
         && record.finalized_at == finalized_at
@@ -285,6 +295,12 @@ fn clear_dead_letter_on_connection(
         .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))
 }
 
+impl From<chio_core::canonical::UntrustedJsonError> for DeadLetterStoreError {
+    fn from(error: chio_core::canonical::UntrustedJsonError) -> Self {
+        Self::UntrustedInput(std::sync::Arc::new(error))
+    }
+}
+
 const WRITER_BACKEND_TAG: &str = "chio-store-sqlite/dead-letter/backend:";
 const WRITER_CONFLICT_TAG: &str = "chio-store-sqlite/dead-letter/conflict:";
 const WRITER_INVALID_RECORD_TAG: &str = "chio-store-sqlite/dead-letter/invalid-record:";
@@ -293,6 +309,9 @@ fn dead_letter_error_into_receipt_store(
     error: DeadLetterStoreError,
 ) -> chio_kernel::ReceiptStoreError {
     match error {
+        DeadLetterStoreError::UntrustedInput(error) => {
+            chio_kernel::ReceiptStoreError::UntrustedInput(error)
+        }
         DeadLetterStoreError::Conflict(message) => {
             chio_kernel::ReceiptStoreError::Conflict(format!("{WRITER_CONFLICT_TAG}{message}"))
         }
@@ -309,6 +328,9 @@ fn dead_letter_error_from_receipt_store(
     error: chio_kernel::ReceiptStoreError,
 ) -> DeadLetterStoreError {
     match error {
+        chio_kernel::ReceiptStoreError::UntrustedInput(error) => {
+            DeadLetterStoreError::UntrustedInput(error)
+        }
         chio_kernel::ReceiptStoreError::Conflict(message) => {
             if let Some(message) = message.strip_prefix(WRITER_CONFLICT_TAG) {
                 DeadLetterStoreError::Conflict(message.to_string())

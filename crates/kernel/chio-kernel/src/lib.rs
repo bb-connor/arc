@@ -144,7 +144,9 @@ pub(crate) use std::collections::HashMap;
 #[cfg(not(loom))]
 pub(crate) use std::future::Future;
 #[cfg(not(loom))]
-pub(crate) use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+pub(crate) use std::time::{Duration, Instant};
+#[cfg(test)]
+pub(crate) use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(not(loom))]
 pub(crate) use chio_core::canonical::canonical_json_bytes;
@@ -630,7 +632,7 @@ pub use weights_binding::{evaluate_weights_binding, WeightsBindingError, Weights
 mod kernel;
 
 #[cfg(not(loom))]
-pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
+pub(crate) use kernel::{read_unix_timestamp, MatchingGrant, ReceiptContent};
 
 #[cfg(not(loom))]
 pub use kernel::{

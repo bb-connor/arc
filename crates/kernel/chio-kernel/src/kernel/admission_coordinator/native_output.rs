@@ -58,7 +58,7 @@ impl NativeSecurityOutputJoinAuthority<'_> {
     fn join_once(&self, label: InformationLabel) -> Result<FlowStateSnapshot, KernelError> {
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         self.validate_original(runtime, now)?;
         let identity = self.context.security_context().as_v1();
         let key = FlowStateKey {
@@ -76,7 +76,7 @@ impl NativeSecurityOutputJoinAuthority<'_> {
         if observed.binding() != &self.binding
             || observed.key() != &key
             || observed.observed_at_unix_ms() < now
-            || observed.observed_at_unix_ms() > runtime.refresh_trusted_time(now)
+            || observed.observed_at_unix_ms() > runtime.refresh_trusted_time(now)?
         {
             return Err(invalid(
                 "native output observation changed identity or time",
@@ -112,7 +112,7 @@ impl NativeSecurityOutputJoinAuthority<'_> {
                 self.lease,
                 &self.binding,
                 &intent,
-                runtime.refresh_trusted_time(now),
+                runtime.refresh_trusted_time(now)?,
             )
         })?;
         if record.output != intent
@@ -225,8 +225,12 @@ impl NativeSecurityOutputJoinAuthority<'_> {
                 "native output differs from original captured finalization",
             ));
         }
-        let request: ToolCallRequest = serde_json::from_str(self.context.request_canonical_json())
-            .map_err(|_| invalid("native output request is invalid"))?;
+        let request: ToolCallRequest = chio_core::canonical::UntrustedJsonText::from_wire(
+            (self.context.request_canonical_json()).as_bytes(),
+            crate::tool_outcome::MAX_FROZEN_INPUT_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(crate::KernelError::from)?;
         retained
             .validate_request_material(&request)
             .map_err(durable_store_error)?;
@@ -256,7 +260,7 @@ impl NativeSecurityOutputJoinAuthority<'_> {
             runtime.store.load_native_security_output_join(
                 self.admission.operation.binding().operation_id(),
                 &runtime.fence,
-                runtime.refresh_trusted_time(now),
+                runtime.refresh_trusted_time(now)?,
             )
         })?
         .ok_or_else(|| invalid("native output readback lost original operation"))?;
@@ -279,7 +283,7 @@ impl NativeSecurityOutputJoinAuthority<'_> {
             .ok_or_else(|| invalid("native output callback returned without a confirmed join"))?;
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         self.validate_original(runtime, now)?;
         if &self.read_history(runtime, now)? != confirmed {
             return Err(invalid(
@@ -305,7 +309,7 @@ impl ChioKernel {
             runtime.store.load_retained_tool_request(
                 context.operation().binding().operation_id(),
                 &runtime.fence,
-                runtime.refresh_trusted_time(current_unix_timestamp_ms()),
+                runtime.refresh_trusted_time(0)?,
             )
         })?
         .ok_or_else(|| invalid("test native output original admission is absent"))?;
@@ -340,8 +344,12 @@ impl ChioKernel {
             .original_retained_request()
             .ok_or_else(|| invalid("native output original request is absent"))?;
         self.validate_original_authority_profile(retained)?;
-        let request: ToolCallRequest = serde_json::from_str(context.request_canonical_json())
-            .map_err(|_| invalid("native output request is invalid"))?;
+        let request: ToolCallRequest = chio_core::canonical::UntrustedJsonText::from_wire(
+            (context.request_canonical_json()).as_bytes(),
+            crate::tool_outcome::MAX_FROZEN_INPUT_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(crate::KernelError::from)?;
         // Workload binding can call a configured capability authority. Like
         // classification, it must never run while holding the mutation lock.
         super::super::security_dispatch::callback("native output identity", || {
@@ -368,10 +376,7 @@ impl ChioKernel {
         {
             let runtime = self.durable_runtime()?;
             let _guard = runtime.lock_mutations()?;
-            authority.validate_original(
-                runtime,
-                runtime.refresh_trusted_time(current_unix_timestamp_ms()),
-            )?;
+            authority.validate_original(runtime, runtime.refresh_trusted_time(0)?)?;
         }
         // The original live lifecycle owner remains required by the caller.
         // Arbitrary classification and hook callbacks run outside the sequencer.

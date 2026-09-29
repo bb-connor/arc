@@ -108,8 +108,12 @@ impl RuntimeReplaySourceSnapshotV1 {
         if bytes.is_empty() || bytes.len() > MAX_RUNTIME_REPLAY_SOURCE_BYTES {
             return Err(invalid("source snapshot byte limit exceeded"));
         }
-        let evidence: SourceEvidence = serde_json::from_slice(bytes)
-            .map_err(|_| invalid("invalid source snapshot encoding"))?;
+        let evidence: SourceEvidence = chio_core::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            MAX_RUNTIME_REPLAY_SOURCE_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationStoreError::from)?;
         let body = &evidence.body;
         if body.schema != SOURCE_SCHEMA || body.link_count != 1 {
             return Err(invalid("invalid source snapshot schema or link count"));

@@ -188,7 +188,7 @@ impl ChioKernel {
         self.validate_guarded_output(request, matched_grant_index, output, false)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         if !matches!(
             admission.operation.state(),
             AdmissionOperationState::DispatchCommitted
@@ -554,7 +554,7 @@ impl ChioKernel {
             receipt.decision.as_ref(),
             &mut delivery_evaluation,
             purchase.as_ref(),
-            current_unix_timestamp_ms() / 1_000,
+            read_unix_timestamp_ms()? / 1_000,
         ) {
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding purchase replay output withheld");
         }
@@ -722,7 +722,7 @@ impl ChioKernel {
             request,
             recovery.as_ref(),
             recovery_status.as_ref(),
-            current_unix_timestamp_ms() / 1_000,
+            read_unix_timestamp_ms()? / 1_000,
         )
         .map_err(|reason| {
             KernelError::DurableAdmission(format!(
@@ -754,7 +754,7 @@ impl ChioKernel {
             // admission stage. Re-admit and reinstall the verified treaty
             // material before retrying the missing bilateral projection.
             if federation_scope.is_none() {
-                let now_unix_ms = current_unix_timestamp_ms();
+                let now_unix_ms = read_unix_timestamp_ms()?;
                 let treaty_admission = self.run_runtime_admission_hook(
                     request,
                     tool_return.raw.receipt_metadata_snapshot(),
@@ -1142,7 +1142,7 @@ impl ChioKernel {
         if delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_purchase_status(
                 purchase.as_ref(),
-                current_unix_timestamp_ms() / 1_000,
+                read_unix_timestamp_ms()? / 1_000,
             ) {
                 warn!(request_id = %request.request_id, reason = %redacted!(&denial), "finding purchase terminal output withheld");
                 #[cfg(feature = "finding-market")]
@@ -1173,7 +1173,7 @@ impl ChioKernel {
             .lookup_post_return_evaluation(admission.operation.binding().operation_id())
             .map_err(durable_outcome_store_error)?;
         let mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = current_unix_timestamp_ms()
+        let trusted_now_unix_ms = read_unix_timestamp_ms()?
             .max(stored_outcome.recorded_at_unix_ms())
             .max(
                 existing_evaluation
@@ -1181,7 +1181,7 @@ impl ChioKernel {
                     .map_or(0, PostReturnEvaluationRecordV1::trusted_time_unix_ms),
             )
             .max(1);
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let (mut evaluation, lease) = match existing_evaluation {
             Some(existing) => (
                 existing,
@@ -1236,7 +1236,7 @@ impl ChioKernel {
         if delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_purchase_status(
                 purchase.as_ref(),
-                current_unix_timestamp_ms() / 1_000,
+                read_unix_timestamp_ms()? / 1_000,
             ) {
                 warn!(request_id = %request.request_id, reason = %redacted!(&denial), "finding purchase final terminal output withheld");
                 #[cfg(feature = "finding-market")]
@@ -1253,7 +1253,7 @@ impl ChioKernel {
                 request,
                 recovery.as_ref(),
                 recovery_status.as_ref(),
-                current_unix_timestamp_ms() / 1_000,
+                read_unix_timestamp_ms()? / 1_000,
             ) {
                 warn!(request_id = %request.request_id, reason = %redacted!(&denial), "finding recovery final terminal output withheld");
                 terminal_finding_denial = Some(denial);
@@ -1489,7 +1489,7 @@ impl ChioKernel {
             security_release,
         )?;
         let mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let context = AdmissionProjectionContext {
             trusted_time_unix_ms: trusted_now_unix_ms,
             ..context
@@ -1721,7 +1721,7 @@ impl ChioKernel {
         let mutation_guard = runtime.lock_mutations()?;
         // A callback cannot extend custody. Check the exact physical operation
         // and original claim at freshly sampled time, without renewing it.
-        let signing_completed_at = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let signing_completed_at = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             runtime.store.revalidate_recovery_claim(
                 &admission.operation,

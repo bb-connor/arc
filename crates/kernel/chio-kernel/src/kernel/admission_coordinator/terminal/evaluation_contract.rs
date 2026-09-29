@@ -35,7 +35,7 @@ impl ChioKernel {
             admission
                 .retained_request
                 .as_ref()
-                .and_then(|original| original.authority_profile()),
+                .map(|original| original.authority_profile()),
         )?;
         if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {
             return Err(KernelError::DurableAdmission(

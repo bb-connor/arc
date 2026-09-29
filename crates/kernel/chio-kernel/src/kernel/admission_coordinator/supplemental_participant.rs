@@ -67,10 +67,7 @@ impl ChioKernel {
                 Ok(())
             };
         };
-        if original
-            .authority_profile()
-            .and_then(|profile| profile.supplemental_participant())
-            != Some(&participant.binding)
+        if original.authority_profile().supplemental_participant() != Some(&participant.binding)
             || !participant
                 .binding
                 .matches_verifier(claim.verifier_binding())

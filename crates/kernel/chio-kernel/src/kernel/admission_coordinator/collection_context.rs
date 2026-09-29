@@ -88,7 +88,7 @@ impl ChioKernel {
         let now_ms = runtime.refresh_trusted_time(
             now.checked_mul(1000)
                 .ok_or_else(|| denied("collection time overflow"))?,
-        );
+        )?;
         let (operation, retained) = runtime
             .store
             .load_unambiguous_retained_tool_request(&selector, &runtime.fence, now_ms)
@@ -149,7 +149,7 @@ impl ChioKernel {
             &matching,
             &current_plan,
             retained.security_binding(),
-            retained.authority_profile(),
+            Some(retained.authority_profile()),
         )
         .map_err(denied)?
             != *binding.immutable_request_hash()
@@ -173,7 +173,7 @@ impl ChioKernel {
             .governed_intent
             .as_ref()
             .ok_or_else(|| denied("original governed intent is unavailable"))?;
-        let refreshed_ms = runtime.refresh_trusted_time(now_ms);
+        let refreshed_ms = runtime.refresh_trusted_time(now_ms)?;
         let current_requirement = self
             .threshold_approval_requirement(request, refreshed_ms / 1000)
             .map_err(denied)?;
@@ -185,7 +185,7 @@ impl ChioKernel {
         self.verify_capability_full_pre_admit(
             &request.capability,
             request.federated_origin_kernel_id.as_deref(),
-            runtime.refresh_trusted_time(refreshed_ms) / 1000,
+            runtime.refresh_trusted_time(refreshed_ms)? / 1000,
         )
         .map_err(denied)?;
         self.check_revocation(&request.capability).map_err(denied)?;
@@ -195,7 +195,7 @@ impl ChioKernel {
         // using refreshed time after current-authority lookups. The pending
         // operation proves prior guard admission, not execution authority.
         // Execution re-evaluates guards and one-shot proofs independently.
-        let current_now = runtime.refresh_trusted_time(refreshed_ms) / 1000;
+        let current_now = runtime.refresh_trusted_time(refreshed_ms)? / 1000;
         if !matching.iter().any(|candidate| {
             self.validate_governed_transaction_pure(
                 request,
@@ -214,7 +214,7 @@ impl ChioKernel {
             request,
             proposal,
             &requirement,
-            runtime.refresh_trusted_time(refreshed_ms) / 1000,
+            runtime.refresh_trusted_time(refreshed_ms)? / 1000,
         )
         .map_err(denied)?;
         // Re-read through the qualified store after potentially slow authority
@@ -227,7 +227,7 @@ impl ChioKernel {
             .load_unambiguous_retained_tool_request(
                 &selector,
                 &runtime.fence,
-                runtime.refresh_trusted_time(refreshed_ms),
+                runtime.refresh_trusted_time(refreshed_ms)?,
             )
             .map_err(denied)?
             .ok_or_else(|| denied("original request disappeared during validation"))?;

@@ -162,7 +162,7 @@ impl ChioKernel {
         };
         let profile = admission
             .original_retained_request()
-            .and_then(|request| request.authority_profile());
+            .map(|request| request.authority_profile());
         if profile.is_some_and(|profile| profile.runtime().is_some())
             && operation.runtime_participant_ledger_digest().is_none()
         {
@@ -192,13 +192,11 @@ impl ChioKernel {
         }
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(now);
+        let now = runtime.refresh_trusted_time(now)?;
         let original = admission
             .original_retained_request()
             .ok_or_else(|| invalid("caller custody lost its original request"))?;
-        let profile = original
-            .authority_profile()
-            .ok_or_else(|| invalid("caller custody requires the original authority profile"))?;
+        let profile = original.authority_profile();
         let operation_id = operation.binding().operation_id();
         if operation.runtime_participant_ledger_digest().is_some() {
             let (current, claims) = custody_call(|| {

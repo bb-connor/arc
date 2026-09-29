@@ -22,7 +22,7 @@ impl ChioKernel {
         let digest = chio_core::crypto::sha256_hex(&report_bytes);
         let runtime = self.durable_runtime()?;
         let guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let (operation, original) = custody::custody_call(|| {
             runtime.store.load_unambiguous_retained_tool_request(
                 &authorization.authorization.invocation.request_id,

@@ -609,10 +609,13 @@ impl RevocationStore for SqliteRevocationStore {
     }
 
     fn revoke(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
-        let revoked_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_secs() as i64)
-            .unwrap_or(0);
+        let revoked_at = i64::try_from(
+            chio_security_types::clock::Clock::unix_millis(
+                &chio_security_types::clock::SystemClock,
+            )?
+            .as_secs(),
+        )
+        .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
         if !self.record_revocation(&transaction, capability_id, revoked_at)? {

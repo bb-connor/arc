@@ -212,7 +212,7 @@ impl SignedAdmissionTerminalProjectionV1 {
                     .observer_work
                     .as_ref()
                     .map(|observer| {
-                        Ok(AdmissionTerminalObserverProjectionV1 {
+                        Ok::<_, AdmissionOperationError>(AdmissionTerminalObserverProjectionV1 {
                             receipt_id: AdmissionIdentifier::try_new(
                                 "observer_receipt_id",
                                 completed.receipt.receipt().id.clone(),
@@ -341,6 +341,9 @@ impl SignedAdmissionTerminalProjectionV1 {
                 &self.body.context,
             )?;
         validate_sidecars(
+            &source_operation,
+            &self.body.context,
+            &projection_json,
             &records,
             self.body.authorization_consumption.as_ref(),
             self.body.observer.as_ref(),
@@ -524,8 +527,12 @@ fn validate_projection_body(
     context: &AdmissionProjectionContext,
     terminal_state: AdmissionOperationState,
 ) -> Result<(), AdmissionOperationError> {
-    let value: serde_json::Value = serde_json::from_slice(bytes)
-        .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+    let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        bytes,
+        crate::admission_operation::MAX_ADMISSION_TERMINAL_PROJECTION_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(AdmissionOperationError::from)?;
     if canonical_json_bytes(&value)
         .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
         != bytes
@@ -572,8 +579,12 @@ fn validate_records(
         .map(|(record, commitment)| {
             let canonical_json =
                 decode_bounded(&record.canonical_json, MAX_ADMISSION_TERMINAL_RECORD_BYTES)?;
-            let value: serde_json::Value = serde_json::from_slice(&canonical_json)
-                .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+            let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+                &canonical_json,
+                crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(AdmissionOperationError::from)?;
             if canonical_json_bytes(&value)
                 .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
                 != canonical_json
@@ -765,8 +776,12 @@ fn validate_economic_mutation_result_record(
         .find(|record| record.kind == AdmissionProjectionRecordKind::EconomicMutationResult)
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
     let result: GovernedEconomicMutationResultBinding =
-        serde_json::from_slice(record.canonical_json())
-            .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            record.canonical_json(),
+            crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationError::from)?;
     result
         .validate_remote_terminal(source, context, terminal, record.record_id())
         .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)
@@ -779,8 +794,12 @@ fn channel_terminal_charge(
         .iter()
         .find(|record| record.kind == AdmissionProjectionRecordKind::ChannelTerminal)
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
-    let value: serde_json::Value = serde_json::from_slice(record.canonical_json())
-        .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        record.canonical_json(),
+        crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(AdmissionOperationError::from)?;
     let charge = value
         .get("actual_charge")
         .cloned()
@@ -824,8 +843,12 @@ fn validate_channel_terminal_record(
         .iter()
         .find(|record| record.kind == AdmissionProjectionRecordKind::Receipt)
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
-    let receipt: ChioReceipt = serde_json::from_slice(receipt_record.canonical_json())
-        .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(
+        receipt_record.canonical_json(),
+        crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(AdmissionOperationError::from)?;
     let receipt_digest = AdmissionDigest::try_new(
         "channel_terminal_receipt_digest",
         sha256_hex(
@@ -907,7 +930,12 @@ fn validate_channel_obligation_record(
     }
     let obligation_record = obligation_record.ok_or_else(mismatch)?;
     let obligation: UntrustedTerminalObligationProjectionV1 =
-        serde_json::from_slice(obligation_record.canonical_json()).map_err(|_| mismatch())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            obligation_record.canonical_json(),
+            crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationError::from)?;
     obligation.source.binding.validate_against(
         source,
         context,
@@ -924,8 +952,12 @@ fn validate_channel_obligation_record(
         .body
         .proposal_digest()
         .map_err(|_| mismatch())?;
-    let tool_value: serde_json::Value =
-        serde_json::from_slice(tool_record.canonical_json()).map_err(|_| mismatch())?;
+    let tool_value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        tool_record.canonical_json(),
+        crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(AdmissionOperationError::from)?;
     let outcome_version = tool_value
         .get("outcome_version")
         .and_then(serde_json::Value::as_u64)
@@ -996,8 +1028,12 @@ fn validate_receipt_record(
     else {
         return Ok(());
     };
-    let receipt: ChioReceipt = serde_json::from_slice(&record.canonical_json)
-        .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(
+        &record.canonical_json,
+        crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(AdmissionOperationError::from)?;
     let replay_receipt_matches = matches!(
         terminal.terminal_replay(),
         Some(AdmissionTerminalReplay::Receipt { receipt_id, .. })
@@ -1069,7 +1105,12 @@ fn validate_denied_projection_body(
     }
     let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
     let projection: UntrustedDeniedAfterDeliveryProjectionV1 =
-        serde_json::from_slice(projection_json).map_err(|_| mismatch())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            projection_json,
+            crate::admission_operation::MAX_ADMISSION_TERMINAL_PROJECTION_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(AdmissionOperationError::from)?;
     if canonical_json_bytes(&projection)
         .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
         != projection_json
@@ -1307,6 +1348,9 @@ fn validate_denied_payment_terminal_record(
 }
 
 fn validate_sidecars(
+    operation: &AdmissionOperationV1,
+    context: &AdmissionProjectionContext,
+    projection_json: &[u8],
     records: &[VerifiedAdmissionTerminalProjectionRecordV1],
     authorization: Option<&AuthorizationReceiptConsumption>,
     observer: Option<&AdmissionTerminalObserverProjectionV1>,
@@ -1315,12 +1359,59 @@ fn validate_sidecars(
         .iter()
         .find(|record| record.kind == AdmissionProjectionRecordKind::AuthorizationConsumption);
     match (authorization_record, authorization) {
-        (Some(record), Some(authorization))
-            if record.record_id.as_str() == authorization.authorization_receipt_id
-                && record.canonical_json
-                    == canonical_json_bytes(authorization).map_err(|error| {
+        (Some(record), Some(authorization)) => {
+            let receipt_record = records
+                .iter()
+                .find(|record| record.kind == AdmissionProjectionRecordKind::Receipt)
+                .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+            let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(
+                receipt_record.canonical_json(),
+                MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+            )?
+            .decode_canonical()?;
+            let verified = VerifiedAuthorizationReceiptConsumption::from_canonical_record_verified(
+                record.canonical_json(),
+                operation,
+                context,
+                &receipt,
+                &receipt.kernel_key,
+            )?;
+            let body: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+                projection_json,
+                MAX_ADMISSION_TERMINAL_PROJECTION_BYTES,
+            )?
+            .decode_canonical()?;
+            let outcome_record = records
+                .iter()
+                .find(|record| record.kind == AdmissionProjectionRecordKind::ToolOutcome)
+                .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+            let outcome: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+                outcome_record.canonical_json(),
+                MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+            )?
+            .decode_canonical()?;
+            let proof = serde_json::to_value(&verified)
+                .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+            if record.record_id.as_str() != authorization.authorization_receipt_id
+                || verified.consumption() != authorization
+                || body.get("authorization") != Some(&proof)
+                || body.get("tool_outcome") != Some(&outcome)
+                || body.get("receipt")
+                    != Some(&serde_json::to_value(&receipt).map_err(|error| {
                         AdmissionOperationError::CanonicalJson(error.to_string())
-                    })? => {}
+                    })?)
+                || proof.get("outcome_id") != outcome.get("outcome_id")
+                || proof.get("outcome_version") != outcome.get("outcome_version")
+                || outcome.get("operation_id")
+                    != Some(
+                        &serde_json::to_value(operation.binding().operation_id()).map_err(
+                            |error| AdmissionOperationError::CanonicalJson(error.to_string()),
+                        )?,
+                    )
+            {
+                return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+            }
+        }
         (None, None) => {}
         _ => return Err(AdmissionOperationError::TerminalProjectionBindingMismatch),
     }

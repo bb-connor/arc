@@ -5,6 +5,8 @@
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum FindingPoolLedgerError {
+    #[error(transparent)]
+    UntrustedInput(chio_core::canonical::SharedUntrustedJsonError),
     #[error("finding pool trusted time rejected: {0}")]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding pool debit conflicts with a prior purchase id")]
@@ -61,4 +63,10 @@ pub enum FindingPoolLedgerError {
     Receipt(String),
     #[error("finding pool mutation receipt outbox flush lock is poisoned")]
     MutationReceiptFlushPoisoned,
+}
+
+impl From<chio_core::canonical::UntrustedJsonError> for FindingPoolLedgerError {
+    fn from(error: chio_core::canonical::UntrustedJsonError) -> Self {
+        Self::UntrustedInput(error.into())
+    }
 }

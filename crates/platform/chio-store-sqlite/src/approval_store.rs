@@ -413,7 +413,9 @@ fn serialize_payload(request: &ApprovalRequest) -> Result<String, ApprovalStoreE
 }
 
 fn deserialize_payload(raw: &str) -> Result<ApprovalRequest, ApprovalStoreError> {
-    serde_json::from_str(raw).map_err(|e| ApprovalStoreError::Serialization(e.to_string()))
+    chio_core::canonical::UntrustedJsonText::from_wire((raw).as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(ApprovalStoreError::from)
 }
 
 impl ApprovalStore for SqliteApprovalStore {
@@ -925,8 +927,11 @@ fn load_approval_reservation(
             "persisted approval reservation members exceed the storage limit".to_string(),
         ));
     }
-    let members = serde_json::from_str::<Vec<ApprovalReservationMember>>(&members_json)
-        .map_err(|e| ApprovalStoreError::Serialization(e.to_string()))?;
+    let members = chio_core::canonical::UntrustedJsonText::from_wire(
+        members_json.as_bytes(),
+        MAX_PERSISTED_APPROVAL_MEMBERS_JSON_BYTES,
+    )
+    .and_then(|input| input.decode_signed::<Vec<ApprovalReservationMember>>())?;
     let state = ReplayReservationState::parse(&state).ok_or_else(|| {
         ApprovalStoreError::Serialization("unknown approval reservation state".to_string())
     })?;

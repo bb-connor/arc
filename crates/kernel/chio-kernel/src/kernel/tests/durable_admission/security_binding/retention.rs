@@ -1,22 +1,28 @@
-//! Exact typed storage compatibility and stable security binding semantics.
+//! Current typed storage and stable security binding semantics.
 
 use super::*;
+use crate::admission_operation::{AdmissionOperationError, AdmissionOperationStoreError};
 use crate::admission_operation::{AdmissionSecurityBindingV1, RetainedToolAdmissionRequestV1};
 use chio_core::canonical::canonical_json_bytes;
 
 #[test]
-fn retained_v2_binds_security_but_not_mutable_flow_generation() -> TestResult {
+fn retained_current_profile_binds_security_but_not_mutable_flow_generation() -> TestResult {
     let (_, request, _, _) = durable_admission_fixture("retained-security");
     let original = context(&request, 1)?;
     let binding = AdmissionSecurityBindingV1::from_trusted_context(Some(&original), false, false)?;
     let matching = matching(&request)?;
-    let retained =
-        RetainedToolAdmissionRequestV1::from_admission(&request, &matching, &[], binding.as_ref())?;
+    let retained = RetainedToolAdmissionRequestV1::from_admission(
+        &request,
+        &matching,
+        &[],
+        binding.as_ref(),
+        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+    )?;
     let decoded = RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
     decoded.validate_security_binding(binding.as_ref())?;
     decoded.validate_request_material(&request)?;
     let encoded: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
-    assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v2");
+    assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v4");
     assert!(encoded["security_binding"]["context"]
         .get("flow_state_generation")
         .is_none());
@@ -24,13 +30,19 @@ fn retained_v2_binds_security_but_not_mutable_flow_generation() -> TestResult {
         SecurityInvocationContext::v1(original.as_v1().clone().with_flow_state_generation(2));
     let live = AdmissionSecurityBindingV1::from_trusted_context(Some(&advanced), false, false)?;
     assert_eq!(live, binding);
-    assert!(decoded.validate_security_binding(None).is_err());
+    assert!(matches!(
+        decoded.validate_security_binding(None),
+        Err(AdmissionOperationStoreError::Invariant(_))
+    ));
     let changed = AdmissionSecurityBindingV1::from_trusted_context(
         Some(&context(&request, 2)?),
         false,
         false,
     )?;
-    assert!(decoded.validate_security_binding(changed.as_ref()).is_err());
+    assert!(matches!(
+        decoded.validate_security_binding(changed.as_ref()),
+        Err(AdmissionOperationStoreError::Invariant(_))
+    ));
     Ok(())
 }
 
@@ -45,6 +57,7 @@ fn retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid
         &matching(&request)?,
         &[],
         binding.as_ref(),
+        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
     )?;
     let original: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     for variant in 0..8 {
@@ -70,13 +83,32 @@ fn retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid
             6 => candidate["security_binding"] = serde_json::Value::Null,
             _ => candidate["security_binding"]["unrecognized_authority"] = serde_json::json!(true),
         }
-        assert!(
-            RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(
-                &candidate
-            )?)
-            .is_err(),
-            "variant {variant}"
-        );
+        let result = RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(
+            &candidate,
+        )?);
+        if variant == 1 {
+            assert!(matches!(
+                result?.validate_security_binding(binding.as_ref()),
+                Err(crate::admission_operation::AdmissionOperationStoreError::Invariant(_))
+            ));
+        } else {
+            if matches!(variant, 0 | 2 | 3) {
+                assert!(
+                    matches!(result, Err(AdmissionOperationStoreError::Invariant(_))),
+                    "variant {variant}: {result:?}"
+                );
+            } else {
+                assert!(
+                    matches!(
+                        result,
+                        Err(AdmissionOperationStoreError::Operation(
+                            AdmissionOperationError::UntrustedInput(_)
+                        ))
+                    ),
+                    "variant {variant}: {result:?}"
+                );
+            }
+        }
     }
     assert!(AdmissionSecurityBindingV1::from_trusted_context(
         Some(&context(&request, u64::MAX)?),
@@ -88,12 +120,18 @@ fn retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid
 }
 
 #[test]
-fn unbound_retained_v1_keeps_its_exact_hash_and_bytes() -> TestResult {
-    let (_, request, _, _) = durable_admission_fixture("legacy-security-compatibility");
+fn current_profile_without_security_context_keeps_its_exact_inner_hash() -> TestResult {
+    let (_, request, _, _) = durable_admission_fixture("profile-without-security-context");
     let matching = matching(&request)?;
-    let retained = RetainedToolAdmissionRequestV1::from_admission(&request, &matching, &[], None)?;
+    let retained = RetainedToolAdmissionRequestV1::from_admission(
+        &request,
+        &matching,
+        &[],
+        None,
+        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+    )?;
     let encoded: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
-    assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v1");
+    assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v4");
     assert!(encoded.get("security_binding").is_none());
     let independent_v1 = serde_json::json!({
         "schema": "chio.tool-admission-request.v1",

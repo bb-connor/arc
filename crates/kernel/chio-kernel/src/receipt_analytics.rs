@@ -84,7 +84,6 @@ pub struct ReceiptAnalyticsMetrics {
 }
 
 impl ReceiptAnalyticsMetrics {
-    #[must_use]
     pub fn from_raw(
         total_receipts: u64,
         allow_count: u64,
@@ -93,13 +92,30 @@ impl ReceiptAnalyticsMetrics {
         incomplete_count: u64,
         total_cost_charged: u64,
         total_attempted_cost: u64,
-    ) -> Self {
+    ) -> Result<Self, crate::ReceiptStoreError> {
+        let inconsistent = || {
+            crate::ReceiptStoreError::ReadBoundary(
+                "receipt analytics decision counts exceed total receipts".into(),
+            )
+        };
         let terminal_total = allow_count
-            .saturating_add(cancelled_count)
-            .saturating_add(incomplete_count);
-        let attempted_total = total_cost_charged.saturating_add(total_attempted_cost);
+            .checked_add(cancelled_count)
+            .and_then(|total| total.checked_add(incomplete_count))
+            .ok_or_else(inconsistent)?;
+        if terminal_total
+            .checked_add(deny_count)
+            .is_none_or(|count| count > total_receipts)
+        {
+            return Err(inconsistent());
+        }
+        let compliant = total_receipts
+            .checked_sub(deny_count)
+            .ok_or_else(inconsistent)?;
+        // Each cost component is exact u64. Widen the ratio denominator so two
+        // individually reportable components cannot clamp their combined cost.
+        let attempted_total = u128::from(total_cost_charged) + u128::from(total_attempted_cost);
 
-        Self {
+        Ok(Self {
             total_receipts,
             allow_count,
             deny_count,
@@ -107,13 +123,10 @@ impl ReceiptAnalyticsMetrics {
             incomplete_count,
             total_cost_charged,
             total_attempted_cost,
-            reliability_score: ratio_option(allow_count, terminal_total),
-            compliance_rate: ratio_option(
-                total_receipts.saturating_sub(deny_count),
-                total_receipts,
-            ),
-            budget_utilization_rate: ratio_option(total_cost_charged, attempted_total),
-        }
+            reliability_score: ratio_option(u128::from(allow_count), u128::from(terminal_total)),
+            compliance_rate: ratio_option(u128::from(compliant), u128::from(total_receipts)),
+            budget_utilization_rate: ratio_option(u128::from(total_cost_charged), attempted_total),
+        })
     }
 }
 
@@ -149,10 +162,29 @@ pub struct ReceiptAnalyticsResponse {
     pub by_time: Vec<TimeAnalyticsRow>,
 }
 
-fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
+fn ratio_option(numerator: u128, denominator: u128) -> Option<f64> {
     if denominator == 0 {
         None
     } else {
         Some(numerator as f64 / denominator as f64)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn analytics_ratios_preserve_full_width_costs_and_reject_impossible_counts(
+    ) -> Result<(), crate::ReceiptStoreError> {
+        let metrics = ReceiptAnalyticsMetrics::from_raw(1, 1, 0, 0, 0, u64::MAX, u64::MAX)?;
+        assert_eq!(metrics.budget_utilization_rate, Some(0.5));
+        for counts in [(1, 0, 2, 0, 0), (u64::MAX, u64::MAX, 0, 1, 0)] {
+            assert!(
+                matches!(ReceiptAnalyticsMetrics::from_raw(counts.0, counts.1, counts.2, counts.3, counts.4, 0, 0),
+                Err(crate::ReceiptStoreError::ReadBoundary(message)) if message == "receipt analytics decision counts exceed total receipts")
+            );
+        }
+        Ok(())
     }
 }

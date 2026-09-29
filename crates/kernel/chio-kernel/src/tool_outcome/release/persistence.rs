@@ -354,8 +354,12 @@ impl MonetaryReleaseEvidenceV1 {
                 maximum: MAX_MONETARY_RELEASE_EVIDENCE_BYTES,
             });
         }
-        let persisted = serde_json::from_slice::<PersistedMonetaryReleaseEvidenceV1>(bytes)
-            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        let persisted = chio_core::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            MAX_MONETARY_RELEASE_EVIDENCE_BYTES,
+        )
+        .and_then(|input| input.decode_signed::<PersistedMonetaryReleaseEvidenceV1>())
+        .map_err(ToolOutcomeError::from)?;
         let bundle = Self::from_persisted(persisted)?;
         if bundle.canonical_bytes()? != bytes {
             return Err(ToolOutcomeError::Invalid(
@@ -587,8 +591,12 @@ impl MonetaryReleaseEvidenceV1 {
         {
             return Err(ToolOutcomeError::Binding("release_evidence.source_binding"));
         }
-        let source = serde_json::from_slice::<ReleaseSourceBindingV1>(&bytes)
-            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        let source = chio_core::canonical::UntrustedJsonText::from_wire(
+            &bytes,
+            MAX_MONETARY_RELEASE_EVIDENCE_BYTES,
+        )
+        .and_then(|input| input.decode_signed::<ReleaseSourceBindingV1>())
+        .map_err(ToolOutcomeError::from)?;
         if canonical(&source)? != bytes {
             return Err(ToolOutcomeError::Invalid(
                 "release_evidence.source_binding_noncanonical",

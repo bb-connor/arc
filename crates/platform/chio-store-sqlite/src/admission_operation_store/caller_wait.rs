@@ -76,7 +76,7 @@ impl SqliteAdmissionOperationStore {
             .ok_or_else(|| invariant("caller wait lost its original request"))?;
         let executor = original
             .authority_profile()
-            .and_then(|profile| profile.caller_executor())
+            .caller_executor()
             .ok_or_else(|| invariant("legacy caller cannot acquire authenticated wait custody"))?;
         if !operation.provider_attempt().is_some_and(|attempt| {
             attempt.is_caller_report() && attempt.transport_key_epoch == executor.key_epoch

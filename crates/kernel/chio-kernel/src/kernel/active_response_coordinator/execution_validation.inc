@@ -264,7 +264,9 @@ fn validate_active_response_execution_evidence(
         let Some(exact_applied) = durable_applied.next() else {
             continue;
         };
-        applied_count = applied_count.saturating_add(1);
+        applied_count = applied_count.checked_add(1).ok_or_else(|| {
+            active_response_internal("active-response applied-effect count overflow")
+        })?;
         let applied = applied_evidence.next().ok_or_else(|| {
             active_response_internal("active-response applied-effect evidence is incomplete")
         })?;
@@ -370,12 +372,12 @@ fn verify_active_response_record_readback(
     evidence: &ActiveResponseExecutionEvidence,
 ) -> Result<ResponseSnapshot, KernelError> {
     let record = evidence.response_record();
-    let snapshot: ResponseSnapshot = serde_json::from_slice(record.canonical_body.as_bytes())
-        .map_err(|error| {
-            active_response_internal(format!(
-                "active-response record readback is malformed: {error}"
-            ))
-        })?;
+    let snapshot: ResponseSnapshot = chio_core::canonical::UntrustedJsonText::from_wire(
+        record.canonical_body.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(crate::KernelError::from)?;
     let canonical = canonical_json_bytes(&snapshot).map_err(|error| {
         active_response_internal(format!(
             "active-response record readback canonicalization failed: {error}"
@@ -709,10 +711,12 @@ fn validate_executable_effect(
     plan: &ResponsePlan,
     effect: &PlannedResponseEffect,
 ) -> Result<(), KernelError> {
-    let value: serde_json::Value = serde_json::from_slice(effect.canonical_contribution.as_bytes())
-        .map_err(|error| {
-            active_response_denied(format!("response contribution is not JSON: {error}"))
-        })?;
+    let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        effect.canonical_contribution.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(crate::KernelError::from)?;
     let canonical = canonical_json_bytes(&value).map_err(|error| {
         active_response_denied(format!("response contribution is not canonical: {error}"))
     })?;

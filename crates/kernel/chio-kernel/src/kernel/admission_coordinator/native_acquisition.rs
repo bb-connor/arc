@@ -146,7 +146,7 @@ impl NativeSecurityFlowJoinAuthority<'_> {
     ) -> Result<T, KernelError> {
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(self.requested_now);
+        let now = runtime.refresh_trusted_time(self.requested_now)?;
         let operation = &self.admission.operation;
         let (current, retained) = store_call(|| {
             runtime.store.load_retained_tool_request(
@@ -231,7 +231,7 @@ impl NativeSecurityFlowJoinAuthority<'_> {
             .ok_or_else(|| invalid("native preparation returned success without a join"))?;
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(self.requested_now);
+        let now = runtime.refresh_trusted_time(self.requested_now)?;
         if read(&self, runtime, now)? != confirmed {
             return Err(invalid("native history changed before verifier completion"));
         }
@@ -268,13 +268,9 @@ impl ChioKernel {
                 .operation
                 .provider_attempt()
                 .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
-            && original
-                .authority_profile()
-                .and_then(|profile| profile.caller_executor())
-                .is_some();
-        if original.authority_profile().is_none()
-            || (admission.operation.state() != AdmissionOperationState::BrokerAttemptRegistered
-                && !caller_resume)
+            && original.authority_profile().caller_executor().is_some();
+        if (admission.operation.state() != AdmissionOperationState::BrokerAttemptRegistered
+            && !caller_resume)
             || admission.operation.dispatch_commit().is_some()
             || self.security_pre_dispatch_policy != SecurityPreDispatchPolicy::Enforce
         {

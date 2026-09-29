@@ -74,14 +74,6 @@ fn setup(
     fixture: &Fixture,
     name: &str,
 ) -> TestResult<(AdmissionOperationV1, AdmissionRecoveryLease)> {
-    setup_profile(fixture, name, true)
-}
-
-fn setup_profile(
-    fixture: &Fixture,
-    name: &str,
-    retain_profile: bool,
-) -> TestResult<(AdmissionOperationV1, AdmissionRecoveryLease)> {
     let (operation, retained) = super::super::retained_request::original_with_requirements(
         &fixture.fence,
         name,
@@ -92,13 +84,10 @@ fn setup_profile(
         },
     )?;
     let profile = selected_profile(fixture)?;
-    let (operation, retained) = if retain_profile {
+    let (operation, retained) =
         super::super::retained_request::authority_profile::prepare_with_profile(
             operation, retained, profile,
-        )?
-    } else {
-        (operation, retained)
-    };
+        )?;
     fixture.store.begin_with_retained_tool_request(
         &operation,
         &retained,
@@ -154,12 +143,12 @@ fn selected_profile(
 }
 
 #[test]
-fn runtime_claim_cannot_upgrade_absent_or_historical_authority_profile() -> TestResult {
-    for retain_profile in [false, true] {
+fn runtime_claim_cannot_upgrade_original_absent_runtime_selection() -> TestResult {
+    {
         let fixture = fixture();
         // The operation predates source selection. Importing later cannot
         // provide the authority its immutable original request never selected.
-        let (operation, lease) = setup_profile(&fixture, "no-original-runtime", retain_profile)?;
+        let (operation, lease) = setup(&fixture, "no-original-runtime")?;
         let source = imported(&fixture, true)?;
         let (_, original) = fixture
             .store
@@ -169,11 +158,7 @@ fn runtime_claim_cannot_upgrade_absent_or_historical_authority_profile() -> Test
                 now_ms(),
             )?
             .ok_or("missing original")?;
-        assert_eq!(original.authority_profile().is_some(), retain_profile);
-        assert!(original
-            .authority_profile()
-            .and_then(|profile| profile.runtime())
-            .is_none());
+        assert!(original.authority_profile().runtime().is_none());
         let before = global_count(&fixture.store);
         let candidate = intent(&operation, &source, "forbidden-upgrade", &[])?;
         assert!(matches!(

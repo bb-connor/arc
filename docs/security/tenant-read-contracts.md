@@ -53,8 +53,10 @@ points, test paths and function names, and an evidence kind. The gate rejects
 missing mappings and missing test references. It does not run the tests or prove
 a function exercises every statement in that family.
 
-84 tables map to existing or extended runtime families; one is explicitly
-`runtime-gap`. All 38 referenced family tests have terminal passing local runs.
+All 85 tables now map to exercised runtime families. The preceding 38 family
+tests had terminal passing local runs; this continuation adds two genuine signed
+authorization-consumption tests. These are family witnesses, not independent
+coverage of every SQL statement.
 The colliding-transition regression also repaired the independent model's global
 ID cache: replay now binds tenant, transition kind and the exact request, as the
 production SQLite store already did. Tenant cases use A's exact identifiers under B's scope, pair empty
@@ -74,13 +76,22 @@ has privileged integrity and rollback evidence; it has no tenant point-read API.
 Global pending-ingress scans remain recovery-coordinator operations, while signed
 ingress and acknowledgements enforce their tenant binding.
 
-The remaining table is `admission_operation_authorization_consumptions`. Its
-sealed local constructor is currently test-only inside `chio-kernel`; kernel
-projection type tests do not establish durable SQLite evidence. Closure needs a
-production signed-terminal projection fixture, positive durable readback and
-foreign principal/projection substitution rejection. The factory was not made
-public or deserializable to obtain a test fixture.
+The `admission_operation_authorization_consumptions` family now uses production
+signed-source verification, signed terminal commit, exact replay and durable
+reopen. Complete altered envelopes are re-signed for tenant, request, source and
+consumer receipt, parameter hash and outcome/version substitutions. A different
+claimant and duplicate source consumption reject atomically. After checking the
+immutable trigger, a negative fixture corrupts the mirrored tenant through the
+owner connection and restores the exact catalog; production readback rejects the
+row binding independently of external-write detection.
 
-Packet 10.3's exhaustive runtime item remains open for this gap. PostgreSQL
-surfaces and hosted deployment acceptance remain outside this SQLite matrix.
-See the [execution record](../reviews/2026-09-28-signed-reader-tenant-execution.md).
+The positive fixture uses a local-system coordinator namespace. This is a
+qualified kernel contract, not a tenant point-read API. The sealed proof exposes
+only a verified production constructor and a private decoding DTO. Ordinary
+local completion still supplies no authorization-consumption participant.
+
+This closes the explicit table-family gap. Packet 10.3's exhaustive runtime item
+remains open for independent per-statement and broader principal coverage.
+PostgreSQL surfaces and hosted deployment acceptance remain outside this SQLite
+matrix. See the [batch execution record](../reviews/2026-09-28-kernel-admission-reader-execution.md)
+and the [preceding execution record](../reviews/2026-09-28-signed-reader-tenant-execution.md).

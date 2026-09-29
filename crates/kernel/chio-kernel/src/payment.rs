@@ -908,7 +908,8 @@ fn read_payment_json<T: DeserializeOwned>(response: ureq::Response) -> Result<T,
             "payment rail response is too large".to_owned(),
         ));
     }
-    serde_json::from_slice(&body)
+    chio_core::canonical::UntrustedJsonText::from_wire(&body, 256 * 1024)
+        .and_then(|input| input.decode_signed())
         .map_err(|_| PaymentError::RailError("payment rail response is invalid".to_owned()))
 }
 

@@ -81,7 +81,7 @@ impl WriterCommandPermit {
             if !matches!(kind, CommandKind::Control) {
                 let previous = health.add_counter(&health.inflight, 1, "inflight overflow")?;
                 permit.inflight = true;
-                health.note_accept(previous);
+                health.note_accept(previous)?;
             }
             if matches!(kind, CommandKind::Write) {
                 health.add_counter(&health.accepted_total, 1, "accepted total overflow")?;
@@ -126,9 +126,12 @@ impl WriterCommandPermit {
             };
             let _ = self.health.add_counter(counter, 1, name);
             if committed {
-                self.health
-                    .last_commit_unix_ms
-                    .store(current_unix_ms(), Ordering::SeqCst);
+                match current_unix_ms() {
+                    Ok(now) => self.health.last_commit_unix_ms.store(now, Ordering::SeqCst),
+                    Err(error) => {
+                        self.health.accounting_error(error.code());
+                    }
+                }
                 self.health.clear_timeout_error_if_drained();
             }
         }

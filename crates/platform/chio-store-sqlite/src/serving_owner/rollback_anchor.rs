@@ -660,8 +660,10 @@ fn decode_slot(slot: &[u8; SLOT_SIZE]) -> Result<AnchorRecord, SqliteServingOwne
     if slot[CHECKSUM_OFFSET..PAYLOAD_OFFSET] != sha256_hex(payload).as_bytes()[..] {
         return Err(invalid("serving rollback anchor checksum is invalid"));
     }
-    let record: AnchorRecord = serde_json::from_slice(payload)
-        .map_err(|error| invalid(format!("serving rollback anchor is invalid JSON: {error}")))?;
+    let record: AnchorRecord =
+        chio_core::canonical::UntrustedJsonText::from_wire(payload, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(SqliteServingOwnerError::from)?;
     if canonical_json_bytes(&record)
         .map_err(|error| invalid(format!("rollback anchor encoding failed: {error}")))?
         != payload

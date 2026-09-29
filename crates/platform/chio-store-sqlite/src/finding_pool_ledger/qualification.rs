@@ -593,8 +593,12 @@ fn verify_legacy_outbox_authority(
         let receipt_json = row
             .get::<_, String>(0)
             .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-        let receipt = serde_json::from_str::<ChioReceipt>(&receipt_json)
-            .map_err(|error| FindingPoolLedgerError::Receipt(error.to_string()))?;
+        let receipt = chio_core::canonical::UntrustedJsonText::from_wire(
+            receipt_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed::<ChioReceipt>())
+        .map_err(FindingPoolLedgerError::from)?;
         if canonical_receipt_authority_json(&receipt.kernel_key)? != authority_json {
             return Err(FindingPoolLedgerError::ReceiptAuthorityMismatch);
         }

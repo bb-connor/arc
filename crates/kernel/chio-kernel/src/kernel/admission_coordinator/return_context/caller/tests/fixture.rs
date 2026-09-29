@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::admission_operation::{
-    immutable_tool_request_hash, qualify_recovery_claim_for_test,
+    immutable_tool_request_hash_with_profile, qualify_recovery_claim_for_test,
     AdmissionExecutionNonceReservationV1, AdmissionOperationBindingInputV1, AdmissionOperationKind,
     AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
     UntrustedAdmissionRecoveryClaim,
@@ -98,7 +98,13 @@ pub(super) fn fixture() -> TestResult<Fixture> {
         &request.arguments,
         None,
     )?;
-    let original = RetainedToolAdmissionRequestV1::from_admission(&request, &matching, &[], None)?;
+    let original = RetainedToolAdmissionRequestV1::from_admission(
+        &request,
+        &matching,
+        &[],
+        None,
+        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+    )?;
     let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
         kind: AdmissionOperationKind::ToolDispatch,
         namespace: AuthenticatedRequestNamespace::for_local_system(identifier(
@@ -112,7 +118,13 @@ pub(super) fn fixture() -> TestResult<Fixture> {
             sha256_hex(&canonical_json_bytes(&request.capability)?),
         )?,
         request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
-            immutable_tool_request_hash(&request, &matching, &[], None)?,
+            immutable_tool_request_hash_with_profile(
+                &request,
+                &matching,
+                &[],
+                None,
+                Some(original.authority_profile()),
+            )?,
             AdmissionDigest::try_new(
                 "action",
                 sha256_hex(&canonical_json_bytes(&request.arguments)?),

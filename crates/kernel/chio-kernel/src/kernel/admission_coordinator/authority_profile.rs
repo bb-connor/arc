@@ -53,7 +53,7 @@ impl ChioKernel {
     ) -> Result<Option<RetainedToolAdmissionRequestV1>, KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(observed_at);
+        let now = runtime.refresh_trusted_time(observed_at)?;
         let loaded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             runtime.store.load_retained_tool_request(
                 operation.binding().operation_id(),
@@ -129,13 +129,7 @@ impl ChioKernel {
         original: &RetainedToolAdmissionRequestV1,
     ) -> Result<(), KernelError> {
         let current = self.admission_authority_profile()?;
-        let matches = match original.authority_profile() {
-            Some(profile) => profile == &current,
-            // Legacy history is readable but cannot select newly configured
-            // operation-owned authority. Concrete claim ports require v4.
-            None => !current.has_operation_owned_authority(),
-        };
-        if !matches {
+        if original.authority_profile() != &current {
             return Err(KernelError::DurableAdmission(
                 "authority profile differs from original admission".into(),
             ));

@@ -83,7 +83,11 @@ fn exercise(route: Route) -> TestResult {
                         )?
                         .ok_or("retained original")?;
                     assert!(original.native_security_authority_binding().is_some());
-                    assert!(original.authority_profile().is_some());
+                    assert_eq!(
+                        serde_json::from_slice::<serde_json::Value>(original.canonical_bytes())?
+                            ["schema"],
+                        "chio.retained-tool-admission-request.v4"
+                    );
                     if committed_egress {
                         let history = kernel
                             .prepare_native_security_egress(

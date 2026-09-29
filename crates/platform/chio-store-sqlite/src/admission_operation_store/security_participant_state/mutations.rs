@@ -155,11 +155,6 @@ impl SqliteAdmissionOperationStore {
         // Existing context-only journals remain historical data. They cannot
         // acquire a first native mutation without an original authority binding.
         original.validate_native_security_authority(&actual.admission_binding()?)?;
-        if original.authority_profile().is_none() {
-            return Err(invalid(
-                "first native mutation requires an original authority profile",
-            ));
-        }
         let occupied: bool = tx
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM security_participant_state_transitions

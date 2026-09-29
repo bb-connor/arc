@@ -45,7 +45,7 @@ impl ChioKernel {
         };
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(0);
+        let now = runtime.refresh_trusted_time(0)?;
         let trusted = context.as_v1();
         let key = FlowStateKey {
             tenant_id: trusted.tenant_id().clone(),
@@ -59,7 +59,7 @@ impl ChioKernel {
                 .store
                 .observe_native_security_flow(&binding, &key, &runtime.fence, now)
         })?;
-        let completed_at = runtime.refresh_trusted_time(now);
+        let completed_at = runtime.refresh_trusted_time(now)?;
         if observed.binding() != &binding
             || observed.key() != &key
             || observed.observed_at_unix_ms() < now
@@ -143,7 +143,7 @@ impl ChioKernel {
         self.validate_security_invocation_context_binding(request, Some(context), None)?;
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(0);
+        let now = runtime.refresh_trusted_time(0)?;
         let (operation, original) = store_call(|| {
             runtime
                 .store
@@ -220,12 +220,8 @@ impl ChioKernel {
                                 ProviderAttemptBindingV1::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX,
                                 request.server_id
                             )
-                        && original
-                            .authority_profile()
-                            .and_then(|profile| profile.caller_executor())
-                            .is_some())
+                        && original.authority_profile().caller_executor().is_some())
             })
-            || original.authority_profile().is_none()
             || self.security_pre_dispatch_policy != SecurityPreDispatchPolicy::Enforce
         {
             return Err(invalid("native egress requires original capture custody"));
@@ -279,9 +275,9 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
     pub fn validate_current(&self) -> Result<u64, KernelError> {
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(self.observation.observed_at_unix_ms());
+        let now = runtime.refresh_trusted_time(self.observation.observed_at_unix_ms())?;
         self.revalidate(runtime, now)?;
-        Ok(runtime.refresh_trusted_time(now))
+        Ok(runtime.refresh_trusted_time(now)?)
     }
 
     pub fn observation(&self) -> &NativeSecurityFlowObservationV1 {
@@ -301,7 +297,7 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
     ) -> Result<AcquiredNativeSecurityEgress<'a>, KernelError> {
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(self.observation.observed_at_unix_ms());
+        let now = runtime.refresh_trusted_time(self.observation.observed_at_unix_ms())?;
         require_deadline(expires_at_unix_ms, now)?;
         self.revalidate(runtime, now)?;
         let payload = canonical_json_bytes(&self.request.arguments)
@@ -348,7 +344,7 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
             ));
         }
         // A callback may have advanced trusted time or changed configuration.
-        let after = runtime.refresh_trusted_time(now);
+        let after = runtime.refresh_trusted_time(now)?;
         require_deadline(expires_at_unix_ms, after)?;
         self.revalidate(runtime, after)?;
         if self.read_history(runtime, after)? != history {
@@ -462,7 +458,7 @@ impl AcquiredNativeSecurityEgress<'_> {
         let prepared = &self.prepared;
         let runtime = prepared.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(prepared.observation.observed_at_unix_ms());
+        let now = runtime.refresh_trusted_time(prepared.observation.observed_at_unix_ms())?;
         require_deadline(self.history.acquisition.fence.expires_at_unix_ms, now)?;
         prepared.revalidate(runtime, now)?;
         if prepared.read_history(runtime, now)? != self.history {
@@ -515,7 +511,7 @@ impl AcquiredNativeSecurityEgress<'_> {
                 "native egress commitment differs from acquired command history",
             ));
         }
-        let after = runtime.refresh_trusted_time(now);
+        let after = runtime.refresh_trusted_time(now)?;
         require_deadline(command.fence.expires_at_unix_ms, after)?;
         prepared.revalidate(runtime, after)?;
         if prepared.read_history(runtime, after)? != history {
@@ -567,7 +563,7 @@ fn observe(
     // The store samples its clock inside the read transaction. The callback
     // need not finish in the millisecond in which the kernel started it.
     // Do not admit either an older snapshot timestamp or an invented future.
-    let completed_at = runtime.refresh_trusted_time(now);
+    let completed_at = runtime.refresh_trusted_time(now)?;
     if observation.binding() != binding
         || observation.key() != key
         || observation.observed_at_unix_ms() < now

@@ -86,7 +86,7 @@ impl ChioKernel {
         };
         let runtime = self.durable_runtime()?;
         let guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let selector =
             AdmissionIdentifier::try_new("request_id", nonce.nonce.bound_to.request_id.clone())?;
         let (operation, original) = custody::custody_call(|| {
@@ -118,7 +118,7 @@ impl ChioKernel {
         }
         let executor = original
             .authority_profile()
-            .and_then(|profile| profile.caller_executor())
+            .caller_executor()
             .cloned()
             .ok_or_else(|| invalid("caller start requires an originally pinned executor"))?;
         if self.caller_executor.as_ref() != Some(&executor)
@@ -192,8 +192,12 @@ impl ChioKernel {
         self.restore_caller_return_context(&admission, &frame, now)?;
         // Decode only after the private codec, physical custody, original
         // profile and signer checks have all succeeded.
-        let wire: CallerReturnWire = serde_json::from_slice(frame.kernel_context_json())
-            .map_err(|_| invalid("caller start context decoding failed"))?;
+        let wire: CallerReturnWire = chio_core::canonical::UntrustedJsonText::from_wire(
+            frame.kernel_context_json(),
+            crate::admission_operation::AdmissionCallerDispatchContextV1::MAX_KERNEL_CONTEXT_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(crate::KernelError::from)?;
         if wire.schema != SCHEMA && wire.schema != NATIVE_CALLER_CONTEXT_SCHEMA {
             return Err(invalid(
                 "legacy caller context cannot acquire start authority",
@@ -310,7 +314,7 @@ impl ChioKernel {
         }
         let runtime = self.durable_runtime()?;
         let mutation_guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(now);
+        let now = runtime.refresh_trusted_time(now)?;
         let retained = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             runtime.store.load_caller_dispatch_context(
                 admission.operation.binding().operation_id(),
@@ -370,8 +374,12 @@ impl ChioKernel {
             .retained_request
             .as_ref()
             .ok_or_else(|| invalid("caller decoding lost the original request"))?;
-        let wire: CallerReturnWire =
-            serde_json::from_slice(bytes).map_err(|error| invalid(error.to_string()))?;
+        let wire: CallerReturnWire = chio_core::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            crate::admission_operation::AdmissionCallerDispatchContextV1::MAX_KERNEL_CONTEXT_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(crate::KernelError::from)?;
         if canonical_json_bytes(&wire).map_err(|error| invalid(error.to_string()))? != bytes {
             return Err(invalid(
                 "caller return component is not exact typed canonical JSON",

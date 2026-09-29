@@ -4,7 +4,9 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
+#[cfg(test)]
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chacha20poly1305::aead::rand_core::{OsRng, RngCore};
 use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
@@ -325,14 +327,15 @@ impl ReceiptCommitWriterHealth {
     /// resets it. The stall clock reads this so a writer that wedges before its
     /// first commit is still caught, while a writer resuming after an idle period
     /// is measured from the fresh work rather than a stale last commit.
-    fn note_accept(&self, previous_inflight: u64) {
-        let now = current_unix_ms();
+    fn note_accept(&self, previous_inflight: u64) -> Result<(), ReceiptStoreError> {
+        let now = current_unix_ms()?;
         let _ =
             self.first_accept_unix_ms
                 .compare_exchange(0, now, Ordering::SeqCst, Ordering::SeqCst);
         if previous_inflight == 0 {
             self.backlog_started_unix_ms.store(now, Ordering::SeqCst);
         }
+        Ok(())
     }
 
     /// Record that the commit actor has disconnected so the liveness classifier
@@ -2419,11 +2422,9 @@ fn commit_receipt_batch_with_completions(
     flush_error
 }
 
-fn current_unix_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
-        .unwrap_or(0)
+fn current_unix_ms() -> Result<u64, chio_security_types::clock::ClockError> {
+    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+        .map(|value| value.get())
 }
 
 /// Classify commit-writer liveness from a counter snapshot. Kept pure so the
@@ -2479,7 +2480,9 @@ fn classify_writer_liveness(
         .chain(backlog_started_unix_ms)
         .max();
     let stalled = match progress_reference {
-        Some(reference) => now_unix_ms.saturating_sub(reference) >= stall_threshold_ms,
+        Some(reference) => now_unix_ms
+            .checked_sub(reference)
+            .is_none_or(|elapsed| elapsed >= stall_threshold_ms),
         None => false,
     };
     if backlogged && stalled {
@@ -3115,6 +3118,7 @@ fn execute_anchored_receipt_write(
 
 fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError {
     match error {
+        ReceiptStoreError::Clock(error) => ReceiptStoreError::Clock(*error),
         ReceiptStoreError::UntrustedInput(error) => {
             ReceiptStoreError::UntrustedInput(Arc::clone(error))
         }
@@ -3474,12 +3478,18 @@ impl SqliteReceiptStore {
     /// assessed against the operator-configured `stall_threshold`. See
     /// [`classify_writer_liveness`] for the transition rules.
     pub fn writer_liveness(&self, stall_threshold: Duration) -> chio_kernel::ReceiptWriterLiveness {
+        let Ok(now) = current_unix_ms() else {
+            return chio_kernel::ReceiptWriterLiveness::Wedged;
+        };
+        let Ok(threshold) = u64::try_from(stall_threshold.as_millis()) else {
+            return chio_kernel::ReceiptWriterLiveness::Wedged;
+        };
         classify_writer_liveness(
             &self.receipt_commit_actor.writer_counters(),
-            u64::try_from(stall_threshold.as_millis()).unwrap_or(u64::MAX),
+            threshold,
             RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
             self.receipt_commit_actor.backlog_started_unix_ms(),
-            current_unix_ms(),
+            now,
         )
     }
 
@@ -4298,7 +4308,9 @@ fn decode_canonical_chio_receipt(
     canonical: &CanonicalBytes,
 ) -> Result<ChioReceipt, ReceiptStoreError> {
     let receipt: ChioReceipt =
-        serde_json::from_slice(canonical.as_bytes()).map_err(ReceiptStoreError::from)?;
+        chio_core::canonical::UntrustedJsonText::from_wire(canonical.as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(ReceiptStoreError::from)?;
     let expected = canonical_json_bytes(&receipt)
         .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
     if expected.as_slice() != canonical.as_bytes() {
@@ -4543,7 +4555,7 @@ mod receipt_commit_actor_tests {
         let health = ReceiptCommitWriterHealth::default();
 
         // 0 -> 1 begins a backlog and stamps a real start time.
-        health.note_accept(0);
+        health.note_accept(0).expect("fixture clock");
         assert_ne!(
             health.backlog_started_unix_ms.load(Ordering::SeqCst),
             0,
@@ -4552,7 +4564,7 @@ mod receipt_commit_actor_tests {
 
         // 1 -> 2 grows an ongoing backlog and must NOT move its start.
         health.backlog_started_unix_ms.store(1, Ordering::SeqCst);
-        health.note_accept(1);
+        health.note_accept(1).expect("fixture clock");
         assert_eq!(
             health.backlog_started_unix_ms.load(Ordering::SeqCst),
             1,
@@ -4561,7 +4573,7 @@ mod receipt_commit_actor_tests {
 
         // 0 -> 1 after the writer drained begins a NEW backlog and restamps.
         health.backlog_started_unix_ms.store(1, Ordering::SeqCst);
-        health.note_accept(0);
+        health.note_accept(0).expect("fixture clock");
         assert_ne!(
             health.backlog_started_unix_ms.load(Ordering::SeqCst),
             1,
@@ -4986,7 +4998,7 @@ mod receipt_commit_actor_tests {
                 10_000,
                 RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
                 None,
-                current_unix_ms(),
+                current_unix_ms().expect("fixture clock"),
             ),
             chio_kernel::ReceiptWriterLiveness::Dead
         );

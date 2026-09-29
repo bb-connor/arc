@@ -13,10 +13,7 @@ use crate::kernel::MatchingGrant;
 use crate::tool_outcome::FrozenEvaluationStepV1;
 use crate::ToolCallRequest;
 
-const SCHEMA: &str = "chio.retained-tool-admission-request.v1";
-const SECURITY_SCHEMA: &str = "chio.retained-tool-admission-request.v2";
-const NATIVE_SECURITY_SCHEMA: &str = "chio.retained-tool-admission-request.v3";
-const AUTHORITY_PROFILE_SCHEMA: &str = "chio.retained-tool-admission-request.v4";
+const SCHEMA: &str = "chio.retained-tool-admission-request.v4";
 const MAX_BYTES: usize = 262_144;
 
 mod security_binding;
@@ -29,9 +26,8 @@ pub(crate) use security_binding::AdmissionSecurityBindingV1;
 ///
 /// One-shot credentials and approval artifacts are deliberately not retained.
 /// This record must not be exposed on a public receipt or collector response.
-/// The API accepts unbound v1, identity-bound v2 and native-authority-bound v3
-/// artifacts, plus explicit original authority profiles in v4. No stored
-/// version establishes a current trusted host context or claim authority.
+/// The current format requires explicit original authority selections. Retained
+/// data establishes neither a current trusted host context nor claim authority.
 #[derive(Clone)]
 pub struct RetainedToolAdmissionRequestV1 {
     // Historical custody verification composes several store layers. Keep the
@@ -58,8 +54,7 @@ struct RetainedRequestWire {
     post_return_steps: Vec<FrozenEvaluationStepV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     security_binding: Option<AdmissionSecurityBindingV1>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    authority_profile: Option<AdmissionAuthorityProfileV1>,
+    authority_profile: AdmissionAuthorityProfileV1,
 }
 
 #[derive(Serialize)]
@@ -203,37 +198,21 @@ impl RetainedToolAdmissionRequestV1 {
             .map_err(Into::into)
     }
 
-    #[cfg(test)]
     pub(crate) fn from_admission(
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],
         post_return_steps: &[FrozenEvaluationStepV1],
         security_binding: Option<&AdmissionSecurityBindingV1>,
-    ) -> Result<Self, AdmissionOperationStoreError> {
-        Self::from_admission_with_profile(
-            request,
-            matching_grants,
-            post_return_steps,
-            security_binding,
-            None,
-        )
-    }
-
-    pub(crate) fn from_admission_with_profile(
-        request: &ToolCallRequest,
-        matching_grants: &[MatchingGrant<'_>],
-        post_return_steps: &[FrozenEvaluationStepV1],
-        security_binding: Option<&AdmissionSecurityBindingV1>,
-        authority_profile: Option<&AdmissionAuthorityProfileV1>,
+        authority_profile: &AdmissionAuthorityProfileV1,
     ) -> Result<Self, AdmissionOperationStoreError> {
         let request = Self::request_without_transient_credentials(request);
         let wire = RetainedRequestWire {
-            schema: Self::schema(security_binding, authority_profile).to_owned(),
+            schema: SCHEMA.to_owned(),
             request: Box::new(request),
             matching_grant_indices: matching_grants.iter().map(|grant| grant.index).collect(),
             post_return_steps: post_return_steps.to_vec(),
             security_binding: security_binding.cloned(),
-            authority_profile: authority_profile.cloned(),
+            authority_profile: authority_profile.clone(),
         };
         let canonical = canonical_json_bytes(&wire).map_err(invalid)?;
         Self::from_canonical_bytes(&canonical)
@@ -245,13 +224,11 @@ impl RetainedToolAdmissionRequestV1 {
         if bytes.is_empty() || bytes.len() > MAX_BYTES {
             return Err(invalid("retained request exceeds its artifact bound"));
         }
-        let wire: Box<RetainedRequestWire> = serde_json::from_slice(bytes).map_err(invalid)?;
+        let wire: Box<RetainedRequestWire> =
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_BYTES)?
+                .decode_canonical()?;
         let request = &wire.request;
-        let expected_schema = Self::schema(
-            wire.security_binding.as_ref(),
-            wire.authority_profile.as_ref(),
-        );
-        if wire.schema != expected_schema
+        if wire.schema != SCHEMA
             || request.dpop_proof.is_some()
             || request.execution_nonce.is_some()
             || request.approval_token.is_some()
@@ -267,13 +244,10 @@ impl RetainedToolAdmissionRequestV1 {
         if let Some(binding) = wire.security_binding.as_ref() {
             binding.validate()?;
         }
-        let canonical = canonical_json_bytes(&wire).map_err(invalid)?;
-        if canonical != bytes {
-            return Err(invalid(
-                "retained request is not exact typed canonical JSON",
-            ));
-        }
-        let retained = Self { wire, canonical };
+        let retained = Self {
+            wire,
+            canonical: bytes.to_vec(),
+        };
         retained.matching_grants()?;
         Ok(retained)
     }
@@ -288,24 +262,10 @@ impl RetainedToolAdmissionRequestV1 {
         self.wire.security_binding.as_ref()
     }
 
-    fn schema(
-        binding: Option<&AdmissionSecurityBindingV1>,
-        profile: Option<&AdmissionAuthorityProfileV1>,
-    ) -> &'static str {
-        if profile.is_some() {
-            return AUTHORITY_PROFILE_SCHEMA;
-        }
-        match binding {
-            Some(binding) if binding.native_authority().is_some() => NATIVE_SECURITY_SCHEMA,
-            Some(_) => SECURITY_SCHEMA,
-            None => SCHEMA,
-        }
-    }
-
     /// Original configured selections only, not activation or mutable policy.
     #[must_use]
-    pub fn authority_profile(&self) -> Option<&AdmissionAuthorityProfileV1> {
-        self.wire.authority_profile.as_ref()
+    pub fn authority_profile(&self) -> &AdmissionAuthorityProfileV1 {
+        &self.wire.authority_profile
     }
 
     /// Historical authority selection only. It cannot authorize a new write.
@@ -315,8 +275,7 @@ impl RetainedToolAdmissionRequestV1 {
             .and_then(AdmissionSecurityBindingV1::native_authority)
     }
 
-    /// Require exact original selection before a native mutation. Legacy
-    /// records without a selection remain readable, but cannot acquire one.
+    /// Require the exact original native selection before a mutation.
     pub fn validate_native_security_authority(
         &self,
         binding: &NativeSecurityAuthorityBindingV1,
@@ -380,12 +339,12 @@ impl RetainedToolAdmissionRequestV1 {
         &self,
         request: &ToolCallRequest,
     ) -> Result<(), AdmissionOperationStoreError> {
-        let candidate = Self::from_admission_with_profile(
+        let candidate = Self::from_admission(
             request,
             &self.matching_grants()?,
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
-            self.wire.authority_profile.as_ref(),
+            &self.wire.authority_profile,
         )?;
         if candidate.canonical != self.canonical {
             return Err(invalid(
@@ -419,7 +378,7 @@ impl RetainedToolAdmissionRequestV1 {
             &self.matching_grants()?,
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
-            self.wire.authority_profile.as_ref(),
+            Some(&self.wire.authority_profile),
         )
     }
 

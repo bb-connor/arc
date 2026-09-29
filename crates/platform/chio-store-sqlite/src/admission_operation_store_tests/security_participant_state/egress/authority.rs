@@ -31,21 +31,29 @@ fn changed_arguments_payload_context_and_selected_authority_deny_before_writes(
             7 => plan.key.tenant_id = chio_security_types::ports::TenantId::new("foreign-tenant")?,
             _ => unreachable!(),
         }
+        let error = fixture
+            .store
+            .acquire_security_participant_egress(
+                &pending.operation,
+                &pending.lease,
+                initialized,
+                &context,
+                &request,
+                &plan,
+                now_ms(),
+            )
+            .expect_err("substituted egress must reject");
         assert!(
-            fixture
-                .store
-                .acquire_security_participant_egress(
-                    &pending.operation,
-                    &pending.lease,
-                    initialized,
-                    &context,
-                    &request,
-                    &plan,
-                    now_ms(),
-                )
-                .is_err(),
-            "variant {variant}"
+            matches!(&error, AdmissionOperationStoreError::Invariant(_)),
+            "variant {variant}: {error}"
         );
+        if matches!(variant, 1 | 2 | 3 | 5 | 7) {
+            assert!(
+                matches!(error, AdmissionOperationStoreError::Invariant(ref message)
+                if message == "native security state: native egress differs from original request or current flow observation"),
+                "variant {variant}: {error}"
+            );
+        }
         assert_eq!(counts(&fixture)?, before, "variant {variant}");
         assert!(fixture.store.connection()?.is_autocommit());
     }

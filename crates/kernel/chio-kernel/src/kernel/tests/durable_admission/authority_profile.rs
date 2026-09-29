@@ -196,15 +196,10 @@ fn immutable_request_commits_to_every_original_profile_selection(
         sha256_hex(&canonical_json_bytes(&independent)?)
     );
     assert_ne!(actual, old_hash);
-    let retained = RetainedToolAdmissionRequestV1::from_admission_with_profile(
-        &request,
-        &matching,
-        &[],
-        None,
-        Some(&profile),
-    )?;
+    let retained =
+        RetainedToolAdmissionRequestV1::from_admission(&request, &matching, &[], None, &profile)?;
     let decoded = RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
-    assert_eq!(decoded.authority_profile(), Some(&profile));
+    assert_eq!(decoded.authority_profile(), &profile);
     decoded.validate_request_material(&request)?;
     for (pointer, value) in [
         (
@@ -264,6 +259,73 @@ fn immutable_request_commits_to_every_original_profile_selection(
             )?,
             actual,
             "{pointer}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn retained_current_profile_rejects_downgrades_duplicates_and_aliases(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::admission_operation::{
+        AdmissionAuthorityProfileV1, AdmissionOperationStoreError, RetainedToolAdmissionRequestV1,
+    };
+    let (_, mut request, _, _) = durable_admission_fixture("retained-current-contract");
+    request.arguments = serde_json::json!({"private_sentinel": {"count": 1}});
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )?;
+    let retained = RetainedToolAdmissionRequestV1::from_admission(
+        &request,
+        &matching,
+        &[],
+        None,
+        &AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+    )?;
+    let bytes = retained.canonical_bytes();
+    assert_eq!(
+        RetainedToolAdmissionRequestV1::from_canonical_bytes(bytes)?.canonical_bytes(),
+        bytes
+    );
+    let wire: serde_json::Value = serde_json::from_slice(bytes)?;
+    for schema in [
+        "chio.retained-tool-admission-request.v1",
+        "chio.retained-tool-admission-request.v2",
+        "chio.retained-tool-admission-request.v3",
+    ] {
+        let mut changed = wire.clone();
+        changed["schema"] = schema.into();
+        assert!(
+            matches!(RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(&changed)?),
+            Err(AdmissionOperationStoreError::Invariant(message)) if message == "retained request contains unsupported authority material")
+        );
+    }
+    let mut missing = wire.clone();
+    missing
+        .as_object_mut()
+        .ok_or("object")?
+        .remove("authority_profile");
+    let error =
+        RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(&missing)?)
+            .err()
+            .ok_or("missing profile accepted")?;
+    assert!(
+        matches!(&error, AdmissionOperationStoreError::Operation(crate::admission_operation::AdmissionOperationError::UntrustedInput(cause))
+        if cause.code() == "urn:chio:error:attest:signed-json-invalid-shape")
+    );
+    assert!(std::error::Error::source(&error).is_some());
+    assert!(!format!("{error:?} {error}").contains("private_sentinel"));
+    let text = std::str::from_utf8(bytes)?;
+    for replacement in ["\"count\":1,\"count\":1", "\"count\":1e0"] {
+        let changed = text.replace("\"count\":1", replacement);
+        assert_ne!(changed.as_bytes(), bytes);
+        assert!(
+            matches!(RetainedToolAdmissionRequestV1::from_canonical_bytes(changed.as_bytes()),
+            Err(AdmissionOperationStoreError::Operation(crate::admission_operation::AdmissionOperationError::UntrustedInput(cause))) if cause.code() == "urn:chio:error:attest:signed-json-noncanonical")
         );
     }
     Ok(())

@@ -139,6 +139,8 @@ type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SqliteServingOwnerError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("authority clock rejected: {0}")]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("sqlite error: {0}")]

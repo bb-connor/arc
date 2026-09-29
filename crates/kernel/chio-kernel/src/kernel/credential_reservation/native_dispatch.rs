@@ -83,9 +83,7 @@ impl DispatchCredentialReservation<'_> {
             invalid("native capture credentials require the original authority profile")
         })?;
         self.kernel.validate_original_authority_profile(original)?;
-        let profile = original.authority_profile().ok_or_else(|| {
-            invalid("native capture credentials cannot upgrade a legacy authority profile")
-        })?;
+        let profile = original.authority_profile();
         let selection = profile.selection();
         if original.native_security_authority_binding().is_none()
             || admission.operation().state() != AdmissionOperationState::CapturePending
@@ -109,7 +107,7 @@ impl DispatchCredentialReservation<'_> {
             .verify_capability_full_pre_admit(
                 &request.capability,
                 request.federated_origin_kernel_id.as_deref(),
-                current_unix_timestamp(),
+                read_unix_timestamp()?,
             )
             .map_err(|error| invalid(&error))?;
         self.kernel.check_revocation(&request.capability)?;
@@ -128,7 +126,7 @@ impl DispatchCredentialReservation<'_> {
                 request,
                 &request.capability,
                 dpop_required,
-                current_unix_timestamp(),
+                read_unix_timestamp()?,
                 admission.requires_execution_nonce(),
             )?
             .refresh()?;
@@ -225,7 +223,7 @@ impl DispatchCredentialReservation<'_> {
             admission.operation(),
             original,
             &self.kernel.config.keypair.public_key(),
-            current_unix_timestamp_ms(),
+            read_unix_timestamp_ms()?,
         )
         .map_err(|error| invalid(&error.to_string()))?;
         Ok(Some(issued))

@@ -78,9 +78,11 @@ pub(crate) fn signed_capability_from_row(
 ) -> rusqlite::Result<Option<CapabilityToken>> {
     row.get::<_, Option<String>>(column)?
         .map(|json| {
-            serde_json::from_str(&json).map_err(|error| {
-                rusqlite::Error::FromSqlConversionFailure(column, Type::Text, Box::new(error))
-            })
+            chio_core::canonical::UntrustedJsonText::from_wire(json.as_bytes(), 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(column, Type::Text, Box::new(error))
+                })
         })
         .transpose()
 }
@@ -95,8 +97,16 @@ pub(crate) fn ensure_snapshots_compatible(
     existing: &CapabilitySnapshot,
     incoming: &CapabilitySnapshot,
 ) -> Result<(), chio_kernel::ReceiptStoreError> {
-    let existing_scope: serde_json::Value = serde_json::from_str(&existing.grants_json)?;
-    let incoming_scope: serde_json::Value = serde_json::from_str(&incoming.grants_json)?;
+    let existing_scope: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        existing.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())?;
+    let incoming_scope: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        incoming.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())?;
     let scalar_fields_match = existing.capability_id == incoming.capability_id
         && existing.subject_key == incoming.subject_key
         && existing.issuer_key == incoming.issuer_key
@@ -355,7 +365,11 @@ impl SqliteReceiptStore {
                     )
                     .optional()?;
 
-                parent_depth.map(|d| d.saturating_add(1)).unwrap_or(1)
+                parent_depth.unwrap_or(0).checked_add(1).ok_or_else(|| {
+                    chio_kernel::ReceiptStoreError::ReadBoundary(
+                        "capability delegation depth overflow".into(),
+                    )
+                })?
             } else {
                 0
             };

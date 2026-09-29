@@ -372,7 +372,7 @@ fn require_intent(
     retained.validate_binding(operation.binding())?;
     let selected = retained
         .authority_profile()
-        .and_then(|profile| profile.approval())
+        .approval()
         .ok_or_else(|| invariant("approval claim lacks an original authority profile"))?;
     if selected.approval_authority_id() != intent.approval_authority_id()
         || selected.expectation_id() != intent.expectation_id()

@@ -65,16 +65,14 @@ fn ordinary_return_context_has_no_caller_artifact_limit(nested: bool) -> TestRes
         &request.arguments,
         request.model_metadata.as_ref(),
     )?;
-    assert!(
+    assert!(matches!(
         crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission(
-            &request,
-            &matching,
-            &[],
-            None,
-        )
-        .is_err(),
-        "caller storage must keep its original artifact bound"
-    );
+            &request, &matching, &[], None,
+            &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+        ),
+        Err(crate::admission_operation::AdmissionOperationStoreError::Invariant(message))
+            if message == "retained request exceeds its artifact bound"
+    ));
     let response = if nested {
         let session = kernel.open_session("context-parent".into(), Vec::new())?;
         kernel.activate_session(&session)?;

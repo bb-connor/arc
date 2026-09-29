@@ -87,7 +87,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                     DurableToolReturnContextInput {
                         security_invocation_context: Some(&prepared.context),
                         security_release_required: true,
-                        trusted_now_unix_ms: current_unix_timestamp_ms()
+                        trusted_now_unix_ms: read_unix_timestamp_ms()?
                             .max(input.trusted_now_unix_ms),
                         ..input
                     },
@@ -110,7 +110,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         let credentials_until = proof.valid_until_unix_ms();
         let runtime = self.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         // The physical transaction rechecks the original operation, authority,
         // observation, journal, credentials and deadline together. Do not
         // discard this live handle and reconstruct one through historical reads.
@@ -214,7 +214,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
             runtime.store.load_retained_tool_request(
                 expected.binding().operation_id(),
                 &runtime.fence,
-                runtime.refresh_trusted_time(now),
+                runtime.refresh_trusted_time(now)?,
             )
         })?
         .ok_or_else(|| invalid("native capture readback is absent"))?;
@@ -228,7 +228,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
             runtime.store.load_native_dispatch_capture(
                 expected.binding().operation_id(),
                 &runtime.fence,
-                runtime.refresh_trusted_time(now),
+                runtime.refresh_trusted_time(now)?,
             )
         })?
         .ok_or_else(|| invalid("native capture budget readback is absent"))?;

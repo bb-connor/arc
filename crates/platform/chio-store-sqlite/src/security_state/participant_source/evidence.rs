@@ -134,8 +134,10 @@ impl SecurityParticipantSourceSnapshot {
         if bytes.is_empty() || bytes.len() > 65_536 {
             return Err(Error::Invalid("fingerprint size is invalid"));
         }
-        let decoded: Self = serde_json::from_slice(bytes)
-            .map_err(|_| Error::Invalid("invalid fingerprint encoding"))?;
+        let decoded: Self =
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| Error::Invalid("invalid fingerprint encoding"))?;
         if decoded.canonical_bytes()? != bytes {
             return Err(Error::Invalid("fingerprint is not exact canonical JSON"));
         }

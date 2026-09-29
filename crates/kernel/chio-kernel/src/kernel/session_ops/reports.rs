@@ -134,12 +134,9 @@ impl ChioKernel {
         // Hash the report, not an invented tool output. Explicit tenant binding
         // must not inherit an unrelated ambient request or thread-local scope.
         let content = canonical_json_bytes(&event).map_err(encode_error)?;
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?
-            .as_secs();
+        let timestamp = self.trusted_now_millis()?.as_secs();
         let body = ChioReceiptBody {
-            id: next_receipt_id("rcpt-session-report"),
+            id: next_receipt_id("rcpt-session-report")?,
             timestamp,
             capability_id: operation.capability.id.clone(),
             tool_server: operation.server_id.clone(),

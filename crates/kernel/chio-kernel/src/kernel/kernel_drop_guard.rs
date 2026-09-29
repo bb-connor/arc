@@ -6,7 +6,7 @@ use crate::admission_operation::AdmissionOperationV1;
 use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCallRequest};
 
 use super::{
-    current_unix_timestamp, current_unix_timestamp_ms, merge_metadata_objects,
+    merge_metadata_objects, read_unix_timestamp, read_unix_timestamp_ms,
     scope_pre_invocation_guard_evidence, ChioKernel, KernelError, PreExecutionBudgetMutation,
     VerifiedGovernedPayeeBinding,
 };
@@ -175,7 +175,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
     pub(crate) fn terminalize_after_transport_failure(&mut self) -> Result<(), KernelError> {
         if let Some(operation) = self.durable_operation {
             self.kernel
-                .terminalize_dispatch_committed_admission(operation, current_unix_timestamp_ms())?;
+                .terminalize_dispatch_committed_admission(operation, read_unix_timestamp_ms()?)?;
             self.mark_durable_operation_terminalized();
         }
         Ok(())
@@ -204,7 +204,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
             .build_cancelled_response_with_metadata_and_payee_binding(
                 self.request,
                 self.post_dispatch_reason,
-                current_unix_timestamp(),
+                read_unix_timestamp()?,
                 self.matched_grant_index,
                 receipt_metadata,
                 self.receipt_context.verified_payee_binding.as_ref(),
@@ -441,17 +441,17 @@ impl<'a> PostAdmissionDropGuard<'a> {
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
         );
-        if let Err(error) = self
-            .kernel
-            .build_cancelled_response_with_metadata_and_payee_binding(
-                self.request,
-                PRE_DISPATCH_CLEANUP_FAULT_REASON,
-                current_unix_timestamp(),
-                self.matched_grant_index,
-                metadata,
-                self.receipt_context.verified_payee_binding.as_ref(),
-            )
-        {
+        if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
+            self.kernel
+                .build_cancelled_response_with_metadata_and_payee_binding(
+                    self.request,
+                    PRE_DISPATCH_CLEANUP_FAULT_REASON,
+                    now.as_secs(),
+                    self.matched_grant_index,
+                    metadata,
+                    self.receipt_context.verified_payee_binding.as_ref(),
+                )
+        }) {
             warn!(
                 request_id = %self.request.request_id,
                 reason = %redacted!(&error),
@@ -502,17 +502,17 @@ impl Drop for PostAdmissionDropGuard<'_> {
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
         );
-        if let Err(error) = self
-            .kernel
-            .build_cancelled_response_with_metadata_and_payee_binding(
-                self.request,
-                self.post_dispatch_reason,
-                current_unix_timestamp(),
-                self.matched_grant_index,
-                receipt_metadata,
-                self.receipt_context.verified_payee_binding.as_ref(),
-            )
-        {
+        if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
+            self.kernel
+                .build_cancelled_response_with_metadata_and_payee_binding(
+                    self.request,
+                    self.post_dispatch_reason,
+                    now.as_secs(),
+                    self.matched_grant_index,
+                    receipt_metadata,
+                    self.receipt_context.verified_payee_binding.as_ref(),
+                )
+        }) {
             warn!(
                 request_id = %self.request.request_id,
                 reason = %redacted!(&error),
@@ -526,10 +526,10 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // until the next startup sweep. Terminalizing here refuses if a durable
         // outcome exists, so it cannot overwrite a return that did complete.
         if let Some(operation) = self.durable_operation {
-            if let Err(error) = self
-                .kernel
-                .terminalize_dispatch_committed_admission(operation, current_unix_timestamp_ms())
-            {
+            if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
+                self.kernel
+                    .terminalize_dispatch_committed_admission(operation, now.get())
+            }) {
                 warn!(
                     request_id = %self.request.request_id,
                     reason = %redacted!(&error),

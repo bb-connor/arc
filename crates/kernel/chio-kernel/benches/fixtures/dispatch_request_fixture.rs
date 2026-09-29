@@ -100,7 +100,7 @@ impl DispatchAllowFixture {
                 SessionId::new(session_id.clone()),
                 guard_agent_id.clone(),
                 vec![capability.clone()],
-            ),
+            )?,
         );
 
         let fixture = Self {

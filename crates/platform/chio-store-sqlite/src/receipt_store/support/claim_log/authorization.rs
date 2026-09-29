@@ -115,12 +115,12 @@ pub(crate) fn resolve_sender_constraint_grant(
             "sender-constrained profile requires capability snapshot grants_json",
         )
     })?;
-    let scope: ChioScope = serde_json::from_str(grants_json).map_err(|error| {
-        invalid_chio_oauth_authorization_profile(
-            receipt_id,
-            format!("invalid capability snapshot grants_json: {error}"),
-        )
-    })?;
+    let scope: ChioScope = chio_core::canonical::UntrustedJsonText::from_wire(
+        (grants_json).as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(ReceiptStoreError::from)?;
 
     if let Some(index) = grant_index {
         let grant = scope.grants.get(index as usize).ok_or_else(|| {

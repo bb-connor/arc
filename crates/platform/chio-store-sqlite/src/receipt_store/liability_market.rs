@@ -178,7 +178,7 @@ impl SqliteReceiptStore {
 
         Ok(LiabilityProviderListReport {
             schema: LIABILITY_PROVIDER_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now()?,
             query: normalized,
             summary: LiabilityProviderListSummary {
                 matching_providers,
@@ -263,7 +263,7 @@ impl SqliteReceiptStore {
 
         Ok(LiabilityProviderResolutionReport {
             schema: LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now()?,
             query: normalized,
             provider: provider.clone(),
             matched_policy,
@@ -1352,7 +1352,7 @@ impl SqliteReceiptStore {
 
         Ok(LiabilityMarketWorkflowReport {
             schema: LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: unix_now()?,
             query: normalized,
             summary: LiabilityMarketWorkflowSummary {
                 matching_requests,

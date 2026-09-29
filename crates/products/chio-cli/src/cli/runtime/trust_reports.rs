@@ -213,7 +213,7 @@ pub(crate) fn cmd_trust_authorization_context_metadata(
     } else {
         let path = require_receipt_db_path(receipt_db_path)?;
         let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
-        store.authorization_profile_metadata_report()
+        store.authorization_profile_metadata_report()?
     };
 
     if json_output {

@@ -148,7 +148,9 @@ impl ChioKernel {
             return Err(invalid("retained federation context exceeds its bound"));
         }
         let wire: FederationWire =
-            serde_json::from_slice(bytes).map_err(|error| invalid(&error.to_string()))?;
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_BYTES)
+                .and_then(|input| input.decode_signed())
+                .map_err(crate::KernelError::from)?;
         if canonical_json_bytes(&wire).map_err(|error| invalid(&error.to_string()))? != bytes {
             return Err(invalid(
                 "retained federation context is not exact typed canonical JSON",

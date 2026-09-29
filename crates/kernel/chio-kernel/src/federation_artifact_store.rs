@@ -9,7 +9,7 @@ use chio_bounded::{BoundedMap, SizeGauge};
 use chio_federation::bilateral::DualSignedReceipt;
 use chio_federation::bilateral_dsse::DsseEnvelope;
 
-use crate::kernel::current_unix_timestamp;
+use crate::kernel::read_unix_timestamp;
 use crate::KernelError;
 
 pub trait FederationArtifactStore: Send + Sync {
@@ -104,7 +104,7 @@ impl InMemoryFederationArtifactStore {
 
 impl FederationArtifactStore for InMemoryFederationArtifactStore {
     fn put_dual_signed(&self, id: &str, receipt: &DualSignedReceipt) -> Result<(), KernelError> {
-        let now = current_unix_timestamp();
+        let now = read_unix_timestamp()?;
         let mut guard = match self.dual.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -117,7 +117,7 @@ impl FederationArtifactStore for InMemoryFederationArtifactStore {
     }
 
     fn get_dual_signed(&self, id: &str) -> Result<Option<DualSignedReceipt>, KernelError> {
-        let now = current_unix_timestamp();
+        let now = read_unix_timestamp()?;
         let mut guard = match self.dual.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -126,7 +126,7 @@ impl FederationArtifactStore for InMemoryFederationArtifactStore {
     }
 
     fn put_dsse(&self, id: &str, envelope: &DsseEnvelope) -> Result<(), KernelError> {
-        let now = current_unix_timestamp();
+        let now = read_unix_timestamp()?;
         let mut guard = match self.dsse.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),
@@ -136,7 +136,7 @@ impl FederationArtifactStore for InMemoryFederationArtifactStore {
     }
 
     fn get_dsse(&self, id: &str) -> Result<Option<DsseEnvelope>, KernelError> {
-        let now = current_unix_timestamp();
+        let now = read_unix_timestamp()?;
         let mut guard = match self.dsse.lock() {
             Ok(g) => g,
             Err(poisoned) => poisoned.into_inner(),

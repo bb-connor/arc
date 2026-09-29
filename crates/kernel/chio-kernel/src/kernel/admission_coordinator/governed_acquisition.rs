@@ -57,7 +57,7 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let snapshot = {
             let _guard = runtime.lock_mutations()?;
-            let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+            let now = runtime.refresh_trusted_time(0)?;
             let snapshot = store_call("activation", || {
                 runtime.store.load_governed_approval_activation(
                     &authority.binding,
@@ -121,7 +121,7 @@ impl ChioKernel {
         .map_err(durable_store_error)?;
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(now);
+        let now = runtime.refresh_trusted_time(now)?;
         let lease = self.claim_approval_recovery(&admission.operation, now)?;
         self.release_retained_governed_approval(&admission.operation, &lease, now)?;
         let original = admission.operation.clone();
@@ -173,7 +173,7 @@ impl ChioKernel {
             .ok_or_else(|| error("approval authority is not configured"))?;
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let history = load_exact_history(runtime, operation, now)?;
         validate_recovery_history(operation, &history)?;
         credential.validate_at(now).map_err(durable_store_error)?;
@@ -210,7 +210,7 @@ impl ChioKernel {
         };
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let lease = self.claim_approval_recovery(operation, now)?;
         self.release_retained_governed_approval(operation, &lease, now)
     }
@@ -221,7 +221,7 @@ impl ChioKernel {
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let (operation, mut history) = store_call("reservation history", || {
             runtime.store.load_governed_approval_claim_history(
                 reference.operation_id(),

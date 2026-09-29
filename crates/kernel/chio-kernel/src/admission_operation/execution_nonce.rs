@@ -98,7 +98,10 @@ impl AdmissionExecutionNonceReservationV1 {
                 "execution nonce reservation exceeds its artifact bound",
             ));
         }
-        let wire: ReservationWire = serde_json::from_slice(bytes).map_err(invalid)?;
+        let wire: ReservationWire =
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_NONCE_BYTES)
+                .and_then(|input| input.decode_signed())
+                .map_err(AdmissionOperationStoreError::from)?;
         if wire.schema != "chio.admission-execution-nonce-reservation.v1"
             || wire.operation_id != *operation.binding().operation_id()
             || wire.issuer != *trusted_issuer

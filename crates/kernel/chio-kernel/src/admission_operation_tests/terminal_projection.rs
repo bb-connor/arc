@@ -5,6 +5,25 @@ use chio_credit::obligation::{
     ObligationCreditElectionV1,
 };
 
+fn signed_authorization_source(
+    operation: &AdmissionOperationV1,
+    receipt: &ChioReceipt,
+    kernel: &Keypair,
+) -> ChioReceipt {
+    let mut body = receipt.body();
+    body.action = ToolCallAction::from_parameters(serde_json::json!({
+        "operation_payload": receipt.action.parameters,
+        "authorization_parameter_hash": operation.binding().action_parameter_hash(),
+        "session_id": "session-1", "tool_call_id": "tool-call-1",
+    }))
+    .expect("source action");
+    body.metadata = Some(serde_json::json!({"receipt_context": {
+        "request_id": operation.binding().request_id(),
+        "authorization_capability_hash": operation.binding().authorization_capability_hash(),
+    }}));
+    ChioReceipt::sign(body, kernel).expect("signed authorization source")
+}
+
 #[test]
 fn completed_projection_cannot_omit_required_atomic_sidecars() {
     let requirements = AdmissionParticipantRequirements {
@@ -72,27 +91,27 @@ fn completed_projection_cannot_omit_required_atomic_sidecars() {
         outcome_version,
     )
     .expect("obligation must bind to the exact terminal projection");
-    let source_tenant = identifier("source_tenant_id", "tenant-123");
-    let authorization = VerifiedAuthorizationReceiptConsumption::from_source_verified(
+    let source = signed_authorization_source(&operation, receipt.receipt(), &kernel);
+    let authorization = VerifiedAuthorizationReceiptConsumption::from_signed_source(
         &operation,
         &context,
-        &receipt,
+        receipt.receipt(),
+        &kernel.public_key(),
+        &source,
         AuthorizationReceiptConsumption {
-            authorization_receipt_id: "authorization-1".to_string(),
+            authorization_receipt_id: source.id.clone(),
             consumer_receipt_id: receipt.receipt().id.clone(),
             request_id: operation.binding.request_id.as_str().to_string(),
             session_id: "session-1".to_string(),
             tool_call_id: "tool-call-1".to_string(),
             tenant_id: Some("tenant-123".to_string()),
-            parameter_hash: POLICY_HASH.to_string(),
+            parameter_hash: operation
+                .binding()
+                .action_parameter_hash()
+                .as_str()
+                .to_owned(),
             consumed_at_unix_ms: context.trusted_time_unix_ms,
         },
-        &identifier("authorization_receipt_id", "authorization-1"),
-        &identifier("session_id", "session-1"),
-        &identifier("tool_call_id", "tool-call-1"),
-        Some(&source_tenant),
-        &digest("parameter_hash", POLICY_HASH),
-        digest("authorization_receipt_digest", AUTH_HASH),
         outcome_id.clone(),
         outcome_version,
     )
@@ -619,33 +638,29 @@ fn authorization_and_attempt_zero_are_exact_source_verified_contracts() {
         Some((&outcome_id, outcome_version)),
     )
     .expect("exact consumer receipt must qualify");
-    let source_authorization_id = identifier("authorization_receipt_id", "authorization-1");
-    let source_session_id = identifier("session_id", "session-1");
-    let source_tool_call_id = identifier("tool_call_id", "tool-call-1");
-    let source_tenant_id = identifier("tenant_id", "tenant-123");
-    let source_parameter_hash = digest("parameter_hash", POLICY_HASH);
+    let source = signed_authorization_source(&operation, receipt.receipt(), &kernel);
     let base = AuthorizationReceiptConsumption {
-        authorization_receipt_id: source_authorization_id.as_str().to_string(),
+        authorization_receipt_id: source.id.clone(),
         consumer_receipt_id: receipt.receipt().id.clone(),
         request_id: operation.binding.request_id.as_str().to_string(),
-        session_id: source_session_id.as_str().to_string(),
-        tool_call_id: source_tool_call_id.as_str().to_string(),
-        tenant_id: Some(source_tenant_id.as_str().to_string()),
-        parameter_hash: source_parameter_hash.as_str().to_string(),
+        session_id: "session-1".to_owned(),
+        tool_call_id: "tool-call-1".to_owned(),
+        tenant_id: Some("tenant-123".to_owned()),
+        parameter_hash: operation
+            .binding()
+            .action_parameter_hash()
+            .as_str()
+            .to_owned(),
         consumed_at_unix_ms: context.trusted_time_unix_ms,
     };
     let verify = |consumption| {
-        VerifiedAuthorizationReceiptConsumption::from_source_verified(
+        VerifiedAuthorizationReceiptConsumption::from_signed_source(
             &operation,
             &context,
-            &receipt,
+            receipt.receipt(),
+            &kernel.public_key(),
+            &source,
             consumption,
-            &source_authorization_id,
-            &source_session_id,
-            &source_tool_call_id,
-            Some(&source_tenant_id),
-            &source_parameter_hash,
-            digest("authorization_receipt_digest", AUTH_HASH),
             outcome_id.clone(),
             outcome_version,
         )

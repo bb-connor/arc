@@ -24,7 +24,7 @@ impl SecurityReleaseArtifacts<'_> {
         let record = SecurityReleaseRecordV1::pending(
             self,
             self.outcome.recording_fence.clone(),
-            crate::kernel::current_unix_timestamp_ms().max(self.evaluation.trusted_time_unix_ms()),
+            crate::kernel::read_unix_timestamp_ms()?.max(self.evaluation.trusted_time_unix_ms()),
         )?;
         let context = DurableSecurityReleaseContext::new(&record, self)?;
         Ok(inspect(&context))
@@ -82,7 +82,7 @@ impl AcknowledgedSecurityReleaseV1 {
         // A native callback can outlive the selected evaluation time. Lease
         // validation must see the time of its acknowledgement, not its start.
         record.acknowledged_at_unix_ms =
-            acknowledged_at_unix_ms.max(crate::kernel::current_unix_timestamp_ms());
+            acknowledged_at_unix_ms.max(crate::kernel::read_unix_timestamp_ms()?);
         record.canonical_bytes().map_err(|error| {
             crate::KernelError::SecurityDispatchOutcomeRecoveryRequired(error.to_string())
         })?;
@@ -153,8 +153,9 @@ impl SecurityReleaseRecordV1 {
         if bytes.is_empty() || bytes.len() > MAX_BYTES {
             return Err(ToolOutcomeError::Invalid("security_release.record_size"));
         }
-        let record: Self = serde_json::from_slice(bytes)
-            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        let record: Self = chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_BYTES)
+            .and_then(|input| input.decode_signed())
+            .map_err(ToolOutcomeError::from)?;
         if record.canonical_bytes()? != bytes {
             return Err(ToolOutcomeError::Invalid(
                 "security_release.noncanonical_record",

@@ -65,9 +65,12 @@ fn freeze_key(request: &EffectRequest) -> PortResult<IssuanceFreezeKey> {
 
 fn decode_freeze_spec(request: &EffectRequest) -> PortResult<IssuanceFreezeSpec> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
-    let spec: IssuanceFreezeSpec =
-        serde_json::from_slice(request.canonical_contribution.as_bytes())
-            .map_err(|_| PortError::invalid_data())?;
+    let spec: IssuanceFreezeSpec = chio_core::canonical::UntrustedJsonText::from_wire(
+        request.canonical_contribution.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|_| PortError::invalid_data())?;
     let canonical = canonical_json_bytes(&spec).map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != request.canonical_contribution.as_bytes() {
         return Err(PortError::invalid_data());
@@ -268,7 +271,9 @@ where
     if body_hash(&body).as_slice() != digest.as_bytes() {
         return Err(PortError::integrity_failure());
     }
-    let value: T = serde_json::from_slice(&body).map_err(|_| PortError::integrity_failure())?;
+    let value: T = chio_core::canonical::UntrustedJsonText::from_wire(&body, 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| PortError::integrity_failure())?;
     if canonical_json_bytes(&value).map_err(|_| PortError::integrity_failure())? != body {
         return Err(PortError::integrity_failure());
     }
@@ -721,8 +726,12 @@ pub(super) fn load_snapshot(
         ) = row;
         let action_id = ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?;
         let effect_id = EffectId::new(effect_id).map_err(|_| PortError::integrity_failure())?;
-        let frozen_affected_ids: RecordIdSet = serde_json::from_slice(&frozen_affected_ids_body)
-            .map_err(|_| PortError::integrity_failure())?;
+        let frozen_affected_ids: RecordIdSet = chio_core::canonical::UntrustedJsonText::from_wire(
+            &frozen_affected_ids_body,
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| PortError::integrity_failure())?;
         if canonical_json_bytes(&frozen_affected_ids).map_err(|_| PortError::integrity_failure())?
             != frozen_affected_ids_body
         {

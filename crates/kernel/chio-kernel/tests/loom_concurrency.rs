@@ -152,7 +152,7 @@ fn loom_real_session_admission_never_outlives_terminal() {
                 SessionId::new("sess-loom"),
                 "agent-loom".to_string(),
                 Vec::new(),
-            );
+            )?;
             assert!(
                 session.activate().is_ok(),
                 "session should activate to ready"

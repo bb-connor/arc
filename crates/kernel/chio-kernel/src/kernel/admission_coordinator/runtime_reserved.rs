@@ -27,10 +27,7 @@ impl ChioKernel {
             || !operation
                 .provider_attempt()
                 .is_some_and(is_caller_report_attempt)
-            || original
-                .authority_profile()
-                .and_then(|profile| profile.runtime())
-                != Some(binding)
+            || original.authority_profile().runtime() != Some(binding)
             || !admission.permits_grant(grant)
         {
             return Err(acquisition_error(
@@ -40,7 +37,7 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let (source, history) = {
             let _guard = runtime.lock_mutations()?;
-            let now = runtime.refresh_trusted_time(context.now_unix_ms);
+            let now = runtime.refresh_trusted_time(context.now_unix_ms)?;
             let (current, history) = load_history(runtime, operation, now)?;
             if current != *operation {
                 return Err(acquisition_error("reserved runtime operation changed"));
@@ -76,7 +73,7 @@ impl ChioKernel {
         .map_err(|_| acquisition_error("reserved runtime revalidation panicked"))??;
         let _guard = runtime.lock_mutations()?;
         let now =
-            runtime.refresh_trusted_time(current_unix_timestamp_ms().max(context.now_unix_ms));
+            runtime.refresh_trusted_time(read_unix_timestamp_ms()?.max(context.now_unix_ms))?;
         let (current, retained) = load_history(runtime, operation, now)?;
         if current != *operation || retained != history {
             return Err(acquisition_error(

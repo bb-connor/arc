@@ -1329,7 +1329,8 @@ impl SqliteReceiptStore {
             match existing {
                 Some(binding_json) => {
                     let existing_binding: chio_core::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding =
-                        serde_json::from_str(&binding_json)?;
+                        chio_core::canonical::UntrustedJsonText::from_wire(binding_json.as_bytes(), 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())?;
                     if existing_binding == normalized_binding {
                         return Ok(());
                     }

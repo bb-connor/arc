@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::scope::{ModelMetadata, ModelSafetyTier};
 use dashmap::DashMap;
@@ -174,10 +173,7 @@ pub(super) fn validate_elicitation_request_in_sessions(
 }
 
 pub(super) fn nested_child_request_id(parent_request_id: &RequestId, suffix: &str) -> RequestId {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
+    let nonce = uuid::Uuid::new_v4();
     RequestId::new(format!("{parent_request_id}-{suffix}-{nonce}"))
 }
 

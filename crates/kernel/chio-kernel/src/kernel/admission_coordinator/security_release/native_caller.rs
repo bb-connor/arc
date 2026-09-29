@@ -57,7 +57,7 @@ impl ChioKernel {
             .ok_or_else(|| recovery_required("native caller release lacks signed delivery"))?;
         let runtime = self.durable_runtime()?;
         let guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let operation_id = admission.operation.binding().operation_id();
         let (operation, physical_original) = store_call(|| {
             runtime

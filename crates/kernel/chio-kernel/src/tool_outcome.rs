@@ -99,6 +99,10 @@ const I_JSON_MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum ToolOutcomeError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error(transparent)]
+    UntrustedInput(chio_core::canonical::SharedUntrustedJsonError),
     #[error("canonical JSON failed: {0}")]
     Canonical(String),
     #[error("invalid field: {0}")]
@@ -715,8 +719,13 @@ impl RawInvocationOutcomeV1 {
                 maximum: MAX_RAW_INVOCATION_OUTCOME_BYTES,
             });
         }
-        let persisted: PersistedRawInvocationOutcomeV1 = serde_json::from_slice(bytes)
-            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        let persisted: PersistedRawInvocationOutcomeV1 =
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                bytes,
+                MAX_RAW_INVOCATION_OUTCOME_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(ToolOutcomeError::from)?;
         let raw = Self::from_persisted(persisted)?;
         if raw.canonical_blob()?.bytes() != bytes {
             return Err(ToolOutcomeError::Invalid("raw.noncanonical_bytes"));
@@ -770,8 +779,12 @@ impl RawInvocationOutcomeV1 {
             });
         }
         if let Some(request_canonical_json) = &self.request_canonical_json {
-            let request: ToolCallRequest = serde_json::from_str(request_canonical_json)
-                .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))?;
+            let request: ToolCallRequest = chio_core::canonical::UntrustedJsonText::from_wire(
+                (request_canonical_json).as_bytes(),
+                MAX_FROZEN_INPUT_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(ToolOutcomeError::from)?;
             if canonical(&request)? != request_canonical_json.as_bytes()
                 || request.request_id != self.request_id.as_str()
                 || request.server_id != self.tool_server.as_str()
@@ -792,8 +805,12 @@ impl RawInvocationOutcomeV1 {
             if context.is_empty() || context.len() > MAX_EVIDENCE_ARTIFACT_BYTES {
                 return Err(ToolOutcomeError::Invalid("raw.federation_context"));
             }
-            let value: Value = serde_json::from_str(context)
-                .map_err(|_| ToolOutcomeError::Invalid("raw.federation_context"))?;
+            let value: Value = chio_core::canonical::UntrustedJsonText::from_wire(
+                (context).as_bytes(),
+                MAX_EVIDENCE_ARTIFACT_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(ToolOutcomeError::from)?;
             if !value.is_object() || canonical(&value)? != context.as_bytes() {
                 return Err(ToolOutcomeError::Invalid("raw.federation_context"));
             }
@@ -834,8 +851,12 @@ impl RawInvocationOutcomeV1 {
         self.request_canonical_json
             .as_deref()
             .map(|request| {
-                serde_json::from_str(request)
-                    .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    (request).as_bytes(),
+                    MAX_FROZEN_INPUT_BYTES,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(ToolOutcomeError::from)
             })
             .transpose()
     }
@@ -1943,3 +1964,9 @@ pub mod test_support;
 #[cfg(test)]
 #[path = "tool_outcome_tests.rs"]
 mod tests;
+
+impl From<chio_core::canonical::UntrustedJsonError> for ToolOutcomeError {
+    fn from(error: chio_core::canonical::UntrustedJsonError) -> Self {
+        Self::UntrustedInput(error.into())
+    }
+}

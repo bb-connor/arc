@@ -77,11 +77,12 @@ impl ChioKernel {
     ) -> Result<SessionId, KernelError> {
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");
         let session = self.with_sessions_write(|sessions| {
-            let session = Arc::new(Session::new(
+            let session = Arc::new(Session::new_with_clock(
                 session_id.clone(),
                 agent_id,
                 issued_capabilities,
-            ));
+                Arc::clone(&self.clock),
+            )?);
             match sessions.entry(session_id.clone()) {
                 Entry::Occupied(_) => Err(KernelError::SessionAlreadyExists(session_id.clone())),
                 Entry::Vacant(entry) => {
@@ -289,7 +290,7 @@ impl ChioKernel {
                 })),
                 receipt_attribution_metadata(&operation.capability, None),
             ),
-            timestamp: current_unix_timestamp(),
+            timestamp: read_unix_timestamp()?,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
         })?;

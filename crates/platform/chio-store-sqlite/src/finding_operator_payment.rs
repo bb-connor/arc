@@ -7,7 +7,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::sha256_hex;
 #[cfg(test)]
@@ -160,7 +159,7 @@ impl SqliteFindingOperatorPaymentAdapter {
                             existing.authorization_id,
                             intent_id,
                             intent_hash,
-                            now_secs()
+                            now_secs()?
                         ],
                     )
                     .map_err(|error| error.to_string())?;
@@ -179,7 +178,7 @@ impl SqliteFindingOperatorPaymentAdapter {
                         params![
                             existing.authorization_id,
                             intent_hash,
-                            now_secs(),
+                            now_secs()?,
                             intent_id
                         ],
                     )
@@ -194,7 +193,7 @@ impl SqliteFindingOperatorPaymentAdapter {
             tx.commit().map_err(|error| error.to_string())?;
             return Ok(held_authorization(existing.authorization_id, true));
         }
-        let now = now_secs();
+        let now = now_secs()?;
         tx.execute(
             r#"
             INSERT INTO chio_finding_operator_payments
@@ -315,7 +314,7 @@ impl SqliteFindingOperatorPaymentAdapter {
                 authorization_id,
                 target_state,
                 transaction_id,
-                now_secs(),
+                now_secs()?,
                 prior_transaction_id,
             ],
         )
@@ -537,7 +536,7 @@ fn bind_legacy_payment_from_journal(
               AND governed_intent_id IS NULL
               AND governed_intent_hash IS NULL
             "#,
-            params![authorization_id, governed_intent_id, now_secs()],
+            params![authorization_id, governed_intent_id, now_secs()?],
         )
         .map_err(|error| error.to_string())?;
     if changed != 1 {
@@ -859,11 +858,14 @@ fn payment_result(
     }
 }
 
-fn now_secs() -> i64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
-        Err(_) => 0,
-    }
+fn now_secs() -> Result<i64, String> {
+    i64::try_from(
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+            .map_err(|error| error.to_string())?
+            .as_secs(),
+    )
+    .map_err(|_| chio_security_types::clock::ClockError::Overflow)
+    .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

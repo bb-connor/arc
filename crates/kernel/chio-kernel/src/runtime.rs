@@ -246,7 +246,7 @@ pub fn enforce_stream_byte_limit(
     for chunk in &stream.chunks {
         let bytes = crate::canonical_json_bytes(&chunk.data)
             .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?;
-        total = total.saturating_add(bytes.len() as u64);
+        total = checked_stream_byte_total(total, bytes.len() as u64)?;
         if total > max_total_bytes {
             return Err(KernelError::Overloaded {
                 resource: crate::OverloadResource::StreamBytes,
@@ -284,7 +284,7 @@ pub fn push_chunk_bounded(
     let chunk_bytes = crate::canonical_json_bytes(&chunk.data)
         .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?
         .len() as u64;
-    let next = running_bytes.saturating_add(chunk_bytes);
+    let next = checked_stream_byte_total(*running_bytes, chunk_bytes)?;
     if max_total_bytes > 0 && next > max_total_bytes {
         return Err(KernelError::Overloaded {
             resource: crate::OverloadResource::StreamBytes,
@@ -427,4 +427,30 @@ pub enum ToolServerEvent {
     ResourcesListChanged,
     ToolsListChanged,
     PromptsListChanged,
+}
+
+/// Refuse an unrepresentable stream size before retaining or hashing its chunk.
+pub(crate) fn checked_stream_byte_total(current: u64, additional: u64) -> Result<u64, KernelError> {
+    current
+        .checked_add(additional)
+        .ok_or(KernelError::Overloaded {
+            resource: crate::OverloadResource::StreamBytes,
+        })
+}
+
+#[cfg(test)]
+mod byte_accounting_tests {
+    use super::*;
+
+    #[test]
+    fn stream_total_overflow_is_not_an_unlimited_or_maximum_budget() -> Result<(), KernelError> {
+        assert_eq!(checked_stream_byte_total(u64::MAX - 1, 1)?, u64::MAX);
+        assert!(matches!(
+            checked_stream_byte_total(u64::MAX, 1),
+            Err(KernelError::Overloaded {
+                resource: crate::OverloadResource::StreamBytes
+            })
+        ));
+        Ok(())
+    }
 }

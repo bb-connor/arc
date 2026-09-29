@@ -516,11 +516,13 @@ fn resolve_rotation_cutoff(
     if let Some(cutoff) = config.explicit_cutoff_unix_secs {
         return Ok(Some(cutoff));
     }
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let time_cutoff = now.saturating_sub(config.retention_days.saturating_mul(86_400));
+    let now =
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
+            .as_secs();
+    let time_cutoff =
+        now.saturating_sub(config.retention_days.checked_mul(86_400).ok_or_else(|| {
+            ReceiptStoreError::ReadBoundary("retention duration overflow".into())
+        })?);
     // Trigger thresholds are measured over the claim receipt log, which projects
     // BOTH tool and child receipts. Reading only chio_tool_receipts would leave a
     // store whose aged (or oldest-checkpointed) evidence is child-only stuck below
@@ -568,7 +570,11 @@ fn resolve_rotation_cutoff(
             // `max_size_bytes`. Advance the cutoff one second past the median so
             // receipts at the median become eligible and a checkpointed prefix
             // can actually age out.
-            let size_cutoff = (median_ts.max(0) as u64).saturating_add(1);
+            let size_cutoff = sqlite_u64(median_ts, "retention median timestamp")?
+                .checked_add(1)
+                .ok_or_else(|| {
+                    ReceiptStoreError::ReadBoundary("retention cutoff overflow".into())
+                })?;
             cutoff = Some(cutoff.map_or(size_cutoff, |current| current.max(size_cutoff)));
         }
     }
@@ -1569,10 +1575,9 @@ pub(super) fn delete_archived_prefix_in_tx(
     archive_path: &str,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
 ) -> Result<(), ReceiptStoreError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let now =
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
+            .as_secs();
     let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     let rollback_generation = rollback_anchor
         .map(|anchor| {
@@ -1891,12 +1896,12 @@ pub(super) fn retention_repair_on_writer(
     //    stays attached through the transaction so the tombstones can be stamped
     //    from the archived rows, and is detached only once the repair commits
     //    (DETACH cannot run inside an open transaction).
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
     let removed = extras.len() as u64;
     let repair_result = (|| -> Result<(), ReceiptStoreError> {
+        let now = chio_security_types::clock::Clock::unix_millis(
+            &chio_security_types::clock::SystemClock,
+        )?
+        .as_secs();
         let rounded_i64 = sqlite_i64(rounded_watermark, "repair rounded watermark")?;
         let now_i64 = sqlite_i64(now, "repair tombstone timestamp")?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;

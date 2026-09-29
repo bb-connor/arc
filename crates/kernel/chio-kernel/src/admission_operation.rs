@@ -106,6 +106,10 @@ pub fn expected_dispatch_committed_version(
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum AdmissionOperationError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error(transparent)]
+    UntrustedInput(chio_core::canonical::SharedUntrustedJsonError),
     #[error("{field} must not be empty")]
     Empty { field: &'static str },
     #[error("{field} exceeds its {maximum}-byte limit")]
@@ -1485,3 +1489,9 @@ pub(crate) fn qualify_recovery_claim_for_test(
 #[cfg(test)]
 #[path = "admission_operation_tests.rs"]
 mod tests;
+
+impl From<chio_core::canonical::UntrustedJsonError> for AdmissionOperationError {
+    fn from(error: chio_core::canonical::UntrustedJsonError) -> Self {
+        Self::UntrustedInput(error.into())
+    }
+}

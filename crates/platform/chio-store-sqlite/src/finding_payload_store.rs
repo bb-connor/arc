@@ -11,7 +11,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_finding::finding_payload_sha256;
 use r2d2::Pool;
@@ -56,6 +55,8 @@ pub enum FindingPayloadPutOutcome {
 /// Fail-closed errors returned by sealed Finding payload persistence.
 #[derive(Debug, Error)]
 pub enum FindingPayloadStoreError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding payload store is unavailable: {0}")]
     Unavailable(String),
     #[error("finding payload record not found")]
@@ -220,7 +221,7 @@ impl SqliteFindingPayloadStore {
                 payload_sha256,
                 encrypted.nonce.as_slice(),
                 encrypted.ciphertext,
-                now_secs(),
+                now_secs()?,
             ],
         )?;
         tx.commit()?;
@@ -350,11 +351,12 @@ fn payload_aad(
     .into_bytes()
 }
 
-fn now_secs() -> i64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
-        Err(_) => 0,
-    }
+fn now_secs() -> Result<i64, FindingPayloadStoreError> {
+    Ok(i64::try_from(
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
+            .as_secs(),
+    )
+    .map_err(|_| chio_security_types::clock::ClockError::Overflow)?)
 }
 
 #[cfg(test)]

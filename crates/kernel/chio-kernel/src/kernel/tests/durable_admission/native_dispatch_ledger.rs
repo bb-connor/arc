@@ -261,7 +261,11 @@ fn native_dispatch_ledger_rejects_invalid_inputs_before_egress_mutation() -> Tes
         (usize::MAX, b"{}".to_vec(), "unmatched grant"),
         (0, Vec::new(), "exceeds its bound"),
         (0, vec![b' '; 256 * 1024 + 1], "exceeds its bound"),
-        (0, b"{".to_vec(), "is not JSON"),
+        (
+            0,
+            b"{".to_vec(),
+            "urn:chio:error:attest:signed-json-invalid-input",
+        ),
         (0, b"{ }".to_vec(), "is not canonical"),
     ] {
         // Both entry points validate before their next irreversible phase.

@@ -23,8 +23,7 @@ pub(super) fn configure_original_selection(
     witness: &Witness,
 ) -> TestResult {
     let profile = original
-        .authority_profile()
-        .ok_or("original authority profile")?;
+        .authority_profile();
     if let Some(binding) = profile.runtime() {
         use chio_runtime_core::*;
         let source =

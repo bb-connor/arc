@@ -1,7 +1,8 @@
 use super::*;
 
 pub(crate) fn parse_settlement_status(value: &str) -> Result<SettlementStatus, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn settlement_reconciliation_action_required(

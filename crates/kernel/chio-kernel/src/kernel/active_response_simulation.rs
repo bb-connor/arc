@@ -7,7 +7,7 @@ use chio_security_types::{ResponseApprovalRequirement, ResponseExecutionMode, Re
 
 use super::active_response_coordinator::validate_executable_response_plan_value;
 use super::{
-    current_unix_timestamp_ms, ActiveResponseAdmissionRequest,
+    read_unix_timestamp_ms, ActiveResponseAdmissionRequest,
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseAuthorizationRequest, ChioKernel,
     KernelError, VerifiedActiveResponseBindings,
 };
@@ -137,7 +137,7 @@ impl ChioKernel {
         &self,
         request: &ActiveResponseSimulationRequest,
     ) -> Result<VerifiedResponseSimulationAuthorization, KernelError> {
-        let now = current_unix_timestamp_ms();
+        let now = read_unix_timestamp_ms()?;
         let bindings = self.verify_active_response_authorization_at(&request.authorization, now)?;
         self.verify_active_response_artifact_authority_attestation(request, &bindings, now)?;
         let requirement = self.resolve_active_response_requirement(&bindings)?;

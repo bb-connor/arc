@@ -423,7 +423,7 @@ impl ChioKernel {
     where
         F: FnOnce() -> Result<(), KernelError>,
     {
-        let now_unix_ms = current_unix_timestamp_ms();
+        let now_unix_ms = read_unix_timestamp_ms()?;
         let claim_deadline_unix_ms =
             now_unix_ms
                 .checked_add(CLEANUP_CLAIM_LEASE_MS)
@@ -710,12 +710,12 @@ impl ChioKernel {
 fn parse_cleanup_payload<T: for<'de> Deserialize<'de>>(
     action: &AdmissionCleanupAction,
 ) -> Result<T, KernelError> {
-    serde_json::from_str(action.payload_json()).map_err(|error| {
-        KernelError::Internal(format!(
-            "cleanup action {} has an invalid participant payload: {error}",
-            action.action_id()
-        ))
-    })
+    chio_core::canonical::UntrustedJsonText::from_wire(
+        (action.payload_json()).as_bytes(),
+        crate::security_admission_operation::MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(crate::KernelError::from)
 }
 
 fn validate_schema(actual: &str, expected: &str) -> Result<(), KernelError> {

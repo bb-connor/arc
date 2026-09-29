@@ -107,7 +107,7 @@ impl RuntimeParticipantClaimAuthority<'_> {
         }
         let runtime = self.kernel.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(self.requested_now_unix_ms);
+        let now = runtime.refresh_trusted_time(self.requested_now_unix_ms)?;
         let source = store_call("activation", || {
             runtime
                 .store
@@ -163,7 +163,7 @@ impl RuntimeParticipantClaimAuthority<'_> {
     ) -> Result<RuntimeAdmissionDecision, KernelError> {
         let runtime = self.kernel.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(self.requested_now_unix_ms);
+        let now = runtime.refresh_trusted_time(self.requested_now_unix_ms)?;
         let admission = self.admission.into_inner();
         let attempted = self.attempted.into_inner();
         let confirmed = self.confirmed.into_inner();
@@ -231,7 +231,7 @@ impl ChioKernel {
         let hook = self.runtime_admission_hook.as_ref().ok_or_else(|| {
             acquisition_error("native capture lost its original runtime verifier")
         })?;
-        let now = current_unix_timestamp_ms();
+        let now = read_unix_timestamp_ms()?;
         let context = RuntimeAdmissionRevalidationContext {
             request,
             admission_metadata: metadata,
@@ -244,7 +244,7 @@ impl ChioKernel {
         let operation = admission.operation();
         let (current, history) = {
             let _guard = runtime.lock_mutations()?;
-            let now = runtime.refresh_trusted_time(now);
+            let now = runtime.refresh_trusted_time(now)?;
             load_history(runtime, operation, now)?
         };
         if current != *operation {
@@ -274,7 +274,7 @@ impl ChioKernel {
         }))
         .map_err(|_| acquisition_error("native runtime revalidation panicked"))??;
         validity
-            .validate_at(runtime.refresh_trusted_time(current_unix_timestamp_ms()))
+            .validate_at(runtime.refresh_trusted_time(0)?)
             .map_err(|error| acquisition_error(&error.to_string()))?;
         Ok(Some((live, validity)))
     }
@@ -290,7 +290,7 @@ impl ChioKernel {
         }
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let lease = self.claim_admission_recovery(operation, now)?;
             self.release_retained_runtime_participants(operation, &lease, now)
@@ -322,7 +322,7 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let source = {
             let _mutation_guard = runtime.lock_mutations()?;
-            let now = runtime.refresh_trusted_time(context.now_unix_ms);
+            let now = runtime.refresh_trusted_time(context.now_unix_ms)?;
             store_call("activation", || {
                 runtime
                     .store
@@ -394,11 +394,7 @@ impl ChioKernel {
         let retained = admission.retained_request.as_ref().ok_or_else(|| {
             acquisition_error("runtime claim requires the retained original request")
         })?;
-        if retained
-            .authority_profile()
-            .and_then(|profile| profile.runtime())
-            != Some(binding)
-        {
+        if retained.authority_profile().runtime() != Some(binding) {
             return Err(acquisition_error(
                 "runtime authority differs from the original profile",
             ));
@@ -417,7 +413,7 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let source_snapshot = {
             let _mutation_guard = runtime.lock_mutations()?;
-            let now = runtime.refresh_trusted_time(context.now_unix_ms);
+            let now = runtime.refresh_trusted_time(context.now_unix_ms)?;
             let source = store_call("activation", || {
                 runtime
                     .store

@@ -124,8 +124,12 @@ impl VerifiedChannelTerminalProjectionV1 {
         context: &AdmissionProjectionContext,
     ) -> Result<Self, AdmissionOperationError> {
         let untrusted: UntrustedChannelTerminalProjectionV1 =
-            serde_json::from_slice(canonical_json)
-                .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                canonical_json,
+                crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(AdmissionOperationError::from)?;
         if canonical_json_bytes(&untrusted)
             .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
             != canonical_json

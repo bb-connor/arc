@@ -116,11 +116,7 @@ impl BrokerNativeCaptureReader {
         retained
             .validate_native_security_authority(&self.native)
             .map_err(|_| rejected())?;
-        if retained
-            .authority_profile()
-            .and_then(|profile| profile.supplemental_participant())
-            != Some(&self.participant)
-        {
+        if retained.authority_profile().supplemental_participant() != Some(&self.participant) {
             return Err(rejected());
         }
         let request = retained.request_for_revalidation();

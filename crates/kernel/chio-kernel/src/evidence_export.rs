@@ -226,6 +226,8 @@ pub struct EvidenceExportBundle {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EvidenceExportError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("receipt store error: {0}")]
     ReceiptStore(#[from] ReceiptStoreError),
 

@@ -61,7 +61,8 @@ pub(crate) fn query_underwriting_appeal(
 pub(crate) fn parse_underwriting_appeal_status(
     value: &str,
 ) -> Result<UnderwritingAppealStatus, ReceiptStoreError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(ReceiptStoreError::from)
+    serde_json::from_value(serde_json::Value::String(value.to_owned()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn load_underwriting_appeal_rows(
@@ -427,9 +428,9 @@ pub(crate) fn liability_claim_workflow_matches_query(
         && policy_number_matches
 }
 
-pub(crate) fn unix_now() -> u64 {
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => duration.as_secs(),
-        Err(_) => 0,
-    }
+pub(crate) fn unix_now() -> Result<u64, ReceiptStoreError> {
+    Ok(
+        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
+            .as_secs(),
+    )
 }

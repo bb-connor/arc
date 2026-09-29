@@ -1,5 +1,6 @@
 //! Original JSON text is retained until the owning numeric and wire contract is checked.
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::{fmt, str::Utf8Error};
 use serde::{de::DeserializeOwned, Serialize};
@@ -114,5 +115,44 @@ impl core::error::Error for UntrustedJsonError {
             Self::Decode(error) => Some(error),
             Self::TooLarge { .. } | Self::NonCanonical => None,
         }
+    }
+}
+
+/// A shared parser failure for cloneable operation and recovery errors.
+/// Equality identifies the same failure, rather than comparing sensitive input
+/// embedded in a parser's diagnostic. Display and Debug expose only its rule.
+#[derive(Clone, Debug)]
+pub struct SharedUntrustedJsonError(Arc<UntrustedJsonError>);
+
+impl From<UntrustedJsonError> for SharedUntrustedJsonError {
+    fn from(error: UntrustedJsonError) -> Self {
+        Self(Arc::new(error))
+    }
+}
+
+impl SharedUntrustedJsonError {
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        self.0.code()
+    }
+}
+
+impl PartialEq for SharedUntrustedJsonError {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for SharedUntrustedJsonError {}
+
+impl fmt::Display for SharedUntrustedJsonError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self.0.as_ref(), f)
+    }
+}
+
+impl core::error::Error for SharedUntrustedJsonError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        Some(self.0.as_ref())
     }
 }

@@ -105,7 +105,8 @@ mod tests {
     fn threshold_retry_claim_holds_lifecycle_and_authentication_until_commit(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let session_id = SessionId::new("threshold-claim-locks");
-        let session = Session::new(session_id.clone(), "agent".into(), Vec::new());
+        let session = Session::new(session_id.clone(), "agent".into(), Vec::new())
+            .expect("fixture session clock");
         session.activate()?;
         let context = OperationContext::new(session_id, RequestId::new("request"), "agent".into());
         session.track_request(&context, OperationKind::ToolCall, true)?;

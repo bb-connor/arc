@@ -63,14 +63,13 @@ fn caller_custody_rejects_each_selected_family_without_its_physical_ledger() -> 
             &request.arguments,
             request.model_metadata.as_ref(),
         )?;
-        fixture.admission.retained_request =
-            Some(RetainedToolAdmissionRequestV1::from_admission_with_profile(
-                &request,
-                &matching,
-                &[],
-                None,
-                Some(&profile),
-            )?);
+        fixture.admission.retained_request = Some(RetainedToolAdmissionRequestV1::from_admission(
+            &request,
+            &matching,
+            &[],
+            None,
+            &profile,
+        )?);
         let result = fixture.kernel.read_caller_participant_custody(
             &fixture.admission,
             0,

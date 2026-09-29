@@ -15,7 +15,7 @@ const MAX_ADMISSION_ERROR_BYTES: usize = 4_096;
 // A complete cleanup snapshot can contain every verified quota and the full
 // bounded revocation set. Keep the journal bound finite, but large enough for
 // the maximum protocol-valid authority input.
-const MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES: usize = 256 * 1_024;
+pub(crate) const MAX_ADMISSION_CLEANUP_PAYLOAD_BYTES: usize = 256 * 1_024;
 pub const MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION: usize = 32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,21 +43,6 @@ impl ReplayReservationState {
             _ => None,
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum AdmissionOperationError {
-    #[error("invalid admission operation: {0}")]
-    Invalid(String),
-
-    #[error("admission operation conflict: {0}")]
-    Conflict(String),
-
-    #[error("admission operation arithmetic overflow: {0}")]
-    Overflow(String),
-
-    #[error("admission operation storage unavailable: {0}")]
-    Unavailable(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -135,9 +120,7 @@ impl AdmissionOperationState {
             "approval_reserved" => Some(Self::ApprovalReserved),
             "ready_to_dispatch" => Some(Self::ReadyToDispatch),
             "capture_pending" => Some(Self::CapturePending),
-            "caller_reservation_capture_pending" => {
-                Some(Self::CallerReservationCapturePending)
-            }
+            "caller_reservation_capture_pending" => Some(Self::CallerReservationCapturePending),
             "compensation_pending" => Some(Self::CompensationPending),
             "dispatch_committed" => Some(Self::DispatchCommitted),
             "caller_reserved" => Some(Self::CallerReserved),
@@ -743,9 +726,7 @@ impl AdmissionCleanupActionKind {
             "approval" => Some(Self::Approval),
             "execution_nonce" => Some(Self::ExecutionNonce),
             "broker" => Some(Self::Broker),
-            "caller_reservation_handoff_intent" => {
-                Some(Self::CallerReservationHandoffIntent)
-            }
+            "caller_reservation_handoff_intent" => Some(Self::CallerReservationHandoffIntent),
             "caller_reservation_handoff" => Some(Self::CallerReservationHandoff),
             "terminal_receipt" => Some(Self::TerminalReceipt),
             _ => None,
@@ -1137,8 +1118,7 @@ pub trait AdmissionOperationStore: Send + Sync {
         limit: usize,
     ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
         if let Some(delegate) = self.cleanup_journal_delegate() {
-            return delegate
-                .list_caller_reservation_reap_candidates(after_operation_id, limit);
+            return delegate.list_caller_reservation_reap_candidates(after_operation_id, limit);
         }
         Err(AdmissionOperationError::Unavailable(
             "caller reservation reap inventory is unavailable".to_string(),

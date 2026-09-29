@@ -176,7 +176,12 @@ pub fn verify_economic_cancellation_terminal_advance(
                 })
                 .ok_or_else(mismatch)?;
             let result: GovernedEconomicMutationResultBinding =
-                serde_json::from_slice(record.canonical_json()).map_err(|_| mismatch())?;
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    record.canonical_json(),
+                    crate::admission_operation::MAX_ADMISSION_TERMINAL_RECORD_BYTES,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(AdmissionOperationError::from)?;
             result.verify_anchored_cancellation(
                 &resulting_slot,
                 expected_head,
