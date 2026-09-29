@@ -1,14 +1,11 @@
 use super::{
-    build_response_plan, canonical_json_bytes, derive_attested_finding_action_id,
-    derive_attested_finding_batch_id, derive_attested_finding_reservation_id, sha256,
-    validate_attested_finding_batch_body, AttestedFindingBatchBinding,
-    AttestedFindingBatchBindings, AttestedFindingBatchBody, AttestedFindingBatchKey,
-    AttestedFindingBatchPublication, AttestedFindingResponsePlanBody,
-    AttestedFindingResponsePlanPublication, AttestedFindingResponsePolicyPlanner,
-    AttestedFindingResponsePolicySelection, AuthoritativeCorrelatedFindingEvidence, CanonicalBody,
-    Digest32, PortError, PortResult, RecordId, ReservedAttestedFindingResponsePlan,
-    ResponsePlanInput, ATTESTED_FINDING_BATCH_SCHEMA_VERSION,
-    ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION,
+    canonical_json_bytes, derive_attested_finding_action_id, derive_attested_finding_batch_id,
+    derive_attested_finding_reservation_id, sha256, validate_attested_finding_batch_body,
+    AttestedFindingBatchBinding, AttestedFindingBatchBindings, AttestedFindingBatchBody,
+    AttestedFindingBatchKey, AttestedFindingBatchPublication, AttestedFindingResponsePlanBody,
+    AttestedFindingResponsePlanPublication, AuthoritativeCorrelatedFindingEvidence, CanonicalBody,
+    Digest32, PortError, PortResult, ReservedAttestedFindingResponsePlan,
+    ATTESTED_FINDING_BATCH_SCHEMA_VERSION, ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION,
 };
 
 pub trait AttestedFindingBatchPlanner: Send + Sync {
@@ -89,65 +86,6 @@ pub(super) fn build_attested_finding_batch_publication(
         body,
         canonical_body: CanonicalBody::new(canonical).map_err(|_| PortError::invalid_data())?,
         body_hash,
-    })
-}
-
-pub(super) fn build_reserved_response_plan(
-    finding: &AuthoritativeCorrelatedFindingEvidence,
-    batch_id: &RecordId,
-    ordinal: u32,
-    binding: &AttestedFindingBatchBinding,
-    policy: &dyn AttestedFindingResponsePolicyPlanner,
-) -> PortResult<ReservedAttestedFindingResponsePlan> {
-    validate_authoritative_finding_binding(finding, binding)?;
-    let receipt = finding.body();
-    let AttestedFindingResponsePolicySelection {
-        execution,
-        affected_ids,
-        effects,
-        ttl_ms,
-        created_at_unix_ms,
-        operator_capability,
-        approval_requirement,
-        submitter,
-        reason_hash,
-        admission_artifact_ref,
-    } = policy.select_response_policy(finding, binding)?;
-    let response_plan = build_response_plan(ResponsePlanInput {
-        execution,
-        action_id: binding.action_id.clone(),
-        trigger_finding_id: receipt.finding_id.clone(),
-        trigger_finding_hash: receipt.finding_hash,
-        trigger_finding_receipt_id: binding.evidence_id.clone(),
-        tenant_id: binding.tenant_id.clone(),
-        policy_version: receipt.policy.policy_version.clone(),
-        policy_hash: receipt.policy.policy_hash,
-        affected_ids,
-        effects,
-        ttl_ms,
-        created_at_unix_ms,
-        operator_capability,
-        approval_requirement,
-        submitter,
-        reason_hash,
-    })
-    .map_err(|_| PortError::invalid_data())?;
-    if response_plan.action_id != binding.action_id
-        || response_plan.trigger_finding_receipt_id != binding.evidence_id
-        || response_plan.trigger_finding_id != binding.finding_id
-        || response_plan.trigger_finding_hash != binding.finding_hash
-        || response_plan.tenant_id != binding.tenant_id
-    {
-        return Err(PortError::integrity_failure());
-    }
-    Ok(ReservedAttestedFindingResponsePlan {
-        finding: finding.clone(),
-        batch_id: batch_id.clone(),
-        ordinal,
-        binding: binding.clone(),
-        response_plan,
-        admission_artifact_ref,
-        admission_artifact_digest: None,
     })
 }
 

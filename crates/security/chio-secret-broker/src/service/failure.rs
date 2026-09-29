@@ -844,8 +844,7 @@ impl BrokerService {
                 ));
             }
         }
-        self.retained_prepared_dispatches()?
-            .remove(&attempt.registration.ids.operation_id);
+        self.discard_prepared_dispatch(&attempt.registration.ids.operation_id)?;
         Ok(())
     }
 }

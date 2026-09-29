@@ -1,4 +1,7 @@
 use super::*;
+
+#[path = "real_adapter/reservation_ownership.rs"]
+mod reservation_ownership;
 use crate::security::event_consumer::tests::*;
 
 type RealAdapterDurableExecutor = DurableActiveResponseExecutor<
@@ -860,15 +863,20 @@ fn real_adapter_fixture_for_mode(
     let artifact_digest = artifacts
         .canonical_digest(&response_plan)
         .unwrap_or_else(|error| panic!("real adapter artifact digest: {error}"));
-    let plan = ReservedAttestedFindingResponsePlan {
-        finding: finding.clone(),
-        batch_id: publication.body.batch_id.clone(),
-        ordinal: 0,
-        binding,
-        response_plan,
-        admission_artifact_ref: artifact_ref,
-        admission_artifact_digest: Some(artifact_digest),
-    };
+    let plan = ReservedAttestedFindingResponsePlan::test_from_publication(
+        finding.clone(),
+        &chio_security_types::ports::AttestedFindingResponsePlanBody {
+            schema_version:
+                chio_security_types::ports::ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION,
+            batch_id: publication.body.batch_id.clone(),
+            ordinal: 0,
+            binding,
+            response_plan,
+            admission_artifact_ref: artifact_ref,
+        },
+        Some(artifact_digest),
+    )
+    .unwrap_or_else(|error| panic!("reserved test plan: {error}"));
     let governed_request = if governed {
         native_request.as_ref().map(|request| {
             governed_approval_request_from_native(request)

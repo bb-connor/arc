@@ -199,30 +199,8 @@ pub struct BrokerService {
     receipt_signer: Arc<dyn SigningBackend>,
     migration_enforcer: Arc<dyn BrokerMigrationEnforcer>,
     attempt_operation_gates: [Mutex<()>; ATTEMPT_OPERATION_GATE_COUNT],
-    retained_prepared_dispatches: Mutex<BTreeMap<String, RetainedPreparedDispatch>>,
+    retained_dispatches: RetainedDispatchCustody,
     dispatch_claim_counter: AtomicU64,
-}
-
-struct RetainedPreparedDispatch {
-    operation_id: String,
-    attempt_id: String,
-    prepared_dispatch_id: String,
-    request_canonical_digest: String,
-    prepared_at_unix_seconds: u64,
-    dispatch: PreparedHttpsDispatch,
-    credential: SecretMaterial,
-    credential_version: chio_store_sqlite::BlobHandle,
-    revocation_set: CanonicalBrokerRevocationSet,
-}
-
-struct ValidatedBrokerAuthorities {
-    revocation_set: CanonicalBrokerRevocationSet,
-}
-
-struct ValidatedBrokerAuditAuthorities {
-    liveness_exchange: crate::authority_ipc::VerifiedAuthorityExchange,
-    revocation_exchange: crate::authority_ipc::VerifiedAuthorityExchange,
-    validated_at_unix_seconds: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -233,7 +211,8 @@ pub enum BrokerExecuteOutcome {
 
 mod authorization;
 
-mod execution;
+mod custody;
+use custody::RetainedDispatchCustody;
 
 mod failure;
 
@@ -243,8 +222,6 @@ pub use ipc::UnixBrokerEndpoint;
 pub use ipc::{BrokerIpcDeadlines, BrokerIpcHandler, BrokerIpcServeOutcome};
 
 mod lifecycle;
-
-mod registration;
 
 mod request_digest;
 pub use request_digest::broker_request_digest;

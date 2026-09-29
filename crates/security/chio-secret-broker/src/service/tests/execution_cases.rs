@@ -102,7 +102,7 @@ fn migration_custody_denial_precedes_credential_materialization() {
     );
     assert!(fixture
         .service
-        .retained_prepared_dispatches()
+        .retained_prepared_dispatch_keys()
         .test_expect("retained custody-denied dispatches")
         .is_empty());
 }
@@ -521,9 +521,9 @@ fn stale_release_after_capture_preserves_the_dispatch_owners_material() {
         .test_expect("persist captured broker attempt");
     assert!(fixture
         .service
-        .retained_prepared_dispatches()
+        .retained_prepared_dispatch_keys()
         .test_expect("retained prepared dispatches")
-        .contains_key(&ids.operation_id));
+        .contains(&ids.operation_id));
 
     assert!(matches!(
         fixture.service.release_attempt(&registration, &request, 23),
@@ -540,9 +540,9 @@ fn stale_release_after_capture_preserves_the_dispatch_owners_material() {
     );
     assert!(fixture
         .service
-        .retained_prepared_dispatches()
+        .retained_prepared_dispatch_keys()
         .test_expect("retained prepared dispatches")
-        .contains_key(&ids.operation_id));
+        .contains(&ids.operation_id));
 }
 
 #[test]
@@ -718,7 +718,7 @@ fn failure_receipt_without_durable_attempt_is_unbound_and_not_predated() {
         .is_none());
     assert!(fixture
         .service
-        .retained_prepared_dispatches()
+        .retained_prepared_dispatch_keys()
         .test_expect("retained dispatch lock")
         .is_empty());
 }
@@ -787,7 +787,7 @@ fn failure_receipt_with_durable_attempt_uses_persisted_binding_and_monotonic_tim
     );
     assert!(fixture
         .service
-        .retained_prepared_dispatches()
+        .retained_prepared_dispatch_keys()
         .test_expect("retained dispatch lock")
         .is_empty());
 }
@@ -883,7 +883,7 @@ fn failure_terminal_and_concurrent_execution_cannot_cross_capture() {
         .is_empty());
     assert!(fixture
         .service
-        .retained_prepared_dispatches()
+        .retained_prepared_dispatch_keys()
         .test_expect("retained dispatch lock")
         .is_empty());
     assert_eq!(receipts.lock().test_expect("receipt lock").len(), 1);

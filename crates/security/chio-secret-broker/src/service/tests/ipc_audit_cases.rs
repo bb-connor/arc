@@ -883,7 +883,7 @@ fn audit_comparison_is_exact_non_dispatching_non_accounting_and_secret_free() {
     drop(authority_state);
     assert!(fixture
         .service
-        .retained_prepared_dispatches()
+        .retained_prepared_dispatch_keys()
         .test_expect("retained prepared dispatches")
         .is_empty());
     assert!(fixture
@@ -1160,7 +1160,7 @@ fn audit_comparison_rejects_invalid_proof_and_capability_before_secret_use() {
         .is_empty());
     assert!(fixture
         .service
-        .retained_prepared_dispatches()
+        .retained_prepared_dispatch_keys()
         .test_expect("retained prepared dispatches")
         .is_empty());
     assert!(fixture

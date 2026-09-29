@@ -18,8 +18,7 @@ use super::{
     AttestedFindingResponseOutboxTransition, AuthoritativeCorrelatedFindingEvidence, BTreeMap,
     CanonicalBody, ChioKernel, Clock, GovernedApprovalReservationMutation, KernelError, Mutex,
     OpaqueReceiptRef, PortErrorKind, PreparedActiveResponseAdmission,
-    PreparedActiveResponseDispatchBinding, ReservedAttestedFindingResponsePlan,
-    SqliteSecurityStateStore, TenantId,
+    PreparedActiveResponseDispatchBinding, SqliteSecurityStateStore, TenantId,
 };
 
 /// Policy-owned response fields for one authoritative finding.

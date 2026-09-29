@@ -77,7 +77,7 @@ mod finding_publication;
 pub use finding_publication::AttestedFindingBatchPlanner;
 use finding_publication::{
     build_attested_finding_batch_publication, build_attested_finding_response_plan_publication,
-    build_reserved_response_plan, validate_authoritative_finding_binding,
+    validate_authoritative_finding_binding,
 };
 
 mod ingress;
@@ -101,7 +101,11 @@ use admission::governed_approval_request_from_native;
 pub use admission::{AttestedFindingAdmissionArtifacts, AttestedFindingResponsePolicySelection};
 
 mod reservation;
-pub use reservation::{AttestedFindingResponsePolicyPlanner, ReservedAttestedFindingResponseBatch};
+use reservation::build_reserved_response_plan;
+pub use reservation::{
+    AttestedFindingResponsePolicyPlanner, ReservedAttestedFindingResponseBatch,
+    ReservedAttestedFindingResponsePlan,
+};
 
 mod coordinator;
 use coordinator::map_approval_coordinator_error;
@@ -144,17 +148,4 @@ pub(super) use coordinator::map_active_response_kernel_error;
 pub(super) struct CorrelationConsumption {
     report: CorrelationConsumerReport,
     finalized: bool,
-}
-
-/// Trusted response plan assembled from one durable reserved identity and one
-/// policy selection.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ReservedAttestedFindingResponsePlan {
-    finding: AuthoritativeCorrelatedFindingEvidence,
-    batch_id: RecordId,
-    ordinal: u32,
-    binding: AttestedFindingBatchBinding,
-    response_plan: ResponsePlan,
-    admission_artifact_ref: AdmissionArtifactRef,
-    admission_artifact_digest: Option<Digest32>,
 }

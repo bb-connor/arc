@@ -1,9 +1,9 @@
 use super::{
     build_attested_finding_batch_publication, build_attested_finding_response_plan_publication,
-    build_reserved_response_plan, validate_authoritative_finding_binding,
-    ActiveResponseFindingAuthority, ActiveResponseFindingAuthorityError, Arc,
-    AttestedFindingAdmissionArtifacts, AttestedFindingBatchBinding, AttestedFindingBatchKey,
-    AttestedFindingBatchPlanner, AttestedFindingBatchPublication, AttestedFindingBatchStore,
+    build_reserved_response_plan, ActiveResponseFindingAuthority,
+    ActiveResponseFindingAuthorityError, Arc, AttestedFindingAdmissionArtifacts,
+    AttestedFindingBatchBinding, AttestedFindingBatchKey, AttestedFindingBatchPlanner,
+    AttestedFindingBatchPublication, AttestedFindingBatchStore,
     AttestedFindingDispatchCommittedResume, AttestedFindingPreDispatchReconstruction,
     AttestedFindingResponseAdmissionState, AttestedFindingResponseCompletionProof,
     AttestedFindingResponseCompletionState, AttestedFindingResponseCoordinator,
@@ -629,17 +629,9 @@ impl DurableAttestedFindingBatchPlanner {
                 );
             }
         };
-        if let Err(error) = validate_authoritative_finding_binding(&finding, &claimed.binding) {
-            return self.close_admission_failure(&claimed, error, report);
-        }
-        let plan = ReservedAttestedFindingResponsePlan {
-            finding,
-            batch_id: claimed.batch_id.clone(),
-            ordinal: claimed.ordinal,
-            binding: claimed.binding.clone(),
-            response_plan: publication.body.response_plan.clone(),
-            admission_artifact_ref: publication.body.admission_artifact_ref.clone(),
-            admission_artifact_digest: claimed.admission_artifact_digest,
+        let plan = match ReservedAttestedFindingResponsePlan::reconstruct(finding, &claimed) {
+            Ok(plan) => plan,
+            Err(error) => return self.close_admission_failure(&claimed, error, report),
         };
         let artifacts = match self
             .policy
@@ -652,13 +644,12 @@ impl DurableAttestedFindingBatchPlanner {
             Ok(authority) => authority,
             Err(error) => return self.close_admission_failure(&claimed, error, report),
         };
-        let artifact_digest = match artifacts.verify_authority_attestation(
-            plan.admission_artifact_ref(),
-            plan.response_plan(),
+        let (plan, artifact_digest) = match plan.bind_admission_artifacts(
+            &artifacts,
             &trusted_artifact_authority,
             now_unix_ms,
         ) {
-            Ok(digest) => digest,
+            Ok(bound) => bound,
             Err(error) => return self.close_admission_failure(&claimed, error, report),
         };
         let artifact_bound = match claimed.admission_artifact_digest.as_ref() {
@@ -682,10 +673,6 @@ impl DurableAttestedFindingBatchPlanner {
                 Err(error) if error.kind() == PortErrorKind::Conflict => return Ok(()),
                 Err(error) => return Err(error),
             },
-        };
-        let plan = ReservedAttestedFindingResponsePlan {
-            admission_artifact_digest: Some(artifact_digest),
-            ..plan
         };
         if plan.response_plan().execution.mode()
             == chio_security_types::ResponseExecutionMode::DryRun

@@ -1,9 +1,10 @@
-use super::{
+use super::super::{
     prepared_dispatch_id, AttemptRegistration, AttemptState, AttemptTransitionEvidence,
     BrokerError, BrokerExecuteRequest, BrokerService, PrepareDispatchAcknowledgement,
     RegisterAttemptAcknowledgement, RegisterAttemptOutcome, ReleaseAttemptAcknowledgement, Result,
-    RetainedPreparedDispatch, MAX_RETAINED_PREPARED_DISPATCHES,
+    MAX_RETAINED_PREPARED_DISPATCHES,
 };
+use super::RetainedPreparedDispatch;
 
 impl BrokerService {
     /// Persist and fsync a kernel-authorized attempt before any budget
@@ -100,7 +101,7 @@ impl BrokerService {
                 now_unix_seconds,
                 true,
             )?
-            .revocation_set;
+            .into_revocation_set();
 
         let mut retained = self.retained_prepared_dispatches()?;
         if let Some(prepared) = retained.get(&registration.ids.operation_id) {

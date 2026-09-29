@@ -4,8 +4,7 @@ use super::{
     validate_revocation_snapshot, verify_capability, verify_request_proof, AdminAuthorization,
     AttemptRegistration, BrokerError, BrokerExecuteRequest, BrokerRevocationRequest, BrokerService,
     CanonicalBrokerRevocationSet, CapabilityLivenessRequest, GovernedAdminAuthorizer,
-    ProviderAdapter, Result, SecretBackend, ValidatedBrokerAuditAuthorities,
-    ValidatedBrokerAuthorities,
+    ProviderAdapter, Result, SecretBackend,
 };
 
 impl BrokerService {
@@ -399,4 +398,23 @@ impl BrokerService {
         )
         .map(|authorities| authorities.revocation_set)
     }
+}
+
+pub(super) struct ValidatedBrokerAuthorities {
+    revocation_set: CanonicalBrokerRevocationSet,
+}
+
+impl ValidatedBrokerAuthorities {
+    pub(super) fn revocation_set(&self) -> &CanonicalBrokerRevocationSet {
+        &self.revocation_set
+    }
+
+    pub(super) fn into_revocation_set(self) -> CanonicalBrokerRevocationSet {
+        self.revocation_set
+    }
+}
+struct ValidatedBrokerAuditAuthorities {
+    liveness_exchange: crate::authority_ipc::VerifiedAuthorityExchange,
+    revocation_exchange: crate::authority_ipc::VerifiedAuthorityExchange,
+    validated_at_unix_seconds: u64,
 }

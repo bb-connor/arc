@@ -1,4 +1,4 @@
-use super::{
+use super::super::{
     broker_request_digest, capability_digest, credential_reference_hash, derive_attempt_ids,
     derive_attempt_ids_for_operation, execution_failure_after_capture_release,
     prepared_dispatch_id, receipt_digest, response_digest, sign_execution_receipt,
@@ -166,7 +166,7 @@ impl BrokerService {
         }
         Ok(false)
     }
-    pub(super) fn execute_inner(
+    pub(in super::super) fn execute_inner(
         &self,
         request: &BrokerExecuteRequest,
         trusted: &TrustedExecutionContext,
@@ -529,7 +529,7 @@ impl BrokerService {
                 authority_now,
                 false,
             )?;
-            if current.revocation_set != retained.revocation_set {
+            if current.revocation_set() != &retained.revocation_set {
                 return Err(BrokerError::AuthorizationDenied(
                     "credential ancestry changed after capture".to_string(),
                 ));

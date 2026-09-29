@@ -1,8 +1,8 @@
 use super::{
     attempt_operation_gate_index, failure_receipt_key_digest, Arc, AtomicU64, AttemptStore,
-    BTreeMap, BrokerError, BrokerExecuteRequest, BrokerService, BrokerServiceAuthorityBundle,
+    BrokerError, BrokerExecuteRequest, BrokerService, BrokerServiceAuthorityBundle,
     BrokerServiceConfig, Mutex, MutexGuard, Ordering, ProductionSqliteAttemptStore, Result,
-    RetainedPreparedDispatch,
+    RetainedDispatchCustody,
 };
 
 impl BrokerService {
@@ -62,16 +62,8 @@ impl BrokerService {
             receipt_signer,
             migration_enforcer,
             attempt_operation_gates: std::array::from_fn(|_| Mutex::new(())),
-            retained_prepared_dispatches: Mutex::new(BTreeMap::new()),
+            retained_dispatches: RetainedDispatchCustody::default(),
             dispatch_claim_counter: AtomicU64::new(0),
-        })
-    }
-
-    pub(super) fn retained_prepared_dispatches(
-        &self,
-    ) -> Result<MutexGuard<'_, BTreeMap<String, RetainedPreparedDispatch>>> {
-        self.retained_prepared_dispatches.lock().map_err(|_| {
-            BrokerError::Invariant("retained prepared-dispatch lock is poisoned".to_string())
         })
     }
 
