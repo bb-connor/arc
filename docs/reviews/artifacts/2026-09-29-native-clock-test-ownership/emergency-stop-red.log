@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'kernel::tests::emergency::clock::clock_failure_during_emergency_stop_cannot_resume_execution' (1915862) panicked at crates/kernel/chio-kernel/src/kernel/tests/emergency/clock.rs:50:9:
+time acquisition failure must still latch the safety stop
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test kernel::tests::emergency::clock::clock_failure_during_emergency_stop_cannot_resume_execution ... FAILED
+
+failures:
+
+failures:
+    kernel::tests::emergency::clock::clock_failure_during_emergency_stop_cannot_resume_execution
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1491 filtered out; finished in 0.08s
+

@@ -1,0 +1,9 @@
+{
+  "name": "caller-ledger-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/caller_execution_ledger-05ae0d689783b758",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 2.23
+}

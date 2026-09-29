@@ -1,0 +1,3 @@
+source test bodies: 845 before, 846 after
+changed/missing: []
+changed/added: [('clock_failure_during_emergency_stop_cannot_resume_execution', '2318cdb7f30f281cc1711e76b45270b40e726179d64fd5af4ce9129b1501c04f')]

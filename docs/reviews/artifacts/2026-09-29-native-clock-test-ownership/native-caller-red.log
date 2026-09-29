@@ -1,0 +1,12 @@
+
+running 1 test
+Error: Authentication(Expired)
+test security::adapters::tests::native_flow::support::caller::native_caller_releases_only_the_authenticated_original_guarded_output ... FAILED
+
+failures:
+
+failures:
+    security::adapters::tests::native_flow::support::caller::native_caller_releases_only_the_authenticated_original_guarded_output
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 7.91s
+

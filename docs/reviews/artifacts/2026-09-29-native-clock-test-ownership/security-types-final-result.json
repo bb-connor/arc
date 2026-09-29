@@ -1,0 +1,9 @@
+{
+  "name": "security-types-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_security_types-6fb4a513664859f7",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 0.09
+}

@@ -1,0 +1,9 @@
+{
+  "name": "response-authority-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_active_response_authority-a39964432b673930",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 1.2
+}

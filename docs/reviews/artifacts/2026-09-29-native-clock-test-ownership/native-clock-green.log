@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'security::adapters::tests::native_flow::support::native_fixture_clock_uses_a_stable_authority_epoch' (1868685) panicked at crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs:783:5:
+assertion `left == right` failed
+  left: 1790682676
+ right: 1800000000
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test security::adapters::tests::native_flow::support::native_fixture_clock_uses_a_stable_authority_epoch ... FAILED
+
+failures:
+
+failures:
+    security::adapters::tests::native_flow::support::native_fixture_clock_uses_a_stable_authority_epoch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 2.68s
+

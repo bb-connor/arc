@@ -1,0 +1,52 @@
+Diff in /tmp/arc-security-launch/crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/combined_credentials/expiry.rs:76:
+     assert!(operation.dispatch_commit().is_none());
+     assert!(operation.native_dispatch_ledger_digest().is_none());
+     assert!(store
+-        .load_native_dispatch_capture(operation.binding().operation_id(), &fence, fixture.clock.snapshot(),)?
++        .load_native_dispatch_capture(
++            operation.binding().operation_id(),
++            &fence,
++            fixture.clock.snapshot(),
++        )?
+         .is_none());
+     let usage = fixture
+         .authority
+Diff in /tmp/arc-security-launch/crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/combined_credentials/expiry.rs:100:
+         0
+     );
+     let (_, runtime) = store
+-        .load_runtime_participant_history(operation.binding().operation_id(), &fence, fixture.clock.snapshot())?
++        .load_runtime_participant_history(
++            operation.binding().operation_id(),
++            &fence,
++            fixture.clock.snapshot(),
++        )?
+         .ok_or("retained runtime")?;
+     let (_, approval) = store
+         .load_governed_approval_claim_history(
+Diff in /tmp/arc-security-launch/crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/combined_credentials/expiry.rs:110:
+         )?
+         .ok_or("retained approval")?;
+     let (_, dpop) = store
+-        .load_dpop_replay_claim_history(operation.binding().operation_id(), &fence, fixture.clock.snapshot())?
++        .load_dpop_replay_claim_history(
++            operation.binding().operation_id(),
++            &fence,
++            fixture.clock.snapshot(),
++        )?
+         .ok_or("retained DPoP")?;
+     assert_eq!((runtime.len(), approval.len(), dpop.len()), (1, 1, 1));
+     assert_eq!(
+Diff in /tmp/arc-security-launch/crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/combined_credentials/expiry.rs:123:
+     );
+     assert_eq!(dpop[0].disposition, chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition::ReservedBeforeDispatch);
+     let ledger = store
+-        .load_native_dispatch_ledger(operation.binding().operation_id(), &fence, fixture.clock.snapshot())?
++        .load_native_dispatch_ledger(
++            operation.binding().operation_id(),
++            &fence,
++            fixture.clock.snapshot(),
++        )?
+         .ok_or("preparation survived capture rollback")?;
+     drop(store);
+     assert_eq!(

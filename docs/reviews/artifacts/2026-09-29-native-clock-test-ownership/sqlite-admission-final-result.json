@@ -1,0 +1,16 @@
+{
+  "name": "sqlite-admission-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-79c1a5a8001b0d54",
+    "admission_operation_store::tests::authority_clock::",
+    "admission_operation_store::tests::injected_clock::",
+    "admission_operation_store::tests::clock_migration::",
+    "admission_operation_store::tests::dpop_replay::",
+    "admission_operation_store::tests::governed_approval_replay::",
+    "admission_operation_store::tests::runtime_replay::",
+    "admission_operation_store::tests::factor_assignment::",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 423.13
+}

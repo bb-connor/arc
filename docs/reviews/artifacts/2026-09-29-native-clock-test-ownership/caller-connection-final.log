@@ -1,0 +1,9 @@
+
+running 4 tests
+test caller_execution_ledger::connection_recovery::the_ledger_pairs_no_artifact_with_a_commit ... ok
+test caller_execution_ledger::connection_recovery::a_denied_rollback_fences_the_ledger ... ok
+test caller_execution_ledger::connection_recovery::a_panic_before_commit_rolls_back_and_the_ledger_serves ... ok
+test caller_execution_ledger::connection_recovery::a_panic_after_commit_recovers_with_the_write_visible ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1890 filtered out; finished in 0.25s
+

@@ -1,0 +1,16 @@
+
+running 11 tests
+test admission::preparation::tests::commit_rechecks_trust_floor_advanced_after_preparation ... ok
+test admission::preparation::tests::supplied_bundle_preparation_and_drop_do_not_call_store ... ok
+test replay_source::tests::marker_identity_is_kind_and_resource_not_historical_admission ... ok
+test admission::preparation::tests::commit_uses_owned_inputs_after_preparation_locals_are_dropped ... ok
+test replay_source::tests::source_bounds_reject_complete_input_without_truncation ... ok
+test replay_source::tests::source_evidence_rejects_tampering_and_noncanonical_encodings ... ok
+test admission::preparation::tests::destructive_preparation_and_drop_never_reserve_or_claim_the_lease ... ok
+test replay_source::tests::source_evidence_round_trips_exact_identity_without_exposing_marker_debug ... ok
+test schema::identity_fixture_tests::runtime_schema_identities_match_canonical_fixture ... ok
+test validation::evidence::tests::relative_evidence_path_helper_accepts_only_safe_paths ... ok
+test admission::preparation::tests::destructive_commit_releases_lease_when_trust_floor_advanced_after_preparation ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

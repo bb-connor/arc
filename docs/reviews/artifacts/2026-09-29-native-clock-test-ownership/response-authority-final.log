@@ -1,0 +1,29 @@
+
+running 24 tests
+test config::tests::combined_deployment_binds_processes_paths_keys_and_store ... ok
+test config::tests::deployment_digest_can_be_planned_before_digest_fields_are_populated ... ok
+test config::tests::combined_deployment_requires_and_authenticates_response_execution_mode ... ok
+test config::tests::deployment_digest_has_an_exact_golden_vector ... ok
+test config::tests::deployment_rejects_mode_substitution_under_the_original_digest ... ok
+test config::tests::daemon_loader_rejects_a_standalone_runtime_projection ... ok
+test config::tests::deployment_rejects_non_normalized_privileged_paths ... ok
+test config::tests::deployment_rejects_oversized_broker_socket_paths ... ok
+test config::tests::daemon_loader_revalidates_the_combined_deployment_digest ... ok
+test runtime::tests::active_response_authority_helper_process ... ignored, helper process launched by the process-boundary test
+test config::tests::deployment_rejects_unknown_modes_and_legacy_schema_versions ... ok
+test config::tests::runtime_config_rejects_same_process_role_aliasing ... ok
+test config::tests::response_dry_run_profile_requires_the_configured_simulator ... ok
+test runtime::tests::signing_key_reader_requires_exact_file_length_and_ignores_inherited_offset ... ok
+test runtime::tests::unauthorized_authority_client_helper_process ... ignored, helper process launched by the process-boundary test
+test store::tests::canonical_digest_matches_canonical_sha256 ... ok
+test store::tests::cleanup_guard_never_removes_a_replacement_inode ... ok
+test store::tests::decisions_use_the_verified_startup_image_not_later_database_writes ... ok
+test store::tests::empty_or_zero_digest_bundle_is_rejected_before_output_creation ... ok
+test store::tests::logical_store_digest_is_stable_and_order_sensitive ... ok
+test runtime::tests::daemon_health_crosses_an_authenticated_process_boundary ... ok
+test runtime::tests::daemon_worker_panic_stops_the_listener_and_joins_workers ... ok
+test store::tests::sqlite_snapshot_round_trips_canonical_metadata_and_rows ... ok
+test runtime::tests::daemon_stop_discards_queued_requests_and_joins_inflight_workers ... ok
+
+test result: ok. 22 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.19s
+

@@ -1,0 +1,8 @@
+{
+  "before": 1491,
+  "after": 1492,
+  "missing": [],
+  "added": [
+    "kernel::tests::emergency::clock::clock_failure_during_emergency_stop_cannot_resume_execution"
+  ]
+}

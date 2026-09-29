@@ -1,0 +1,4 @@
+[packet/3-retention-accounting 619a60e577] refactor: confine shared kernel fixtures to their test owners
+ 23 files changed, 1101 insertions(+), 1068 deletions(-)
+ create mode 100644 crates/kernel/chio-kernel/src/kernel/tests/fixtures/receipt_store.rs
+ create mode 100644 crates/kernel/chio-kernel/src/kernel/tests/fixtures/revocation_store.rs

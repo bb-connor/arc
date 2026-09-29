@@ -1,0 +1,4 @@
+dropped: crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/corruption.rs native_capture_physical_corruption_denies_readback_and_reopen: `SqliteAuthorityStore::open_serving(&database, _directory.path().join( )) .is_err()` no longer present
+dropped: crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/output/faults.rs native_output_journal_locally_rehashed_history_cannot_replace_the_global_anchor: `SqliteAuthorityStore::open_serving(&database, _directory.path().join( )).is_err()` no longer present
+dropped: crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery/restart.rs verify: `SqliteAuthorityStore::open_serving( witness.directory.join( ), witness.directory.join( ) ) .is_err()` no longer present
+weak negative assertion baseline ratcheted: 1177 sites, 1260 assertions, 3 dropped, 0 tightened, expires 2027-01-31

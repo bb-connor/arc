@@ -1,0 +1,9 @@
+{
+  "name": "settle-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_settle-1f5ef2fce2d4384a",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 3.48
+}

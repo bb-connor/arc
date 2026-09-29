@@ -1,0 +1,9 @@
+{
+  "name": "core-identities-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_core_types-7ad3a0be0a860c5d",
+    "shared_identifiers"
+  ],
+  "exit_code": 0,
+  "seconds": 0.0
+}

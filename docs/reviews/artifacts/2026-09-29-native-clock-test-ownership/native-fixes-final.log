@@ -1,0 +1,23 @@
+
+running 8 tests
+
+thread 'security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture' (1934028) panicked at crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/combined_credentials/expiry.rs:53:5:
+wrong denial: Some("guard denied the request: durable admission failed: combined admission capture invariant failed: budget state invariant violated: admission operation invariant failed: native security state: native capture rejected after runtime expiry cutpoint: admission operation mutation was fenced")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture ... FAILED
+test security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_cannot_renew_a_lease_that_expires_during_classification ... ok
+test security::adapters::tests::native_flow::support::declassification::faults::native_declassification_expiry_at_final_commit_retains_consumption_without_capture ... ok
+test security::adapters::tests::native_flow::support::capture::broker::connection::native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement ... ok
+test security::adapters::tests::native_flow::support::caller::denial::native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::nonce::execution::expiry::native_nonce_expiry_at_final_commit_rolls_back_capture_without_reversing_taint ... ok
+test security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_rechecks_revocation_and_stop_after_output_join ... ok
+test security::adapters::tests::native_flow::support::caller::denial::native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_checkpoint ... ok
+
+failures:
+
+failures:
+    security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture
+
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 1174 filtered out; finished in 108.45s
+

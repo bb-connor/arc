@@ -1,0 +1,16 @@
+
+running 11 tests
+test completed_delivery_replays_the_exact_report_after_reopen_without_another_effect ... ok
+test expired_or_untrusted_authorization_never_claims_or_invokes ... ok
+test another_attempt_or_kernel_signing_key_cannot_create_a_second_execution ... ok
+test failed_or_panicking_effect_retains_an_unknown_attempt_across_restart ... ok
+test full_ledger_and_changed_schema_do_not_reset_retained_claims ... ok
+test independent_connections_race_one_operation_without_holding_sqlite_across_effect ... ok
+test injected_clock::injected_epoch_owns_claim_report_expiry_and_restart ... ok
+test injected_clock::clock_faults_deny_report_replay_and_preserve_durable_custody ... ok
+test substituted_key_epoch_or_physical_ledger_fails_closed ... ok
+test claimed_attempt_survives_process_death_without_redispatch ... ok
+test expired_permission_can_replay_a_retained_report_but_cannot_execute ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s
+

@@ -1,0 +1,1 @@
+{"exit_code": -2, "binary": "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-b5e864074f540d39", "args": ["native_flow", "--test-threads=4"]}

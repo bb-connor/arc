@@ -1,0 +1,10 @@
+{
+  "name": "caller-connection-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-79c1a5a8001b0d54",
+    "caller_execution_ledger::",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 0.31
+}

@@ -11,10 +11,10 @@ The current batch has its own implementation and verification record below; this
 | --- | --- | --- |
 | Decoder classification | 298 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel and SQLite baseline owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
-| Ambient clocks | 142 occurrences at 137 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Other owners remain. |
-| Negative assertions | Baseline contains 1,263 assertions at 1,180 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
+| Ambient clocks | 140 occurrences at 135 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks now share their configured authority owners; other owners remain. |
+| Negative assertions | Baseline contains 1,260 assertions at 1,177 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
-| Schema/domain duplication | Wire lock records 200 identifiers declared in multiple files; domain gate has 38 debt entries | Snapshot/growth gates exist; consolidation and domain-shape repairs remain. Domain debt includes both duplicates and shape exceptions. |
+| Schema/domain duplication | Wire lock records 163 identifiers declared in multiple files; domain gate has 32 shape exceptions and zero duplicate byte domains | Six duplicated byte domains and 37 schema duplicates retired with 43 canonical identity pins. Remaining schema consolidation and domain-shape repairs stay queued. |
 
 Sources: `docs/security/trust-boundary-inventory.json`,
 `docs/reviews/2026-09-27-arithmetic-inventory.tsv`,
@@ -43,8 +43,9 @@ secret-ownership implementation in item 3 is recorded in the
 [September 29 execution record](2026-09-29-compiler-secret-hardening-execution.md).
 The four production owners and helper portion of item 4 are implemented in the
 [module-boundary record](2026-09-29-security-module-boundaries-execution.md).
-Kernel test ownership and declaration consolidation remain in item 4. This
-continuation does not erase the other queues.
+Kernel test ownership and the selected declaration consolidation in item 4 are
+implemented in the [native clock and test ownership record](2026-09-29-native-clock-test-ownership-execution.md).
+This continuation does not erase the other queues.
 
 ### 2. Remaining authority boundaries and rejection semantics
 
@@ -86,23 +87,28 @@ requirement overrides the user's no-compatibility directive.
 
 Reference: [hardening spec](../superpowers/specs/2026-09-26-hardening-toolchain-spec.md).
 
-### 4. Structural boundaries, helper isolation and declaration ownership
+### 4. Structural boundaries, helper isolation and declaration ownership (selected batch implemented)
 
-The September 29 batch converts security ports, broker service, SQLite security
-state and control-plane composition into named module/privacy owners, with
-separate mechanical, visibility and formatting commits. Complete the remaining
-kernel test ownership cut and retain unchanged test inventories.
+The September 29 batches convert security ports, broker service, SQLite security
+state, control-plane composition and kernel tests into named module/privacy
+owners. Mechanical relocation, visibility and formatting remain separate commits.
+The kernel cut preserves all 845 scenario bodies and 1,491 compiled tests, migrates
+exact selectors and removes the 40,754-line root allowance. Packet 7's remaining
+owners are not implied complete by finishing its five ranked starting owners.
 
-`chio-cage-init` is now a standalone package with a 72-package normal musl graph
-and zero denied dependencies. Shared contracts live in `chio-cage-plan`; the
-parent cage retains supervision. The available aarch64 static artifact is
-measured separately from unperformed native x86_64 enforcement qualification.
-Consolidate duplicate schema and domain declarations with their owners and
-canonical fixtures. Also replace native-flow fixtures' load-sensitive wall clocks
-with one deterministic authority clock before repeating the parallel campaign.
-Prefer one authoritative definition and direct imports over new compatibility
-layers. These broad structural changes remain separately reviewable successor
-work under the existing plan's sequencing.
+`chio-cage-init` is a standalone package with a 72-package normal musl graph and
+zero denied dependencies. Shared contracts live in `chio-cage-plan`; the parent
+cage retains supervision. The available aarch64 static artifact is measured
+separately from native x86_64 enforcement qualification.
+
+The [native clock and declaration record](2026-09-29-native-clock-test-ownership-execution.md)
+records the deterministic fixture clock, repaired kernel/SQLite/broker/executor
+clock ownership, all six duplicate byte-domain retirements and 37 retired schema
+duplicates. All 1,098 recorded wire values are unchanged; 43 identity/canonical
+hash fixtures pin the moved identifiers. The remaining 163 duplicated schema
+values and 32 domain-shape exceptions need semantic ownership or versioned
+protocol decisions. Do not mechanically rewrite their bytes to satisfy a gate.
+No new historical compatibility aliases were introduced.
 
 ### 5. Measured storage performance
 

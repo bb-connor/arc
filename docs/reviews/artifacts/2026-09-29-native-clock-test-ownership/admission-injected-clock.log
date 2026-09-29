@@ -1,0 +1,11 @@
+
+running 6 tests
+test execution_nonce_store::clock_tests::injected_clock_errors_and_overflow_leave_sql_unchanged ... ok
+test governed_approval_replay_store::clock_tests::injected_clock_faults_preserve_approval_owner_and_retry_window ... ok
+test admission_operation_store::tests::injected_clock::injected_authority_preserves_caller_skew_limit ... ok
+test admission_operation_store::tests::injected_clock::stale_caller_time_cannot_extend_injected_authority_lease ... ok
+test admission_operation_store::tests::injected_clock::admission_uses_injected_authority_time_across_restart ... ok
+test admission_operation_store::tests::injected_clock::injected_clock_faults_deny_even_exact_admission_replay ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1888 filtered out; finished in 7.45s
+

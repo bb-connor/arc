@@ -1,0 +1,663 @@
+{
+  "qualification": "Composite local qualification: completed full campaign followed by focused repairs; not a passing single final full campaign.",
+  "expected": 143,
+  "latest_passed": 143,
+  "latest_failed": [],
+  "missing": [],
+  "runs": [
+    {
+      "name": "native-flow-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+        "native_flow",
+        "--test-threads=12",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 1381.25,
+      "log": "native-flow-final.log",
+      "terminal_summaries": [
+        "test result: FAILED. 140 passed; 3 failed; 0 ignored; 0 measured; 1039 filtered out; finished in 1381.15s"
+      ],
+      "selected_passed": 140,
+      "selected_failed": [
+        "security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture",
+        "security::adapters::tests::native_flow::support::capture::broker::connection::native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement",
+        "security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_cannot_renew_a_lease_that_expires_during_classification"
+      ]
+    },
+    {
+      "name": "native-fixes-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+        "runtime_expiry_after_native_verification_rolls_back_physical_capture",
+        "expiry_at_final_commit",
+        "native_output_preparation_cannot_renew_a_lease_that_expires_during_classification",
+        "native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement",
+        "native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery",
+        "native_captured_lifecycle_rechecks_revocation_and_stop_after_output_join",
+        "native_caller_abort_after_release_checkpoint",
+        "--test-threads=3",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 108.5,
+      "log": "native-fixes-final.log",
+      "terminal_summaries": [
+        "test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 1174 filtered out; finished in 108.45s"
+      ],
+      "selected_passed": 7,
+      "selected_failed": [
+        "security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture"
+      ]
+    },
+    {
+      "name": "runtime-expiry-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+        "runtime_expiry_after_native_verification_rolls_back_physical_capture",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 6.86,
+      "log": "runtime-expiry-stale-observation.log",
+      "terminal_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 6.83s"
+      ],
+      "selected_passed": 0,
+      "selected_failed": [
+        "security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture"
+      ]
+    },
+    {
+      "name": "runtime-expiry-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+        "runtime_expiry_after_native_verification_rolls_back_physical_capture",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 8.84,
+      "log": "runtime-expiry-final.log",
+      "terminal_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 8.78s"
+      ],
+      "selected_passed": 1,
+      "selected_failed": []
+    }
+  ],
+  "latest_results": {
+    "security::adapters::native_flow::tests::native_policy_time_bounds_are_inclusive_at_observation_and_exclusive_at_expiry": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_classifier_panic_denies_without_taint_or_budget": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_classifier_substitution_denies_without_taint_or_budget": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_classifies_before_budget_and_rechecks_after_the_single_join": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_inherits_global_lineage_before_the_exact_epoch_exists": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_inherits_principal_epoch_from_another_lineage": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_local_policy_does_not_acquire_egress_custody": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_missing_manifest_denies_before_classification_or_join": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_operator_floor_is_in_the_original_join": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_propagates_inherited_session_only_taint": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_stronger_post_join_classification_denies_without_rejoining": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::input::native_input_untrusted_declassification_denies_before_classification_or_join": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::ledger::faults::ledger_write_failures_preserve_committed_egress_through_compensation_and_reopen": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::ledger::native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::ledger::native_dispatch_ledger_denies_unmatched_grant_without_retention": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::ledger::native_dispatch_ledger_retains_exact_policy_and_custody_after_compensation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_local_policy_does_not_manufacture_an_egress_fence": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_local_policy_revalidates_clock_without_fence_writes": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_accepts_recorded_restricted_labels_with_matching_clearance": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_commits_real_egress_custody_without_activating_dispatch": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_contains_classifier_panic_without_egress_writes": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_contains_clock_panic_before_egress_acquisition": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_classifier_payload_substitution": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_classifier_taint_not_in_original_join": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_clock_failure_before_egress_acquisition": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_future_clock_before_preparation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_legacy_evidence_configuration": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_other_initialized_authority_before_classification": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_public_destination_for_recorded_restricted_input": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_regressing_clock_before_egress_acquisition": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_unrecorded_operator_floor_without_rejoining": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_rejects_untrusted_declassification_before_classification": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_requires_admitted_manifest_before_classification": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::native_policy_requires_taint_propagation_in_each_recorded_label": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::policy::native_policy_evidence_binds_exact_inputs_and_decision_without_payload": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::policy::native_policy_evidence_commits_large_manifest_without_retaining_its_payload": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::policy::native_policy_evidence_retains_unused_category_policy_and_admitted_clearance": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::policy::oversized_native_policy_evidence_denies_before_any_egress_custody": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::caller::denial::native_caller_changed_input_cannot_replace_original_reserved_join": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::caller::denial::native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery": {
+      "status": "ok",
+      "log": "native-fixes-final.log"
+    },
+    "security::adapters::tests::native_flow::support::caller::denial::native_caller_preflight_requires_fresh_host_flow_state_before_reservation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::caller::native_caller_composes_local_egress_declassification_and_complete_credentials": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::caller::native_caller_releases_only_the_authenticated_original_guarded_output": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::caller::restart::native_caller_original_delivery_survives_restart_and_authority_expiry": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_acknowledgement_faults_preserve_committed_accounting": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_lost_ack_retains_owned_dpop_without_reclaim": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_preserves_original_commit_indices_after_revocation_and_reopen": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_rejects_missing_or_substituted_revocation_history": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::broker::connection::native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement": {
+      "status": "ok",
+      "log": "native-fixes-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rechecks_original_parent_and_signs_actual_revocation_cut": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rejects_a_kernel_from_another_authority": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::broker::native_broker_capture_reads_only_original_operation_and_never_recharges": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::clock::native_capture_policy_deadline_is_exclusive_with_shared_clock": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture": {
+      "status": "ok",
+      "log": "runtime-expiry-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::native_capture_preserves_nonempty_runtime_approval_and_dpop_in_one_operation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::native_combined_credentials_deny_missing_proof_or_changed_approved_intent_before_capture": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_declassification_supports_public_nested_sync_and_async_with_all_credentials": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_nonce_supports_public_nested_sync_and_async_dispatch": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_declassification_proof_reaches_native_untrusted_issuer_denial": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::corruption::native_capture_physical_corruption_denies_readback_and_reopen": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::native_atomic_capture_faults_roll_back_budget_and_operation_together": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::native_atomic_capture_preserves_dpop_required_by_another_matching_grant": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::native_atomic_capture_retains_quota_and_ledger_without_tool_effect": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_locally_rehashed_history_cannot_replace_the_global_anchor": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_lost_acknowledgement_recovers_history_without_release_authority": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_precommit_failures_roll_back_rows_events_and_global_head": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::native_output_journal_inherits_all_current_labels_when_output_is_public": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::native_output_journal_propagates_taint_once_without_releasing_or_rewriting_input": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::native_output_journal_rejects_stale_lease_generation_and_substituted_artifacts": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_cannot_renew_a_lease_that_expires_during_classification": {
+      "status": "ok",
+      "log": "native-fixes-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_classifies_actual_value_and_ordered_stream_chunks": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_rejects_missing_double_suppressed_and_panicking_joins": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::declassification::faults::native_declassification_expiry_at_final_commit_retains_consumption_without_capture": {
+      "status": "ok",
+      "log": "native-fixes-final.log"
+    },
+    "security::adapters::tests::native_flow::support::declassification::faults::native_declassification_output_fault_rolls_back_outcome_without_refunding_use": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::declassification::matrix::native_declassification_composes_nonce_runtime_approval_and_dpop_sync_and_async": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::declassification::native_declassification_executes_once_without_lowering_inherited_state": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::declassification::rejection::native_declassification_refuses_unselected_lifecycle_without_activation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::declassification::rejection::native_declassification_rejects_missing_and_substituted_signed_claims": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_cannot_release_without_output_preparation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_invokes_once_and_replays_the_released_receipt": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_rechecks_revocation_and_stop_after_output_join": {
+      "status": "ok",
+      "log": "native-fixes-final.log"
+    },
+    "security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_rejects_real_expiry_after_capture": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_requires_one_successful_live_handoff": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::native_fixture_clock_uses_a_stable_authority_epoch": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::nonce::execution::expiry::native_nonce_completed_receipt_replay_survives_expiry_without_new_authority": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::nonce::execution::expiry::native_nonce_expiry_at_final_commit_rolls_back_capture_without_reversing_taint": {
+      "status": "ok",
+      "log": "native-fixes-final.log"
+    },
+    "security::adapters::tests::native_flow::support::nonce::execution::native_nonce_executes_once_and_replays_its_receipt_for_local_and_egress": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::nonce::execution::native_nonce_mutations_and_missing_credentials_never_reach_the_connector": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::nonce::execution::native_nonce_omission_cannot_reopen_an_issued_preflight_or_dispatch": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_callback_faults_deny_issuance_but_preserve_committed_taint": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_issues_without_dispatch_or_standalone_nonce_custody": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_before_participants": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_capture_before_connector": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_capture_transaction_rollback": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_database_commit_before_anchor": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_effect_started": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_evaluation_started": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_output_resolved": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_release_acknowledged": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_release_checkpointed": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_return_persisted": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_reversible_reservation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::baseline_terminal_projected": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_atomic_capture": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_claim_before_effect": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_durable_report": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_effect_without_report": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_output_join": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_raw_report": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_acknowledgement": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_checkpoint": {
+      "status": "ok",
+      "log": "native-fixes-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_terminal_projection": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_before_atomic_capture": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_release": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_report": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_output_recovery_rejects_changed_classification": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::combined_capture_transaction_rollback": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::combined_database_commit_before_anchor": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::combined_effect_started": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::combined_release_checkpointed": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::combined_reversible_reservation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::competing_native_recovery_workers_converge_on_original_terminalization": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::cumulative_capture_transaction_rollback": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::cumulative_database_commit_before_anchor": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::cumulative_release_checkpointed": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::declassification_capture_transaction_rollback": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::declassification_database_commit_before_anchor": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::declassification_effect_started": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::declassification_output_joined": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::declassification_release_checkpointed": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::late_caller_report_cannot_replace_native_unknown_outcome": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::nonce_capture_transaction_rollback": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::nonce_database_commit_before_anchor": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::nonce_effect_started": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::nonce_release_checkpointed": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::races::duplicate_native_start_cannot_steal_the_live_operation": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::races::revocation_after_native_capture_fences_connector_handoff": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    },
+    "security::adapters::tests::native_flow::support::process_recovery::races::revocation_wins_before_native_capture": {
+      "status": "ok",
+      "log": "native-flow-final.log"
+    }
+  }
+}

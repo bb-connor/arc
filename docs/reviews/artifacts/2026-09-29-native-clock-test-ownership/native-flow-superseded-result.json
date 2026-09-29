@@ -1,0 +1,10 @@
+{
+  "name": "native-flow-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+    "native_flow",
+    "--test-threads=4"
+  ],
+  "exit_code": -2,
+  "seconds": 805.39
+}

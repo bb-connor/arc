@@ -1,0 +1,10 @@
+{
+  "name": "durable-integration-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/durable_admission_sqlite-b1bf7eb140f9461f",
+    "federation_context",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 3.23
+}

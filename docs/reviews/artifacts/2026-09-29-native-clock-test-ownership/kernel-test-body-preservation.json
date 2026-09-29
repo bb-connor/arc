@@ -1,0 +1,4240 @@
+{
+  "before": 845,
+  "after": 846,
+  "original_bodies_preserved": true,
+  "new_regression_tests": [
+    "clock_failure_during_emergency_stop_cannot_resume_execution"
+  ],
+  "digests": [
+    {
+      "name": "a_live_claimant_leaves_the_seeded_row_without_invoking_the_hook",
+      "sha256": "6db8e8e4d161cc7e9d242c0cddd65f7b19ad7226342fdfed4150cd0e5945b692",
+      "count": 1
+    },
+    {
+      "name": "a_missing_nested_session_root_compensates_the_durable_admission",
+      "sha256": "c85a4dd2ed9da010f3d8ce684e6c9747569cf7fbe899e740d6b39ae7e6c4feb6",
+      "count": 1
+    },
+    {
+      "name": "aborted_settled_mustprepay_charge_refunds_the_quoted_amount",
+      "sha256": "6f30b2abf8c2461beb16db2d0f86f576ced3ee94ba1184d3bf02361848327085",
+      "count": 1
+    },
+    {
+      "name": "aborted_settled_non_mustprepay_charge_refunds_the_charged_amount",
+      "sha256": "13bf086b978672881112dcd05b7f4494e13e30cd79b3108144e0146bb1bec59d",
+      "count": 1
+    },
+    {
+      "name": "aborted_unsettled_mustprepay_charge_releases_not_refunds",
+      "sha256": "00dad8e4a1f2fb1bd660895a47793abc7b6fbf1e62fef381f442b85d65086055",
+      "count": 1
+    },
+    {
+      "name": "absent_runtime_ledger_does_not_turn_selection_failure_into_successful_release",
+      "sha256": "97352c1548a46d01091ed1d2b4fbaa2676fefe6be42794da2c8070e449d81f91",
+      "count": 1
+    },
+    {
+      "name": "active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch",
+      "sha256": "bc7f6ab20beb57cf2a5595a58fe04ddcc4ba2fd76fde4cf31a6dbabca7dfaeb0",
+      "count": 1
+    },
+    {
+      "name": "adding_security_context_cannot_recover_an_unbound_terminal",
+      "sha256": "1430ef36c63874cac040a1f24776297836c3f77dace7fef519c6a8e8b1b7a172",
+      "count": 1
+    },
+    {
+      "name": "admission_receipt_reconciliation_heals_a_crash_gap_before_serving",
+      "sha256": "e9da0ae3ec6556247e127c2499711a92b48ed421b8ae569ffa6c9114f5079bfd",
+      "count": 1
+    },
+    {
+      "name": "admit_capability_budget_fails_closed_on_a_poisoned_registry",
+      "sha256": "05f68cfad77ab4a94b4e887ef79b2d33d040e042429772ca44331b1c5d224cb2",
+      "count": 1
+    },
+    {
+      "name": "aggregate_invocation_budget_exhausts_across_grants_atomically",
+      "sha256": "24af93716a3b4b4d6247706322d039f9c26e1fedb739dab801c8ed89bf65f375",
+      "count": 1
+    },
+    {
+      "name": "algorithm_allowlist_matches_floor_semantics",
+      "sha256": "c1c9817c5c59d86312cd1aa22edf5aa5d948ae36438bfc256b4f74a9380a7739",
+      "count": 1
+    },
+    {
+      "name": "all_calls_produce_verified_receipts",
+      "sha256": "a6868ffbc0f59d9311d18f6e8725dcd1b0c51bf80749f331eb92fb3e0433b209",
+      "count": 1
+    },
+    {
+      "name": "all_hybrid_threshold_artifacts_preserve_replay_identity_under_pq_floor",
+      "sha256": "6c0be64c0d3d17313fbe7ce291feeeb81573890ff532c4549e6890096e7c532c",
+      "count": 1
+    },
+    {
+      "name": "allow_classical_rejects_hybrid_threshold_artifacts",
+      "sha256": "5b65a1b3c8bcbacc73dc48c90e6997e2273666ba84635ddfb44a650ac817eb15",
+      "count": 1
+    },
+    {
+      "name": "allow_receipt_append_linearizes_with_concurrent_revocation",
+      "sha256": "e9ff442b7e4137a73e5357f3b586b96c3a8e90d8ce58767a5e869af6ce9e6c34",
+      "count": 1
+    },
+    {
+      "name": "allow_verdict_carries_signed_execution_nonce_and_verifies",
+      "sha256": "1051335cf293dda0358bfa3078226538112ec3cdea49568a1e1c2a61c9d34ef4",
+      "count": 1
+    },
+    {
+      "name": "allowing_guard_evidence_is_signed_into_success_receipt",
+      "sha256": "8a3f652934f21d15461aff8acaf5710adcac841389d79f6e40301118bc909499",
+      "count": 1
+    },
+    {
+      "name": "altered_session_operation_cannot_consume_threshold_wait",
+      "sha256": "1780efae8697189c7ea52f1b9c048af1f358525f18ec875f517caa4e65591417",
+      "count": 1
+    },
+    {
+      "name": "always_offload_moves_guards_off_the_async_worker_without_a_timer",
+      "sha256": "53cf78689e820e8fd9e806aec6ec1ee5a17706b9af9a3b769fe26bc24954da16",
+      "count": 1
+    },
+    {
+      "name": "always_offload_moves_guards_off_the_worker_without_a_timer_even_with_a_budget",
+      "sha256": "ab6ab133d4345b42201b4a8bf82b452868684e898c7c572dcd3838eaa65a1687",
+      "count": 1
+    },
+    {
+      "name": "always_offload_runs_guards_inline_without_a_tokio_runtime",
+      "sha256": "3d816e301af9e94e70e6a99ff6df1a158207b397da8a0d1f71439de868d02d19",
+      "count": 1
+    },
+    {
+      "name": "an_unrelated_cumulative_grant_does_not_withdraw_an_exempt_admission",
+      "sha256": "a83f854825ada8211caba6fdfe01d533152ec71d14543c1264e83ecf9dbdde0a",
+      "count": 1
+    },
+    {
+      "name": "anonymous_async_receipt_cannot_inherit_a_concurrent_tenant",
+      "sha256": "f37454d527aa1c023793ff143d8701ad05e448e9c7439cb29eb71d4368307837",
+      "count": 1
+    },
+    {
+      "name": "anonymous_nested_receipt_cannot_inherit_a_concurrent_tenant",
+      "sha256": "83fec719cd511e21e5681a498f82230a7bcd73993988e349c7ead5f54c95fdec",
+      "count": 1
+    },
+    {
+      "name": "append_failure_cannot_return_or_locally_mirror_a_report",
+      "sha256": "8bcde63d5ad127b2aa99becd3ac8ddfbaeaa85e7138fa2c5e18409eca1a03ab5",
+      "count": 1
+    },
+    {
+      "name": "append_only_store_fails_closed_for_parent_receipt_after_mirror_eviction",
+      "sha256": "98a865b634a76369df8cb0808679ec9197dc99b3548671f95a8401c2af8061ae",
+      "count": 1
+    },
+    {
+      "name": "apply_stream_limits_marks_chunk_count_exceeded_stream_incomplete",
+      "sha256": "7d3662860104ac8ea0eef2d196859d57d7d474f13aed933b6ae8a0f10db7c48d",
+      "count": 1
+    },
+    {
+      "name": "apply_stream_limits_marks_duration_exceeded_stream_incomplete",
+      "sha256": "109b9b482a9b50a57af89a2221b5fc197564f5f8e79a0d5e5e292ad918d0dd09",
+      "count": 1
+    },
+    {
+      "name": "approval_claim_failures_preserve_the_confirmed_operation_for_cleanup",
+      "sha256": "717822e22f7dba2fb0cea59335dc617dfd33460e5b50900427dda07435095184",
+      "count": 1
+    },
+    {
+      "name": "approval_cleanup_requires_a_confirmed_exact_release",
+      "sha256": "6508923db1bcde88a65c09ae24bd859fbd7ff4929551333de60f0b0a88e76a9d",
+      "count": 1
+    },
+    {
+      "name": "approval_reservation_requires_the_original_prepared_request_and_grant",
+      "sha256": "5a87f15a695ead03043483d4a24b26e13625906494525bac82983726751a3899",
+      "count": 1
+    },
+    {
+      "name": "approved_session_retry_resumes_original_threshold_request",
+      "sha256": "0dfd0440bd04eb186995c8822947ae3b7556a14d0db3b973a8fe74f96f3fec5c",
+      "count": 1
+    },
+    {
+      "name": "async_allowing_guard_evidence_is_signed_into_success_receipt",
+      "sha256": "cd9fed2dc958a28516d2e38bf64939e0f7d1d78aa40cb1d7432738f485c90f05",
+      "count": 1
+    },
+    {
+      "name": "async_evaluate_current_thread_runtime_bypasses_sync_bridge",
+      "sha256": "973cc896ed4717769a85fb55e4efbb822a33ca42bed68a8df2212525138b1181",
+      "count": 1
+    },
+    {
+      "name": "async_evaluate_tool_call_supports_shared_kernel_concurrency",
+      "sha256": "042e68cc90f22a924746f9f549ebb75260ca74c77bd2edda9ac7d37f7750ca25",
+      "count": 1
+    },
+    {
+      "name": "async_payment_mutation_is_revalidated_by_guard_before_dispatch",
+      "sha256": "bd7bae969fdcaa25c2a094780f314f5933d06ce7bb195bee136cb31b731af8f2",
+      "count": 1
+    },
+    {
+      "name": "async_tool_server_event_drain_current_thread_preserves_events",
+      "sha256": "69ec4815723a4af0f7394237e8d8302d1a9ab327ee6b79653a89e9f81c2842fd",
+      "count": 1
+    },
+    {
+      "name": "async_tool_server_event_drain_preserves_partial_events_after_error",
+      "sha256": "cea590b3503de047596598cf9f8cb602797938417db8aec48f4320ce465c8db5",
+      "count": 1
+    },
+    {
+      "name": "atomic_seed_failure_persists_neither_receipt_nor_work_and_skips_the_hook",
+      "sha256": "2fb5c304f1a6fec78a278cb72f7de4160d23627b7fef64bdb0d38be2c9427bd8",
+      "count": 1
+    },
+    {
+      "name": "attach_honors_disabled_checkpointing",
+      "sha256": "60fd5550538b6df56ef5df46daa2ac1cd9e904d6ecd06f3b1dee0a2dac5bbe55",
+      "count": 1
+    },
+    {
+      "name": "attach_rejects_configured_retention_on_unsupported_store",
+      "sha256": "1332e1b753655fde393e59831b6911f3c0f9f8ba3b9f88d3b8a872f5a1d6d612",
+      "count": 1
+    },
+    {
+      "name": "attach_rejects_retention_when_checkpointing_disabled",
+      "sha256": "146b2e250f6b2a127d0d38e37f188a13595e90e375943e306f8878f0c2fc7c85",
+      "count": 1
+    },
+    {
+      "name": "attach_rejects_tenant_scoped_retention",
+      "sha256": "cbdf01c27e042683a61ddb8db6a82c7e2245cba840b58e8a3dc10e268ef00e2d",
+      "count": 1
+    },
+    {
+      "name": "attach_requires_checkpoint_install_when_supported",
+      "sha256": "22b79a40b8238a7ab3c7c08e74e04fc0816568c7415461acc4fa41afe069759b",
+      "count": 1
+    },
+    {
+      "name": "background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request_path",
+      "sha256": "3e6044234811c3edfa2089d9c65254361a94fb24203c3ee6c3490000435eba10",
+      "count": 1
+    },
+    {
+      "name": "begin_child_request_clears_child_inflight_when_lineage_persistence_fails",
+      "sha256": "03b2706c4a9dac1f6f5e0c4af10e881a45e538aec4014321d022ccf9c89c2e5b",
+      "count": 1
+    },
+    {
+      "name": "begin_child_request_requires_parent_lineage",
+      "sha256": "012c3dd6fd25d49e6eebfc396e7f2d0dab7ff22e751c68e184908319fd231f24",
+      "count": 1
+    },
+    {
+      "name": "begin_session_request_clears_inflight_when_lineage_persistence_fails",
+      "sha256": "b4028fb91711eed5a711588c88b657ba74104c9364faf930cbd16734a30642d1",
+      "count": 1
+    },
+    {
+      "name": "blocking_adapter_preserves_kernel_caller_binding_in_value_and_cost_paths",
+      "sha256": "fdef8a71763186ae977405677c3c40e7fbb634764e86561ae124bfa6a8973abf",
+      "count": 1
+    },
+    {
+      "name": "blocking_cost_delivery_preserves_the_durable_idempotency_key",
+      "sha256": "75d4af3d9413121be4bdf4d6903a822553cd75f2370b51f98a5a7635bd41a188",
+      "count": 1
+    },
+    {
+      "name": "blocking_evaluate_current_thread_runtime_fails_before_receipt_side_effects",
+      "sha256": "d56f99971f27d858af5ee925338b14c49ef89cecb92fd69a721b0334db991c93",
+      "count": 1
+    },
+    {
+      "name": "blocking_evaluate_without_session_leaves_tenant_id_none",
+      "sha256": "489f0332f2dcd7e605ed32f95a34872c6a9feee9576a43b2db991b550b47bffa",
+      "count": 1
+    },
+    {
+      "name": "boot_reconfiguration_preserves_channel_shutdown",
+      "sha256": "1648f057c504d0b6e86b78eedd3f89e2db415a4014afde31e0c66288ee162ede",
+      "count": 1
+    },
+    {
+      "name": "bound_tool_invocation_accepts_approved_canonical_arguments",
+      "sha256": "dfb87a1a3dba82d5f80b9186a6ab2db840940df140d1c17daa928f2cfd4cd493",
+      "count": 1
+    },
+    {
+      "name": "bound_tool_invocation_denies_capability_transfer_for_same_subject",
+      "sha256": "b9b787967f13af470a4d01970e2a35f8cfd689b30221cbbcecad177a0545e702",
+      "count": 1
+    },
+    {
+      "name": "bound_tool_invocation_denies_parameter_mutation_with_valid_approval",
+      "sha256": "3ec333c40ad4654cc0e46f5e7607d278b2f030686d86314a49329787865cf4bc",
+      "count": 1
+    },
+    {
+      "name": "bound_tool_invocation_rejects_mutation_before_approval_checks",
+      "sha256": "f399b3ea74486e4fe0899ac9c17a9584537af8921c7cf88f14a5625c01e100ee",
+      "count": 1
+    },
+    {
+      "name": "bounded_in_memory_artifact_store_loses_evidence_when_both_layers_evict",
+      "sha256": "9f61963be5f4a227e81066d96de09979662ee66ab71506feb8a1f276e67d0e59",
+      "count": 1
+    },
+    {
+      "name": "budget_backend_error_compensates_durable_admission_before_dispatch",
+      "sha256": "61ca846f5c7a405b4fe95b2bed2e3c4728f2dd10478348f7fd698ca5ce2127a9",
+      "count": 1
+    },
+    {
+      "name": "budget_exhaustion",
+      "sha256": "7759e38161f92c72e29ec35b88e38560662757203f7b058e4f3e072d4c7abf67",
+      "count": 1
+    },
+    {
+      "name": "budgets_are_tracked_per_matching_grant",
+      "sha256": "ddcc806ef52e444703f52ebfba5ea331502ca6c967f0c391ff2211e0b1345fc7",
+      "count": 1
+    },
+    {
+      "name": "caller_authorization_preparation_preserves_no_presented_nonce_and_required_approval",
+      "sha256": "476153b42459c485be496002685b6a4d551e4f1d72ef72a8cd0829ef0da7950e",
+      "count": 1
+    },
+    {
+      "name": "caller_share_snapshot_waits_for_mutations_before_sampling_time",
+      "sha256": "fa2ffa34f8ceb4b139953303019171096bc3c3ca1e160bdf49a170c3746a30ab",
+      "count": 1
+    },
+    {
+      "name": "cancellation_poll_before_url_elicitation_records_ambiguous_dispatch",
+      "sha256": "888b179203d600a610dc41180b1a841f3328b67d4cea62b7c330dfd3865386cd",
+      "count": 1
+    },
+    {
+      "name": "cancelled_dispatch_start_preserves_authoritative_reason",
+      "sha256": "a782d16c8a17fd1ecc1c3be31fd806a0fe45b480b3201cf6ca1b74cf0aec4594",
+      "count": 1
+    },
+    {
+      "name": "cancelled_session_cannot_resume_threshold_wait",
+      "sha256": "0a10ec1344467156e38bc4e96f05e616862a02a2bd5d48b1838a6bef4928d12a",
+      "count": 1
+    },
+    {
+      "name": "cancelled_session_evaluation_releases_only_its_receipt_context",
+      "sha256": "a66084e79b5e822f98e64e313e58e289984a24a146aa23d47d71afc86115b9a2",
+      "count": 1
+    },
+    {
+      "name": "capability_only_floor_setter_does_not_reconfigure_receipt_authority",
+      "sha256": "3a90704b729017de0d8b8f96ae363f99fdf9be6cee8e4616483f1397662725c6",
+      "count": 1
+    },
+    {
+      "name": "capture_callback_panics_retain_uncertainty_without_poisoning_recovery",
+      "sha256": "cea8f1a12a21775c14e1fd555de81fd36d50a2e0bd6e6a2b3bea47777b299705",
+      "count": 1
+    },
+    {
+      "name": "captured_monetary_invocation_only_explicit_predispatch_cancel_can_release",
+      "sha256": "c3c1b861d25f57373cf1d5a2a9e7140e0761fa9731d694c3ef9f50b8f9449441",
+      "count": 1
+    },
+    {
+      "name": "captured_monetary_replay_cannot_fall_through_to_overlapping_unlimited_grant",
+      "sha256": "d0f840961fa325dc233d448d3dfda052d44ee3343f7fd3d584c934d45650c009",
+      "count": 1
+    },
+    {
+      "name": "captured_reconciled_hold_rejects_legacy_reverse_without_hold_id",
+      "sha256": "10275b8b31c3bc697636e90378a8318fceedfda8f861f2258e0b86d363e0198a",
+      "count": 1
+    },
+    {
+      "name": "changed_capture_participant_denies_before_tool_effect_and_retains_accounting",
+      "sha256": "85365d3d1323c234acb78ffb853c3cbe0f71835892f543c30ca7703ee806726e",
+      "count": 1
+    },
+    {
+      "name": "changed_runtime_authority_cannot_reuse_original_admission",
+      "sha256": "662163ddbcb2b6dc53ed427e5dadf8e5b587b6b359dae4efada9bf3d973bf175",
+      "count": 1
+    },
+    {
+      "name": "changed_runtime_generation_cannot_reuse_original_admission",
+      "sha256": "5366a0d04fae577685b661582decbeca43611a86509bc8611735b23362be74dd",
+      "count": 1
+    },
+    {
+      "name": "changed_security_identity_cannot_recover_a_completed_operation",
+      "sha256": "f66e7cdd138927352ef4b92f5cf4fdaebaa5a6e7beeb2581ce67ae44dfb4e0c2",
+      "count": 1
+    },
+    {
+      "name": "changed_security_identity_is_rejected_before_dispatch_capture",
+      "sha256": "c84ed30c45e7a76a35cca655f616fdbbd3bbcc8af9eb338abee015efa1c36acf",
+      "count": 1
+    },
+    {
+      "name": "changed_security_requirements_cannot_recover_an_unbound_terminal",
+      "sha256": "d51ebc19a0eb4730e7206e70c520a7b2ba066e2d5b3c013658d531e306216658",
+      "count": 1
+    },
+    {
+      "name": "changed_session_lineage_cannot_consume_threshold_wait",
+      "sha256": "7fb4a5ff3f3980f7551eb6a1bce46f94f22db03cfbea00ca719f2d660039b392",
+      "count": 1
+    },
+    {
+      "name": "checkpoint_capable_store_without_background_fails_setup",
+      "sha256": "81df6f75b2268b2a9a470a0c64590c9f040f89a80237abda1ed7cdfa42a6c9a0",
+      "count": 1
+    },
+    {
+      "name": "checkpoint_counters_refresh_across_kernels_sharing_store",
+      "sha256": "15dd2fc91ee77e3fec89f59b0f3f52e24f7e8958a54fa2d8a1bf09d98779d371",
+      "count": 1
+    },
+    {
+      "name": "checkpoint_counters_restore_when_store_is_reattached",
+      "sha256": "e6900dfb02bd0f09b2f0b5771346cd39bccc1db095e353080bdc7777063bd497",
+      "count": 1
+    },
+    {
+      "name": "checkpoint_triggers_at_100_receipts",
+      "sha256": "a27ce5d0be7bddeb06a2f43d95039b519529914b1eb645ece0922df64c476733",
+      "count": 1
+    },
+    {
+      "name": "chio_governed_request_without_runtime_hook_fails_closed",
+      "sha256": "0c95bb2192d7b7666c69150b61f507f7638650a67c111ddff812781f9bd99e61",
+      "count": 1
+    },
+    {
+      "name": "chio_post_admission_drop_guard_retains_non_monetary_runtime_reservations",
+      "sha256": "b44a7d8e67b3d5f7483f28a221019e30187d5f3ee4478128351d4dbf1583a05b",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_does_not_release_destructive_lease_after_dispatch_failure",
+      "sha256": "7dc7dd636e593ba944e3f80f1b7462ff67899316205a9aa2c090c5c7751225b1",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_hook_allows_dispatch_and_records_metadata",
+      "sha256": "63e4332039dc2dd96814f05ec3655bc7a4d8f68152edbc5a94e2b7ffd8ee6365",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_hook_denies_before_tool_dispatch_and_records_metadata",
+      "sha256": "e46d0bd2bc87a3a32d0ce763355895ae7ecb661be085b81c230b38ef84de2574",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign",
+      "sha256": "85ae63a866ae6733555d140da72186269d54cf22d4f165604750b4a7d468a42e",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_hook_receives_nested_flow_route_metadata_before_dispatch",
+      "sha256": "66b58906a2ead78e0e54ff4cae0b4f11d2486b1c6cce7632b50ef581dfa1769a",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_hook_receives_route_metadata_before_dispatch",
+      "sha256": "301739ac39c6fb8ae55fdeb0fab13fc5b4655a92d841e686a026af8992e24ec6",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial",
+      "sha256": "087ac1b3bd301f28f38e18f27b5490a5d96b3799cea3ddc02b7bcee4a0b07d03",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_retains_reservations_on_ambiguous_cancellation",
+      "sha256": "5a9c7ea1c51cc58c24db5d85207099d3ae71fe0030a75efd3889a5806cee37a2",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_retains_reservations_on_ambiguous_incomplete",
+      "sha256": "1fa9acb3e266ca9f175583f6e0d25af590c77c5ef41b076f3863678a0dce9f0a",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_admission_retains_reservations_on_non_durable_url_elicitation",
+      "sha256": "375e8cb7119e564b631106ee90cf79f8d7cef4ba2a41647ec24e2fdb1d3bac5e",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_live_parent_and_vendor_calls_expose_package_valid_receipts",
+      "sha256": "53d6eafb6a9282fbd6b9b2e670d2d12816f5035307b404204501e5a93f0282b8",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial",
+      "sha256": "017e1c2edef4851137862dd2dd30d65d6b18a4b429c2049311c38e560e578812",
+      "count": 1
+    },
+    {
+      "name": "chio_runtime_release_failure_surfaces_cleanup_failure_on_pending_approval",
+      "sha256": "994fc7ba77efdaa76d0d1898e296986b1b59c8ff46829107360548161b489961",
+      "count": 1
+    },
+    {
+      "name": "chio_swarm_request_without_runtime_hook_fails_closed",
+      "sha256": "bb9737a241b7b71e724b4a937501aee85d74246a1896df8dc075e6f60e32c099",
+      "count": 1
+    },
+    {
+      "name": "chio_treaty_request_without_runtime_hook_fails_closed",
+      "sha256": "cec6e3f899d1db105cb0a43bb4e673c5f5b9af188c8f68fc7620ceb15f94bd4d",
+      "count": 1
+    },
+    {
+      "name": "classical_boot_preserves_canonical_proposal",
+      "sha256": "1377953df3c1cb7158cc0ee707ec2f8dc1df2b227516ac5937e876527c6c458a",
+      "count": 1
+    },
+    {
+      "name": "classical_envelopes_allow_omitted_ed25519_metadata",
+      "sha256": "db4e69d85b21bb8631022a118ca4156d55ab64aede4f97fb07821e00c023b6d2",
+      "count": 1
+    },
+    {
+      "name": "classical_inline_and_channel_receipts_remain_identical",
+      "sha256": "5e29b82a35c3e526aed2e9a9029f5c23b3c2af4ac7db86e2f75ca879d0d4b03d",
+      "count": 1
+    },
+    {
+      "name": "classical_installed_proposal_dispatches_and_replays_once",
+      "sha256": "2c18208f1d6277767ad915caed6421a1d34c2e8ceb7b35382f54451bd2aaf060",
+      "count": 1
+    },
+    {
+      "name": "classical_threshold_verifiers_agree_on_canonical_replay_identity",
+      "sha256": "49501d8acc4d726e6df15ee31e17d0fcf0b7341408d64e1161481197b5a25efe",
+      "count": 1
+    },
+    {
+      "name": "clock_failure_during_emergency_stop_cannot_resume_execution",
+      "sha256": "2318cdb7f30f281cc1711e76b45270b40e726179d64fd5af4ce9129b1501c04f",
+      "count": 1
+    },
+    {
+      "name": "close_session_persists_anonymous_anchor_and_rejects_late_auth_rotation",
+      "sha256": "3d5ad354e637b0bd1b7ec0b5dba398d697a1eabf3d709ba550ad00b2d2d0eada",
+      "count": 1
+    },
+    {
+      "name": "close_session_with_sqlite_store_reuses_initial_anonymous_anchor",
+      "sha256": "01866728a2a624e808ee9532fdaaa5063ec4b8ed7523946f0521e40d081d9175",
+      "count": 1
+    },
+    {
+      "name": "committed_approval_retains_signed_horizon_under_capacity_pressure",
+      "sha256": "0b9d12197af2684c702ba8c7543903dfbe5c3ea34ccee40cf50f13efb82b271b",
+      "count": 1
+    },
+    {
+      "name": "committed_dispatch_credential_retains_replay_marker_under_capacity_pressure",
+      "sha256": "bdad855f703b93c54c3457f0d53707f1a661d8a65451fd02f34740b1a481511e",
+      "count": 1
+    },
+    {
+      "name": "competing_prepared_credentials_cannot_release_the_winning_reservation",
+      "sha256": "7abadbe99ff785dc6342fa2e5523802911c0fcfdff437a8e0d2d2a9f37b1ded0",
+      "count": 1
+    },
+    {
+      "name": "completed_federated_replay_remains_closed_until_cosign_succeeds",
+      "sha256": "1f653deced4e75f73dbe0c9875bd9987a9d095eb3f5e555bec5e28c8f06e52d1",
+      "count": 1
+    },
+    {
+      "name": "completed_replay_does_not_weaken_the_current_crypto_floor",
+      "sha256": "dcf988e3b006682b046a5b6ce695bc0a3a52fa1c6e409acb7db45c5fc6640d3a",
+      "count": 1
+    },
+    {
+      "name": "completed_replay_heals_a_failed_receipt_projection_without_redispatch",
+      "sha256": "a66cd3e6e4ca82bbe4b18ed930868c1429dc065fde2564559a9b33ea6c24cd82",
+      "count": 1
+    },
+    {
+      "name": "completed_replay_uses_original_signer_without_reinvocation",
+      "sha256": "adee27dcca4cfda82ed0ed5983820c1a129a63d09275affbc3da2a0738fae8db",
+      "count": 1
+    },
+    {
+      "name": "concurrent_duplicate_request_ids_keep_federation_scopes_isolated",
+      "sha256": "0b41f017d854da324dd40d7965cc03621fae6b29a2348705e4f7a8d32b63e5f2",
+      "count": 1
+    },
+    {
+      "name": "concurrent_evaluate_and_emergency_stop_is_race_free",
+      "sha256": "a1f0c1a17f85eb21f711d48939e6885f4cfe0068480b8b0a1add074539c39ea6",
+      "count": 1
+    },
+    {
+      "name": "concurrent_identical_monetary_requests_capture_before_payment_and_release_loser_leases",
+      "sha256": "e955b97cc1df514074e90f6bcf36effbbc84d66d4b95a1721744b9b53e0ecf36",
+      "count": 1
+    },
+    {
+      "name": "concurrent_receipt_checkpointing_keeps_contiguous_batches",
+      "sha256": "c5b07ecf2a556fbebae5c1acb93b964aa67052317e66278925a0e7e94bf68551",
+      "count": 1
+    },
+    {
+      "name": "concurrent_recovery_keeps_distinct_treaty_reports_for_the_same_request_id",
+      "sha256": "7e13c9b49ed46c99d0715d54249a4aed78c63ba8d13a4414c088ebda09e2e12d",
+      "count": 1
+    },
+    {
+      "name": "concurrent_threshold_retry_cannot_claim_same_session_wait",
+      "sha256": "44cbe4ae96fbf3b467dd5f5232702187aff854d2d21312976e9f3acbe7be354a",
+      "count": 1
+    },
+    {
+      "name": "configured_pool_ledger_freezes_the_durable_admission_runtime",
+      "sha256": "ca33896f6eed0a7f2a540eda2236813d2d097e688be4cd10aa13e98ea262080f",
+      "count": 1
+    },
+    {
+      "name": "connector_tool_not_registered_after_side_effect_retains_admission",
+      "sha256": "c5dca3b988f0a9d31e2a34b7206415aa3e41d9048bd5b7fb39e998748cceff6e",
+      "count": 1
+    },
+    {
+      "name": "cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units",
+      "sha256": "3f2a4b109db13bd80d256693366b533b1d89116fd3cbb78db353e9aa9ae65966",
+      "count": 1
+    },
+    {
+      "name": "cross_currency_without_oracle_keeps_provisional_charge_and_marks_failed_settlement",
+      "sha256": "ac8306f4ec52bae49e3a226c250d5a1fbe68150a2fa6b06d3e2143cce33017ba",
+      "count": 1
+    },
+    {
+      "name": "cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anchor",
+      "sha256": "3e8779d3410c8304260d8ca565b185548d58bcbaf1bc97b0e1d921f8986b886b",
+      "count": 1
+    },
+    {
+      "name": "cumulative_admission_retains_the_original_request_and_capability",
+      "sha256": "e68de4e48af2c2b9b4afacb10c0d56d4e2f98af76d91c5a156cc805591563604",
+      "count": 1
+    },
+    {
+      "name": "cumulative_approval_below_threshold_dispatches_without_a_proposal",
+      "sha256": "beec408703e5639b4d124e7417541d5ec62a402fa000b308591cbd15730a121d",
+      "count": 1
+    },
+    {
+      "name": "cumulative_approval_guard_denial_creates_no_budget_state",
+      "sha256": "62eaf6f3d164dd711d46c24ab7de586884c8fae510241b27fb631574a2020652",
+      "count": 1
+    },
+    {
+      "name": "cumulative_approval_membership_does_not_change_operation_identity",
+      "sha256": "3fa3d745311ee5dcab0d5dfb252067edebf6fbae5ba6fc1b6677d489889e0f8b",
+      "count": 1
+    },
+    {
+      "name": "cumulative_approval_resumes_the_same_hold_and_dispatches_once",
+      "sha256": "36786cc78d907c8756def684f9e47952b543a28158ed138ed6802a7b243855b7",
+      "count": 1
+    },
+    {
+      "name": "cumulative_proposal_clock_does_not_trust_future_artifact_time",
+      "sha256": "f82e28628ad813c19e292ab679816488d94c2be1b817adcd0015ee77c51241f3",
+      "count": 1
+    },
+    {
+      "name": "cumulative_proposal_clock_rechecks_expiry_after_policy_lookup",
+      "sha256": "9e9e5adcd472fd2efeb14c883d5814fc91c51cde242057dade2d0cf6b39383a1",
+      "count": 1
+    },
+    {
+      "name": "cumulative_proposal_clock_refreshes_stale_admission_time",
+      "sha256": "376fdc8cf71fff939f59699286c937a7af47a8ff06a9dec7276c4177d08ef9f1",
+      "count": 1
+    },
+    {
+      "name": "cumulative_retry_cannot_backfill_missing_original_authority",
+      "sha256": "cd7a1dcde569b380b6a8dd997088a4b138057978ebbe93c2db06298de5ae453f",
+      "count": 1
+    },
+    {
+      "name": "current_profile_with_context_only_binding_has_exact_bytes_and_hash",
+      "sha256": "ac6a0bfa1e33d1c6298f759138ae23e95002e2e2e73be758f1c00e810195a179",
+      "count": 1
+    },
+    {
+      "name": "current_profile_without_security_context_keeps_its_exact_inner_hash",
+      "sha256": "36728493461beef9e23d1e50ebdc76d6578aa5f35b98c0739f64ffb28612ae0d",
+      "count": 1
+    },
+    {
+      "name": "dead_commit_writer_denies_before_the_capability_lineage_write",
+      "sha256": "281270060b59a0ef1f52a83b283546ebf18c3faa5286f1f054b7cd5489bd30de",
+      "count": 1
+    },
+    {
+      "name": "dead_commit_writer_denies_before_the_tool_executes",
+      "sha256": "97a37ea14f583d01191cb8a25f0ea463eb1a440b46263169b5edc57f80d86366",
+      "count": 1
+    },
+    {
+      "name": "dead_writer_cannot_return_a_report",
+      "sha256": "d91f90401577a77636973983a3c38a2350eba4b3042e3c3f5927f22c22971b66",
+      "count": 1
+    },
+    {
+      "name": "default_governed_approval_replay_store_accepts_once_and_denies_replay",
+      "sha256": "f315ec6afb5c6260af40a20a7e3cb28ab22289bf9b8e57cd7b72d28f8f59c3b6",
+      "count": 1
+    },
+    {
+      "name": "delegated_reserving_child_holds_sibling_share_until_reconciled",
+      "sha256": "a8256a4c8b1a0486aa00ca2a164364cb8b99a7d8e0895ce05b3aa6356a1441fa",
+      "count": 1
+    },
+    {
+      "name": "delegated_reserving_child_sibling_share_freed_after_ttl_reap",
+      "sha256": "b1f317b650c4b20f333a6142e354a1b0c48a26b7ff96ceb8b81a0a3901a67f70",
+      "count": 1
+    },
+    {
+      "name": "delegated_reserving_child_with_non_monetary_grant_holds_sibling_share_until_reconciled",
+      "sha256": "ad03a197996828f738e0d875ac562f5121e077a20c76c9dba5d52eb781d209ef",
+      "count": 1
+    },
+    {
+      "name": "delegated_reserving_child_with_non_monetary_grant_sibling_share_freed_after_ttl_reap",
+      "sha256": "b3730e444545830542fcea24f9579a7f3cd5d690f4d6cc96bac6403df008b2a8",
+      "count": 1
+    },
+    {
+      "name": "delegated_tool_call_exceeding_configured_max_depth_denies",
+      "sha256": "8a3c5c11f24da93bec493bfe27de5efcb743b85d3095319a53c4e716ff7c87bf",
+      "count": 1
+    },
+    {
+      "name": "delegated_tool_call_records_observed_capability_lineage",
+      "sha256": "cd7d3c1d83d58f7dec55831c8537aa63e7b0c7b01f5c365ba156ba047a8c6223",
+      "count": 1
+    },
+    {
+      "name": "delegated_tool_call_with_delegatee_subject_mismatch_denies",
+      "sha256": "85cc26e1b2c17099483a6306b7019da102aad227e3bdb85d267283534996d8a4",
+      "count": 1
+    },
+    {
+      "name": "delegated_tool_call_with_scope_escalation_denies",
+      "sha256": "8de1dceba74e1f41669bbc8b78e134fb0738bc510b79a8a8c468f5a0084da0c2",
+      "count": 1
+    },
+    {
+      "name": "delegated_tool_call_with_truncated_ancestor_chain_denies",
+      "sha256": "f4b1206170a090244a4652bdcc6b35424f850e925a1ff99a6ff0af2ba23bbb59",
+      "count": 1
+    },
+    {
+      "name": "delegated_tool_call_without_delegate_operation_denies",
+      "sha256": "7c2ae4f6fec7056f3b2430539b84529b0cd1bd16b28b7e8ae3d83338ff73e249",
+      "count": 1
+    },
+    {
+      "name": "delegated_tool_call_without_parent_snapshot_denies",
+      "sha256": "913448434bee01f4f1cc8644a3c85673af561a365d602378817105b3b8490087",
+      "count": 1
+    },
+    {
+      "name": "delivery_wait_samples_expiry_after_readiness",
+      "sha256": "147726bcfc34900b843333f2b688c2ef6468ad88c2c94e1a5b0444939e85f5ce",
+      "count": 1
+    },
+    {
+      "name": "denial_receipt_reports_the_committed_balance_not_the_original_ceiling",
+      "sha256": "da21ff1b10830089f74c7e89892afa607a8940442fcc7140ccf9ea0fbe501c4f",
+      "count": 1
+    },
+    {
+      "name": "denying_guard_evidence_is_signed_into_deny_receipt",
+      "sha256": "2e6fed9dd397069d8c04091d98c9ee1f95d48188e2bc594f0952c0646fe5e2b3",
+      "count": 1
+    },
+    {
+      "name": "direct_monetary_dispatch_without_capture_proof_fails_closed",
+      "sha256": "8cc623d5492f35d9b2be29a7aaace15a03a390b2912a3213936937afa0825d44",
+      "count": 1
+    },
+    {
+      "name": "disabled_mode_allows_tool_calls_without_nonce",
+      "sha256": "801146d0c0ee00f0f3cf45d6642df70b381ec9ef1a5e084289e7c51908de7e92",
+      "count": 1
+    },
+    {
+      "name": "dispatch_budget_bounds_a_connection_that_blocks_before_awaiting",
+      "sha256": "fda0b4bec8e27bba32767ecb1b8cf733be697c9d3507b31e131466e7d6fa99c2",
+      "count": 1
+    },
+    {
+      "name": "dispatch_budget_expiry_runs_full_unwind_and_emits_cancelled_receipt",
+      "sha256": "3d76f0baa637bc5658ec6d1064b22ce12b4d771302f497a27626fde0eed320df",
+      "count": 1
+    },
+    {
+      "name": "dispatch_credential_drop_contains_rollback_panic_during_unwind",
+      "sha256": "483b73cf99fc43aa84def213bd74a870abae03666b1e31e8231c5d281d785903",
+      "count": 1
+    },
+    {
+      "name": "dispatch_credential_reserve_panic_is_contained_and_rolled_back",
+      "sha256": "4da8434a65ea56ea19ce7d383ef97db9f7373ba5b5b1ceef2e21ad27123aae4f",
+      "count": 1
+    },
+    {
+      "name": "dispatch_credential_rollback_panic_is_contained_and_aggregated",
+      "sha256": "82c94bd8d9d5e379fc0a883d2a2e5e7f8bfe6494c2e48ed84158e2ce9f9645d9",
+      "count": 1
+    },
+    {
+      "name": "dispatch_deadline_cannot_outlive_a_shorter_signed_approval",
+      "sha256": "fa53aeaf33a2407de5904a0a90a5c848a1cfed9fbb765578f39a63903e462ad5",
+      "count": 1
+    },
+    {
+      "name": "dispatch_deadline_keeps_the_original_dpop_window",
+      "sha256": "79074d14c3cee1d76c2d956cf372f87c71b020306546190a23edf02256374dc1",
+      "count": 1
+    },
+    {
+      "name": "dispatch_for_unregistered_tool_server_still_denies",
+      "sha256": "74837f9a95d4bc2f2889c9aaf1f17c8b084bac77c8d3935a4add720abade8259",
+      "count": 1
+    },
+    {
+      "name": "dispatch_not_registered_retains_full_budget_state",
+      "sha256": "15590d06bf9f65654907a10ec02a59ef28e0a15acde952057c647f9bb7ad9e13",
+      "count": 1
+    },
+    {
+      "name": "dispatch_not_registered_retains_full_budget_state_nested_flow",
+      "sha256": "5af9a03b885055f45fe23ad589131806ca2416b6168b48dbdc01096b697c19b4",
+      "count": 1
+    },
+    {
+      "name": "domain_exact_constraint_is_enforced",
+      "sha256": "b0b2f69366b944ffd730d69307566862f43a77479049b4ff70419a76bafcae95",
+      "count": 1
+    },
+    {
+      "name": "dpop_claim_failures_preserve_the_confirmed_operation_for_cleanup",
+      "sha256": "e3843e8411ee1667b1f9cf9e40ad8fb4e7a7f0827e978de7ce15ccbcad11521a",
+      "count": 1
+    },
+    {
+      "name": "dpop_cleanup_requires_a_confirmed_exact_release",
+      "sha256": "1f2baf09b9776647a2a5e50bdd03d1feb9d003582176c3cfa0bb3ddba5c7b6cd",
+      "count": 1
+    },
+    {
+      "name": "dpop_configuration_and_reservation_cannot_bypass_durable_custody",
+      "sha256": "69d1410740c43bbb3e402c6097ed1510b9760a5724623da0bb41c9e45b939d8b",
+      "count": 1
+    },
+    {
+      "name": "dpop_not_required_grant_allows_without_proof",
+      "sha256": "f5c919eb48fa0ab55e4409b00fda3f504dd30d62a5ebc2f7554c9a962d148fac",
+      "count": 1
+    },
+    {
+      "name": "dpop_profile_removal_distinguishes_selected_authority_from_configuration",
+      "sha256": "a1d406bd1018f9855f9a44c020109778ccc6edea54518c5f10249faf984e6e83",
+      "count": 1
+    },
+    {
+      "name": "dpop_required_grant_allows_when_valid_proof_provided",
+      "sha256": "5e3de192e4531d870946e73a0612529bdeefc6f379c3098a39b2857153a37839",
+      "count": 1
+    },
+    {
+      "name": "dpop_required_grant_denies_when_no_proof_provided",
+      "sha256": "96bbcf45b7c3b8fb767aa520411da4597e6ace43ffc775dc8f6df79e4dfa2613",
+      "count": 1
+    },
+    {
+      "name": "dpop_required_grant_denies_when_proof_has_wrong_tool_name",
+      "sha256": "ae4cbd5fa4971f054aed6244d2dbce8b9e48c7b250b11e3a9a10d2945517ae74",
+      "count": 1
+    },
+    {
+      "name": "dpop_reservation_requires_the_original_prepared_request_and_grant",
+      "sha256": "13a853d2be22d57b837ee4b3a8bfa6180d67d7cfdb7fefda2d22766c55a14b2a",
+      "count": 1
+    },
+    {
+      "name": "dpop_retirement_between_preparation_and_consumption_rejects_the_stale_plan",
+      "sha256": "55331f7bfb24a187b894aab508db5bae30ac7c146873d12ef88212150108fb64",
+      "count": 1
+    },
+    {
+      "name": "dpop_rule_codes_survive_root_and_nested_signed_denials",
+      "sha256": "4520804f33f131e532b668af3d8c03bb4ebfeef440ca6b23852de8f07b3aa40c",
+      "count": 1
+    },
+    {
+      "name": "draining_session_cannot_resume_threshold_wait",
+      "sha256": "b1d1a0674ed556b485e6a82eaafa363f6d6d97ccbadf63971e33fcb43326109f",
+      "count": 1
+    },
+    {
+      "name": "drop_guard_disposition_table",
+      "sha256": "e6ad5f93e57c431de9a237afe1305487a32b35157003770767b54a1373867ff8",
+      "count": 1
+    },
+    {
+      "name": "drop_guard_reverse_failure_records_cleanup_fault",
+      "sha256": "eac9b2c65b79967296133b0a5ea7bda5368e97504cec65903074717de90cdd09",
+      "count": 1
+    },
+    {
+      "name": "drop_non_monetary_post_dispatch_records_cancellation_receipt",
+      "sha256": "b1bd58973a357490062a0e99d71261879629c2b2cd1d054b4af2e3c83d115ee4",
+      "count": 1
+    },
+    {
+      "name": "drop_post_dispatch_retains_and_marks_reservations",
+      "sha256": "a5a8ded72b29f6ed263f89e8a04748fdd552a29d4741861f1f1a1dae4c034df1",
+      "count": 1
+    },
+    {
+      "name": "drop_pre_dispatch_cleanup_fault_receipt_includes_monetary_hold_id",
+      "sha256": "83bff0d445bc29ff9f192e4549bb020ee3823441f557d8ea996828d524b4b157",
+      "count": 1
+    },
+    {
+      "name": "drop_pre_dispatch_monetary_unwinds_without_receipt",
+      "sha256": "14c75a9f6aa9313cd0c13a25f550e33d6977a8ee01cc3bf21ee30cbf15e65be1",
+      "count": 1
+    },
+    {
+      "name": "drop_pre_dispatch_overlapping_readmit_keeps_sibling_denied",
+      "sha256": "a99bc4691e182b8f0de4817120e707408d62f5f02bd24560651164e04fcbe5a6",
+      "count": 1
+    },
+    {
+      "name": "drop_pre_dispatch_records_receipt_on_cleanup_fault",
+      "sha256": "12867a3460f6fa5311ca17526a4ecb1759bbd383ab20ca2caffb6ad4518ba0fd",
+      "count": 1
+    },
+    {
+      "name": "drop_pre_dispatch_releases_admitted_child_budget",
+      "sha256": "c8d2f2b64352cb726e1ac1ef75bc642720c556e31bdb5e153606da80e8dce4ea",
+      "count": 1
+    },
+    {
+      "name": "drop_pre_dispatch_releases_reservations_no_receipt",
+      "sha256": "7b3c73aa5b5727fd42856c5748107357d53592c4d7084a2912e7384f7776b4c5",
+      "count": 1
+    },
+    {
+      "name": "drop_pre_dispatch_reverses_invocation_budget",
+      "sha256": "92e1b632d1beb538829a8686f9d66372b771e49a130cd4cd7b297a4604fb311e",
+      "count": 1
+    },
+    {
+      "name": "dropped_boot_handle_preserves_receipt_authority_without_issuer_trust",
+      "sha256": "c70e9faef28040366040603535f87e31bf33f3bbd1e56b50975e5bc8f7c961cc",
+      "count": 1
+    },
+    {
+      "name": "dropped_delivery_preparation_compensates_before_dispatch",
+      "sha256": "16371d90a00a6932ed737856c1cfea78ee8e135b518b813702b3b3e00cae2319",
+      "count": 1
+    },
+    {
+      "name": "dropped_dispatch_retains_dpop_without_rollback_ownership",
+      "sha256": "62a4989c7a2ba3ed2b55e15129b72282d04798a360fc7f0507e6e9ba3332c459",
+      "count": 1
+    },
+    {
+      "name": "dropped_durable_guard_evaluation_terminalizes_before_dispatch",
+      "sha256": "4632e4c9eeb8a14cac9af3062af41ad179f9136718983e4d9e32b1e79b7cbda9",
+      "count": 1
+    },
+    {
+      "name": "dropping_a_suspended_evaluation_does_not_clear_the_current_one",
+      "sha256": "a19d04b95c9b77b88b373912f9aba6fe06f35b788493d8579153332b63538ed7",
+      "count": 1
+    },
+    {
+      "name": "dropping_an_old_reservation_cannot_release_its_successor_episode",
+      "sha256": "5c61b39ae0bd1cf0c88b0ed8d8822f0f60b0670b7b4bc64bd8cce974aae77abe",
+      "count": 1
+    },
+    {
+      "name": "dropping_an_old_reservation_cannot_release_its_successor_episode",
+      "sha256": "9400c60c6ccb1a7948082c57daeb6552789951cf0eae461b04a1840a814ec8ec",
+      "count": 1
+    },
+    {
+      "name": "dropping_async_evaluate_after_monetary_dispatch_retains_budget_and_payment_hold",
+      "sha256": "8bfb44c9566e31a7a9db48373fd6ccea7218dcb2234e17188207b70cde3b4ea7",
+      "count": 1
+    },
+    {
+      "name": "dropping_nested_evaluate_after_monetary_dispatch_retains_budget_and_payment_hold",
+      "sha256": "dea0230a7bc78afd12b352554f97d00b5f63d6ff7d0679a176dc7c239ce6b1ab",
+      "count": 1
+    },
+    {
+      "name": "durable_admission_binds_the_first_budget_eligible_matching_grant",
+      "sha256": "9273660d59af0d9830c165fb980455c433d9b1cd541c4dfedc4f7fb724b73559",
+      "count": 1
+    },
+    {
+      "name": "durable_admission_passes_opaque_supplemental_bytes_to_installed_verifier",
+      "sha256": "95b575cfc3d945ad1856c39d251a9125e2ef0b0c3ad81f811f7b942870c18eab",
+      "count": 1
+    },
+    {
+      "name": "durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ephemeral_mode",
+      "sha256": "4cd8c992a6f89689598627ab5dcbc51df60679bb3af3b43d94f81a49c1418a63",
+      "count": 1
+    },
+    {
+      "name": "durable_completion_projects_the_canonical_receipt_idempotently",
+      "sha256": "0dbb928608b9f774a650cbdf73259dc6d0aebadf81eaf8dd5df57309a0b8f483",
+      "count": 1
+    },
+    {
+      "name": "durable_exact_output_guard_runs_after_transform_and_again_at_replay_release",
+      "sha256": "7651078bd57566fa437d1e55e31f01fd85d6ed308d7b42e37472ac572945f2d1",
+      "count": 1
+    },
+    {
+      "name": "durable_materialization_seeds_a_claimable_settlement_attempt",
+      "sha256": "e2b06d92c2d0ccfc392b22aeeeecdcc5278b3acdc44813fa65f72fca980af476",
+      "count": 1
+    },
+    {
+      "name": "durable_monetary_guard_denial_closes_unstarted_payment",
+      "sha256": "55f85de4a7ad77f0246457b7b55304d6ef988b28d6b0cd6860f6028cc2e84d05",
+      "count": 1
+    },
+    {
+      "name": "durable_monetary_lifecycle_uses_the_qualified_projection_store",
+      "sha256": "de4236d3271c2b165dd3f56e3ef7a664b93992da602bc4c99ee91ae43a410429",
+      "count": 1
+    },
+    {
+      "name": "durable_monetary_selection_skips_a_cumulative_only_grant",
+      "sha256": "b1b049098190705cbe723db232d189a243401aa0cbcc31f59be97b5354201919",
+      "count": 1
+    },
+    {
+      "name": "durable_post_invocation_identity_binds_transformed_output_and_replay",
+      "sha256": "c7b7dec70c979197f815203bfadfebc14db19175abe3c6eae2d7a0c22072d325",
+      "count": 1
+    },
+    {
+      "name": "durable_post_invocation_identity_change_cannot_replace_recovered_finalization",
+      "sha256": "0c86360aea85096fd375e79db075fc5d84d5024d1e73b75b1c0476ab42bb98d6",
+      "count": 1
+    },
+    {
+      "name": "durable_pre_dispatch_denial_commits_terminal_compensation",
+      "sha256": "7d040208e92f8762f5677f6b1baca81e8e9d2831fcc7792c4a6ac96860ac182c",
+      "count": 1
+    },
+    {
+      "name": "durable_recovery_captures_after_tool_return_and_never_releases_from_authorized",
+      "sha256": "9ee82501833caa619f321a8e105720cd706354119f1ac9112b5e6b92b7080606",
+      "count": 1
+    },
+    {
+      "name": "durable_redaction_cannot_upgrade_incomplete_transport_and_replay_is_exactly_once",
+      "sha256": "14e7bdf69bf1776c31e12d90143b325da97cdea2f432c4fb4637d16c96cff312",
+      "count": 1
+    },
+    {
+      "name": "durable_redaction_recovery_uses_the_recorded_stream_limits",
+      "sha256": "8572767fd27341ef051e7fef8b774f771aa263ba4f929fbd47b1644d3589b667",
+      "count": 1
+    },
+    {
+      "name": "durable_server_url_elicitation_finalizes_the_pool_claim",
+      "sha256": "7fffafe8b08b0210c8d5e43ee54ef2e21262823b8987c00dde0bb1a07ab62df6",
+      "count": 1
+    },
+    {
+      "name": "durable_server_url_elicitation_terminalizes_as_outcome_unknown",
+      "sha256": "b87ac884fb512871270334558b3b021a5afa18d870e0b0de1141ff5273bb594d",
+      "count": 1
+    },
+    {
+      "name": "durable_startup_reconciliation_drains_the_pool_receipt_outbox",
+      "sha256": "083b8973738798a6c2874154d3a92676624231e0ab628c9a1d42396593100b4e",
+      "count": 1
+    },
+    {
+      "name": "durable_startup_reconciliation_rejects_late_pool_ledger_installation",
+      "sha256": "9fbce928ee265f75b5a891adad4675b73fea2fdbd515e56bee211e90ad8aca67",
+      "count": 1
+    },
+    {
+      "name": "durable_terminal_receipt_uses_the_admitted_tenant",
+      "sha256": "f851252ad7d791392d0963c6bbaf8d27d4be1d72a09806aa03558125bae55432",
+      "count": 1
+    },
+    {
+      "name": "durable_zero_charge_commits_release_evidence_before_releasing_payment",
+      "sha256": "cfe53c4b65e052f30c4620ccce7ef0073beaa9843c82fa213a45c7f688061308",
+      "count": 1
+    },
+    {
+      "name": "echo_server_invoke_with_cost_returns_none",
+      "sha256": "a26563dfca3999a241634887f864b8d62d171bdc2451f1e07b5ccc124af43684",
+      "count": 1
+    },
+    {
+      "name": "elicitation_validation_requires_policy_and_form_negotiation",
+      "sha256": "9430b408d973b97bbbadd85cfcf88651e84ec5d464c8fa6b96abe063479ffa0b",
+      "count": 1
+    },
+    {
+      "name": "emergency_status_exposes_since_and_reason",
+      "sha256": "9de30e472e57879be0dbfae6e3656c1497c78568b156003953309abf9a5b4ee3",
+      "count": 1
+    },
+    {
+      "name": "emergency_stop_forces_deny_on_next_evaluate",
+      "sha256": "e49ad5b4e93da772052ed0498dc9a3f44b87fccb280a3c0ac168f203dc59358b",
+      "count": 1
+    },
+    {
+      "name": "emergency_stop_reason_wins_before_federation_negotiation",
+      "sha256": "e873bba2aa0558f1b084c217b049be545372f1e46d9b7ce893fa5db37b10d817",
+      "count": 1
+    },
+    {
+      "name": "emergency_stop_receipt_records_deny_decision",
+      "sha256": "7c9131bb15b4c06b051d21308f716ff8a7ae58d89142c0c2becf7b42f0dc69b7",
+      "count": 1
+    },
+    {
+      "name": "emergency_stop_then_resume_restores_allow_path",
+      "sha256": "76fd0e0794c88a168416231dc7ecd01486691f5e732112a5c66d82b5ac94645a",
+      "count": 1
+    },
+    {
+      "name": "empty_algorithm_allowlist_denies",
+      "sha256": "cdc6be40655debe9195e73f5adb0c12856a06879fbb494f43dac3f251c39e322",
+      "count": 1
+    },
+    {
+      "name": "execution_nonce_is_owned_before_dispatch_and_retained_after_commit",
+      "sha256": "c72685cda13fa79eb097880cb92bea72b5a3c63db561d3ca3b1bae92c4211fdc",
+      "count": 1
+    },
+    {
+      "name": "execution_nonce_store_allows_dispatch_and_denies_replay",
+      "sha256": "a44ba95bf1bc738ab456892096978193872859be2298aaa1b315f839a18c0476",
+      "count": 1
+    },
+    {
+      "name": "exhausted_grant_receipt_retains_failed_runtime_release_evidence",
+      "sha256": "226a09354f0ddea38f474f60d4035b238dd06663de542d218c7e9086219e0f87",
+      "count": 1
+    },
+    {
+      "name": "existing_admission_projections_use_verified_batch_without_point_reads_or_appends",
+      "sha256": "20a292a432d043afe4283cb73ef9e56e0a00d7741abf9bd72f343902497e5558",
+      "count": 1
+    },
+    {
+      "name": "expired_capability_denied",
+      "sha256": "c1093dd749adb1391bab8e71ae764669975d4d88727f08e4879c17ccb7239122",
+      "count": 1
+    },
+    {
+      "name": "explicit_unsafe_no_charge_mustprepay_records_the_actual_request_reference",
+      "sha256": "67f270f7c55a0e9337043718b7e8740f87f9b8177c1b2e3f0c7e74d76c12f77b",
+      "count": 1
+    },
+    {
+      "name": "failed_boot_quote_preserves_running_receipt_signer",
+      "sha256": "456b3b649fca06e4ff03753fb9079c39f266045708b00ef721c8c06dace80424",
+      "count": 1
+    },
+    {
+      "name": "failed_boot_reconfiguration_preserves_previous_authority_and_floor",
+      "sha256": "86ed6d57d60aceb2ca625a5e62976d73fef03137ef3fcade1757a103bbcc0df5",
+      "count": 1
+    },
+    {
+      "name": "failed_receipt_signing_recovers_tool_outcome_without_redispatch",
+      "sha256": "dce86484e8b1c3b288f2f5bde6841de7215f62f47dcb13b42131b239ed3b3227",
+      "count": 1
+    },
+    {
+      "name": "failed_signer_cannot_fall_back_to_an_independent_key",
+      "sha256": "5f231b5f7e124defec0b12a1098cee328dbeddfe632a637416e05776359f81dd",
+      "count": 1
+    },
+    {
+      "name": "failed_terminal_projection_retains_finalizing_operation_and_blocks_redispatch",
+      "sha256": "3a26c31eee8135c8b513302ad09f2fcad4e5bb83b6d559123c224636056b74e6",
+      "count": 1
+    },
+    {
+      "name": "failed_tool_return_persistence_retains_dispatch_and_blocks_redispatch",
+      "sha256": "abffb9eb0658b384c0ffc391d14de0a6903aa9d8327730d30bedb957f629bcf8",
+      "count": 1
+    },
+    {
+      "name": "failure_observation_preserves_pending_operation_and_approval_authority",
+      "sha256": "366a77524605482058ded88a78f58d317691d8d554d8411f79ebb92c70d1e307",
+      "count": 1
+    },
+    {
+      "name": "federated_origin_without_runtime_hook_or_context_fails_closed",
+      "sha256": "ae950fabc5d2763216f3ba051bcefaa96c62c225baa999fcbcf2873625886fbd",
+      "count": 1
+    },
+    {
+      "name": "federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs",
+      "sha256": "24cc04f01f332a2a236018f6a1589bf960ee50049d7200e0552aa364a074e30f",
+      "count": 1
+    },
+    {
+      "name": "federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_dispatch",
+      "sha256": "d17df3c8793f7b4b61b07284bc5205b8e92566d91c675293220313de288b55b2",
+      "count": 1
+    },
+    {
+      "name": "federated_request_without_pinned_peer_fails_closed",
+      "sha256": "fce001fd4c8bf0720d46e43912c5aaabdbcade767e7dd87d6507be8b2fb6f074",
+      "count": 1
+    },
+    {
+      "name": "federated_request_without_pinned_peer_fails_closed_pre_dispatch",
+      "sha256": "87daf306baab8988a701221952865d7f461d3598f631aa64a2e890e7f55ba439",
+      "count": 1
+    },
+    {
+      "name": "federated_request_without_receipt_store_denies_before_dispatch_or_cosign",
+      "sha256": "0909781df374a4bd9f312bdcc5cae9b131b68ab1a1a5ad4293bf876b991d12be",
+      "count": 1
+    },
+    {
+      "name": "federation_cosigner_not_called_when_local_persistence_fails",
+      "sha256": "fda0e321161efcc30537296b0272809d50a79c6fd3cae8f79ef4dd0d92a00361",
+      "count": 1
+    },
+    {
+      "name": "finalization_recovers_after_frozen_evaluation_creation",
+      "sha256": "d3e97744dc75ef2477164f3724405bd874e01e1985c6e748436e76f55aa2d7d2",
+      "count": 1
+    },
+    {
+      "name": "finalization_recovers_after_pure_result_staging",
+      "sha256": "b6c7e8ebfd60bdee6cfa3de2acb3c75d90492431f5fedd9e216a7b0bbd7042ac",
+      "count": 1
+    },
+    {
+      "name": "finalization_recovers_after_store_owner_rotation",
+      "sha256": "79c0ad093b28b329b64f824241a2eda92b118a4d48b93411c2b06de8fe7bf1cc",
+      "count": 1
+    },
+    {
+      "name": "finalization_recovers_before_evaluation_creation",
+      "sha256": "12fe9ce523a8a10c586590977780db28e0482b4af8dae15f656dfb901ffb5ca3",
+      "count": 1
+    },
+    {
+      "name": "finding_memory_binding_denies_before_tool_dispatch",
+      "sha256": "b98f346910dc97c01bd45ab55e0013c46c2e1f615e0b516c5cbc17c584c1ff87",
+      "count": 1
+    },
+    {
+      "name": "finding_memory_lineage_requires_a_durable_terminal_projection",
+      "sha256": "5674c6a53abbcee8135e7143f45c028fe6150f3e57b19100ee1261381ce9dcb3",
+      "count": 1
+    },
+    {
+      "name": "finding_memory_status_is_rechecked_after_checkpoint_preflight",
+      "sha256": "6abfd8f269c72e850294c4a35cb73e539000f7b3fce943699e7ee62cebebd9f0",
+      "count": 1
+    },
+    {
+      "name": "finding_memory_write_rejects_a_delivery_from_another_status_feed_before_dispatch",
+      "sha256": "0b966c81d337e9f10773ac8b78c640230cab562685f8fe769b619472b14e3988",
+      "count": 1
+    },
+    {
+      "name": "forced_credential_revalidation_preserves_legacy_runtime_admission_verdict",
+      "sha256": "f7002a07fbc5f6452017b7d1dfd2dc965767f19c81454e4d632c3f70dcd65766",
+      "count": 1
+    },
+    {
+      "name": "foreign_prepared_kernel_cannot_claim_another_kernels_dpop_operation",
+      "sha256": "94c26878d4433d0f0c72a22ed87c01dd899c285e43d5ac55630b63bb8b0adc09",
+      "count": 1
+    },
+    {
+      "name": "foreign_prepared_kernel_cannot_claim_another_kernels_operation",
+      "sha256": "681fcfb579aa6451647301763c47fc48de4c816c4f61158013c21cab90a1a357",
+      "count": 1
+    },
+    {
+      "name": "forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign",
+      "sha256": "34801d379fe41fcdb3b4e3795e5ae07b25db72606848fdc58c5e71c347761431",
+      "count": 1
+    },
+    {
+      "name": "formal_receipt_totality_allow_persists_one_signed_receipt",
+      "sha256": "7584b8545c7ca2b0256b65ca5e43f252c146298f320528cd7a3896098f5b45c4",
+      "count": 1
+    },
+    {
+      "name": "formal_receipt_totality_budget_exhaustion_persists_one_signed_receipt",
+      "sha256": "111970cbd0767ae7699919f6a0a8dc9396c5fffc8c7e36b9e87a86275cba015c",
+      "count": 1
+    },
+    {
+      "name": "formal_receipt_totality_dpop_failure_persists_one_signed_receipt",
+      "sha256": "5ce15fcefea80ab396b2d658adec30e83323aab3d6bb8c1a85896b34fc62488e",
+      "count": 1
+    },
+    {
+      "name": "formal_receipt_totality_guard_error_persists_one_signed_receipt",
+      "sha256": "590b07fbc15932abb5531d7b84b67881c4acb8832ec9e79cf16e1670fc1e5de7",
+      "count": 1
+    },
+    {
+      "name": "formal_receipt_totality_malformed_capability_persists_one_signed_receipt",
+      "sha256": "59a68649e890569d6dfc42e84cc0403c2dfe0f62d3159caeb7385ad8e79256f5",
+      "count": 1
+    },
+    {
+      "name": "formal_receipt_totality_out_of_scope_persists_one_signed_receipt",
+      "sha256": "84879ff2691fc6db92f0f2ef0740d28deeff0d82ac5c2b8c190621581f108ee1",
+      "count": 1
+    },
+    {
+      "name": "formal_receipt_totality_revocation_persists_one_signed_receipt",
+      "sha256": "e060e7e8be2a504dba4f2bfd0ec9a4d3f92b074859ec4891fe1087fcd2c1b0d9",
+      "count": 1
+    },
+    {
+      "name": "formal_receipt_totality_tool_error_persists_one_signed_receipt",
+      "sha256": "5dbc5f289ddb8658ec68aa0b8c5e8097aac6d21d8ce93878a27803b14cf42eaf",
+      "count": 1
+    },
+    {
+      "name": "free_matching_grant_does_not_inherit_paid_grant_requirements",
+      "sha256": "7b7e3c73caeb829e8704c453adeac5ba9b29b6093cb31acf51e0c93c14788443",
+      "count": 1
+    },
+    {
+      "name": "freeze_rejection_after_payment_does_not_invent_credential_custody",
+      "sha256": "85001c6bb51c1cb7995b1562f3689b88dfd4a7009726638dad2b8d1127f6de58",
+      "count": 1
+    },
+    {
+      "name": "freeze_rejection_after_payment_retains_the_authorizing_approval",
+      "sha256": "2811fc30dbdf5f4e9dc45a4c54a77e8b04eea14f091e616b89adb9b387f3262b",
+      "count": 1
+    },
+    {
+      "name": "frozen_return_context_cannot_cross_operations_with_the_same_request_id",
+      "sha256": "c98cc021458eb8315a82b2dd42b37e3f86cb6294ff56883cb80fa71dd6c099d2",
+      "count": 1
+    },
+    {
+      "name": "frozen_return_context_keeps_limits_and_metadata_when_kernel_configuration_changes",
+      "sha256": "d56dfdf7e114efa0ca0165a0742e3c8ef67dc5f3a14c1876c0f6816e2648fc31",
+      "count": 1
+    },
+    {
+      "name": "frozen_return_context_rejects_substituted_return_request_before_persistence",
+      "sha256": "dfd5b7c4aae4e6c4bfbe6d0cbc8efd7f18ecb48e3ce75673f9cec1269396b251",
+      "count": 1
+    },
+    {
+      "name": "governed_acp_hold_flow_records_commerce_scope_and_payment_metadata",
+      "sha256": "bd53bdcbe7bc5fd9b7052ce3b9a4840de248614a2f753f28fd7de5a7e910c84a",
+      "count": 1
+    },
+    {
+      "name": "governed_acp_seller_mismatch_denies_before_payment_or_tool_execution",
+      "sha256": "589b7085d90d295c69e6e2f6fa50b772f1cc14f95a38e12f5fe8755740271f4e",
+      "count": 1
+    },
+    {
+      "name": "governed_acp_value_requires_signed_destination_authority",
+      "sha256": "bce97fc2dce89e24bb2f7e0f7f3486d8c55fbf1207ad960a46cc697e42c35f1d",
+      "count": 1
+    },
+    {
+      "name": "governed_approval_token_binds_every_authorization_field_and_time_window",
+      "sha256": "866189ced85e40c7c090829d6647666abe05e55d26ed919fc1933403395951df",
+      "count": 1
+    },
+    {
+      "name": "governed_call_chain_evidence_store_error_consumes_no_budget",
+      "sha256": "509c605808a11f0b3165e842f3522e48713a05325ec2854abb94eb1d0f825d75",
+      "count": 1
+    },
+    {
+      "name": "governed_call_chain_receipt_follows_asserted_observed_verified_execution_order",
+      "sha256": "20d9306b393c52a64b4b41e01d195ea6daaaf012169912c067201ef32aa28ed0",
+      "count": 1
+    },
+    {
+      "name": "governed_call_chain_receipt_observes_capability_lineage_subjects",
+      "sha256": "f31571a4ccdc5fd71244ba66c8a6c9df319dfc8b63ab8e2cb3a31f8c95d359d0",
+      "count": 1
+    },
+    {
+      "name": "governed_call_chain_receipt_observes_local_parent_receipt_linkage",
+      "sha256": "f2d78fd527cdb825f5af4a98c043542b298cf9da0938ccb531d5e1a4fa366a33",
+      "count": 1
+    },
+    {
+      "name": "governed_call_chain_receipt_observes_session_parent_request_lineage",
+      "sha256": "f67b4a31ec956299563693a3feb6286e7dd1fc6486908ea75bae6d3bac6d4cd5",
+      "count": 1
+    },
+    {
+      "name": "governed_call_chain_receipt_verifies_signed_upstream_delegator_proof",
+      "sha256": "01bc5026c91446da0021bf3aa3ab929fcdf28ed8fd7eaec93c0cbe072094cd60",
+      "count": 1
+    },
+    {
+      "name": "governed_denial_does_not_block_later_matching_grant",
+      "sha256": "85d45b4381c1b0635005e658b9f40993c42c86b0697cc667479b89bebd004e39",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_optional",
+      "sha256": "dc33424961232227459d1f80c70d7bd7ee89a6241dbe1d3f53e25d0ab8933305",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_allow_rebinds_google_attestation_to_verified",
+      "sha256": "ea2dce78607ecee5e2a2af93d0aeeeff3ee1422acf7ceceadba9c728479cc456",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_allow_rebinds_nitro_attestation_to_verified",
+      "sha256": "d28e02a55c693e1017be621f98b694679e22695672b523e5e15db701d72224ca",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_allow_rebinds_trusted_attestation_to_verified",
+      "sha256": "049c145c1718887875f190866cfd681dfda2e4f924eed95c5499df7f73e6089a",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_allow_receipt_contains_approval_metadata",
+      "sha256": "d942cb8e9d31dff1eae555aaec0327ae404297e8940eba03929872ba8383ab28",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_allow_receipt_preserves_call_chain_context",
+      "sha256": "e10697d521ce95bc1fd7b5c472856d4e3a5fc2654e23442e33bca0315671fb52",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_allow_receipt_preserves_metered_billing_quote_context",
+      "sha256": "0811febe189cd2f96af66cfa0e14b6e1df796a1714450111b0518359f6bdc688",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_denial_without_approval_consumes_no_budget_and_records_intent",
+      "sha256": "00fea958ca23028126b01637a19c415092d25564377c87ba66619c66a02f11bb",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_denial_without_required_runtime_assurance_consumes_no_budget",
+      "sha256": "08017a5faef2e4ae1a69897554d1b527d181a22841c1dd9f15b993a832bc36eb",
+      "count": 1
+    },
+    {
+      "name": "governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata",
+      "sha256": "7c59438e1c4951b6ff993b9c0345890331190152624c39c6012a11efe1390abc",
+      "count": 1
+    },
+    {
+      "name": "governed_mustprepay_against_cumulative_only_grant_is_denied",
+      "sha256": "1b3bb1778f3bd60bfa41acac63a932124cc69a00168cb00bcc2c3c5502ccd32c",
+      "count": 1
+    },
+    {
+      "name": "governed_mustprepay_quote_above_cumulative_ceiling_is_denied",
+      "sha256": "bd05be42c0c813be9aad1fb45ebf270712d06379bb1da122ea5cdf7c5d8a8b0e",
+      "count": 1
+    },
+    {
+      "name": "governed_mustprepay_quote_above_per_invocation_ceiling_is_denied",
+      "sha256": "020882d65b84baf1bf94883490c9ae420e8c3648bc63f66d1603b10891881f6b",
+      "count": 1
+    },
+    {
+      "name": "governed_mustprepay_quote_above_threshold_requires_approval",
+      "sha256": "0c00b4195cb2ae7e66fa0dd609d4f89bbaa5620c9cc32e5b7f424e3d76e262ec",
+      "count": 1
+    },
+    {
+      "name": "governed_mustprepay_rejects_quote_above_grant_ceiling",
+      "sha256": "6b6178b31eebd6b467f4565e8579f3ea747f96efbb6a868f6e37da6dd7b8b030",
+      "count": 1
+    },
+    {
+      "name": "governed_mustprepay_with_charge_below_threshold_passes_without_token",
+      "sha256": "78ea8af824820e65854ca3a683f250f922c9c9ec611d300a7a121e6ce761396d",
+      "count": 1
+    },
+    {
+      "name": "governed_mustprepay_with_charge_funds_the_quoted_cost_not_the_hold",
+      "sha256": "46b9300da3ed3a45cec95ad04b6c1eb5f8c3660295d8726cda50ee770c0f235b",
+      "count": 1
+    },
+    {
+      "name": "governed_mustprepay_without_adapter_is_denied_end_to_end",
+      "sha256": "11dbcb8c68c4ca0d3f5ceb23bb788dca5a1185f9b4bb0313e4434e88f81bbbfb",
+      "count": 1
+    },
+    {
+      "name": "governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metadata",
+      "sha256": "8d625cf369c47f3a922958c4075039dc2a024cc1071e3fc620e28aa2e7486ae4",
+      "count": 1
+    },
+    {
+      "name": "governed_request_denies_autonomous_tier_with_weak_runtime_assurance",
+      "sha256": "e14df18356c1f05cc7fa3174869b72963ddb9e1c5e9c172b7996c422cac551ac",
+      "count": 1
+    },
+    {
+      "name": "governed_request_denies_conflicting_workload_identity_binding",
+      "sha256": "9b4b0757f3560bc27dacd5a08fe83bcaee925a8d86d9a602335b33dc5d86e3cb",
+      "count": 1
+    },
+    {
+      "name": "governed_request_denies_delegated_autonomy_with_expired_bond",
+      "sha256": "8c34bd1be81c09e14387c0689efe621e0a11f20b8bb783b6b050012468404d4f",
+      "count": 1
+    },
+    {
+      "name": "governed_request_denies_delegated_autonomy_without_bond_attachment",
+      "sha256": "72746125f278b7edc30660b07561ab437e77f40fcb4891b3123a7ebea0c6d109",
+      "count": 1
+    },
+    {
+      "name": "governed_request_denies_untrusted_attestation_when_trust_policy_is_configured",
+      "sha256": "873900b100888039b298b9a80f388479dc5351b3e66d29690dc8eeaab0509c46",
+      "count": 1
+    },
+    {
+      "name": "governed_request_denies_unverified_attestation_when_runtime_assurance_is_required",
+      "sha256": "31b872a852cd16013531be0b743a2c53ed9e5a56f9f66ba6dedee1363e9db700",
+      "count": 1
+    },
+    {
+      "name": "governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_capability_lineage",
+      "sha256": "fb4fcbc1e38650cb938b818496a9019ea2379ac57b8c572ef7e42bdbedd39054",
+      "count": 1
+    },
+    {
+      "name": "governed_request_rejects_empty_call_chain_chain_id",
+      "sha256": "51dc41fee1c58c27aa1ef1a32769f87479b7bfc10fa392d179490bd5be9d22a6",
+      "count": 1
+    },
+    {
+      "name": "governed_request_rejects_empty_metered_billing_provider",
+      "sha256": "682f774dca2359d45aaa234f00cb0e00d3ceee62f5eb6ea4dda8aeedecb8638e",
+      "count": 1
+    },
+    {
+      "name": "governed_request_rejects_self_referential_call_chain_parent_request",
+      "sha256": "9b79a9e50e7496d0c6ea1df517406fa70b0224cbca1682fe828aef673539ffeb",
+      "count": 1
+    },
+    {
+      "name": "governed_request_rejects_upstream_call_chain_proof_subject_mismatch",
+      "sha256": "edd801050bcf70a161bddfdf9aebead84f641a186f1c9c36bfeb1a056b8239a9",
+      "count": 1
+    },
+    {
+      "name": "governed_window_refusals_keep_their_code_in_root_and_nested_receipts",
+      "sha256": "293ddccbe3013bf3e24dc9bcb723e2224ebcf5b4d64dccbef01f9bee6cbb6c54",
+      "count": 1
+    },
+    {
+      "name": "governed_x402_authorization_failure_denies_before_tool_execution",
+      "sha256": "aa07e754435971f202d3b5cef9c8e0c0e8c2ddcaf45bb1d989e0922d2e546ef3",
+      "count": 1
+    },
+    {
+      "name": "governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadata",
+      "sha256": "8ffe27fa6c2046790fcfaefa934477c3e74ef50cb276d3d3c70ddbe85ef4cad4",
+      "count": 1
+    },
+    {
+      "name": "guard_denies_request",
+      "sha256": "5e4347523730e48bcd0f366fff903aee3111f5e652f3f0fb70a4d60f05a793f0",
+      "count": 1
+    },
+    {
+      "name": "guard_dispatch_revalidation_is_opt_in_and_opted_in_errors_fail_closed",
+      "sha256": "93ce25c2187f634546c6ed4685fb0b13a1961c459b83d7a465ebd40baa0df5dc",
+      "count": 1
+    },
+    {
+      "name": "guard_error_treated_as_deny",
+      "sha256": "28d53756314b7bada9be78baee85609e45df66e3975c82133a1f79db6c91f9d0",
+      "count": 1
+    },
+    {
+      "name": "guard_pipeline_budget_denies_hung_guard_and_frees_worker",
+      "sha256": "ddf29dfbe6b1e57aa812c29f3ae6a9db194d0b37f8eaebbd4c149ad8565f9646",
+      "count": 1
+    },
+    {
+      "name": "healthy_writer_records_capability_snapshot_through_the_bounded_path",
+      "sha256": "26ab5d49556c9d8ba23a089111a51e7b38d08d87ec2b59265cecfc3b69bf9965",
+      "count": 1
+    },
+    {
+      "name": "hitl_batch_respond_applies_multiple_decisions",
+      "sha256": "c33ce0a49f2fd5ffcaefccbc08c03746bff47dc5faa9df1142b766789a527976",
+      "count": 1
+    },
+    {
+      "name": "hitl_channel_fires_on_pending",
+      "sha256": "405126012c3331de8ab194b4b5f7ba5bd14b2ed6d354434295973c4465fc97ad",
+      "count": 1
+    },
+    {
+      "name": "hitl_force_approval_denies_without_trusted_approvers",
+      "sha256": "ecabd04a4263b823b95fab1cf28ace60395c7b69ff44509d0a1da4b15c624f3c",
+      "count": 1
+    },
+    {
+      "name": "hitl_force_approval_returns_pending",
+      "sha256": "26067bf08d4e6195fc224edb7ff94e75dc5e83b0063d79bd49f15167c3d76741",
+      "count": 1
+    },
+    {
+      "name": "hitl_replay_of_consumed_token_rejected",
+      "sha256": "b7003d7a8ce8664279f994cc2e4afdf323dfac96c75b0789d700563d8e9d21e9",
+      "count": 1
+    },
+    {
+      "name": "hitl_resume_approved_executes",
+      "sha256": "58577fa82dda140f4bb3a8d77f852ec87f730c6168305c80b14bec0153c5385d",
+      "count": 1
+    },
+    {
+      "name": "hitl_resume_denied_records_denial",
+      "sha256": "44eb90cea18a4b25db979900550653c32a9f5a74f5d0b6ce302b988fe10752c2",
+      "count": 1
+    },
+    {
+      "name": "hitl_token_verification_rejects_expired_tokens",
+      "sha256": "66a476682bb449700ccfb52fcb7fa73892dbde44517e87213a2320fc427767af",
+      "count": 1
+    },
+    {
+      "name": "hosted_aggregate_family_uses_signed_root_lineage_before_enforcement",
+      "sha256": "6060291254d50a701b0d5a4ebb4f341d9a2aaeda8580c39099b92bcf48f7a48b",
+      "count": 1
+    },
+    {
+      "name": "hosted_clean_decline_with_governed_rollback_error_is_signed_retention_unknown",
+      "sha256": "8bbe379e016a9616dd3420ac7eeb09f8958fc199d682afbfc5e96e490a8cfeb6",
+      "count": 1
+    },
+    {
+      "name": "hosted_cumulative_family_requires_matching_signed_root_lineage",
+      "sha256": "53d49ae67b8cd29444c5a6d60cb22acb5d0a17175c17fb311a51e0db09443a3c",
+      "count": 1
+    },
+    {
+      "name": "hosted_empty_payment_authorization_id_is_outcome_unknown_without_fabricated_id",
+      "sha256": "19f5cc703291d57823e0b2ff3a6b72765711301c1d33b3c52f85f2c24fa30097",
+      "count": 1
+    },
+    {
+      "name": "hosted_empty_release_transaction_id_is_not_reported_as_clean_unwind",
+      "sha256": "8737a039fd8d78f1f6047afb24517d514780f8975a2b578bd9439d8f9262085a",
+      "count": 1
+    },
+    {
+      "name": "hosted_governed_commit_error_after_dispatch_records_terminal_receipt",
+      "sha256": "cd93ac143ed3322e11f46e1d5552ef89dc3d9dedf39f07156e28d2650acbcded",
+      "count": 1
+    },
+    {
+      "name": "hosted_governed_commit_false_after_authorization_is_signed_as_retention_unknown",
+      "sha256": "922a3cc4441e8481d5131cb73ffa8ff0fd35fcd3ba6339cb0d9b1b926765de9d",
+      "count": 1
+    },
+    {
+      "name": "hosted_immediate_dispatch_revalidation_checks_opted_in_guard",
+      "sha256": "76a7a26e76d350ef026b51e875891b378dbabc2ccf57e4708dfd7773e196f742",
+      "count": 1
+    },
+    {
+      "name": "hosted_late_approval_replay_rolls_back_earlier_credentials",
+      "sha256": "d9670aa18c5db0924fa82f9106d8c07ba7eee7d4c4ed7f90469245855af0f672",
+      "count": 1
+    },
+    {
+      "name": "hosted_named_remote_without_fresh_peer_fails_before_dispatch",
+      "sha256": "c0380a02fae557088937bb2e1c2a24f8509c07c2f6ce0204bbb2daea8b982bac",
+      "count": 1
+    },
+    {
+      "name": "hosted_payment_ambiguity_panic_retains_budget_without_fabricated_id",
+      "sha256": "913f995a62e924d225d2c62df71a2c1571758098b820412f564fe1b29938aa30",
+      "count": 1
+    },
+    {
+      "name": "hosted_payment_ambiguity_pending_release_retains_authorization_and_budget",
+      "sha256": "f1f2a3afe59890c8135f7e0eeefbf0813bed96484fe8384903967fcef74b0ae9",
+      "count": 1
+    },
+    {
+      "name": "hosted_payment_ambiguity_rail_error_retains_budget_without_fabricated_id",
+      "sha256": "16908cf8f8cb273a1ef4d9f6941107c9f484407a5a116bf8def1860f3f89217a",
+      "count": 1
+    },
+    {
+      "name": "hosted_payment_ambiguity_release_error_retains_authorization_and_budget",
+      "sha256": "52416d5773dca2d6831f5116b1f215bf5a7a7bce892019f8a63e2c0d6715f908",
+      "count": 1
+    },
+    {
+      "name": "hosted_payment_ambiguity_successful_release_then_budget_reversal_failure_retains_only_budget",
+      "sha256": "141ad6253a04352b2f4201ee628b05204723232b4d2a71956069d0d1c62d31ab",
+      "count": 1
+    },
+    {
+      "name": "hosted_post_dispatch_approval_commit_failure_records_terminal_receipt",
+      "sha256": "ef8acbae924511c20ca5b65444a4c4831489ae626b363dfa543516b55ea442c6",
+      "count": 1
+    },
+    {
+      "name": "hosted_revocation_during_dispatch_prevents_allow_finalization",
+      "sha256": "2d0a3b3df69a6bdf6d0682ddcf15e61dd1d6603823155d4fd52bf4a3f70bc72f",
+      "count": 1
+    },
+    {
+      "name": "hosted_settled_payment_unwind_refunds_the_authorization_reference",
+      "sha256": "12ada5c3c9117f4a56f9dc880eb204b96464550138e438c2b47c68f02fff6870",
+      "count": 1
+    },
+    {
+      "name": "hosted_url_elicitation_commits_credentials_fail_closed",
+      "sha256": "309409fe91f8fa1d993c879375b71d9eabbcf2003424bcda706af6f178864dc6",
+      "count": 1
+    },
+    {
+      "name": "hosted_url_elicitation_does_not_attempt_credential_rollback_after_dispatch",
+      "sha256": "db93c89c0803b20eafbf2288defc08230d0b330905a27aaf7408226c63031936",
+      "count": 1
+    },
+    {
+      "name": "hybrid_boot_preserves_separate_pool_receipt_authority",
+      "sha256": "1dbc525438225d464c9693519722b45c21240de95f8f153b9ec4180a7599485f",
+      "count": 1
+    },
+    {
+      "name": "hybrid_budget_fallback_preserves_authority_and_byte_identity",
+      "sha256": "69cf9a11c82c987d52b1dda69b94fa0f2879da3a3fdc5f0d6ada5a58f04c0598",
+      "count": 1
+    },
+    {
+      "name": "hybrid_channel_and_budget_fallback_refuse_changed_content",
+      "sha256": "202f8f21151b01df22498ad18a80f2ab042e5912985b894717e97e01cf750623",
+      "count": 1
+    },
+    {
+      "name": "hybrid_channel_receipt_uses_boot_verified_authority",
+      "sha256": "d2d697fbc70326331a65d1d4c3010eee15b45318721723d9bad66020ad456066",
+      "count": 1
+    },
+    {
+      "name": "hybrid_channel_refuses_stale_classical_identity",
+      "sha256": "69285b061b596df559e94322998036ae4984ae6f8c4f5c8c3bedb6c410607a36",
+      "count": 1
+    },
+    {
+      "name": "hybrid_durable_dispatch_and_replay_retain_original_receipt",
+      "sha256": "bff8671fa0f28a33b07579539f99688f375b0d0becd29ec0dbbf4259dcbb219a",
+      "count": 1
+    },
+    {
+      "name": "hybrid_envelopes_require_explicit_consistent_metadata",
+      "sha256": "05c7802d8cad80e0728665f615b51d86d97b6239ee1dddb00cd5a5757f23e0dc",
+      "count": 1
+    },
+    {
+      "name": "hybrid_full_queue_fallback_uses_same_authority",
+      "sha256": "c6a26d34be7f42ef8d196365dfb1743c3ab7a15485ad457bae1c10db622d3095",
+      "count": 1
+    },
+    {
+      "name": "hybrid_inline_receipt_uses_boot_verified_authority",
+      "sha256": "5adb41cdc3c55620887f34e8dba1e7066755fb92135e7501471f0d1752f9212f",
+      "count": 1
+    },
+    {
+      "name": "hybrid_inline_signer_refuses_changed_content",
+      "sha256": "30ddb6be7969d58eef920a5cede713e6e69127aa1babe5563094be5eeacee6ca",
+      "count": 1
+    },
+    {
+      "name": "hybrid_proposal_dispatches_and_replays_once",
+      "sha256": "94a7c3517390d463ca0d0b40d8e9e6ff2bac110597d89a5f61bc3d65c1be5ec6",
+      "count": 1
+    },
+    {
+      "name": "hybrid_signing_config_debug_omits_seed",
+      "sha256": "bbae2c5202d34a0cd9da61ee9cc0f7dd479535838417ae4c47e12652d8a9e7af",
+      "count": 1
+    },
+    {
+      "name": "immediately_ready_delivery_still_revalidates_runtime_admission",
+      "sha256": "f75c5110fac473ef12cbd11a613cb4b3474981c1a9ed18c56fdff197292d9122",
+      "count": 1
+    },
+    {
+      "name": "immutable_request_commits_to_every_original_profile_selection",
+      "sha256": "60c649a79cca5626ed45148780567a1e4725764f67f3c163d53cca4bb4571e1f",
+      "count": 1
+    },
+    {
+      "name": "in_memory_capture_replay_preserves_historical_mutation_values",
+      "sha256": "924bbc1bb1d0e5613c59593540c3fec243b76581902ff7a610535c3e0f0cb78d",
+      "count": 1
+    },
+    {
+      "name": "in_memory_revocation_store",
+      "sha256": "535c9dbafb765866896d7ce9dfa3851af7a2139c817237b234e6c34f527d0fbf",
+      "count": 1
+    },
+    {
+      "name": "in_memory_revocation_store_is_ephemeral_by_default",
+      "sha256": "f556db412077bef1534f00e38f4b969af60f31be0d824720f4f319054a529f0b",
+      "count": 1
+    },
+    {
+      "name": "in_memory_store_retains_the_exact_signed_window_without_a_local_ttl",
+      "sha256": "90f5ac580e424686f0cb4258e8f9afa01419354515346252c2affd8411c9319e",
+      "count": 1
+    },
+    {
+      "name": "inclusion_proof_verifies_against_stored_checkpoint",
+      "sha256": "71410b0de93a10693ef2906c986ee33ef63599c32a820670e8b299e4a1a2caa3",
+      "count": 1
+    },
+    {
+      "name": "incompatible_installed_signer_denies_without_publishing_proposal",
+      "sha256": "1665c7cd74618589b26bc5909ecf0f823c8dc5601a2b5b79dea6182b55a3be4f",
+      "count": 1
+    },
+    {
+      "name": "incomplete_stream_output_marks_reservations_retained",
+      "sha256": "2945bde946f4446b29160a65eab57449967a5e70dc9df702b128a02b5cfbb9b8",
+      "count": 1
+    },
+    {
+      "name": "input_callback_cannot_suppress_skip_repeat_or_retarget_the_join",
+      "sha256": "51385b355c15292eaabf81b30832c6cac4a8cab4b664208618d6996118bfc9b4",
+      "count": 1
+    },
+    {
+      "name": "input_join_requires_exact_intent_acknowledgement_and_independent_history",
+      "sha256": "d5f145e816e2a857536deedeaf62693686b38364dae103cc8cf83a7cc7f8865d",
+      "count": 1
+    },
+    {
+      "name": "installed_artifact_store_preserves_cosign_evidence_across_cache_eviction",
+      "sha256": "7f028a91891f4d65ebd59586f4aedbab129687afcfd3ee9733a915af8784658b",
+      "count": 1
+    },
+    {
+      "name": "installed_dpop_and_default_approval_follow_the_kernel_clock",
+      "sha256": "1af3d0c1f9f929aa50fa0092f7051017689c8ede9d159fa6e59d92ea5249959c",
+      "count": 1
+    },
+    {
+      "name": "installed_hybrid_backend_signs_cumulative_proposal",
+      "sha256": "b1c12d3c7585aa35c5bc9414823aa6b6b5a114acd8c1ddeea8a5513440dadbe9",
+      "count": 1
+    },
+    {
+      "name": "installed_issuance_admission_rejects_freeze_and_principal_substitution",
+      "sha256": "3879538b7b9e40fc2fe74c03cfd3e1497de21bb286a74f2df2ff5f53726681d3",
+      "count": 1
+    },
+    {
+      "name": "installed_issuance_admission_requires_context_and_allows_exact_subject",
+      "sha256": "876c2c490564bb0fe3bc7431d2394c5fc1bfdd51577f6595953f910da8d2e838",
+      "count": 1
+    },
+    {
+      "name": "installed_runtime_seeds_before_claim_and_routes_after_the_receipt_is_queryable",
+      "sha256": "6a2f26b6337bd4b96c74f095ef2976b810de3f0186e96142632c0671bce93add",
+      "count": 1
+    },
+    {
+      "name": "installed_runtime_uses_the_configured_bounded_atomic_append",
+      "sha256": "f96317b997f962d4be6124dd71003df1e71a16d50e433376396a649c63972759",
+      "count": 1
+    },
+    {
+      "name": "installing_runtime_trace_observer_starts_sequence_at_one",
+      "sha256": "b5e3fb7fc5a9dba00e28f1f910364dd09ebc1402558ef5ca8d0d834203b95eac",
+      "count": 1
+    },
+    {
+      "name": "internal_receipt_from_distinct_authority_skips_settlement_routing",
+      "sha256": "fa012448e481aae7005965d01eac0e10c6f5ce48421383a56e44133aaa040b99",
+      "count": 1
+    },
+    {
+      "name": "invalid_deadlines_publish_neither_pending_request_nor_notification",
+      "sha256": "0edc436047ad14b188dae60e072c05fd9cf2f2ba7a91dc4b1e0baf315efdac6c",
+      "count": 1
+    },
+    {
+      "name": "invalid_return_context_cannot_commit_dispatch_or_capture_budget",
+      "sha256": "81a4a9ef8ae5fb469d9f77e27384cfff8f79529129c337b152923bf52e62c8f4",
+      "count": 1
+    },
+    {
+      "name": "inverted_signed_window_has_one_refusal_independent_of_verifier_time",
+      "sha256": "9198e201a3169ca96f0cc009528bec4797c676a7a3cfd4612c987598d8f5a811",
+      "count": 1
+    },
+    {
+      "name": "invocation_and_dispatch_identities_survive_every_resolved_delivery_route",
+      "sha256": "0978dda703dc5eb5f3ccca455f77d7c6b9ea043077e15d8d21542c094ebeb6e9",
+      "count": 1
+    },
+    {
+      "name": "invocation_context_binds_capability_and_route_on_value_cost_and_stream_dispatch",
+      "sha256": "ac57e0b981c9aef9dc69842fe66b75852b15323412c97f72ac04bf8ac59c29cf",
+      "count": 1
+    },
+    {
+      "name": "invocation_context_reaches_nested_flow_dispatch_without_a_wire_capability",
+      "sha256": "d35467786e2181881b32619eb833d3ffb24009af8ab5c252c2ea05e2b3d62130",
+      "count": 1
+    },
+    {
+      "name": "invocation_owned_connections_close_on_completion_denial_and_cancellation",
+      "sha256": "6e5bb86596e78f91175aaddde95c3726b97c84654f4c521af43bfc116e18f897",
+      "count": 1
+    },
+    {
+      "name": "issue_and_use_capability",
+      "sha256": "06979cfff29a7cff1618a3ee5f98e79725ec76ed19ace528d354c10308660ffc",
+      "count": 1
+    },
+    {
+      "name": "kernel_accepts_capabilities_from_configured_authority",
+      "sha256": "36772d9ffe08476b0fe360968644b018b84dd78a0a0c1399fbbd9d885603b346",
+      "count": 1
+    },
+    {
+      "name": "kernel_accepts_optional_payment_adapter_installation",
+      "sha256": "35c9be6878d9a88196ca32a0b3de9c8ffc02c237725e584e89f3a13292255af6",
+      "count": 1
+    },
+    {
+      "name": "kernel_allows_action_when_unaffected_by_new_constraint",
+      "sha256": "943925dac8f6c6b76bf501ed55e366218aae3693a445ae7a7db0092904863853",
+      "count": 1
+    },
+    {
+      "name": "kernel_allows_tool_call_when_model_is_in_allowlist",
+      "sha256": "6e6abbc2f20cb07371312f0f8d134453ebb0591dc59928245e036c2c1d41d4b4",
+      "count": 1
+    },
+    {
+      "name": "kernel_allows_tool_call_without_model_metadata_when_grant_has_no_model_constraint",
+      "sha256": "27c50c076717750642c48705da703643efe34783237093c83a9678b5af180634",
+      "count": 1
+    },
+    {
+      "name": "kernel_bounded_registry_lists_every_labelled_structure",
+      "sha256": "fb4435ed1e8d0596c7ae0b38e559b3c4f4c4ed5ca663dbfa4590eb7cbffb2014",
+      "count": 1
+    },
+    {
+      "name": "kernel_denies_memory_write_matching_deny_pattern",
+      "sha256": "0e65fb71ede245acfc1cdfae9254b754a6a38108552004e2bc9641296681295b",
+      "count": 1
+    },
+    {
+      "name": "kernel_denies_memory_write_to_disallowed_store",
+      "sha256": "23394d8845fce745c48b8512ed5bc02db33b5599972d8f9f18d7e46576d07c61",
+      "count": 1
+    },
+    {
+      "name": "kernel_denies_tool_call_when_model_is_not_in_allowlist",
+      "sha256": "47a433591c372e9e170addf111d6747de52a0ece0b468520facc6038e84902a6",
+      "count": 1
+    },
+    {
+      "name": "kernel_denies_tool_call_when_model_metadata_is_missing_but_required",
+      "sha256": "d3b4962ce97ea0c1a5eea7af0d412ea114f41bf093e62ef96a466014fc6f94de",
+      "count": 1
+    },
+    {
+      "name": "kernel_denies_tool_call_when_model_safety_tier_is_below_minimum",
+      "sha256": "a29bd05d30a438d842e827b53e221a6434480d2909b315cd363827f8d16c4628",
+      "count": 1
+    },
+    {
+      "name": "kernel_error_report_includes_out_of_scope_context",
+      "sha256": "82b02b591e2f0add94501f77d9b749ea36b0b470a19bda76d6255d61b5dcf4a6",
+      "count": 1
+    },
+    {
+      "name": "kernel_error_report_includes_request_cancel_context",
+      "sha256": "7e76b23401f7fed412d574b458e0c7e896d49e8c52d9ee4e65c3fda4fde86f86",
+      "count": 1
+    },
+    {
+      "name": "kernel_exposes_normalized_session_roots_for_later_enforcement",
+      "sha256": "6ae565f6deaefd8550caa6f4948002d70dc450113b4c796e8c1ff910cf4837b8",
+      "count": 1
+    },
+    {
+      "name": "kernel_guard_registration",
+      "sha256": "9f9c08283ef5365dd4f988810485c0389fdb06575a0abcb1eaf5bf30c3c16cbc",
+      "count": 1
+    },
+    {
+      "name": "kernel_persists_child_receipts_to_sqlite_store",
+      "sha256": "d7e6ce6c1c6d68d6745f0b8f9be323efae090f1aef2d00422721b5e4d32f0dd4",
+      "count": 1
+    },
+    {
+      "name": "kernel_persists_tool_receipts_to_sqlite_store",
+      "sha256": "849cd252c3380151aa51586c15d3a450bd7c61b6583719c35be233063924e80e",
+      "count": 1
+    },
+    {
+      "name": "kernel_records_constraint_and_defers_to_data_guard",
+      "sha256": "fa7261ae76657c38e27939fc44cee5d0dbfaad596f8df9a9c150d3906642bf9f",
+      "count": 1
+    },
+    {
+      "name": "kernel_rejects_classical_capability_under_pq_required_floor",
+      "sha256": "f635dfd42c1af2acd3b78d78ad39a74ae79c30472136a51cc3cbd6d49afe49f0",
+      "count": 1
+    },
+    {
+      "name": "kernel_rejects_historical_issuance_key",
+      "sha256": "98cc4cac25b5bf293bb94bcafd7daa608aa63aca94bbe9acff632eb40de60af3",
+      "count": 1
+    },
+    {
+      "name": "kernel_rejects_trusted_signed_issuance_substitution",
+      "sha256": "d3507fa71dd465a724b2fceb0635bd5b9cab6da67491565425a15da4f985f731",
+      "count": 1
+    },
+    {
+      "name": "kernel_reports_capability_issuer_trust",
+      "sha256": "4b5f5e1692cc30971498f82ae6033475b4838d5b2728924959a84c3cf550026b",
+      "count": 1
+    },
+    {
+      "name": "kernel_revocation_during_delivery_wait_prevents_tool_execution",
+      "sha256": "74a9918ab7185fa76038db21c3754d4a3de4f90d1b9c3dc1e4ceec35325c24cf",
+      "count": 1
+    },
+    {
+      "name": "kernel_ttl_enforces_30s_default",
+      "sha256": "8d1e3fc49be7a77d29b1b2afa4542a792578c4c772a97fb02d98f4623e87953c",
+      "count": 1
+    },
+    {
+      "name": "largest_representable_approval_expiry_is_published_exactly",
+      "sha256": "f09efe4b395ceaca9029db2b182b9fe212c20c482e95ebb53e4e70aa81af35eb",
+      "count": 1
+    },
+    {
+      "name": "local_default_without_store_invokes_tool",
+      "sha256": "49846b977046c97d4f59088134dba8e83f45cdb3ed4274b3755df4fd1034b38b",
+      "count": 1
+    },
+    {
+      "name": "lost_cancellation_acknowledgement_records_ambiguity_and_blocks_dispatch",
+      "sha256": "74796639e81e6818be49812cca0e1b4baa64c6e0b4fc94d438716ebf63cfd4b8",
+      "count": 1
+    },
+    {
+      "name": "lost_capture_acknowledgement_records_ambiguity_and_blocks_replay",
+      "sha256": "f5e7ce9fa9fd489ecb407a4047e9b4705d9afc55825cb41b7d6e602831cf500b",
+      "count": 1
+    },
+    {
+      "name": "lost_claim_and_history_acknowledgements_require_fresh_recovery",
+      "sha256": "8cc1c69ac2b5c44cf109b5c6da6b648046ac3d7670c62888dc1ae047d8dfae3f",
+      "count": 1
+    },
+    {
+      "name": "matched_grant_index_populated_in_guard_context",
+      "sha256": "5a37c13fa1dca89a019f4d67c26ff584d594ce353cd6d8b8c93eabc212ea8beb",
+      "count": 1
+    },
+    {
+      "name": "mediated_allow_receipt_records_bound_execution_nonce_id",
+      "sha256": "e2bb8b68c74afca15858b4247785abab708af005762a517dc6ff57b9a601f350",
+      "count": 1
+    },
+    {
+      "name": "memory_provenance_hook_is_noop_when_store_absent",
+      "sha256": "e84dc65f692a1f3b65908476718673a6a5c588922ac07f50695b61196b333595",
+      "count": 1
+    },
+    {
+      "name": "memory_read_flags_chain_tamper_as_unverified",
+      "sha256": "27a2ac0d01a4e55e4cbd6f4a2ffe47a04e57b5771115825a3a2b57f87e61823d",
+      "count": 1
+    },
+    {
+      "name": "memory_read_surfaces_verified_provenance_metadata_on_receipt",
+      "sha256": "4b2a1aba21c136f145724d1969afee0acce5e95a550261beedae6cfc3f231a5f",
+      "count": 1
+    },
+    {
+      "name": "memory_read_without_prior_write_is_flagged_unverified",
+      "sha256": "28256424c31c564cde3fc0878655e53b0dfa073570b74d1c2a76ea8036a667cc",
+      "count": 1
+    },
+    {
+      "name": "memory_write_appends_provenance_entry_linked_to_receipt",
+      "sha256": "dbadc3ba14d45eb30993c5c6ddda57f10001c844b0d435cec89488ff824b16ae",
+      "count": 1
+    },
+    {
+      "name": "mismatched_binding_is_rejected",
+      "sha256": "1e800220f1b94c95c6e46813eddbe4df49989048e037fe63679cb220deae1203",
+      "count": 1
+    },
+    {
+      "name": "mismatched_federation_admission_context_fails_after_local_receipt_persistence",
+      "sha256": "73026c50397df9dad4eae068d8664a1d7c3d4a0eb073b1533ca35d2c0ed0b81c",
+      "count": 1
+    },
+    {
+      "name": "missing_approval_replay_store_denies_before_dispatch_and_reverses_monetary_admission",
+      "sha256": "629d230ef937ffb88443bc3a729cdbecfeeb25e6d85616a701de362085b3b25f",
+      "count": 1
+    },
+    {
+      "name": "missing_federation_admission_context_fails_after_local_receipt_persistence",
+      "sha256": "a8684dd702ce354069531ce782016fe815a29d1967d23f990893608a18182352",
+      "count": 1
+    },
+    {
+      "name": "missing_proposal_cannot_restart_pending_session_request",
+      "sha256": "86a832836670bfb89fb22216a0fc9bdd37341818c07f8879b8011cc3ce3a0758",
+      "count": 1
+    },
+    {
+      "name": "missing_required_receipt_store_cannot_return_a_report",
+      "sha256": "0e50dd9b3aa044b6b04bdae19fb6d56605b754cc5b24a7d6fca51f14dc295093",
+      "count": 1
+    },
+    {
+      "name": "missing_seed_preserves_previous_authority_and_floor",
+      "sha256": "d68249ddb9f9f3f62860d513ba3c8f8dc585ea0f53706568f5a1aa574c07cf7b",
+      "count": 1
+    },
+    {
+      "name": "monetary_allow_receipt_contains_financial_metadata",
+      "sha256": "e5437d5eee463fe2ef54f0c63f9629bbacad11d933702dff39580fa1e2b9b106",
+      "count": 1
+    },
+    {
+      "name": "monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_charge",
+      "sha256": "0a038c43171072ace423cd68f875ac2950804a61cfc49e97aa9a177c7d1b77b1",
+      "count": 1
+    },
+    {
+      "name": "monetary_allow_records_budget_hold_and_append_only_events",
+      "sha256": "d612e8ae03c011714bcccdb49256b0667d0d727e82aee2f89ff6d011f7ba677c",
+      "count": 1
+    },
+    {
+      "name": "monetary_denial_exceeds_per_invocation_cap",
+      "sha256": "13df6d935c92ac3c8540811f36a1c2227ca0936b6de2ac6c1672a1f33d0bafe5",
+      "count": 1
+    },
+    {
+      "name": "monetary_denial_receipt_contains_financial_metadata",
+      "sha256": "12868b81a6b0fe59f9e8e535613f31d3eda274b145c765be9fd275ea0b018043",
+      "count": 1
+    },
+    {
+      "name": "monetary_full_pipeline_three_invocations_third_denied",
+      "sha256": "ad8b264054b3090d4973f365e443f3bab112cee6b1b5d65d6d166632f4f35efb",
+      "count": 1
+    },
+    {
+      "name": "monetary_guard_denial_consumes_no_budget_and_records_attempted_cost",
+      "sha256": "6c13c9f4e41a3a8b3222c530d678e95e15a6a069f4b61fec4ffec90e6e881510",
+      "count": 1
+    },
+    {
+      "name": "monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocation",
+      "sha256": "e912d51ac4453f24334ac5486cf63ee87950380dd1cd5bf65c1a72ae937dcf43",
+      "count": 1
+    },
+    {
+      "name": "monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt",
+      "sha256": "142214e2337bdf912489358cb29261358d0424a23573d3952932bc1bc4dfdd52",
+      "count": 1
+    },
+    {
+      "name": "monetary_server_not_reporting_cost_charges_max_cost_per_invocation",
+      "sha256": "79ffb079d38a1f4b5c5ac32978542e06f73cb49f16cc153e068fb78cf0b10422",
+      "count": 1
+    },
+    {
+      "name": "monetary_tool_server_error_retains_precharged_budget",
+      "sha256": "bd4be492fbfda84831ced771f593fe3b3b1c1b30a69d90fa9b53c93fb0e0fa73",
+      "count": 1
+    },
+    {
+      "name": "multi_grant_budget_remaining_uses_matched_grant_total",
+      "sha256": "2e85f2dfbf587bb8ea8bb6164dcf7ae3a5b6d1990d5311ac657cf93ba4939f49",
+      "count": 1
+    },
+    {
+      "name": "mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt",
+      "sha256": "0a2db4bcfd8bc93f6de8de13f1da87a6fab2fc5aa6defc751bfe7d7b4991c5f2",
+      "count": 1
+    },
+    {
+      "name": "mustprepay_no_budget_charge_captures_unsettled_authorization",
+      "sha256": "9f089ce2be933e41ff61a3bec0a4ff3aa6d633820760ff8554abe213457c951f",
+      "count": 1
+    },
+    {
+      "name": "mustprepay_no_budget_charge_receipt_financial_deserializes_with_quote",
+      "sha256": "396179cff5e4b9f6dfa460b1786ba382081b6818e76f259ce41b4c517aef3387",
+      "count": 1
+    },
+    {
+      "name": "mustprepay_no_budget_charge_retains_hold_after_ambiguous_dispatch",
+      "sha256": "2105114c361c903bc7f15b52aeaf4dfa52e8b4891bb6d841c092488f8dc1317b",
+      "count": 1
+    },
+    {
+      "name": "mustprepay_no_budget_charge_uncapturable_authorization_denies",
+      "sha256": "41294dc5fa67304c6096ae6c8003640c5e66c1f40d2640a3cc2973a930288a8c",
+      "count": 1
+    },
+    {
+      "name": "native_callback_cannot_suppress_skip_repeat_or_retarget_its_join",
+      "sha256": "7383bf4f2f53b62152bd47bf0ae5a012281ca9d7b6594b8ee628996d0dbb94d1",
+      "count": 1
+    },
+    {
+      "name": "native_dispatch_checks_live_selection_before_optional_fallbacks",
+      "sha256": "c4921e3e6e38f254c8d0b93ad36649c1f114abffb4b1d5ecb37801f01faec88f",
+      "count": 1
+    },
+    {
+      "name": "native_dispatch_ledger_confirms_both_reads_without_activating_dispatch",
+      "sha256": "be914d93337d469075fa4385a49f85f643f9cc73a2e964a2ae2516003ef3c2b7",
+      "count": 1
+    },
+    {
+      "name": "native_dispatch_ledger_faults_deny_even_when_history_survives",
+      "sha256": "d7306e0c12feb70c551abfca41d7b6854e40e707cf8392686490c01a4648f48a",
+      "count": 1
+    },
+    {
+      "name": "native_dispatch_ledger_rejects_invalid_inputs_before_egress_mutation",
+      "sha256": "bd528cf9a001402ccd6176593aab22f225ab3a11ba2b3b4c905c568a51dc3238",
+      "count": 1
+    },
+    {
+      "name": "native_dispatch_retains_original_requirement_when_live_selection_is_absent",
+      "sha256": "293c09eab7b6ed016bab046b03ebb788b475b3a77ee905cf3a9a63a20b6a8eff",
+      "count": 1
+    },
+    {
+      "name": "native_egress_acquisition_faults_never_return_custody_and_read_after_writes",
+      "sha256": "e498b15e9ae2b1418ead959d9f726d5bc83004c64ff3de98086d34df327fd0be",
+      "count": 1
+    },
+    {
+      "name": "native_egress_changed_live_material_or_identity_cannot_prepare",
+      "sha256": "17d33bef462b3497e23801bd36218f12061fed6d8be4aaa324c4e844071ad572",
+      "count": 1
+    },
+    {
+      "name": "native_egress_changed_observation_or_expiry_denies_before_acquisition",
+      "sha256": "d9a451afd488cce83ec42066fbd9d7a45a0065f87b3ae5e2a47c6679c8bda9c2",
+      "count": 1
+    },
+    {
+      "name": "native_egress_commit_faults_preserve_acquisition_and_deny_success",
+      "sha256": "dabf6496207dedd8f648af208979f7e01c0fcca096225f0e033de8a316983764",
+      "count": 1
+    },
+    {
+      "name": "native_egress_coordinator_binds_fresh_generation_and_both_commitments",
+      "sha256": "c9e30567d4421a54a6c2fe1d1b1db48bb9121353d6927b219b30cf7bc9e5d861",
+      "count": 1
+    },
+    {
+      "name": "native_egress_generation_change_after_acquisition_prevents_commitment",
+      "sha256": "2dac48facbd5e26cef94d69483f93b36b6e6589f9e95a9075b8b2e5e4d6b9b68",
+      "count": 1
+    },
+    {
+      "name": "native_egress_observation_time_must_fall_inside_the_read_interval",
+      "sha256": "88b1b9c7e573dfacdf2b6e06e67ca2f8a9ac8a00c6af5a4e5f06276010b1a2dd",
+      "count": 1
+    },
+    {
+      "name": "native_egress_operation_change_after_preparation_prevents_acquisition",
+      "sha256": "82d728a596d5c09120b69decb1b8be316e2a8f708c62f99feeaa5049f6d1a4fa",
+      "count": 1
+    },
+    {
+      "name": "native_hook_without_preparation_support_denies_before_any_join",
+      "sha256": "08df51bc722de9bfbf531a6c59e5153ccb41ec054307be86991f6e6586fb3f7f",
+      "count": 1
+    },
+    {
+      "name": "native_join_requires_matching_acknowledgement_and_anchored_readback",
+      "sha256": "c95504536137b17d1c86f2d4dfc94f17e0114e1a5de657315a915e12649bc930",
+      "count": 1
+    },
+    {
+      "name": "native_preparation_rejects_substituted_original_request_before_any_join",
+      "sha256": "d85a2a13127a1fb5ebddcf2581b9da3dc8ac4b5c950dc827e459cda6aeca886c",
+      "count": 1
+    },
+    {
+      "name": "native_raw_return_recovery_requires_original_selection",
+      "sha256": "30cb1da62f2840321d622dfe48213dc25116c46b025df56b74593753f66ba824",
+      "count": 1
+    },
+    {
+      "name": "native_recovery_lease_panic_does_not_poison_the_mutation_sequencer",
+      "sha256": "90525395cf9f936785839bdfa0f1ffc7114839bca56668c827a0e86c56ba4097",
+      "count": 1
+    },
+    {
+      "name": "native_retained_codec_is_strict_and_hash_domain_is_versioned",
+      "sha256": "631e5518430117bb0cb4d9e5aeb40a88ff77447db0e9a3ed747acb3257c368ac",
+      "count": 1
+    },
+    {
+      "name": "native_selection_cannot_be_added_to_context_only_history",
+      "sha256": "b4dfe1cba3ebd7f070e163d0aef2f4caaf4aff2ee76ca92679701fccf9b81c34",
+      "count": 1
+    },
+    {
+      "name": "native_selection_cannot_fall_back_without_a_durable_store",
+      "sha256": "7b2adbef7b26b74343963df8c4cfdf783966b4b023f8399958d47d028be39bed",
+      "count": 1
+    },
+    {
+      "name": "native_selection_change_is_rejected_before_dispatch_capture",
+      "sha256": "ca197786c6cd69e9df33608928a036f247074b56a83a9ba319d443d7d397dc65",
+      "count": 1
+    },
+    {
+      "name": "native_selection_errors_and_panics_fail_closed_before_admission",
+      "sha256": "7f43522de8df3900b92365e83406978602c2b5079be7db64bdce85afccf9e39f",
+      "count": 1
+    },
+    {
+      "name": "native_selection_rejects_missing_context_or_optional_enforcement_before_begin",
+      "sha256": "6e5d64c82866a6478de1e0cdb9f07e8eb71104be342f4ce12f5e7253647a651f",
+      "count": 1
+    },
+    {
+      "name": "native_selection_requires_retained_admission_outside_mode_coverage",
+      "sha256": "85fd72073ba5d9c30c0b1c1c76317436c6b8fef7bc8786861fd97ad0f4d61bde",
+      "count": 1
+    },
+    {
+      "name": "nested_admission_denied_while_rss_shedding",
+      "sha256": "9334d6afddb54c8e0eaa15929e15e1906393b8ecad1ea33afb4edaea60af64b1",
+      "count": 1
+    },
+    {
+      "name": "nested_async_conflict_preserves_threshold_wait",
+      "sha256": "f90025825601c14b2c5f52af0332cc40793de139737e8fda7ab93a147901c4ac",
+      "count": 1
+    },
+    {
+      "name": "nested_async_session_resumes_threshold_request",
+      "sha256": "55e1e9c569c733b863f6c7df5d975a819f2f734b02082d601e7d2b95ae152875",
+      "count": 1
+    },
+    {
+      "name": "nested_bridge_cancellation_blocks_next_child_and_drop_clears_dispatch_scope",
+      "sha256": "2048b4f4a529eff4f352c91a73d98f1f3a86f63c90bcf3f90b526dcb3c32cf0e",
+      "count": 1
+    },
+    {
+      "name": "nested_child_before_url_elicitation_is_terminal_and_consumes_nonce",
+      "sha256": "e17934a72f6118a9ccc31296d5ee69b4c95dd5441990a7fe24a4fd08e8a75538",
+      "count": 1
+    },
+    {
+      "name": "nested_completed_replay_uses_original_signer_without_reinvocation",
+      "sha256": "45e1073fc41e5cfa0758de3f51a6073f235a919fc882271af294f6166966b315",
+      "count": 1
+    },
+    {
+      "name": "nested_cumulative_approval_resumes_and_dispatches_once",
+      "sha256": "9944ba83376dea4657ea63288e1227d544faf0e20c7e16871b32ed0b4be1aca3",
+      "count": 1
+    },
+    {
+      "name": "nested_dispatch_isolates_a_synchronously_blocking_call_from_the_async_pool",
+      "sha256": "652cc84dfecc9a0c0a9d52cc37256728dda7b91f4fe19310ce7bebdb266fc1f1",
+      "count": 1
+    },
+    {
+      "name": "nested_durable_admission_commits_before_dispatch_and_blocks_replay",
+      "sha256": "4fd656fac0d1a1df1f3bf0e0e1bb8213d9e3aecb4cc8dfd64e15bb1d5aa6e2ec",
+      "count": 1
+    },
+    {
+      "name": "nested_durable_url_elicitation_terminalizes_as_outcome_unknown",
+      "sha256": "6dcb2f3382239b9e5d0a59930cc3246711c0bfdc95bcb4c76284b909cea46e41",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_child_receipt_timeout_records_cancellation",
+      "sha256": "0bfcfb698e4b34baca60848781d000a1e289e52676452a0f72ea3f34b3286d64",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_drop_path_preserves_child_receipts_after_a_first_append_failure",
+      "sha256": "cbd39a6b23a84766966d34514bc2071fb6d649fe4f972374c6742a2ebdd2e7d2",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_drop_post_dispatch_flushes_buffered_child_receipt",
+      "sha256": "acb1fbe393c338828a2acd53fd541f3c930aa18b62ea0f5d4f74295caf397321",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_drop_post_dispatch_records_cancellation_receipt",
+      "sha256": "6c869a7f6dfa9856c62cb9aea3ec70dd49461c7c36ae5740498c6101b4fb11c2",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_normal_path_records_child_receipt_exactly_once",
+      "sha256": "ddd5c697b807d5b30c92a4702f0133de826378ab424918c2fe538c02ba2c6b22",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_revalidates_after_credential_reservation",
+      "sha256": "82eb996b0f3cfbf463efd9aeb1cbbff90bb79a5b65c179bce654894780f5b814",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_transient_child_append_timeout_preserves_child_receipt",
+      "sha256": "09c993c57fe60b990ccbcdc5cf4215f202af7ede0ab578e5bc065d1c29fb3731",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_uses_operation_owned_approval_acquisition",
+      "sha256": "305b634e720bef247366394d3d1cdc4b4b9dc75fddad4247cd5968577aea5579",
+      "count": 1
+    },
+    {
+      "name": "nested_flow_uses_operation_owned_dpop_acquisition",
+      "sha256": "fb1df23a690c0209c38097f3fd7c9b1274bb34d59eb3c1edb5b4bb6269b0c534",
+      "count": 1
+    },
+    {
+      "name": "nested_governed_call_chain_evidence_store_error_consumes_no_budget",
+      "sha256": "14bcf689065bc81880476c2cf987051de7c5bfc68e58c7acd7cb35e24c52c628",
+      "count": 1
+    },
+    {
+      "name": "nested_governed_commit_error_after_dispatch_records_terminal_receipt",
+      "sha256": "2b39e95df73638f29c0b823e40dbd1f61cb3350dbac132a72a2ad969a3a72b86",
+      "count": 1
+    },
+    {
+      "name": "nested_governed_commit_error_during_ambiguous_authorization_is_signed_unknown",
+      "sha256": "ea80f6ba512c2704c36c0e6c6ecd9cdbae320df7dabe91f66aab807ebfebf6f9",
+      "count": 1
+    },
+    {
+      "name": "nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge",
+      "sha256": "97452fb6b4eee818d657a6ffa2c77efa051f848b3ba0d137ef50cc62b6615a1c",
+      "count": 1
+    },
+    {
+      "name": "nested_immediate_dispatch_revalidation_checks_mutated_runtime_trust_state",
+      "sha256": "8ce8564112ea9e0796e52d86f4143e0fa6efa70f52b2117441c7673ec0415e04",
+      "count": 1
+    },
+    {
+      "name": "nested_late_approval_replay_rolls_back_credentials_and_dispatch_claim",
+      "sha256": "838e262648f79bf3d6ce7df4af5837afae9140c2ab7530d3a54bfb491ef58993",
+      "count": 1
+    },
+    {
+      "name": "nested_missing_session_roots_lookup_reverses_pre_execution_budget",
+      "sha256": "9d9cd8e35247c26930d6a6a9596ec54c67df58c62d9b3594ddbadd60a770babf",
+      "count": 1
+    },
+    {
+      "name": "nested_monetary_allow_uses_reported_cost",
+      "sha256": "e27ec25f2b6b65a07259de1e0c18875aa69d13cff65f98ea74da20248d828494",
+      "count": 1
+    },
+    {
+      "name": "nested_native_join_only_hook_cannot_activate_dispatch",
+      "sha256": "8840af0aec72c1644395569e1d02e27965dd2b1ff2df67c1ca8498479082c2cb",
+      "count": 1
+    },
+    {
+      "name": "nested_native_selection_cannot_change_on_terminal_replay",
+      "sha256": "37267fec1b925bc513540dbb61b5f0811abc575480ce8c71d48dd547bdd96b71",
+      "count": 1
+    },
+    {
+      "name": "nested_notification_before_url_elicitation_is_terminal_without_child_receipt",
+      "sha256": "d63052fea0ee3da1ffab9acfe8d6c449504b0a2715822b8e5c58a578b6c00b86",
+      "count": 1
+    },
+    {
+      "name": "nested_padded_payment_authorization_id_is_outcome_unknown_without_fabricated_id",
+      "sha256": "26cce519cca6acf5ee0e755d839a8e142c5d8c8797021549c5d1b87e61f56468",
+      "count": 1
+    },
+    {
+      "name": "nested_padded_refund_transaction_id_is_not_reported_as_clean_unwind",
+      "sha256": "5f07e19cc686b1ae6dcf751883397f321376c1481d785a1d1574bd8d127135ee",
+      "count": 1
+    },
+    {
+      "name": "nested_payment_ambiguity_failed_refund_retains_authorization_and_budget",
+      "sha256": "926f17fd9581921f5b681b6c9a0282888335030fe3feaac71616e2bc7cdbea24",
+      "count": 1
+    },
+    {
+      "name": "nested_payment_ambiguity_panic_retains_budget_without_fabricated_id",
+      "sha256": "969eeb96a6d2139e430b5238ad59ce34766a130b11f68992c8827ca769586103",
+      "count": 1
+    },
+    {
+      "name": "nested_payment_ambiguity_refund_panic_retains_authorization_and_budget",
+      "sha256": "c31e3f1577aa4d9bb05c4047c3c2175b49c9946a60929e7f7546437f64a525ed",
+      "count": 1
+    },
+    {
+      "name": "nested_payment_ambiguity_unavailable_retains_budget_without_fabricated_id",
+      "sha256": "f0acd485d3e04efc7e194326df5945149a55964ea25b2b6f274698a706737e57",
+      "count": 1
+    },
+    {
+      "name": "nested_payment_authorization_denial_releases_delegated_sibling_budget",
+      "sha256": "96cb24fd8c9aff4fa002717e2c6fe75b98b3ea1109df70b3737f75b56e00ba58",
+      "count": 1
+    },
+    {
+      "name": "nested_payment_mutation_is_revalidated_by_runtime_hook_before_dispatch",
+      "sha256": "a0abf94117f5eecd5464ece5549d3fb660619e4a5b94559c4e50a6eed299a141",
+      "count": 1
+    },
+    {
+      "name": "nested_payment_revalidation_does_not_require_dispatch_credentials",
+      "sha256": "e72b4090642b244c203134fc7015335f67b78df6fa344356a0bcc60146f3fa47",
+      "count": 1
+    },
+    {
+      "name": "nested_post_dispatch_approval_commit_failure_records_terminal_receipt",
+      "sha256": "8c7c267a5b905dcf5fbdb084ea7659baf74b3e9000d958cdac152523c79dd1bf",
+      "count": 1
+    },
+    {
+      "name": "nested_receipt_evaluations_clear_and_restore_both_authority_scopes",
+      "sha256": "7bb8b403fd15769e3157faef99097bc5659af38059ad92fa6708fe5e03838fb4",
+      "count": 1
+    },
+    {
+      "name": "nested_remote_delivery_rechecks_revocation_after_preparation",
+      "sha256": "6d0fd53ed3c198641922e979834797c063ecf05ba63e847ce98d0aaf4827c90e",
+      "count": 1
+    },
+    {
+      "name": "nested_retained_federation_context_rejection_compensates_before_dispatch",
+      "sha256": "005d5b88c916e9814a41fa81350d137d1001854f0c27ef7cdd528c476736efb9",
+      "count": 1
+    },
+    {
+      "name": "nested_return_context_preserves_large_request_behavior",
+      "sha256": "f085581688fad855b8fdd7adfffa49c6f9a6eca713b23dc851261f67c6014fb0",
+      "count": 1
+    },
+    {
+      "name": "nested_revocation_during_dispatch_prevents_allow_finalization",
+      "sha256": "70e343b74ab87a965a59f1e215a1ffa9cd98408232f09cc4f890adb1ae0ee462",
+      "count": 1
+    },
+    {
+      "name": "nested_runtime_release_failure_denies_pending_approval",
+      "sha256": "fb458b1318ac05b0d5535e742bc78160d40bc9fcd83cbbf5906027271becc938",
+      "count": 1
+    },
+    {
+      "name": "nested_security_callbacks_preserve_the_effect_boundary",
+      "sha256": "588640ea3f064c33eb8efe8f12d5b27d5e46dd8c2a5527541293096c7d17c6f1",
+      "count": 1
+    },
+    {
+      "name": "nested_security_replay_checks_every_identity_field_and_preserves_flow_observations",
+      "sha256": "0609da390b7c5b7e22efb85a3b23e274a4d6de2fa8d0c95dfcf208c90f8e71d2",
+      "count": 1
+    },
+    {
+      "name": "nested_sync_conflict_preserves_threshold_wait",
+      "sha256": "e576c86467eb4e07d3a292a687244200a70ddf5606bfdb950b234846d7e8287a",
+      "count": 1
+    },
+    {
+      "name": "nested_sync_session_resumes_threshold_request",
+      "sha256": "51ac0cd942cb78e8de4fb287b3824c305f998f849ff279588dbec76bfac8a056",
+      "count": 1
+    },
+    {
+      "name": "nested_url_elicitation_commits_credentials_fail_closed",
+      "sha256": "40df9842a50180fae9361b09d9c423ec95d5c044486a8d5edf6deba1ccb3b49e",
+      "count": 1
+    },
+    {
+      "name": "nested_url_elicitation_does_not_attempt_credential_rollback_after_dispatch",
+      "sha256": "a92e7db91eec3dc3c43fe6f065cd7a0d0989dfd3e75f0cfef3e9c665bef7316f",
+      "count": 1
+    },
+    {
+      "name": "nested_url_elicitation_surfaces_cancellation_receipt_failure",
+      "sha256": "2dddf6e3dbd257d61c23a0cfd98aef373aaf7ccbc1e8ba74eaafebf273dbb772",
+      "count": 1
+    },
+    {
+      "name": "no_ceiling_mustprepay_authorizes_with_the_payment_journal_active",
+      "sha256": "75cce5c53e4de475dc6777f7d52f4ffc1156253318d6b5b4a8e65ef209d7441a",
+      "count": 1
+    },
+    {
+      "name": "no_charge_mustprepay_requires_a_durable_payment_participant_before_authorization",
+      "sha256": "d2fc63a628e79aa7d192f4018e2b510bfe633ce4d05763dab0f3bfbcb8ccdea0",
+      "count": 1
+    },
+    {
+      "name": "no_runtime_uses_the_legacy_append_without_routing",
+      "sha256": "d6a95c9aeb891c4e220d4b50e1cce2cb1ec28047df79c2c806dd7782e9cac9af",
+      "count": 1
+    },
+    {
+      "name": "non_durable_monetary_kernel_denies_before_ambiguous_dispatch",
+      "sha256": "9850ead62ed497b86f2d9fb0542c451b027546df104b00b3283dfbd609ed7130",
+      "count": 1
+    },
+    {
+      "name": "non_durable_monetary_terminal_failures_retain_nested_funds",
+      "sha256": "ead80c516f0a5735c93b4ac592161778164560e3915a9ee8a115344efb549551",
+      "count": 1
+    },
+    {
+      "name": "non_durable_monetary_terminal_failures_retain_top_level_funds",
+      "sha256": "10b48ffa6584450ee030f6820f86b61f744cb514aefa019478c763e89c3d9162",
+      "count": 1
+    },
+    {
+      "name": "non_durable_monetary_url_elicitation_retains_admission_fail_closed",
+      "sha256": "05b1135c17b5e9e0b9a5186e3fc7d5e2e4eccd8bcb36e20895366526c64bd08b",
+      "count": 1
+    },
+    {
+      "name": "non_durable_url_elicitation_retains_full_budget_state",
+      "sha256": "0dd06f265323c04f18eb0f535d2b7204d59f1d4dd5fa7b68bcabc85c7a181a0f",
+      "count": 1
+    },
+    {
+      "name": "non_durable_url_elicitation_retains_full_budget_state_nested_flow",
+      "sha256": "47abd73f517678df559569174e4a2b3ef1b140c271f96c41541764dd46c98891",
+      "count": 1
+    },
+    {
+      "name": "non_durable_url_elicitation_retains_sibling_budget",
+      "sha256": "254d25cdf29f573729bba5a211081505a1144f6e64e0b23f100f726b00da9a1f",
+      "count": 1
+    },
+    {
+      "name": "non_durable_url_elicitation_retains_sibling_budget_nested_flow",
+      "sha256": "0535a66983c6c2fc3c440a4042292d83144ea8217ca3997051ffcdd221005c61",
+      "count": 1
+    },
+    {
+      "name": "non_federated_kernel_without_receipt_store_fails_closed_unless_ephemeral_enabled",
+      "sha256": "36589b7af8ee0a4c9166da815650d4f79039f78096edb807067c9eeb33d62630",
+      "count": 1
+    },
+    {
+      "name": "non_federated_request_leaves_no_dual_signed_artifact_behind",
+      "sha256": "bb66a3904c3887fa7caf884402f7d7d1dbf151782a9d952a80b6cb0e3fee99ac",
+      "count": 1
+    },
+    {
+      "name": "non_mustprepay_charge_authorizes_the_charged_amount",
+      "sha256": "ce190832449124ccede3ffa9957bc0768ca4eb035d91eb5808f2cdeda4eb33c2",
+      "count": 1
+    },
+    {
+      "name": "non_strict_dpop_only_payment_requests_reach_the_external_rail",
+      "sha256": "e4257d9ac9b084ef22612d80e1f33f6d938ff7538893705cdeec24e75afd9613",
+      "count": 1
+    },
+    {
+      "name": "non_tool_admission_denied_while_rss_shedding",
+      "sha256": "34036499779eb13d5fe81f281e442560aabaceb10205cbb2ed9914bc6e8f05d2",
+      "count": 1
+    },
+    {
+      "name": "nonce_admission_all_gates_reject_forged_signature_without_consumption",
+      "sha256": "1b1befc15aa747c2862a25bb5f57449fc50ccd5840d5f93f50f0a5a835be0df6",
+      "count": 1
+    },
+    {
+      "name": "nonce_admission_reservation_checks_every_request_binding_before_consumption",
+      "sha256": "c43efe90c4f746463f0209a7fea101ebb3607ab45b7c106e24d061220882f8ea",
+      "count": 1
+    },
+    {
+      "name": "nonce_admission_reservation_rejects_unsupported_schema_before_consumption",
+      "sha256": "ac80f605a620e9bcf7768c1c7f43f5972261917b239c4c30e6658fdce4fb32e0",
+      "count": 1
+    },
+    {
+      "name": "nonce_admission_strict_reservation_requires_a_presented_nonce",
+      "sha256": "6e5d109b9551c9f077261bca67da719ae89f49f16bbce4f41c3930593d96a3c9",
+      "count": 1
+    },
+    {
+      "name": "nonce_admission_validation_is_non_consuming_and_debug_is_opaque",
+      "sha256": "fc94352aa974e03a65cce20177e647a66d3953c32cb8340e7b9de15231d96fd3",
+      "count": 1
+    },
+    {
+      "name": "nonce_clock_failure_keeps_its_code_in_the_signed_denial",
+      "sha256": "f5fc5ac9eac3fe87bd51a35615b86ef097ff6575fa24e254bda573628a518bae",
+      "count": 1
+    },
+    {
+      "name": "nonce_preflight_cleanup_lost_ack_denies_without_minting_nonce",
+      "sha256": "553c75f0b1fea5b90b1bea4e0eb9bb7940b33a558c7113561c7dccc19e7181fd",
+      "count": 1
+    },
+    {
+      "name": "nonce_preflight_runtime_release_failure_denies_without_minting_nonce",
+      "sha256": "e14cc034f5e8579dd206bd4c8d0d08aacd8fb03306cbc99937ca7d156ef87a6b",
+      "count": 1
+    },
+    {
+      "name": "nonce_replay_precedes_payment_and_capture_when_release_would_be_unconfirmed",
+      "sha256": "84cae9a64c722879addf46f89f2562281a6889b2b32f724ae1b89cbdbfe105b7",
+      "count": 1
+    },
+    {
+      "name": "nonce_replay_precedes_payment_and_captured_cancellation",
+      "sha256": "0b06ae71a25ca76442f2376cdd291944a72ca8a0ac74c1ec2cac79808c68f6aa",
+      "count": 1
+    },
+    {
+      "name": "nonce_request_id_mismatch_precedes_payment_and_capture_top_and_nested",
+      "sha256": "96bdb0564a106959e23b33564638b91d73ff782d7a9e17fd6bedb1dc9766a580",
+      "count": 1
+    },
+    {
+      "name": "nonmonetary_nonce_cleanup_signs_post_commit_reverse_ambiguity",
+      "sha256": "531df1cfef48baa6e5bba96fa5b39a22b9fed9e90a1f2c204b35f3a693cc143b",
+      "count": 1
+    },
+    {
+      "name": "normalized_conflict_preserves_threshold_wait",
+      "sha256": "5da7cdced5165d5bd03c6c906012c4945fe1ee5588a93ed56d23e14ed86bb7eb",
+      "count": 1
+    },
+    {
+      "name": "normalized_observer_statuses_reach_the_durable_store",
+      "sha256": "4507fec7b48b152c6173aff83e13d3c19d6da6a1e40119ec80621ba9cb79287a",
+      "count": 1
+    },
+    {
+      "name": "open_session_assigns_unique_ids_across_kernel_instances",
+      "sha256": "3704b4cc07ab18a6c5c8e473c1bc3e57862fba9bbb89b4b5380847f23724e811",
+      "count": 1
+    },
+    {
+      "name": "open_session_id_has_csprng_structure",
+      "sha256": "4581966eb1ae9560c1c2f2f8f895daf732685480a4f0020826126d59bd4cfa50",
+      "count": 1
+    },
+    {
+      "name": "open_session_ids_do_not_collide_across_many_calls",
+      "sha256": "bbb48638a3c8e10c71327fdb7951ffd93b48d6fbe1c0dd59fa7a9d7a507d58cb",
+      "count": 1
+    },
+    {
+      "name": "open_session_with_id_rejects_duplicate_ids",
+      "sha256": "3a0146d84b362439df7c8f0bb779f55471a4989de303db94613e4e8a7be18dfd",
+      "count": 1
+    },
+    {
+      "name": "open_session_with_id_rolls_back_insert_when_anchor_persistence_fails",
+      "sha256": "a37c6c539f6e5aa6d4c787d618a52911f03e1f3220c772abf266904aa5144315",
+      "count": 1
+    },
+    {
+      "name": "optional_kernel_preserves_non_swarm_dispatch",
+      "sha256": "bd8c8be597b144308e18a5f4191b13f002202d44de9d7e9dd7432bdd13f17e93",
+      "count": 1
+    },
+    {
+      "name": "ordinary_native_selection_cannot_change_on_terminal_replay",
+      "sha256": "c4af2a28a936c95761ae394c54d7236b01f241439d4537489ca34b352f3adf3a",
+      "count": 1
+    },
+    {
+      "name": "ordinary_return_context_preserves_large_request_behavior",
+      "sha256": "793c8f9618abc09838f90bfb9ab7fbcd73b4a0eb3986b9553882a8847d5d6376",
+      "count": 1
+    },
+    {
+      "name": "ordinary_security_replay_checks_every_identity_field_and_preserves_flow_observations",
+      "sha256": "ef88dc7fc5933daab920a28ef268368cd3a766412f17266b4d68675660336017",
+      "count": 1
+    },
+    {
+      "name": "out_of_scope_tool_denied",
+      "sha256": "c8b4a87c35073f1b2a30953d95d8a8ce4fe12b39239f7dabb8f86d44db4e76ef",
+      "count": 1
+    },
+    {
+      "name": "oversized_dpop_identity_denies_before_other_credential_probes_or_mutations",
+      "sha256": "cb655ac870c6d98288aed554ea65684783c5059f6f223545e3a202aae59ece7e",
+      "count": 1
+    },
+    {
+      "name": "path_prefix_constraint_is_enforced",
+      "sha256": "b1eadadb13024d716765d5edddc0013d4f11edb0e13456a7bbd0e146e319e280",
+      "count": 1
+    },
+    {
+      "name": "payment_authorization_denial_releases_delegated_sibling_budget",
+      "sha256": "fc74c2f7d900f7ab2bd2b6b51ba1e37fa11985c4228f8ed898c2a36a3c96f01c",
+      "count": 1
+    },
+    {
+      "name": "payment_authorization_errors_cancel_capture_only_for_definite_denials",
+      "sha256": "7e0d211f84f68efd156caf644ff996aa0a5f77577d7975dad6cced724b6a5f29",
+      "count": 1
+    },
+    {
+      "name": "payment_revalidation_does_not_require_dispatch_credentials",
+      "sha256": "6b1ea2b345fa4a3985bfe08d6614ec81843533820e771088c9baea332dcfa4d4",
+      "count": 1
+    },
+    {
+      "name": "pending_retry_rechecks_crypto_floor_without_reissuing_proposal",
+      "sha256": "6250dc2eb139f86d9a8905f6a411a5590ba5dac47d09c115233ad75b4d5ff7de",
+      "count": 1
+    },
+    {
+      "name": "pending_retry_rechecks_current_directory",
+      "sha256": "e737d7f0cd036a6f1f2c18614540c2e925904ee91d773a519487895e224f3e0f",
+      "count": 1
+    },
+    {
+      "name": "per_guard_budget_bounds_single_guard_not_pipeline",
+      "sha256": "f61c46a25e07c63b4be8884714589b2f7b97502c8bc2435920a4c0327686237d",
+      "count": 1
+    },
+    {
+      "name": "phase_19_1_breakdown_surfaces_per_factor_details",
+      "sha256": "29cc8e2bf6ac133ddc9fda49afbcda656b40e0fe0454fab11ba5c4209822ec8b",
+      "count": 1
+    },
+    {
+      "name": "phase_19_1_revoked_capability_scores_below_500",
+      "sha256": "dec8a8f91b0e26e1c22a05755fdea35859bb24d9134f6e19b1a6820fa4ca3f97",
+      "count": 1
+    },
+    {
+      "name": "phase_19_1_zero_denies_in_1000_calls_scores_above_900",
+      "sha256": "eec87d0dfc528f0dd572a39369f34a753f5e67e3f8ace2abf70c3f20f5fd934f",
+      "count": 1
+    },
+    {
+      "name": "phase_dispatch_requires_the_full_evaluation_pipeline",
+      "sha256": "98112e76ad69986d558dcf3f68781a8b835953760ea6efdb47f9c67310f3ed24",
+      "count": 1
+    },
+    {
+      "name": "pipeline_budget_bounds_the_per_guard_loop",
+      "sha256": "6b12383c278e2d8b9a1078729531a604ce3f5047790d1a559002515bf4fc2fd5",
+      "count": 1
+    },
+    {
+      "name": "plan_evaluation_all_steps_allowed",
+      "sha256": "e5011eedec7f8fdc59e4c43854419824895b81421b1a3c2fdd9c8e4dec09da3f",
+      "count": 1
+    },
+    {
+      "name": "plan_evaluation_capability_id_mismatch_denies_every_step",
+      "sha256": "013f7e78ae6561b6c2bb1d13386805faacccecffbad084864eb833d8a205ef26",
+      "count": 1
+    },
+    {
+      "name": "plan_evaluation_denies_all_steps_when_kernel_stopped",
+      "sha256": "64608cd5fdf32c7f4341280af144f274a01d55e42b1a3c05c812ad43b71d101e",
+      "count": 1
+    },
+    {
+      "name": "plan_evaluation_first_step_denied_does_not_short_circuit",
+      "sha256": "eb3d29b9e10144391f6b81234cc489de87b8465b9f60cd6a8840ead8cd2f9e1e",
+      "count": 1
+    },
+    {
+      "name": "plan_evaluation_middle_step_out_of_scope",
+      "sha256": "9071d8ec169d512b9683fc6d4616112c24d0017fa59a2398d2fcb0e231f9d190",
+      "count": 1
+    },
+    {
+      "name": "plan_evaluation_model_metadata_scoped_per_step",
+      "sha256": "90625d65295290f0aeb5819a0ce9ab81bd6e56b630b2dbee2d45a85d66c0525b",
+      "count": 1
+    },
+    {
+      "name": "point_load_store_resolves_parent_receipt_after_mirror_eviction",
+      "sha256": "634318085b4bd6aa3b7540df08fea289b618e8aa9de36e56cd6a3a33f8b95831",
+      "count": 1
+    },
+    {
+      "name": "poisoned_runtime_trace_lock_does_not_disable_revocation_or_admission",
+      "sha256": "43fdc86bf13b68946ee66a4ddcd07464aec1e0a9d6d8fc79d5a1dd614be94136",
+      "count": 1
+    },
+    {
+      "name": "poisoned_tcb_lock_denies_at_the_pre_dispatch_gate",
+      "sha256": "dd425c2c230611ec66bbf0b5a92a22834da3429ee0c5b503c5a030441de7b362",
+      "count": 1
+    },
+    {
+      "name": "pool_ledger_allows_the_initial_durable_admission_runtime",
+      "sha256": "aae90dbf219e129a3ab315e63befd4beb618547346dabc65a4ecea787e1eac4e",
+      "count": 1
+    },
+    {
+      "name": "portable_subject_denial_does_not_consume_sibling_budget",
+      "sha256": "1ab55371acaa3cb48fa0530f5fc63941d44609b4ef8ec0e6ff6a76ca6e3a81a7",
+      "count": 1
+    },
+    {
+      "name": "post_commit_claim_failure_does_not_change_receipt_success",
+      "sha256": "368783c9d11fc1ecc7b3efdb55342b60836177b9693ccd42e0369ed6615240bc",
+      "count": 1
+    },
+    {
+      "name": "post_invocation_block_marks_reservations_retained",
+      "sha256": "f242c0946b5dd93c82644660a0ece274c1f314d2b3714dee73f66292635ff723",
+      "count": 1
+    },
+    {
+      "name": "pq_boot_denial_is_signed_without_dispatch",
+      "sha256": "0ea1023ada1c877c6619038a67ce9524f6b6fc0311ffcc6c9b5693c3eb839576",
+      "count": 1
+    },
+    {
+      "name": "pq_boot_refuses_classical_pool_authority_without_substitution",
+      "sha256": "01b48bc29ecdb3dd0b678e1648afab6ad65d68676c4ead80321c7a205fbd0c81",
+      "count": 1
+    },
+    {
+      "name": "pq_capability_cannot_authorize_classical_threshold_votes",
+      "sha256": "92aab7b9433f1bc1c20e405af1e5371fd25a6deff88385bdbd8e4f9cdb0e47f8",
+      "count": 1
+    },
+    {
+      "name": "pq_capability_without_boot_signer_cannot_publish_classical_proposal",
+      "sha256": "4c3396f2f0f5409d4de15157e99fe2a03333c082004cde4f11a63f5b92cc064b",
+      "count": 1
+    },
+    {
+      "name": "pq_required_capability_dispatch_produces_pq_receipt",
+      "sha256": "3284c493db80a4b33cf579b5b8c4debd1880e9078f2ebb545312c731c5641dac",
+      "count": 1
+    },
+    {
+      "name": "pq_required_proposal_uses_the_boot_verified_authority",
+      "sha256": "2873b9e46b43d0272fd0433e46775d398ec37fd083b06f499835f8c52320ea5c",
+      "count": 1
+    },
+    {
+      "name": "predispatch_payment_release_uses_the_durable_operation_reference",
+      "sha256": "d7ca87c93d3b1ed5b76423d4f5dd248855c6b9280563346356c51a34507643c2",
+      "count": 1
+    },
+    {
+      "name": "predispatch_unwind_requires_confirmed_payment_release_status",
+      "sha256": "89f0f715ce398755610483bd45f8ce585c92f8c24dad154a8010fdff70fad834",
+      "count": 1
+    },
+    {
+      "name": "preflight_retry_terminal_state_matches_receipt_decision_reason",
+      "sha256": "2298afd485c57cacffbefa3d6be35e6e1347f1dacd9d04381944fe4da2a34e5a",
+      "count": 1
+    },
+    {
+      "name": "prepared_credentials_and_dropped_plans_do_not_mutate_replay_stores",
+      "sha256": "9595c10dcbeb90a94ce362e1332c9dba774adbb3b9fdd218675ae4cdbab3af98",
+      "count": 1
+    },
+    {
+      "name": "prepared_credentials_cannot_rebind_the_original_authority_profile",
+      "sha256": "cf8f72c3762ce2fd7126dc7ee60a8a9a7ad404605f7124ab5501843236f1ee9f",
+      "count": 1
+    },
+    {
+      "name": "prepared_credentials_contain_reservation_panics_and_release_earlier_markers",
+      "sha256": "70ac3c14418d2e0d8b77ab8fbffb365154a9eaa42ed77aa331870c2dc24b7e2a",
+      "count": 1
+    },
+    {
+      "name": "prepared_credentials_do_not_turn_approval_validation_into_replay_permission",
+      "sha256": "9fd7893300c1474cc2f2781d5de009674f1e4d3105539f1aa55020a2d4e47a9c",
+      "count": 1
+    },
+    {
+      "name": "prepared_credentials_reject_expiry_before_the_first_store_write",
+      "sha256": "7c0faac79673977e329ec8972c87ea5b42905ac6df88e695b6940e983a5b1ceb",
+      "count": 1
+    },
+    {
+      "name": "prepared_credentials_validate_the_complete_set_before_any_reservation",
+      "sha256": "efb4c5b47e0f0af4dab30b4203564ffd5694748997d80c9b958dc92159a36625",
+      "count": 1
+    },
+    {
+      "name": "prepared_delivery_with_unchanged_authority_dispatches_once",
+      "sha256": "1e6f6113a1be1ab5527c85eb9bb96e9fa47234d54c7a4deb138132cd5a0d21b5",
+      "count": 1
+    },
+    {
+      "name": "production_build_and_sign_accepts_matching_content_hash",
+      "sha256": "2de191ec8ce568f26a10aa12bec649ed5cd90b23cbc6a4ebaf688b9b753255f1",
+      "count": 1
+    },
+    {
+      "name": "production_build_and_sign_refuses_render_a_sign_b",
+      "sha256": "8c5ee267cd7e1316d1a0b2ca117f091f62e5d9c408f45e77b1d85ffee11cf1b4",
+      "count": 1
+    },
+    {
+      "name": "production_evaluate_rejects_direct_attenuated_without_trust_root_resolver",
+      "sha256": "7d566c7c925f440b992094457471d9d677f861c929745eab68ba7e4cf6bff6ef",
+      "count": 1
+    },
+    {
+      "name": "qualification_contains_claim_panic_after_persistence",
+      "sha256": "d66435e303aa0813619976738a2b5f130a1c987647b62e74c84303ce0419a8d4",
+      "count": 1
+    },
+    {
+      "name": "qualification_contains_claim_panic_before_persistence",
+      "sha256": "67b04a2e720df7e3d026c73babfd53c0f35b95518c7a39a17e71a6ac4ed79c3d",
+      "count": 1
+    },
+    {
+      "name": "qualification_contains_operation_read_panic",
+      "sha256": "011ba72fd362aa5a39f54834c97a2187c72b9a4c791292896667f9bd95bf13ab",
+      "count": 1
+    },
+    {
+      "name": "qualification_contains_revalidation_panic",
+      "sha256": "c1a266455f87bd0a80bfca59bbdd3252e69838cfdf304d55b9a51c2071f2c4a3",
+      "count": 1
+    },
+    {
+      "name": "qualification_preserves_ordinary_errors_without_creating_claims",
+      "sha256": "9720c7ccd96e211fce02d5ccdb743d293db806ecc017a5456edafde8442bf252",
+      "count": 1
+    },
+    {
+      "name": "raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor",
+      "sha256": "f4ba05eab183924376ef7e37fdf6a5875b2b1cf2d30065f37dd8d4b4d215b3fc",
+      "count": 1
+    },
+    {
+      "name": "reaper_releases_shares_for_holds_closed_before_a_store_error",
+      "sha256": "11b69483c7f58ea612a44feea4bf4115c53657c4736b27d60b4ccfa606606244",
+      "count": 1
+    },
+    {
+      "name": "receipt_append_timeout_releases_write_lock_within_budget",
+      "sha256": "d2cac207a77d570ea6d63b0ba07b4a5630d12c2513898875610fd02b405c81f7",
+      "count": 1
+    },
+    {
+      "name": "receipt_log_basics",
+      "sha256": "9b5f4cbd3e9733a806855f24d1aa20bec886ec3f4b2f6bab8d9111dab92b6797",
+      "count": 1
+    },
+    {
+      "name": "receipt_log_ring_caps_and_reports_gauge",
+      "sha256": "d6fbebd9db43b6c8de8071d7ff687227785ba08b9f91c818719f5a6c270ae9d2",
+      "count": 1
+    },
+    {
+      "name": "receipt_store_install_fails_closed_on_checkpoint_hydration_error",
+      "sha256": "a48e23f3059a27f7864f03fae28d1a32e65fdf90dbc3373bbf10716a7c66b1dd",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_budget_remaining_accounts_for_other_committed_spend",
+      "sha256": "ed1af310cc6a3e957e5ed063edef49112d381dac51158665ca1ed6900d00f4eb",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_clamps_realized_above_reserved",
+      "sha256": "c27af9265a5adf63be7c4a467ec3a022dcc98bd749a9a406988acf6bb34fd3cb",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_no_total_cap_grant_does_not_stamp_sentinel",
+      "sha256": "adedeed8ab4df7a2baf09217edfdd0b072b661cfd8325582ff798e82d0bf173f",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_normalizes_currency_for_zero_exposure_invocation",
+      "sha256": "988987fda2fe93b099cc6d6d9de2844874fecff4ce838da0375132cf0e15857c",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_receipt_binds_reserved_hold_into_authoritative_predicate",
+      "sha256": "795d1ac5559c2459b05cd073debba8d79efd64044b4d58653b9f39e929f2044a",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_receipt_persist_failure_still_returns_authoritative_receipt",
+      "sha256": "78015b0297d5946e325f7e435a05b77eb050a1b4fa0706a480a592d9382b412a",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_rejects_forged_nonce",
+      "sha256": "adc219991d2296cc022413c8c1684502db93060fa44add57601b099639e4de06",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_rejects_mismatched_realized_currency",
+      "sha256": "518b1d8bf9cc4d040793674af961432d81dbaf71c6b1a981c40dc759bb13ae3b",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_second_time_is_rejected_as_replay",
+      "sha256": "46f4f3a921eff2cb23c274d36fdd2b2d583c00ebb3c8fa663309185d9dbdb862",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_settles_reserved_hold_and_frees_difference",
+      "sha256": "d3de56925628c99dba52d51be294c8f4a5cf3badf8947689ac739822e5e0fb83",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_stamps_delegated_lineage",
+      "sha256": "f26230c6f84291f6cde526a1bd8a0a56e2c87ac5f61034a0153c6e49109405af",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_stamps_grant_budget_not_reservation_exposure",
+      "sha256": "55c7ca84f846943f938022a6face952bec89396eec03d4d6e13c94b1b91a13f3",
+      "count": 1
+    },
+    {
+      "name": "reconcile_by_nonce_transient_settle_error_preserves_nonce_for_retry",
+      "sha256": "f6cca50b79cde1cdca1adec1237c562896e029c4b1090f22c915a7a77d757668",
+      "count": 1
+    },
+    {
+      "name": "reconcile_stamps_mustprepay_prepayment_rail_reference",
+      "sha256": "8ba6601735376a8eaffa86a858b59ff6e2f47871c02987bd1d23f9400ed8e6a4",
+      "count": 1
+    },
+    {
+      "name": "reconstructed_kernel_preserves_pending_hybrid_artifact_and_dispatch_identity",
+      "sha256": "6e5cc6e9ca9e375fcd323fcbf239a2b18b868a0c25587cc316d788eae8efce27",
+      "count": 1
+    },
+    {
+      "name": "reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal",
+      "sha256": "ee1d302604fbe366646c1eb7ada91b6ec922759165244463d9eb7bff3a884bae",
+      "count": 1
+    },
+    {
+      "name": "redaction_reapplies_stream_chunk_cap",
+      "sha256": "146ba7c42ff36e9d2cfaa2a5d0156f4d262c50ebb816110eab5f42efd1850787",
+      "count": 1
+    },
+    {
+      "name": "refused_delivery_preparation_compensates_before_dispatch",
+      "sha256": "e1a8c305a5222b640332dc817cbbd933fcda8a5d4e1f9bd55ddaf5e375f4e35e",
+      "count": 1
+    },
+    {
+      "name": "rejected_capability_does_not_retain_original_request_material",
+      "sha256": "efb076fe944afc56224dfcac14c808e59bfb51e93131804989b8ba2806d9e866",
+      "count": 1
+    },
+    {
+      "name": "rejection_with_warning_logging_does_not_call_hook_name",
+      "sha256": "f47418d16f0b8f00c1681aa0e745d37ad2e583818f83ebd4ce7fbdfa9017cf8b",
+      "count": 1
+    },
+    {
+      "name": "remote_delivery_rechecks_revocation_after_preparation",
+      "sha256": "21cf931bee071471723de031bc58f5aef4eab2a2992016e405fa98f5a97158b0",
+      "count": 1
+    },
+    {
+      "name": "repeated_failure_reports_have_distinct_signed_ids",
+      "sha256": "039a7cb6eecadeddf3bd8773533d90d47f5d36f502e2ce5903f93f3165aba6ec",
+      "count": 1
+    },
+    {
+      "name": "replacement_signed_proposal_cannot_take_over_session_wait",
+      "sha256": "caa5a75c0949d23c4beeab26e06688abc150a321d2c5bfc00983e75c2d4d350f",
+      "count": 1
+    },
+    {
+      "name": "replayed_nonce_is_rejected_by_store",
+      "sha256": "b35a57d5e6e0b458649c987b1b9d52f320d89189c96b673f3c0c2bea935b75b7",
+      "count": 1
+    },
+    {
+      "name": "report_binds_original_operation_and_exact_content_without_caller_authority",
+      "sha256": "08bc9f22ec28b6ebbea732a6d36e7264052752bbe2ec9ccf41e647fdf78942c0",
+      "count": 1
+    },
+    {
+      "name": "report_refuses_classical_signer_below_boot_floor",
+      "sha256": "fc81c78366671f708c57d851bc4adfb0614f4f7161553b7f620992456ce63839",
+      "count": 1
+    },
+    {
+      "name": "report_tenant_is_explicit_session_snapshot_not_ambient_or_caller_metadata",
+      "sha256": "fee3de53bd13ea020c551746acbcfbc5691824ef148734023316beea2108f174",
+      "count": 1
+    },
+    {
+      "name": "request_cancelled_marks_reservations_retained",
+      "sha256": "f2cbff33332afc13f3ea048853f7b31ae950ad37dd199e2cae2e8752209ca792",
+      "count": 1
+    },
+    {
+      "name": "request_incomplete_marks_reservations_retained",
+      "sha256": "8d23e6b26e1fc5deea7233230c461717d30cd905ff3f2cde44d081aaabcf86d7",
+      "count": 1
+    },
+    {
+      "name": "request_keyed_tenant_scope_survives_missing_thread_local_scope",
+      "sha256": "2c2110454c0a1e8071eb92c5cfce910bc1fceb5068304ffaccab5d6832e73f90",
+      "count": 1
+    },
+    {
+      "name": "require_presented_nonce_denies_when_missing_in_strict_mode",
+      "sha256": "d6430fe9e5fc786d9956b89924708bcbc2e451e968f57d31ce897b7642a37b0f",
+      "count": 1
+    },
+    {
+      "name": "require_presented_nonce_passes_when_valid",
+      "sha256": "2c64446a83211e9271aa8e2d68f60e45981872ce2468898aca9a50799122bd94",
+      "count": 1
+    },
+    {
+      "name": "required_swarm_rejects_hook_without_dispatch_revalidation",
+      "sha256": "878da80b0b56c17726fc21e26b74db488bda8abeb10a82d30707a82a2c8287b4",
+      "count": 1
+    },
+    {
+      "name": "required_swarm_rejects_malformed_context_without_dispatch",
+      "sha256": "02b1674417c3d42225d904b592afec1992fe7d3901cf99a926399c657ece75e9",
+      "count": 1
+    },
+    {
+      "name": "required_swarm_rejects_missing_hook_and_replacement_with_ordinary_hook",
+      "sha256": "7b35e501fb04702ab55cae9ad948c806674efb2f478d9431a092d6888060e139",
+      "count": 1
+    },
+    {
+      "name": "required_swarm_rejects_omitted_context_before_permissive_hook_or_tool",
+      "sha256": "b18fdd2f8a36c4ddd2ce90ad117d18a372fc4b10a5981f59334ddddacde25810",
+      "count": 1
+    },
+    {
+      "name": "reserved_hold_ttl_matches_minted_nonce_expiry",
+      "sha256": "49194ac058fba1d235cf7fea4e3feda3cb1120043ede3fa4196769128f46446e",
+      "count": 1
+    },
+    {
+      "name": "reserved_hold_ttl_reaper_settles_expired_authorization_at_worst_case",
+      "sha256": "64e08e76afe5c50c4dd71db945da01c2ed493f96e750e1632d40f53c0f185b2d",
+      "count": 1
+    },
+    {
+      "name": "reserving_authorization_admits_governed_mustprepay_with_settled_prepayment",
+      "sha256": "db4be7ccd265082939737dc27c7964a65f4b756bd7dbe99f20989af3f9551974",
+      "count": 1
+    },
+    {
+      "name": "reserving_authorization_denies_governed_mustprepay_without_settled_prepayment",
+      "sha256": "7263b4af800e1f41ed1473acfa66289cd6b17b85f1cf2a74cc909c08723352f8",
+      "count": 1
+    },
+    {
+      "name": "reserving_authorization_keeps_hold_open_and_blocks_oversubscription",
+      "sha256": "9d5ae61a948a43c2ec170aa485b177b25388ff8fbf262a1ddacbf619ab403cb5",
+      "count": 1
+    },
+    {
+      "name": "reserving_authorization_leaves_non_mustprepay_path_unchanged",
+      "sha256": "277a069adc5291180fcc9d8d7cee2cd733f4f02c2a9524f19a5b228ab89ce2ad",
+      "count": 1
+    },
+    {
+      "name": "reserving_authorization_rejects_presented_execution_nonce",
+      "sha256": "03c88c9686488a505b2da0a902207147e0b848fcc659f179c0d8b6b0c61db090",
+      "count": 1
+    },
+    {
+      "name": "reserving_authorization_succeeds_for_unregistered_tool_server",
+      "sha256": "e1a79d36755e66d1d718ff7845aec48dc5d6fcb25158765efd300c24384be904",
+      "count": 1
+    },
+    {
+      "name": "reserving_authorization_terminal_state_matches_receipt_decision_reason",
+      "sha256": "9ba7531bf34be9e6010e2ced3963223be710cf763fda296b0108e06f5d5c4f0e",
+      "count": 1
+    },
+    {
+      "name": "reserving_mustprepay_stamp_failure_refunds_captured_prepayment",
+      "sha256": "0bf715aa12d57a3c10fb45662d4a3bb3700d6085fdb37ceaf910188ba46facb6",
+      "count": 1
+    },
+    {
+      "name": "reserving_receipt_persist_failure_is_nonfatal_and_reservation_reconcilable",
+      "sha256": "2b00b403e296d2d93c90ea0282684a27abcfcf83f2eb3da17b1fbec7ef232342",
+      "count": 1
+    },
+    {
+      "name": "reserving_receipt_persist_failure_keeps_delegated_reservation_and_share",
+      "sha256": "074ab113a4146f5f4229bbc0e4b63297a84a874aaa635c0ae2527b79dd890020",
+      "count": 1
+    },
+    {
+      "name": "reserving_stamp_failure_persists_no_reserved_receipt",
+      "sha256": "a803adb6e24381646b408073df5f99d83760d7275bb379dd266f647e03618d72",
+      "count": 1
+    },
+    {
+      "name": "reserving_stamp_failure_reverses_authorized_hold",
+      "sha256": "7baef6f132311fc77689a2b622e3bb0a70cd94a8971cae56eef20fbafc699a7e",
+      "count": 1
+    },
+    {
+      "name": "restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve",
+      "sha256": "82687dc1ddd2f1e430718532a8c493826125327521c415e4b6e7277f07f0d5ff",
+      "count": 1
+    },
+    {
+      "name": "resumed_session_revalidates_approval_votes",
+      "sha256": "19e0178c50e8428fe056904245a2c847c653933b3d05fa7e64a141e7f29a65fd",
+      "count": 1
+    },
+    {
+      "name": "resumed_session_revalidates_current_threshold_policy",
+      "sha256": "16a2f2dc27394ed853255039202761f30759b9cd3aabc0da62ba0b67373102ca",
+      "count": 1
+    },
+    {
+      "name": "resumed_session_revalidates_revoked_capability",
+      "sha256": "9650db3cb7f0b8a58b86dc0bf0627cdb581a357fe824baf0901ccd6685fcd264",
+      "count": 1
+    },
+    {
+      "name": "retained_capability_liveness_rejects_revoked_delegation_ancestors",
+      "sha256": "c2780092eed62fd03641cf7697fafe31d55af2f9f66900d786373194ac318733",
+      "count": 1
+    },
+    {
+      "name": "retained_capability_liveness_revalidates_signed_subject_time_and_current_authority",
+      "sha256": "50b42ba2a806f5ad5a2cd61c4661fa9958abb462023e373e595522ba4f47932b",
+      "count": 1
+    },
+    {
+      "name": "retained_current_profile_binds_security_but_not_mutable_flow_generation",
+      "sha256": "6a28af4efefb2b59671660d1ed6a49847b1116e4e2b5455ba3be9d81f63b2355",
+      "count": 1
+    },
+    {
+      "name": "retained_current_profile_rejects_downgrades_duplicates_and_aliases",
+      "sha256": "1de4b468e562232053a4772f91a92af541ec01014631bed5214af8d8c16a84c0",
+      "count": 1
+    },
+    {
+      "name": "retained_federation_context_does_not_bypass_public_replay_revocation",
+      "sha256": "1afb07b715b29393855f481f925ae5053c61720c19989d2c4efccf2fc808f1b2",
+      "count": 1
+    },
+    {
+      "name": "retained_federation_context_finalizing_recovery_survives_owner_rotation",
+      "sha256": "dde62914d91b406096151b0e903534f82dd7a247ab21944381a5dbc71454316c",
+      "count": 1
+    },
+    {
+      "name": "retained_federation_context_is_private_and_cannot_be_removed_by_schema_downgrade",
+      "sha256": "2e78682d67f410664793d7ddbcd3cce7666c2d20e5e15c019e7a80012ce4dcef",
+      "count": 1
+    },
+    {
+      "name": "retained_federation_context_recovers_without_live_peer_or_new_runtime_admission",
+      "sha256": "b3c2b2926d63b13195930bf5b1594a753ce0ab287b3a7e3c3ee4237d4e29a353",
+      "count": 1
+    },
+    {
+      "name": "retained_federation_context_recovery_uses_original_pin_time",
+      "sha256": "87d0cbb547def82d1d506cc1f5de80812ce0cc700e3d7234fb4534b85119160f",
+      "count": 1
+    },
+    {
+      "name": "retained_federation_context_rejects_a_changed_local_identity",
+      "sha256": "91e57b5908b610d3983d3256ea7111fdac4bee93b57d43fdc7d79727504e81bf",
+      "count": 1
+    },
+    {
+      "name": "retained_federation_context_rejects_wrong_treaty_pin_before_dispatch",
+      "sha256": "4ec8b1d2a40ec758ed90829d4cd52b8409c813fa5fbd7b3b92ccd6ac50b71bf7",
+      "count": 1
+    },
+    {
+      "name": "retained_federation_context_tampering_fails_the_committed_outcome_binding",
+      "sha256": "a5bfa1cd5c22f82bd53d53d96964e384c37a2500f9af10746b16490b6146aa09",
+      "count": 1
+    },
+    {
+      "name": "retained_hybrid_receipt_requires_original_authority_without_redispatch",
+      "sha256": "5bb3ec4a24d0922e7f5f479ca68b7a493e5ad50f16e54c7f74b9cc5db1ee92a6",
+      "count": 1
+    },
+    {
+      "name": "retained_marker_requires_a_real_reservation",
+      "sha256": "0b6e5eb6bd3af06e1233ee01b0a2325e63716d34216a17a977a82ac16e79bc31",
+      "count": 1
+    },
+    {
+      "name": "retained_runtime_release_does_not_depend_on_current_hook_selection",
+      "sha256": "42f63b4e181140e3be1dd401d20fe4e5ef693bd187f2ffbee2aa62a69b899e1b",
+      "count": 1
+    },
+    {
+      "name": "retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid_generations",
+      "sha256": "7db0b20688886b6e470dd855c35c1a30569405b11a1930e523a4ff70b8f3e3a5",
+      "count": 1
+    },
+    {
+      "name": "retained_treaty_evidence_rejects_unknown_fields",
+      "sha256": "8a51b0b7bb8a285a317546bdda5ddf54758039d62111c6696285964112578752",
+      "count": 1
+    },
+    {
+      "name": "retained_treaty_evidence_reverification_checks_original_signatures_and_keys",
+      "sha256": "2f26c4ad88ac8fe743967e4a4ed60fcee79ea7801308e8dc27e091bde5d697cd",
+      "count": 1
+    },
+    {
+      "name": "retired_dpop_source_denies_preparation_before_other_credentials_mutate",
+      "sha256": "82871f000f73ac176658293a67bcaaa3af6f6d722e95611623e886579f58f719",
+      "count": 1
+    },
+    {
+      "name": "return_context_rejects_request_or_grant_substitution_before_commit",
+      "sha256": "b85633b9569d1721025f27fd2b14c87cbdf13076d3734dc23824877b9c0159fd",
+      "count": 1
+    },
+    {
+      "name": "returned_backend_drop_keeps_installed_authority",
+      "sha256": "b42850d11943b79392298e535df408c8768d6e4bdbb9edd243cbd08f2bdb981f",
+      "count": 1
+    },
+    {
+      "name": "revocation_gate_allows_an_installed_view_without_a_durable_store",
+      "sha256": "105e85b0139737d01dee62fd96834329c56f3dc5b9f3bbbb5e25a0e987c0d580",
+      "count": 1
+    },
+    {
+      "name": "revocation_gate_allows_ephemeral_store_with_optin",
+      "sha256": "311a030ba6286a4edd889fd7b0ddec2d0533c83aa432ec91fa726d61854b38e7",
+      "count": 1
+    },
+    {
+      "name": "revocation_gate_denies_ephemeral_store_without_optin",
+      "sha256": "99029d353732d97e60ca6f51f0e5b751d0a0f4c9858168ec429b9f9aea06a099",
+      "count": 1
+    },
+    {
+      "name": "revoked_ancestor_capability_denies_descendant",
+      "sha256": "0e98c6a5943777c20b5ccff6b458d297693e322c96dadd34002797c716a03cd4",
+      "count": 1
+    },
+    {
+      "name": "revoked_capability_denied",
+      "sha256": "ebee81f6c3133473bd77f8410e4296e87aeb7a631ca046fe89d2281b31dc5634",
+      "count": 1
+    },
+    {
+      "name": "rotated_authority_does_not_resign_retained_proposal",
+      "sha256": "b5cfcfcbf9a21b0e249583156fb5845a5961cff51d40cfb0dc3aedd2c28eda87",
+      "count": 1
+    },
+    {
+      "name": "rotated_session_authentication_cannot_resume_threshold_wait",
+      "sha256": "3efd8f9463ced019fb92230e02dddca1fe30e8c94fadfa66d72105d0a11fe490",
+      "count": 1
+    },
+    {
+      "name": "route_failure_leaves_the_receipt_and_work_durable",
+      "sha256": "0e792949aee2f71f08b9c6ab155bb084cc7a6adcbafede493aa031849d9dc966",
+      "count": 1
+    },
+    {
+      "name": "rss_shed_persists_signed_overload_deny_receipt",
+      "sha256": "99e48f21e47cbad44e686d4d0d30bfd034bfcb53c20d78f2c91ce75e39039b40",
+      "count": 1
+    },
+    {
+      "name": "runtime_claim_allow_requires_exact_acknowledged_physical_readback",
+      "sha256": "185c9b9af69acdc2fd629c130706f3fb0271a37e280aed9e0f24762457415f8e",
+      "count": 1
+    },
+    {
+      "name": "runtime_claim_lost_ack_and_callback_panics_deny_without_losing_recovery",
+      "sha256": "fae19fdc7058ea68527b3f4ae40cc8d6d1ce06c8340a7b45cee64da59c67f7ea",
+      "count": 1
+    },
+    {
+      "name": "runtime_cleanup_lost_acknowledgement_requires_readback_on_retry",
+      "sha256": "b718db4d299e6372fa14461b5ce8460db824f3cc71a6450b12013f7138f99eef",
+      "count": 1
+    },
+    {
+      "name": "runtime_cleanup_missing_empty_and_unsupported_history_fail_closed",
+      "sha256": "e09d8b72a038c955c17bdfb24113bfbd03f844a34674f09a62f6b08345298367",
+      "count": 1
+    },
+    {
+      "name": "runtime_cleanup_rejects_changed_operation_readback_before_release",
+      "sha256": "0aab112ebadc0b96d2077880b09a4c386649ee1c61a08b90887cfe10e6382c8d",
+      "count": 1
+    },
+    {
+      "name": "runtime_cleanup_rejects_success_without_exact_physical_release",
+      "sha256": "956a839f2358b6383400ca5f7f95c0531dc8017686f6ab4383c5dc63c61685b1",
+      "count": 1
+    },
+    {
+      "name": "runtime_lease_panic_denies_swallowed_failure_and_preserves_recovery",
+      "sha256": "b8a23b59ada55cb3c0df370eee222b9c20df2f107dd19f9552be012a28f5d7e9",
+      "count": 1
+    },
+    {
+      "name": "runtime_selection_panic_cannot_fall_back_to_legacy_evaluation",
+      "sha256": "d1f3a2d8a6dd427e931bbcc25430988af702ff0670329d94fce63f21ad334279",
+      "count": 1
+    },
+    {
+      "name": "runtime_selection_panic_is_denied_before_original_admission",
+      "sha256": "8b54e20c4df3475a1eac909f87955883de100e0a44e171ecaf8219263be1bc68",
+      "count": 1
+    },
+    {
+      "name": "sampling_validation_requires_policy_and_negotiation",
+      "sha256": "f19ae318b0fade889e1f62a5a6cb962e1e9fd7fbbb82b4a42053a67f4b8bd4ea",
+      "count": 1
+    },
+    {
+      "name": "security_binding_preserves_large_ordinary_requests",
+      "sha256": "85207edfe5f6f54f673f38e797f8f1fae3646fc4c0b94c9e81dd521f0f70349f",
+      "count": 1
+    },
+    {
+      "name": "security_bound_raw_return_recovers_without_a_live_request_or_redispatch",
+      "sha256": "c4cd43049ce174420a5ec19e09222f88ca6794c9e1bb2898ead71e543a1f8b9e",
+      "count": 1
+    },
+    {
+      "name": "security_rejection_after_payment_preserves_actual_credential_disposition",
+      "sha256": "3ca7acbb0f8f02e473f15252fe0da938e2208bbee652b0fd550970f32cfd175a",
+      "count": 1
+    },
+    {
+      "name": "security_rejection_keeps_credentials_reversible_until_dispatch",
+      "sha256": "e4a6565ddf1d536985dfb5f5714fd05f76d813114fbfac577c7d034a06ceb201",
+      "count": 1
+    },
+    {
+      "name": "security_rejection_releases_dpop_nonce_and_approval_as_one_attempt",
+      "sha256": "d0e9627869fcdbc843666d22966ec6fac728e79014aa6f471e6c9aec03eb96b3",
+      "count": 1
+    },
+    {
+      "name": "security_rejection_reports_unconfirmed_credential_rollback",
+      "sha256": "b14fb9c8fd9059d4118e6a3c26529d790147c69ed944aa80d4f6a329f1ff107a",
+      "count": 1
+    },
+    {
+      "name": "security_release_requirement_and_federation_survive_either_codec_order",
+      "sha256": "1f24487883acfb5581aa815116a46272b85eea36b30ba76474d29d8aa4a1e64b",
+      "count": 1
+    },
+    {
+      "name": "serving_closed_store_denies_before_an_early_capability_rejection",
+      "sha256": "f8ad4760cb9c20060fd2ee8b6cbb978afdc01cda85c57b832dafc11753f06587",
+      "count": 1
+    },
+    {
+      "name": "serving_closed_store_deny_is_not_masked_by_its_own_receipt_append",
+      "sha256": "1be0545379039c0a3390e18e384a00acfc68381c17153f944e94706d045f2c57",
+      "count": 1
+    },
+    {
+      "name": "session_lifecycle_is_hosted_by_kernel",
+      "sha256": "57116208caa398d9403c499a49ad62c7ec8da8bc406f06f6c1041983eef99d3f",
+      "count": 1
+    },
+    {
+      "name": "session_operation_capability_list_uses_session_snapshot",
+      "sha256": "120fa0f67b04b3f00bd08a51a0710de49e1fe002b713561fff8c4217c575cc3b",
+      "count": 1
+    },
+    {
+      "name": "session_operation_completion_returns_candidates_and_enforces_scope",
+      "sha256": "26d34116d86aaa06d85b290527befae15d7b664ff1211ccf7d7e50d692efff14",
+      "count": 1
+    },
+    {
+      "name": "session_operation_forwards_supplemental_authorization_to_kernel_validation",
+      "sha256": "fd4f7a32b16c8f9458372f2546a05a924accdf796a9eae88d08dd0da7f2504c6",
+      "count": 1
+    },
+    {
+      "name": "session_operation_get_prompt_enforces_scope",
+      "sha256": "9c931c60cc62e3633879e1897dc6b0b7632070de191b4d61777fa72e0a822103",
+      "count": 1
+    },
+    {
+      "name": "session_operation_list_resources_filters_to_session_scope",
+      "sha256": "3425bbf42667dfd0f6be3731336affba447465f141467554a3cf0072715431fd",
+      "count": 1
+    },
+    {
+      "name": "session_operation_list_roots_uses_session_snapshot",
+      "sha256": "495d6e69c2f3e92c61cab885b4721ec8956e66ec6cbc0f64a7c70d8e490df1e6",
+      "count": 1
+    },
+    {
+      "name": "session_operation_read_resource_enforces_scope",
+      "sha256": "854cce6627320dac64a261cc452addeb34704c87106ed7e73dc2c81bcbd701cc",
+      "count": 1
+    },
+    {
+      "name": "session_operation_read_resource_enforces_session_roots_for_filesystem_resources",
+      "sha256": "1be8101b8621f3ba1e3cf0776ac6f2b160526710d2c6ae9fa04fd28ee7d1babe",
+      "count": 1
+    },
+    {
+      "name": "session_operation_read_resource_fails_closed_when_filesystem_roots_are_missing",
+      "sha256": "106d9e253769b314f572079ea60a8ebd4777fd4987873d090d8e34143ee8a965",
+      "count": 1
+    },
+    {
+      "name": "session_operation_rejects_nonce_bound_to_another_request",
+      "sha256": "e5ff3b4c694672776fac2e76ea25a5620771beb16f2df00dc58c7faa7edf795f",
+      "count": 1
+    },
+    {
+      "name": "session_operation_tool_call_malformed_nonce_clears_inflight",
+      "sha256": "9c497bc488f1a680dc3f70688f879333d7bc911bd38b81c9dae5c8250dd795af",
+      "count": 1
+    },
+    {
+      "name": "session_operation_tool_call_tracks_and_clears_inflight",
+      "sha256": "468eadcc4162a25878f647f99408f983f7d563aaaecbfd49935a54ba1de053cf",
+      "count": 1
+    },
+    {
+      "name": "session_reports_never_seed_claim_route_or_invoke_settlement",
+      "sha256": "2e5551856f64257a695beac1aa143dc6a4f04cfbc291e20ba025f283f9fcd0cf",
+      "count": 1
+    },
+    {
+      "name": "session_reports_use_boot_selected_hybrid_authority",
+      "sha256": "1f62ceff4b620192938b9667a6f6b01f8b8c26e6b6796c0eb11f6832473215d4",
+      "count": 1
+    },
+    {
+      "name": "session_tenant_id_is_stamped_on_tool_call_receipt",
+      "sha256": "43421c8eb989fd5b1aaa7ff747aaeb1febb9cb40a11a0692d634ed1b84790da2",
+      "count": 1
+    },
+    {
+      "name": "session_tool_call_preserves_chio_swarm_runtime_context",
+      "sha256": "580c3406c923b3ea69edea364301e9ef5e0420c63ac884c7886d02fef4c37386",
+      "count": 1
+    },
+    {
+      "name": "session_tool_call_records_incomplete_terminal_state",
+      "sha256": "37b1e74985ed5c0f68c32a20d54ce2673d500df13d07cbcd98a6d71c7e09d2d4",
+      "count": 1
+    },
+    {
+      "name": "session_tool_call_uses_context_authority_and_final_security_fence",
+      "sha256": "109caf8f5a9ae16a1ed54922fe9efdec53f7d4f40bd2752328f0c3f7909f2987",
+      "count": 1
+    },
+    {
+      "name": "session_without_tenant_id_produces_untagged_receipt",
+      "sha256": "c335a806af0170ae7859401084b52e3dcc3d1832c5976eb03138b3a171441de7",
+      "count": 1
+    },
+    {
+      "name": "set_session_auth_context_rolls_back_when_anchor_persistence_fails",
+      "sha256": "e2e9f3c379bde4abf3d8eabed954cb3bf67993c83094ea07d9b8b4f9a233deca",
+      "count": 1
+    },
+    {
+      "name": "settled_legacy_authorization_uses_authorization_id_as_payment_reference",
+      "sha256": "217587f539552ded4f999f1932f625b0592d4f680f0184540f805a65e68cf5e7",
+      "count": 1
+    },
+    {
+      "name": "settled_no_charge_mustprepay_ambiguous_dispatch_retains_payment",
+      "sha256": "8eebdefafa754e15b61bf1ede1d3c0013c2aba40394fd3c9db3bdc9101f9d061",
+      "count": 1
+    },
+    {
+      "name": "settlement_hook_does_not_hold_the_receipt_store_write_lock",
+      "sha256": "8fb4a59e02257579f14dee3852eb9cb656b7605ceb70a2e90d5df31293325b1b",
+      "count": 1
+    },
+    {
+      "name": "shared_threshold_rejects_oversized_set_before_policy_lookup",
+      "sha256": "f6ecdfb06f63a5e821d31fb163d781e5ed6a15557946cb532c14fe6045d94407",
+      "count": 1
+    },
+    {
+      "name": "shared_threshold_rejects_proposal_algorithm_metadata_substitution",
+      "sha256": "aa61ccc4cf5188073771ca03cdb5390d4aafc59c8f7da7caab74de72310da874",
+      "count": 1
+    },
+    {
+      "name": "shared_threshold_rejects_vote_algorithm_metadata_substitution",
+      "sha256": "fded8f740707536e8a7244f95a605f8b5a11c9cb5e09da8a3a927490f5b4c31e",
+      "count": 1
+    },
+    {
+      "name": "shared_threshold_resolves_current_route_exactly_once",
+      "sha256": "411222d9b8206cdd639760a414219bc4c602575dd010faaf6d53b8231e0a0d9e",
+      "count": 1
+    },
+    {
+      "name": "shared_threshold_verifier_rejects_classical_proposal_with_hybrid_votes",
+      "sha256": "3a99dddc80a6f6cdd85e99c4e2bebca039d930d88337b506c283f8c063ed500f",
+      "count": 1
+    },
+    {
+      "name": "sibling_sum_denial_reverses_pre_execution_invocation_increment",
+      "sha256": "94b6e74f474920004fc2822852d3cb679f697ac13bc8e3cfe217f31d4912cd58",
+      "count": 1
+    },
+    {
+      "name": "sibling_sum_denial_reverses_pre_execution_monetary_charge",
+      "sha256": "2bb58bde6136ec6861f848d83e14e2ca1dff8c7355d374bc4940ae9101bcee8d",
+      "count": 1
+    },
+    {
+      "name": "side_effecting_mode_exempts_only_explicitly_read_only_tools",
+      "sha256": "25af99c5ff68ec21463f20c89acf83de3f3e16c53721e27e7157409f4a89e837",
+      "count": 1
+    },
+    {
+      "name": "signed_receipts_preserve_uncapped_and_full_width_grant_ceilings",
+      "sha256": "8f9840591fda0859ec36fcc40fd0adab662d891ad98148987c56a9c2b29b4a30",
+      "count": 1
+    },
+    {
+      "name": "signer_callback_cannot_extend_the_original_finalization_lease",
+      "sha256": "d548c3e0fb1b243529bc8c6598ad257cdc9c9f12d79563d2668ddfa1c2ecfdae",
+      "count": 1
+    },
+    {
+      "name": "signer_can_reenter_without_holding_the_mutation_sequencer",
+      "sha256": "b8c5ef2e8e5ce0305c7a85149afe27b9641c8bd6392548d4f4f2bc37b2e24bc9",
+      "count": 1
+    },
+    {
+      "name": "signer_identity_substitution_cannot_publish_a_terminal",
+      "sha256": "6eab4c0a71595a48fea13692e32c09203473c68f4e21c477dae60201a145f66c",
+      "count": 1
+    },
+    {
+      "name": "signer_panic_preserves_finalizing_without_poisoning_the_sequencer",
+      "sha256": "72e3b221c082be6c28549b331e110a5fb86e0f4f31261e0e6f257395ff05a8f2",
+      "count": 1
+    },
+    {
+      "name": "sim_adapter_abort_after_dispatch_retains_authorization",
+      "sha256": "402c5e7e56224c46f2e1be3184f04134ee1bd1dd98e7d659f001f2106a2dde65",
+      "count": 1
+    },
+    {
+      "name": "sim_adapter_settles_governed_mustprepay_onto_receipt",
+      "sha256": "4a82002ec6eafe463bcfa4ef93c8c33fd2dc630b33f8ff29ca7eaaee1b327d3a",
+      "count": 1
+    },
+    {
+      "name": "sim_adapter_zero_actual_cost_retains_prepaid_charge",
+      "sha256": "3107b578b3ca7957a45e75dc071bd3d1e68946ede863ebfa4c87cd3e55af3585",
+      "count": 1
+    },
+    {
+      "name": "sqlite_revocation_store_survives_kernel_restart",
+      "sha256": "679b990d2ac74b94849e0b9f0383bd81ca2c330ef5ab5d02de9147f7e8909164",
+      "count": 1
+    },
+    {
+      "name": "stale_nonce_is_rejected_after_ttl",
+      "sha256": "3481a7eb5a96eaef0c4c88e580835f7e9bf0f990413f653bef340b02e816b507",
+      "count": 1
+    },
+    {
+      "name": "startup_recovery_rejects_a_changed_post_return_plan",
+      "sha256": "7ada7e67cee93555822bf82b7164eda11f43b4155bdfdccf9ed481464bf5676d",
+      "count": 1
+    },
+    {
+      "name": "startup_recovery_reverses_the_executable_hold_after_budget_authorization",
+      "sha256": "c1275a5175ce0735eef8f756f32fe2bb27a9fa6e4d653340258a4bf63ff0b127",
+      "count": 1
+    },
+    {
+      "name": "startup_recovery_terminalizes_admission_before_budget_authorization",
+      "sha256": "b1a82777bdd01977fae6aa507e1431708f5d4ce45e12817ae0263c41daac96a8",
+      "count": 1
+    },
+    {
+      "name": "store_miss_falls_back_to_local_mirror",
+      "sha256": "802e192adeefd4e8cd83f4dc0b729df478a38ddd841c675653d22c936a6bb022",
+      "count": 1
+    },
+    {
+      "name": "store_read_error_propagates_and_is_not_mirror_served",
+      "sha256": "e84141d38e7de0061a32342eb72f98975a8c961f8080f73fe0e1eb384532221e",
+      "count": 1
+    },
+    {
+      "name": "streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete",
+      "sha256": "82a2acd9b995d7d9da40eea0e961d0c3c786d8cb8375ec28d5e8ff7825c957d2",
+      "count": 1
+    },
+    {
+      "name": "streamed_tool_receipt_records_chunk_hash_metadata",
+      "sha256": "6c07107d6901929625c4442421b898f50d382cfe268e47834dfd7381f87481d5",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_denies_dispatch_with_mismatched_binding",
+      "sha256": "55714ad28798e9873c986f9694a85d4d52f74788b674a708c527a3583b6632fa",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_denies_dispatch_with_stale_nonce",
+      "sha256": "7cf0ba158dc85279462511f6b11af7439c0932adb8201f73138e83f928e9e114",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_denies_dispatch_without_presented_nonce",
+      "sha256": "e4ba7b31a84ff4ba516872d0dd965cba8d14795d2d90eb5a49a5d5af410271be",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_denies_missing_nonce_before_server_lookup",
+      "sha256": "24d497d00eb51278f4ff37b511b245fd55fd0b835295fe2d5789db57a04371c9",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_dispatches_once_with_presented_nonce",
+      "sha256": "a93ca992d54b2ee70fad47cedfefeb97269e1c1846922c097406e11cce2c4d12",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_nested_flow_operation_forwards_presented_nonce",
+      "sha256": "1fead7164b09d24c7db3492161d574dd31b6b7c2b92477bb76cd8532db51f990",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_payment_denial_does_not_consume_nonce",
+      "sha256": "ea764aeb70987f5d22a71821e49b22b372022055f6584a799a41722994a4784c",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_preflights_nonce_then_executes_once",
+      "sha256": "d926b7ed1fcf0d1b0686fe03a469ddfb12f29337a57cde2e591c6313b233d9c1",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_request_id_mismatch_precedes_monetary_side_effects",
+      "sha256": "48d1326cbcebd4ce14c3d7510702deb4b970d1b07c155fc248728d2c194118e6",
+      "count": 1
+    },
+    {
+      "name": "strict_nonce_mode_still_preflights_before_the_external_rail",
+      "sha256": "8bdc965e6b96e15687939e8dcea1e40f1cbb07474f51cbe32172fe84d7b9f9cc",
+      "count": 1
+    },
+    {
+      "name": "strict_retry_mediated_spend_receipt_names_presented_nonce",
+      "sha256": "3f8c53e5592e7311661232a8388165f8cb70fbe1c8131fb26f6151c8f476d750",
+      "count": 1
+    },
+    {
+      "name": "subject_mismatch_denied",
+      "sha256": "d36fc0d2e6ce0490d9dd4f8a7cc216de1aa681b41de008e2d6accda20cdac3c3",
+      "count": 1
+    },
+    {
+      "name": "subscribe_session_resource_requires_subscribe_operation",
+      "sha256": "3bd178e9c89c2283c22b82f68e41b76d8b7f1005cdcb383cd6638f4ccb8d5804",
+      "count": 1
+    },
+    {
+      "name": "supplemental_authorization_is_rejected_before_dispatch_when_unconfigured",
+      "sha256": "a929faeca0e5b99454e9b31e9e769cf8e1b88113a136c044043272ac3ad0246d",
+      "count": 1
+    },
+    {
+      "name": "suspended_receipt_context_migrates_and_cleans_up_on_its_own_context",
+      "sha256": "45d91269142386766e8f1c14186e834bc9714ab05e7a0dda48f31375d92e84d5",
+      "count": 1
+    },
+    {
+      "name": "sync_bridge_current_thread_diagnostic_only_advertises_multithread_runtime",
+      "sha256": "280728f3adb890910db819f4ddb88f258c7c35f861f7d2bf458f2d5068538193",
+      "count": 1
+    },
+    {
+      "name": "sync_tool_server_event_queue_current_thread_returns_error_not_empty_success",
+      "sha256": "b3b39c737e42edb116110a6e434c0877e44e430436b6cdecd8d4eaa5593e3da3",
+      "count": 1
+    },
+    {
+      "name": "tampered_signature_is_rejected",
+      "sha256": "f87e7fa73a9c874f411372cc48d54ff2ce49f315404b3ddf1d6084ab6bc002f9",
+      "count": 1
+    },
+    {
+      "name": "tenant_id_falls_back_to_oauth_federated_claims",
+      "sha256": "a025da317e5bcf1e0176a3471a4b2a7c72d55280907937544e61d1c9453f074c",
+      "count": 1
+    },
+    {
+      "name": "terminal_allow_persistence_rechecks_revocation_at_append_boundary",
+      "sha256": "97a40a83d4532ea9760eca1a08b2a6372e3d46145daf3ee2167cbb2f1be97e2c",
+      "count": 1
+    },
+    {
+      "name": "threshold_approval_set_is_policy_bound_and_order_independent",
+      "sha256": "0c947f8687c56f193f36221a6cd48e14553e3d3be7e5ab98f7c826f1a282a29a",
+      "count": 1
+    },
+    {
+      "name": "threshold_session_rejects_unsupported_durable_nonce_profile",
+      "sha256": "ee79965e6904b6a1c481351c79b01ad852b0f4e075f268af3647e2b53a0ade89",
+      "count": 1
+    },
+    {
+      "name": "threshold_verifiers_enforce_replay_member_id_bounds",
+      "sha256": "5b59325767c3ef1e68f510bdbfcae1fab6bcff330d5c0cdab12b5dff6ee734af",
+      "count": 1
+    },
+    {
+      "name": "timed_out_dispatch_aborts_a_queued_blocking_task_before_it_runs_the_tool",
+      "sha256": "6c8778d119d9ceb22200f915e08fbe34aa4032fd49ee59eb688854e8f0c2dbf8",
+      "count": 1
+    },
+    {
+      "name": "tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscriptions",
+      "sha256": "3a10593f7a20e3deb563d537dfa4165726e47241c319a4501b93edfd11cd2b23",
+      "count": 1
+    },
+    {
+      "name": "tool_call_nested_flow_bridge_propagates_child_cancellation",
+      "sha256": "fd0ba03481e7ef955d91a698223921a60c9a16cd0192683bc96bb7df8d0a23c1",
+      "count": 1
+    },
+    {
+      "name": "tool_call_nested_flow_bridge_propagates_parent_cancellation",
+      "sha256": "19f546c3ec50ce132484939819fc086f402276743b3eac24435dbd9b0e170523",
+      "count": 1
+    },
+    {
+      "name": "tool_call_nested_flow_bridge_roundtrips_elicitation",
+      "sha256": "410df21946426ba5d53a1e17f90fb0bb620251cf2935a4d10854063fabfca92c",
+      "count": 1
+    },
+    {
+      "name": "tool_call_nested_flow_bridge_roundtrips_sampling",
+      "sha256": "56d5e7357838bac261535bbc8767297f7f61472241c668a0d70451509dd72efc",
+      "count": 1
+    },
+    {
+      "name": "tool_call_nested_flow_bridge_updates_session_roots",
+      "sha256": "15713db717d8a69aa1120376b5fea6a3bb0d6fdb35dd1f86f2036c33ebf452d8",
+      "count": 1
+    },
+    {
+      "name": "tool_call_nested_flow_rejects_malformed_execution_nonce_without_inflight_leak",
+      "sha256": "c5604ea3397f35707c4ee966fc18f6e31a73b5bd5ff1a0d3242a982bb8ea28f0",
+      "count": 1
+    },
+    {
+      "name": "tool_invocation_cost_serde_roundtrip",
+      "sha256": "9bfc61c9fef3b341b1b11e4da97f66e91456b8885c75084f7ba3eee662122f79",
+      "count": 1
+    },
+    {
+      "name": "tool_threshold_rejects_empty_and_oversized_sets_before_policy_lookup",
+      "sha256": "30976f6a097a6c70bd25a426b8bc2474d5c1fa29723cf6bcfbcc22ba7d64c4ec",
+      "count": 1
+    },
+    {
+      "name": "tool_threshold_rejects_proposal_algorithm_metadata_substitution",
+      "sha256": "5b5e8a8fef5dfcb12498eacceae5a66380eab233600a6b26c19e2ac154dc807e",
+      "count": 1
+    },
+    {
+      "name": "tool_threshold_rejects_vote_algorithm_metadata_substitution",
+      "sha256": "c144ca860c4085c9c0fe2b2c35b8fece5510013da5999241aabd6872418b1de8",
+      "count": 1
+    },
+    {
+      "name": "tool_threshold_resolves_current_route_exactly_once",
+      "sha256": "bff6d348589ae693ff18a711dd9c3ef75b8b925a1c9fb144c14f717214f476fc",
+      "count": 1
+    },
+    {
+      "name": "tool_threshold_verifier_enforces_pq_floor_independently",
+      "sha256": "b78f73ae9cb7bb73ed8079a4ad5721c2ea8852c60fd15ef486533ba7ac98f8e1",
+      "count": 1
+    },
+    {
+      "name": "tool_threshold_verifier_rejects_classical_proposal_with_hybrid_votes",
+      "sha256": "5b8e3e74de99a45ab18afdd68c954b2dbc0f9c6ae701eebdd60e88890d24de69",
+      "count": 1
+    },
+    {
+      "name": "top_level_durable_admission_commits_before_dispatch_and_blocks_replay",
+      "sha256": "b083e82f1ba91664a28fd207cb3fdfdb2ed1c4d3112c06ecd2e78d6747254b9e",
+      "count": 1
+    },
+    {
+      "name": "two_kernels_commit_wins_before_the_automatic_fence",
+      "sha256": "3eef37910cbe9a9e19e4ff4b790cac7a1a91e7a3dbe4a8e15cd717b5c4cade58",
+      "count": 1
+    },
+    {
+      "name": "two_kernels_fence_wins_against_an_inflight_automatic_commit",
+      "sha256": "faca6e128ffb53278f4b524c20c3ce5641dd8b7f3f47ea456832f65ffd4ac20d",
+      "count": 1
+    },
+    {
+      "name": "unconfirmed_dispatch_commit_retains_payment_quota_and_approval",
+      "sha256": "1b7ff662475d9fe19108e192db4c79c8fbf3f5b47fa44925ae048a93657a281d",
+      "count": 1
+    },
+    {
+      "name": "unconfirmed_payment_authorization_receipt_names_the_attempted_durable_operation",
+      "sha256": "c815b80aee93984e546c7951be141d4c38a6a10ab6ad2e36d4314e0b84b41f5b",
+      "count": 1
+    },
+    {
+      "name": "unconfirmed_payment_unwind_receipt_names_the_attempted_durable_operation",
+      "sha256": "c410ef5be26b18c930ee547654c1a5fe728e0c5036839feebf9d7e7fe2145079",
+      "count": 1
+    },
+    {
+      "name": "unfinished_return_cannot_be_signed_by_a_replacement_authority",
+      "sha256": "00f83de8bdcb8ab0630a5ce0a469b387ba91fdd3326ec190c9ce2f7cd748bd59",
+      "count": 1
+    },
+    {
+      "name": "unknown_or_mismatched_session_cannot_mint_a_report",
+      "sha256": "94daacd6ca546e83aa5c67f561fcd26beb2deb0e1f51cd11d31693022b4ee305",
+      "count": 1
+    },
+    {
+      "name": "unlimited_grant_guard_denial_does_not_reverse_budget_store",
+      "sha256": "a5c70982433fba0bd726b56e02b04adf5aad941d77828235e38e494cafbe9bb4",
+      "count": 1
+    },
+    {
+      "name": "unmeasured_cost_is_provisional_and_emits_no_nonce",
+      "sha256": "11754245145994d4832462337fac7344b185bbe566af60d55dc7c99d00652305",
+      "count": 1
+    },
+    {
+      "name": "unregistered_server_denied",
+      "sha256": "3350fda22b4b19d3c6570bc45b0d247802ea3fae0472b110316bd42a96e2f980",
+      "count": 1
+    },
+    {
+      "name": "unsubscribe_session_resource_is_idempotent",
+      "sha256": "13768f3e2ab893f0fd3f018c1f8d21935733e8478fbefcdf29bde528e360b63e",
+      "count": 1
+    },
+    {
+      "name": "unsupported_durable_participants_fail_before_dispatch",
+      "sha256": "7b2c51f46af81b72d1668d63ecaf58ad92ba26d9d666ba3d6fc0a49489b50568",
+      "count": 1
+    },
+    {
+      "name": "unsupported_native_egress_ports_reject_commands_and_history_without_mutation",
+      "sha256": "ab40c6bee6d858213231794448ea32eb0a1cff3693eb6d7561a2db8009c1f90b",
+      "count": 1
+    },
+    {
+      "name": "untrusted_issuer_denied",
+      "sha256": "570ba02a488a5a81962e0a153aae2dbc54bae1fa9d7ee9ebfd25e3dee19d309b",
+      "count": 1
+    },
+    {
+      "name": "velocity_guard_denial_produces_signed_deny_receipt_no_panic",
+      "sha256": "4d15cfbc1d35dfcd101c8bf6d6c521fc8c7e864b7053f6c7b7072ff9a15ef130",
+      "count": 1
+    },
+    {
+      "name": "watchdog_does_not_keep_the_kernel_alive",
+      "sha256": "c254badff71b631d2f2568e4968329749686b1c83719102fe2dcd5631723b8ac",
+      "count": 1
+    },
+    {
+      "name": "watchdog_does_not_start_without_a_timer",
+      "sha256": "71b3f38c6f2833050bf62d69618446a4c408727a460eae565603539f7cca490c",
+      "count": 1
+    },
+    {
+      "name": "web3_evidence_required_activation_allows_checkpoint_capable_store",
+      "sha256": "cfcb64cab28a29e799aea4f74d2753b9a43c7ea74f657fb7104efdda90d83632",
+      "count": 1
+    },
+    {
+      "name": "web3_evidence_required_activation_rejects_append_only_receipt_store",
+      "sha256": "c38569bf3386f197d84e6d1848c5df434dc4688be914fb9265cd74a218c0801a",
+      "count": 1
+    },
+    {
+      "name": "web3_evidence_required_activation_rejects_checkpoint_disabled",
+      "sha256": "0e618000799de4fc643957a0fba3805995f973d54ee25154ac71f53b29433ea5",
+      "count": 1
+    },
+    {
+      "name": "web3_evidence_required_activation_rejects_missing_receipt_store",
+      "sha256": "90ee403912e31cf8cbf6ebc0c758c888947277951a4255963dd58472237eadc4",
+      "count": 1
+    },
+    {
+      "name": "wedged_writer_denies_before_dispatch_without_a_running_watchdog",
+      "sha256": "928e3ccf9358bccdb406124bff939fd2516b74f2d033230e410af4b048975e48",
+      "count": 1
+    },
+    {
+      "name": "wedged_writer_denies_before_evaluation_capability_snapshot",
+      "sha256": "5c360e542c05b94b046abc7c35c48dd42688595676073efa65728349fb113ec1",
+      "count": 1
+    },
+    {
+      "name": "wedged_writer_watchdog_denies_before_side_effect",
+      "sha256": "8ed6cd9f53a1e7ac3b96315e9c3932a2e05b0cc47ca70f8c86c38078835d427a",
+      "count": 1
+    },
+    {
+      "name": "wildcard_server_grant_allows_real_server",
+      "sha256": "5dcb90347cc13de3b2f5a891aaeecdfea7c42001653b606df4625287774d2c60",
+      "count": 1
+    },
+    {
+      "name": "wildcard_tool_grant_allows_any_tool",
+      "sha256": "dd3697902004bb6fa26cc6df71f367d98fd559e4d407697299d7a79045ad74ee",
+      "count": 1
+    },
+    {
+      "name": "wire_and_normalized_approval_shape_checks_agree_for_all_combinations",
+      "sha256": "d13a30778c3fb897c283d304dd1fa3d123747af947793815ba67086d7221a52f",
+      "count": 1
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "chio_kernel": "/tmp/arc-security-launch/target/debug/deps/chio_kernel-03778b1afde6e279",
+  "chio_runtime_core": "/tmp/arc-security-launch/target/debug/deps/chio_runtime_core-4b73843e1953c4e8",
+  "durable_admission_sqlite": "/tmp/arc-security-launch/target/debug/deps/durable_admission_sqlite-b1bf7eb140f9461f",
+  "chio_active_response_authority": "/tmp/arc-security-launch/target/debug/deps/chio_active_response_authority-a39964432b673930",
+  "chio_core_types": "/tmp/arc-security-launch/target/debug/deps/chio_core_types-7ad3a0be0a860c5d",
+  "chio_settle": "/tmp/arc-security-launch/target/debug/deps/chio_settle-1f5ef2fce2d4384a",
+  "chio_runtime": "/tmp/arc-security-launch/target/debug/deps/chio_runtime-0c8b097c4bbcb4a6",
+  "chio_store_sqlite": "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-79c1a5a8001b0d54",
+  "caller_execution_ledger": "/tmp/arc-security-launch/target/debug/deps/caller_execution_ledger-05ae0d689783b758",
+  "chio_security_types": "/tmp/arc-security-launch/target/debug/deps/chio_security_types-6fb4a513664859f7",
+  "chio_runtime_proof_parity": "/tmp/arc-security-launch/target/debug/deps/chio_runtime_proof_parity-71423cdf392c8fbc",
+  "chio_fincred": "/tmp/arc-security-launch/target/debug/deps/chio_fincred-83419347eaeea94d",
+  "chio_control_plane": "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd"
+}

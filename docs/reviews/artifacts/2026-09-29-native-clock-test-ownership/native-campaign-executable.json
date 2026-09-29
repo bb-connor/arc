@@ -1,0 +1,7 @@
+{
+  "pid": 1905519,
+  "original_executable": "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+  "immutable_executable": "/tmp/arc-security-launch/.superpowers/sdd/2026-09-29-native-clock-test-ownership/native-campaign-candidate",
+  "observed_process_executable": "/tmp/arc-security-launch/.superpowers/sdd/2026-09-29-native-clock-test-ownership/native-campaign-candidate",
+  "reason": "Preserve the running campaign and its child-process executable while rebuilding review fixes."
+}

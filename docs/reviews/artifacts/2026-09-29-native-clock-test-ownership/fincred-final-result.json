@@ -1,0 +1,9 @@
+{
+  "name": "fincred-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_fincred-83419347eaeea94d",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 0.01
+}

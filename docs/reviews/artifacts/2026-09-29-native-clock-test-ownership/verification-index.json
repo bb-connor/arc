@@ -1,0 +1,313 @@
+{
+  "source_commit": "c2015692b5d8f4a8027c6ef6f7f4c4b97b5480df",
+  "base": "8c8677470b6ff40491c0f66ac6aba31093be30bf",
+  "reviewed_commit": "a8b5f11d3e",
+  "host": "aarch64 Linux",
+  "cargo_incremental": "0",
+  "qualification": "Local boundary qualification using multiple source snapshots and focused repair runs. Not an exact-candidate full-workspace or hosted qualification.",
+  "tests": [
+    {
+      "name": "caller-connection-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-79c1a5a8001b0d54",
+        "caller_execution_ledger::",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 0.31,
+      "log": "caller-connection-final.log",
+      "test_summaries": [
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1890 filtered out; finished in 0.25s"
+      ]
+    },
+    {
+      "name": "caller-ledger-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/caller_execution_ledger-05ae0d689783b758",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 2.23,
+      "log": "caller-ledger-final.log",
+      "test_summaries": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s"
+      ]
+    },
+    {
+      "name": "core-canonical-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_core_types-7ad3a0be0a860c5d",
+        "canonical"
+      ],
+      "exit_code": 0,
+      "seconds": 0.11,
+      "log": "core-canonical-final.log",
+      "test_summaries": [
+        "test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 371 filtered out; finished in 0.10s"
+      ]
+    },
+    {
+      "name": "core-identities-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_core_types-7ad3a0be0a860c5d",
+        "shared_identifiers"
+      ],
+      "exit_code": 0,
+      "seconds": 0.0,
+      "log": "core-identities-final.log",
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 429 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "name": "durable-integration-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/durable_admission_sqlite-b1bf7eb140f9461f",
+        "federation_context",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 3.23,
+      "log": "durable-integration-final.log",
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 3.22s"
+      ]
+    },
+    {
+      "name": "fincred-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_fincred-83419347eaeea94d",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 0.01,
+      "log": "fincred-final.log",
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "name": "kernel-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_kernel-03778b1afde6e279",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 24.58,
+      "log": "kernel-final.log",
+      "test_summaries": [
+        "test result: ok. 1491 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.54s"
+      ]
+    },
+    {
+      "name": "native-fixes-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+        "runtime_expiry_after_native_verification_rolls_back_physical_capture",
+        "expiry_at_final_commit",
+        "native_output_preparation_cannot_renew_a_lease_that_expires_during_classification",
+        "native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement",
+        "native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery",
+        "native_captured_lifecycle_rechecks_revocation_and_stop_after_output_join",
+        "native_caller_abort_after_release_checkpoint",
+        "--test-threads=3",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 108.5,
+      "log": "native-fixes-final.log",
+      "test_summaries": [
+        "test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 1174 filtered out; finished in 108.45s"
+      ]
+    },
+    {
+      "name": "native-flow-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+        "native_flow",
+        "--test-threads=12",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "seconds": 1381.25,
+      "log": "native-flow-final.log",
+      "test_summaries": [
+        "test result: FAILED. 140 passed; 3 failed; 0 ignored; 0 measured; 1039 filtered out; finished in 1381.15s"
+      ]
+    },
+    {
+      "name": "proof-parity-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_runtime_proof_parity-71423cdf392c8fbc",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 0.01,
+      "log": "proof-parity-final.log",
+      "test_summaries": [
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+      ]
+    },
+    {
+      "name": "response-authority-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_active_response_authority-a39964432b673930",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 1.2,
+      "log": "response-authority-final.log",
+      "test_summaries": [
+        "test result: ok. 22 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.19s"
+      ]
+    },
+    {
+      "name": "runtime-core-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_runtime_core-4b73843e1953c4e8",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 0.03,
+      "log": "runtime-core-final.log",
+      "test_summaries": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+      ]
+    },
+    {
+      "name": "runtime-expiry-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+        "runtime_expiry_after_native_verification_rolls_back_physical_capture",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 8.84,
+      "log": "runtime-expiry-final.log",
+      "test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 8.78s"
+      ]
+    },
+    {
+      "name": "security-types-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_security_types-6fb4a513664859f7",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 0.09,
+      "log": "security-types-final.log",
+      "test_summaries": [
+        "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s"
+      ]
+    },
+    {
+      "name": "settle-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_settle-1f5ef2fce2d4384a",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 3.48,
+      "log": "settle-final.log",
+      "test_summaries": [
+        "test result: ok. 252 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.47s"
+      ]
+    },
+    {
+      "name": "sqlite-admission-final",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-79c1a5a8001b0d54",
+        "admission_operation_store::tests::authority_clock::",
+        "admission_operation_store::tests::injected_clock::",
+        "admission_operation_store::tests::clock_migration::",
+        "admission_operation_store::tests::dpop_replay::",
+        "admission_operation_store::tests::governed_approval_replay::",
+        "admission_operation_store::tests::runtime_replay::",
+        "admission_operation_store::tests::factor_assignment::",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 423.13,
+      "log": "sqlite-admission-final.log",
+      "test_summaries": [
+        "test result: ok. 179 passed; 0 failed; 0 ignored; 0 measured; 1715 filtered out; finished in 423.08s"
+      ]
+    },
+    {
+      "name": "kernel-final-2",
+      "command": [
+        "/tmp/arc-security-launch/target/debug/deps/chio_kernel-03778b1afde6e279",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "seconds": 29.21,
+      "log": "kernel-final-2.log",
+      "test_summaries": [
+        "test result: ok. 1492 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.18s"
+      ]
+    }
+  ],
+  "other_checks": [
+    {
+      "log": "clippy-final-4.log",
+      "status": "passed",
+      "scope": "16 modified packages, --lib plus durable_admission_sqlite and caller_execution_ledger integration targets; -D warnings"
+    },
+    {
+      "log": "kernel-test-clippy-final.log",
+      "status": "passed",
+      "command": "CARGO_INCREMENTAL=0 cargo clippy --locked -p chio-kernel --features admission-test-support,finding-market --lib --tests -- -D warnings"
+    },
+    {
+      "log": "format-final.log",
+      "status": "passed",
+      "scope": "All 16 modified packages before final fixture formatting"
+    },
+    {
+      "log": "format-complete-final.log",
+      "status": "passed",
+      "command": "cargo fmt -p chio-control-plane -p chio-store-sqlite -- --check"
+    },
+    {
+      "log": "no-std-final.log",
+      "status": "passed",
+      "scope": "chio-core-types and chio-security-types with --no-default-features --target wasm32-unknown-unknown"
+    },
+    {
+      "log": "hygiene-complete-final.log",
+      "status": "passed",
+      "command": "python3 scripts/check-rust-file-hygiene.py"
+    },
+    {
+      "log": "negative-complete-final.log",
+      "status": "passed",
+      "command": "python3 scripts/check-negative-assertions.py"
+    },
+    {
+      "status": "passed",
+      "scope": "git diff --cached --check excluding verbatim artifact *.log files; their terminal blank lines are preserved",
+      "raw_log_check": "Unscoped check reports only libtest terminal blank lines, preserved deliberately."
+    }
+  ],
+  "native_latest_results": "native-qualification.json",
+  "inventory": {
+    "original_kernel_bodies": 845,
+    "kernel_original_cases": 1491,
+    "kernel_final_cases": 1492,
+    "identity_payload_pins": 43,
+    "wire_values": 1098,
+    "resolved_default_selectors": 182,
+    "pq_selectors_not_compiled": 36
+  },
+  "not_qualified": [
+    "full workspace at final candidate",
+    "PQ-only cases",
+    "native x86_64 enforcement",
+    "AWS-LC source audit",
+    "hosted workflows",
+    "publication/install closure",
+    "M5/operational acceptance",
+    "added broker read-transaction performance"
+  ]
+}

@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture' (1898501) panicked at crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/combined_credentials/expiry.rs:50:5:
+wrong denial: Some("guard denied the request: durable admission failed: combined admission capture invariant failed: budget state invariant violated: admission operation invariant failed: native security state: expiry cutpoint missed its bounded live credential window")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture ... FAILED
+
+failures:
+
+failures:
+    security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 7.45s
+

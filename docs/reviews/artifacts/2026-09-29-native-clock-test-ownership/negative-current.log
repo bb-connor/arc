@@ -1,0 +1,5 @@
+
+Weak negative assertion failures:
+- crates/kernel/chio-kernel/src/kernel/tests/durable_admission/pre_dispatch.rs:132 new weak negative assertion in `evaluate`: assert!(evaluation.await.is_err()); assert the variant that rejected
+- crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs: baseline entry for `evaluate` assert!(evaluation.await.is_err()) no longer matches anything; remove it (run --ratchet)
+Weak negative assertions: 1260 across 255 files, baseline 1260 assertions at 1177 sites across 255 files, expires 2027-01-31

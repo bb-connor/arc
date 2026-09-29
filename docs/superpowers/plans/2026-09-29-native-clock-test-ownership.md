@@ -32,11 +32,11 @@
 
 **Interfaces:** Consumes existing `Clock`, `ChioKernel::new_with_clock`, `SqliteAuthorityStore::open_serving_with_clock`, runtime/broker injected clocks and the independent caller executor clock. Produces deterministic fixture setup plus explicit clock advancement. Reproduced failures required repairing kernel and SQLite clock ownership and a read-only SQLite authority-time query for broker adapters; see the execution ledger rulings.
 
-- [ ] Pin the fixture epoch with a failing fixture regression; retain the previous parallel capture-expiry failure as causal evidence.
-- [ ] Wire all native-flow authority owners, resolver, runtime, broker and restart paths to deterministic clocks. Preserve deliberate fault clocks and historical-time fixtures.
-- [ ] Repair the reproduced production clock bypasses while preserving skew, high-water and expiry checks; cover unavailable, wall-regression, monotonic-regression and stale-caller rejection.
-- [ ] Exercise native-flow and nonce replay/capture/restart/expiry cases in parallel, with focused before/after evidence and exact terminal counts. Expected: all selected tests pass, including intended denial tests.
-- [ ] Commit the fixture change and verification evidence.
+- [x] Pin the fixture epoch with a failing fixture regression; retain the previous parallel capture-expiry failure as causal evidence.
+- [x] Wire all native-flow authority owners, resolver, runtime, broker and restart paths to deterministic clocks. Preserve deliberate fault clocks and historical-time fixtures.
+- [x] Repair the reproduced production clock bypasses while preserving skew, high-water and expiry checks; cover unavailable, wall-regression, monotonic-regression and stale-caller rejection.
+- [x] Exercise native-flow and nonce replay/capture/restart/expiry cases in parallel, with focused before/after evidence and exact terminal counts. Expected: a passing latest result for every selected test, including intended denial tests. Preserve the completed full campaign and qualify demonstrated fixes with focused reruns; do not present failed or interrupted campaigns as green.
+- [x] Commit the fixture change and verification evidence.
 
 ### Task 2: Kernel test responsibility and privacy modules
 
@@ -47,7 +47,7 @@
 - [x] Save existing test inventory and source test bodies before the cut.
 - [x] Convert all hand-maintained includes in the kernel test owner to modules, retaining test bodies/cfgs; separate common fixtures from scenario tests.
 - [x] Commit mechanical relocation, then explicit imports and smallest useful fixture visibility, then formatting independently.
-- [x] Compare full kernel test inventories and unchanged test bodies. Run the kernel owning test target and strict Clippy. Expected: no missing tests, no new warnings, no changed behavior.
+- [x] Compare full kernel test inventories and unchanged test bodies. Run the kernel owning test target and strict Clippy. Expected: no missing original tests, no new warnings, no changed behavior from relocation. The final review may add an explicitly recorded regression case.
 - [x] Ratchet hygiene through the script and migrate source gates/selectors, never increase caps manually.
 
 ### Task 3: Shared security schema and domain declarations

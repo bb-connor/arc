@@ -1,0 +1,29 @@
+
+running 24 tests
+test clock::tests::conversions_never_wrap_or_substitute_epoch_zero ... ok
+test clock::tests::authority_expiry_and_skew_boundaries_are_exact ... ok
+test clock::tests::retries_cannot_extend_authority_when_wall_time_stops ... ok
+test clock::tests::clock_fence_refuses_regression_without_replacing_the_high_water ... ok
+test flow::tests::blank_principal_and_compartment_are_rejected ... ok
+test declassification::tests::invalid_time_and_top_target_reject_before_signing ... ok
+test declassification::tests::validated_body_round_trips_strictly ... ok
+test flow::tests::bottom_is_unique_public_label ... ok
+test flow::tests::borrowed_identifier_is_validated_before_owned_allocation ... ok
+test flow::tests::configured_cardinality_overflow_is_rejected ... ok
+test flow::tests::configured_limits_cannot_widen_protocol_limits ... ok
+test flow::tests::duplicate_reader_and_compartment_values_are_rejected ... ok
+test flow::tests::information_label_order_rejects_reversed_readers_and_partial_constraints ... ok
+test flow::tests::duplicate_owner_json_is_rejected ... ok
+test flow::tests::known_and_top_canonical_vectors_round_trip ... ok
+test flow::tests::noncanonical_input_normalizes_to_identical_canonical_bytes ... ok
+test flow::tests::owner_must_be_its_own_reader ... ok
+test flow::tests::c1_control_identifier_is_rejected_by_schema_and_runtime ... ok
+test flow::tests::information_label_schema_positive_and_negative_vectors ... ok
+test flow::tests::tool_flow_declaration_is_strict_and_canonical ... ok
+test flow::tests::unknown_and_variant_payload_fields_are_rejected ... ok
+test flow::tests::schema_and_runtime_enforce_every_default_cardinality_bound ... ok
+test flow::tests::internal_control_identifier_is_rejected_by_schema_and_runtime ... ok
+test flow::tests::utf8_identifier_limit_is_normative_in_bytes ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

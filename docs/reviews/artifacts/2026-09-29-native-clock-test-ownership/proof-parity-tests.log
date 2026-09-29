@@ -1,0 +1,13 @@
+
+running 8 tests
+test tests::rejects_accepted_package_hash_drift ... ok
+test tests::rejects_uppercase_sha256_digest ... ok
+test tests::rejects_accepted_regeneration_report_failure_code ... ok
+test tests::rejects_accepted_workflow_report_failure_code ... ok
+test tests::rejects_regeneration_artifacts_with_mismatched_run_id ... ok
+test tests::accepts_valid_runtime_proof_regeneration_artifacts ... ok
+test tests::rejects_source_record_missing_binding_hash_field ... ok
+test tests::rejects_workflow_step_evidence_source_record_mismatch ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody' (1881997) panicked at crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/broker/authority.rs:210:9:
+assertion `left == right` failed: Some("tool server error: tool server could not prepare delivery: guard denied the request: broker authority is unavailable: original kernel admission readback failed")
+  left: Deny
+ right: Allow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody ... FAILED
+
+failures:
+
+failures:
+    security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 3.09s
+

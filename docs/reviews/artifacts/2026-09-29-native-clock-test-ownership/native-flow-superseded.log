@@ -1,0 +1,93 @@
+
+running 143 tests
+test security::adapters::native_flow::tests::native_policy_time_bounds_are_inclusive_at_observation_and_exclusive_at_expiry ... ok
+test security::adapters::tests::native_flow::input::native_input_classifier_substitution_denies_without_taint_or_budget ... ok
+test security::adapters::tests::native_flow::input::native_input_classifier_panic_denies_without_taint_or_budget ... ok
+test security::adapters::tests::native_flow::input::native_input_local_policy_does_not_acquire_egress_custody ... ok
+test security::adapters::tests::native_flow::input::native_input_inherits_global_lineage_before_the_exact_epoch_exists ... ok
+test security::adapters::tests::native_flow::input::native_input_classifies_before_budget_and_rechecks_after_the_single_join ... ok
+test security::adapters::tests::native_flow::input::native_input_missing_manifest_denies_before_classification_or_join ... ok
+test security::adapters::tests::native_flow::input::native_input_inherits_principal_epoch_from_another_lineage ... ok
+test security::adapters::tests::native_flow::input::native_input_untrusted_declassification_denies_before_classification_or_join ... ok
+test security::adapters::tests::native_flow::input::native_input_stronger_post_join_classification_denies_without_rejoining ... ok
+test security::adapters::tests::native_flow::input::native_input_operator_floor_is_in_the_original_join ... ok
+test security::adapters::tests::native_flow::input::native_input_propagates_inherited_session_only_taint ... ok
+test security::adapters::tests::native_flow::ledger::native_dispatch_ledger_denies_unmatched_grant_without_retention ... ok
+test security::adapters::tests::native_flow::native_local_policy_does_not_manufacture_an_egress_fence ... ok
+test security::adapters::tests::native_flow::ledger::native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen ... ok
+test security::adapters::tests::native_flow::native_local_policy_revalidates_clock_without_fence_writes ... ok
+test security::adapters::tests::native_flow::ledger::native_dispatch_ledger_retains_exact_policy_and_custody_after_compensation ... ok
+test security::adapters::tests::native_flow::native_policy_accepts_recorded_restricted_labels_with_matching_clearance ... ok
+test security::adapters::tests::native_flow::native_policy_contains_classifier_panic_without_egress_writes ... ok
+test security::adapters::tests::native_flow::native_policy_commits_real_egress_custody_without_activating_dispatch ... ok
+test security::adapters::tests::native_flow::ledger::faults::ledger_write_failures_preserve_committed_egress_through_compensation_and_reopen has been running for over 60 seconds
+test security::adapters::tests::native_flow::native_policy_contains_clock_panic_before_egress_acquisition ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_classifier_payload_substitution ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_classifier_taint_not_in_original_join ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_legacy_evidence_configuration ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_clock_failure_before_egress_acquisition ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_future_clock_before_preparation ... FAILED
+test security::adapters::tests::native_flow::native_policy_rejects_public_destination_for_recorded_restricted_input ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_regressing_clock_before_egress_acquisition ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_other_initialized_authority_before_classification ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_unrecorded_operator_floor_without_rejoining ... ok
+test security::adapters::tests::native_flow::native_policy_rejects_untrusted_declassification_before_classification ... ok
+test security::adapters::tests::native_flow::native_policy_requires_admitted_manifest_before_classification ... ok
+test security::adapters::tests::native_flow::ledger::faults::ledger_write_failures_preserve_committed_egress_through_compensation_and_reopen ... ok
+test security::adapters::tests::native_flow::native_policy_requires_taint_propagation_in_each_recorded_label ... ok
+test security::adapters::tests::native_flow::policy::oversized_native_policy_evidence_denies_before_any_egress_custody ... ok
+test security::adapters::tests::native_flow::policy::native_policy_evidence_retains_unused_category_policy_and_admitted_clearance ... ok
+test security::adapters::tests::native_flow::policy::native_policy_evidence_commits_large_manifest_without_retaining_its_payload ... ok
+test security::adapters::tests::native_flow::policy::native_policy_evidence_binds_exact_inputs_and_decision_without_payload ... ok
+test security::adapters::tests::native_flow::support::caller::denial::native_caller_changed_input_cannot_replace_original_reserved_join ... ok
+test security::adapters::tests::native_flow::support::caller::denial::native_caller_preflight_requires_fresh_host_flow_state_before_reservation ... ok
+test security::adapters::tests::native_flow::support::caller::native_caller_composes_local_egress_declassification_and_complete_credentials ... FAILED
+test security::adapters::tests::native_flow::support::caller::native_caller_releases_only_the_authenticated_original_guarded_output ... FAILED
+test security::adapters::tests::native_flow::support::caller::denial::native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery ... FAILED
+test security::adapters::tests::native_flow::support::caller::restart::native_caller_original_delivery_survives_restart_and_authority_expiry ... FAILED
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_lost_ack_retains_owned_dpop_without_reclaim ... ok
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_preserves_original_commit_indices_after_revocation_and_reopen ... ok
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_acknowledgement_faults_preserve_committed_accounting has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_rejects_missing_or_substituted_revocation_history ... ok
+test security::adapters::tests::native_flow::support::capture::broker::connection::native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement ... FAILED
+test security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rechecks_original_parent_and_signs_actual_revocation_cut ... ok
+test security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rejects_a_kernel_from_another_authority ... ok
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting ... ok
+test security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody ... ok
+test security::adapters::tests::native_flow::support::capture::clock::native_capture_policy_deadline_is_exclusive_with_shared_clock ... ok
+test security::adapters::tests::native_flow::support::capture::broker::native_broker_capture_reads_only_original_operation_and_never_recharges ... ok
+test security::adapters::tests::native_flow::support::capture::combined_credentials::expiry::runtime_expiry_after_native_verification_rolls_back_physical_capture ... FAILED
+test security::adapters::tests::native_flow::support::capture::combined_credentials::native_combined_credentials_deny_missing_proof_or_changed_approved_intent_before_capture ... ok
+test security::adapters::tests::native_flow::support::capture::combined_credentials::native_capture_preserves_nonempty_runtime_approval_and_dpop_in_one_operation ... ok
+test security::adapters::tests::native_flow::support::capture::combined_credentials::native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::combined_credentials::native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop ... ok
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_declassification_supports_public_nested_sync_and_async_with_all_credentials has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_nonce_supports_public_nested_sync_and_async_dispatch has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch ... ok
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_declassification_proof_reaches_native_untrusted_issuer_denial ... ok
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_acknowledgement_faults_preserve_committed_accounting ... ok
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress ... ok
+test security::adapters::tests::native_flow::support::capture::corruption::native_capture_physical_corruption_denies_readback_and_reopen has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::native_atomic_capture_faults_roll_back_budget_and_operation_together ... ok
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_nonce_supports_public_nested_sync_and_async_dispatch ... ok
+test security::adapters::tests::native_flow::support::capture::native_atomic_capture_preserves_dpop_required_by_another_matching_grant ... ok
+test security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_locally_rehashed_history_cannot_replace_the_global_anchor ... ok
+test security::adapters::tests::native_flow::support::capture::combined_credentials::nested::native_declassification_supports_public_nested_sync_and_async_with_all_credentials ... ok
+test security::adapters::tests::native_flow::support::capture::native_atomic_capture_retains_quota_and_ledger_without_tool_effect ... ok
+test security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_lost_acknowledgement_recovers_history_without_release_authority ... ok
+test security::adapters::tests::native_flow::support::capture::output::native_output_journal_inherits_all_current_labels_when_output_is_public ... ok
+test security::adapters::tests::native_flow::support::capture::corruption::native_capture_physical_corruption_denies_readback_and_reopen ... ok
+test security::adapters::tests::native_flow::support::capture::output::faults::native_output_journal_precommit_failures_roll_back_rows_events_and_global_head ... ok
+test security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_cannot_renew_a_lease_that_expires_during_classification ... FAILED
+test security::adapters::tests::native_flow::support::capture::output::native_output_journal_rejects_stale_lease_generation_and_substituted_artifacts ... ok
+test security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_classifies_actual_value_and_ordered_stream_chunks ... ok
+test security::adapters::tests::native_flow::support::capture::output::native_output_journal_propagates_taint_once_without_releasing_or_rewriting_input ... ok
+test security::adapters::tests::native_flow::support::declassification::faults::native_declassification_expiry_at_final_commit_retains_consumption_without_capture ... FAILED
+test security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_rejects_missing_double_suppressed_and_panicking_joins ... ok
+test security::adapters::tests::native_flow::support::declassification::rejection::native_declassification_refuses_unselected_lifecycle_without_activation ... ok
+test security::adapters::tests::native_flow::support::declassification::faults::native_declassification_output_fault_rolls_back_outcome_without_refunding_use ... ok
+test security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_cannot_release_without_output_preparation ... ok

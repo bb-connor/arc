@@ -606,8 +606,13 @@ mechanical, visibility and formatting commits. The final review additionally
 sealed broker authority results, retained credential custody and reserved
 response-plan construction. See the
 [execution and qualification record](../../reviews/2026-09-29-security-module-boundaries-execution.md).
-Rank 5 and the wider declaration-consolidation queue remain open; the packet-wide
-checkboxes below are not claims that every owner has been completed.
+Rank 5 is also implemented in the
+[native clock and test ownership record](../../reviews/2026-09-29-native-clock-test-ownership-execution.md):
+845 unchanged scenario bodies, 1,491 preserved compiled tests and migrated selectors.
+The same continuation removes all six duplicated byte domains and 37 duplicated
+schema values without changing identifier bytes. The broader module,
+schema and domain-shape queues remain open; the packet-wide checkboxes below
+are not claims that every owner has been completed.
 
 | Rank | Logical module | Logical lines | Why first |
 | --- | --- | --- | --- |

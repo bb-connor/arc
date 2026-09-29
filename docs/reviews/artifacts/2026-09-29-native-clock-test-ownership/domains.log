@@ -1,0 +1,13 @@
+dropped: chio.channel.release-authorization.signed-digest.v1\0: compliant
+dropped: chio.fincred.source-artifact.v1\0: compliant
+dropped: chio.fincred.source-disclosure.v1\0: compliant
+dropped: chio.runtime-replay-source-seal.v1\0: compliant
+dropped: chio.verified-security-event-evidence.v1\0: compliant
+dropped: chio.verified-security-event-receipt-evidence.v1\0: compliant
+tightened: chio.channel.release-authorization.signed-digest.v1\0: declaration cap dropped, single declaration
+tightened: chio.fincred.source-artifact.v1\0: declaration cap dropped, single declaration
+tightened: chio.fincred.source-disclosure.v1\0: declaration cap dropped, single declaration
+tightened: chio.runtime-replay-source-seal.v1\0: declaration cap dropped, single declaration
+tightened: chio.verified-security-event-evidence.v1\0: declaration cap dropped, single declaration
+tightened: chio.verified-security-event-receipt-evidence.v1\0: declaration cap dropped, single declaration
+domain debt ratcheted: 32 entries kept, 6 dropped, 6 tightened, expiries 2026-10-31, 2026-11-30, 2026-12-31, 2027-01-31

@@ -1,0 +1,10 @@
+{
+  "name": "runtime-expiry-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+    "runtime_expiry_after_native_verification_rolls_back_physical_capture",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "seconds": 6.86
+}

@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'security::adapters::tests::native_flow::native_policy_rejects_future_clock_before_preparation' (1901688) panicked at crates/platform/chio-control-plane/src/security/adapters/tests/native_flow.rs:267:5:
+assertion failed: matches!(fixture.run(resolver, || {})?, Err(NativeFlowError::ClockChanged))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test security::adapters::tests::native_flow::native_policy_rejects_future_clock_before_preparation ... FAILED
+
+failures:
+
+failures:
+    security::adapters::tests::native_flow::native_policy_rejects_future_clock_before_preparation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 3.77s
+

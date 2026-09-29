@@ -1,0 +1,4 @@
+dropped: crates/kernel/chio-kernel/src/kernel/tests.rs: 265 lines is under its base limit
+dropped: crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs: 1925 lines is under its base limit
+dropped: crates/kernel/chio-kernel/tests/durable_admission_sqlite/federation_context.rs: 197 lines is under its base limit
+allowlist ratcheted: 107 entries kept, 3 dropped, 0 tightened, expiries 2026-10-31, 2026-11-30, 2026-12-31, 2027-01-31

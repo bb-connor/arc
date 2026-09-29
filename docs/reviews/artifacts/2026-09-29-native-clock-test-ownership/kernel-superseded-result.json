@@ -1,0 +1,9 @@
+{
+  "name": "kernel-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_kernel-03778b1afde6e279",
+    "--test-threads=4"
+  ],
+  "exit_code": 101,
+  "seconds": 22.26
+}

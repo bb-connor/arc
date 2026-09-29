@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'security::adapters::tests::native_flow::support::capture::clock::native_capture_policy_deadline_is_exclusive_with_shared_clock' (1876780) panicked at crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/clock.rs:51:9:
+assertion `left == right` failed: Some("capability verification failed: capability not yet valid")
+  left: Deny
+ right: Allow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test security::adapters::tests::native_flow::support::capture::clock::native_capture_policy_deadline_is_exclusive_with_shared_clock ... FAILED
+
+failures:
+
+failures:
+    security::adapters::tests::native_flow::support::capture::clock::native_capture_policy_deadline_is_exclusive_with_shared_clock
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1181 filtered out; finished in 2.56s
+

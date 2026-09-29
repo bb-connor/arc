@@ -1,0 +1,17 @@
+{
+  "name": "native-fixes-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-7ffd0e34a0d1b8dd",
+    "runtime_expiry_after_native_verification_rolls_back_physical_capture",
+    "expiry_at_final_commit",
+    "native_output_preparation_cannot_renew_a_lease_that_expires_during_classification",
+    "native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement",
+    "native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery",
+    "native_captured_lifecycle_rechecks_revocation_and_stop_after_output_join",
+    "native_caller_abort_after_release_checkpoint",
+    "--test-threads=3",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "seconds": 108.5
+}

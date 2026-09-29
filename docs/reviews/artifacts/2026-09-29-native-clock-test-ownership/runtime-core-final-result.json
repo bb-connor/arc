@@ -1,0 +1,9 @@
+{
+  "name": "runtime-core-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_runtime_core-4b73843e1953c4e8",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 0.03
+}

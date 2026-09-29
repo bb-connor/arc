@@ -1,0 +1,9 @@
+{
+  "name": "proof-parity-final",
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_runtime_proof_parity-71423cdf392c8fbc",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 0.01
+}

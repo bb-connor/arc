@@ -1,0 +1,334 @@
+[
+  {
+    "file": "crates/economy/chio-credit/src/financial_credentials.rs",
+    "literal": "b\"chio.fincred.source-artifact.v1\\0\"",
+    "old_name": "SOURCE_ARTIFACT_DIGEST_DOMAIN"
+  },
+  {
+    "file": "crates/economy/chio-credit/src/financial_credentials.rs",
+    "literal": "b\"chio.fincred.source-disclosure.v1\\0\"",
+    "old_name": "SOURCE_DISCLOSURE_DIGEST_DOMAIN"
+  },
+  {
+    "file": "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs",
+    "literal": "\"chio.runtime-replay-source-seal.v1\"",
+    "old_name": "SOURCE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs",
+    "literal": "b\"chio.runtime-replay-source-seal.v1\\0\"",
+    "old_name": "SOURCE_DOMAIN"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-core/src/replay_source.rs",
+    "literal": "\"chio.runtime-replay-source-seal.v1\"",
+    "old_name": "SOURCE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-core/src/replay_source.rs",
+    "literal": "b\"chio.runtime-replay-source-seal.v1\\0\"",
+    "old_name": "SOURCE_DOMAIN"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-core/src/schema.rs",
+    "literal": "\"chio.runtime.evidence-manifest.v1\"",
+    "old_name": "CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-core/src/schema.rs",
+    "literal": "\"chio.runtime.proof-regeneration-input.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_REGENERATION_INPUT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-core/src/schema.rs",
+    "literal": "\"chio.runtime.proof-regeneration-report.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-core/src/schema.rs",
+    "literal": "\"chio.runtime.proof-parity-report.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-core/src/schema.rs",
+    "literal": "\"chio.runtime.trust-floor-state.v1\"",
+    "old_name": "CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-proof-parity/src/lib.rs",
+    "literal": "\"chio.runtime.evidence-manifest.v1\"",
+    "old_name": "CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-proof-parity/src/lib.rs",
+    "literal": "\"chio.runtime.proof-parity-report.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-proof-parity/src/lib.rs",
+    "literal": "\"chio.runtime.proof-regeneration-input.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_REGENERATION_INPUT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-proof-parity/src/lib.rs",
+    "literal": "\"chio.runtime.proof-regeneration-report.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.admission-profile.v1\"",
+    "old_name": "CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.admission-bundle.v1\"",
+    "old_name": "CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.admission-report.v1\"",
+    "old_name": "CHIO_RUNTIME_ADMISSION_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.step-evidence.v1\"",
+    "old_name": "CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.evidence-manifest.v1\"",
+    "old_name": "CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.proof-regeneration-input.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_REGENERATION_INPUT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.proof-regeneration-report.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.proof-parity-report.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.admission-store.v1\"",
+    "old_name": "CHIO_RUNTIME_ADMISSION_STORE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.pheromone-policy.v1\"",
+    "old_name": "CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.pheromone-policy-decision.v1\"",
+    "old_name": "CHIO_RUNTIME_PHEROMONE_POLICY_DECISION_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.peer-weights.v1\"",
+    "old_name": "CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.trust-floor-state.v1\"",
+    "old_name": "CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.orchestration-plan.v1\"",
+    "old_name": "CHIO_RUNTIME_ORCHESTRATION_PLAN_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.orchestration-profile.v1\"",
+    "old_name": "CHIO_RUNTIME_ORCHESTRATION_PROFILE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.run-contract.v1\"",
+    "old_name": "CHIO_RUNTIME_RUN_CONTRACT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.orchestration-run-report.v1\"",
+    "old_name": "CHIO_RUNTIME_ORCHESTRATION_RUN_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.orchestration-resume-plan.v1\"",
+    "old_name": "CHIO_RUNTIME_ORCHESTRATION_RESUME_PLAN_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.orchestration-status-report.v1\"",
+    "old_name": "CHIO_RUNTIME_ORCHESTRATION_STATUS_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.proof-drift-report.v1\"",
+    "old_name": "CHIO_RUNTIME_PROOF_DRIFT_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.supervisor-profile.v1\"",
+    "old_name": "CHIO_RUNTIME_SUPERVISOR_PROFILE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.run-lease.v1\"",
+    "old_name": "CHIO_RUNTIME_RUN_LEASE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.scheduler-tick-report.v1\"",
+    "old_name": "CHIO_RUNTIME_SCHEDULER_TICK_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.evidence-sink-health-report.v1\"",
+    "old_name": "CHIO_RUNTIME_EVIDENCE_SINK_HEALTH_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.recovery-drill-report.v1\"",
+    "old_name": "CHIO_RUNTIME_RECOVERY_DRILL_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.artifact-retention-profile.v1\"",
+    "old_name": "CHIO_RUNTIME_ARTIFACT_RETENTION_PROFILE_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.artifact-retention-plan.v1\"",
+    "old_name": "CHIO_RUNTIME_ARTIFACT_RETENTION_PLAN_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.provider-bindings.v1\"",
+    "old_name": "CHIO_RUNTIME_PROVIDER_BINDINGS_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.provider-health-report.v1\"",
+    "old_name": "CHIO_RUNTIME_PROVIDER_HEALTH_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.ops-status-report.v1\"",
+    "old_name": "CHIO_RUNTIME_OPS_STATUS_REPORT_SCHEMA"
+  },
+  {
+    "file": "crates/platform/chio-control-plane/src/security/active_response_authority.rs",
+    "literal": "\"chio.active-response-policy-authority.v2\"",
+    "old_name": "ACTIVE_RESPONSE_AUTHORITY_SCHEMA"
+  },
+  {
+    "file": "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs",
+    "literal": "\"chio.native-flow-dispatch-policy.v1\"",
+    "old_name": "SCHEMA"
+  },
+  {
+    "file": "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs",
+    "literal": "\"chio.native-flow-dispatch-policy.v2\"",
+    "old_name": "DECLASSIFIED_SCHEMA"
+  },
+  {
+    "file": "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs",
+    "literal": "b\"chio.verified-security-event-evidence.v1\\0\"",
+    "old_name": "EVENT_EVIDENCE_HASH_DOMAIN"
+  },
+  {
+    "file": "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs",
+    "literal": "b\"chio.verified-security-event-receipt-evidence.v1\\0\"",
+    "old_name": "RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN"
+  },
+  {
+    "file": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs",
+    "literal": "\"chio.native-flow-dispatch-policy.v1\"",
+    "old_name": "POLICY_SCHEMA"
+  },
+  {
+    "file": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs",
+    "literal": "\"chio.native-flow-dispatch-policy.v2\"",
+    "old_name": "DECLASSIFIED_POLICY_SCHEMA"
+  },
+  {
+    "file": "crates/platform/chio-store-sqlite/src/channel_release_publisher_store.rs",
+    "literal": "b\"chio.channel.release-authorization.signed-digest.v1\\0\"",
+    "old_name": "CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN"
+  },
+  {
+    "file": "crates/platform/chio-store-sqlite/src/security_state/events.rs",
+    "literal": "b\"chio.verified-security-event-evidence.v1\\0\"",
+    "old_name": "EVENT_EVIDENCE_HASH_DOMAIN"
+  },
+  {
+    "file": "crates/platform/chio-store-sqlite/src/security_state/events.rs",
+    "literal": "b\"chio.verified-security-event-receipt-evidence.v1\\0\"",
+    "old_name": "RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN"
+  },
+  {
+    "file": "crates/security/chio-active-response-authority/src/config.rs",
+    "literal": "\"chio.active-response-policy-authority.v2\"",
+    "old_name": "ACTIVE_RESPONSE_AUTHORITY_PROTOCOL"
+  },
+  {
+    "file": "crates/trust/chio-credentials/src/financial.rs",
+    "literal": "b\"chio.fincred.source-artifact.v1\\0\"",
+    "old_name": "FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN"
+  },
+  {
+    "file": "crates/trust/chio-credentials/src/financial.rs",
+    "literal": "b\"chio.fincred.source-disclosure.v1\\0\"",
+    "old_name": "FINANCIAL_SOURCE_DISCLOSURE_DIGEST_DOMAIN"
+  },
+  {
+    "file": "crates/trust/chio-pheromone/src/lib.rs",
+    "literal": "\"chio.runtime.trust-floor-state.v1\"",
+    "name": "CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA",
+    "old_name": "CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA",
+    "owner": "chio_core_types::runtime_schema"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.trusted-verifiers.v1\"",
+    "name": "CHIO_RUNTIME_TRUSTED_VERIFIERS_SCHEMA",
+    "old_name": "CHIO_RUNTIME_TRUSTED_VERIFIERS_SCHEMA",
+    "owner": "chio_runtime_core"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.verifier-trust-bundle.v1\"",
+    "name": "CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA",
+    "old_name": "CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA",
+    "owner": "chio_runtime_core"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-core/src/schema.rs",
+    "literal": "\"chio.runtime.workflow-run-report.v1\"",
+    "name": "CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA",
+    "old_name": "CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA",
+    "owner": "chio_core_types::runtime_schema"
+  },
+  {
+    "file": "crates/kernel/chio-runtime-proof-parity/src/lib.rs",
+    "literal": "\"chio.runtime.workflow-run-report.v1\"",
+    "name": "CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA",
+    "old_name": "CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA",
+    "owner": "chio_core_types::runtime_schema"
+  },
+  {
+    "file": "crates/kernel/chio-runtime/src/lib.rs",
+    "literal": "\"chio.runtime.workflow-run-report.v1\"",
+    "name": "CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA",
+    "old_name": "CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA",
+    "owner": "chio_core_types::runtime_schema"
+  }
+]
