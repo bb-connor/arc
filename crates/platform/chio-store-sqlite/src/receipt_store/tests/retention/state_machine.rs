@@ -155,6 +155,7 @@ fn prop_retention_preserves_append_invariant() -> Result<(), Box<dyn std::error:
                         store.flush_receipt_writes().map_err(map_err)?;
             phase("health");
                         prop_assert!(store.receipt_store_health().map_err(map_err)?.healthy);
+            phase("teardown-original");
         }
         phase("reopen");
         // Invariant (2): reopen succeeds (open-time seed re-verifies).
@@ -174,6 +175,8 @@ fn prop_retention_preserves_append_invariant() -> Result<(), Box<dyn std::error:
         phase("read-live-ids");
         let live_ids = receipt_id_set(&reopened).map_err(map_err)?;
         let archive_store = SqliteReceiptStore::open(&archive).map_err(map_err)?;
+        let reopened_writer = std::sync::Arc::downgrade(&reopened.receipt_commit_actor.worker);
+        let archive_writer = std::sync::Arc::downgrade(&archive_store.receipt_commit_actor.worker);
         let archived_ids = receipt_id_set(&archive_store).map_err(map_err)?;
         let overlap: Vec<&String> = live_ids.intersection(&archived_ids).collect();
         prop_assert!(
@@ -187,9 +190,17 @@ fn prop_retention_preserves_append_invariant() -> Result<(), Box<dyn std::error:
             "archived and live receipt-id sets must partition the full appended history"
         );
 
-        phase("complete");
+        phase("teardown-archive");
+        drop(archive_store);
+        phase("teardown-reopened");
+        drop(reopened);
+        prop_assert!(
+            reopened_writer.upgrade().is_none() && archive_writer.upgrade().is_none(),
+            "case completion must follow both writer owners' teardown"
+        );
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(&archive);
+        phase("complete");
         Ok(())
     })?;
     Ok(())
