@@ -57,6 +57,10 @@ impl SqliteBudgetStore {
         connection: &mut Connection,
         allow_provisioned: bool,
     ) -> Result<(), BudgetStoreError> {
+        // Bounded bytecode reuse for budget and shared admission lookups.
+        // Rows and authorization decisions are always read in their transaction.
+        connection
+            .set_prepared_statement_cache_capacity(crate::AUTHORIZATION_STATEMENT_CACHE_CAPACITY);
         if !allow_provisioned {
             if let Some(epoch) = crate::serving_owner::provisioned_owner_epoch(connection)? {
                 return Err(BudgetStoreError::Fenced {
@@ -1166,7 +1170,7 @@ impl SqliteBudgetStore {
         hold_id: &str,
     ) -> Result<Option<SqliteBudgetHold>, BudgetStoreError> {
         transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT
                     hold_id,
@@ -1183,41 +1187,40 @@ impl SqliteBudgetStore {
                 FROM budget_authorization_holds
                 WHERE hold_id = ?1
                 "#,
-                params![hold_id],
-                |row| {
-                    let disposition = row.get::<_, String>(7)?;
-                    let authority =
-                        sqlite_budget_event_authority(row.get(8)?, row.get(9)?, row.get(10)?)?;
-                    Ok(SqliteBudgetHold {
-                        hold_id: row.get(0)?,
-                        capability_id: row.get(1)?,
-                        grant_index: budget_usize_from_row(row, 2, "grant_index")?,
-                        authorized_exposure_units: budget_u64_from_row(
-                            row,
-                            3,
-                            "authorized_exposure_units",
-                        )?,
-                        remaining_exposure_units: budget_u64_from_row(
-                            row,
-                            4,
-                            "remaining_exposure_units",
-                        )?,
-                        invocation_count_debited: row.get::<_, i64>(5)? > 0,
-                        invocation_captured: row.get::<_, i64>(6)? > 0,
-                        disposition: HoldDisposition::parse(&disposition).ok_or_else(|| {
-                            rusqlite::Error::FromSqlConversionFailure(
-                                7,
-                                rusqlite::types::Type::Text,
-                                Box::new(std::io::Error::new(
-                                    std::io::ErrorKind::InvalidData,
-                                    format!("unknown hold disposition `{disposition}`"),
-                                )),
-                            )
-                        })?,
-                        authority,
-                    })
-                },
-            )
+            )?
+            .query_row(params![hold_id], |row| {
+                let disposition = row.get::<_, String>(7)?;
+                let authority =
+                    sqlite_budget_event_authority(row.get(8)?, row.get(9)?, row.get(10)?)?;
+                Ok(SqliteBudgetHold {
+                    hold_id: row.get(0)?,
+                    capability_id: row.get(1)?,
+                    grant_index: budget_usize_from_row(row, 2, "grant_index")?,
+                    authorized_exposure_units: budget_u64_from_row(
+                        row,
+                        3,
+                        "authorized_exposure_units",
+                    )?,
+                    remaining_exposure_units: budget_u64_from_row(
+                        row,
+                        4,
+                        "remaining_exposure_units",
+                    )?,
+                    invocation_count_debited: row.get::<_, i64>(5)? > 0,
+                    invocation_captured: row.get::<_, i64>(6)? > 0,
+                    disposition: HoldDisposition::parse(&disposition).ok_or_else(|| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            7,
+                            rusqlite::types::Type::Text,
+                            Box::new(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                format!("unknown hold disposition `{disposition}`"),
+                            )),
+                        )
+                    })?,
+                    authority,
+                })
+            })
             .optional()
             .map_err(Into::into)
     }
@@ -1228,7 +1231,7 @@ impl SqliteBudgetStore {
         grant_index: usize,
     ) -> Result<bool, BudgetStoreError> {
         transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT EXISTS(
                     SELECT 1
@@ -1238,6 +1241,8 @@ impl SqliteBudgetStore {
                       AND invocation_captured = 1
                 )
                 "#,
+            )?
+            .query_row(
                 params![
                     capability_id,
                     crate::integer::checked::<_, i64>(grant_index)?
@@ -1253,7 +1258,7 @@ impl SqliteBudgetStore {
         grant_index: usize,
     ) -> Result<bool, BudgetStoreError> {
         transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT EXISTS(
                     SELECT 1
@@ -1264,6 +1269,8 @@ impl SqliteBudgetStore {
                       AND disposition != 'reversed'
                 )
                 "#,
+            )?
+            .query_row(
                 params![
                     capability_id,
                     crate::integer::checked::<_, i64>(grant_index)?
@@ -1278,7 +1285,7 @@ impl SqliteBudgetStore {
         event_id: &str,
     ) -> Result<Option<BudgetMutationRecord>, BudgetStoreError> {
         connection
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT
                     event_id,
@@ -1309,9 +1316,8 @@ impl SqliteBudgetStore {
                 FROM budget_mutation_events
                 WHERE event_id = ?1
                 "#,
-                params![event_id],
-                mutation_record_from_row,
-            )
+            )?
+            .query_row(params![event_id], mutation_record_from_row)
             .optional()
             .map_err(Into::into)
     }

@@ -1,7 +1,7 @@
 //! Store operations the kernel performs while authorizing one tool call,
 //! measured against a populated database.
 //!
-//! Each group populates its tables to `POPULATED_ROWS` before the first
+//! Each group populates its tables to `populated_rows()` before the first
 //! measured iteration. An empty table measures index descent that production
 //! never performs, so the populated state is part of the measurement rather
 //! than setup convenience.
@@ -38,7 +38,23 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 mod authorization_composite;
 
 /// Rows each store carries before its first measured iteration.
-const POPULATED_ROWS: usize = 20_000;
+fn populated_rows() -> usize {
+    static ROWS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *ROWS.get_or_init(|| population("CHIO_AUTHORIZATION_ROWS", 20_000))
+}
+
+fn population(key: &str, default: usize) -> usize {
+    let count = match std::env::var(key) {
+        Ok(value) => match value.parse::<usize>() {
+            Ok(count) if count > 0 => count,
+            _ => fail_bench(&format!("{key} must be a positive row count")),
+        },
+        Err(std::env::VarError::NotPresent) => default,
+        Err(error) => fail_bench(&format!("{key}: {error}")),
+    };
+    eprintln!("authorization fixture {key}={count}");
+    count
+}
 
 /// Capability grants the populated budget rows spread across, so the measured
 /// authorize lands in an index of realistic depth rather than on one hot row.
@@ -47,7 +63,10 @@ const POPULATED_CAPABILITIES: usize = 512;
 /// Suspension records the populated security state carries. The scheduler admits
 /// one claimed plan per record, so this group populates to a lower count than
 /// the append-only tables.
-const POPULATED_SUSPENSIONS: usize = 2_000;
+fn populated_suspensions() -> usize {
+    static ROWS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *ROWS.get_or_init(|| population("CHIO_AUTHORIZATION_SUSPENSIONS", 2_000))
+}
 
 /// Plans the scheduler will hand out in one claim, which is its own ceiling.
 const SCHEDULER_CLAIM_BATCH: u32 = 1_024;
@@ -137,11 +156,11 @@ fn bench_budget_charge_release(c: &mut Criterion) {
         Ok(store) => store,
         Err(error) => fail_bench(&format!("open sqlite budget store: {error}")),
     };
-    for index in 0..POPULATED_ROWS {
+    for index in 0..populated_rows() {
         charge_and_release(&store, index);
     }
 
-    let mut index = POPULATED_ROWS;
+    let mut index = populated_rows();
     c.bench_function("budget_charge_release_pair_populated", |b| {
         b.iter(|| {
             charge_and_release(&store, index);
@@ -149,6 +168,41 @@ fn bench_budget_charge_release(c: &mut Criterion) {
         });
     });
 
+    c.bench_function("budget_usage_read_populated", |b| {
+        let capability = bench_capability(populated_rows() / 2);
+        b.iter(|| match store.get_usage(&capability, 0) {
+            Ok(Some(usage)) => {
+                black_box(usage);
+            }
+            Ok(None) => fail_bench("populated budget usage is missing"),
+            Err(error) => fail_bench(&format!("read budget usage: {error}")),
+        });
+    });
+    c.bench_function("budget_charge_reverse_pair_populated", |b| {
+        b.iter(|| {
+            match store.authorize_budget_hold(authorize_request(index)) {
+                Ok(BudgetAuthorizeHoldDecision::Authorized(hold)) => {
+                    black_box(hold);
+                }
+                Ok(other) => fail_bench(&format!("budget hold was not authorized: {other:?}")),
+                Err(error) => fail_bench(&format!("authorize budget hold: {error}")),
+            }
+            if let Err(error) =
+                store.reverse_budget_hold(chio_kernel::budget_store::BudgetReverseHoldRequest {
+                    capability_id: bench_capability(index),
+                    grant_index: 0,
+                    reversed_exposure_units: 100,
+                    hold_id: Some(format!("bench-hold-{index}")),
+                    event_id: Some(format!("bench-reverse-{index}")),
+                    expected_cumulative_approval_state: None,
+                    authority: Some(bench_authority()),
+                })
+            {
+                fail_bench(&format!("reverse budget hold: {error}"));
+            }
+            index += 1;
+        });
+    });
     drop(store);
     let _ = std::fs::remove_file(path);
 }
@@ -190,11 +244,11 @@ fn bench_admission_operation_record_and_read(c: &mut Criterion) {
         Ok(store) => store,
         Err(error) => fail_bench(&format!("open sqlite admission operation store: {error}")),
     };
-    for index in 0..POPULATED_ROWS {
+    for index in 0..populated_rows() {
         record_admission_operation(&store, index);
     }
 
-    let mut index = POPULATED_ROWS;
+    let mut index = populated_rows();
     c.bench_function("admission_operation_record_populated", |b| {
         b.iter(|| {
             record_admission_operation(&store, index);
@@ -202,7 +256,7 @@ fn bench_admission_operation_record_and_read(c: &mut Criterion) {
         });
     });
 
-    let recorded = admission_operation(POPULATED_ROWS / 2);
+    let recorded = admission_operation(populated_rows() / 2);
     c.bench_function("admission_operation_read_populated", |b| {
         b.iter(|| match store.load(recorded.operation_id()) {
             Ok(Some(operation)) => {
@@ -247,7 +301,7 @@ fn suspension_key(affected: &RecordIdSet) -> CapabilitySetSuspensionKey {
     }
 }
 
-/// Install `POPULATED_SUSPENSIONS` capability-set suspensions, each covering one
+/// Install `populated_suspensions()` capability-set suspensions, each covering one
 /// capability, and return a capability the denial path must refuse.
 fn populate_suspensions(path: &Path) -> (SqliteSecurityStateStore, RecordId) {
     let store = match SqliteSecurityStateStore::open(path) {
@@ -257,7 +311,7 @@ fn populate_suspensions(path: &Path) -> (SqliteSecurityStateStore, RecordId) {
     let tenant_id = suspension_tenant();
     let now = now_unix_ms();
 
-    let actions: Vec<ActionId> = (0..POPULATED_SUSPENSIONS)
+    let actions: Vec<ActionId> = (0..populated_suspensions())
         .map(
             |index| match ActionId::new(format!("bench-suspension-{index}")) {
                 Ok(action) => action,
@@ -348,7 +402,7 @@ fn populate_suspensions(path: &Path) -> (SqliteSecurityStateStore, RecordId) {
         }
     }
 
-    (store, suspended_capability(POPULATED_SUSPENSIONS / 2))
+    (store, suspended_capability(populated_suspensions() / 2))
 }
 
 fn suspension_apply_request(

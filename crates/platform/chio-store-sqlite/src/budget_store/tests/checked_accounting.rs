@@ -9,6 +9,15 @@ fn open_store(path: &Path, composite: bool) -> SqliteBudgetStore {
     }
     let locks = path.with_extension("locks");
     fs::create_dir_all(&locks).test_expect("lock directory");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let parent = path.parent().test_expect("fixture parent directory");
+        for directory in [parent, locks.as_path()] {
+            fs::set_permissions(directory, fs::Permissions::from_mode(0o700))
+                .test_expect("private fixture directory");
+        }
+    }
     crate::serving_owner::SqliteAuthorityStore::provision(path, &locks)
         .test_expect("provision owner");
     crate::serving_owner::SqliteAuthorityStore::open_serving(path, &locks)

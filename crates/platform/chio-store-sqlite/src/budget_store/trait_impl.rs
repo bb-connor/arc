@@ -71,12 +71,14 @@ impl BudgetStore for SqliteBudgetStore {
             None,
         )?;
         let usage = transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT seq, invocation_count, total_cost_exposed, total_cost_realized_spend
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
+            )?
+            .query_row(
                 params![
                     &request.capability_id,
                     crate::integer::checked::<_, i64>(request.grant_index)?
@@ -783,7 +785,7 @@ impl BudgetStore for SqliteBudgetStore {
                 "live budget hold blocks generic reverse".to_string(),
             ));
         }
-        if let Some(hold_id) = hold_id {
+        let validated_hold = if let Some(hold_id) = hold_id {
             let hold = SqliteBudgetStore::ensure_open_hold(
                 &transaction,
                 hold_id,
@@ -799,20 +801,25 @@ impl BudgetStore for SqliteBudgetStore {
                     "budget hold `{hold_id}` does not match reverse amount"
                 )));
             }
-            SqliteBudgetStore::validate_hold_authority(
+            let next_authority = SqliteBudgetStore::validate_hold_authority(
                 hold_id,
                 hold.authority.as_ref(),
                 authority,
             )?;
-        }
+            Some((hold_id, hold, next_authority))
+        } else {
+            None
+        };
 
         let current = transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT invocation_count, total_cost_exposed, total_cost_realized_spend
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
+            )?
+            .query_row(
                 params![
                     capability_id,
                     crate::integer::checked::<_, i64>(grant_index)?
@@ -883,19 +890,7 @@ impl BudgetStore for SqliteBudgetStore {
                 "budget usage compare-and-set failed".into(),
             ));
         }
-        if let Some(hold_id) = hold_id {
-            let next_authority = SqliteBudgetStore::validate_hold_authority(
-                hold_id,
-                SqliteBudgetStore::ensure_open_hold(
-                    &transaction,
-                    hold_id,
-                    capability_id,
-                    grant_index,
-                )?
-                .authority
-                .as_ref(),
-                authority,
-            )?;
+        if let Some((hold_id, _, next_authority)) = validated_hold {
             self.update_hold(
                 &transaction,
                 hold_id,
@@ -1004,7 +999,7 @@ impl BudgetStore for SqliteBudgetStore {
                 "live budget hold blocks generic release".to_string(),
             ));
         }
-        if let Some(hold_id) = hold_id {
+        let validated_hold = if let Some(hold_id) = hold_id {
             let hold = SqliteBudgetStore::ensure_open_hold(
                 &transaction,
                 hold_id,
@@ -1023,20 +1018,25 @@ impl BudgetStore for SqliteBudgetStore {
                     "budget hold `{hold_id}` cannot release more than remaining exposure"
                 )));
             }
-            SqliteBudgetStore::validate_hold_authority(
+            let next_authority = SqliteBudgetStore::validate_hold_authority(
                 hold_id,
                 hold.authority.as_ref(),
                 authority,
             )?;
-        }
+            Some((hold_id, hold, next_authority))
+        } else {
+            None
+        };
 
         let current = transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT invocation_count, total_cost_exposed, total_cost_realized_spend
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
+            )?
+            .query_row(
                 params![
                     capability_id,
                     crate::integer::checked::<_, i64>(grant_index)?
@@ -1097,18 +1097,7 @@ impl BudgetStore for SqliteBudgetStore {
                 "budget usage compare-and-set failed".into(),
             ));
         }
-        if let Some(hold_id) = hold_id {
-            let hold = SqliteBudgetStore::ensure_open_hold(
-                &transaction,
-                hold_id,
-                capability_id,
-                grant_index,
-            )?;
-            let next_authority = SqliteBudgetStore::validate_hold_authority(
-                hold_id,
-                hold.authority.as_ref(),
-                authority,
-            )?;
+        if let Some((hold_id, hold, next_authority)) = validated_hold {
             let remaining = ExposureUnits::new(hold.remaining_exposure_units)
                 .try_sub(ExposureUnits::new(cost_units))?
                 .get();
@@ -1245,7 +1234,7 @@ impl BudgetStore for SqliteBudgetStore {
                 "live budget hold blocks generic reconciliation".to_string(),
             ));
         }
-        if let Some(hold_id) = hold_id {
+        let validated_hold = if let Some(hold_id) = hold_id {
             let hold = SqliteBudgetStore::ensure_open_hold(
                 &transaction,
                 hold_id,
@@ -1264,20 +1253,25 @@ impl BudgetStore for SqliteBudgetStore {
                     "budget hold `{hold_id}` does not match reconciled exposure"
                 )));
             }
-            SqliteBudgetStore::validate_hold_authority(
+            let next_authority = SqliteBudgetStore::validate_hold_authority(
                 hold_id,
                 hold.authority.as_ref(),
                 authority,
             )?;
-        }
+            Some((hold_id, hold, next_authority))
+        } else {
+            None
+        };
 
         let current = transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT invocation_count, total_cost_exposed, total_cost_realized_spend
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
+            )?
+            .query_row(
                 params![
                     capability_id,
                     crate::integer::checked::<_, i64>(grant_index)?
@@ -1351,19 +1345,7 @@ impl BudgetStore for SqliteBudgetStore {
                 "budget usage compare-and-set failed".into(),
             ));
         }
-        if let Some(hold_id) = hold_id {
-            let next_authority = SqliteBudgetStore::validate_hold_authority(
-                hold_id,
-                SqliteBudgetStore::ensure_open_hold(
-                    &transaction,
-                    hold_id,
-                    capability_id,
-                    grant_index,
-                )?
-                .authority
-                .as_ref(),
-                authority,
-            )?;
+        if let Some((hold_id, _, next_authority)) = validated_hold {
             self.update_hold(
                 &transaction,
                 hold_id,
@@ -1439,7 +1421,7 @@ impl BudgetStore for SqliteBudgetStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         let row = transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT
                     capability_id,
@@ -1452,6 +1434,8 @@ impl BudgetStore for SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
+            )?
+            .query_row(
                 params![
                     capability_id,
                     crate::integer::checked::<_, i64>(grant_index)?

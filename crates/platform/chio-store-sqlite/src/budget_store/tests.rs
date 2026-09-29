@@ -2477,3 +2477,6 @@ fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dy
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[path = "tests/statement_caching.rs"]
+mod statement_caching;

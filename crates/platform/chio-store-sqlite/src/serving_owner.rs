@@ -1482,6 +1482,7 @@ fn open_existing_database(path: &Path) -> Result<Connection, SqliteServingOwnerE
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )?;
+    connection.set_prepared_statement_cache_capacity(crate::AUTHORIZATION_STATEMENT_CACHE_CAPACITY);
     // Provisioning writes before `open_serving` sets its own pragmas, so the busy
     // timeout has to be in place here or a transient lock aborts it instantly.
     connection.execute_batch("PRAGMA busy_timeout = 5000;")?;

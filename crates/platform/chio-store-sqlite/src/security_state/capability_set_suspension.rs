@@ -293,15 +293,17 @@ fn load_binding(
     effect_id: &str,
 ) -> PortResult<Option<(Vec<u8>, String)>> {
     connection
-        .query_row(
+        .prepare_cached(
             r#"
             SELECT affected_set_hash, action_id
             FROM security_capability_set_suspension_effects
             WHERE tenant_id = ?1 AND effect_id = ?2
             "#,
-            params![tenant_id, effect_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
         )
+        .map_err(sqlite_error)?
+        .query_row(params![tenant_id, effect_id], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
         .optional()
         .map_err(sqlite_error)
 }
@@ -313,7 +315,7 @@ fn load_members(
     effect_id: &EffectId,
 ) -> PortResult<RecordIdSet> {
     let mut statement = connection
-        .prepare(
+        .prepare_cached(
             r#"
             SELECT capability_id
             FROM security_capability_set_suspension_members
@@ -349,12 +351,15 @@ pub(super) fn load_snapshot(
     key: &CapabilitySetSuspensionKey,
 ) -> PortResult<CapabilitySetSuspensionSnapshot> {
     let state: Option<(i64, i64)> = connection
-        .query_row(
+        .prepare_cached(
             r#"
             SELECT generation, highest_fencing_token
             FROM security_capability_set_suspension_state
             WHERE tenant_id = ?1 AND affected_set_hash = ?2
             "#,
+        )
+        .map_err(sqlite_error)?
+        .query_row(
             params![
                 key.tenant_id.as_str(),
                 key.affected_set_hash.as_bytes().as_slice()
@@ -366,7 +371,7 @@ pub(super) fn load_snapshot(
     let state_exists = state.is_some();
     let (generation, highest_fencing_token) = state.unwrap_or((0, 0));
     let mut statement = connection
-        .prepare(
+        .prepare_cached(
             r#"
             SELECT action_id, effect_id, affected_ids_body, contribution_hash,
                    expires_at, installed_fencing_token
@@ -839,7 +844,7 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
             .transaction_with_behavior(TransactionBehavior::Deferred)
             .map_err(sqlite_error)?;
         let mut statement = transaction
-            .prepare(
+            .prepare_cached(
                 r#"
                 SELECT affected_set_hash
                 FROM security_capability_set_suspension_state

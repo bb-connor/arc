@@ -210,6 +210,10 @@ pub(super) fn bench_authorization_composite(c: &mut Criterion) {
     {
         use std::os::unix::fs::PermissionsExt;
         require(
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)),
+            "secure authority parent directory",
+        );
+        require(
             std::fs::set_permissions(&locks, std::fs::Permissions::from_mode(0o700)),
             "secure lock directory",
         );
@@ -237,7 +241,7 @@ pub(super) fn bench_authorization_composite(c: &mut Criterion) {
     // Populate every mutation and signed receipt, retaining the same identities.
     // Readback and suspension reads add no rows, so perform those only in the
     // measured operation instead of repeating 20,000 nonmutating setup scans.
-    for index in 0..POPULATED_ROWS {
+    for index in 0..populated_rows() {
         let operation = stores.create_admission(index);
         stores.budget_and_receipt(index, &operation);
     }
@@ -249,7 +253,7 @@ pub(super) fn bench_authorization_composite(c: &mut Criterion) {
         stores.authority.verify_database_path(&database),
         "verify populated authority",
     );
-    let mut index = POPULATED_ROWS;
+    let mut index = populated_rows();
     c.bench_function("authorization_store_composite_populated", |b| {
         b.iter(|| {
             stores.authorization(index);

@@ -48,7 +48,7 @@ impl SqliteBudgetStore {
             bool,
         );
         let row: Option<Row> = transaction
-            .query_row(
+            .prepare_cached(
                 r#"
                 SELECT projection_kind, operation_id, revocation_set_digest,
                        expected_quota_count, expected_artifact_count,
@@ -66,26 +66,25 @@ impl SqliteBudgetStore {
                               WHERE hold_id = parent.hold_id)
                 FROM budget_authorization_holds AS parent WHERE hold_id = ?1
                 "#,
-                rusqlite::params![hold_id],
-                |row| {
-                    Ok((
-                        row.get(0)?,
-                        row.get(1)?,
-                        row.get(2)?,
-                        row.get(3)?,
-                        row.get(4)?,
-                        row.get(5)?,
-                        row.get(6)?,
-                        row.get(7)?,
-                        row.get(8)?,
-                        row.get(9)?,
-                        row.get(10)?,
-                        row.get(11)?,
-                        row.get(12)?,
-                        row.get(13)?,
-                    ))
-                },
-            )
+            )?
+            .query_row(rusqlite::params![hold_id], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                    row.get(8)?,
+                    row.get(9)?,
+                    row.get(10)?,
+                    row.get(11)?,
+                    row.get(12)?,
+                    row.get(13)?,
+                ))
+            })
             .optional()?;
         match row {
             None => Ok(()),

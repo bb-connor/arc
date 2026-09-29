@@ -45,6 +45,10 @@ extern crate self as chio_store_sqlite;
 
 use std::path::{Path, PathBuf};
 
+// Budget, admission and suspension authorization reuse only compiled SQL.
+// Bound each participating connection's cache; rows and authority are re-read.
+const AUTHORIZATION_STATEMENT_CACHE_CAPACITY: usize = 64;
+
 pub mod admission_operation_store;
 mod agent_web_replay_store;
 pub mod approval_store;

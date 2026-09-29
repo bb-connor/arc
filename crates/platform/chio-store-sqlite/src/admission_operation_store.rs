@@ -1339,7 +1339,7 @@ fn load_by_operation_id_tx(
     operation_id: &AdmissionOperationId,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
     let raw = transaction
-        .query_row(
+        .prepare_cached(
             r#"
             SELECT operation_id, request_namespace_digest, request_id,
                    operation_json, state, terminal, coordinator_lease_epoch,
@@ -1350,9 +1350,9 @@ fn load_by_operation_id_tx(
                    recovery_store_lease_id, recovery_store_owner_epoch
             FROM admission_operations WHERE operation_id = ?1
             "#,
-            [operation_id.as_str()],
-            read_raw_row,
         )
+        .map_err(sqlite_error)?
+        .query_row([operation_id.as_str()], read_raw_row)
         .optional()
         .map_err(sqlite_error)?;
     let stored = raw.map(decode_row).transpose()?;
@@ -1463,7 +1463,7 @@ fn load_by_replay_key_tx(
     replay_key: &AdmissionReplayKey,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
     let raw = transaction
-        .query_row(
+        .prepare_cached(
             r#"
             SELECT operation_id, request_namespace_digest, request_id,
                    operation_json, state, terminal, coordinator_lease_epoch,
@@ -1475,6 +1475,9 @@ fn load_by_replay_key_tx(
             FROM admission_operations
             WHERE request_namespace_digest = ?1 AND request_id = ?2
             "#,
+        )
+        .map_err(sqlite_error)?
+        .query_row(
             params![
                 replay_key.request_namespace_digest.as_str(),
                 replay_key.request_id.as_str(),

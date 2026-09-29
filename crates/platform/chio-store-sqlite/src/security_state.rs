@@ -235,6 +235,9 @@ impl SqliteSecurityStateStore {
             }
         }
         let connection = Connection::open(path).map_err(sqlite_error)?;
+        // Reuse suspension lookup bytecode, never the observed authority state.
+        connection
+            .set_prepared_statement_cache_capacity(crate::AUTHORIZATION_STATEMENT_CACHE_CAPACITY);
         participant_source::ensure_legacy_writable(&connection)?;
         connection
             .busy_timeout(Duration::from_secs(5))

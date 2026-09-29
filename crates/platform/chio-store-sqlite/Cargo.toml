@@ -69,6 +69,7 @@ uuid = { workspace = true, features = ["v7"] }
 zeroize = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
+rusqlite = { workspace = true, features = ["trace"] }
 base64.workspace = true
 async-trait = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
