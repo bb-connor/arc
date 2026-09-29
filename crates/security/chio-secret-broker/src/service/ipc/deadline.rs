@@ -1,5 +1,8 @@
-const DEFAULT_BROKER_IPC_DEADLINE_MS: u64 = 5_000;
-const MAX_BROKER_IPC_DEADLINE_MS: u64 = 30_000;
+use super::*;
+
+
+pub(super) const DEFAULT_BROKER_IPC_DEADLINE_MS: u64 = 5_000;
+pub(super) const MAX_BROKER_IPC_DEADLINE_MS: u64 = 30_000;
 
 /// Absolute read and write budgets for one accepted broker IPC connection.
 ///
@@ -9,8 +12,8 @@ const MAX_BROKER_IPC_DEADLINE_MS: u64 = 30_000;
 /// corresponding absolute budget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BrokerIpcDeadlines {
-    read: Duration,
-    write: Duration,
+    pub(super) read: Duration,
+    pub(super) write: Duration,
 }
 
 impl BrokerIpcDeadlines {
@@ -48,7 +51,7 @@ pub enum BrokerIpcServeOutcome {
 }
 
 #[cfg(unix)]
-trait BrokerIpcDeadlineStream: Read + Write {
+pub(super) trait BrokerIpcDeadlineStream: Read + Write {
     fn set_broker_read_timeout(&self, timeout: Option<Duration>) -> std::io::Result<()>;
     fn set_broker_write_timeout(&self, timeout: Option<Duration>) -> std::io::Result<()>;
 }
@@ -65,7 +68,7 @@ impl BrokerIpcDeadlineStream for std::os::unix::net::UnixStream {
 }
 
 #[cfg(unix)]
-struct BrokerIpcDeadlineIo<S> {
+pub(super) struct BrokerIpcDeadlineIo<S> {
     stream: S,
     read_deadline: Instant,
     write_budget: Duration,
@@ -76,7 +79,7 @@ struct BrokerIpcDeadlineIo<S> {
 
 #[cfg(unix)]
 impl<S: BrokerIpcDeadlineStream> BrokerIpcDeadlineIo<S> {
-    fn new(stream: S, deadlines: BrokerIpcDeadlines) -> std::io::Result<Self> {
+    pub(super) fn new(stream: S, deadlines: BrokerIpcDeadlines) -> std::io::Result<Self> {
         let accepted_at = Instant::now();
         let read_deadline = accepted_at.checked_add(deadlines.read).ok_or_else(|| {
             std::io::Error::new(
@@ -96,19 +99,19 @@ impl<S: BrokerIpcDeadlineStream> BrokerIpcDeadlineIo<S> {
         })
     }
 
-    fn stream(&self) -> &S {
+    pub(super) fn stream(&self) -> &S {
         &self.stream
     }
 
-    fn into_inner(self) -> S {
+    pub(super) fn into_inner(self) -> S {
         self.stream
     }
 
-    fn read_deadline_setup_failed(&self) -> bool {
+    pub(super) fn read_deadline_setup_failed(&self) -> bool {
         self.read_deadline_setup_failed
     }
 
-    fn write_deadline_setup_failed(&self) -> bool {
+    pub(super) fn write_deadline_setup_failed(&self) -> bool {
         self.write_deadline_setup_failed
     }
 

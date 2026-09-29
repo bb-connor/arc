@@ -1,5 +1,8 @@
+use super::*;
+
+
 #[cfg(unix)]
-struct ProvisionalBrokerSocketCleanup {
+pub(in crate::service) struct ProvisionalBrokerSocketCleanup {
     path: PathBuf,
     identity: BrokerSocketIdentity,
     armed: bool,
@@ -7,7 +10,7 @@ struct ProvisionalBrokerSocketCleanup {
 
 #[cfg(unix)]
 impl ProvisionalBrokerSocketCleanup {
-    fn new(path: &Path) -> Result<Self> {
+    pub(in crate::service) fn new(path: &Path) -> Result<Self> {
         use std::os::unix::fs::{FileTypeExt, MetadataExt};
 
         let metadata = std::fs::symlink_metadata(path).map_err(|error| {
@@ -28,11 +31,11 @@ impl ProvisionalBrokerSocketCleanup {
         })
     }
 
-    fn identity(&self) -> BrokerSocketIdentity {
+    pub(in crate::service) fn identity(&self) -> BrokerSocketIdentity {
         self.identity
     }
 
-    fn disarm(&mut self) {
+    pub(in crate::service) fn disarm(&mut self) {
         self.armed = false;
     }
 }
@@ -68,7 +71,7 @@ impl Drop for UnixBrokerEndpoint {
 }
 
 #[cfg(unix)]
-fn validate_broker_socket_identity(
+pub(in crate::service) fn validate_broker_socket_identity(
     path: &Path,
     trusted_service_uid: u32,
 ) -> Result<BrokerSocketIdentity> {
@@ -93,7 +96,7 @@ fn validate_broker_socket_identity(
 }
 
 #[cfg(unix)]
-fn acquire_broker_socket_lifecycle_lock(path: &Path, trusted_service_uid: u32) -> Result<File> {
+pub(in crate::service) fn acquire_broker_socket_lifecycle_lock(path: &Path, trusted_service_uid: u32) -> Result<File> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
     let mut lock_path = path.as_os_str().to_os_string();

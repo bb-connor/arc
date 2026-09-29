@@ -1,16 +1,19 @@
+use super::*;
+
+
 /// A privileged preparation may retain one descriptor while the kernel performs
 /// final authorization and capture. This is separate from the ordinary frame
 /// read deadline. A first byte starts the ordinary deadline again; neither
 /// trickled bytes nor another operation extend the prepared lifetime.
 #[cfg(unix)]
 #[derive(Default)]
-struct PreparedIpcSlot {
+pub(super) struct PreparedIpcSlot {
     busy: Arc<std::sync::atomic::AtomicBool>,
     pending: Mutex<Option<PreparedIpcConnection>>,
 }
 
 #[cfg(unix)]
-struct PreparedIpcPermit(Arc<std::sync::atomic::AtomicBool>);
+pub(super) struct PreparedIpcPermit(Arc<std::sync::atomic::AtomicBool>);
 
 #[cfg(unix)]
 impl Drop for PreparedIpcPermit {
@@ -20,7 +23,7 @@ impl Drop for PreparedIpcPermit {
 }
 
 #[cfg(unix)]
-struct PreparedIpcConnection {
+pub(super) struct PreparedIpcConnection {
     stream: UnixStream,
     expected_frame_sha256: [u8; 32],
     deadline: Instant,
@@ -29,7 +32,7 @@ struct PreparedIpcConnection {
 
 #[cfg(unix)]
 impl PreparedIpcSlot {
-    fn reserve(&self) -> Result<PreparedIpcPermit> {
+    pub(super) fn reserve(&self) -> Result<PreparedIpcPermit> {
         self.busy
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .map_err(|_| {
@@ -41,7 +44,7 @@ impl PreparedIpcSlot {
 
 #[cfg(unix)]
 impl UnixBrokerEndpoint {
-    fn prepare_connection(
+    pub(super) fn prepare_connection(
         &self,
         mut stream: BrokerIpcDeadlineIo<UnixStream>,
         request: AuthenticatedIpcRequest,
@@ -163,7 +166,7 @@ impl UnixBrokerEndpoint {
         }
     }
 
-    fn serve_prepared(
+    pub(super) fn serve_prepared(
         &self,
         connection: PreparedIpcConnection,
         first: [u8; 1],
@@ -217,7 +220,7 @@ impl UnixBrokerEndpoint {
 }
 
 #[cfg(unix)]
-fn prepared_connection_binding(
+pub(super) fn prepared_connection_binding(
     tenant: &str,
     authenticated: &crate::registration::AuthenticatedAttemptRequest,
 ) -> std::result::Result<([u8; 32], Instant), BrokerIpcServeFailure> {
@@ -255,11 +258,14 @@ fn prepared_connection_binding(
 }
 
 #[cfg(unix)]
-fn prepared_client_fault(message: &str) -> BrokerIpcServeFailure {
+pub(super) fn prepared_client_fault(message: &str) -> BrokerIpcServeFailure {
     BrokerIpcServeFailure::Client(BrokerError::AuthorizationDenied(message.into()))
 }
 
 #[cfg(unix)]
-fn prepared_internal_fault(message: &str) -> BrokerIpcServeFailure {
+pub(super) fn prepared_internal_fault(message: &str) -> BrokerIpcServeFailure {
     BrokerIpcServeFailure::Internal(BrokerError::Storage(message.into()))
 }
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests;

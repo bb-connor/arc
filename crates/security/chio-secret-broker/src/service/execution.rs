@@ -1,5 +1,162 @@
+use super::*;
+
 impl BrokerService {
-    fn execute_inner(
+
+
+    pub fn execute(
+        &self,
+        request: &BrokerExecuteRequest,
+        trusted: &TrustedExecutionContext,
+        now_unix_seconds: u64,
+    ) -> Result<BrokerExecuteResponse> {
+        match self.execute_evidenced(request, trusted, now_unix_seconds)? {
+            BrokerExecuteOutcome::Success(response) => Ok(*response),
+            BrokerExecuteOutcome::Failure(failure) => {
+                let failure = *failure;
+                Err(BrokerError::AuthorizationDenied(failure.diagnostic_code))
+            }
+        }
+    }
+
+    /// Recover an exact durable completion before consulting live admission
+    /// authorities. This path accepts only the canonical request that created
+    /// the persisted attempt and the broker-signed completed response.
+    pub fn replay_completed(
+        &self,
+        request: &BrokerExecuteRequest,
+        now_unix_seconds: u64,
+    ) -> Result<Option<BrokerExecuteResponse>> {
+        let _operation_guard = self.attempt_operation_guard_for_request(request)?;
+        request.validate_bounds()?;
+        let request_digest = broker_request_digest(request)?;
+        let provisional_ids = derive_attempt_ids(
+            &request.capability.body.capability_id,
+            &request.invocation_id,
+            &request.proof.body.nonce,
+            &request_digest,
+        )?;
+        let Some(attempt) = self.attempts.load_attempt(&provisional_ids.attempt_id)? else {
+            return Ok(None);
+        };
+        if !matches!(
+            attempt.state,
+            AttemptState::DispatchCommitted
+                | AttemptState::UnknownOutcome
+                | AttemptState::Completed
+        ) {
+            return Ok(None);
+        }
+        let expected = Self::expected_registration(request, &attempt.registration)?;
+        if expected != attempt.registration {
+            return Err(BrokerError::Conflict(
+                "completed replay request differs from its durable registration".to_string(),
+            ));
+        }
+        let Some(response) = self
+            .receipt_sink
+            .load_completed(&attempt.registration.ids.attempt_id)?
+        else {
+            if attempt.state == AttemptState::Completed {
+                return Err(BrokerError::Storage(
+                    "completed broker attempt lacks its durable replay response".to_string(),
+                ));
+            }
+            return Ok(None);
+        };
+        let trusted = TrustedExecutionContext {
+            admission_operation_id: attempt.registration.ids.operation_id.clone(),
+            prepared_dispatch_id: prepared_dispatch_id(&attempt.registration, request)?,
+            quotas: attempt.registration.quotas.clone(),
+            authority_metadata_digest: attempt.registration.authority_metadata_digest.clone(),
+            revocation_authority_domain: attempt.registration.revocation_authority_domain.clone(),
+            source_receipt_ids: response.receipt.body.source_receipt_ids.clone(),
+        };
+        trusted.validate_for(request)?;
+        self.validate_completed_replay(request, &trusted, &attempt, &response)?;
+        if attempt.state != AttemptState::Completed {
+            self.attempts.transition(
+                &attempt.registration.ids.attempt_id,
+                attempt.state,
+                AttemptState::Completed,
+                &AttemptTransitionEvidence {
+                    revocation_set_digest: attempt.revocation_set_digest,
+                    budget_commit_index: attempt.budget_commit_index,
+                    revocation_commit_index: attempt.revocation_commit_index,
+                    authority_commit_index: attempt.authority_commit_index,
+                    leader_epoch: attempt.leader_epoch,
+                    response_digest: Some(response.evidence.response_body_sha256.clone()),
+                },
+                now_unix_seconds,
+            )?;
+        }
+        Ok(Some(response))
+    }
+
+    pub fn execute_evidenced(
+        &self,
+        request: &BrokerExecuteRequest,
+        trusted: &TrustedExecutionContext,
+        now_unix_seconds: u64,
+    ) -> Result<BrokerExecuteOutcome> {
+        self.execute_evidenced_with_terminal_clock(request, trusted, now_unix_seconds, &|| {
+            Ok(now_unix_seconds)
+        })
+    }
+
+    pub(crate) fn execute_evidenced_with_terminal_clock(
+        &self,
+        request: &BrokerExecuteRequest,
+        trusted: &TrustedExecutionContext,
+        now_unix_seconds: u64,
+        terminal_clock: &dyn Fn() -> Result<u64>,
+    ) -> Result<BrokerExecuteOutcome> {
+        let _operation_guard = self.attempt_operation_guard_for_request(request)?;
+        if let Some(failure) = self.replay_failure_locked(request, now_unix_seconds)? {
+            return Ok(BrokerExecuteOutcome::Failure(Box::new(failure)));
+        }
+        match self.execute_inner(request, trusted, now_unix_seconds, terminal_clock) {
+            Ok(response) => Ok(BrokerExecuteOutcome::Success(Box::new(response))),
+            Err(failure) => {
+                if self.targets_completed_attempt(request)? {
+                    return Err(failure.error);
+                }
+                let terminal_unix_seconds = terminal_clock()?.max(now_unix_seconds);
+                self.persist_failure_for_origin(
+                    request,
+                    terminal_unix_seconds,
+                    &failure.error,
+                    FailureOrigin::Execution,
+                    failure.projection,
+                )
+                .map(|failure| BrokerExecuteOutcome::Failure(Box::new(failure)))
+            }
+        }
+    }
+
+    pub(super) fn targets_completed_attempt(&self, request: &BrokerExecuteRequest) -> Result<bool> {
+        let request_digest = broker_request_digest(request)?;
+        let ids = derive_attempt_ids(
+            &request.capability.body.capability_id,
+            &request.invocation_id,
+            &request.proof.body.nonce,
+            &request_digest,
+        )?;
+        let Some(attempt) = self.attempts.load_attempt(&ids.attempt_id)? else {
+            return Ok(false);
+        };
+        if attempt.state == AttemptState::Completed {
+            return Ok(true);
+        }
+        if self.receipt_sink.supports_completed_replay()
+            && matches!(
+                attempt.state,
+                AttemptState::DispatchCommitted | AttemptState::UnknownOutcome
+            )
+        {
+            return Ok(self.receipt_sink.load_completed(&ids.attempt_id)?.is_some());
+        }
+        Ok(false)
+    }pub(super) fn execute_inner(
         &self,
         request: &BrokerExecuteRequest,
         trusted: &TrustedExecutionContext,
@@ -613,7 +770,7 @@ impl BrokerService {
         Ok(response)
     }
 
-    fn validate_completed_replay(
+    pub(super) fn validate_completed_replay(
         &self,
         request: &BrokerExecuteRequest,
         trusted: &TrustedExecutionContext,
@@ -683,436 +840,5 @@ impl BrokerService {
         }
         Ok(())
     }
-
-    fn persist_failure_for_origin(
-        &self,
-        request: &BrokerExecuteRequest,
-        now_unix_seconds: u64,
-        error: &BrokerError,
-        origin: FailureOrigin,
-        known_projection: Option<FailureProjection>,
-    ) -> Result<BrokerExecuteFailure> {
-        if let Some(failure) = self.replay_failure_locked(request, now_unix_seconds)? {
-            return Ok(failure);
-        }
-        let attempt = self.attempt_for_request(request)?;
-        let projection = match attempt.as_ref() {
-            Some(attempt) => {
-                let expected = Self::expected_registration(request, &attempt.registration)?;
-                if expected != attempt.registration {
-                    return Err(BrokerError::Conflict(
-                        "failure request differs from its durable attempt registration".to_string(),
-                    ));
-                }
-                Some(match (origin, known_projection) {
-                    (FailureOrigin::Admission, Some(_)) => {
-                        return Err(BrokerError::Invariant(
-                            "admission failure cannot carry execution-stage provenance".to_string(),
-                        ));
-                    }
-                    (FailureOrigin::Admission, None) => {
-                        self.authoritative_pre_dispatch_terminal(attempt, error, now_unix_seconds)?
-                    }
-                    (FailureOrigin::Execution, Some(projection)) => {
-                        validate_execution_projection_for_attempt(attempt, projection)?;
-                        projection
-                    }
-                    (FailureOrigin::Execution, None) => {
-                        self.execution_failure_projection(attempt, error, now_unix_seconds)?
-                    }
-                })
-            }
-            None => {
-                if matches!(error, BrokerError::AuthorityUnavailable(_)) {
-                    return Err(BrokerError::AuthorityUnavailable(
-                        "transient broker authority failure remains retryable".to_string(),
-                    ));
-                }
-                None
-            }
-        };
-        self.persist_terminal_failure(request, now_unix_seconds, error, projection)
-    }
-
-    fn attempt_for_request(&self, request: &BrokerExecuteRequest) -> Result<Option<AttemptRecord>> {
-        let request_digest = failure_bound_request_digest(request)?;
-        let ids = derive_attempt_ids(
-            &request.capability.body.capability_id,
-            &request.invocation_id,
-            &request.proof.body.nonce,
-            &request_digest,
-        )?;
-        self.attempts.load_attempt(&ids.attempt_id)
-    }
-
-    fn authoritative_pre_dispatch_terminal(
-        &self,
-        attempt: &AttemptRecord,
-        _error: &BrokerError,
-        now_unix_seconds: u64,
-    ) -> Result<FailureProjection> {
-        if matches!(
-            attempt.state,
-            AttemptState::Captured
-                | AttemptState::DispatchCommitted
-                | AttemptState::UnknownOutcome
-                | AttemptState::Completed
-        ) {
-            return Err(BrokerError::AuthorityUnavailable(
-                "post-capture broker attempt remains on its recovery path".to_string(),
-            ));
-        }
-        let query = execution_hold_query(attempt)?;
-        match self.budget.query_execution_hold(&query)? {
-            ExecutionHoldState::Denied => {
-                pre_dispatch_authority_projection(attempt.state, BrokerFailureOutcome::Denied)
-            }
-            ExecutionHoldState::Reversed => {
-                pre_dispatch_authority_projection(attempt.state, BrokerFailureOutcome::Reversed)
-            }
-            ExecutionHoldState::Captured(commit) => {
-                self.reconcile_captured_failure_boundary(attempt, commit, now_unix_seconds)?;
-                Err(BrokerError::AuthorityUnavailable(
-                    "authoritative broker capture requires recovery without a failure terminal"
-                        .to_string(),
-                ))
-            }
-            ExecutionHoldState::Unknown | ExecutionHoldState::Held => {
-                Err(BrokerError::AuthorityUnavailable(
-                    "broker admission remains nonterminal and retryable".to_string(),
-                ))
-            }
-        }
-    }
-
-    fn reconcile_captured_failure_boundary(
-        &self,
-        attempt: &AttemptRecord,
-        commit: crate::budget::CombinedCaptureCommit,
-        now_unix_seconds: u64,
-    ) -> Result<()> {
-        let evidence = AttemptTransitionEvidence {
-            revocation_set_digest: Some(commit.checked_revocation_set_digest),
-            budget_commit_index: Some(commit.budget_commit_index),
-            revocation_commit_index: Some(commit.revocation_commit_index),
-            authority_commit_index: Some(commit.authority_commit_index),
-            leader_epoch: Some(commit.leader_epoch),
-            response_digest: None,
-        };
-        let current = if attempt.state == AttemptState::Registered {
-            if self
-                .attempts
-                .claim_registered_attempt(&attempt.registration.ids.attempt_id, now_unix_seconds)?
-            {
-                self.attempts
-                    .load_attempt(&attempt.registration.ids.attempt_id)?
-                    .ok_or_else(|| {
-                        BrokerError::Storage(
-                            "captured broker attempt disappeared after preparation claim"
-                                .to_string(),
-                        )
-                    })?
-            } else {
-                self.attempts
-                    .load_attempt(&attempt.registration.ids.attempt_id)?
-                    .ok_or_else(|| {
-                        BrokerError::Storage(
-                            "captured broker attempt disappeared during reconciliation".to_string(),
-                        )
-                    })?
-            }
-        } else {
-            attempt.clone()
-        };
-        match current.state {
-            AttemptState::Prepared | AttemptState::Held | AttemptState::Captured => {
-                self.attempts.transition(
-                    &current.registration.ids.attempt_id,
-                    current.state,
-                    AttemptState::Captured,
-                    &evidence,
-                    now_unix_seconds.max(current.updated_at_unix_seconds),
-                )?;
-                Ok(())
-            }
-            AttemptState::DispatchCommitted | AttemptState::UnknownOutcome => Ok(()),
-            AttemptState::Registered
-            | AttemptState::Reversed
-            | AttemptState::Completed
-            | AttemptState::Failed => Err(BrokerError::Conflict(
-                "authoritative capture conflicts with the local broker attempt".to_string(),
-            )),
-        }
-    }
-
-    fn execution_failure_projection(
-        &self,
-        attempt: &AttemptRecord,
-        error: &BrokerError,
-        now_unix_seconds: u64,
-    ) -> Result<FailureProjection> {
-        match attempt.state {
-            AttemptState::Captured if attempt.dispatch_claim_id.is_none() => {
-                Ok(FailureProjection {
-                    stage: BrokerFailureStage::Capture,
-                    outcome: failure_outcome_before_dispatch(error),
-                    dispatch_knowledge: BrokerDispatchKnowledge::NotCommitted,
-                })
-            }
-            AttemptState::Captured => Err(BrokerError::AuthorityUnavailable(
-                "captured broker attempt still has a live dispatch claim".to_string(),
-            )),
-            AttemptState::DispatchCommitted | AttemptState::UnknownOutcome => {
-                Err(BrokerError::AuthorityUnavailable(
-                    "post-dispatch broker failure lacks exact boundary provenance".to_string(),
-                ))
-            }
-            AttemptState::Completed => Err(BrokerError::Conflict(
-                "completed broker attempt cannot emit a failure terminal".to_string(),
-            )),
-            AttemptState::Registered
-            | AttemptState::Prepared
-            | AttemptState::Held
-            | AttemptState::Reversed
-            | AttemptState::Failed => {
-                self.authoritative_pre_dispatch_terminal(attempt, error, now_unix_seconds)
-            }
-        }
-    }
-
-    fn persist_terminal_failure(
-        &self,
-        request: &BrokerExecuteRequest,
-        now_unix_seconds: u64,
-        error: &BrokerError,
-        projection: Option<FailureProjection>,
-    ) -> Result<BrokerExecuteFailure> {
-        if let Some(failure) = self.replay_failure_locked(request, now_unix_seconds)? {
-            return Ok(failure);
-        }
-        let receipt_id = failure_receipt_id(request)?;
-        let request_digest = failure_bound_request_digest(request)?;
-        let capability_digest = capability_digest(&request.capability).ok();
-        let ids = derive_attempt_ids(
-            &request.capability.body.capability_id,
-            &request.invocation_id,
-            &request.proof.body.nonce,
-            &request_digest,
-        )
-        .ok();
-        let attempt = match ids.as_ref() {
-            Some(ids) => self.attempts.load_attempt(&ids.attempt_id)?,
-            None => None,
-        };
-        if let Some(attempt) = attempt.as_ref() {
-            let expected = Self::expected_registration(request, &attempt.registration)?;
-            if expected != attempt.registration {
-                return Err(BrokerError::Conflict(
-                    "failure request differs from its durable attempt registration".to_string(),
-                ));
-            }
-        }
-        let (
-            issued_at_unix_seconds,
-            stage,
-            outcome,
-            dispatch_knowledge,
-            attempt_id,
-            invocation_id,
-            hold_id,
-            parent_capability_id,
-            broker_capability_id,
-            bound_request_digest,
-        ) = match attempt.as_ref() {
-            Some(attempt) => {
-                let projection = match projection {
-                    Some(projection) => projection,
-                    None => failure_state_projection(attempt.state, error)?,
-                };
-                (
-                    now_unix_seconds
-                        .max(attempt.updated_at_unix_seconds)
-                        .max(request.proof.body.issued_at_unix_seconds)
-                        .max(1),
-                    projection.stage,
-                    projection.outcome,
-                    projection.dispatch_knowledge,
-                    Some(attempt.registration.ids.attempt_id.clone()),
-                    Some(attempt.registration.invocation_id.clone()),
-                    Some(attempt.registration.ids.hold_id.clone()),
-                    Some(attempt.registration.parent_capability_id.clone()),
-                    Some(attempt.registration.broker_capability_id.clone()),
-                    attempt.registration.request_digest.clone(),
-                )
-            }
-            None => (
-                now_unix_seconds
-                    .max(request.proof.body.issued_at_unix_seconds)
-                    .max(1),
-                BrokerFailureStage::Admission,
-                failure_outcome_before_dispatch(error),
-                BrokerDispatchKnowledge::NotStarted,
-                None,
-                None,
-                None,
-                None,
-                None,
-                request_digest,
-            ),
-        };
-        let diagnostic_code = format!("chio.broker.{}", error.diagnostic_code());
-        let receipt = sign_failure_receipt(
-            BrokerFailureReceiptBody {
-                schema: BROKER_FAILURE_RECEIPT_SCHEMA.to_string(),
-                receipt_id,
-                issued_at_unix_seconds,
-                stage,
-                outcome,
-                diagnostic_code: diagnostic_code.clone(),
-                request_digest: bound_request_digest,
-                capability_digest,
-                attempt_id,
-                invocation_id,
-                hold_id,
-                parent_capability_id,
-                broker_capability_id,
-                dispatch_knowledge,
-            },
-            self.receipt_signer.as_ref(),
-        )?;
-        let reference = match self.receipt_sink.persist_failure(&receipt) {
-            Ok(reference) => reference,
-            Err(BrokerError::Conflict(_)) => {
-                return self
-                    .replay_failure_locked(request, now_unix_seconds)?
-                    .ok_or_else(|| {
-                        BrokerError::Conflict(
-                            "broker attempt already has a different durable failure terminal"
-                                .to_string(),
-                        )
-                    });
-            }
-            Err(error) => return Err(error),
-        };
-        validate_identifier(&reference, "failure receipt reference", 512)?;
-        let expected_reference = format!(
-            "broker-failure-receipt-sha256-{}",
-            crate::receipt::failure_receipt_digest(&receipt)?
-        );
-        if reference != expected_reference {
-            return Err(BrokerError::Invariant(
-                "broker receipt sink returned an unbound failure receipt reference".to_string(),
-            ));
-        }
-        if let Some(attempt) = attempt.as_ref() {
-            self.terminalize_failure_attempt(attempt, &receipt.body, now_unix_seconds)?;
-        }
-        Ok(BrokerExecuteFailure {
-            diagnostic_code,
-            receipt_reference: reference,
-            receipt,
-        })
-    }
-
-    fn terminalize_failure_attempt(
-        &self,
-        attempt: &AttemptRecord,
-        receipt: &BrokerFailureReceiptBody,
-        now_unix_seconds: u64,
-    ) -> Result<()> {
-        let target = if receipt.outcome == BrokerFailureOutcome::Reversed {
-            AttemptState::Reversed
-        } else {
-            AttemptState::Failed
-        };
-        if !failure_projection_matches_attempt(attempt, receipt, target) {
-            return Err(BrokerError::Conflict(
-                "broker failure receipt conflicts with the durable attempt boundary".to_string(),
-            ));
-        }
-        match attempt.state {
-            AttemptState::Registered | AttemptState::Prepared | AttemptState::Held => {
-                if attempt.state == AttemptState::Registered && target == AttemptState::Reversed {
-                    return Err(BrokerError::Conflict(
-                        "registered broker attempt cannot claim an authoritative reversal"
-                            .to_string(),
-                    ));
-                }
-                self.attempts.transition(
-                    &attempt.registration.ids.attempt_id,
-                    attempt.state,
-                    target,
-                    &AttemptTransitionEvidence::default(),
-                    now_unix_seconds.max(attempt.updated_at_unix_seconds),
-                )?;
-            }
-            AttemptState::Captured
-                if target == AttemptState::Failed
-                    && attempt.dispatch_claim_id.is_none()
-                    && receipt.stage == BrokerFailureStage::Capture
-                    && receipt.dispatch_knowledge == BrokerDispatchKnowledge::NotCommitted =>
-            {
-                self.attempts.transition(
-                    &attempt.registration.ids.attempt_id,
-                    AttemptState::Captured,
-                    AttemptState::Failed,
-                    &AttemptTransitionEvidence {
-                        revocation_set_digest: attempt.revocation_set_digest.clone(),
-                        budget_commit_index: attempt.budget_commit_index,
-                        revocation_commit_index: attempt.revocation_commit_index,
-                        authority_commit_index: attempt.authority_commit_index,
-                        leader_epoch: attempt.leader_epoch,
-                        response_digest: None,
-                    },
-                    now_unix_seconds.max(attempt.updated_at_unix_seconds),
-                )?;
-            }
-            AttemptState::DispatchCommitted | AttemptState::UnknownOutcome
-                if target == AttemptState::Failed
-                    && attempt_has_capture_evidence(attempt)
-                    && matches!(
-                        (receipt.stage, receipt.outcome, receipt.dispatch_knowledge,),
-                        (
-                            BrokerFailureStage::Dispatch,
-                            BrokerFailureOutcome::Unknown,
-                            BrokerDispatchKnowledge::Unknown,
-                        ) | (
-                            BrokerFailureStage::Response | BrokerFailureStage::ReceiptPersistence,
-                            BrokerFailureOutcome::Failed,
-                            BrokerDispatchKnowledge::Committed,
-                        )
-                    ) =>
-            {
-                self.attempts.transition(
-                    &attempt.registration.ids.attempt_id,
-                    attempt.state,
-                    AttemptState::Failed,
-                    &AttemptTransitionEvidence {
-                        revocation_set_digest: attempt.revocation_set_digest.clone(),
-                        budget_commit_index: attempt.budget_commit_index,
-                        revocation_commit_index: attempt.revocation_commit_index,
-                        authority_commit_index: attempt.authority_commit_index,
-                        leader_epoch: attempt.leader_epoch,
-                        response_digest: attempt.response_digest.clone(),
-                    },
-                    now_unix_seconds.max(attempt.updated_at_unix_seconds),
-                )?;
-            }
-            AttemptState::Failed if target == AttemptState::Failed => {}
-            AttemptState::Reversed if target == AttemptState::Reversed => {}
-            AttemptState::Captured
-            | AttemptState::DispatchCommitted
-            | AttemptState::UnknownOutcome
-            | AttemptState::Completed
-            | AttemptState::Failed
-            | AttemptState::Reversed => {
-                return Err(BrokerError::Conflict(
-                    "broker failure receipt conflicts with the durable attempt state".to_string(),
-                ));
-            }
-        }
-        self.retained_prepared_dispatches()?
-            .remove(&attempt.registration.ids.operation_id);
-        Ok(())
-    }
 }
+

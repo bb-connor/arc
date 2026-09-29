@@ -1,5 +1,8 @@
+use super::*;
+
+
 #[cfg(unix)]
-fn classify_broker_ipc_handler_result(
+pub(in crate::service) fn classify_broker_ipc_handler_result(
     operation: IpcOperation,
     handled: Result<IpcResponse>,
 ) -> std::result::Result<IpcResponse, BrokerIpcServeFailure> {
@@ -26,10 +29,10 @@ fn classify_broker_ipc_handler_result(
 }
 
 #[cfg(unix)]
-const MAX_BROKER_IPC_ERROR_CODE_BYTES: usize = 64;
+pub(in crate::service) const MAX_BROKER_IPC_ERROR_CODE_BYTES: usize = 64;
 
 #[cfg(unix)]
-fn validate_broker_ipc_response_envelope(
+pub(in crate::service) fn validate_broker_ipc_response_envelope(
     operation: IpcOperation,
     response: &IpcResponse,
 ) -> Result<()> {
@@ -60,7 +63,7 @@ fn validate_broker_ipc_response_envelope(
 }
 
 #[cfg(unix)]
-fn is_well_formed_broker_ipc_error_code(code: &str) -> bool {
+pub(in crate::service) fn is_well_formed_broker_ipc_error_code(code: &str) -> bool {
     let bytes = code.as_bytes();
     let (Some(first), Some(last)) = (bytes.first(), bytes.last()) else { return false; };
     if bytes.len() > MAX_BROKER_IPC_ERROR_CODE_BYTES
@@ -76,7 +79,7 @@ fn is_well_formed_broker_ipc_error_code(code: &str) -> bool {
 }
 
 #[cfg(unix)]
-fn validate_signed_broker_execute_failure(response: &IpcResponse) -> bool {
+pub(in crate::service) fn validate_signed_broker_execute_failure(response: &IpcResponse) -> bool {
     let Some(error_code) = response.error_code.as_deref() else {
         return false;
     };
@@ -103,7 +106,7 @@ fn validate_signed_broker_execute_failure(response: &IpcResponse) -> bool {
 }
 
 #[cfg(unix)]
-fn write_broker_ipc_response(
+pub(in crate::service) fn write_broker_ipc_response(
     stream: &mut BrokerIpcDeadlineIo<UnixStream>,
     frame: &[u8],
 ) -> std::result::Result<(), BrokerIpcServeFailure> {
@@ -144,14 +147,14 @@ fn write_broker_ipc_response(
 
 #[cfg(unix)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BrokerIpcWriteFailureClass {
+pub(in crate::service) enum BrokerIpcWriteFailureClass {
     Client,
     DeadlineInternal,
     OperatingSystemInternal,
 }
 
 #[cfg(unix)]
-fn classify_broker_ipc_write_error(
+pub(in crate::service) fn classify_broker_ipc_write_error(
     kind: std::io::ErrorKind,
     deadline_internal_failure: bool,
 ) -> BrokerIpcWriteFailureClass {

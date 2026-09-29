@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(unix)]
 #[test]
 fn handler_error_classification_table_separates_service_faults() {
@@ -440,151 +442,6 @@ fn endpoint_lifecycle_lock_precedes_bind_and_releases_on_drop() {
     drop(replacement);
 }
 
-fn audit_reference_for_execution(
-    fixture: &Fixture,
-    request: &BrokerExecuteRequest,
-    exact_match: bool,
-) -> (
-    crate::audit::BrokerAuditReferenceRequest,
-    crate::audit::BrokerAuditReferencePrecommitment,
-) {
-    let (request_head, request_body) = audit_reference_parts(fixture, request, exact_match);
-    crate::audit::BrokerAuditReferenceRequest::new_with_precommitment(request_head, request_body)
-        .test_expect("audit reference request")
-}
-
-fn audit_reference_parts(
-    fixture: &Fixture,
-    request: &BrokerExecuteRequest,
-    exact_match: bool,
-) -> (Vec<u8>, Vec<u8>) {
-    let destination = &request.request.destination;
-    let mut request_head = Vec::new();
-    if exact_match {
-        request_head.extend_from_slice(destination.method.as_bytes());
-    } else {
-        request_head.extend_from_slice(b"GET");
-    }
-    request_head.push(b' ');
-    request_head.extend_from_slice(destination.exact_path_and_query.as_bytes());
-    request_head.extend_from_slice(b" HTTP/1.1\r\nHost: ");
-    if destination.normalized_host.contains(':') {
-        request_head.push(b'[');
-        request_head.extend_from_slice(destination.normalized_host.as_bytes());
-        request_head.push(b']');
-    } else {
-        request_head.extend_from_slice(destination.normalized_host.as_bytes());
-    }
-    if destination.explicit_port != 443 {
-        request_head.push(b':');
-        request_head.extend_from_slice(destination.explicit_port.to_string().as_bytes());
-    }
-    request_head.extend_from_slice(
-        b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nContent-Length: ",
-    );
-    request_head.extend_from_slice(request.request.body.len().to_string().as_bytes());
-    request_head.extend_from_slice(b"\r\n");
-    for header in &request.request.headers {
-        request_head.extend_from_slice(header.name.as_bytes());
-        request_head.extend_from_slice(b": ");
-        request_head.extend_from_slice(&header.value);
-        request_head.extend_from_slice(b"\r\n");
-    }
-    request_head.extend_from_slice(b"authorization: Bearer ");
-    request_head.extend_from_slice(&fixture.canary);
-    request_head.extend_from_slice(b"\r\n\r\n");
-    (request_head, request.request.body.clone())
-}
-
-fn audit_trust(fixture: &Fixture) -> crate::audit::BrokerAuditTrustConfiguration<'_> {
-    crate::audit::BrokerAuditTrustConfiguration {
-        trusted_capability_issuer: &fixture.audit_trusted_issuer,
-        broker_audience: "broker-service",
-        parent_audience: "broker-parent",
-        provider_adapter_id: "generic-bearer",
-        provider_adapter_version: 1,
-        receipt_signer: &fixture.audit_receipt_signer,
-        maximum_clock_skew_seconds: 2,
-        maximum_liveness_snapshot_age_seconds: 5,
-        maximum_revocation_snapshot_age_seconds: 5,
-        trusted_authority: &fixture.audit_authority,
-        deployment_id: "test-deployment",
-        broker_instance_id: "test-broker-instance",
-        tenant_scope: "tenant-a",
-        runner_id: "test-enterprise-runner",
-        trusted_runner: &fixture.audit_runner_key,
-        governed_admin_policy: fixture.audit_admin.policy(),
-    }
-}
-
-#[cfg(target_os = "linux")]
-struct SocketAuditHandler {
-    service: Arc<BrokerService>,
-    admin: Arc<GovernedAdminAuthorizer>,
-    trusted_runner: PublicKey,
-}
-
-#[cfg(target_os = "linux")]
-impl crate::privileged_audit::BrokerPrivilegedAuditHandler for SocketAuditHandler {
-    fn now_unix_seconds(&self) -> Result<u64> {
-        Ok(20)
-    }
-
-    fn compare(
-        &self,
-        request: &BrokerExecuteRequest,
-        reference: crate::audit::BrokerAuditReferenceRequest,
-        runner_authorization: &crate::audit::SignedBrokerAuditRunnerAuthorization,
-        admin_authorization: &AdminAuthorization,
-    ) -> Result<crate::audit::CompletedBrokerAuditComparison> {
-        let verified_runner = crate::audit::verify_broker_audit_runner_authorization(
-            runner_authorization,
-            request,
-            &reference,
-            crate::audit::BrokerAuditRunnerTrust {
-                deployment_id: "test-deployment",
-                broker_instance_id: "test-broker-instance",
-                tenant_scope: "tenant-a",
-                runner_id: "test-enterprise-runner",
-                trusted_runner: &self.trusted_runner,
-            },
-            20,
-        )?;
-        self.service.audit_compare_outbound_request(
-            request,
-            reference,
-            verified_runner,
-            admin_authorization,
-            self.admin.as_ref(),
-            20,
-        )
-    }
-}
-
-#[cfg(target_os = "linux")]
-struct TerminalPersistenceFailureAuditHandler;
-
-#[cfg(target_os = "linux")]
-impl crate::privileged_audit::BrokerPrivilegedAuditHandler
-    for TerminalPersistenceFailureAuditHandler
-{
-    fn now_unix_seconds(&self) -> Result<u64> {
-        Ok(20)
-    }
-
-    fn compare(
-        &self,
-        _request: &BrokerExecuteRequest,
-        _reference: crate::audit::BrokerAuditReferenceRequest,
-        _runner_authorization: &crate::audit::SignedBrokerAuditRunnerAuthorization,
-        _admin_authorization: &AdminAuthorization,
-    ) -> Result<crate::audit::CompletedBrokerAuditComparison> {
-        Err(BrokerError::Storage(
-            "injected terminal audit persistence failure".to_string(),
-        ))
-    }
-}
-
 #[cfg(target_os = "linux")]
 #[test]
 fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
@@ -882,42 +739,6 @@ fn privileged_audit_socket_propagates_terminal_persistence_failure() {
         .test_expect("join privileged audit server")
         .test_expect_err("terminal persistence failure must reach supervision");
     assert!(matches!(error, BrokerError::Storage(_)));
-}
-
-fn verify_completed_audit(
-    completed: &crate::audit::CompletedBrokerAuditComparison,
-    runner: &crate::audit::SignedBrokerAuditRunnerAuthorization,
-    admin: &AdminAuthorization,
-    expected: crate::audit::BrokerAuditExpectedContext<'_>,
-) -> Result<()> {
-    crate::audit::verify_broker_audit_evidence(
-        crate::audit::BrokerAuditEvidenceBundle {
-            comparison: &completed.comparison,
-            runner_authorization: runner,
-            admin_authorization: admin,
-            authority: completed.authority_evidence(),
-        },
-        expected,
-    )
-}
-
-fn completed_audit_context<'a>(
-    request: &'a BrokerExecuteRequest,
-    audit_id: &'a str,
-    reference_source: &'a str,
-    reference_precommitment: &'a crate::audit::BrokerAuditReferencePrecommitment,
-    trust: crate::audit::BrokerAuditTrustConfiguration<'a>,
-) -> crate::audit::BrokerAuditExpectedContext<'a> {
-    crate::audit::BrokerAuditExpectedContext {
-        request,
-        audit_id,
-        reference_source,
-        reference_precommitment,
-        revocation_authority_domain: "combined-authority",
-        trust,
-        not_before_unix_seconds: 19,
-        expires_at_unix_seconds: 21,
-    }
 }
 
 #[test]
@@ -1432,3 +1253,4 @@ fn audit_comparison_requires_exact_runner_and_durable_one_shot_governance() {
         .test_expect("observed authorization lock")
         .is_empty());
 }
+

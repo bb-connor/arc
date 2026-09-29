@@ -1,3 +1,9 @@
+use crate::service::tests::{fixture, execution, test_attempt_registration};
+use crate::capability::issue_capability;
+use crate::proof::issue_request_proof;
+use crate::service::tests::{endpoint_test_handler_method, endpoint_test_request};
+use chio_test_support::prelude::*;
+use std::thread;
 use super::*;
 use crate::registration::{
     sign_register_attempt_authorization, verify_register_attempt_authorization,
