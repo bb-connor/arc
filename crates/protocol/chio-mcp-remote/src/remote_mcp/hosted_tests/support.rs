@@ -6,14 +6,14 @@ use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::RemoteServeHttpConfig;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use chio_core::crypto::Keypair;
-use chio_hosted_mcp::RemoteServeHttpConfig;
 use chio_manifest::{
     sign_manifest, ToolAnnotations, ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA,
 };
@@ -21,106 +21,7 @@ use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN};
 use serde_json::{json, Value};
 
-const SESSION_IDLE_EXPIRY_ENV: &str = "CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS";
-const SESSION_DRAIN_GRACE_ENV: &str = "CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS";
-const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS";
-
 static UNIQUE_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-static TEST_ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-
-#[derive(Clone)]
-struct TestNativeLaunchFactory;
-
-struct TestMigrationStore {
-    state: chio_security_types::EnterpriseMigrationState,
-}
-
-impl chio_security_types::EnterpriseMigrationStateStore for TestMigrationStore {
-    fn register(
-        &self,
-        _transition: &chio_security_types::EnterpriseMigrationTransition,
-    ) -> chio_security_types::ports::PortResult<
-        chio_security_types::EnterpriseMigrationRegisterOutcome,
-    > {
-        Err(chio_security_types::ports::PortError::unavailable())
-    }
-
-    fn load(
-        &self,
-        key: &chio_security_types::EnterpriseMigrationKey,
-    ) -> chio_security_types::ports::PortResult<Option<chio_security_types::EnterpriseMigrationState>>
-    {
-        Ok((key == &self.state.key).then(|| self.state.clone()))
-    }
-
-    fn compare_and_promote(
-        &self,
-        _transition: &chio_security_types::EnterpriseMigrationTransition,
-    ) -> chio_security_types::ports::PortResult<chio_security_types::EnterpriseMigrationCasOutcome>
-    {
-        Err(chio_security_types::ports::PortError::unavailable())
-    }
-}
-
-impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for TestNativeLaunchFactory {
-    fn authorization_contract_digest(
-        &self,
-    ) -> Result<String, chio_mcp_adapter::edge::AdapterError> {
-        Ok("31".repeat(32))
-    }
-
-    fn prepare_launch(
-        &self,
-        _command: &str,
-        _args: &[&str],
-        expected_server_id: &str,
-        admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-    ) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, chio_mcp_adapter::edge::AdapterError>
-    {
-        let key = chio_security_types::EnterpriseMigrationKey {
-            deployment_id: chio_security_types::ports::RecordId::new("test-deployment").map_err(
-                |error| chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string()),
-            )?,
-            scope_kind: chio_security_types::EnterpriseMigrationScopeKind::ToolServer,
-            scope_id: chio_security_types::ports::RecordId::new(expected_server_id).map_err(
-                |error| chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string()),
-            )?,
-            control: chio_security_types::EnterpriseMigrationControl::CageEnforcement,
-        };
-        let posture = chio_security_types::ports::Digest32::new([0x31; 32]);
-        let state = chio_security_types::EnterpriseMigrationState {
-            schema_version: chio_security_types::ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION,
-            key: key.clone(),
-            stage: chio_security_types::EnterpriseMigrationStage::Shadow,
-            generation: 1,
-            transition_digest: chio_security_types::ports::Digest32::new([0x32; 32]),
-            prior_head_digest: Some(chio_security_types::ports::Digest32::new([0x33; 32])),
-            posture_digest: posture,
-            evidence_digest: chio_security_types::ports::Digest32::new([0x34; 32]),
-            authorization_digest: chio_security_types::ports::Digest32::new([0x35; 32]),
-            intent_digest: chio_security_types::ports::Digest32::new([0x36; 32]),
-            updated_at_unix_ms: 1,
-            signer_public_key: "test-signer".to_string(),
-        };
-        let store: Arc<dyn chio_security_types::EnterpriseMigrationStateStore> =
-            Arc::new(TestMigrationStore { state });
-        let binding = chio_security_types::EnterpriseMigrationRuntimeBinding::load(
-            &store,
-            &key,
-            chio_security_types::EnterpriseMigrationStage::Shadow,
-            posture,
-        )
-        .map_err(|error| {
-            chio_mcp_adapter::edge::AdapterError::ConnectionFailed(error.to_string())
-        })?;
-        let authorization = chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
-            expected_server_id,
-            binding,
-            admitted_manifest_registry,
-        )?;
-        Ok(chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(Box::new(authorization)))
-    }
-}
 
 #[derive(Clone, Debug, Default)]
 pub struct LifecycleTuning {
@@ -225,7 +126,7 @@ pub fn unix_now() -> u64 {
 fn start_server<F>(
     token: String,
     admin_token: String,
-    tuning: LifecycleTuning,
+    _tuning: LifecycleTuning,
     spawn: F,
 ) -> TestServer
 where
@@ -238,15 +139,8 @@ where
     let base_url = format!("http://{listen}");
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
 
-    let guard = {
-        let _env_lock = TEST_ENV_LOCK.lock().expect("lock test env");
-        let env_snapshot = apply_session_lifecycle_env(&tuning);
-        let guard = spawn(&dir, listen);
-        let startup = wait_for_server_result(&client, &base_url, &guard);
-        restore_env(env_snapshot);
-        startup.expect("hosted MCP server to become ready");
-        guard
-    };
+    let guard = spawn(&dir, listen);
+    wait_for_server_result(&client, &base_url, &guard).expect("hosted MCP server to become ready");
 
     // Sanity-check that the worker did not exit immediately after readiness.
     if let Some(error) = guard.try_get_result().expect("poll server result") {
@@ -659,7 +553,6 @@ fn build_client() -> Client {
 
 pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConfig {
     let policy_path = write_policy(dir);
-    let script_path = write_mock_server_script(dir);
     let (signed_manifest_path, manifest_public_key) = write_signed_manifest(dir);
     let resume_hmac_keyring_path = dir.join("remote-session-hmac-keyring.json");
     fs::write(
@@ -725,12 +618,19 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         server_version: "0.1.0".to_string(),
         signed_manifest_path: Some(signed_manifest_path),
         manifest_public_key: Some(manifest_public_key),
-        native_launch_factory: Arc::new(TestNativeLaunchFactory),
+        native_launch_factory: Arc::new(crate::tests::TestNativeLaunchFactory),
+        test_transport: Some(Arc::new(EchoTransport)),
+        test_lifecycle_policy: Some(crate::SessionLifecyclePolicy {
+            idle_expiry_millis: crate::DEFAULT_SESSION_IDLE_EXPIRY_MILLIS,
+            drain_grace_millis: crate::DEFAULT_SESSION_DRAIN_GRACE_MILLIS,
+            reaper_interval_millis: crate::DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
+            tombstone_retention_millis: crate::DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
+        }),
         page_size: 50,
         tools_list_changed: false,
         shared_hosted_owner: false,
-        wrapped_command: "/usr/bin/python3".to_string(),
-        wrapped_args: vec![script_path.to_string_lossy().into_owned()],
+        wrapped_command: "/bin/true".to_string(),
+        wrapped_args: vec![],
         egress_contract: None,
     }
 }
@@ -793,6 +693,19 @@ fn spawn_static_bearer_server_thread(
     tuning: LifecycleTuning,
 ) -> ServerGuard {
     let mut config = base_remote_config(dir, listen);
+    let lifecycle = config
+        .test_lifecycle_policy
+        .as_mut()
+        .expect("fixture lifecycle policy");
+    if let Some(value) = tuning.idle_expiry_millis {
+        lifecycle.idle_expiry_millis = value;
+    }
+    if let Some(value) = tuning.drain_grace_millis {
+        lifecycle.drain_grace_millis = value;
+    }
+    if let Some(value) = tuning.reaper_interval_millis {
+        lifecycle.reaper_interval_millis = value;
+    }
     let session_db_path = tuning
         .session_db_path
         .unwrap_or_else(|| dir.join("remote-session-tombstones.sqlite3"));
@@ -839,7 +752,14 @@ fn spawn_local_oauth_http_server_thread(
 fn spawn_server_thread(config: RemoteServeHttpConfig) -> ServerGuard {
     let (result_tx, result_rx) = mpsc::channel();
     let thread = thread::spawn(move || {
-        let result = std::panic::catch_unwind(|| chio_hosted_mcp::serve_http(config));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .enable_all()
+                .build()
+                .expect("HTTP test runtime")
+                .block_on(crate::serve_http_async(config))
+        }));
         let exit_result = match result {
             Ok(Ok(())) => Err("hosted MCP server exited unexpectedly".to_string()),
             Ok(Err(error)) => Err(error.to_string()),
@@ -885,172 +805,38 @@ impl ServerGuard {
     }
 }
 
-fn apply_session_lifecycle_env(tuning: &LifecycleTuning) -> Vec<(String, Option<String>)> {
-    let mut snapshot = Vec::new();
-    apply_env_override(
-        &mut snapshot,
-        SESSION_IDLE_EXPIRY_ENV,
-        tuning.idle_expiry_millis.map(|value| value.to_string()),
-    );
-    apply_env_override(
-        &mut snapshot,
-        SESSION_DRAIN_GRACE_ENV,
-        tuning.drain_grace_millis.map(|value| value.to_string()),
-    );
-    apply_env_override(
-        &mut snapshot,
-        SESSION_REAPER_INTERVAL_ENV,
-        tuning.reaper_interval_millis.map(|value| value.to_string()),
-    );
-    snapshot
-}
-
-fn apply_env_override(
-    snapshot: &mut Vec<(String, Option<String>)>,
-    name: &str,
-    value: Option<String>,
-) {
-    snapshot.push((name.to_string(), std::env::var(name).ok()));
-    if let Some(value) = value {
-        // Safety: test startup serializes process-global env mutation under TEST_ENV_LOCK.
-        unsafe { std::env::set_var(name, value) };
-    } else {
-        // Safety: test startup serializes process-global env mutation under TEST_ENV_LOCK.
-        unsafe { std::env::remove_var(name) };
-    }
-}
-
-fn restore_env(snapshot: Vec<(String, Option<String>)>) {
-    for (name, value) in snapshot {
-        if let Some(value) = value {
-            // Safety: test startup serializes process-global env mutation under TEST_ENV_LOCK.
-            unsafe { std::env::set_var(name, value) };
-        } else {
-            // Safety: test startup serializes process-global env mutation under TEST_ENV_LOCK.
-            unsafe { std::env::remove_var(name) };
-        }
-    }
-}
-
-fn write_policy(dir: &Path) -> PathBuf {
-    let policy = r#"
-kernel:
-  max_capability_ttl: 3600
-  delegation_depth_limit: 5
-  allow_sampling: true
-capabilities:
-  default:
-    tools:
-      - server: wrapped-http-mock
-        tool: echo_json
-        operations: [invoke]
-        ttl: 300
-"#;
-
-    let path = dir.join("http-policy.yaml");
-    fs::write(&path, policy).expect("write HTTP policy");
-    path
-}
-
-fn write_mock_server_script(dir: &Path) -> PathBuf {
-    let script = r##"
-import json
-import sys
-
-TOOLS = [{
-    "name": "echo_json",
-    "title": "Echo JSON",
-    "description": "Return structured JSON",
-    "inputSchema": {
-        "type": "object",
-        "properties": {
-            "message": {"type": "string"}
-        }
-    },
-    "outputSchema": {
-        "type": "object",
-        "properties": {
-            "echo": {"type": "string"}
-        }
-    },
-    "annotations": {
-        "readOnlyHint": True
-    }
-}]
-
-def respond(payload):
-    sys.stdout.write(json.dumps(payload) + "\n")
-    sys.stdout.flush()
-
-for line in sys.stdin:
-    if not line.strip():
-        continue
-
-    message = json.loads(line)
-    method = message.get("method")
-
-    if method == "initialize":
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {
-                "protocolVersion": "2025-11-25",
-                "capabilities": {
-                    "tools": {}
-                },
-                "serverInfo": {
-                    "name": "mock-http-upstream",
-                    "version": "0.1.0"
-                }
-            }
-        })
-        continue
-
-    if method == "notifications/initialized":
-        continue
-
-    if method == "tools/list":
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {
-                "tools": TOOLS
-            }
-        })
-        continue
-
-    if method == "tools/call":
-        arguments = message.get("params", {}).get("arguments", {})
-        respond({
-            "jsonrpc": "2.0",
-            "id": message["id"],
-            "result": {
-                "content": [{"type": "text", "text": "echoed"}],
-                "structuredContent": {"echo": arguments.get("message", "hello")},
-                "isError": False
-            }
-        })
-        continue
-
-    respond({
-        "jsonrpc": "2.0",
-        "id": message.get("id"),
-        "error": {
-            "code": -32601,
-            "message": f"unknown method: {method}"
-        }
-    })
-"##;
-
-    let path = dir.join("mock_http_mcp_server.py");
-    fs::write(&path, script).expect("write mock server script");
-    #[cfg(unix)]
+struct EchoTransport;
+impl chio_mcp_adapter::edge::McpTransport for EchoTransport {
+    fn list_tools(
+        &self,
+    ) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, chio_mcp_adapter::edge::AdapterError>
     {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
-            .expect("secure mock server script");
+        Ok(vec![serde_json::from_value(json!({
+            "name": "echo_json", "title": "Echo JSON", "description": "Return structured JSON",
+            "inputSchema": {"type":"object", "properties":{"message":{"type":"string"}}},
+            "outputSchema": {"type":"object", "properties":{"echo":{"type":"string"}}},
+            "annotations":{"readOnlyHint":true}
+        }))
+        .expect("echo tool fixture")])
     }
-    path
+    fn call_tool(
+        &self,
+        name: &str,
+        arguments: Value,
+    ) -> Result<chio_mcp_adapter::edge::McpToolResult, chio_mcp_adapter::edge::AdapterError> {
+        if name != "echo_json" {
+            return Err(chio_mcp_adapter::edge::AdapterError::ToolNotFound(
+                name.into(),
+            ));
+        }
+        Ok(chio_mcp_adapter::edge::McpToolResult {
+            content: vec![json!({"type":"text","text":"echoed"})],
+            structured_content: Some(
+                json!({"echo":arguments.get("message").cloned().unwrap_or(json!("hello"))}),
+            ),
+            is_error: Some(false),
+        })
+    }
 }
 
 fn read_sse_until_response(response: Response, expected_id: Value) -> (Value, Vec<Value>) {
@@ -1103,4 +889,24 @@ fn read_next_sse_event(reader: &mut impl BufRead) -> Option<Option<Value>> {
             data.push(rest.trim_start().to_string());
         }
     }
+}
+
+fn write_policy(dir: &Path) -> PathBuf {
+    let policy = r#"
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 5
+  allow_sampling: true
+capabilities:
+  default:
+    tools:
+      - server: wrapped-http-mock
+        tool: echo_json
+        operations: [invoke]
+        ttl: 300
+"#;
+
+    let path = dir.join("http-policy.yaml");
+    fs::write(&path, policy).expect("write HTTP policy");
+    path
 }

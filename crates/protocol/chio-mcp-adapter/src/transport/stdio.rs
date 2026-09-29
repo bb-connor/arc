@@ -1,5 +1,6 @@
 use std::io::{BufRead, BufReader, Read, Write};
-use std::process::{Child, Command, Stdio};
+#[cfg(test)]
+use std::process::Child;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -22,14 +23,15 @@ use super::handlers::{
 use super::nested_flow::NestedFlowTaskRuntime;
 use super::utils::{
     adapter_jsonrpc_error, is_nested_flow_notification, proxy_client_capabilities, read_line,
-    remove_chio_auth_env, send_line, MAX_STDIO_MCP_BUFFERED_MESSAGES, MCP_PROTOCOL_VERSION,
+    send_line, MAX_STDIO_MCP_BUFFERED_MESSAGES, MCP_PROTOCOL_VERSION,
     UPSTREAM_REQUEST_POLL_INTERVAL,
 };
 
 const UPSTREAM_INITIALIZATION_TIMEOUT: Duration = Duration::from_secs(10);
 const UPSTREAM_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(10);
 const UPSTREAM_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
-const LEGACY_CHILD_REAP_TIMEOUT: Duration = Duration::from_secs(2);
+#[cfg(test)]
+const TEST_CHILD_REAP_TIMEOUT: Duration = Duration::from_secs(2);
 
 include!("stdio_parts/transport.inc");
 include!("stdio_parts/lifecycle_and_tests.inc");
@@ -37,3 +39,7 @@ include!("stdio_parts/lifecycle_and_tests.inc");
 #[path = "stdio_writer.rs"]
 mod writer;
 use writer::{run_stdio_writer, BoundedStdioWriter, WriterCommand};
+
+#[cfg(test)]
+#[path = "stdio_test_process.rs"]
+mod test_process;

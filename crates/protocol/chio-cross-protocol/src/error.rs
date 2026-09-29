@@ -2,6 +2,9 @@ use crate::discovery::DiscoveryProtocol;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BridgeError {
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("capability reference mismatch: expected {expected}, got {actual}")]
     CapabilityRefMismatch { expected: String, actual: String },
 

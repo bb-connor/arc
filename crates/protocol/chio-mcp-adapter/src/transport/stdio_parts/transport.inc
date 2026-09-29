@@ -65,7 +65,8 @@ enum NaturalExitPoll {
 }
 
 enum NaturalChildExit {
-    Legacy,
+    #[cfg(test)]
+    TestProcess,
     Caged(Box<chio_cage::CageEnforcementRecord>),
 }
 
@@ -148,28 +149,12 @@ impl ActiveCageReceiptPersistence {
 
 #[derive(Debug)]
 enum ManagedChild {
-    Legacy(Child),
+    #[cfg(test)]
+    TestProcess(Child),
     Caged(Box<chio_cage::EnforcedChild>),
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum NativeLaunchRequirement {
-    LegacyAllowed,
-    CageRequired,
-}
-
-fn dispatch_native_launch<T, E>(
-    requirement: NativeLaunchRequirement,
-    legacy: impl FnOnce() -> Result<T, E>,
-    cage: impl FnOnce() -> Result<T, E>,
-) -> Result<T, E> {
-    match requirement {
-        NativeLaunchRequirement::LegacyAllowed => legacy(),
-        NativeLaunchRequirement::CageRequired => cage(),
-    }
-}
-
-/// Verified inputs required to opt an MCP subprocess into cage enforcement.
+/// Verified inputs required for MCP subprocess cage enforcement.
 #[derive(Clone)]
 pub struct CageReceiptPersistence {
     attempt_id: String,
@@ -323,115 +308,6 @@ impl std::fmt::Debug for CageRequiredLaunch {
     }
 }
 
-#[derive(Clone)]
-pub struct LegacyNativeLaunchAuthorization {
-    server_id: String,
-    migration: chio_security_types::EnterpriseMigrationRuntimeBinding,
-    manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-}
-
-impl std::fmt::Debug for LegacyNativeLaunchAuthorization {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("LegacyNativeLaunchAuthorization")
-            .field("server_id", &self.server_id)
-            .field("migration", &"durable")
-            .field("manifest_registry", &"verified")
-            .finish()
-    }
-}
-
-impl LegacyNativeLaunchAuthorization {
-    pub fn new(
-        server_id: impl Into<String>,
-        migration: chio_security_types::EnterpriseMigrationRuntimeBinding,
-        manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-    ) -> Result<Self, AdapterError> {
-        let server_id = server_id.into();
-        validate_cage_migration_identity(&server_id, &migration)?;
-        manifest_registry
-            .authorize_cage_manifest(&server_id)
-            .map_err(|error| {
-                AdapterError::ConnectionFailed(format!(
-                    "legacy MCP launch manifest authorization failed: {error}"
-                ))
-            })?;
-        migration
-            .require_legacy_fallback_permitted()
-            .map_err(|error| {
-                AdapterError::ConnectionFailed(format!(
-                    "legacy MCP launch denied by enterprise migration state: {error}"
-                ))
-            })?;
-        Ok(Self {
-            server_id,
-            migration,
-            manifest_registry,
-        })
-    }
-
-    fn revalidate(&self) -> Result<(), AdapterError> {
-        validate_cage_migration_identity(&self.server_id, &self.migration)?;
-        self.manifest_registry
-            .authorize_cage_manifest(&self.server_id)
-            .map_err(|error| {
-                AdapterError::ConnectionFailed(format!(
-                    "legacy MCP launch manifest authorization failed: {error}"
-                ))
-            })?;
-        self.migration
-            .require_legacy_fallback_permitted()
-            .map_err(|error| {
-                AdapterError::ConnectionFailed(format!(
-                    "legacy MCP launch denied by enterprise migration state: {error}"
-                ))
-            })
-    }
-
-    #[must_use]
-    pub fn server_id(&self) -> &str {
-        &self.server_id
-    }
-
-    #[must_use]
-    pub fn requires_flow_runtime(&self) -> bool {
-        self.manifest_registry.requires_flow_runtime()
-    }
-}
-
-pub enum NativeMcpLaunch {
-    LegacyAuthorized(Box<LegacyNativeLaunchAuthorization>),
-    CageRequired(Box<CageRequiredLaunch>),
-}
-
-impl NativeMcpLaunch {
-    /// Publisher manifests admitted by the signed launch policy. Hosts retain
-    /// this registry when matching live discovery to authenticated tool metadata.
-    #[must_use]
-    pub fn manifest_registry(&self) -> &Arc<chio_manifest::VerifiedManifestRegistry> {
-        match self {
-            Self::LegacyAuthorized(authorization) => &authorization.manifest_registry,
-            Self::CageRequired(launch) => &launch.manifest_registry,
-        }
-    }
-
-    #[must_use]
-    pub fn server_id(&self) -> &str {
-        match self {
-            Self::LegacyAuthorized(authorization) => authorization.server_id(),
-            Self::CageRequired(launch) => &launch.server_id,
-        }
-    }
-
-    #[must_use]
-    pub fn requires_flow_runtime(&self) -> bool {
-        match self {
-            Self::LegacyAuthorized(authorization) => authorization.requires_flow_runtime(),
-            Self::CageRequired(launch) => launch.manifest_registry.requires_flow_runtime(),
-        }
-    }
-}
-
 pub trait NativeMcpLaunchFactory:
     Send + Sync + std::panic::RefUnwindSafe + std::panic::UnwindSafe
 {
@@ -446,11 +322,11 @@ pub trait NativeMcpLaunchFactory:
         args: &[&str],
         expected_server_id: &str,
         admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-    ) -> Result<NativeMcpLaunch, AdapterError>;
+    ) -> Result<CageRequiredLaunch, AdapterError>;
 
     /// Retain the original authenticated broker connection in an enforced
-    /// launch. This must not connect to the broker again or fall back to a
-    /// legacy launch. Factories without this composition refuse by default.
+    /// launch. This must retain the original broker socket. Factories without
+    /// this composition refuse by default.
     #[cfg(target_os = "linux")]
     fn prepare_broker_launch(
         &self,
@@ -467,6 +343,22 @@ pub trait NativeMcpLaunchFactory:
 }
 
 impl CageRequiredLaunch {
+    /// Registry that authorized this exact launch.
+    #[must_use]
+    pub fn manifest_registry(&self) -> &Arc<chio_manifest::VerifiedManifestRegistry> {
+        &self.manifest_registry
+    }
+
+    #[must_use]
+    pub fn server_id(&self) -> &str {
+        &self.server_id
+    }
+
+    #[must_use]
+    pub fn requires_flow_runtime(&self) -> bool {
+        self.manifest_registry.requires_flow_runtime()
+    }
+
     /// Verify that the factory retained this exact open prepared socket. The
     /// same daemon can own many sockets, so peer identity alone is insufficient.
     #[cfg(target_os = "linux")]
@@ -624,162 +516,13 @@ impl StdioMcpTransport {
     pub fn spawn(
         command: &str,
         args: &[&str],
-        launch: NativeMcpLaunch,
+        launch: CageRequiredLaunch,
     ) -> Result<Self, AdapterError> {
         Self::spawn_with_timeouts(command, args, launch, StdioRequestTimeouts::default())
     }
 
-    /// Spawn an authorized MCP subprocess with bounded operator-selected deadlines.
+    /// Launch through the verified cage with bounded request deadlines.
     pub fn spawn_with_timeouts(
-        command: &str,
-        args: &[&str],
-        launch: NativeMcpLaunch,
-        request_timeouts: StdioRequestTimeouts,
-    ) -> Result<Self, AdapterError> {
-        match launch {
-            NativeMcpLaunch::LegacyAuthorized(authorization) => {
-                Self::spawn_legacy_authorized(command, args, *authorization, request_timeouts)
-            }
-            NativeMcpLaunch::CageRequired(launch) => {
-                Self::spawn_cage_required_with_timeouts(command, args, *launch, request_timeouts)
-            }
-        }
-    }
-
-    fn spawn_legacy_authorized(
-        command: &str,
-        args: &[&str],
-        authorization: LegacyNativeLaunchAuthorization,
-        request_timeouts: StdioRequestTimeouts,
-    ) -> Result<Self, AdapterError> {
-        let admitted_manifest = authorization
-            .manifest_registry
-            .verified_manifest(&authorization.server_id)
-            .ok_or_else(|| {
-                AdapterError::ConnectionFailed(
-                    "legacy MCP launch manifest disappeared from the verified registry".into(),
-                )
-            })?
-            .manifest
-            .clone();
-        let transport = Self::spawn_legacy_with_gate_and_timeouts(
-            command,
-            args,
-            || authorization.revalidate(),
-            request_timeouts,
-        )?;
-        if let Err(error) = validate_signed_mcp_tool_surface(&transport, &admitted_manifest) {
-            return Err(merge_cleanup_failures(
-                error,
-                [("legacy transport shutdown", transport.shutdown())],
-            ));
-        }
-        Ok(transport)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn spawn_legacy_unchecked_for_test(
-        command: &str,
-        args: &[&str],
-    ) -> Result<Self, AdapterError> {
-        Self::spawn_legacy_with_gate(command, args, || Ok(()))
-    }
-
-    #[cfg(test)]
-    fn spawn_legacy_unchecked_for_test_with_timeouts(
-        command: &str,
-        args: &[&str],
-        request_timeouts: StdioRequestTimeouts,
-    ) -> Result<Self, AdapterError> {
-        Self::spawn_legacy_with_gate_and_timeouts(command, args, || Ok(()), request_timeouts)
-    }
-
-    #[cfg(test)]
-    fn spawn_legacy_with_gate(
-        command: &str,
-        args: &[&str],
-        prelaunch: impl FnOnce() -> Result<(), AdapterError>,
-    ) -> Result<Self, AdapterError> {
-        Self::spawn_legacy_with_gate_and_timeouts(
-            command,
-            args,
-            prelaunch,
-            StdioRequestTimeouts::default(),
-        )
-    }
-
-    fn spawn_legacy_with_gate_and_timeouts(
-        command: &str,
-        args: &[&str],
-        prelaunch: impl FnOnce() -> Result<(), AdapterError>,
-        request_timeouts: StdioRequestTimeouts,
-    ) -> Result<Self, AdapterError> {
-        let mut child_command = Command::new(command);
-        child_command
-            .args(args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        remove_chio_auth_env(&mut child_command);
-
-        let mut child = dispatch_native_launch(
-            NativeLaunchRequirement::LegacyAllowed,
-            || {
-                prelaunch()?;
-                child_command.spawn().map_err(|e| {
-                    AdapterError::ConnectionFailed(format!("failed to spawn {command}: {e}"))
-                })
-            },
-            || {
-                Err(AdapterError::ConnectionFailed(
-                    "legacy MCP launch selected the cage backend".into(),
-                ))
-            },
-        )?;
-
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| AdapterError::ConnectionFailed("child stdout not captured".into()))?;
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| AdapterError::ConnectionFailed("child stdin not captured".into()))?;
-
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| AdapterError::ConnectionFailed("child stderr not captured".into()))?;
-
-        Self::from_launched_process(
-            ManagedChild::Legacy(child),
-            Box::new(stdin),
-            Box::new(stdout),
-            Box::new(stderr),
-            None,
-            None,
-            request_timeouts,
-        )
-    }
-
-    /// Launch an explicitly opted-in MCP server through the verified cage.
-    ///
-    /// Every cage admission, compilation, bootstrap, or evidence failure is
-    /// terminal. This path never retries with the legacy direct spawn.
-    pub fn spawn_cage_required(
-        command: &str,
-        args: &[&str],
-        launch: CageRequiredLaunch,
-    ) -> Result<Self, AdapterError> {
-        Self::spawn_cage_required_with_timeouts(
-            command,
-            args,
-            launch,
-            StdioRequestTimeouts::default(),
-        )
-    }
-
-    fn spawn_cage_required_with_timeouts(
         command: &str,
         args: &[&str],
         launch: CageRequiredLaunch,
@@ -862,15 +605,7 @@ impl StdioMcpTransport {
                 [("failure receipt", receipt_result)],
             ));
         }
-        let launch_result = dispatch_native_launch(
-            NativeLaunchRequirement::CageRequired,
-            || {
-                Err(AdapterError::ConnectionFailed(
-                    "cage-required MCP launch selected the legacy backend".into(),
-                ))
-            },
-            || Ok(chio_cage::launch_prepared(prepared, launch_options)),
-        )?;
+        let launch_result = chio_cage::launch_prepared(prepared, launch_options);
         let mut child = match launch_result {
             Ok(child) => child,
             Err(error) => {
@@ -1180,8 +915,7 @@ impl StdioMcpTransport {
         Ok(transport)
     }
 
-    /// Verified cage evidence for cage-required transports. Legacy transports
-    /// return `None` and never claim native confinement.
+    /// Verified cage evidence. Only test process fixtures can omit it.
     #[must_use]
     pub fn enforcement_evidence(&self) -> Option<&chio_cage::FullyEnforcedEvidence> {
         self.enforcement_evidence.as_ref()

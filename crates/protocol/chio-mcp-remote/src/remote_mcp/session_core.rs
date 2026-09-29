@@ -8,34 +8,6 @@ use std::sync::{mpsc, Arc, Mutex as StdMutex, Weak};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::capability::token::CapabilityToken;
-use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature as Ed25519Signature};
-use chio_core::session::{
-    ChioIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext,
-    OAuthBearerFederatedClaims, RequestOwnershipSnapshot, SessionAuthContext, SessionAuthMethod,
-    SessionId,
-};
-use chio_kernel::operator_report::{
-    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM,
-    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER,
-    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM,
-    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_PARAMETER,
-};
-use chio_kernel::{
-    is_supported_dpop_schema, ChioKernel, ChioOAuthAuthorizationProfile, DpopConfig, DpopNonceStore,
-    DpopProof, GovernedAuthorizationDetail, GovernedAuthorizationTransactionContext, KernelError,
-    PeerCapabilities, RevocationStore, ToolServerConnection,
-    CHIO_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
-    CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE, CHIO_OAUTH_AUTHORIZATION_PROFILE_ID,
-    CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
-    CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
-};
-use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport};
-use chio_mcp_adapter::edge::{AdapterError, ChioMcpEdge, McpEdgeConfig, McpTransport};
-use chio_mcp_adapter::server::AdaptedMcpServer;
-use chio_mcp_adapter::transport::StdioMcpTransport;
-use hmac::{Hmac, Mac};
 use async_stream::stream;
 use axum::extract::{Form, Path as AxumPath, Query, Request, State};
 use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN, WWW_AUTHENTICATE};
@@ -46,7 +18,33 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use chio_core::canonical::canonical_json_bytes;
+use chio_core::capability::token::CapabilityToken;
+use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature as Ed25519Signature};
+use chio_core::session::{
+    ChioIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext,
+    OAuthBearerFederatedClaims, RequestOwnershipSnapshot, SessionAuthContext, SessionAuthMethod,
+    SessionId,
+};
 use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_kernel::operator_report::{
+    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM,
+    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM,
+};
+use chio_kernel::{
+    is_supported_dpop_schema, ChioKernel, ChioOAuthAuthorizationProfile, DpopConfig,
+    DpopNonceStore, DpopProof, GovernedAuthorizationDetail,
+    GovernedAuthorizationTransactionContext, KernelError, PeerCapabilities, RevocationStore,
+    ToolServerConnection, CHIO_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
+    CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE, CHIO_OAUTH_AUTHORIZATION_PROFILE_ID,
+    CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
+    CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
+};
+use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport};
+use chio_mcp_adapter::edge::{AdapterError, ChioMcpEdge, McpEdgeConfig, McpTransport};
+use chio_mcp_adapter::server::AdaptedMcpServer;
+use chio_mcp_adapter::transport::StdioMcpTransport;
+use hmac::{Hmac, Mac};
 use p256::ecdsa::{Signature as P256Signature, VerifyingKey as P256VerifyingKey};
 use p384::ecdsa::{Signature as P384Signature, VerifyingKey as P384VerifyingKey};
 use reqwest::Client as HttpClient;
@@ -65,6 +63,7 @@ use url::Url;
 use zeroize::{Zeroize, Zeroizing};
 
 use chio_control_plane::policy::{load_policy, LoadedPolicy};
+use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority;
 use chio_control_plane::trust_control::{
     self, ChildReceiptQuery, RevocationQuery, ToolReceiptQuery,
 };
@@ -75,12 +74,10 @@ use chio_control_plane::{
     enterprise_federation::{
         EnterpriseProviderKind, EnterpriseProviderRecord, EnterpriseProviderRegistry,
     },
-    issue_default_capabilities, load_or_create_authority_keypair,
-    open_durable_admission_runtime, require_control_token, rotate_authority_keypair,
-    validate_distinct_database_paths, validate_durable_admission_participant_paths,
-    DurableAdmissionRuntime,
+    issue_default_capabilities, load_or_create_authority_keypair, open_durable_admission_runtime,
+    require_control_token, rotate_authority_keypair, validate_distinct_database_paths,
+    validate_durable_admission_participant_paths, DurableAdmissionRuntime,
 };
-use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority;
 
 const MCP_ENDPOINT_PATH: &str = "/mcp";
 const ADMIN_HEALTH_PATH: &str = "/admin/health";
@@ -123,12 +120,9 @@ const DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS: u64 = 30 * 60 * 1000;
 const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
 const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
 const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"chio.identity_federation.v1";
-const REMOTE_SESSION_RESUME_RECORD_HMAC_LABEL: &[u8] =
-    b"chio.remote_mcp.resume_record_hmac.v2";
-const REMOTE_SESSION_TOMBSTONE_HMAC_LABEL: &[u8] =
-    b"chio.remote_mcp.terminal_tombstone_hmac.v2";
-const REMOTE_SESSION_TERMINAL_FENCE_HMAC_LABEL: &[u8] =
-    b"chio.remote_mcp.terminal_fence_hmac.v2";
+const REMOTE_SESSION_RESUME_RECORD_HMAC_LABEL: &[u8] = b"chio.remote_mcp.resume_record_hmac.v2";
+const REMOTE_SESSION_TOMBSTONE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_tombstone_hmac.v2";
+const REMOTE_SESSION_TERMINAL_FENCE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_fence_hmac.v2";
 const REMOTE_SESSION_HMAC_KEYRING_SCHEMA: &str = "chio.remote-mcp.resume-hmac-keyring.v1";
 const MAX_REMOTE_SESSION_HMAC_PREVIOUS_KEYS: usize = 4;
 const MAX_REMOTE_SESSION_HMAC_GRACE_MILLIS: u64 = 7 * 24 * 60 * 60 * 1_000;
@@ -194,6 +188,10 @@ pub struct RemoteServeHttpConfig {
     /// Pinned authority that prepares every native launch. The factory must
     /// fail closed when its policy, migration state, or manifest binding no
     /// longer authorizes the exact subprocess.
+    #[cfg(test)]
+    pub(crate) test_transport: Option<Arc<dyn McpTransport>>,
+    #[cfg(test)]
+    pub(crate) test_lifecycle_policy: Option<SessionLifecyclePolicy>,
     pub native_launch_factory: Arc<dyn chio_mcp_adapter::transport::NativeMcpLaunchFactory>,
     pub page_size: usize,
     pub tools_list_changed: bool,
@@ -992,15 +990,14 @@ struct RemoteSessionCapability {
     subject_public_key: String,
 }
 
-
 #[path = "session_core/authority_mode.rs"]
 mod session_core_authority_mode;
-#[path = "session_core/session.rs"]
-mod session_core_session;
 #[path = "session_core/factory.rs"]
 mod session_core_factory;
 #[path = "session_core/ledger.rs"]
 mod session_core_ledger;
+#[path = "session_core/session.rs"]
+mod session_core_session;
 
 struct BroadcastJsonRpcWriter {
     event_tx: broadcast::Sender<RemoteSessionEvent>,
@@ -1061,12 +1058,8 @@ impl BroadcastJsonRpcWriter {
                 continue;
             }
 
-            let message: Value = serde_json::from_slice(&line).map_err(|error| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("failed to parse JSON-RPC output from edge worker: {error}"),
-                )
-            })?;
+            let message: Value = decode_json(&line, MAX_SESSION_JSON_BYTES)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
             let _ = self.event_tx.send(self.next_event(message));
         }
 
@@ -1076,12 +1069,33 @@ impl BroadcastJsonRpcWriter {
 
 impl Write for BroadcastJsonRpcWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.buffer.extend_from_slice(buf);
-        self.flush_complete_lines()?;
+        for fragment in buf.split_inclusive(|byte| *byte == b'\n') {
+            if fragment.len() > MAX_SESSION_JSON_BYTES.saturating_sub(self.buffer.len()) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    chio_core::canonical::UntrustedJsonError::TooLarge {
+                        bytes: self.buffer.len().saturating_add(fragment.len()),
+                        bound: MAX_SESSION_JSON_BYTES,
+                    },
+                ));
+            }
+            self.buffer.extend_from_slice(fragment);
+            self.flush_complete_lines()?;
+        }
         Ok(buf.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
         self.flush_complete_lines()
+    }
+}
+
+impl RemoteServeHttpConfig {
+    fn lifecycle_policy(&self) -> SessionLifecyclePolicy {
+        #[cfg(test)]
+        if let Some(policy) = &self.test_lifecycle_policy {
+            return policy.clone();
+        }
+        SessionLifecyclePolicy::from_env()
     }
 }

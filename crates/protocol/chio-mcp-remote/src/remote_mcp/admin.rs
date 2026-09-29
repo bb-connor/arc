@@ -491,7 +491,7 @@ async fn handle_admin_revocations(
 async fn handle_admin_revoke_capability(
     State(state): State<RemoteAppState>,
     headers: HeaderMap,
-    Json(payload): Json<AdminRevokeCapabilityRequest>,
+    BoundedJson(payload): BoundedJson<AdminRevokeCapabilityRequest>,
 ) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
         return response;

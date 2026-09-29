@@ -173,12 +173,12 @@ async fn issue(
             return plain_http_error(StatusCode::BAD_REQUEST, "invalid credential exchange body")
         }
     };
-    let input: IssueRequest = match serde_json::from_slice(&bytes) {
+    let input: IssueRequest = match decode_json(&bytes, 16 * 1024) {
         Ok(input) => input,
-        Err(_) => {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "expected ttlSeconds and explicit allowedTools",
+        Err(error) => {
+            return input::with_source(
+                plain_http_error(StatusCode::BAD_REQUEST, error.code()),
+                error,
             )
         }
     };
@@ -361,7 +361,7 @@ fn load_record(
     let Some((session_id, encoded, signature)) = stored else {
         return Ok(None);
     };
-    let record: SessionCredential = serde_json::from_str(&encoded)?;
+    let record: SessionCredential = decode_json(encoded.as_bytes(), MAX_SESSION_JSON_BYTES)?;
     let signature = Ed25519Signature::from_hex(&signature)?;
     if record.schema != SCHEMA
         || record.token_hash != token_hash
@@ -521,7 +521,8 @@ fn decode_call(
     encoded: &str,
     signature: &str,
 ) -> Result<CredentialCall, Response> {
-    let call: CredentialCall = serde_json::from_str(encoded).map_err(storage_error)?;
+    let call: CredentialCall = decode_json(encoded.as_bytes(), MAX_SESSION_JSON_BYTES)
+        .map_err(|error| input::with_source(storage_error(error.code()), error))?;
     let signature = Ed25519Signature::from_hex(signature).map_err(storage_error)?;
     if call.schema != "chio.mcp.session-credential-call.v1"
         || call.session_id != session_id

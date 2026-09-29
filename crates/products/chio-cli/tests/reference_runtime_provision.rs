@@ -612,7 +612,7 @@ fn an_enforced_provision_binds_the_helper_the_grants_and_a_promoted_ledger() {
 }
 
 #[test]
-fn a_shadow_provision_authorizes_without_containment() {
+fn a_shadow_provision_has_no_launch_authority() {
     let fixture = Fixture::new();
     let output = fixture.output("shadow");
     let provisioned = fixture
@@ -622,7 +622,7 @@ fn a_shadow_provision_authorizes_without_containment() {
         .expect("provision shadow profile without an anchor");
     assert!(provisioned.status.success(), "{}", stderr(&provisioned));
     let report = report(&provisioned);
-    assert_eq!(report["securityMode"], "shadow_legacy_authorized");
+    assert_eq!(report["securityMode"], "shadow_preparation_only");
     assert_eq!(report["containmentEnforced"], false);
     assert_eq!(report["migrationStage"], "shadow");
     assert_eq!(report["migrationGeneration"], 1);
@@ -653,7 +653,7 @@ fn a_shadow_provision_authorizes_without_containment() {
         .expect("run preflight");
     let text = String::from_utf8_lossy(&preflight.stdout).into_owned();
     assert!(
-        text.contains("launch: legacy_authorized"),
+        text.contains("launch: refused"),
         "{text}{}",
         stderr(&preflight)
     );
@@ -790,7 +790,7 @@ fn the_demo_provisioner_keeps_its_disabled_stage_report() {
     assert!(provisioned.status.success(), "{}", stderr(&provisioned));
     let report = report(&provisioned);
     assert_eq!(report["schema"], "chio.native-mcp-demo-provision-report.v1");
-    assert_eq!(report["securityMode"], "disabled_legacy_authorized_demo");
+    assert_eq!(report["securityMode"], "disabled_preparation_only");
     assert_eq!(report["migrationStage"], "disabled");
     assert_eq!(report["migrationGeneration"], 0);
     for absent in ["cageInitPath", "readPaths", "migrationTransitionDigests"] {

@@ -75,21 +75,28 @@ impl SharedUpstreamOwner {
         let admitted_manifest = manifest_registry
             .verified_manifest(&config.server_id)
             .ok_or_else(|| {
-                CliError::cli_other_error(
-                    "admitted remote MCP manifest is unavailable".to_string(),
-                )
+                CliError::cli_other_error("admitted remote MCP manifest is unavailable".to_string())
             })?;
-        let native_launch = config.native_launch_factory.prepare_launch(
-            &config.wrapped_command,
-            &wrapped_arg_refs,
-            &config.server_id,
-            Arc::clone(&manifest_registry),
-        )?;
-        let notification_source: Arc<dyn McpTransport> = Arc::new(StdioMcpTransport::spawn(
-            &config.wrapped_command,
-            &wrapped_arg_refs,
-            native_launch,
-        )?);
+        let launch_transport = || -> Result<Arc<dyn McpTransport>, CliError> {
+            let native_launch = config.native_launch_factory.prepare_launch(
+                &config.wrapped_command,
+                &wrapped_arg_refs,
+                &config.server_id,
+                Arc::clone(&manifest_registry),
+            )?;
+            Ok(Arc::new(StdioMcpTransport::spawn(
+                &config.wrapped_command,
+                &wrapped_arg_refs,
+                native_launch,
+            )?) as Arc<dyn McpTransport>)
+        };
+        #[cfg(test)]
+        let notification_source = match &config.test_transport {
+            Some(transport) => Arc::clone(transport),
+            None => launch_transport()?,
+        };
+        #[cfg(not(test))]
+        let notification_source = launch_transport()?;
         let adapter = McpAdapter::new(
             McpAdapterConfig {
                 server_id: config.server_id.clone(),

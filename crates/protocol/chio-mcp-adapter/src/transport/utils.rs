@@ -1,4 +1,5 @@
 use std::io::{BufRead, Write};
+#[cfg(test)]
 use std::process::Command;
 use std::time::Duration;
 
@@ -54,6 +55,7 @@ pub(super) fn tool_call_params(
     }
     params
 }
+#[cfg(test)]
 pub(super) const CHIO_AUTH_ENV_VARS: &[&str] = &[
     "CHIO_AUTH_TOKEN",
     "CHIO_ADMIN_TOKEN",
@@ -68,6 +70,7 @@ pub(super) const CHIO_AUTH_ENV_VARS: &[&str] = &[
     "CHIO_TRUST_SERVICE_TOKEN",
 ];
 
+#[cfg(test)]
 pub(super) fn remove_chio_auth_env(command: &mut Command) {
     for key in CHIO_AUTH_ENV_VARS {
         command.env_remove(key);

@@ -1,6 +1,7 @@
 pub fn serve_http(config: RemoteServeHttpConfig) -> Result<(), CliError> {
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|error| CliError::cli_other_error(format!("failed to start async runtime: {error}")))?;
+    let runtime = tokio::runtime::Runtime::new().map_err(|error| {
+        CliError::cli_other_error(format!("failed to start async runtime: {error}"))
+    })?;
     runtime.block_on(async move { serve_http_async(config).await })
 }
 
@@ -72,8 +73,11 @@ async fn rate_limit_mcp_request(
 ) -> Response {
     let key = mcp_rate_limit_key(remote_addr);
     if let Err(retry_after) = limiter.check(key, mcp_rate_limit_now()) {
-        let mut response =
-            (StatusCode::TOO_MANY_REQUESTS, "MCP request rate limit exceeded").into_response();
+        let mut response = (
+            StatusCode::TOO_MANY_REQUESTS,
+            "MCP request rate limit exceeded",
+        )
+            .into_response();
         if let Ok(value) = HeaderValue::from_str(&retry_after.to_string()) {
             response
                 .headers_mut()
@@ -152,7 +156,7 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
 
     let factory = Arc::new(RemoteSessionFactory::new(config.clone())?);
     let sessions = Arc::new(RemoteSessionLedger::new(
-        SessionLifecyclePolicy::from_env(),
+        config.lifecycle_policy(),
         config.session_db_path.clone(),
         factory.resume_hmac_keyring.clone(),
     )?);
@@ -164,7 +168,8 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         })?;
         restore_persisted_sessions(path, keyring, &sessions, |record| {
             factory.restore_session(record)
-        }).await?;
+        })
+        .await?;
     }
     sessions.cleanup_due_sessions().await;
 
@@ -364,17 +369,18 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         .map(|metadata| metadata.resource.as_str())
         .unwrap_or(MCP_ENDPOINT_PATH)
         .to_string();
-    let (request_auth_context, session_credential) = match remote_mcp_session_credentials::authenticate_request(
-        &state,
-        request.headers(),
-        "POST",
-        &expected_target,
-    )
-    .await
-    {
-        Ok(auth_context) => auth_context,
-        Err(response) => return response,
-    };
+    let (request_auth_context, session_credential) =
+        match remote_mcp_session_credentials::authenticate_request(
+            &state,
+            request.headers(),
+            "POST",
+            &expected_target,
+        )
+        .await
+        {
+            Ok(auth_context) => auth_context,
+            Err(response) => return response,
+        };
     if let Err(response) = validate_post_accept_header(request.headers()) {
         return response;
     }
@@ -386,13 +392,12 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         Ok(body) => body,
         Err(response) => return response,
     };
-    let message: Value = match serde_json::from_slice(&body) {
+    let message: Value = match decode_json(&body, MCP_MAX_POST_BODY_BYTES) {
         Ok(message) => message,
         Err(error) => {
-            return jsonrpc_http_error(
-                StatusCode::BAD_REQUEST,
-                -32700,
-                &format!("invalid JSON: {error}"),
+            return input::with_source(
+                jsonrpc_http_error(StatusCode::BAD_REQUEST, -32700, error.code()),
+                error,
             );
         }
     };
@@ -402,7 +407,11 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             return response;
         }
     }
-    let response_method = message.get("method").and_then(Value::as_str).unwrap_or_default().to_owned();
+    let response_method = message
+        .get("method")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
     let is_initialize = is_initialize_request(&message);
     let is_request = message.get("id").is_some() && message.get("method").is_some();
     if is_initialize {
@@ -417,13 +426,11 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     }
 
     let session = {
-        let session_id = match jsonrpc_session_id_from_headers(
-            &headers,
-            "request requires MCP-Session-Id",
-        ) {
-            Ok(session_id) => session_id,
-            Err(response) => return response,
-        };
+        let session_id =
+            match jsonrpc_session_id_from_headers(&headers, "request requires MCP-Session-Id") {
+                Ok(session_id) => session_id,
+                Err(response) => return response,
+            };
         let Some(entry) = resolve_session_entry(&state, &session_id).await else {
             return plain_http_error(StatusCode::NOT_FOUND, "unknown MCP session");
         };
@@ -461,8 +468,13 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             // A cancellation must reach an active call without waiting for its
             // response stream. It grants no access to unrelated session events.
             if let Err(response) = remote_mcp_session_credentials::authenticate_request(
-                &state, &headers, "POST", &expected_target,
-            ).await {
+                &state,
+                &headers,
+                "POST",
+                &expected_target,
+            )
+            .await
+            {
                 return response;
             }
             if let Err(error) = session.send(message) {
@@ -518,14 +530,21 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     // Authority may expire or be revoked while waiting behind another request.
     if session_credential.is_some() {
         if let Err(response) = remote_mcp_session_credentials::authenticate_request(
-            &state, &headers, "POST", &expected_target,
-        ).await {
+            &state,
+            &headers,
+            "POST",
+            &expected_target,
+        )
+        .await
+        {
             return response;
         }
     }
     if response_method == "chio/acknowledge" {
         if let Some(credential) = session_credential.as_ref() {
-            return match remote_mcp_session_credentials::acknowledge_call(&state, credential, &message) {
+            return match remote_mcp_session_credentials::acknowledge_call(
+                &state, credential, &message,
+            ) {
                 Ok(response) => Json(response).into_response(),
                 Err(response) => response,
             };
@@ -540,8 +559,12 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 }
                 Err(response) => return response,
             }
-        } else { None }
-    } else { None };
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     if let Err(error) = session.send(message) {
         drop(stream_lock);
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
@@ -623,10 +646,15 @@ async fn handle_initialize_post(
     }
 
     let initialize_params = message.get("params").cloned().unwrap_or_else(|| json!({}));
-    let authorization = match chio_mcp_adapter::edge::authorization::negotiate_authorization_capabilities(&initialize_params) {
-        Ok(profile) => profile,
-        Err(error) => return jsonrpc_http_error(StatusCode::BAD_REQUEST, -32602, &error.to_string()),
-    };
+    let authorization =
+        match chio_mcp_adapter::edge::authorization::negotiate_authorization_capabilities(
+            &initialize_params,
+        ) {
+            Ok(profile) => profile,
+            Err(error) => {
+                return jsonrpc_http_error(StatusCode::BAD_REQUEST, -32602, &error.to_string())
+            }
+        };
     let mut peer_capabilities = parse_remote_session_peer_capabilities(&initialize_params);
     peer_capabilities.authorization = Some(authorization);
 
@@ -1058,9 +1086,9 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
 
     let session_id =
         match plain_session_id_from_headers(request.headers(), "missing MCP-Session-Id") {
-        Ok(session_id) => session_id,
-        Err(response) => return response,
-    };
+            Ok(session_id) => session_id,
+            Err(response) => return response,
+        };
     let Some(entry) = resolve_session_entry(&state, &session_id).await else {
         return plain_http_error(StatusCode::NOT_FOUND, "unknown MCP session");
     };

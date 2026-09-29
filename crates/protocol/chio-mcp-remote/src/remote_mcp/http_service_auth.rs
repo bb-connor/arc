@@ -159,12 +159,8 @@ fn validate_chio_oauth_authorization_profile_metadata(
     source: &str,
 ) -> Result<(), CliError> {
     let expected_profile = ChioOAuthAuthorizationProfile::default();
-    let profile: ChioOAuthAuthorizationProfile =
-        serde_json::from_value(value.clone()).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "{source} contains invalid Chio authorization profile metadata: {error}"
-            ))
-        })?;
+    let profile: ChioOAuthAuthorizationProfile = serde_json::from_value(value.clone())
+        .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
     if profile.schema != CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA {
         return Err(CliError::cli_other_error(format!(
             "{source} must advertise Chio authorization profile schema `{CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA}`"
@@ -622,10 +618,13 @@ fn build_remote_auth_mode(
 
 fn build_sender_dpop_runtime() -> Result<(Arc<DpopNonceStore>, DpopConfig), CliError> {
     let config = DpopConfig::default();
-    let store = Arc::new(DpopNonceStore::new(
-        config.nonce_store_capacity,
-        Duration::from_secs(config.proof_ttl_secs),
-    ).map_err(|error| CliError::cli_other_error(error.to_string()))?);
+    let store = Arc::new(
+        DpopNonceStore::new(
+            config.nonce_store_capacity,
+            Duration::from_secs(config.proof_ttl_secs),
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?,
+    );
     Ok((store, config))
 }
 
@@ -713,13 +712,10 @@ fn parse_request_time_authorization_details_from_value(
 ) -> Result<Vec<GovernedAuthorizationDetail>, Response> {
     let details: Vec<GovernedAuthorizationDetail> =
         serde_json::from_value(value).map_err(|error| {
-            oauth_token_error(
-                StatusCode::BAD_REQUEST,
-                "invalid_request",
-                &format!(
-                    "{} must be a JSON array of Chio governed authorization details: {error}",
-                    CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER
-                ),
+            let error = chio_core::canonical::UntrustedJsonError::Decode(error);
+            input::with_source(
+                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_request", error.code()),
+                error,
             )
         })?;
     validate_request_time_authorization_details(&details)?;
@@ -732,14 +728,10 @@ fn parse_request_time_authorization_details(
     let Some(raw) = raw else {
         return Ok(None);
     };
-    let value: Value = serde_json::from_str(raw).map_err(|error| {
-        oauth_token_error(
-            StatusCode::BAD_REQUEST,
-            "invalid_request",
-            &format!(
-                "{} must be valid JSON: {error}",
-                CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER
-            ),
+    let value: Value = decode_json(raw.as_bytes(), MAX_AUTH_JSON_BYTES).map_err(|error| {
+        input::with_source(
+            oauth_token_error(StatusCode::BAD_REQUEST, "invalid_request", error.code()),
+            error,
         )
     })?;
     parse_request_time_authorization_details_from_value(value).map(Some)
@@ -750,13 +742,10 @@ fn parse_request_time_transaction_context_from_value(
 ) -> Result<GovernedAuthorizationTransactionContext, Response> {
     let context: GovernedAuthorizationTransactionContext =
         serde_json::from_value(value).map_err(|error| {
-            oauth_token_error(
-                StatusCode::BAD_REQUEST,
-                "invalid_request",
-                &format!(
-                    "{} must be a JSON object matching Chio transaction context: {error}",
-                    CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_PARAMETER
-                ),
+            let error = chio_core::canonical::UntrustedJsonError::Decode(error);
+            input::with_source(
+                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_request", error.code()),
+                error,
             )
         })?;
     validate_request_time_transaction_context(&context)?;
@@ -769,14 +758,10 @@ fn parse_request_time_transaction_context(
     let Some(raw) = raw else {
         return Ok(None);
     };
-    let value: Value = serde_json::from_str(raw).map_err(|error| {
-        oauth_token_error(
-            StatusCode::BAD_REQUEST,
-            "invalid_request",
-            &format!(
-                "{} must be valid JSON: {error}",
-                CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_PARAMETER
-            ),
+    let value: Value = decode_json(raw.as_bytes(), MAX_AUTH_JSON_BYTES).map_err(|error| {
+        input::with_source(
+            oauth_token_error(StatusCode::BAD_REQUEST, "invalid_request", error.code()),
+            error,
         )
     })?;
     parse_request_time_transaction_context_from_value(value).map(Some)
@@ -1127,13 +1112,17 @@ fn build_request_sender_constraint(
     }
 }
 
-fn decode_sender_dpop_proof(raw: &str) -> Result<DpopProof, String> {
+fn decode_sender_dpop_proof(raw: &str) -> Result<DpopProof, SenderConstraintError> {
     let encoded = raw.trim();
-    let bytes = URL_SAFE_NO_PAD
-        .decode(encoded)
-        .map_err(|error| format!("DPoP proof header is not valid base64url: {error}"))?;
-    serde_json::from_slice::<DpopProof>(&bytes)
-        .map_err(|error| format!("DPoP proof header is not valid JSON: {error}"))
+    if encoded.len() > MAX_AUTH_JSON_BYTES {
+        return Err(chio_core::canonical::UntrustedJsonError::TooLarge {
+            bytes: encoded.len(),
+            bound: MAX_AUTH_JSON_BYTES,
+        }
+        .into());
+    }
+    let bytes = URL_SAFE_NO_PAD.decode(encoded)?;
+    Ok(decode_json(&bytes, MAX_AUTH_JSON_BYTES)?)
 }
 
 fn verify_sender_dpop_proof(
@@ -1200,7 +1189,7 @@ fn validate_sender_constraint_runtime(
     expected_method: &str,
     nonce_store: &DpopNonceStore,
     config: &DpopConfig,
-) -> Result<(), String> {
+) -> Result<(), SenderConstraintError> {
     let Some(sender_constraint) = sender_constraint else {
         return Ok(());
     };
@@ -1211,8 +1200,8 @@ fn validate_sender_constraint_runtime(
         let proof = headers
             .get(DPOP_HEADER)
             .and_then(|value| value.to_str().ok())
-            .ok_or_else(|| "missing DPoP proof header".to_string())
-            .and_then(decode_sender_dpop_proof)?;
+            .ok_or_else(|| "missing DPoP proof header".to_string())?;
+        let proof = decode_sender_dpop_proof(proof)?;
         let sender_key = PublicKey::from_hex(sender_key)
             .map_err(|error| format!("token cnf.chioSenderKey is invalid: {error}"))?;
         verify_sender_dpop_proof(
@@ -1231,7 +1220,9 @@ fn validate_sender_constraint_runtime(
             .and_then(|value| value.to_str().ok())
             .ok_or_else(|| "missing mTLS thumbprint header".to_string())?;
         if actual_thumbprint != expected_thumbprint {
-            return Err("mTLS thumbprint did not match the sender-bound token".to_string());
+            return Err("mTLS thumbprint did not match the sender-bound token"
+                .to_string()
+                .into());
         }
     }
     if let Some(expected_attestation) = sender_constraint.chio_attestation_sha256.as_deref() {
@@ -1241,7 +1232,9 @@ fn validate_sender_constraint_runtime(
             .ok_or_else(|| "missing runtime attestation binding header".to_string())?;
         if actual_attestation != expected_attestation {
             return Err(
-                "runtime attestation binding did not match the sender-bound token".to_string(),
+                "runtime attestation binding did not match the sender-bound token"
+                    .to_string()
+                    .into(),
             );
         }
     }

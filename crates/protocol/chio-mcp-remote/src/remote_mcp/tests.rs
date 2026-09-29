@@ -3,6 +3,7 @@
 mod tests {
     use super::*;
     use chio_core::session::{SessionAuthMethod, SessionTransport};
+    use chio_kernel::operator_report::CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER;
     use rusqlite::params;
     use serde_json::json;
     use std::net::ToSocketAddrs as _;
@@ -13,46 +14,13 @@ mod tests {
     mod bearer_verifier;
     #[path = "dpop_replay.rs"]
     mod dpop_replay;
-    #[path = "session_runtime.rs"]
-    mod session_runtime;
     #[path = "session_recovery.rs"]
     mod session_recovery;
+    #[path = "session_runtime.rs"]
+    mod session_runtime;
 
     #[derive(Clone)]
-    struct TestNativeLaunchFactory;
-
-    struct TestMigrationStore {
-        state: chio_security_types::EnterpriseMigrationState,
-    }
-
-    impl chio_security_types::EnterpriseMigrationStateStore for TestMigrationStore {
-        fn register(
-            &self,
-            _transition: &chio_security_types::EnterpriseMigrationTransition,
-        ) -> chio_security_types::ports::PortResult<
-            chio_security_types::EnterpriseMigrationRegisterOutcome,
-        > {
-            Err(chio_security_types::ports::PortError::unavailable())
-        }
-
-        fn load(
-            &self,
-            key: &chio_security_types::EnterpriseMigrationKey,
-        ) -> chio_security_types::ports::PortResult<
-            Option<chio_security_types::EnterpriseMigrationState>,
-        > {
-            Ok((key == &self.state.key).then(|| self.state.clone()))
-        }
-
-        fn compare_and_promote(
-            &self,
-            _transition: &chio_security_types::EnterpriseMigrationTransition,
-        ) -> chio_security_types::ports::PortResult<
-            chio_security_types::EnterpriseMigrationCasOutcome,
-        > {
-            Err(chio_security_types::ports::PortError::unavailable())
-        }
-    }
+    pub(crate) struct TestNativeLaunchFactory;
 
     impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for TestNativeLaunchFactory {
         fn authorization_contract_digest(&self) -> Result<String, AdapterError> {
@@ -65,54 +33,46 @@ mod tests {
             _args: &[&str],
             expected_server_id: &str,
             admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-        ) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, AdapterError> {
-            let key = chio_security_types::EnterpriseMigrationKey {
-                deployment_id: chio_security_types::ports::RecordId::new("test-deployment")
-                    .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?,
-                scope_kind: chio_security_types::EnterpriseMigrationScopeKind::ToolServer,
-                scope_id: chio_security_types::ports::RecordId::new(expected_server_id)
-                    .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?,
-                control: chio_security_types::EnterpriseMigrationControl::CageEnforcement,
-            };
-            let posture = chio_security_types::ports::Digest32::new([0x21; 32]);
-            let state = chio_security_types::EnterpriseMigrationState {
-                schema_version: chio_security_types::ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION,
-                key: key.clone(),
-                stage: chio_security_types::EnterpriseMigrationStage::Shadow,
-                generation: 1,
-                transition_digest: chio_security_types::ports::Digest32::new([0x22; 32]),
-                prior_head_digest: Some(chio_security_types::ports::Digest32::new([0x23; 32])),
-                posture_digest: posture,
-                evidence_digest: chio_security_types::ports::Digest32::new([0x24; 32]),
-                authorization_digest: chio_security_types::ports::Digest32::new([0x25; 32]),
-                intent_digest: chio_security_types::ports::Digest32::new([0x26; 32]),
-                updated_at_unix_ms: 1,
-                signer_public_key: "test-signer".to_string(),
-            };
-            let store: Arc<dyn chio_security_types::EnterpriseMigrationStateStore> =
-                Arc::new(TestMigrationStore { state });
-            let binding = chio_security_types::EnterpriseMigrationRuntimeBinding::load(
-                &store,
-                &key,
-                chio_security_types::EnterpriseMigrationStage::Shadow,
-                posture,
-            )
-            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?;
-            let authorization =
-                chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
-                    expected_server_id,
-                    binding,
-                    admitted_manifest_registry,
-                )?;
-            Ok(chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(
-                Box::new(authorization),
+        ) -> Result<chio_mcp_adapter::transport::CageRequiredLaunch, AdapterError> {
+            let _ = (expected_server_id, admitted_manifest_registry);
+            Err(AdapterError::ConnectionFailed(
+                "test factory refuses native launch".into(),
             ))
         }
     }
 
-    fn test_native_launch_factory(
-    ) -> Arc<dyn chio_mcp_adapter::transport::NativeMcpLaunchFactory> {
+    fn test_native_launch_factory() -> Arc<dyn chio_mcp_adapter::transport::NativeMcpLaunchFactory>
+    {
         Arc::new(TestNativeLaunchFactory)
+    }
+
+    #[test]
+    fn jwt_original_bytes_reject_duplicates_and_retain_encoding_sources() {
+        use chio_core::canonical::UntrustedJsonError;
+        use std::error::Error;
+        let token = format!(
+            "{}.e30.AA",
+            URL_SAFE_NO_PAD.encode(br#"{"alg":"EdDSA","alg":"none"}"#)
+        );
+        let response = match decode_jwt_parts(&token, None) {
+            Ok(_) => panic!("duplicate JWT header accepted"),
+            Err(response) => response,
+        };
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert!(response
+            .extensions()
+            .get::<Arc<UntrustedJsonError>>()
+            .expect("typed duplicate cause")
+            .source()
+            .is_some());
+        let response = match decode_jwt_parts("!.e30.AA", None) {
+            Ok(_) => panic!("invalid JWT encoding accepted"),
+            Err(response) => response,
+        };
+        assert!(response
+            .extensions()
+            .get::<Arc<base64::DecodeError>>()
+            .is_some());
     }
 
     #[test]
@@ -165,10 +125,13 @@ mod tests {
 
     fn test_sender_dpop_runtime() -> (Arc<DpopNonceStore>, DpopConfig) {
         let config = DpopConfig::default();
-        let store = Arc::new(DpopNonceStore::new(
-            config.nonce_store_capacity,
-            Duration::from_secs(config.proof_ttl_secs),
-        ).expect("positive replay store test capacities"));
+        let store = Arc::new(
+            DpopNonceStore::new(
+                config.nonce_store_capacity,
+                Duration::from_secs(config.proof_ttl_secs),
+            )
+            .expect("positive replay store test capacities"),
+        );
         (store, config)
     }
 
@@ -184,8 +147,8 @@ mod tests {
             max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
@@ -241,6 +204,8 @@ mod tests {
             server_version: "0.1.0".to_string(),
             signed_manifest_path: None,
             manifest_public_key: None,
+            test_transport: None,
+            test_lifecycle_policy: None,
             native_launch_factory: test_native_launch_factory(),
             page_size: 50,
             tools_list_changed: false,
@@ -248,7 +213,6 @@ mod tests {
             wrapped_command: "/bin/true".to_string(),
             wrapped_args: vec!["mock.py".to_string()],
             egress_contract: None,
-
         }
     }
 
@@ -304,17 +268,16 @@ mod tests {
 
         let mut no_session_credential = config.clone();
         no_session_credential.auth_token = None;
-        let error = session_core_authority_mode::validate_remote_authority_config(
-            &no_session_credential,
-        )
-        .expect_err("a hosted edge needs a session credential");
+        let error =
+            session_core_authority_mode::validate_remote_authority_config(&no_session_credential)
+                .expect_err("a hosted edge needs a session credential");
         assert!(error.to_string().contains("requires a session credential"));
 
         no_session_credential.auth_jwt_public_key = Some("jwt-public-key".to_string());
-        assert!(session_core_authority_mode::validate_remote_authority_config(
-            &no_session_credential
-        )
-        .is_ok());
+        assert!(
+            session_core_authority_mode::validate_remote_authority_config(&no_session_credential)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -459,10 +422,7 @@ mod tests {
             .expect("redirect includes authorization code")
     }
 
-    fn stored_authorization_code_expiry(
-        server: &LocalAuthorizationServer,
-        code: &str,
-    ) -> u64 {
+    fn stored_authorization_code_expiry(server: &LocalAuthorizationServer, code: &str) -> u64 {
         let guard = server.codes.lock().expect("lock authorization codes");
         guard
             .get(code)
@@ -542,7 +502,9 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    pub(super) fn acquire_test_session_store(path: &FsPath) -> Arc<RemoteSessionStoreLifecycleLease> {
+    pub(super) fn acquire_test_session_store(
+        path: &FsPath,
+    ) -> Arc<RemoteSessionStoreLifecycleLease> {
         Arc::new(
             RemoteSessionStoreLifecycleLease::acquire(path)
                 .expect("acquire retained test session store"),
@@ -568,9 +530,7 @@ mod tests {
     struct TestSessionTransport;
 
     impl McpTransport for TestSessionTransport {
-        fn list_tools(
-            &self,
-        ) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
+        fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
             Ok(Vec::new())
         }
 
@@ -863,7 +823,11 @@ mod tests {
 
             for feature in [OPAQUE_SUPPLEMENTAL_AUTHORIZATION, "future_authority"] {
                 let mut substituted = record.clone();
-                let profile = substituted.peer_capabilities.authorization.as_mut().unwrap();
+                let profile = substituted
+                    .peer_capabilities
+                    .authorization
+                    .as_mut()
+                    .unwrap();
                 let enabled = profile.supports(feature);
                 profile.features.insert(feature.to_string(), !enabled);
                 let error = validate_restored_peer_capabilities(&substituted)
@@ -890,7 +854,9 @@ mod tests {
             record.peer_capabilities.authorization = Some(CapabilityNegotiation::v1_default());
             let error = validate_restored_peer_capabilities(&record)
                 .expect_err("malformed retained negotiation must not become legacy");
-            assert!(error.to_string().contains("invalid authorization negotiation"));
+            assert!(error
+                .to_string()
+                .contains("invalid authorization negotiation"));
             assert!(!error.to_string().contains(&record.session_id));
         }
     }
@@ -920,13 +886,11 @@ mod tests {
         let expected = expected_resume_agent_id(&config, &auth_context)
             .expect("derive expected agent id")
             .expect("expected agent id");
-        let foreign = derive_federated_agent_keypair(
-            &seed_path,
-            "oidc:https://issuer.example#sub:user-456",
-        )
-        .expect("derive foreign principal keypair")
-        .public_key()
-        .to_hex();
+        let foreign =
+            derive_federated_agent_keypair(&seed_path, "oidc:https://issuer.example#sub:user-456")
+                .expect("derive foreign principal keypair")
+                .public_key()
+                .to_hex();
 
         assert_ne!(expected, foreign);
         let _ = std::fs::remove_file(seed_path);
@@ -997,9 +961,8 @@ mod tests {
             ownership: RemoteSessionOwnershipSnapshot::default(),
             terminal_at: 13,
         };
-        let (tombstone, fence) =
-            sign_terminal_session_records(&keyring, terminal_record, 2, 2)
-                .expect("sign terminal transition");
+        let (tombstone, fence) = sign_terminal_session_records(&keyring, terminal_record, 2, 2)
+            .expect("sign terminal transition");
         persist_terminal_session_transition(&path, &tombstone, &fence, &keyring)
             .expect("persist terminal transition");
 
@@ -1436,6 +1399,8 @@ mod tests {
             server_version: "0.1.0".to_string(),
             signed_manifest_path: None,
             manifest_public_key: None,
+            test_transport: None,
+            test_lifecycle_policy: None,
             native_launch_factory: test_native_launch_factory(),
             page_size: 50,
             tools_list_changed: false,
@@ -1443,7 +1408,6 @@ mod tests {
             wrapped_command: "python3".to_string(),
             wrapped_args: vec!["mock.py".to_string()],
             egress_contract: None,
-
         };
 
         let discovery_url = resolve_identity_provider_discovery_url(&config)
@@ -1455,7 +1419,9 @@ mod tests {
         );
     }
 
-    fn spawn_localhost_json_server(body: &'static str) -> (std::net::SocketAddr, std::thread::JoinHandle<()>) {
+    fn spawn_localhost_json_server(
+        body: &'static str,
+    ) -> (std::net::SocketAddr, std::thread::JoinHandle<()>) {
         let bind_ip = ("localhost", 0)
             .to_socket_addrs()
             .expect("resolve localhost")
@@ -1518,9 +1484,9 @@ mod tests {
         let contract = HttpEgressContract {
             tenant_egress_namespace: "chio-mcp-remote-oidc-test".to_string(),
             allowed_schemes: std::collections::BTreeSet::from(["http".to_string()]),
-            allowed_authority_set: std::collections::BTreeSet::from([
-                "169.254.169.254".to_string()
-            ]),
+            allowed_authority_set: std::collections::BTreeSet::from(
+                ["169.254.169.254".to_string()],
+            ),
             deny_loopback: true,
             deny_link_local: true,
             deny_ipv6_ula: true,
@@ -1609,6 +1575,8 @@ mod tests {
             server_version: "0.1.0".to_string(),
             signed_manifest_path: None,
             manifest_public_key: None,
+            test_transport: None,
+            test_lifecycle_policy: None,
             native_launch_factory: test_native_launch_factory(),
             page_size: 50,
             tools_list_changed: false,
@@ -1616,7 +1584,6 @@ mod tests {
             wrapped_command: "python3".to_string(),
             wrapped_args: vec!["mock.py".to_string()],
             egress_contract: None,
-
         };
 
         let error = build_remote_auth_state(&config, "127.0.0.1:0".parse().unwrap(), None, None)

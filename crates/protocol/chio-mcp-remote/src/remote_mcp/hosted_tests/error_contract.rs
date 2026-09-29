@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-mod support;
+use super::support;
 
 use chio_core::crypto::Keypair;
 use serde_json::{json, Value};
@@ -55,7 +55,7 @@ fn hosted_mcp_rejects_malformed_jsonrpc_body_with_structured_error() {
     assert!(body["error"]["message"]
         .as_str()
         .expect("parse error message")
-        .contains("invalid JSON"));
+        .starts_with("urn:chio:error:attest:signed-json-"));
 
     let session = server.initialize_session();
     assert!(!session.id.is_empty());
@@ -228,4 +228,21 @@ fn hosted_mcp_rejects_expired_or_mismatched_auth_during_session_reuse_without_pa
         tools["result"]["tools"][0]["name"].as_str(),
         Some("echo_json")
     );
+}
+
+#[test]
+fn hosted_mcp_duplicate_keys_deny_without_creating_a_session() {
+    let server = start_http_server("test-token");
+    let response = server.post_bytes(Some("test-token"), None, "application/json, text/event-stream", "application/json",
+        br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"private_marker":1,"private_marker":2}}"#);
+    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+    assert!(response.headers().get("mcp-session-id").is_none());
+    let body: Value = response.json().expect("duplicate error");
+    assert_eq!(body["error"]["code"], -32700);
+    assert_eq!(
+        body["error"]["message"],
+        "urn:chio:error:attest:signed-json-invalid-input"
+    );
+    assert!(!body.to_string().contains("private_marker"));
+    assert!(!server.initialize_session().id.is_empty());
 }

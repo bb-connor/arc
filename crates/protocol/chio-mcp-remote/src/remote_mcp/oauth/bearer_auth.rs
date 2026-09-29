@@ -314,7 +314,10 @@ pub(super) fn validate_content_type(headers: &HeaderMap) -> Result<(), Response>
     ))
 }
 
-pub(super) fn validate_protocol_version(headers: &HeaderMap, session: &RemoteSession) -> Result<(), Response> {
+pub(super) fn validate_protocol_version(
+    headers: &HeaderMap,
+    session: &RemoteSession,
+) -> Result<(), Response> {
     let Some(expected) = session.protocol_version() else {
         return Ok(());
     };
@@ -472,7 +475,12 @@ impl JwtBearerVerifier {
             &self.sender_dpop_nonce_store,
             &self.sender_dpop_config,
         )
-        .map_err(|message| unauthorized_bearer_response(&message, protected_resource_metadata))?;
+        .map_err(|error| {
+            let mut response =
+                unauthorized_bearer_response(&error.to_string(), protected_resource_metadata);
+            response.extensions_mut().insert(Arc::new(error));
+            response
+        })?;
 
         let principal = Some(build_federated_principal(
             &claims,
@@ -567,11 +575,11 @@ impl IntrospectionBearerVerifier {
         let response = send_with_contract(contract, &self.client, raw_request)
             .await
             .map_err(|error| {
-            plain_http_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("token introspection endpoint unavailable: {error}"),
-            )
-        })?;
+                plain_http_error(
+                    StatusCode::BAD_GATEWAY,
+                    &format!("token introspection endpoint unavailable: {error}"),
+                )
+            })?;
         if !response.status().is_success() {
             return Err(plain_http_error(
                 StatusCode::BAD_GATEWAY,
@@ -720,8 +728,11 @@ impl IntrospectionBearerVerifier {
             &self.sender_dpop_nonce_store,
             &self.sender_dpop_config,
         )
-        .map_err(|message| {
-            unauthorized_bearer_response(&message, input.protected_resource_metadata)
+        .map_err(|error| {
+            let mut response =
+                unauthorized_bearer_response(&error.to_string(), input.protected_resource_metadata);
+            response.extensions_mut().insert(Arc::new(error));
+            response
         })?;
 
         let principal = Some(build_federated_principal(

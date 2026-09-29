@@ -19,26 +19,23 @@ upstream MCP server) and `chio-mcp-edge` (the MCP hosting runtime).
   `chio-cross-protocol`'s `CrossProtocolOrchestrator`, mapping kernel
   verdicts to A2A `TaskResponse`s.
 - Bound and prune the deferred task table by capacity and TTL, and restrict
-  polling or cancelling a task to its owning `agent_id`.
+  polling or cancelling a task to its owning `agent_id`. Retained terminal
+  results count toward capacity; expiry uses the shared wall and monotonic clock.
 - Parse and validate the inbound JSON-RPC envelope, method params, and
   identifier fields before any skill resolution or kernel dispatch runs.
-- Provide an explicit, feature-gated non-authoritative passthrough
-  (`ChioA2aEdgeCompatibility`) that bypasses the kernel for bounded
-  migration and tests.
 - Record per-outcome receipt-write counters and render them as Prometheus
   text (`metrics` module).
 
 ## Public API
 
-- `ChioA2aEdge::new(config: A2aEdgeConfig, manifests: Vec<ToolManifest>)` -
-  construct the edge; validates the Agent Card config and every manifest.
+- `ChioA2aEdge::new_with_registry(config, registry)` -
+  construct the edge from admitted signed manifests and validate the Agent Card config.
 - `ChioA2aEdge::{agent_card, agent_card_json, skill_ids, skill,
   bridge_fidelity}` - Agent Card and skill-catalog introspection.
 - `ChioA2aEdge::{handle_send_message, handle_stream_message, handle_jsonrpc}` -
   kernel-mediated blocking send, deferred stream start, and raw JSON-RPC
-  dispatch (returns an `A2aJsonRpcResponse`).
-- `ChioA2aEdge::compatibility()` -> `ChioA2aEdgeCompatibility` - opt-in
-  passthrough surface (`cfg(test)` or `feature = "compatibility-surface"`).
+  dispatch. `handle_jsonrpc` accepts original bytes (up to 1 MiB), rejects
+  duplicate keys before dispatch, and returns `Result<A2aJsonRpcResponse, A2aEdgeError>`.
 - `A2aEdgeConfig`, `A2aEdgeError`, `A2aKernelExecutionContext` - Agent Card
   config, error type, and per-call kernel execution context.
 - Wire types: `AgentCard`, `A2aSkillEntry`, `SendMessageRequest`,
@@ -54,7 +51,6 @@ upstream MCP server) and `chio-mcp-edge` (the MCP hosting runtime).
 
 | Flag | Effect |
 |------|--------|
-| `compatibility-surface` | Compiles `ChioA2aEdge::compatibility()` and the passthrough handlers outside test builds. |
 | `otel` | Enables the `otel` module and its GenAI span helpers (`chio-kernel/otel`, `chio-mcp-edge/otel`). |
 
 ## Testing

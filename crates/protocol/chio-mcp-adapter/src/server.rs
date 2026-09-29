@@ -98,24 +98,13 @@ impl AdaptedMcpServer {
         command: &str,
         args: &[&str],
         config: McpAdapterConfig,
-        launch: crate::transport::NativeMcpLaunch,
+        launch: crate::transport::CageRequiredLaunch,
     ) -> Result<Self, AdapterError> {
         Self::new(McpAdapter::from_command(command, args, config, launch)?)
     }
 
     /// Construct a server whose subprocess cannot fall back from required
     /// cage enforcement to direct native launch.
-    pub fn from_cage_required_command(
-        command: &str,
-        args: &[&str],
-        config: McpAdapterConfig,
-        launch: crate::transport::CageRequiredLaunch,
-    ) -> Result<Self, AdapterError> {
-        Self::new(McpAdapter::from_cage_required_command(
-            command, args, config, launch,
-        )?)
-    }
-
     /// Spawn an MCP server, discover its live surface, and retain only the
     /// publisher-signed manifest admitted by `registry`.
     pub fn from_command_with_manifest_registry(
@@ -123,7 +112,7 @@ impl AdaptedMcpServer {
         args: &[&str],
         config: McpAdapterConfig,
         registry: &chio_manifest::VerifiedManifestRegistry,
-        launch: crate::transport::NativeMcpLaunch,
+        launch: crate::transport::CageRequiredLaunch,
     ) -> Result<Self, AdapterError> {
         Self::new_with_manifest_registry(
             McpAdapter::from_command(command, args, config, launch)?,

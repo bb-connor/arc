@@ -102,6 +102,7 @@ impl RemoteSessionFactory {
                 open_durable_admission_runtime(mode, local_admission_database.as_deref())?
             }
         };
+        let lifecycle_policy = config.lifecycle_policy();
         Ok(Self {
             config,
             manifest_registry,
@@ -110,7 +111,7 @@ impl RemoteSessionFactory {
             session_store_lease,
             resume_hmac_keyring,
             shared_upstream_owner: Arc::new(StdMutex::new(None)),
-            lifecycle_policy: read_session_lifecycle_policy(),
+            lifecycle_policy,
         })
     }
 
@@ -217,6 +218,22 @@ impl RemoteSessionFactory {
             .ok_or_else(|| {
                 CliError::cli_other_error("admitted remote MCP manifest is unavailable".to_string())
             })?;
+        #[cfg(test)]
+        if let Some(transport) = &self.config.test_transport {
+            let adapter = McpAdapter::new(
+                McpAdapterConfig {
+                    server_id: self.config.server_id.clone(),
+                    server_name: self.config.server_name.clone(),
+                    server_version: self.config.server_version.clone(),
+                    public_key: admitted_manifest.manifest.public_key.clone(),
+                },
+                Box::new(SerializedMcpTransport::from_arc(Arc::clone(transport))),
+            );
+            return Ok(Arc::new(AdaptedMcpServer::new_with_manifest_registry(
+                adapter,
+                self.manifest_registry.as_ref(),
+            )?));
+        }
         let adapted_server = AdaptedMcpServer::from_command_with_manifest_registry(
             &self.config.wrapped_command,
             &wrapped_arg_refs,
@@ -526,7 +543,10 @@ impl RemoteSessionFactory {
             Some(stored)
                 if stored == policy_fingerprint
                     && stored_capabilities_are_current(&record.issued_capabilities)
-                    && stored_capability_issuers_are_trusted(&kernel, &record.issued_capabilities)
+                    && stored_capability_issuers_are_trusted(
+                        &kernel,
+                        &record.issued_capabilities,
+                    )
                     && record
                         .issued_capabilities
                         .iter()
@@ -622,6 +642,11 @@ fn require_authorized_wrapped_command(
     config: &RemoteServeHttpConfig,
     manifest_registry: &Arc<chio_manifest::VerifiedManifestRegistry>,
 ) -> Result<(), CliError> {
+    // An injected unit-test transport has no native process to authorize.
+    #[cfg(test)]
+    if config.test_transport.is_some() {
+        return Ok(());
+    }
     let wrapped_args = config
         .wrapped_args
         .iter()

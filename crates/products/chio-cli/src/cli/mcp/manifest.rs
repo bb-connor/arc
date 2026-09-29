@@ -149,11 +149,8 @@ pub(crate) fn cmd_mcp_print_scopes(args: &McpWrapArgs) -> Result<(), CliError> {
                 "native MCP launch policy belongs to a different server".to_string(),
             ));
         }
-        require_unprotected_wrap_compatible(&launch)?;
-        let cage_required = matches!(
-            &launch,
-            chio_mcp_adapter::transport::NativeMcpLaunch::CageRequired(_)
-        );
+        require_unprotected_wrap_compatible(launch.manifest_registry())?;
+
         let transport = chio_mcp_adapter::transport::StdioMcpTransport::spawn(
             &program,
             &child_args_refs,
@@ -164,7 +161,7 @@ pub(crate) fn cmd_mcp_print_scopes(args: &McpWrapArgs) -> Result<(), CliError> {
                 "failed to spawn wrapped MCP server '{program}': {e}"
             ))
         })?;
-        let operation = if cage_required && transport.enforcement_evidence().is_none() {
+        let operation = if transport.enforcement_evidence().is_none() {
             Err(CliError::cli_other_error(
                 "cage-required MCP launch returned no fully enforced evidence".to_string(),
             ))

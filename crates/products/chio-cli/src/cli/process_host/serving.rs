@@ -54,14 +54,6 @@ pub(super) fn connect(
             &arguments,
             None,
         )?;
-        if require_enforced
-            && !matches!(
-                &launch,
-                chio_mcp_adapter::transport::NativeMcpLaunch::CageRequired(_)
-            )
-        {
-            return Err(error("governed process tools require Enforced cage launch"));
-        }
         if launch.requires_flow_runtime() {
             return Err(error("this process host profile does not install an information-flow runtime; flow-required MCP manifests are refused"));
         }

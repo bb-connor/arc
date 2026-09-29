@@ -22,17 +22,17 @@ submodules instead.
 | `src/config.rs` | `A2aEdgeConfig` and its construction-time Agent Card field validation. |
 | `src/types.rs` | A2A wire types (`AgentCard`, `SendMessageRequest`, `A2aMessage`, `A2aPart`, `TaskResponse`, `TaskStatus`, `A2aJsonRpcResponse`) and `A2aKernelExecutionContext`. |
 | `src/bridge.rs` | `A2aCapabilityBridge` (`CapabilityBridge` impl), bridge-fidelity evaluation, skill-candidate construction, and the authoritative target-protocol registry and orchestrated execution call. |
-| `src/conversion.rs` | Message-to-argument extraction, kernel-output-to-A2A-part projection, and the Chio metadata envelope builders (pending, cancelled, passthrough, authoritative annotation). |
-| `src/edge.rs` | `ChioA2aEdge`: construction, Agent Card, skill resolution, the `message/send` / `message/stream` / JSON-RPC handlers, deferred task lifecycle, and the `ChioA2aEdgeCompatibility` passthrough wrapper. |
-| `src/jsonrpc.rs` | JSON-RPC envelope parsing and params validation shared by the authoritative and compatibility dispatchers. |
+| `src/conversion.rs` | Message-to-argument extraction, kernel-output-to-A2A-part projection, and the Chio metadata envelope builders (pending, cancelled, authoritative annotation). |
+| `src/edge.rs` | `ChioA2aEdge`: construction, Agent Card, skill resolution, the `message/send` / `message/stream` / JSON-RPC handlers, deferred task lifecycle. |
+| `src/jsonrpc.rs` | JSON-RPC envelope parsing and params validation after bounded original-byte validation. |
 | `src/metrics.rs` | This edge's `chio_receipt_write_total` counters, independent of every other edge's counters, plus Prometheus rendering. |
 | `src/otel.rs` | A2A-specific GenAI tool-call span helper built on `chio-kernel`'s OTel primitives (`feature = "otel"`). |
 
 ## Skill publication and dispatch
 
-1. `ChioA2aEdge::new` validates the Agent Card config, then runs every
-   `ToolManifest` through `chio_manifest::validate_manifest` before building
-   any skill.
+1. `ChioA2aEdge::new_with_registry` receives manifests from the admitted
+   registry and validates the Agent Card config before building any skill.
+   An unverified fixture constructor is restricted to unit tests.
 2. `build_skill_candidate` resolves each tool's target protocol (native,
    MCP, or OpenAI-compatible), evaluates `BridgeFidelity`, and assigns a
    skill id: server-qualified on tool-name collision across manifests,
@@ -53,10 +53,6 @@ submodules instead.
    terminal `TaskResponse`, and returns it on every later poll. `task/cancel`
    moves a `Working` task to `Cancelled` (idempotent once cancelled) and
    rejects cancelling any other terminal status.
-5. The compatibility surface (`ChioA2aEdgeCompatibility`, gated by
-   `cfg(test)` or `feature = "compatibility-surface"`) skips the kernel
-   entirely, invokes `dyn ToolServerConnection::invoke` directly, and tags
-   the result with explicit `authoritative: false` metadata.
 
 ## Invariants and failure modes
 
@@ -64,8 +60,8 @@ submodules instead.
   must be non-empty and free of leading or trailing whitespace; violations
   fail construction with `A2aEdgeError::InvalidRequest` instead of being
   trimmed.
-- Every manifest passed to `ChioA2aEdge::new` must pass
-  `chio_manifest::validate_manifest` before any skill is built from it.
+- Production construction requires a `VerifiedManifestRegistry` before any
+  skill is built.
 - A skill id that collides across manifests and is looked up unqualified
   resolves to an explicit "ambiguous, use one of" error instead of silently
   picking a candidate.
@@ -73,23 +69,25 @@ submodules instead.
   `metadata.chio.targetSkillId` JSON-RPC params, must be non-empty,
   unpadded, and (for `agent_id` and `taskId`) free of control characters
   before any skill resolution, kernel dispatch, or task-state mutation.
+- Original JSON-RPC bytes are bounded to 1 MiB and parsed with duplicate-key
+  detection before creating a JSON value. Parser causes remain typed locally.
 - The JSON-RPC boundary rejects a non-object `params` for a known method
   with `-32602`, an unknown method with `-32601`, and a malformed envelope
   (`jsonrpc != "2.0"`, missing `method`, or a non-string/number/null `id`)
   with `-32600`, all before message parsing or task lookup.
 - `message.parts` must be non-empty with at most one `data` part, itself a
   JSON object.
-- Deferred tasks are capped at `MAX_DEFERRED_A2A_TASKS` (1024) concurrently
-  `Working` tasks and expire `DEFERRED_A2A_TASK_TTL_MILLIS` (5 minutes) after
-  creation; pruning runs before every stream, get, and cancel operation.
-  Terminal tasks do not count against the cap but are still pruned once
-  their TTL elapses.
+- Deferred tasks are capped at `MAX_DEFERRED_A2A_TASKS` (1024) retained
+  entries, including terminal results. They expire after
+  `DEFERRED_A2A_TASK_TTL_MILLIS` (5 minutes), using `AuthorityDeadline` and
+  the kernel clock. Pruning runs before every stream, get, and cancel operation.
+  A clock failure rejects the operation and retains task custody; execution
+  rechecks the deadline immediately before dispatch. Identifiers cannot wrap.
 - `task/get` and `task/cancel` reject a task whose `owner_agent_id` does not
   match the calling `agent_id`.
 - The receipt-write error counter increments only for `BridgeError::Kernel`
   orchestration failures, not other bridge errors such as an unregistered
-  target protocol; the passthrough surface never records a verdict or
-  receipt-write outcome at all. `render_a2a_edge_metrics_prometheus` appends
+  target protocol. `render_a2a_edge_metrics_prometheus` appends
   receipt-writer liveness gauges after the outcome counters, so a wedged or
   dead writer is visible on the same scrape.
 - `#![forbid(unsafe_code)]` at the crate root.
@@ -102,8 +100,7 @@ capability, governance, session, and model-metadata types (`CapabilityToken`,
 `ModelMetadata`). `chio-cross-protocol` is the primary architectural
 dependency: it supplies the `CapabilityBridge` trait, the target-protocol
 registry, `CrossProtocolOrchestrator`, `BridgeFidelity`, the
-runtime-lifecycle contract, and the sync bridge behind the compatibility
-surface. `chio-kernel` supplies `ChioKernel`, `Verdict`, `ToolCallOutput`,
+runtime-lifecycle contract. `chio-kernel` supplies `ChioKernel`, `Verdict`, `ToolCallOutput`,
 `ToolServerConnection`, and the DPoP / execution-nonce types carried on
 `A2aKernelExecutionContext`. `chio-manifest` supplies `ToolDefinition`,
 `ToolManifest`, and `validate_manifest`. `chio-mcp-edge` supplies

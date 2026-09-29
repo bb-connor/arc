@@ -23,26 +23,8 @@ pub struct LaunchMaterial {
     pub args: Vec<String>,
 }
 
-/// How the policy authorizes the launch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LaunchKind {
-    /// Migration stage Disabled: the launch is authorized but not confined.
-    LegacyAuthorized,
-    /// The policy requires the cage.
-    CageRequired,
-}
-
-impl LaunchKind {
-    fn label(self) -> &'static str {
-        match self {
-            Self::LegacyAuthorized => "legacy_authorized",
-            Self::CageRequired => "cage_required",
-        }
-    }
-}
-
 /// Load the material the way the edge does and return how it authorizes the launch.
-pub fn load_launch(material: &LaunchMaterial) -> Result<LaunchKind, String> {
+pub fn load_launch(material: &LaunchMaterial) -> Result<(), String> {
     let registry = chio_manifest::load_existing_verified_manifest_registry(
         &material.signed_manifest,
         &material.manifest_public_key,
@@ -66,26 +48,17 @@ pub fn load_launch(material: &LaunchMaterial) -> Result<LaunchKind, String> {
             material.server_id
         ));
     }
-    Ok(match launch {
-        chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(_) => {
-            LaunchKind::LegacyAuthorized
-        }
-        chio_mcp_adapter::transport::NativeMcpLaunch::CageRequired(_) => LaunchKind::CageRequired,
-    })
+    Ok(())
 }
 
 /// Reports whether the signed launch material authorizes the wrapped command.
 pub struct NativeLaunchProbe {
     material: Option<LaunchMaterial>,
-    require_enforcement: bool,
 }
 
 impl NativeLaunchProbe {
-    pub fn new(material: Option<LaunchMaterial>, require_enforcement: bool) -> Self {
-        Self {
-            material,
-            require_enforcement,
-        }
+    pub fn new(material: Option<LaunchMaterial>) -> Self {
+        Self { material }
     }
 }
 
@@ -107,28 +80,12 @@ impl Probe for NativeLaunchProbe {
             );
         };
         let outcome = load_launch(material);
-        let kind = outcome
-            .as_ref()
-            .map_or("refused", |kind| kind.label());
+        let kind = outcome.as_ref().map_or("refused", |()| "cage_required");
         let report = match outcome {
-            Ok(LaunchKind::CageRequired) => ProbeReport::ok(
+            Ok(()) => ProbeReport::ok(
                 self.name(),
                 "the signed launch material authorizes the wrapped command under the cage",
             ),
-            Ok(LaunchKind::LegacyAuthorized) if self.require_enforcement => ProbeReport::fail(
-                self.name(),
-                ProbeSeverity::Error,
-                "urn:chio:error:cli:other",
-                "the signed launch material authorizes the wrapped command at migration stage Disabled, which does not confine it",
-            )
-            .with_help("provision the launch at an enforcing migration stage before claiming containment"),
-            Ok(LaunchKind::LegacyAuthorized) => ProbeReport::fail(
-                self.name(),
-                ProbeSeverity::Warning,
-                "urn:chio:error:cli:other",
-                "the signed launch material authorizes the wrapped command at migration stage Disabled, which does not confine it",
-            )
-            .with_help("demo provisions run here; enforcement evidence needs an enforcing stage"),
             Err(reason) => ProbeReport::fail(
                 self.name(),
                 ProbeSeverity::Error,
@@ -141,7 +98,10 @@ impl Probe for NativeLaunchProbe {
             .with_context("server_id", material.server_id.clone())
             .with_context("command", command_line(&material.command, &material.args))
             .with_context("launch", kind)
-            .with_context("signed_manifest", material.signed_manifest.display().to_string())
+            .with_context(
+                "signed_manifest",
+                material.signed_manifest.display().to_string(),
+            )
             .with_context("cage_policy", material.cage_policy.display().to_string())
     }
 }

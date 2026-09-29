@@ -9,8 +9,8 @@ mod stdio;
 mod utils;
 
 pub use stdio::{
-    CageReceiptPersistence, CageRequiredLaunch, LegacyNativeLaunchAuthorization, NativeMcpLaunch,
-    NativeMcpLaunchFactory, StdioMcpTransport, StdioRequestTimeouts,
+    CageReceiptPersistence, CageRequiredLaunch, NativeMcpLaunchFactory, StdioMcpTransport,
+    StdioRequestTimeouts,
 };
 
 #[cfg(test)]
@@ -331,7 +331,7 @@ for line in sys.stdin:
         let script_path = dir.join("mock_mcp_server.py");
         std::fs::write(&script_path, script).expect("write mock script");
 
-        let transport = StdioMcpTransport::spawn_legacy_unchecked_for_test(
+        let transport = StdioMcpTransport::spawn_test_process(
             "python3",
             &[script_path.to_str().expect("path to str")],
         )

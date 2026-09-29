@@ -58,6 +58,12 @@ fn init_creates_expected_project_files() {
         fs::read_to_string(project_dir.join("Cargo.toml")).expect("read scaffold manifest");
     assert!(cargo_toml.contains("[package]"));
     assert!(!cargo_toml.contains("{{PACKAGE_NAME}}"));
+    let demo = fs::read_to_string(project_dir.join("src/bin/demo.rs")).expect("read demo");
+    assert!(demo.contains("provision-reference-runtime"));
+    assert!(demo.contains("CHIO_CAGE_INIT"));
+    assert!(demo.contains("CHIO_RECEIPT_ANCHOR_ROOT"));
+    assert!(demo.contains(".join(&target)"));
+    assert!(!demo.contains("provision-native-mcp-demo"));
 
     assert_private_directory(&project_dir);
 }
@@ -300,6 +306,7 @@ fn init_rejects_symlink_target_with_trailing_separator() {
     );
 }
 
+#[cfg(all(target_os = "linux", feature = "real-linux-enforcement"))]
 #[test]
 fn scaffolded_demo_runs_governed_hello_flow() {
     let project_dir = unique_test_dir();
@@ -314,6 +321,14 @@ fn scaffolded_demo_runs_governed_hello_flow() {
         String::from_utf8_lossy(&init.stderr)
     );
 
+    assert!(
+        std::env::var_os("CHIO_CAGE_INIT").is_some(),
+        "set CHIO_CAGE_INIT on the enforcement host"
+    );
+    assert!(
+        std::env::var_os("CHIO_RECEIPT_ANCHOR_ROOT").is_some(),
+        "set CHIO_RECEIPT_ANCHOR_ROOT on a separate filesystem"
+    );
     let cargo_target_dir = project_dir.join(".chio-test-target");
     let output = Command::new("cargo")
         .arg("run")

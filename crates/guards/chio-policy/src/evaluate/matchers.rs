@@ -6,12 +6,13 @@ fn apply_conditions(
     spec: &HushSpec,
     context: &RuntimeContext,
     conditions: &HashMap<String, Condition>,
+    now: chrono::DateTime<chrono::Utc>,
 ) -> HushSpec {
     let mut effective = spec.clone();
 
     if let Some(rules) = &mut effective.rules {
         for (block_name, condition) in conditions {
-            if !evaluate_condition(condition, context) && !rules.clear_block(block_name) {
+            if !evaluate_condition_at(condition, context, now) && !rules.clear_block(block_name) {
                 debug_assert!(
                     false,
                     "unknown condition block name `{block_name}`; \
@@ -397,9 +398,7 @@ fn workload_identity_matches(
     expected: &crate::models::WorkloadIdentityMatch,
     actual: &chio_core::capability::workload_identity::WorkloadIdentity,
 ) -> bool {
-    expected
-        .scheme
-        .is_none_or(|scheme| scheme == actual.scheme)
+    expected.scheme.is_none_or(|scheme| scheme == actual.scheme)
         && expected
             .trust_domain
             .as_deref()

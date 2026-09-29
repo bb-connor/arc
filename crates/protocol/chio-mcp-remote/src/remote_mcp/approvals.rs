@@ -129,7 +129,8 @@ fn load_record(
         .optional()
         .map_err(internal)?
         .ok_or_else(|| failure(StatusCode::NOT_FOUND, "unknown approval"))?;
-    let signed: SignedRecord = serde_json::from_str(&serialized).map_err(internal)?;
+    let signed: SignedRecord = decode_json(serialized.as_bytes(), MAX_SESSION_JSON_BYTES)
+        .map_err(|error| input::with_source(internal(error.code()), error))?;
     if signed.record.id != id
         || !signer
             .public_key()
@@ -170,7 +171,7 @@ fn projection(record: &ApprovalRecord) -> Value {
 pub(super) async fn submit(
     State(state): State<RemoteAppState>,
     headers: HeaderMap,
-    Json(request): Json<SubmitRequest>,
+    BoundedJson(request): BoundedJson<SubmitRequest>,
 ) -> Response {
     if let Err(response) =
         super::remote_mcp_admin::validate_admin_request(&headers, state.admin_token.as_deref())
@@ -292,7 +293,7 @@ pub(super) async fn decide(
     State(state): State<RemoteAppState>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
-    Json(request): Json<DecisionRequest>,
+    BoundedJson(request): BoundedJson<DecisionRequest>,
 ) -> Response {
     let (mut connection, signer) = match storage(&state, &headers) {
         Ok(value) => value,

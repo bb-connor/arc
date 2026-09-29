@@ -1,6 +1,12 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::result_large_err)]
 
+mod input;
+use input::{
+    decode as decode_json, BoundedJson, SenderConstraintError, MAX_AUTH_JSON_BYTES,
+    MAX_SESSION_JSON_BYTES,
+};
+
 pub use chio_control_plane::{CliError, JwtProviderProfile};
 
 #[path = "remote_mcp/admin.rs"]
@@ -23,3 +29,7 @@ include!("remote_mcp/http_service.rs");
 include!("remote_mcp/http_service_auth.rs");
 include!("remote_mcp/oauth.rs");
 include!("remote_mcp/tests.rs");
+
+#[cfg(test)]
+#[path = "remote_mcp/hosted_tests/mod.rs"]
+mod hosted_tests;

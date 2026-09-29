@@ -132,7 +132,7 @@ fn context<'a>(entry: &'a serde_json::Value, key: &str) -> &'a str {
 }
 
 #[test]
-fn a_provisioned_demo_launch_passes_without_enforcement_and_fails_with_it() {
+fn inactive_provisioned_launch_is_always_refused() {
     let temporary = tempfile::tempdir().expect("create test directory");
     let root = temporary
         .path()
@@ -145,13 +145,13 @@ fn a_provisioned_demo_launch_passes_without_enforcement_and_fails_with_it() {
     let envelope = report(&advisory);
     assert_eq!(envelope["schema"], "chio.doctor.v1");
     assert_eq!(
-        envelope["exit_code"], 0,
-        "advisory preflight must exit zero: {envelope}"
+        envelope["exit_code"], 1,
+        "inactive launch must be refused: {envelope}"
     );
-    assert!(advisory.status.success());
+    assert!(!advisory.status.success());
     let launch = probe(&envelope, "security.native_launch");
-    assert_eq!(launch["severity"], "warning", "{launch}");
-    assert_eq!(context(launch, "launch"), "legacy_authorized");
+    assert_eq!(launch["severity"], "error", "{launch}");
+    assert_eq!(context(launch, "launch"), "refused");
     assert_eq!(context(launch, "server_id"), "conformance-mcp-core");
     assert_eq!(
         probe(&envelope, "security.bearer_roles")["severity"],
@@ -174,7 +174,7 @@ fn a_provisioned_demo_launch_passes_without_enforcement_and_fails_with_it() {
     assert!(launch["message"]
         .as_str()
         .expect("launch message")
-        .contains("migration stage Disabled"));
+        .contains("requires an enforced migration stage"));
 }
 
 #[test]

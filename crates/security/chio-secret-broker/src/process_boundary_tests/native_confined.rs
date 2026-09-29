@@ -7,7 +7,7 @@ use chio_cage::{
 use chio_manifest::{NativeSyscallProfile, VerifiedManifestRegistry};
 use chio_mcp_adapter::edge::AdapterError;
 use chio_mcp_adapter::transport::{
-    CageReceiptPersistence, CageRequiredLaunch, NativeMcpLaunch, NativeMcpLaunchFactory,
+    CageReceiptPersistence, CageRequiredLaunch, NativeMcpLaunchFactory,
 };
 use chio_security_types::{
     CageLaunchContractDigests, EnterpriseMigrationRuntimeBinding, EnterpriseMigrationStateStore,
@@ -426,7 +426,7 @@ impl NativeMcpLaunchFactory for ConfinedFactory {
         _: &[&str],
         _: &str,
         _: Arc<VerifiedManifestRegistry>,
-    ) -> std::result::Result<NativeMcpLaunch, AdapterError> {
+    ) -> std::result::Result<CageRequiredLaunch, AdapterError> {
         Err(AdapterError::ConnectionFailed(
             "prepared broker stream is required".into(),
         ))

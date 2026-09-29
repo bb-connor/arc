@@ -10,10 +10,10 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use tracing::warn;
 
 use super::{
-    session_now_millis, validate_resume_record_integrity_with_keyring,
+    decode_json, session_now_millis, validate_resume_record_integrity_with_keyring,
     validate_terminal_fence_integrity, validate_terminal_tombstone_integrity, CliError,
     RemoteSessionDiagnosticRecord, RemoteSessionHmacKeyring, RemoteSessionResumeRecord,
-    RemoteSessionTerminalFence, RemoteSessionTombstoneRecord,
+    RemoteSessionTerminalFence, RemoteSessionTombstoneRecord, MAX_SESSION_JSON_BYTES,
 };
 
 pub(super) const SESSION_ACTIVE_TABLE: &str = "remote_active_sessions";
@@ -746,7 +746,10 @@ fn load_active_session_records_at(
             invalid_session_ids.push(session_id);
             continue;
         }
-        match serde_json::from_str::<RemoteSessionResumeRecord>(&record_json) {
+        match decode_json::<RemoteSessionResumeRecord>(
+            record_json.as_bytes(),
+            MAX_SESSION_JSON_BYTES,
+        ) {
             Ok(record) if record.session_id == session_id => {
                 match validate_resume_record_integrity_with_keyring(keyring, &record, now) {
                     Ok(()) => records.push(record),
@@ -885,11 +888,7 @@ fn parse_terminal_session_record(
     now: u64,
 ) -> Result<RemoteSessionTombstoneRecord, CliError> {
     let tombstone: RemoteSessionTombstoneRecord =
-        serde_json::from_str(record_json).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "parse terminal MCP session tombstone {session_id}: {error}"
-            ))
-        })?;
+        decode_json(record_json.as_bytes(), MAX_SESSION_JSON_BYTES)?;
     if tombstone.record.session_id != session_id {
         return Err(CliError::cli_other_error(format!(
             "terminal MCP session tombstone row {session_id} does not match payload {}",
@@ -906,11 +905,8 @@ fn parse_terminal_fence(
     keyring: &RemoteSessionHmacKeyring,
     now: u64,
 ) -> Result<RemoteSessionTerminalFence, CliError> {
-    let fence: RemoteSessionTerminalFence = serde_json::from_str(record_json).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "parse terminal MCP session generation fence {session_id}: {error}"
-        ))
-    })?;
+    let fence: RemoteSessionTerminalFence =
+        decode_json(record_json.as_bytes(), MAX_SESSION_JSON_BYTES)?;
     if fence.session_id != session_id {
         return Err(CliError::cli_other_error(format!(
             "terminal MCP session generation fence row {session_id} does not match payload {}",
@@ -975,12 +971,7 @@ pub(super) fn prepare_terminal_session_transition(
         .optional()?;
     if let Some(active_record_json) = active_record_json {
         let active: RemoteSessionResumeRecord =
-            serde_json::from_str(&active_record_json).map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "active MCP session {} is malformed during terminalization: {error}",
-                    fence.session_id
-                ))
-            })?;
+            decode_json(active_record_json.as_bytes(), MAX_SESSION_JSON_BYTES)?;
         if active.session_id != fence.session_id {
             return Err(CliError::cli_other_error(format!(
                 "active MCP session row {} contains state for {} during terminalization",
@@ -1196,12 +1187,7 @@ pub(super) fn persist_active_session_record(
         .optional()?;
     if let Some(existing_json) = existing_json {
         let existing: RemoteSessionResumeRecord =
-            serde_json::from_str(&existing_json).map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "existing MCP session {} has malformed authenticated state: {error}",
-                    record.session_id
-                ))
-            })?;
+            decode_json(existing_json.as_bytes(), MAX_SESSION_JSON_BYTES)?;
         if existing.session_id != record.session_id {
             return Err(CliError::cli_other_error(format!(
                 "existing MCP session row {} contains authenticated state for {}",

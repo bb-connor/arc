@@ -20,13 +20,13 @@ use crate::CliError;
 const REPORT_SCHEMA: &str = "chio.reference-runtime-provision-report.v1";
 const ENFORCED_SECURITY_MODE: &str = "enforced_cage";
 const ENFORCED_WARNING: &str = "The launch is confined only on a host that enforces the cage; the private signers in this directory belong to the operator and stay root-only.";
-const SHADOW_SECURITY_MODE: &str = "shadow_legacy_authorized";
-const SHADOW_WARNING: &str = "Shadow stage authorizes a legacy launch while the ledger records the cage posture; it is not containment.";
+const SHADOW_SECURITY_MODE: &str = "shadow_preparation_only";
+const SHADOW_WARNING: &str = "Shadow artifacts record the cage posture but cannot authorize native launch. Promote to Enforced before executing tools.";
 
 /// The migration stage the ledger is promoted to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 pub(crate) enum ProvisionStage {
-    /// Legacy launch recorded against the cage posture.
+    /// Preparation only. Runtime launch remains denied until Enforced.
     Shadow,
     /// Cage-required launch.
     Enforced,

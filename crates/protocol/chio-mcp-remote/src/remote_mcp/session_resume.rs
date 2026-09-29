@@ -1,8 +1,5 @@
 #[cfg(unix)]
-fn stable_file_metadata_matches(
-    first: &std::fs::Metadata,
-    second: &std::fs::Metadata,
-) -> bool {
+fn stable_file_metadata_matches(first: &std::fs::Metadata, second: &std::fs::Metadata) -> bool {
     use std::os::unix::fs::MetadataExt;
 
     first.dev() == second.dev()
@@ -17,10 +14,7 @@ fn stable_file_metadata_matches(
 }
 
 #[cfg(not(unix))]
-fn stable_file_metadata_matches(
-    first: &std::fs::Metadata,
-    second: &std::fs::Metadata,
-) -> bool {
+fn stable_file_metadata_matches(first: &std::fs::Metadata, second: &std::fs::Metadata) -> bool {
     first.len() == second.len() && first.modified().ok() == second.modified().ok()
 }
 
@@ -216,10 +210,7 @@ fn upstream_argument_file_identities(
                 candidate.display()
             ))
         })?;
-        let digest = stable_upstream_file_hash(
-            &canonical,
-            "remote MCP upstream argument file",
-        )?;
+        let digest = stable_upstream_file_hash(&canonical, "remote MCP upstream argument file")?;
         identities.push(json!({
             "argument_index": index,
             "canonical_path": canonical,
@@ -254,13 +245,12 @@ fn fingerprint_remote_runtime_contract(
     let upstream_executable = resolve_remote_upstream_executable(&config.wrapped_command)?;
     let upstream_executable_digest =
         stable_upstream_file_hash(&upstream_executable, "remote MCP upstream executable")?;
-    let upstream_working_directory = std::fs::canonicalize(std::env::current_dir()?).map_err(
-        |error| {
+    let upstream_working_directory =
+        std::fs::canonicalize(std::env::current_dir()?).map_err(|error| {
             CliError::cli_other_error(format!(
                 "canonicalize remote MCP upstream working directory: {error}"
             ))
-        },
-    )?;
+        })?;
     let argument_file_identities = upstream_argument_file_identities(config)?;
     let admitted_manifest = manifest_registry
         .verified_manifest(&config.server_id)
@@ -652,20 +642,11 @@ fn load_resume_hmac_keyring_at(
     };
     let encoded = read_resume_hmac_keyring_file(path)?;
     let mut deserializer = serde_json::Deserializer::from_slice(encoded.as_slice());
-    let keyring_file = RemoteSessionHmacKeyringFile::deserialize(&mut deserializer).map_err(
-        |error| {
-            CliError::cli_other_error(format!(
-                "parse strict remote MCP resume HMAC keyring {}: {error}",
-                path.display()
-            ))
-        },
-    )?;
-    deserializer.end().map_err(|error| {
-        CliError::cli_other_error(format!(
-            "parse strict remote MCP resume HMAC keyring {}: {error}",
-            path.display()
-        ))
-    })?;
+    let keyring_file = RemoteSessionHmacKeyringFile::deserialize(&mut deserializer)
+        .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
+    deserializer
+        .end()
+        .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
     if keyring_file.schema != REMOTE_SESSION_HMAC_KEYRING_SCHEMA {
         return Err(CliError::cli_other_error(format!(
             "remote MCP resume HMAC keyring {} has unsupported schema {}",
@@ -832,14 +813,16 @@ fn validate_resume_record_integrity_with_keyring(
             record.session_id
         )));
     }
-    let key = keyring.verification_key(&record.resume_integrity, now).ok_or_else(|| {
-        CliError::cli_other_error(format!(
-            "stored MCP session {} uses an unknown or expired resume HMAC key {} version {}",
-            record.session_id,
-            record.resume_integrity.key_id,
-            record.resume_integrity.key_version
-        ))
-    })?;
+    let key = keyring
+        .verification_key(&record.resume_integrity, now)
+        .ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "stored MCP session {} uses an unknown or expired resume HMAC key {} version {}",
+                record.session_id,
+                record.resume_integrity.key_id,
+                record.resume_integrity.key_version
+            ))
+        })?;
     let expected_tag = compute_resume_record_integrity_tag(key, record)?;
     verify_remote_session_hmac(
         &expected_tag,
@@ -855,8 +838,7 @@ impl RemoteSessionHmacKeyring {
         integrity: &RemoteSessionIntegrityTag,
         now: u64,
     ) -> Option<&RemoteSessionHmacKey> {
-        if self.current.key_id == integrity.key_id
-            && self.current.version == integrity.key_version
+        if self.current.key_id == integrity.key_id && self.current.version == integrity.key_version
         {
             return Some(&self.current);
         }
@@ -882,12 +864,10 @@ fn compute_remote_session_hmac<T: Serialize>(
     envelope: &T,
     description: &str,
 ) -> Result<String, CliError> {
-    let canonical = canonical_json_bytes(envelope).map_err(|error| {
-        CliError::cli_other_error(format!("serialize {description}: {error}"))
-    })?;
-    let mut mac = Hmac::<Sha256>::new_from_slice(key).map_err(|_| {
-        CliError::cli_other_error("initialize remote session HMAC".to_string())
-    })?;
+    let canonical = canonical_json_bytes(envelope)
+        .map_err(|error| CliError::cli_other_error(format!("serialize {description}: {error}")))?;
+    let mut mac = Hmac::<Sha256>::new_from_slice(key)
+        .map_err(|_| CliError::cli_other_error("initialize remote session HMAC".to_string()))?;
     mac.update(label);
     mac.update(&[0]);
     mac.update(&canonical);
@@ -943,10 +923,8 @@ fn sign_terminal_session_records(
         terminal_epoch,
         resume_integrity: keyring.empty_tag_for_current(),
     };
-    tombstone.resume_integrity.tag = compute_terminal_tombstone_integrity_tag(
-        &keyring.current,
-        &tombstone,
-    )?;
+    tombstone.resume_integrity.tag =
+        compute_terminal_tombstone_integrity_tag(&keyring.current, &tombstone)?;
     let mut fence = RemoteSessionTerminalFence {
         session_id: tombstone.record.session_id.clone(),
         terminal_at: tombstone.record.terminal_at,
@@ -955,8 +933,7 @@ fn sign_terminal_session_records(
         terminal_epoch,
         resume_integrity: keyring.empty_tag_for_current(),
     };
-    fence.resume_integrity.tag =
-        compute_terminal_fence_integrity_tag(&keyring.current, &fence)?;
+    fence.resume_integrity.tag = compute_terminal_fence_integrity_tag(&keyring.current, &fence)?;
     Ok((tombstone, fence))
 }
 

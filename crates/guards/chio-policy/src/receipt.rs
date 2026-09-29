@@ -2,9 +2,9 @@
 //!
 //! Wraps `evaluate()` with timing, policy hashing, and a structured receipt.
 
+use chio_security_types::clock::{Clock, ClockError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::time::Instant;
 use uuid::Uuid;
 
 use crate::evaluate::{evaluate, Decision, EvaluationAction, PostureResult};
@@ -72,16 +72,26 @@ pub fn evaluate_audited(
     spec: &HushSpec,
     action: &EvaluationAction,
     config: &AuditConfig,
-) -> DecisionReceipt {
-    let start = if config.enabled {
-        Some(Instant::now())
-    } else {
-        None
-    };
-
+    clock: &dyn Clock,
+) -> Result<DecisionReceipt, ClockError> {
+    let start = clock.read()?;
+    let millis = i64::try_from(start.unix_millis().get()).map_err(|_| ClockError::Overflow)?;
+    let timestamp = chrono::DateTime::from_timestamp_millis(millis)
+        .ok_or(ClockError::Overflow)?
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
     let result = evaluate(spec, action);
-
-    let duration_us = start.map(|s| s.elapsed().as_micros() as u64).unwrap_or(0);
+    let duration_us = if config.enabled {
+        let end = clock.read()?;
+        end.unix_millis().duration_since(start.unix_millis())?;
+        u64::try_from(
+            end.monotonic()
+                .duration_since(start.monotonic())?
+                .as_micros(),
+        )
+        .map_err(|_| ClockError::Overflow)?
+    } else {
+        0
+    };
 
     let policy = if config.enabled {
         build_policy_summary(spec)
@@ -99,9 +109,7 @@ pub fn evaluate_audited(
         content_redacted: config.redact_content && action.content.is_some(),
     };
 
-    let timestamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-
-    DecisionReceipt {
+    Ok(DecisionReceipt {
         receipt_id: Uuid::new_v4().to_string(),
         timestamp,
         hushspec_version: HUSHSPEC_VERSION.to_string(),
@@ -113,7 +121,7 @@ pub fn evaluate_audited(
         origin_profile: result.origin_profile,
         posture: result.posture,
         evaluation_duration_us: duration_us,
-    }
+    })
 }
 
 fn build_policy_summary(spec: &HushSpec) -> PolicySummary {
@@ -180,7 +188,9 @@ mod tests {
                 runtime_attestation: None,
             },
             &AuditConfig::default(),
-        );
+            &chio_security_types::clock::FixedClock::new(1_776_254_400),
+        )
+        .unwrap();
 
         assert_eq!(receipt.decision, Decision::Allow);
         assert!(receipt.action.content_redacted);
@@ -206,7 +216,9 @@ mod tests {
                 enabled: false,
                 redact_content: false,
             },
-        );
+            &chio_security_types::clock::FixedClock::new(1_776_254_400),
+        )
+        .unwrap();
 
         assert_eq!(receipt.evaluation_duration_us, 0);
         assert!(receipt.policy.content_hash.is_empty());
@@ -243,7 +255,9 @@ mod tests {
                 enabled: false,
                 redact_content: true,
             },
-        );
+            &chio_security_types::clock::FixedClock::new(1_776_254_400),
+        )
+        .unwrap();
 
         assert_eq!(receipt.action.target.as_deref(), Some("mail.send"));
         assert!(!receipt.action.content_redacted);
@@ -291,7 +305,9 @@ mod tests {
                 runtime_attestation: None,
             },
             &AuditConfig::default(),
-        );
+            &chio_security_types::clock::FixedClock::new(1_776_254_400),
+        )
+        .unwrap();
 
         assert_eq!(receipt.decision, Decision::Deny);
         assert_eq!(

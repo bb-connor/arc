@@ -457,15 +457,6 @@ fn cage_migration_revalidates_after_preparation_and_recovers_only_by_rebuild() {
         .test_expect("legacy-removed cage state exists");
 
     assert!(enforcer.require_enforced().is_err());
-    assert!(
-        chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
-            "other-server",
-            enforcer.clone(),
-            Arc::new(chio_manifest::VerifiedManifestRegistry::default()),
-        )
-        .is_err()
-    );
-
     let mut rebuilt_policy = policy;
     rebuilt_policy.stage = chio_security_types::EnterpriseMigrationStage::LegacyRemoved;
     rebuilt_policy.minimum_head = promoted.minimum_head();
@@ -669,27 +660,9 @@ fn unprotected_wrapper_uses_signed_registry_flow_requirement() {
         .test_unwrap();
     assert!(registry.authorize_cage_manifest("cage-policy-test").is_ok());
 
-    let directory = tempfile::tempdir().test_expect("flow launch migration directory");
-    let (migration_policy, _) = durable_migration_policy_at_stage(
-        directory.path(),
-        chio_security_types::EnterpriseMigrationStage::Shadow,
-    );
-    let migration = load_cage_migration_enforcer(
-        &migration_policy,
-        "cage-policy-test",
-        &test_launch_contract(),
-    )
-    .test_expect("flow launch migration binding");
-    let launch = chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(Box::new(
-        chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
-            "cage-policy-test".to_string(),
-            migration,
-            Arc::new(registry),
-        )
-        .test_expect("flow legacy launch authorization"),
-    ));
-    assert!(launch.requires_flow_runtime());
-    let error = super::super::wrap::require_unprotected_wrap_compatible(&launch).test_unwrap_err();
+    assert!(registry.requires_flow_runtime());
+    let error =
+        super::super::wrap::require_unprotected_wrap_compatible(&registry).test_unwrap_err();
     assert!(error
         .to_string()
         .contains("rejects flow-required manifests"));
@@ -704,22 +677,35 @@ fn unprotected_wrapper_uses_signed_registry_flow_requirement() {
             chio_manifest::RuntimeToolTopology::local(),
         )
         .test_expect("register flow-free signed manifest");
-    let flow_free_migration = load_cage_migration_enforcer(
-        &migration_policy,
-        "cage-policy-test",
-        &test_launch_contract(),
-    )
-    .test_expect("flow-free launch migration binding");
-    let flow_free_launch =
-        chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(Box::new(
-            chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
-                "cage-policy-test".to_string(),
-                flow_free_migration,
-                Arc::new(flow_free_registry),
-            )
-            .test_expect("flow-free legacy launch authorization"),
-        ));
-    assert!(!flow_free_launch.requires_flow_runtime());
-    super::super::wrap::require_unprotected_wrap_compatible(&flow_free_launch)
-        .test_expect("flow-free launch remains wrapper compatible");
+    assert!(!flow_free_registry.requires_flow_runtime());
+    super::super::wrap::require_unprotected_wrap_compatible(&flow_free_registry)
+        .test_expect("flow-free registry remains wrapper compatible");
+}
+
+#[test]
+fn inactive_signed_policies_cannot_prepare_native_launches() {
+    for stage in [
+        chio_security_types::EnterpriseMigrationStage::Disabled,
+        chio_security_types::EnterpriseMigrationStage::Shadow,
+    ] {
+        let mut body = policy(
+            chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+            chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+        );
+        body.enterprise_migration.stage = stage;
+        let signer = chio_core::Keypair::from_seed(&[91; 32]);
+        let bytes = chio_core::canonical_json_bytes(&signed_policy(body, &signer)).test_unwrap();
+        let error = load_native_mcp_launch_from_bytes(
+            Path::new("/not-opened/policy.json"),
+            &bytes,
+            &signer.public_key(),
+            "/operator/mcp-server",
+            &[],
+            None,
+        )
+        .test_expect_err("inactive migration cannot authorize a native launch");
+        assert!(error
+            .to_string()
+            .contains("requires an enforced migration stage"));
+    }
 }

@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-mod support;
+use super::support;
 
 use std::net::TcpListener;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -23,39 +23,6 @@ fn listen_addr() -> std::net::SocketAddr {
     let addr = listener.local_addr().expect("listener addr");
     drop(listener);
     addr
-}
-
-fn normal_dependency_names(manifest: &str) -> Vec<String> {
-    let mut in_dependencies = false;
-    let mut names = Vec::new();
-
-    for line in manifest.lines() {
-        let trimmed = line.trim();
-        if trimmed == "[dependencies]" {
-            in_dependencies = true;
-            continue;
-        }
-        if in_dependencies && trimmed.starts_with('[') {
-            break;
-        }
-        if !in_dependencies || trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        let Some((name, _)) = trimmed.split_once('=') else {
-            continue;
-        };
-        names.push(name.trim().trim_matches('"').to_string());
-    }
-
-    names
-}
-
-#[test]
-fn hosted_mcp_normal_dependencies_are_reexport_boundary_only() {
-    assert_eq!(
-        normal_dependency_names(include_str!("../Cargo.toml")),
-        vec!["chio-control-plane", "chio-mcp-remote"]
-    );
 }
 
 #[test]
@@ -88,18 +55,12 @@ fn base_remote_config_carries_wrapped_server_defaults() {
     assert_eq!(config.server_name, "Wrapped HTTP Mock");
     assert_eq!(config.server_version, "0.1.0");
     assert_eq!(config.page_size, 50);
-    assert_eq!(config.wrapped_command, "/usr/bin/python3");
+    assert_eq!(config.wrapped_command, "/bin/true");
     assert_eq!(
         config.resume_hmac_keyring_path,
         Some(dir.join("remote-session-hmac-keyring.json"))
     );
-    assert_eq!(
-        config.wrapped_args,
-        vec![dir
-            .join("mock_http_mcp_server.py")
-            .to_string_lossy()
-            .into_owned()]
-    );
+    assert!(config.wrapped_args.is_empty());
+    assert!(config.test_transport.is_some());
     assert!(config.policy_path.exists());
-    assert!(std::path::Path::new(&config.wrapped_args[0]).exists());
 }

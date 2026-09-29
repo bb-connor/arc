@@ -26,7 +26,10 @@ impl LocalAuthorizationServer {
         format!("{}/token", self.issuer.trim_end_matches('/'))
     }
 
-    pub(super) fn authorization_page(&self, request: &AuthorizationRequest) -> Result<String, Response> {
+    pub(super) fn authorization_page(
+        &self,
+        request: &AuthorizationRequest,
+    ) -> Result<String, Response> {
         let resource = validate_authorization_request(
             request,
             &self.supported_scopes,
@@ -122,7 +125,10 @@ impl LocalAuthorizationServer {
         ))
     }
 
-    pub(super) fn approve_authorization(&self, form: AuthorizationApprovalForm) -> Result<Redirect, Response> {
+    pub(super) fn approve_authorization(
+        &self,
+        form: AuthorizationApprovalForm,
+    ) -> Result<Redirect, Response> {
         let request = AuthorizationRequest {
             response_type: form.response_type.clone(),
             client_id: form.client_id.clone(),
@@ -308,7 +314,12 @@ impl LocalAuthorizationServer {
             &self.sender_dpop_nonce_store,
             &self.sender_dpop_config,
         )
-        .map_err(|message| oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &message))?;
+        .map_err(|error| {
+            let mut response =
+                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &error.to_string());
+            response.extensions_mut().insert(Arc::new(error));
+            response
+        })?;
 
         Ok(self.issue_token_response(TokenResponseInput {
             subject: grant.subject,
@@ -368,7 +379,12 @@ impl LocalAuthorizationServer {
             &self.sender_dpop_nonce_store,
             &self.sender_dpop_config,
         )
-        .map_err(|message| oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &message))?;
+        .map_err(|error| {
+            let mut response =
+                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &error.to_string());
+            response.extensions_mut().insert(Arc::new(error));
+            response
+        })?;
         let subject = claims.sub.clone().unwrap_or_else(|| self.subject.clone());
         let client_id = claims
             .client_id

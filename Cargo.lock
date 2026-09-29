@@ -2568,6 +2568,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
+ "chio-security-types",
  "chio-test-support",
  "serde",
  "serde_json",
@@ -4103,20 +4104,8 @@ dependencies = [
 name = "chio-hosted-mcp"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "chio-control-plane",
- "chio-core-types",
- "chio-kernel",
- "chio-manifest",
- "chio-mcp-adapter",
  "chio-mcp-remote",
- "chio-security-types",
- "chio-siem",
- "reqwest 0.13.2",
- "serde_json",
- "sha2 0.10.9",
- "tokio",
- "url",
 ]
 
 [[package]]
@@ -4471,6 +4460,7 @@ dependencies = [
  "chio-metrics-spec",
  "chio-secure-ipc",
  "chio-security-types",
+ "chio-siem",
  "chio-store-sqlite",
  "hmac 0.12.1",
  "p256 0.13.2",
@@ -4483,6 +4473,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "subtle",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
  "url",
@@ -4705,6 +4696,7 @@ dependencies = [
  "chio-core",
  "chio-guards",
  "chio-kernel",
+ "chio-security-types",
  "chrono",
  "chrono-tz",
  "hex",

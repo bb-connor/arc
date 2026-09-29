@@ -131,30 +131,6 @@ const EXCEPTION_RULES: &[ExceptionRule] = &[
         compatibility_only: false,
     },
     ExceptionRule {
-        path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_legacy_with_gate_and_timeouts",
-        kind: DangerousKind::CommandNew,
-        receiver: None,
-        class: "MCP server process lifecycle",
-        compatibility_only: false,
-    },
-    ExceptionRule {
-        path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_legacy_with_gate_and_timeouts",
-        kind: DangerousKind::Spawn,
-        receiver: Some("child_command"),
-        class: "MCP server process lifecycle",
-        compatibility_only: false,
-    },
-    ExceptionRule {
-        path: "crates/protocol/chio-a2a-edge/src/edge.rs",
-        function: "ChioA2aEdge::handle_send_message_passthrough",
-        kind: DangerousKind::Invoke,
-        receiver: Some("server"),
-        class: "A2A compatibility-only passthrough",
-        compatibility_only: true,
-    },
-    ExceptionRule {
         path: "crates/protocol/chio-acp-edge/src/edge.rs",
         function: "ChioAcpEdge::invoke_passthrough",
         kind: DangerousKind::Invoke,
@@ -309,49 +285,19 @@ const CALL_CONTRACTS: &[CallContract] = &[
     },
     CallContract {
         path: MCP_LAUNCH_SOURCE,
-        function: "LegacyNativeLaunchAuthorization::revalidate",
-        target: "self.manifest_registry.authorize_cage_manifest",
+        function: "StdioMcpTransport::spawn",
+        target: "Self::spawn_with_timeouts",
         minimum: 1,
     },
     CallContract {
         path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_legacy_authorized",
-        target: "authorization.revalidate",
-        minimum: 1,
-    },
-    CallContract {
-        path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_legacy_authorized",
-        target: "validate_signed_mcp_tool_surface",
-        minimum: 1,
-    },
-    CallContract {
-        path: MCP_LAUNCH_SOURCE,
-        function: "LegacyNativeLaunchAuthorization::revalidate",
-        target: "self.migration.require_legacy_fallback_permitted",
-        minimum: 1,
-    },
-    CallContract {
-        path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_legacy_with_gate_and_timeouts",
-        target: "prelaunch",
-        minimum: 1,
-    },
-    CallContract {
-        path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_cage_required",
-        target: "Self::spawn_cage_required_with_timeouts",
-        minimum: 1,
-    },
-    CallContract {
-        path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_cage_required_with_timeouts",
+        function: "StdioMcpTransport::spawn_with_timeouts",
         target: "migration.require_enforced",
         minimum: 1,
     },
     CallContract {
         path: MCP_LAUNCH_SOURCE,
-        function: "StdioMcpTransport::spawn_cage_required_with_timeouts",
+        function: "StdioMcpTransport::spawn_with_timeouts",
         target: "chio_cage::launch_prepared",
         minimum: 1,
     },
@@ -1227,7 +1173,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_compatibility_exception_is_accepted() {
+    fn removed_a2a_bypass_is_rejected_even_with_compatibility_cfg() {
         let source = r#"
             struct ChioA2aEdge;
             impl ChioA2aEdge {
@@ -1237,7 +1183,7 @@ mod tests {
                 }
             }
         "#;
-        assert!(validate_fixture("crates/protocol/chio-a2a-edge/src/edge.rs", source).is_ok());
+        assert!(validate_fixture("crates/protocol/chio-a2a-edge/src/edge.rs", source).is_err());
     }
 
     #[test]

@@ -51,14 +51,12 @@ fn mcp_rate_limiter_caps_tracked_keys() {
 fn remote_session_factory_holds_one_durable_admission_sidecar() {
     let directory = private_remote_admission_directory("owner");
     let policy_path = directory.join("policy.yaml");
-    std::fs::write(
-        &policy_path,
-        "capabilities:\n  default:\n    tools: []\n",
-    )
-    .expect("write remote admission policy");
+    std::fs::write(&policy_path, "capabilities:\n  default:\n    tools: []\n")
+        .expect("write remote admission policy");
     let session_database = directory.join("sessions.sqlite3");
     let mut config = test_remote_config();
     config.policy_path = policy_path;
+    config.test_transport = Some(Arc::new(TestSessionTransport));
     config.session_db_path = Some(session_database.clone());
     config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(&directory));
     let _manifest_path = configure_signed_manifest(&mut config, &directory);
@@ -67,8 +65,7 @@ fn remote_session_factory_holds_one_durable_admission_sidecar() {
         RemoteSessionFactory::new(config.clone()).expect("claim remote durable admission owner");
     assert!(factory.durable_admission.is_some());
     assert_ne!(
-        durable_admission_sidecar_path(&session_database)
-            .expect("derive remote admission sidecar"),
+        durable_admission_sidecar_path(&session_database).expect("derive remote admission sidecar"),
         session_database
     );
     assert!(RemoteSessionFactory::new(config.clone()).is_err());
@@ -82,11 +79,8 @@ fn remote_session_factory_holds_one_durable_admission_sidecar() {
 fn remote_session_factory_requires_manifest_trust_inputs() {
     let directory = private_remote_admission_directory("manifest-trust");
     let policy_path = directory.join("policy.yaml");
-    std::fs::write(
-        &policy_path,
-        "capabilities:\n  default:\n    tools: []\n",
-    )
-    .expect("write remote admission policy");
+    std::fs::write(&policy_path, "capabilities:\n  default:\n    tools: []\n")
+        .expect("write remote admission policy");
     let mut config = test_remote_config();
     config.policy_path = policy_path;
     config.session_db_path = Some(directory.join("sessions.sqlite3"));
@@ -115,7 +109,7 @@ impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for CountingLaunchFacto
         args: &[&str],
         expected_server_id: &str,
         registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-    ) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, AdapterError> {
+    ) -> Result<chio_mcp_adapter::transport::CageRequiredLaunch, AdapterError> {
         self.0.fetch_add(1, Ordering::SeqCst);
         chio_mcp_adapter::transport::NativeMcpLaunchFactory::prepare_launch(
             &TestNativeLaunchFactory,
@@ -129,7 +123,10 @@ impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for CountingLaunchFacto
 
 #[test]
 fn remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition() {
-    for flow in [None, Some(chio_manifest::ToolFlowDeclaration::public_egress())] {
+    for flow in [
+        None,
+        Some(chio_manifest::ToolFlowDeclaration::public_egress()),
+    ] {
         let requires_flow = flow.is_some();
         let directory = private_remote_admission_directory("flow-installation");
         let policy_path = directory.join("policy.yaml");
@@ -148,7 +145,9 @@ fn remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisit
 
         let result = RemoteSessionFactory::new(config);
         if requires_flow {
-            let error = result.err().expect("flow runtime is not installed by this factory");
+            let error = result
+                .err()
+                .expect("flow runtime is not installed by this factory");
             assert!(error.to_string().contains(
                 "remote MCP session construction requires an active-defense host for flow-required manifests"
             ));
@@ -156,10 +155,15 @@ fn remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisit
             assert!(!session_database.exists());
             assert!(!admission_database.exists());
         } else {
-            let factory = result.expect("unconstrained manifest remains supported");
-            assert!(calls.load(Ordering::SeqCst) > 0);
-            assert!(factory.durable_admission.is_some());
-            drop(factory);
+            let error = result
+                .err()
+                .expect("native launch requires enforced authority");
+            assert!(error
+                .to_string()
+                .contains("test factory refuses native launch"));
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert!(!session_database.exists());
+            assert!(!admission_database.exists());
         }
         std::fs::remove_dir_all(directory).expect("remove isolated remote factory fixture");
     }
@@ -169,11 +173,8 @@ fn remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisit
 fn remote_session_factory_rejects_admission_sidecar_aliases() {
     let directory = private_remote_admission_directory("alias");
     let policy_path = directory.join("policy.yaml");
-    std::fs::write(
-        &policy_path,
-        "capabilities:\n  default:\n    tools: []\n",
-    )
-    .expect("write remote admission policy");
+    std::fs::write(&policy_path, "capabilities:\n  default:\n    tools: []\n")
+        .expect("write remote admission policy");
     let session_database = directory.join("sessions.sqlite3");
     let admission_database =
         durable_admission_sidecar_path(&session_database).expect("derive admission sidecar");

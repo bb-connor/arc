@@ -205,14 +205,20 @@ fn strict_nonce_retries_require_and_accept_stable_request_ids() {
         .to_string()
         .contains("handle_send_message_with_request_id"));
     let stream_error = edge
-        .handle_stream_message("echo", &request, &retry_execution)
+        .handle_stream_message("echo", &request, &kernel, &retry_execution)
         .test_expect_err("generated stream IDs must reject execution nonces");
     assert!(stream_error
         .to_string()
         .contains("handle_stream_message_with_request_id"));
 
-    edge.handle_stream_message_with_request_id(request_id, "echo", &request, &retry_execution)
-        .test_expect("stable stream IDs should accept execution nonces");
+    edge.handle_stream_message_with_request_id(
+        request_id,
+        "echo",
+        &request,
+        &kernel,
+        &retry_execution,
+    )
+    .test_expect("stable stream IDs should accept execution nonces");
     let retry = edge
         .handle_send_message_with_request_id(
             request_id,

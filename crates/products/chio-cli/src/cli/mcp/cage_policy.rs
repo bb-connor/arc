@@ -186,7 +186,7 @@ impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for SignedCagePolicyLau
         args: &[&str],
         expected_server_id: &str,
         admitted_manifest_registry: Arc<chio_manifest::VerifiedManifestRegistry>,
-    ) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, chio_mcp_adapter::edge::AdapterError>
+    ) -> Result<chio_mcp_adapter::transport::CageRequiredLaunch, chio_mcp_adapter::edge::AdapterError>
     {
         let launch = load_native_mcp_launch_from_bytes(
             &self.path,
@@ -377,9 +377,8 @@ pub(super) struct ProvisionedCagePolicyInput {
 }
 
 /// Constructs and signs the exact private policy types consumed by native MCP
-/// launch. The stage comes from the provisioning profile: Disabled authorizes
-/// a legacy launch without claiming containment (the demo), Enforced binds
-/// the launch to the cage.
+/// launch. Disabled and Shadow artifacts are preparation only. Runtime
+/// launch admission requires an enforced durable migration binding.
 #[allow(dead_code)]
 pub(super) struct ProvisionedCagePolicyFactory {
     input: ProvisionedCagePolicyInput,
@@ -736,7 +735,7 @@ pub(crate) fn load_native_mcp_launch(
     command: &str,
     args: &[&str],
     admitted_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
-) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, CliError> {
+) -> Result<chio_mcp_adapter::transport::CageRequiredLaunch, CliError> {
     let bytes = read_cage_policy(path)?;
     let trusted_policy_signer =
         chio_core::PublicKey::from_hex(trusted_policy_signer).map_err(|error| {
@@ -752,38 +751,10 @@ pub(crate) fn load_native_mcp_launch(
     )
 }
 
-#[allow(dead_code)]
-pub(super) fn validate_native_mcp_demo_policy(
-    path: &Path,
-    trusted_policy_signer: &chio_core::PublicKey,
-    command: &str,
-    args: &[&str],
-    expected_server_id: &str,
-    physical_migration_database_path: &Path,
-) -> Result<(), CliError> {
-    let bytes = read_cage_policy(path)?;
-    let policy = decode_cage_policy(path, &bytes, trusted_policy_signer)?;
-    if policy.enterprise_migration.stage != chio_security_types::EnterpriseMigrationStage::Disabled
-        || policy.signed_manifest.manifest.server_id != expected_server_id
-    {
-        return Err(CliError::cli_other_error(
-            "provisioned native MCP demo policy must bind the exact server at Disabled stage"
-                .to_string(),
-        ));
-    }
-
-    let launch_contract = cage_launch_contract_digests(&policy, trusted_policy_signer)?;
-    let mut validation_policy = policy;
-    validation_policy.enterprise_migration.state_database_path =
-        physical_migration_database_path.to_path_buf();
-    let _authorization =
-        compose_legacy_authorized_launch(validation_policy, command, args, &launch_contract, None)?;
-    Ok(())
-}
-
-/// Validate a provisioned policy at an enforcing stage without composing
+/// Validate a staged provisioned policy without composing
 /// the launch: the signature, the bound server, the stage, the launch
-/// contract and the migration ledger it names. Composing the launch retains
+/// contract and the migration ledger it names. Inactive stages prepare artifacts
+/// only. Composing an enforced launch retains
 /// the cage helper and the target on the enforcing host, which is the
 /// edge's and the preflight's job.
 #[allow(dead_code)]
@@ -824,7 +795,11 @@ pub(super) fn validate_provisioned_policy(
         &policy.signed_manifest.manifest.server_id,
         &launch_contract,
     )?;
-    if !expected_stage.legacy_fallback_permitted() {
+    if matches!(
+        expected_stage,
+        chio_security_types::EnterpriseMigrationStage::Enforced
+            | chio_security_types::EnterpriseMigrationStage::LegacyRemoved
+    ) {
         binding.require_enforced().map_err(|error| {
             CliError::cli_other_error(format!(
                 "provisioned migration ledger does not enforce the launch: {error}"
@@ -841,44 +816,35 @@ fn load_native_mcp_launch_from_bytes(
     command: &str,
     args: &[&str],
     admitted_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
-) -> Result<chio_mcp_adapter::transport::NativeMcpLaunch, CliError> {
+) -> Result<chio_mcp_adapter::transport::CageRequiredLaunch, CliError> {
     let policy = decode_cage_policy(path, bytes, trusted_policy_signer)?;
-    let launch_contract = cage_launch_contract_digests(&policy, trusted_policy_signer)?;
-    if policy
-        .enterprise_migration
-        .stage
-        .legacy_fallback_permitted()
-    {
-        compose_legacy_authorized_launch(
-            policy,
-            command,
-            args,
-            &launch_contract,
-            admitted_manifest_registry,
-        )
-        .map(|authorization| {
-            chio_mcp_adapter::transport::NativeMcpLaunch::LegacyAuthorized(Box::new(authorization))
-        })
-    } else {
-        compose_cage_required_launch(
-            policy,
-            &chio_core::sha256_hex(bytes),
-            command,
-            args,
-            &launch_contract,
-            admitted_manifest_registry,
-        )
-        .map(|launch| chio_mcp_adapter::transport::NativeMcpLaunch::CageRequired(Box::new(launch)))
+    if !matches!(
+        policy.enterprise_migration.stage,
+        chio_security_types::EnterpriseMigrationStage::Enforced
+            | chio_security_types::EnterpriseMigrationStage::LegacyRemoved
+    ) {
+        return Err(CliError::cli_other_error(
+            "native MCP launch requires an enforced migration stage",
+        ));
     }
+    let launch_contract = cage_launch_contract_digests(&policy, trusted_policy_signer)?;
+    compose_cage_required_launch(
+        policy,
+        &chio_core::sha256_hex(bytes),
+        command,
+        args,
+        &launch_contract,
+        admitted_manifest_registry,
+    )
 }
 
 fn read_cage_policy(path: &Path) -> Result<Vec<u8>, CliError> {
-    let bytes = std::fs::read(path).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to read cage launch policy {}: {error}",
-            path.display()
-        ))
-    })?;
+    let file = std::fs::File::open(path)?;
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(file, MAX_CAGE_POLICY_BYTES as u64 + 1),
+        &mut bytes,
+    )?;
     if bytes.is_empty() || bytes.len() > MAX_CAGE_POLICY_BYTES {
         return Err(CliError::cli_other_error(format!(
             "cage launch policy {} is empty or exceeds {} bytes",
@@ -996,66 +962,6 @@ fn resolve_launch_manifest_registry(
             ))
         })?;
     Ok(registry)
-}
-
-fn compose_legacy_authorized_launch(
-    policy: McpCageLaunchPolicy,
-    command: &str,
-    args: &[&str],
-    launch_contract: &chio_security_types::CageLaunchContractDigests,
-    admitted_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
-) -> Result<chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization, CliError> {
-    if policy.schema != MCP_CAGE_LAUNCH_POLICY_SCHEMA
-        || policy.signed_manifest.manifest.schema != chio_manifest::TOOL_MANIFEST_SCHEMA
-    {
-        return Err(CliError::cli_other_error(
-            "legacy native launch requires a strict signed cage policy and v2 manifest".to_string(),
-        ));
-    }
-    let expected_argv = std::iter::once(command.to_string())
-        .chain(args.iter().map(|argument| (*argument).to_string()))
-        .collect::<Vec<_>>();
-    if !Path::new(command).is_absolute()
-        || policy.runtime.target_path != Path::new(command)
-        || policy.runtime.target_argv != expected_argv
-    {
-        return Err(CliError::cli_other_error(
-            "cage policy target path and argv must exactly match the wrapped command".to_string(),
-        ));
-    }
-    let server_id = policy.signed_manifest.manifest.server_id.clone();
-    let profile = policy
-        .signed_manifest
-        .manifest
-        .required_permissions
-        .as_ref()
-        .ok_or_else(|| {
-            CliError::cli_other_error(
-                "cage launch policy manifest has no explicit platform permissions".to_string(),
-            )
-        })?
-        .native_syscall_profile;
-    let topology = if profile == chio_manifest::NativeSyscallProfile::BrokeredNativeV1 {
-        chio_manifest::RuntimeToolTopology::brokered()
-    } else {
-        chio_manifest::RuntimeToolTopology::local()
-    };
-    let registry = resolve_launch_manifest_registry(
-        &policy,
-        topology,
-        admitted_manifest_registry,
-        "legacy launch",
-    )?;
-    let migration =
-        load_cage_migration_enforcer(&policy.enterprise_migration, &server_id, launch_contract)?;
-    chio_mcp_adapter::transport::LegacyNativeLaunchAuthorization::new(
-        server_id, migration, registry,
-    )
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "legacy native launch migration authorization denied: {error}"
-        ))
-    })
 }
 
 fn compose_cage_required_launch(
@@ -1197,6 +1103,11 @@ fn compose_cage_required_launch_with_prepared_broker(
     };
     let migration =
         load_cage_migration_enforcer(&policy.enterprise_migration, &server_id, launch_contract)?;
+    migration.require_enforced().map_err(|error| {
+        CliError::cli_other_error(format!(
+            "native MCP launch requires enforced migration: {error}"
+        ))
+    })?;
     if policy.runtime.runtime_files.iter().any(|runtime_file| {
         !admitted
             .read_resources()

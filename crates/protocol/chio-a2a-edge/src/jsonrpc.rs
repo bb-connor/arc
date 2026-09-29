@@ -22,9 +22,9 @@ impl ChioA2aEdge {
         }
 
         if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Err(id.clone().map(|id| {
-                Self::jsonrpc_error_payload(id, -32600, "invalid jsonrpc envelope")
-            }));
+            return Err(id
+                .clone()
+                .map(|id| Self::jsonrpc_error_payload(id, -32600, "invalid jsonrpc envelope")));
         }
 
         let Some(method) = message.get("method").and_then(Value::as_str) else {
@@ -61,12 +61,11 @@ impl ChioA2aEdge {
     fn parse_jsonrpc_send_message_params(
         &self,
         params: Value,
-        request_name: &str,
+        _request_name: &str,
     ) -> Result<(String, SendMessageRequest), A2aEdgeError> {
         let skill_id = self.resolve_jsonrpc_target_skill_id(&params)?;
-        let request = serde_json::from_value::<SendMessageRequest>(params).map_err(|error| {
-            A2aEdgeError::InvalidRequest(format!("invalid {request_name} request: {error}"))
-        })?;
+        let request = serde_json::from_value::<SendMessageRequest>(params)
+            .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
 
         Ok((skill_id, request))
     }
@@ -170,5 +169,23 @@ impl ChioA2aEdge {
             ));
         }
         Ok(Some(target_skill_id.to_string()))
+    }
+}
+
+/// Maximum original A2A JSON-RPC envelope size.
+pub const MAX_A2A_REQUEST_BYTES: usize = 1024 * 1024;
+
+impl ChioA2aEdge {
+    /// Decode bounded original peer bytes before dispatching through the kernel.
+    pub fn handle_jsonrpc(
+        &mut self,
+        bytes: &[u8],
+        kernel: &ChioKernel,
+        execution: &A2aKernelExecutionContext,
+    ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
+        let message =
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_A2A_REQUEST_BYTES)?
+                .decode_signed()?;
+        Ok(self.handle_jsonrpc_value(message, kernel, execution))
     }
 }

@@ -81,7 +81,7 @@ fn extract_prefers_data_over_text() {
 }
 
 #[test]
-fn compatibility_send_rejects_multiple_data_parts() {
+fn kernel_send_rejects_multiple_data_parts() {
     let mut edge = ChioA2aEdge::new(
         A2aEdgeConfig::default(),
         vec![{
@@ -91,7 +91,7 @@ fn compatibility_send_rejects_multiple_data_parts() {
         }],
     )
     .test_unwrap();
-    let server = test_server();
+    let (kernel, execution) = kernel_for_server(test_server());
     let request = SendMessageRequest {
         message: A2aMessage {
             role: "user".to_string(),
@@ -109,8 +109,7 @@ fn compatibility_send_rejects_multiple_data_parts() {
     };
 
     let error = edge
-        .compatibility()
-        .handle_send_message_compatibility("echo", &request, &server)
+        .handle_send_message("echo", &request, &kernel, &execution)
         .test_expect_err("multiple A2A data parts must fail");
     let A2aEdgeError::InvalidRequest(message) = error else {
         panic!("expected invalid request error");

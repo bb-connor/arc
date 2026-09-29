@@ -43,8 +43,6 @@ pub struct McpAdapterConfig {
 
 /// Adapter that wraps an MCP server as a Chio tool server.
 ///
-/// Usage:
-///
 #[derive(Clone)]
 pub struct McpAdapter {
     pub(crate) config: McpAdapterConfig,
@@ -213,7 +211,7 @@ impl McpAdapter {
         command: &str,
         args: &[&str],
         config: McpAdapterConfig,
-        launch: crate::transport::NativeMcpLaunch,
+        launch: crate::transport::CageRequiredLaunch,
     ) -> Result<Self, AdapterError> {
         Self::from_command_with_timeouts(
             command,
@@ -229,7 +227,7 @@ impl McpAdapter {
         command: &str,
         args: &[&str],
         config: McpAdapterConfig,
-        launch: crate::transport::NativeMcpLaunch,
+        launch: crate::transport::CageRequiredLaunch,
         request_timeouts: crate::transport::StdioRequestTimeouts,
     ) -> Result<Self, AdapterError> {
         if launch.server_id() != config.server_id {
@@ -237,10 +235,9 @@ impl McpAdapter {
                 "native MCP launch authorization belongs to a different server".to_string(),
             ));
         }
-        let cage_required = matches!(&launch, crate::transport::NativeMcpLaunch::CageRequired(_));
         let transport =
             StdioMcpTransport::spawn_with_timeouts(command, args, launch, request_timeouts)?;
-        let enforcement_evidence = if cage_required {
+        let enforcement_evidence = {
             match transport.enforcement_evidence().cloned() {
                 Some(evidence) => Some(evidence),
                 None => {
@@ -250,11 +247,9 @@ impl McpAdapter {
                     return Err(merge_shutdown_error(error, transport.shutdown()));
                 }
             }
-        } else {
-            None
         };
         let enforcement_receipt = transport.enforcement_receipt().cloned();
-        if cage_required && enforcement_receipt.is_none() {
+        if enforcement_receipt.is_none() {
             let error = AdapterError::ConnectionFailed(
                 "cage-required transport returned no persisted enforcement receipt".into(),
             );
@@ -264,22 +259,6 @@ impl McpAdapter {
         adapter.native_enforcement_evidence = enforcement_evidence;
         adapter.native_enforcement_receipt = enforcement_receipt;
         Ok(adapter)
-    }
-
-    /// Create an adapter whose subprocess is required to reach verified cage
-    /// enforcement. Cage admission or launch failure is terminal.
-    pub fn from_cage_required_command(
-        command: &str,
-        args: &[&str],
-        config: McpAdapterConfig,
-        launch: crate::transport::CageRequiredLaunch,
-    ) -> Result<Self, AdapterError> {
-        Self::from_command(
-            command,
-            args,
-            config,
-            crate::transport::NativeMcpLaunch::CageRequired(Box::new(launch)),
-        )
     }
 
     #[must_use]

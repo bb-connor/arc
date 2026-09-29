@@ -10,12 +10,6 @@ static OPENAI_TARGET_EXECUTOR: OpenAiTargetExecutor = OpenAiTargetExecutor;
 const MAX_DEFERRED_A2A_TASKS: usize = 1024;
 const DEFERRED_A2A_TASK_TTL_MILLIS: u64 = 5 * 60 * 1000;
 
-fn unix_now_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_millis() as u64)
-}
-
 #[derive(Debug, Clone)]
 struct SkillBinding {
     target_protocol: DiscoveryProtocol,
@@ -49,7 +43,9 @@ impl CapabilityBridge for A2aCapabilityBridge {
             .cloned()
             .map(serde_json::from_value)
             .transpose()
-            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))
+            .map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })
     }
 
     fn inject_capability_ref(

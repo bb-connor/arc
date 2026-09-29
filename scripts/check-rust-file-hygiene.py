@@ -536,12 +536,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=3_211,
         max_fragments=2,
     ),
-    "crates/guards/chio-policy/src/evaluate.rs": allow(
-        "2026-12-31",
-        "policy evaluation surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=3_170,
-        max_fragments=5,
-    ),
+
     "third_party/regress-chio/tests/unicodesets.rs": allow(
         "2026-12-31",
         "vendored regress unicode-set suite assembled from include! fragments; capped until the fragments become modules",
@@ -553,11 +548,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "security receipt projection assembled from include! fragments; capped until the fragments become modules",
         max_lines=3_155,
         max_fragments=2,
-    ),
-    "crates/platform/chio-control-plane/src/security/active_response.rs": allow(
-        "2026-10-31",
-        "control-plane active response surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_002,
     ),
     "crates/platform/chio-store-sqlite/tests/security_state.rs": allow(
         "2026-12-31",

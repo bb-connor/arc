@@ -5,9 +5,10 @@
 //!
 //! Design principles:
 //! - Fail-closed: missing context fields cause conditions to evaluate to false.
-//! - Deterministic: same context + condition = same result, always.
+//! - Deterministic: the same context, condition and clock sample yield the same result.
 //! - Not Turing-complete: fixed predicate types composed with AND/OR/NOT.
 
+use chio_security_types::clock::{Clock, ClockError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -72,6 +73,7 @@ pub struct TimeWindowCondition {
 
 /// Runtime context provided by the enforcement engine at evaluation time.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeContext {
     #[serde(default)]
     pub user: HashMap<String, serde_json::Value>,
@@ -87,22 +89,45 @@ pub struct RuntimeContext {
     pub request: HashMap<String, serde_json::Value>,
     #[serde(default)]
     pub custom: HashMap<String, serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub current_time: Option<String>,
 }
 
 /// Missing context fields cause the condition to evaluate to false (fail-closed).
-pub fn evaluate_condition(condition: &Condition, context: &RuntimeContext) -> bool {
-    evaluate_condition_depth(condition, context, 0)
+pub fn evaluate_condition(
+    condition: &Condition,
+    context: &RuntimeContext,
+    clock: &dyn Clock,
+) -> Result<bool, ClockError> {
+    let now = observed_time(clock)?;
+    Ok(evaluate_condition_at(condition, context, now))
 }
 
-fn evaluate_condition_depth(condition: &Condition, context: &RuntimeContext, depth: usize) -> bool {
+pub(crate) fn observed_time(
+    clock: &dyn Clock,
+) -> Result<chrono::DateTime<chrono::Utc>, ClockError> {
+    let millis = i64::try_from(clock.unix_millis()?.get()).map_err(|_| ClockError::Overflow)?;
+    chrono::DateTime::from_timestamp_millis(millis).ok_or(ClockError::Overflow)
+}
+
+pub(crate) fn evaluate_condition_at(
+    condition: &Condition,
+    context: &RuntimeContext,
+    now: chrono::DateTime<chrono::Utc>,
+) -> bool {
+    evaluate_condition_depth(condition, context, now, 0)
+}
+
+fn evaluate_condition_depth(
+    condition: &Condition,
+    context: &RuntimeContext,
+    now: chrono::DateTime<chrono::Utc>,
+    depth: usize,
+) -> bool {
     if depth > MAX_NESTING_DEPTH {
         return false;
     }
 
     if let Some(tw) = &condition.time_window {
-        if !check_time_window(tw, context) {
+        if !check_time_window(tw, now) {
             return false;
         }
     }
@@ -116,7 +141,7 @@ fn evaluate_condition_depth(condition: &Condition, context: &RuntimeContext, dep
     if let Some(all) = &condition.all_of {
         if !all
             .iter()
-            .all(|c| evaluate_condition_depth(c, context, depth + 1))
+            .all(|c| evaluate_condition_depth(c, context, now, depth + 1))
         {
             return false;
         }
@@ -126,14 +151,14 @@ fn evaluate_condition_depth(condition: &Condition, context: &RuntimeContext, dep
         if !any.is_empty()
             && !any
                 .iter()
-                .any(|c| evaluate_condition_depth(c, context, depth + 1))
+                .any(|c| evaluate_condition_depth(c, context, now, depth + 1))
         {
             return false;
         }
     }
 
     if let Some(not_cond) = &condition.not {
-        if evaluate_condition_depth(not_cond, context, depth + 1) {
+        if evaluate_condition_depth(not_cond, context, now, depth + 1) {
             return false;
         }
     }
@@ -141,8 +166,8 @@ fn evaluate_condition_depth(condition: &Condition, context: &RuntimeContext, dep
     true
 }
 
-fn check_time_window(tw: &TimeWindowCondition, context: &RuntimeContext) -> bool {
-    let now = resolve_current_time(context, tw.timezone.as_deref());
+fn check_time_window(tw: &TimeWindowCondition, now: chrono::DateTime<chrono::Utc>) -> bool {
+    let now = resolve_current_time(now, tw.timezone.as_deref());
     let Some((hour, minute, day_of_week)) = now else {
         return false;
     };
@@ -208,28 +233,19 @@ fn day_abbreviation(day: u32) -> &'static str {
     }
 }
 
-fn resolve_current_time(context: &RuntimeContext, timezone: Option<&str>) -> Option<(u8, u8, u32)> {
-    use chrono::{Datelike, FixedOffset, NaiveDateTime, Timelike, Utc};
+fn resolve_current_time(
+    utc_now: chrono::DateTime<chrono::Utc>,
+    timezone: Option<&str>,
+) -> Option<(u8, u8, u32)> {
+    use chrono::{Datelike, FixedOffset, Timelike};
     use std::str::FromStr;
-
-    let utc_now = if let Some(ref time_str) = context.current_time {
-        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(time_str) {
-            dt.with_timezone(&Utc)
-        } else if let Ok(dt) = NaiveDateTime::parse_from_str(time_str, "%Y-%m-%dT%H:%M:%S") {
-            dt.and_utc()
-        } else {
-            return None;
-        }
-    } else {
-        Utc::now()
-    };
 
     let tz = timezone.unwrap_or("UTC");
     let adjusted = if let Ok(tz) = chrono_tz::Tz::from_str(tz) {
         utc_now.with_timezone(&tz).fixed_offset()
     } else {
         let offset_minutes = parse_timezone_offset(tz)?;
-        let offset = FixedOffset::east_opt(offset_minutes.saturating_mul(60))?;
+        let offset = FixedOffset::east_opt(offset_minutes.checked_mul(60)?)?;
         utc_now.with_timezone(&offset)
     };
     let hour = adjusted.hour() as u8;
@@ -393,11 +409,11 @@ mod tests {
         }
     }
 
-    fn context_at(current_time: &str) -> RuntimeContext {
-        RuntimeContext {
-            current_time: Some(current_time.to_string()),
-            ..RuntimeContext::default()
-        }
+    fn clock_at(timestamp: &str) -> chio_security_types::clock::FixedClock {
+        let millis = chrono::DateTime::parse_from_rfc3339(timestamp)
+            .unwrap()
+            .timestamp_millis();
+        chio_security_types::clock::FixedClock::from_millis(u64::try_from(millis).unwrap())
     }
 
     fn nested_all_of_condition(depth: usize) -> Condition {
@@ -436,8 +452,10 @@ mod tests {
 
         assert!(evaluate_condition(
             &condition,
-            &context_at("2026-04-15T01:30:00Z")
-        ));
+            &RuntimeContext::default(),
+            &clock_at("2026-04-15T01:30:00Z")
+        )
+        .unwrap());
     }
 
     #[test]
@@ -475,8 +493,10 @@ mod tests {
                 context: Some(expected),
                 ..Condition::default()
             },
-            &context
-        ));
+            &context,
+            &chio_security_types::clock::FixedClock::new(1_776_254_400)
+        )
+        .unwrap());
     }
 
     #[test]
@@ -492,8 +512,10 @@ mod tests {
         };
         assert!(!evaluate_condition(
             &invalid_timezone,
-            &context_at("2026-04-15T12:00:00Z")
-        ));
+            &RuntimeContext::default(),
+            &clock_at("2026-04-15T12:00:00Z")
+        )
+        .unwrap());
 
         let expected = HashMap::from([("user.team".to_string(), serde_json::json!("ops"))]);
         assert!(!evaluate_condition(
@@ -501,27 +523,32 @@ mod tests {
                 context: Some(expected),
                 ..Condition::default()
             },
-            &RuntimeContext::default()
-        ));
+            &RuntimeContext::default(),
+            &chio_security_types::clock::FixedClock::new(1_776_254_400)
+        )
+        .unwrap());
     }
 
     #[test]
     fn excessive_condition_nesting_is_rejected() {
         assert!(!evaluate_condition(
             &nested_all_of_condition(MAX_NESTING_DEPTH + 2),
-            &RuntimeContext::default()
-        ));
+            &RuntimeContext::default(),
+            &chio_security_types::clock::FixedClock::new(1_776_254_400)
+        )
+        .unwrap());
         assert!(!evaluate_condition(
             &nested_any_of_condition(MAX_NESTING_DEPTH + 2),
-            &RuntimeContext::default()
-        ));
+            &RuntimeContext::default(),
+            &chio_security_types::clock::FixedClock::new(1_776_254_400)
+        )
+        .unwrap());
     }
 
     #[test]
     fn compound_conditions_cover_any_of_not_and_full_day_windows() {
         let mut context = RuntimeContext {
             environment: Some("prod".to_string()),
-            current_time: Some("2026-04-15T12:00:00Z".to_string()),
             ..RuntimeContext::default()
         };
         context
@@ -571,14 +598,21 @@ mod tests {
             ..Condition::default()
         };
 
-        assert!(evaluate_condition(&condition, &context));
+        assert!(evaluate_condition(
+            &condition,
+            &context,
+            &chio_security_types::clock::FixedClock::new(1_776_254_400)
+        )
+        .unwrap());
         assert!(evaluate_condition(
             &Condition {
                 any_of: Some(Vec::new()),
                 ..Condition::default()
             },
-            &context
-        ));
+            &context,
+            &chio_security_types::clock::FixedClock::new(1_776_254_400)
+        )
+        .unwrap());
         assert!(!evaluate_condition(
             &Condition {
                 time_window: Some(TimeWindowCondition {
@@ -589,8 +623,10 @@ mod tests {
                 }),
                 ..Condition::default()
             },
-            &context
-        ));
+            &context,
+            &chio_security_types::clock::FixedClock::new(1_776_254_400)
+        )
+        .unwrap());
     }
 
     #[test]
@@ -627,16 +663,24 @@ mod tests {
     #[test]
     fn current_time_and_context_resolution_cover_naive_and_root_map_paths() {
         assert_eq!(
-            resolve_current_time(&context_at("2026-04-15T07:45:00"), Some("US/Pacific")),
+            resolve_current_time(
+                observed_time(&clock_at("2026-04-15T07:45:00Z")).unwrap(),
+                Some("US/Pacific")
+            ),
             Some((0, 45, 2))
         );
         assert_eq!(
-            resolve_current_time(&context_at("2026-04-15T12:15:00+02:00"), Some("UTC")),
+            resolve_current_time(
+                observed_time(&clock_at("2026-04-15T12:15:00+02:00")).unwrap(),
+                Some("UTC")
+            ),
             Some((10, 15, 2))
         );
         assert_eq!(
-            resolve_current_time(&context_at("not-a-timestamp"), Some("UTC")),
-            None
+            observed_time(&chio_security_types::clock::FixedClock::from_millis(
+                u64::MAX
+            )),
+            Err(ClockError::Overflow)
         );
 
         let mut context = RuntimeContext::default();

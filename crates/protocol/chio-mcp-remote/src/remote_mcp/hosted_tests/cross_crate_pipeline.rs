@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-mod support;
+use super::support;
 
 use std::sync::{Arc, Mutex};
 use std::thread;

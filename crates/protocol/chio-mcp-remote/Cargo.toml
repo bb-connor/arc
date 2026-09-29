@@ -16,6 +16,7 @@ public_entrypoint = true
 name = "chio_mcp_remote"
 
 [dependencies]
+thiserror = { workspace = true }
 async-trait = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
@@ -51,3 +52,5 @@ workspace = true
 
 [dev-dependencies]
 chio-security-types = { workspace = true }
+chio-siem = { workspace = true }
+reqwest = { workspace = true, features = ["blocking"] }

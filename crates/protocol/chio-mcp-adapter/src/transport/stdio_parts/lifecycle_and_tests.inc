@@ -55,8 +55,9 @@ fn poll_natural_child_exit(
         return NaturalExitPoll::Stopped;
     }
     let observation = match lifecycle.child.as_mut() {
-        Some(ManagedChild::Legacy(child)) => match child.try_wait() {
-            Ok(Some(_)) => Ok(Some(NaturalChildExit::Legacy)),
+        #[cfg(test)]
+        Some(ManagedChild::TestProcess(child)) => match child.try_wait() {
+            Ok(Some(_)) => Ok(Some(NaturalChildExit::TestProcess)),
             Ok(None) => Ok(None),
             Err(error) => Err(AdapterError::ConnectionFailed(format!(
                 "failed to poll MCP child status: {error}"
@@ -86,7 +87,8 @@ fn poll_natural_child_exit(
     };
     match observation {
         None => NaturalExitPoll::Running,
-        Some(NaturalChildExit::Legacy) => {
+        #[cfg(test)]
+        Some(NaturalChildExit::TestProcess) => {
             lifecycle.child.take();
             lifecycle.terminal = ChildTerminalState::Exited;
             NaturalExitPoll::Exited
@@ -180,7 +182,8 @@ fn terminate_child(
     cage_receipts: Option<&ActiveCageReceiptPersistence>,
 ) -> Result<(), AdapterError> {
     match child {
-        ManagedChild::Legacy(child) => terminate_legacy_child(child),
+        #[cfg(test)]
+        ManagedChild::TestProcess(child) => terminate_test_child(child),
         ManagedChild::Caged(child) => {
             let cage_receipts = cage_receipts.ok_or_else(|| {
                 AdapterError::ConnectionFailed(
@@ -192,18 +195,19 @@ fn terminate_child(
     }
 }
 
-fn terminate_legacy_child(mut child: Child) -> Result<(), AdapterError> {
+#[cfg(test)]
+fn terminate_test_child(mut child: Child) -> Result<(), AdapterError> {
     let kill_error = child.kill().err().map(|error| error.to_string());
-    let deadline = Instant::now() + LEGACY_CHILD_REAP_TIMEOUT;
+    let deadline = Instant::now() + TEST_CHILD_REAP_TIMEOUT;
     loop {
         match child.try_wait() {
             Ok(Some(_)) => return Ok(()),
             Ok(None) => {}
             Err(error) => {
-                let reaper = detach_legacy_child_reaper(child);
+                let reaper = detach_test_child_reaper(child);
                 return Err(merge_cleanup_failures(
                     AdapterError::ConnectionFailed(format!(
-                        "failed to poll legacy MCP child after termination: {error}"
+                        "failed to poll test MCP child after termination: {error}"
                     )),
                     [("detached child reaper", reaper)],
                 ));
@@ -215,10 +219,10 @@ fn terminate_legacy_child(mut child: Child) -> Result<(), AdapterError> {
                 .as_deref()
                 .map(|error| format!("; initial kill failed: {error}"))
                 .unwrap_or_default();
-            let reaper = detach_legacy_child_reaper(child);
+            let reaper = detach_test_child_reaper(child);
             return Err(merge_cleanup_failures(
                 AdapterError::ConnectionFailed(format!(
-                    "legacy MCP child did not reap within {LEGACY_CHILD_REAP_TIMEOUT:?}{kill_context}"
+                    "test MCP child did not reap within {TEST_CHILD_REAP_TIMEOUT:?}{kill_context}"
                 )),
                 [("detached child reaper", reaper)],
             ));
@@ -227,16 +231,17 @@ fn terminate_legacy_child(mut child: Child) -> Result<(), AdapterError> {
     }
 }
 
-fn detach_legacy_child_reaper(mut child: Child) -> Result<(), AdapterError> {
+#[cfg(test)]
+fn detach_test_child_reaper(mut child: Child) -> Result<(), AdapterError> {
     std::thread::Builder::new()
-        .name("chio-mcp-legacy-reaper".to_string())
+        .name("chio-mcp-test-reaper".to_string())
         .spawn(move || {
             let _ = child.wait();
         })
         .map(|_| ())
         .map_err(|error| {
             AdapterError::ConnectionFailed(format!(
-                "failed to spawn legacy MCP child reaper: {error}"
+                "failed to spawn test MCP child reaper: {error}"
             ))
         })
 }
@@ -400,48 +405,10 @@ fn validate_signed_mcp_tool_surface(
 
 #[cfg(test)]
 mod cage_launch_tests {
-    use std::cell::Cell;
 
     use chio_test_support::prelude::*;
 
     use super::*;
-
-    struct TestMigrationStore {
-        state: chio_security_types::EnterpriseMigrationState,
-    }
-
-    impl chio_security_types::EnterpriseMigrationStateStore for TestMigrationStore {
-        fn register(
-            &self,
-            _transition: &chio_security_types::EnterpriseMigrationTransition,
-        ) -> chio_security_types::ports::PortResult<
-            chio_security_types::EnterpriseMigrationRegisterOutcome,
-        > {
-            Ok(
-                chio_security_types::EnterpriseMigrationRegisterOutcome::Existing(
-                    self.state.clone(),
-                ),
-            )
-        }
-
-        fn load(
-            &self,
-            key: &chio_security_types::EnterpriseMigrationKey,
-        ) -> chio_security_types::ports::PortResult<
-            Option<chio_security_types::EnterpriseMigrationState>,
-        > {
-            Ok((key == &self.state.key).then(|| self.state.clone()))
-        }
-
-        fn compare_and_promote(
-            &self,
-            _transition: &chio_security_types::EnterpriseMigrationTransition,
-        ) -> chio_security_types::ports::PortResult<
-            chio_security_types::EnterpriseMigrationCasOutcome,
-        > {
-            Ok(chio_security_types::EnterpriseMigrationCasOutcome::Conflict(self.state.clone()))
-        }
-    }
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
@@ -530,42 +497,10 @@ mod cage_launch_tests {
             .test_expect("valid evidence")
     }
 
-    fn legacy_authorization(
+    fn flow_registry(
         flow: Option<chio_manifest::ToolFlowDeclaration>,
-    ) -> LegacyNativeLaunchAuthorization {
+    ) -> chio_manifest::VerifiedManifestRegistry {
         let server_id = "flow-cage";
-        let key = chio_security_types::EnterpriseMigrationKey {
-            deployment_id: chio_security_types::ports::RecordId::new("test-deployment")
-                .test_expect("deployment id"),
-            scope_kind: chio_security_types::EnterpriseMigrationScopeKind::ToolServer,
-            scope_id: chio_security_types::ports::RecordId::new(server_id).test_expect("server id"),
-            control: chio_security_types::EnterpriseMigrationControl::CageEnforcement,
-        };
-        let posture = chio_security_types::ports::Digest32::new([0x11; 32]);
-        let state = chio_security_types::EnterpriseMigrationState {
-            schema_version: chio_security_types::ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION,
-            key: key.clone(),
-            stage: chio_security_types::EnterpriseMigrationStage::Shadow,
-            generation: 1,
-            transition_digest: chio_security_types::ports::Digest32::new([0x12; 32]),
-            prior_head_digest: Some(chio_security_types::ports::Digest32::new([0x13; 32])),
-            posture_digest: posture,
-            evidence_digest: chio_security_types::ports::Digest32::new([0x14; 32]),
-            authorization_digest: chio_security_types::ports::Digest32::new([0x15; 32]),
-            intent_digest: chio_security_types::ports::Digest32::new([0x16; 32]),
-            updated_at_unix_ms: 1,
-            signer_public_key: "test-signer".to_string(),
-        };
-        let store: Arc<dyn chio_security_types::EnterpriseMigrationStateStore> =
-            Arc::new(TestMigrationStore { state });
-        let migration = chio_security_types::EnterpriseMigrationRuntimeBinding::load(
-            &store,
-            &key,
-            chio_security_types::EnterpriseMigrationStage::Shadow,
-            posture,
-        )
-        .test_expect("load migration binding");
-
         let signer = chio_core::Keypair::from_seed(&[73; 32]);
         let manifest = chio_manifest::ToolManifest {
             schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
@@ -608,21 +543,11 @@ mod cage_launch_tests {
                 chio_manifest::RuntimeToolTopology::local(),
             )
             .test_expect("register manifest authorization");
-        LegacyNativeLaunchAuthorization::new(server_id, migration, Arc::new(registry))
-            .test_expect("construct legacy launch authorization")
+        registry
     }
 
     #[test]
-    fn legacy_launch_retains_verified_flow_runtime_requirement() {
-        let authorization =
-            legacy_authorization(Some(chio_manifest::ToolFlowDeclaration::public_egress()));
-        assert!(authorization.requires_flow_runtime());
-        assert!(NativeMcpLaunch::LegacyAuthorized(Box::new(authorization)).requires_flow_runtime());
-        assert!(!legacy_authorization(None).requires_flow_runtime());
-    }
-
-    #[test]
-    fn legacy_launch_rejects_discovered_tool_surface_drift() {
+    fn signed_manifest_rejects_discovered_tool_surface_drift() {
         let script = r#"
 import json
 import sys
@@ -659,28 +584,29 @@ for line in sys.stdin:
 "#;
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .test_expect("legacy surface test clock")
+            .test_expect("signed surface test clock")
             .as_nanos();
         let script_path = std::env::temp_dir().join(format!(
             "chio-mcp-adapter-drifted-{}-{stamp}.py",
             std::process::id()
         ));
-        std::fs::write(&script_path, script).test_expect("write legacy surface test server");
+        std::fs::write(&script_path, script).test_expect("write signed surface test server");
         let script_argument = script_path
             .to_str()
-            .test_expect("legacy surface test path is UTF-8");
+            .test_expect("signed surface test path is UTF-8");
 
-        let result = StdioMcpTransport::spawn(
-            "python3",
-            &[script_argument],
-            NativeMcpLaunch::LegacyAuthorized(Box::new(legacy_authorization(None))),
-        );
+        let registry = flow_registry(None);
+        let transport = StdioMcpTransport::spawn_test_process("python3", &[script_argument])
+            .test_expect("start stdio fixture");
+        let manifest = &registry
+            .verified_manifest("flow-cage")
+            .test_expect("registered")
+            .manifest;
+        let result = validate_signed_mcp_tool_surface(&transport, manifest);
+        transport.shutdown().test_expect("shutdown fixture");
         let _ = std::fs::remove_file(script_path);
         let error = match result {
-            Ok(transport) => {
-                let _ = transport.shutdown();
-                panic!("legacy launch accepted a tool surface outside its signed manifest")
-            }
+            Ok(()) => panic!("accepted a tool surface outside its signed manifest"),
             Err(error) => error,
         };
 
@@ -747,61 +673,6 @@ for line in sys.stdin:
             )
             .test_expect("register local manifest");
         assert!(local_registry.authorize_cage_manifest("flow-cage").is_ok());
-    }
-
-    #[test]
-    fn cage_required_success_uses_only_the_cage_backend() {
-        let legacy_calls = Cell::new(0);
-        let cage_calls = Cell::new(0);
-        let result = dispatch_native_launch(
-            NativeLaunchRequirement::CageRequired,
-            || {
-                legacy_calls.set(legacy_calls.get() + 1);
-                Ok::<_, &'static str>(1)
-            },
-            || {
-                cage_calls.set(cage_calls.get() + 1);
-                Ok::<_, &'static str>(7)
-            },
-        );
-        assert_eq!(result, Ok(7));
-        assert_eq!(legacy_calls.get(), 0);
-        assert_eq!(cage_calls.get(), 1);
-    }
-
-    #[test]
-    fn unsupported_or_failed_cage_has_no_direct_spawn_fallback() {
-        let legacy_calls = Cell::new(0);
-        let cage_calls = Cell::new(0);
-        let result = dispatch_native_launch(
-            NativeLaunchRequirement::CageRequired,
-            || {
-                legacy_calls.set(legacy_calls.get() + 1);
-                Ok::<_, &'static str>(1)
-            },
-            || {
-                cage_calls.set(cage_calls.get() + 1);
-                Err::<u8, _>("unsupported")
-            },
-        );
-        assert_eq!(result, Err("unsupported"));
-        assert_eq!(legacy_calls.get(), 0);
-        assert_eq!(cage_calls.get(), 1);
-    }
-
-    #[test]
-    fn legacy_non_required_launch_never_calls_the_cage_backend() {
-        let cage_calls = Cell::new(0);
-        let result = dispatch_native_launch(
-            NativeLaunchRequirement::LegacyAllowed,
-            || Ok::<_, &'static str>(3),
-            || {
-                cage_calls.set(cage_calls.get() + 1);
-                Ok::<_, &'static str>(9)
-            },
-        );
-        assert_eq!(result, Ok(3));
-        assert_eq!(cage_calls.get(), 0);
     }
 
     #[test]
@@ -876,7 +747,7 @@ for _line in sys.stdin:
             .to_str()
             .test_expect("initialize timeout script path is UTF-8");
         let started = Instant::now();
-        let result = StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
+        let result = StdioMcpTransport::spawn_test_process_with_timeouts(
             "python3",
             &[script_argument],
             short_initialization_timeout(),
@@ -925,7 +796,7 @@ for line in sys.stdin:
             request: Duration::from_secs(2),
             ..short_request_timeouts()
         };
-        let transport = StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
+        let transport = StdioMcpTransport::spawn_test_process_with_timeouts(
             "python3",
             &[script_argument],
             timeouts,
@@ -983,7 +854,7 @@ for line in sys.stdin:
             .to_str()
             .test_expect("operator timeout script path is UTF-8");
         for seconds in [1, 3] {
-            let transport = StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
+            let transport = StdioMcpTransport::spawn_test_process_with_timeouts(
                 "python3",
                 &[script_argument],
                 StdioRequestTimeouts::with_request_timeout_seconds(seconds)
@@ -1038,7 +909,7 @@ for line in sys.stdin:
         let script_argument = script_path
             .to_str()
             .test_expect("request cancellation script path is UTF-8");
-        let transport = StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
+        let transport = StdioMcpTransport::spawn_test_process_with_timeouts(
             "python3",
             &[script_argument],
             short_request_timeouts(),
@@ -1104,7 +975,7 @@ for line in sys.stdin:
             .to_str()
             .test_expect("shutdown preemption marker path is UTF-8");
         let transport = Arc::new(
-            StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
+            StdioMcpTransport::spawn_test_process_with_timeouts(
                 "python3",
                 &[script_argument, marker_argument],
                 StdioRequestTimeouts {
@@ -1178,7 +1049,7 @@ for line in sys.stdin:
         let script_argument = script_path
             .to_str()
             .test_expect("natural exit script path is UTF-8");
-        let transport = StdioMcpTransport::spawn_legacy_unchecked_for_test_with_timeouts(
+        let transport = StdioMcpTransport::spawn_test_process_with_timeouts(
             "python3",
             &[script_argument],
             short_request_timeouts(),

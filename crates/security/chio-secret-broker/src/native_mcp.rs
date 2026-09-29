@@ -11,7 +11,7 @@ use chio_kernel::{
 use chio_manifest::{NativeSyscallProfile, VerifiedManifestRegistry};
 use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig};
 use chio_mcp_adapter::server::AdaptedMcpServer;
-use chio_mcp_adapter::transport::{NativeMcpLaunch, NativeMcpLaunchFactory, StdioRequestTimeouts};
+use chio_mcp_adapter::transport::{NativeMcpLaunchFactory, StdioRequestTimeouts};
 
 use crate::kernel_admission::{
     BrokerKernelConnection, BrokerMcpConnection, BrokerMcpToolConnection,
@@ -213,17 +213,12 @@ impl BrokerMcpToolConnection for NativeBrokerMcpTool {
             launch
                 .verify_prepared_broker_stream(&witness)
                 .map_err(|_| refused_at("prepared socket identity"))?;
-            let adapter = McpAdapter::from_command_with_timeouts(
-                &command,
-                &args,
-                config,
-                NativeMcpLaunch::CageRequired(Box::new(launch)),
-                timeouts,
-            )
-            .map_err(|error| {
-                tracing::error!(error = %error, "confined broker MCP preparation failed");
-                refused_at("MCP handshake")
-            })?;
+            let adapter =
+                McpAdapter::from_command_with_timeouts(&command, &args, config, launch, timeouts)
+                    .map_err(|error| {
+                    tracing::error!(error = %error, "confined broker MCP preparation failed");
+                    refused_at("MCP handshake")
+                })?;
             let server = AdaptedMcpServer::new_with_manifest_registry(adapter, registry.as_ref())
                 .map_err(|_| refused_at("manifest discovery"))?;
             let prepared = PreparedDelivery { context, server };

@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let chio_bin = env::var("CHIO_BIN").unwrap_or_else(|_| "chio".to_string());
     let hello_server = build_hello_server(&project_root, &target_dir)?;
     let security_dir = state_dir.join("native-mcp-security");
-    provision_native_mcp_demo(
+    provision_native_mcp_runtime(
         &chio_bin,
         &project_root,
         &hello_server,
@@ -162,8 +162,14 @@ fn build_hello_server(
     project_root: &Path,
     target_dir: &Path,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if env::consts::OS != "linux" {
+        return Err("native MCP cage execution requires a supported Linux host".into());
+    }
+    let target = format!("{}-unknown-linux-musl", env::consts::ARCH);
     let output = Command::new("cargo")
         .arg("build")
+        .arg("--target")
+        .arg(&target)
         .arg("--quiet")
         .arg("--manifest-path")
         .arg(project_root.join("Cargo.toml"))
@@ -180,12 +186,13 @@ fn build_hello_server(
     }
 
     let executable = target_dir
+        .join(&target)
         .join("debug")
         .join(format!("hello_server{}", env::consts::EXE_SUFFIX));
     Ok(executable.canonicalize()?)
 }
 
-fn provision_native_mcp_demo(
+fn provision_native_mcp_runtime(
     chio_bin: &str,
     project_root: &Path,
     hello_server: &Path,
@@ -194,7 +201,12 @@ fn provision_native_mcp_demo(
     let (execution_uid, execution_gid) = project_owner_identity(project_root)?;
     let output = Command::new(chio_bin)
         .arg("security")
-        .arg("provision-native-mcp-demo")
+        .arg("provision-reference-runtime")
+        .arg("--cage-init")
+        .arg(env::var("CHIO_CAGE_INIT").map_err(|_| "set CHIO_CAGE_INIT to the canonical static cage helper path")?)
+        .arg("--receipt-rollback-anchor-root")
+        .arg(env::var("CHIO_RECEIPT_ANCHOR_ROOT").map_err(|_| "set CHIO_RECEIPT_ANCHOR_ROOT to a private directory on a separate persistent filesystem")?)
+        .args(["--stage", "enforced", "--max-artifact-bytes", "268435456"])
         .arg("--output-dir")
         .arg(security_dir)
         .arg("--tools-fixture")

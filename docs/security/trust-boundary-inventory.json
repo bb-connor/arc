@@ -212,6 +212,11 @@
     "crates/protocol/chio-a2a-adapter/src/mapping.rs",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs",
     "crates/protocol/chio-a2a-adapter/src/transport.rs",
+    "crates/protocol/chio-a2a-edge/src/bridge.rs",
+    "crates/protocol/chio-a2a-edge/src/conversion.rs",
+    "crates/protocol/chio-a2a-edge/src/edge.rs",
+    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs",
+    "crates/protocol/chio-hosted-mcp/src/lib.rs",
     "crates/protocol/chio-mcp-adapter/src/framing.rs",
     "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs",
     "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs",
@@ -223,6 +228,16 @@
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs",
+    "crates/protocol/chio-mcp-remote/src/input.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/jwt_support.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs",
     "crates/protocol/chio-openai-adapter/src/adapter.rs",
     "crates/protocol/chio-openai-adapter/src/input.rs",
     "crates/protocol/chio-openai-adapter/src/lib.rs",
@@ -1094,8 +1109,11 @@
     "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire",
     "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire",
+    "crates/protocol/chio-a2a-edge/src/conversion.rs::extract_arguments_from_message::from_wire",
+    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire",
     "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame::from_wire",
     "crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame::from_wire",
+    "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire",
     "crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frame::from_wire",
@@ -1798,6 +1816,8 @@
     "crates/protocol/chio-a2a-adapter/src/invoke.rs::invoke_stream_jsonrpc::from_value",
     "crates/protocol/chio-a2a-adapter/src/invoke.rs::subscribe_task_jsonrpc::from_value",
     "crates/protocol/chio-a2a-adapter/src/mapping.rs::parse_tool_input::from_value",
+    "crates/protocol/chio-a2a-edge/src/bridge.rs::extract_capability_ref::from_value",
+    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::parse_jsonrpc_send_message_params::from_value",
     "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs::respond_to_upstream_nested_flow::from_value",
     "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs::parse_requested_task::from_value",
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::call_tool_with_params::from_value",
@@ -1828,6 +1848,13 @@
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_authorization_details_from_value::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::validate_chio_oauth_authorization_profile_metadata::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::acknowledge_call::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::finish_at::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::verified_completed_response::from_value",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs::load_resume_hmac_keyring_at::Deserializer::from_slice",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_slice",
     "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value",
     "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice",
@@ -4117,7 +4144,16 @@
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_slice": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation.",
-    "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness."
+    "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness.",
+    "crates/protocol/chio-a2a-edge/src/bridge.rs::extract_capability_ref::from_value": "Capability-ref DTO conversion preserves parser causes. The kernel validates capability, peer and execution bindings before dispatch; projection alone establishes no authority.",
+    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::parse_jsonrpc_send_message_params::from_value": "Envelope and SendMessage conversions operate on Values already admitted by the bounded original-byte JSON-RPC reader. Conversion errors retain typed JSON causes, and parameters never mint authority.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_authorization_details_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::validate_chio_oauth_authorization_profile_metadata::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::acknowledge_call::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::finish_at::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::verified_completed_response::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs::load_resume_hmac_keyring_at::Deserializer::from_slice": "The HMAC keyring has a 64 KiB nofollow file bound and uses strict deny_unknown_fields typed DTO deserialization plus end-of-input validation. This rejects duplicate and unknown keys without copying secrets into Value; secret material retains zeroizing ownership."
   },
   "proofs": [
     {
@@ -6170,44 +6206,18 @@
       "create_message::from_value",
       "refresh_roots_from_client_with_channel::from_value"
     ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs": [
-      "load_record::from_str"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": [
-      "handle_post::from_slice"
-    ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": [
-      "decode_sender_dpop_proof::from_slice",
-      "parse_request_time_authorization_details::from_str",
       "parse_request_time_authorization_details_from_value::from_value",
-      "parse_request_time_transaction_context::from_str",
       "parse_request_time_transaction_context_from_value::from_value",
       "validate_chio_oauth_authorization_profile_metadata::from_value"
     ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/jwt_support.rs": [
-      "decode_jwt_parts::from_slice",
-      "decode_jwt_parts::from_slice"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs": [
-      "flush_complete_lines::from_slice"
-    ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs": [
       "acknowledge_call::from_value",
-      "decode_call::from_str",
       "finish_at::from_value",
-      "issue::from_slice",
-      "load_record::from_str",
       "verified_completed_response::from_value"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs": [
       "load_resume_hmac_keyring_at::Deserializer::from_slice"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs": [
-      "load_active_session_records_at::from_str",
-      "parse_terminal_fence::from_str",
-      "parse_terminal_session_record::from_str",
-      "persist_active_session_record::from_str",
-      "prepare_terminal_session_transition::from_str"
     ],
     "crates/protocol/chio-mistral-tools-adapter/src/lib.rs": [
       "parse_value::from_slice"
@@ -7797,12 +7807,12 @@
       "contract": "Tool arguments are already decoded untrusted Values projected into explicit A2A operation shapes. Caller capabilities remain the kernel responsibility; the projected invocation is not a proof."
     },
     "crates/protocol/chio-a2a-edge/src/bridge.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Capability-ref DTO conversion preserves parser causes. The kernel validates capability, peer and execution bindings before dispatch; projection alone establishes no authority."
     },
     "crates/protocol/chio-a2a-edge/src/jsonrpc.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Envelope and SendMessage conversions operate on Values already admitted by the bounded original-byte JSON-RPC reader. Conversion errors retain typed JSON causes, and parameters never mint authority."
     },
     "crates/protocol/chio-acp-edge/src/bridge.rs": {
       "kind": "typed-value-conversion",
@@ -7920,37 +7930,17 @@
       "kind": "reviewed-protocol-reader",
       "contract": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof."
     },
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/jwt_support.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources."
     },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority."
     },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-protocol-reader",
+      "contract": "The HMAC keyring has a 64 KiB nofollow file bound and uses strict deny_unknown_fields typed DTO deserialization plus end-of-input validation. This rejects duplicate and unknown keys without copying secrets into Value; secret material retains zeroizing ownership."
     },
     "crates/protocol/chio-mistral-tools-adapter/src/lib.rs": {
       "kind": "raw-input-baseline",
@@ -11838,6 +11828,117 @@
       "migrations": [
         "parse_sse_frame::from_str"
       ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/input.rs": {
+      "contract": "Shared original-byte reader enforces per-surface byte bounds and duplicate-aware UntrustedJsonText decoding. HTTP errors expose registered codes and retain typed parser sources in response extensions.",
+      "migrations": [],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": {
+      "contract": "MCP HTTP bodies are bounded to 8 MiB and duplicate-checked before Value projection or session creation. Broadcast frames are bounded before accumulation and decoded through the same original-byte reader.",
+      "migrations": [
+        "handle_post::from_slice"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs": {
+      "contract": "Administrative revoke JSON uses the bounded application/json extractor before DTO conversion and authenticated state mutation.",
+      "migrations": [],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs": {
+      "contract": "Approval submission and decision JSON use the bounded extractor. Stored signed approvals decode original bounded bytes before signature validation. Parser causes remain typed and redacted externally.",
+      "migrations": [
+        "load_record::from_str"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": {
+      "contract": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
+      "migrations": [
+        "decode_sender_dpop_proof::from_slice",
+        "parse_request_time_authorization_details::from_str",
+        "parse_request_time_transaction_context::from_str"
+      ],
+      "retained_typed_conversions": [
+        "parse_request_time_authorization_details_from_value::from_value",
+        "parse_request_time_transaction_context_from_value::from_value",
+        "validate_chio_oauth_authorization_profile_metadata::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/jwt_support.rs": {
+      "contract": "Encoded JWT and DPoP inputs are size-bounded before base64 allocation; original decoded header and claim bytes reject duplicate keys before cryptographic checks. JSON and encoding errors retain sources with redacted outward codes.",
+      "migrations": [
+        "decode_jwt_parts::from_slice"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs": {
+      "contract": "Metadata-profile JSON decodes bounded original bytes with typed failure causes before configuration use.",
+      "migrations": [
+        "flush_complete_lines::from_slice"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs": {
+      "contract": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
+      "migrations": [
+        "decode_call::from_str",
+        "issue::from_slice",
+        "load_record::from_str"
+      ],
+      "retained_typed_conversions": [
+        "acknowledge_call::from_value",
+        "finish_at::from_value",
+        "verified_completed_response::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs": {
+      "contract": "Session resume records, tombstones and replay fences decode original bounded bytes before their existing MAC, session, expiry and replay checks. Typed parser causes remain in CliError.",
+      "migrations": [
+        "load_active_session_records_at::from_str",
+        "parse_terminal_fence::from_str",
+        "parse_terminal_session_record::from_str",
+        "persist_active_session_record::from_str",
+        "prepare_terminal_session_transition::from_str"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs": {
+      "contract": "The HMAC keyring has a 64 KiB nofollow file bound and uses strict deny_unknown_fields typed DTO deserialization plus end-of-input validation. This rejects duplicate and unknown keys without copying secrets into Value; secret material retains zeroizing ownership.",
+      "migrations": [],
+      "retained_typed_conversions": [
+        "load_resume_hmac_keyring_at::Deserializer::from_slice"
+      ]
+    },
+    "crates/protocol/chio-a2a-edge/src/edge.rs": {
+      "contract": "Public JSON-RPC ingress accepts at most 1 MiB original bytes and duplicate-checks before private Value dispatch. Production construction uses the verified manifest registry and all effects use kernel orchestration; no compatibility passthrough exists.",
+      "migrations": [],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs": {
+      "contract": "Envelope and SendMessage conversions operate on Values already admitted by the bounded original-byte JSON-RPC reader. Conversion errors retain typed JSON causes, and parameters never mint authority.",
+      "migrations": [],
+      "retained_typed_conversions": [
+        "parse_jsonrpc_send_message_params::from_value"
+      ]
+    },
+    "crates/protocol/chio-a2a-edge/src/bridge.rs": {
+      "contract": "Capability-ref DTO conversion preserves parser causes. The kernel validates capability, peer and execution bindings before dispatch; projection alone establishes no authority.",
+      "migrations": [],
+      "retained_typed_conversions": [
+        "extract_capability_ref::from_value"
+      ]
+    },
+    "crates/protocol/chio-a2a-edge/src/conversion.rs": {
+      "contract": "Typed message arguments must be an object and pass bounded I-JSON canonicalization. Public raw JSON ingress rejects duplicate fields before creating these Values.",
+      "migrations": [],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-hosted-mcp/src/lib.rs": {
+      "contract": "Facade reexports the remote MCP owner. It adds no original-byte reader, launch path or authority constructor; remote owner contracts apply.",
+      "migrations": [],
       "retained_typed_conversions": []
     }
   }

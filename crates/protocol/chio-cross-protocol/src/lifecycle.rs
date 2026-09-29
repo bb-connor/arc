@@ -5,7 +5,6 @@ use serde_json::Value;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeLifecycleSurface {
     A2aAuthoritative,
-    A2aCompatibility,
     AcpAuthoritative,
     AcpCompatibility,
 }
@@ -38,17 +37,6 @@ pub fn runtime_lifecycle_contract(surface: RuntimeLifecycleSurface) -> RuntimeLi
             partial_output_delivery: "collated_terminal_payload".to_string(),
             claim_eligible: true,
             compatibility_only: false,
-        },
-        RuntimeLifecycleSurface::A2aCompatibility => RuntimeLifecycleContract {
-            surface: "a2a_compatibility".to_string(),
-            blocking_entrypoint: "message/send".to_string(),
-            stream_entrypoint: "unsupported".to_string(),
-            follow_up_entrypoint: "unsupported".to_string(),
-            cancel_entrypoint: "unsupported".to_string(),
-            stream_delivery: "collected_final_payload_only".to_string(),
-            partial_output_delivery: "collected_final_payload_only".to_string(),
-            claim_eligible: false,
-            compatibility_only: true,
         },
         RuntimeLifecycleSurface::AcpAuthoritative => RuntimeLifecycleContract {
             surface: "acp_authoritative".to_string(),

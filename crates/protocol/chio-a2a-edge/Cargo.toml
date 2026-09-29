@@ -1,6 +1,6 @@
 [package]
 name = "chio-a2a-edge"
-description = "A2A edge crate that exposes Chio tools as blocking A2A skills with truthful compatibility isolation"
+description = "A2A edge crate that exposes Chio tools as blocking A2A skills through the Chio kernel"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,10 +13,10 @@ name = "chio_a2a_edge"
 
 [features]
 default = []
-compatibility-surface = []
 otel = ["chio-kernel/otel", "chio-mcp-edge/otel"]
 
 [dependencies]
+chio-security-types = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-cross-protocol = { workspace = true }
 chio-edge-metrics = { workspace = true }

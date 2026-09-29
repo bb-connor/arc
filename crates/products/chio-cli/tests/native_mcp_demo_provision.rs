@@ -112,10 +112,7 @@ fn exact_rerun_is_idempotent_and_emits_no_secret() {
     assert_success(&first);
     let first_report: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("decode first report");
-    assert_eq!(
-        first_report["securityMode"],
-        "disabled_legacy_authorized_demo"
-    );
+    assert_eq!(first_report["securityMode"], "disabled_preparation_only");
     assert_eq!(first_report["containmentEnforced"], false);
     assert_eq!(
         first_report["executionIdentity"],
@@ -127,7 +124,7 @@ fn exact_rerun_is_idempotent_and_emits_no_secret() {
     );
     assert_eq!(
         first_report["warning"],
-        "Disabled is legacy-authorized demo mode, not cage containment."
+        "Disabled artifacts cannot authorize native launch. Provision an enforced runtime to execute tools."
     );
     assert_eq!(
         first_report["runtimeSecurityDirectory"],

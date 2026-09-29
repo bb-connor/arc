@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    mod authorization_projection {
+    pub(super) mod authorization_projection {
         include!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../../tests/bindings/support/authorization_projection.rs"
@@ -308,7 +308,7 @@ mod tests {
         }
     }
 
-    fn test_manifest() -> ToolManifest {
+    pub(super) fn test_manifest() -> ToolManifest {
         ToolManifest {
             schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
             server_id: "test-srv".to_string(),
@@ -639,7 +639,7 @@ mod tests {
         }
     }
 
-    fn text_message(text: &str) -> SendMessageRequest {
+    pub(super) fn text_message(text: &str) -> SendMessageRequest {
         SendMessageRequest {
             message: A2aMessage {
                 role: "user".to_string(),
@@ -652,14 +652,14 @@ mod tests {
         }
     }
 
-    fn unix_now() -> u64 {
+    pub(super) fn unix_now() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .test_expect("system time should be after unix epoch")
             .as_secs()
     }
 
-    fn test_kernel_config() -> KernelConfig {
+    pub(super) fn test_kernel_config() -> KernelConfig {
         let keypair = Keypair::generate();
         KernelConfig {
             ca_public_keys: vec![keypair.public_key()],
@@ -681,7 +681,7 @@ mod tests {
         }
     }
 
-    fn capability_for_tool(
+    pub(super) fn capability_for_tool(
         issuer: &Keypair,
         subject: &Keypair,
         server_id: &str,
@@ -951,17 +951,44 @@ mod tests {
 
     include!("agent_card.rs");
 
+    fn kernel_for_server(
+        server: impl ToolServerConnection + 'static,
+    ) -> (ChioKernel, A2aKernelExecutionContext) {
+        let config = test_kernel_config();
+        let subject = Keypair::generate();
+        let capability = capability_for_tool(
+            &config.keypair,
+            &subject,
+            server.server_id(),
+            &server.tool_names()[0],
+        );
+        let execution = A2aKernelExecutionContext {
+            capability,
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: vec![],
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
+            model_metadata: None,
+        };
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(server));
+        (kernel, execution)
+    }
+
     // ---- SendMessage tests ----
 
     #[test]
     fn send_message_completes_successfully() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let server = test_server();
+        let (kernel, execution) = kernel_for_server(test_server());
         let request = text_message("hello");
         let response = edge
-            .compatibility()
-            .handle_send_message_compatibility("echo", &request, &server)
+            .handle_send_message("echo", &request, &kernel, &execution)
             .test_unwrap();
         assert_eq!(response.status, TaskStatus::Completed);
         assert!(response.message.is_some());
@@ -970,7 +997,7 @@ mod tests {
                 .metadata
                 .as_ref()
                 .and_then(|metadata| { metadata["chio"]["authorityPath"].as_str() }),
-            Some("passthrough_compatibility")
+            Some("cross_protocol_orchestrator")
         );
     }
 
@@ -978,15 +1005,13 @@ mod tests {
     fn send_message_returns_task_id() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let server = test_server();
+        let (kernel, execution) = kernel_for_server(test_server());
         let request = text_message("test");
         let r1 = edge
-            .compatibility()
-            .handle_send_message_compatibility("echo", &request, &server)
+            .handle_send_message("echo", &request, &kernel, &execution)
             .test_unwrap();
         let r2 = edge
-            .compatibility()
-            .handle_send_message_compatibility("echo", &request, &server)
+            .handle_send_message("echo", &request, &kernel, &execution)
             .test_unwrap();
         assert_ne!(r1.id, r2.id);
         assert!(r1.id.starts_with("a2a-task-"));
@@ -996,18 +1021,17 @@ mod tests {
     fn send_message_unknown_skill_errors() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let server = test_server();
+        let (kernel, execution) = kernel_for_server(test_server());
         let request = text_message("test");
         let err = edge
-            .compatibility()
-            .handle_send_message_compatibility("nonexistent", &request, &server)
+            .handle_send_message("nonexistent", &request, &kernel, &execution)
             .test_expect_err("unknown A2A skill must fail");
         assert!(matches!(err, A2aEdgeError::ToolNotFound(_)));
     }
 
     #[test]
     fn send_message_server_failure_returns_failed_task() {
-        let server = FailingToolServer;
+        let (kernel, execution) = kernel_for_server(FailingToolServer);
         // Need a manifest for the failing server
         let manifest = ToolManifest {
             schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
@@ -1037,8 +1061,7 @@ mod tests {
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]).test_unwrap();
         let request = text_message("test");
         let response = edge
-            .compatibility()
-            .handle_send_message_compatibility("fail_tool", &request, &server)
+            .handle_send_message("fail_tool", &request, &kernel, &execution)
             .test_unwrap();
         assert_eq!(response.status, TaskStatus::Failed);
         assert!(response.status_message.is_some());
@@ -1047,7 +1070,7 @@ mod tests {
                 .metadata
                 .as_ref()
                 .and_then(|metadata| { metadata["chio"]["authorityPath"].as_str() }),
-            Some("passthrough_compatibility")
+            Some("cross_protocol_orchestrator")
         );
     }
 
@@ -1631,10 +1654,10 @@ mod tests {
             Ok(_) => panic!("expected invalid request error"),
             Err(error) => error,
         };
-        let A2aEdgeError::InvalidRequest(message) = error else {
-            panic!("expected invalid request error");
-        };
-        assert!(message.contains("invalid SendStreamingMessage request:"));
+        assert!(matches!(
+            error,
+            A2aEdgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(_))
+        ));
     }
 
     #[test]
@@ -1817,7 +1840,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
         };
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -1868,7 +1891,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -1912,7 +1935,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
         };
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -1958,7 +1981,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
         };
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -1997,7 +2020,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
         };
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -2032,7 +2055,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 41,
@@ -2071,7 +2094,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 42,
@@ -2111,7 +2134,7 @@ mod tests {
         };
 
         for invalid_id in [json!(true), json!({"nested": 1}), json!([1])] {
-            let response = edge.handle_jsonrpc(
+            let response = edge.handle_jsonrpc_value(
                 json!({
                     "jsonrpc": "2.0",
                     "id": invalid_id,
@@ -2152,7 +2175,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "1.0",
                 "id": "request-7",
@@ -2169,7 +2192,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_compatibility_send_rejects_non_object_params_before_passthrough() {
+    fn jsonrpc_send_rejects_non_object_params_before_dispatch() {
         let mut edge = ChioA2aEdge::new(
             A2aEdgeConfig::default(),
             vec![{
@@ -2179,16 +2202,17 @@ mod tests {
             }],
         )
         .test_unwrap();
-        let server = test_server();
+        let (kernel, execution) = kernel_for_server(test_server());
 
-        let response = edge.compatibility().handle_jsonrpc_compatibility(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 43,
                 "method": "message/send",
                 "params": []
             }),
-            &server,
+            &kernel,
+            &execution,
         );
 
         assert_eq!(response["error"]["code"], -32602);
@@ -2199,7 +2223,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_passthrough_marks_compatibility_path() {
+    fn jsonrpc_send_reports_authoritative_path() {
         let mut edge = ChioA2aEdge::new(
             A2aEdgeConfig::default(),
             vec![{
@@ -2209,10 +2233,8 @@ mod tests {
             }],
         )
         .test_unwrap();
-        let server = test_server();
-        let response = edge.compatibility().handle_jsonrpc_compatibility(
-            // This explicit compatibility wrapper remains available for bounded
-            // migrations, but it is not the receipt-bearing trust path.
+        let (kernel, execution) = kernel_for_server(test_server());
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 9,
@@ -2224,27 +2246,27 @@ mod tests {
                     }
                 }
             }),
-            &server,
+            &kernel,
+            &execution,
         );
         assert_eq!(
             response["result"]["metadata"]["chio"]["authorityPath"].as_str(),
-            Some("passthrough_compatibility")
+            Some("cross_protocol_orchestrator")
         );
         assert_eq!(
             response["result"]["metadata"]["chio"]["authoritative"].as_bool(),
-            Some(false)
-        );
-        assert_eq!(
-            response["result"]["metadata"]["chio"]["compatibilityOnly"].as_bool(),
             Some(true)
         );
+        assert!(response["result"]["metadata"]["chio"]["receiptId"]
+            .as_str()
+            .is_some());
         assert_eq!(
             response["result"]["metadata"]["chio"]["lifecycle"]["messageStream"].as_str(),
-            Some("unsupported")
+            Some("deferred_task_poll")
         );
         assert_eq!(
             response["result"]["metadata"]["chio"]["runtimeLifecycle"]["surface"].as_str(),
-            Some("a2a_compatibility")
+            Some("a2a_authoritative")
         );
     }
 
@@ -2270,7 +2292,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 10,
@@ -2320,7 +2342,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 10,
@@ -2349,7 +2371,7 @@ mod tests {
             Some(true)
         );
 
-        let resolved = edge.handle_jsonrpc(
+        let resolved = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 11,
@@ -2399,7 +2421,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let accepted = edge.handle_jsonrpc(
+        let accepted = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 10,
@@ -2422,7 +2444,7 @@ mod tests {
             .to_string();
 
         kernel.set_runtime_admission_hook(Arc::new(DenyingRuntimeAdmissionHook));
-        let denied = edge.handle_jsonrpc(
+        let denied = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 11,
@@ -2470,7 +2492,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "method": "message/stream",
@@ -2511,7 +2533,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let created = edge.handle_jsonrpc(
+        let created = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 30,
@@ -2528,7 +2550,7 @@ mod tests {
         );
         let task_id = created["result"]["id"].as_str().test_unwrap().to_string();
 
-        let resolved = edge.handle_jsonrpc(
+        let resolved = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 31,
@@ -2542,7 +2564,7 @@ mod tests {
         assert_eq!(resolved["result"]["status"].as_str(), Some("completed"));
         assert!(edge.tasks.contains_key(&task_id));
 
-        let repeated = edge.handle_jsonrpc(
+        let repeated = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 32,
@@ -2580,7 +2602,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 32,
@@ -2656,7 +2678,7 @@ mod tests {
         };
 
         for index in 0..1_024 {
-            let response = edge.handle_jsonrpc(
+            let response = edge.handle_jsonrpc_value(
                 json!({
                     "jsonrpc": "2.0",
                     "id": index,
@@ -2674,7 +2696,7 @@ mod tests {
             assert_eq!(response["result"]["status"].as_str(), Some("working"));
         }
 
-        let rejected = edge.handle_jsonrpc(
+        let rejected = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 2_000,
@@ -2693,7 +2715,7 @@ mod tests {
         assert!(rejected["error"]["message"]
             .as_str()
             .test_unwrap()
-            .contains("too many deferred tasks"));
+            .contains("urn:chio:error:transport:task-capacity-exceeded"));
     }
 
     #[test]
@@ -2717,7 +2739,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let rejected = edge.handle_jsonrpc(
+        let rejected = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 2_500,
@@ -2742,7 +2764,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_stream_capacity_ignores_retained_terminal_deferred_tasks() {
+    fn jsonrpc_stream_capacity_counts_retained_terminal_deferred_tasks() {
         for terminal_status in [TaskStatus::Cancelled, TaskStatus::Completed] {
             let mut edge =
                 ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
@@ -2764,7 +2786,7 @@ mod tests {
             };
 
             for index in 0..MAX_DEFERRED_A2A_TASKS {
-                let created = edge.handle_jsonrpc(
+                let created = edge.handle_jsonrpc_value(
                     json!({
                         "jsonrpc": "2.0",
                         "id": index,
@@ -2793,7 +2815,7 @@ mod tests {
 
             assert_eq!(edge.tasks.len(), MAX_DEFERRED_A2A_TASKS);
 
-            let accepted = edge.handle_jsonrpc(
+            let accepted = edge.handle_jsonrpc_value(
                 json!({
                     "jsonrpc": "2.0",
                     "id": 3_000,
@@ -2809,7 +2831,11 @@ mod tests {
                 &execution,
             );
 
-            assert_eq!(accepted["result"]["status"].as_str(), Some("working"));
+            assert_eq!(
+                accepted["error"]["message"],
+                "urn:chio:error:transport:task-capacity-exceeded"
+            );
+            assert_eq!(edge.tasks.len(), MAX_DEFERRED_A2A_TASKS);
         }
     }
 
@@ -2834,7 +2860,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let response = edge.handle_jsonrpc(
+        let response = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 12,
@@ -2851,7 +2877,7 @@ mod tests {
         );
         let task_id = response["result"]["id"].as_str().test_unwrap().to_string();
 
-        let cancelled = edge.handle_jsonrpc(
+        let cancelled = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 13,
@@ -2869,7 +2895,7 @@ mod tests {
             Some("cancelled")
         );
 
-        let cancelled_again = edge.handle_jsonrpc(
+        let cancelled_again = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 14,
@@ -2913,7 +2939,7 @@ mod tests {
             model_metadata: None,
         };
 
-        let created = edge.handle_jsonrpc(
+        let created = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 15,
@@ -2930,7 +2956,7 @@ mod tests {
         );
         let task_id = created["result"]["id"].as_str().test_unwrap().to_string();
 
-        let cancelled = edge.handle_jsonrpc(
+        let cancelled = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 16,
@@ -2954,7 +2980,7 @@ mod tests {
             Some("cancelled")
         );
 
-        let repeated = edge.handle_jsonrpc(
+        let repeated = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 18,
@@ -3136,10 +3162,9 @@ mod tests {
         let m1 = test_manifest();
         let m2 = test_manifest(); // Same tool names
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![m1, m2]).test_unwrap();
-        let server = test_server();
+        let (kernel, execution) = kernel_for_server(test_server());
         let error = edge
-            .compatibility()
-            .handle_send_message_compatibility("echo", &text_message("hello"), &server)
+            .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
             .test_expect_err("ambiguous unqualified A2A skill id must fail");
 
         let A2aEdgeError::InvalidRequest(message) = error else {

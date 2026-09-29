@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-mod support;
+use super::support;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;

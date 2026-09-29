@@ -366,7 +366,14 @@ mod cli_env_tests {
         // The advertised nested spelling is the single supported one: the flat
         // `retention-repair` form must not linger and diverge from the guidance.
         assert!(
-            parse_cli(["chio", "receipt", "retention-repair", "--archive", "a.sqlite3"]).is_err(),
+            parse_cli([
+                "chio",
+                "receipt",
+                "retention-repair",
+                "--archive",
+                "a.sqlite3"
+            ])
+            .is_err(),
             "the flat `retention-repair` spelling must not be accepted"
         );
     }
@@ -851,7 +858,7 @@ pub(crate) enum SecurityCommands {
 
     /// Provision a signed native MCP demo at migration stage Disabled.
     ///
-    /// Disabled is legacy-authorized demo mode, not cage containment. The
+    /// Disabled artifacts cannot authorize a native MCP launch. The
     /// command creates demo-only private signers and must not be used as a
     /// production containment claim.
     ProvisionNativeMcpDemo {

@@ -30,9 +30,6 @@ pub fn preflight_runner(config: ProbeConfig, request: PreflightRequest) -> Docto
     DoctorRunner::new(config)
         .with_probe(Box::new(PlatformProbe::host(request.require_enforcement)))
         .with_probe(Box::new(BearerRoleProbe::from_environment()))
-        .with_probe(Box::new(NativeLaunchProbe::new(
-            request.launch,
-            request.require_enforcement,
-        )))
+        .with_probe(Box::new(NativeLaunchProbe::new(request.launch)))
         .with_probe(Box::new(DurableStoreProbe::new(request.stores)))
 }

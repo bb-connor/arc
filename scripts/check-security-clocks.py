@@ -20,7 +20,8 @@ INVENTORY = ROOT / "scripts/security-clock-inventory.json"
 ROOTS = ("crates/security/", "crates/kernel/", "crates/guards/",
          "crates/platform/chio-control-plane/", "crates/platform/chio-store-sqlite/",
          "crates/protocol/chio-mcp-edge/", "crates/protocol/chio-mcp-adapter/",
-         "crates/protocol/chio-a2a-adapter/", "crates/protocol/chio-openai-adapter/")
+         "crates/protocol/chio-a2a-adapter/", "crates/protocol/chio-openai-adapter/",
+         "crates/protocol/chio-mcp-remote/", "crates/protocol/chio-a2a-edge/")
 ADAPTER = "crates/security/chio-security-types/src/clock/system.rs"
 PORT = "crates/security/chio-security-types/src/clock.rs"
 spec = importlib.util.spec_from_file_location("negative_assertions", ROOT / "scripts/check-negative-assertions.py")
