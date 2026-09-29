@@ -1,413 +1,5 @@
-fn load_valid_scheduler_lease(
-    connection: &Connection,
-    tenant_id: &TenantId,
-    action_id: &str,
-    trusted_now: u64,
-    expected_live: bool,
-) -> PortResult<Option<ScheduledWork>> {
-    type StoredLease = (String, i64, String, i64, i64, Vec<u8>);
-    let stored: Option<StoredLease> = connection
-        .query_row(
-            r#"
-            SELECT claim_id, claim_ordinal, lease_owner_id,
-                   lease_expires_at, fencing_token, lease_body_hash
-            FROM security_scheduler_leases
-            WHERE tenant_id = ?1 AND action_id = ?2
-            "#,
-            params![tenant_id.as_str(), action_id],
-            |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get(5)?,
-                ))
-            },
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    let Some((
-        claim_id,
-        claim_ordinal_sql,
-        lease_owner_id,
-        lease_expires_at,
-        fencing_token,
-        stored_body_hash,
-    )) = stored
-    else {
-        return Ok(None);
-    };
-    let claim_id = RecordId::new(claim_id).map_err(|_| PortError::integrity_failure())?;
-    let claim_ordinal = from_i64(claim_ordinal_sql)?;
-    let work = ScheduledWork {
-        tenant_id: tenant_id.clone(),
-        action_id: ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?,
-        lease_owner_id: LeaseOwnerId::new(lease_owner_id)
-            .map_err(|_| PortError::integrity_failure())?,
-        lease_expires_at_unix_ms: from_i64(lease_expires_at)?,
-        fencing_token: from_i64(fencing_token)?,
-    };
-    if work.lease_expires_at_unix_ms == 0 || work.fencing_token == 0 {
-        return Err(PortError::integrity_failure());
-    }
-    let expected_body_hash = scheduler_lease_body_hash(
-        work.tenant_id.as_str(),
-        work.action_id.as_str(),
-        claim_id.as_str(),
-        claim_ordinal,
-        work.lease_owner_id.as_str(),
-        work.lease_expires_at_unix_ms,
-        work.fencing_token,
-    )?;
-    if stored_body_hash.as_slice() != expected_body_hash.as_slice() {
-        return Err(PortError::integrity_failure());
-    }
+use super::*;
 
-    let scheduler_claim: Option<(String, i64, i64, i64)> = connection
-        .query_row(
-            r#"
-            SELECT lease_owner_id, lease_expires_at, result_count, committed_at
-            FROM security_scheduler_claims
-            WHERE tenant_id = ?1 AND claim_id = ?2
-            "#,
-            params![tenant_id.as_str(), claim_id.as_str()],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    let mut valid_origins = 0_u8;
-    if let Some((claim_owner_id, claim_expires_at, result_count, committed_at)) = scheduler_claim {
-        let matching_claim_ordinal_rows = connection
-            .query_row(
-                r#"
-                SELECT COUNT(*)
-                FROM security_scheduler_leases
-                WHERE tenant_id = ?1 AND claim_id = ?2 AND claim_ordinal = ?3
-                "#,
-                params![tenant_id.as_str(), claim_id.as_str(), claim_ordinal_sql],
-                |row| row.get::<_, i64>(0),
-            )
-            .map_err(sqlite_error)?;
-        let valid = claim_owner_id == work.lease_owner_id.as_str()
-            && claim_expires_at > 0
-            && claim_expires_at <= lease_expires_at
-            && result_count > 0
-            && result_count <= i64::from(MAX_SCHEDULER_CLAIMS)
-            && committed_at >= 0
-            && from_i64(committed_at)? <= trusted_now
-            && claim_expires_at > committed_at
-            && claim_ordinal_sql < result_count
-            && matching_claim_ordinal_rows == 1;
-        if valid {
-            valid_origins = valid_origins
-                .checked_add(1)
-                .ok_or_else(PortError::integrity_failure)?;
-        }
-    }
-
-    let initial_dispatch: Option<(String, String, String, i64, i64)> = connection
-        .query_row(
-            r#"
-            SELECT action_id, commit_mode, initial_lease_owner_id,
-                   initial_lease_expires_at, initial_fencing_token
-            FROM security_response_dispatches
-            WHERE tenant_id = ?1 AND dispatch_id = ?2
-            "#,
-            params![tenant_id.as_str(), claim_id.as_str()],
-            |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                ))
-            },
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    if let Some((dispatch_action_id, commit_mode, owner_id, expires_at, token)) = initial_dispatch {
-        let valid = dispatch_action_id == work.action_id.as_str()
-            && matches!(commit_mode.as_str(), "fresh" | "governed_committed_resume")
-            && owner_id == work.lease_owner_id.as_str()
-            && claim_ordinal == 0
-            && expires_at > 0
-            && expires_at <= lease_expires_at
-            && token == fencing_token;
-        if valid {
-            valid_origins = valid_origins
-                .checked_add(1)
-                .ok_or_else(PortError::integrity_failure)?;
-        }
-    }
-
-    let dispatch_recovery: Option<(String, String, String, i64, i64, Option<String>)> = connection
-        .query_row(
-            r#"
-            SELECT recoveries.action_id, recoveries.outcome,
-                   recoveries.lease_owner_id, recoveries.lease_expires_at,
-                   recoveries.fencing_token, dispatches.action_id
-            FROM security_response_dispatch_recoveries AS recoveries
-            LEFT JOIN security_response_dispatches AS dispatches
-              ON dispatches.tenant_id = recoveries.tenant_id
-             AND dispatches.dispatch_id = recoveries.dispatch_id
-            WHERE recoveries.tenant_id = ?1 AND recoveries.recovery_id = ?2
-            "#,
-            params![tenant_id.as_str(), claim_id.as_str()],
-            |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get(5)?,
-                ))
-            },
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    if let Some((recovery_action_id, outcome, owner_id, expires_at, token, dispatch_action_id)) =
-        dispatch_recovery
-    {
-        let valid = recovery_action_id == work.action_id.as_str()
-            && dispatch_action_id.as_deref() == Some(work.action_id.as_str())
-            && outcome == "takeover"
-            && owner_id == work.lease_owner_id.as_str()
-            && claim_ordinal == 0
-            && expires_at > 0
-            && expires_at <= lease_expires_at
-            && token == fencing_token;
-        if valid {
-            valid_origins = valid_origins
-                .checked_add(1)
-                .ok_or_else(PortError::integrity_failure)?;
-        }
-    }
-    if valid_origins != 1 {
-        return Err(PortError::integrity_failure());
-    }
-
-    let durable_fencing_token: Option<i64> = connection
-        .query_row(
-            r#"
-            SELECT last_fencing_token
-            FROM security_scheduler_fence_sequences
-            WHERE tenant_id = ?1
-            "#,
-            params![tenant_id.as_str()],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    if durable_fencing_token
-        .map(from_i64)
-        .transpose()?
-        .is_none_or(|token| token < work.fencing_token)
-    {
-        return Err(PortError::integrity_failure());
-    }
-    if (work.lease_expires_at_unix_ms > trusted_now) != expected_live {
-        return Err(PortError::conflict());
-    }
-    Ok(Some(work))
-}
-
-impl SqliteSecurityStateStore {
-    pub fn cleanup_expired_terminal_scheduler_leases(
-        &self,
-        tenant_id: &TenantId,
-        max_leases: u32,
-    ) -> PortResult<(u32, bool)> {
-        if max_leases == 0 || max_leases > MAX_SCHEDULER_CLAIMS {
-            return Err(PortError::invalid_data());
-        }
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
-        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
-        let orphaned_expired_lease = transaction
-            .query_row(
-                r#"
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM security_scheduler_leases AS leases
-                    LEFT JOIN security_response_plans AS plans
-                      ON plans.tenant_id = leases.tenant_id
-                     AND plans.action_id = leases.action_id
-                    WHERE leases.tenant_id = ?1
-                      AND leases.lease_expires_at <= ?2
-                      AND plans.action_id IS NULL
-                )
-                "#,
-                params![tenant_id.as_str(), to_i64(trusted_now)?],
-                |row| row.get::<_, bool>(0),
-            )
-            .map_err(sqlite_error)?;
-        if orphaned_expired_lease {
-            return Err(PortError::integrity_failure());
-        }
-        let mut statement = transaction
-            .prepare(
-                r#"
-                SELECT leases.action_id
-                FROM security_scheduler_leases AS leases
-                JOIN security_response_plans AS plans
-                  ON plans.tenant_id = leases.tenant_id
-                 AND plans.action_id = leases.action_id
-                WHERE leases.tenant_id = ?1
-                  AND leases.lease_expires_at <= ?2
-                  AND (
-                       plans.state IN ('cancelled', 'expired', 'failed', 'lifted')
-                    OR CASE
-                         WHEN json_valid(CAST(plans.body AS TEXT))
-                         THEN json_extract(CAST(plans.body AS TEXT), '$.state')
-                              IN ('cancelled', 'expired', 'failed', 'lifted')
-                         ELSE 1
-                       END
-                  )
-                ORDER BY leases.lease_expires_at, leases.claim_id,
-                         leases.claim_ordinal, leases.action_id
-                LIMIT ?3
-                "#,
-            )
-            .map_err(sqlite_error)?;
-        let rows = statement
-            .query_map(
-                params![
-                    tenant_id.as_str(),
-                    to_i64(trusted_now)?,
-                    i64::from(max_leases)
-                        .checked_add(1)
-                        .ok_or_else(PortError::invalid_data)?,
-                ],
-                |row| row.get::<_, String>(0),
-            )
-            .map_err(sqlite_error)?;
-        let mut durable_leases = Vec::new();
-        for row in rows {
-            durable_leases.push(row.map_err(sqlite_error)?);
-        }
-        drop(statement);
-        let terminal_remaining = durable_leases.len() > crate::integer::checked::<_, usize>(max_leases)?;
-        durable_leases.truncate(crate::integer::checked::<_, usize>(max_leases)?);
-        let mut cleaned = 0_u32;
-        for action_id in durable_leases {
-            let work = load_valid_scheduler_lease(
-                &transaction,
-                tenant_id,
-                &action_id,
-                trusted_now,
-                false,
-            )?
-            .ok_or_else(PortError::integrity_failure)?;
-            let current_plan = load_response_plan(
-                &transaction,
-                work.tenant_id.as_str(),
-                work.action_id.as_str(),
-            )?
-            .ok_or_else(PortError::integrity_failure)?;
-            let snapshot = decode_response_snapshot(&current_plan)
-                .map_err(|_| PortError::integrity_failure())?;
-            let durable_dispatch_id: Option<String> = transaction
-                .query_row(
-                    r#"
-                    SELECT dispatch_id
-                    FROM security_response_dispatches
-                    WHERE tenant_id = ?1 AND action_id = ?2
-                    "#,
-                    params![work.tenant_id.as_str(), work.action_id.as_str()],
-                    |row| row.get(0),
-                )
-                .optional()
-                .map_err(sqlite_error)?;
-            let durable_dispatch_id = durable_dispatch_id
-                .map(RecordId::new)
-                .transpose()
-                .map_err(|_| PortError::integrity_failure())?;
-            match (&snapshot.execution_dispatch, durable_dispatch_id) {
-                (None, None) => {}
-                (Some(dispatch), Some(durable_dispatch_id))
-                    if dispatch.dispatch_id == durable_dispatch_id =>
-                {
-                    let key = ResponseDispatchKey {
-                        tenant_id: dispatch.tenant_id.clone(),
-                        dispatch_id: dispatch.dispatch_id.clone(),
-                    };
-                    let durable_dispatch = load_response_dispatch(&transaction, &key)?
-                        .ok_or_else(PortError::integrity_failure)?;
-                    let authorization = &durable_dispatch.authorization.body;
-                    if snapshot.dispatch_authorization_hash
-                        != Some(durable_dispatch.authorization.body_hash)
-                        || dispatch.schema_version != authorization.schema_version
-                        || dispatch.tenant_id != authorization.key.tenant_id
-                        || dispatch.dispatch_id != authorization.key.dispatch_id
-                        || dispatch.action_id != authorization.action_id
-                        || dispatch.plan_hash != authorization.plan_hash
-                        || dispatch.executor_authority_id != authorization.executor_authority_id
-                        || dispatch.executor_authority_generation
-                            != authorization.executor_authority_generation
-                        || dispatch.authorization_capability_hash
-                            != authorization.authorization_capability_hash
-                        || dispatch.governed_intent_hash != authorization.governed_intent_hash
-                        || dispatch.policy_decision_hash != authorization.policy_decision_hash
-                        || dispatch.approval != authorization.approval
-                        || dispatch.authorized_at_unix_ms != authorization.authorized_at_unix_ms
-                    {
-                        return Err(PortError::integrity_failure());
-                    }
-                }
-                _ => return Err(PortError::integrity_failure()),
-            }
-            if !snapshot.state.is_terminal() {
-                return Err(PortError::integrity_failure());
-            }
-            let retry_key = SchedulerWorkKey {
-                tenant_id: work.tenant_id.clone(),
-                action_id: work.action_id.clone(),
-            };
-            if let Some(retry) = load_scheduler_retry(&transaction, &retry_key)? {
-                if retry.attempts == 0
-                    || retry.first_failure_at_unix_ms >= retry.not_before_unix_ms
-                    || retry.not_before_unix_ms > trusted_now
-                {
-                    return Err(PortError::integrity_failure());
-                }
-            }
-            delete_scheduler_lease(&transaction, &work)?;
-            let deleted_retries = transaction
-                .execute(
-                    "DELETE FROM security_scheduler_retries WHERE tenant_id = ?1 AND action_id = ?2",
-                    params![work.tenant_id.as_str(), work.action_id.as_str()],
-                )
-                .map_err(sqlite_error)?;
-            if deleted_retries > 1 {
-                return Err(PortError::integrity_failure());
-            }
-            let cleanup_hash = canonical_request_hash(&(&work, true))?;
-            let transition_id = RecordId::new(format!(
-                "scheduler-expired-terminal-cleanup-{}",
-                hex::encode(cleanup_hash)
-            ))
-            .map_err(|_| PortError::integrity_failure())?;
-            record_transition(
-                &transaction,
-                work.tenant_id.as_str(),
-                transition_id.as_str(),
-                "scheduler_expired_terminal_cleanup",
-                &cleanup_hash,
-            )?;
-            cleaned = cleaned
-                .checked_add(1)
-                .ok_or_else(PortError::integrity_failure)?;
-        }
-        transaction.commit().map_err(sqlite_error)?;
-        Ok((cleaned, terminal_remaining))
-    }
-}
 
 impl ResponseStore for SqliteSecurityStateStore {
     fn load_plan(&self, key: &ResponsePlanKey) -> PortResult<Option<ResponsePlanRecord>> {
@@ -1115,4 +707,252 @@ impl ResponseStore for SqliteSecurityStateStore {
     }
 }
 
-include!("part_06_scheduler_and_dispatch.inc");
+pub(super) fn decode_response_snapshot(record: &ResponsePlanRecord) -> PortResult<ResponseSnapshot> {
+    validate_canonical_json_body(&record.canonical_body, &record.body_hash)?;
+    let snapshot: ResponseSnapshot = chio_core::canonical::UntrustedJsonText::from_wire(
+        record.canonical_body.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|_| PortError::invalid_data())?;
+    if snapshot.schema_version != RESPONSE_STATE_SCHEMA_VERSION
+        || snapshot.plan.tenant_id != record.tenant_id
+        || snapshot.plan.action_id != record.action_id
+        || snapshot.generation != record.generation
+        || snapshot.state.as_str() != record.state.as_str()
+        || snapshot.due_at_unix_ms != record.due_at_unix_ms
+        || snapshot.plan.validate_shape().is_err()
+        || snapshot
+            .execution_dispatch
+            .as_ref()
+            .is_some_and(|binding| binding.validate_for_plan(&snapshot.plan).is_err())
+        || match (
+            &snapshot.execution_dispatch,
+            &snapshot.dispatch_authorization_hash,
+        ) {
+            (None, None) => false,
+            (Some(_), Some(hash)) => hash.as_bytes().iter().all(|byte| *byte == 0),
+            _ => true,
+        }
+    {
+        return Err(PortError::invalid_data());
+    }
+    validate_response_snapshot_lifecycle(&snapshot, false)
+        .map_err(|_| PortError::invalid_data())?;
+    Ok(snapshot)
+}
+
+pub(super) fn response_mutation_scheduler_fence(
+    mutation: &ResponseMutationRecord,
+) -> PortResult<(Option<&LeaseOwnerId>, Option<u64>)> {
+    match mutation {
+        ResponseMutationRecord::Requested(_) => Err(PortError::invalid_data()),
+        ResponseMutationRecord::Transition(record) => Ok((
+            record.scheduler_lease_owner_id.as_ref(),
+            record.scheduler_fencing_token,
+        )),
+        ResponseMutationRecord::EffectRequested(record) => Ok((
+            record.scheduler_lease_owner_id.as_ref(),
+            Some(record.scheduler_fencing_token),
+        )),
+        ResponseMutationRecord::EffectApplied(record) => Ok((
+            record.scheduler_lease_owner_id.as_ref(),
+            Some(record.scheduler_fencing_token),
+        )),
+        ResponseMutationRecord::EffectFailed(record) => Ok((
+            record.scheduler_lease_owner_id.as_ref(),
+            Some(record.scheduler_fencing_token),
+        )),
+        ResponseMutationRecord::Rollback(record) => Ok((
+            record.scheduler_lease_owner_id.as_ref(),
+            Some(record.scheduler_fencing_token),
+        )),
+        ResponseMutationRecord::Failed(record) => Ok((
+            record.scheduler_lease_owner_id.as_ref(),
+            record.scheduler_fencing_token,
+        )),
+        ResponseMutationRecord::Final(record) => Ok((
+            record.scheduler_lease_owner_id.as_ref(),
+            record.scheduler_fencing_token,
+        )),
+    }
+}
+
+pub(super) fn load_response_plan(
+    connection: &Connection,
+    tenant_id: &str,
+    action_id: &str,
+) -> PortResult<Option<ResponsePlanRecord>> {
+    type StoredPlan = (String, i64, String, Vec<u8>, Vec<u8>, Option<i64>);
+    let stored: Option<StoredPlan> = connection
+        .query_row(
+            r#"
+            SELECT tenant_id, generation, state, body, body_hash, due_at
+            FROM security_response_plans WHERE tenant_id = ?1 AND action_id = ?2
+            "#,
+            params![tenant_id, action_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    stored
+        .map(
+            |(tenant_id, generation, state, body, stored_hash, due_at)| {
+                let body_hash = decode_digest(stored_hash)?;
+                let canonical_body =
+                    CanonicalBody::new(body).map_err(|_| PortError::integrity_failure())?;
+                validate_canonical_json_body(&canonical_body, &body_hash)
+                    .map_err(|_| PortError::integrity_failure())?;
+                Ok(ResponsePlanRecord {
+                    tenant_id: chio_security_types::ports::TenantId::new(tenant_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                    action_id: ActionId::new(action_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                    generation: from_i64(generation)?,
+                    state: RecordId::new(state).map_err(|_| PortError::integrity_failure())?,
+                    canonical_body,
+                    body_hash,
+                    due_at_unix_ms: due_at.map(from_i64).transpose()?,
+                })
+            },
+        )
+        .transpose()
+}
+
+pub(super) fn load_response_receipt_cursor(
+    connection: &Connection,
+    tenant_id: &str,
+    action_id: &str,
+) -> PortResult<Option<ResponseReceiptCursor>> {
+    type StoredCursor = (String, String, Vec<u8>, i64, String);
+    let stored: Option<StoredCursor> = connection
+        .query_row(
+            r#"
+            SELECT tenant_id, action_id, plan_hash, generation, current_evidence_id
+            FROM security_response_receipt_cursors
+            WHERE tenant_id = ?1 AND action_id = ?2
+            "#,
+            params![tenant_id, action_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    stored
+        .map(
+            |(tenant_id, action_id, plan_hash, generation, current_evidence_id)| {
+                Ok(ResponseReceiptCursor {
+                    tenant_id: chio_security_types::ports::TenantId::new(tenant_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                    action_id: ActionId::new(action_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                    plan_hash: decode_digest(plan_hash)?,
+                    generation: from_i64(generation)?,
+                    current_evidence_id: OpaqueReceiptRef::new(current_evidence_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                })
+            },
+        )
+        .transpose()
+}
+
+pub(super) fn load_response_effect(
+    connection: &Connection,
+    tenant_id: &str,
+    effect_id: &str,
+) -> PortResult<Option<ResponseEffectRecord>> {
+    type StoredEffect = (
+        String,
+        String,
+        String,
+        i64,
+        String,
+        i64,
+        String,
+        Vec<u8>,
+        Vec<u8>,
+        Option<String>,
+    );
+    let stored: Option<StoredEffect> = connection
+        .query_row(
+            r#"
+            SELECT tenant_id, action_id, effect_id, generation, scheduler_lease_owner_id,
+                   scheduler_fencing_token, state, body, body_hash, encrypted_rollback_ref
+            FROM security_response_effects WHERE tenant_id = ?1 AND effect_id = ?2
+            "#,
+            params![tenant_id, effect_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                    row.get(8)?,
+                    row.get(9)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    stored
+        .map(
+            |(
+                tenant_id,
+                action_id,
+                effect_id,
+                generation,
+                scheduler_lease_owner_id,
+                scheduler_fencing_token,
+                state,
+                body,
+                stored_hash,
+                encrypted_rollback_ref,
+            )| {
+                let body_hash = decode_digest(stored_hash)?;
+                let canonical_body =
+                    CanonicalBody::new(body).map_err(|_| PortError::integrity_failure())?;
+                validate_canonical_json_body(&canonical_body, &body_hash)
+                    .map_err(|_| PortError::integrity_failure())?;
+                Ok(ResponseEffectRecord {
+                    tenant_id: chio_security_types::ports::TenantId::new(tenant_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                    action_id: ActionId::new(action_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                    effect_id: EffectId::new(effect_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                    generation: from_i64(generation)?,
+                    scheduler_lease_owner_id: LeaseOwnerId::new(scheduler_lease_owner_id)
+                        .map_err(|_| PortError::integrity_failure())?,
+                    scheduler_fencing_token: from_i64(scheduler_fencing_token)?,
+                    state: RecordId::new(state).map_err(|_| PortError::integrity_failure())?,
+                    canonical_body,
+                    body_hash,
+                    encrypted_rollback_ref: encrypted_rollback_ref
+                        .map(RecordId::new)
+                        .transpose()
+                        .map_err(|_| PortError::integrity_failure())?,
+                })
+            },
+        )
+        .transpose()
+}

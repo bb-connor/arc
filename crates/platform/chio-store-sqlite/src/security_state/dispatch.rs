@@ -1,565 +1,5 @@
-impl ResponseSchedulerStore for SqliteSecurityStateStore {
-    fn load_retry(&self, key: &SchedulerWorkKey) -> PortResult<Option<SchedulerRetryState>> {
-        let connection = self.connection()?;
-        load_scheduler_retry(&connection, key)
-    }
+use super::*;
 
-    fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()> {
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Deferred)
-            .map_err(sqlite_error)?;
-        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
-        validate_scheduler_work(&transaction, work, trusted_now)?;
-        transaction.commit().map_err(sqlite_error)
-    }
-
-    fn compare_and_swap_scheduled_mutation(
-        &self,
-        request: &ResponseScheduledMutationCasRequest,
-    ) -> PortResult<ResponsePlanRecord> {
-        validate_canonical_json_body(&request.current.canonical_body, &request.current.body_hash)?;
-        validate_canonical_json_body(
-            &request.candidate.canonical_body,
-            &request.candidate.body_hash,
-        )?;
-        let current_snapshot = decode_response_snapshot(&request.current)?;
-        let candidate_snapshot = decode_response_snapshot(&request.candidate)?;
-        let current_mutations = current_snapshot.mutations.as_slice();
-        let candidate_mutations = candidate_snapshot.mutations.as_slice();
-        let appended = candidate_mutations
-            .last()
-            .ok_or_else(PortError::invalid_data)?;
-        let expected_candidate_generation = request
-            .current
-            .generation
-            .checked_add(1)
-            .ok_or_else(PortError::integrity_failure)?;
-        let exact_prefix = current_mutations
-            .len()
-            .checked_add(1)
-            .is_some_and(|expected| candidate_mutations.len() == expected)
-            && candidate_mutations.get(..current_mutations.len()) == Some(current_mutations);
-        let (scheduler_owner, scheduler_token) = response_mutation_scheduler_fence(appended)?;
-        if request.current.tenant_id != request.work.tenant_id
-            || request.current.action_id != request.work.action_id
-            || request.candidate.tenant_id != request.current.tenant_id
-            || request.candidate.action_id != request.current.action_id
-            || request.candidate.generation != expected_candidate_generation
-            || appended.generation() != expected_candidate_generation
-            || appended.transition_id() != &request.transition_id
-            || !exact_prefix
-            || candidate_snapshot.schema_version != current_snapshot.schema_version
-            || candidate_snapshot.plan != current_snapshot.plan
-            || candidate_snapshot.execution_dispatch != current_snapshot.execution_dispatch
-            || candidate_snapshot.dispatch_authorization_hash
-                != current_snapshot.dispatch_authorization_hash
-            || scheduler_owner != Some(&request.work.lease_owner_id)
-            || scheduler_token != Some(request.work.fencing_token)
-            || request.work.fencing_token == 0
-        {
-            return Err(PortError::invalid_data());
-        }
-        let request_hash = canonical_request_hash(request)?;
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
-        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
-        if transition_status(
-            &transaction,
-            request.candidate.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "response_scheduled_mutation_cas",
-            &request_hash,
-        )? {
-            let durable = load_response_plan(
-                &transaction,
-                request.candidate.tenant_id.as_str(),
-                request.candidate.action_id.as_str(),
-            )?
-            .ok_or_else(PortError::integrity_failure)?;
-            let durable_snapshot =
-                decode_response_snapshot(&durable).map_err(|_| PortError::integrity_failure())?;
-            let durable_mutations = durable_snapshot.mutations.as_slice();
-            let candidate_is_durable_prefix = candidate_mutations.len() <= durable_mutations.len()
-                && durable_mutations.get(..candidate_mutations.len()) == Some(candidate_mutations);
-            if !candidate_is_durable_prefix
-                || durable.tenant_id != request.candidate.tenant_id
-                || durable.action_id != request.candidate.action_id
-                || durable.generation < request.candidate.generation
-                || durable_snapshot.schema_version != candidate_snapshot.schema_version
-                || durable_snapshot.plan != candidate_snapshot.plan
-                || durable_snapshot.execution_dispatch != candidate_snapshot.execution_dispatch
-                || durable_snapshot.dispatch_authorization_hash
-                    != candidate_snapshot.dispatch_authorization_hash
-            {
-                return Err(PortError::integrity_failure());
-            }
-            let work_key = SchedulerWorkKey {
-                tenant_id: request.work.tenant_id.clone(),
-                action_id: request.work.action_id.clone(),
-            };
-            match load_scheduler_lease(&transaction, &work_key)? {
-                Some(lease) => {
-                    let lease_is_live = lease.lease_expires_at_unix_ms > trusted_now;
-                    let validated = load_valid_scheduler_lease(
-                        &transaction,
-                        &lease.tenant_id,
-                        lease.action_id.as_str(),
-                        trusted_now,
-                        lease_is_live,
-                    )?
-                    .ok_or_else(PortError::integrity_failure)?;
-                    if validated != lease {
-                        return Err(PortError::integrity_failure());
-                    }
-                    if lease.lease_owner_id != request.work.lease_owner_id
-                        || lease.fencing_token != request.work.fencing_token
-                    {
-                        return Err(PortError::conflict());
-                    }
-                    if lease.lease_expires_at_unix_ms < request.work.lease_expires_at_unix_ms {
-                        return Err(PortError::integrity_failure());
-                    }
-                    if !lease_is_live && !durable_snapshot.state.is_terminal() {
-                        return Err(PortError::conflict());
-                    }
-                }
-                None if !durable_snapshot.state.is_terminal() => {
-                    return Err(PortError::conflict());
-                }
-                None => {}
-            }
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(durable);
-        }
-
-        validate_scheduler_work(&transaction, &request.work, trusted_now)?;
-        let current = load_response_plan(
-            &transaction,
-            request.current.tenant_id.as_str(),
-            request.current.action_id.as_str(),
-        )?
-        .ok_or_else(PortError::invalid_data)?;
-        if current != request.current {
-            return Err(PortError::conflict());
-        }
-        if let ResponseMutationRecord::Transition(renewal) = appended {
-            if renewal.from_state == ResponseState::Applying
-                && renewal.to_state == ResponseState::Applying
-            {
-                let current_expiry = current_snapshot
-                    .applying_lease_expires_at_unix_ms
-                    .ok_or_else(PortError::integrity_failure)?;
-                let exact_renewed_expiry = request
-                    .work
-                    .lease_expires_at_unix_ms
-                    .min(current_snapshot.plan.expires_at_unix_ms);
-                if renewal.cause != ResponseTransitionCause::ApplyingLeaseRenewed
-                    || renewal.occurred_at_unix_ms.abs_diff(trusted_now) > MAX_CLOCK_SKEW_MS
-                    || trusted_now >= current_expiry
-                    || renewal.occurred_at_unix_ms >= current_expiry
-                    || renewal.applying_lease_expires_at_unix_ms != Some(exact_renewed_expiry)
-                    || candidate_snapshot.applying_lease_expires_at_unix_ms
-                        != Some(exact_renewed_expiry)
-                    || candidate_snapshot.due_at_unix_ms != Some(exact_renewed_expiry)
-                    || exact_renewed_expiry <= current_expiry
-                {
-                    return Err(PortError::conflict());
-                }
-            }
-        }
-        let updated = transaction
-            .execute(
-                r#"
-                UPDATE security_response_plans
-                SET generation = ?4, state = ?5, body = ?6, body_hash = ?7, due_at = ?8
-                WHERE action_id = ?1 AND tenant_id = ?2 AND generation = ?3
-                "#,
-                params![
-                    request.candidate.action_id.as_str(),
-                    request.candidate.tenant_id.as_str(),
-                    to_i64(request.current.generation)?,
-                    to_i64(request.candidate.generation)?,
-                    request.candidate.state.as_str(),
-                    request.candidate.canonical_body.as_bytes(),
-                    request.candidate.body_hash.as_bytes().as_slice(),
-                    request.candidate.due_at_unix_ms.map(to_i64).transpose()?
-                ],
-            )
-            .map_err(sqlite_error)?;
-        if updated != 1 {
-            return Err(PortError::conflict());
-        }
-        record_transition(
-            &transaction,
-            request.candidate.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "response_scheduled_mutation_cas",
-            &request_hash,
-        )?;
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(request.candidate.clone())
-    }
-
-    fn validate_lease_identity(
-        &self,
-        tenant_id: &TenantId,
-        action_id: &ActionId,
-        lease_owner_id: &LeaseOwnerId,
-        fencing_token: u64,
-    ) -> PortResult<()> {
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Deferred)
-            .map_err(sqlite_error)?;
-        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
-        validate_scheduler_lease_binding(
-            &transaction,
-            tenant_id.as_str(),
-            action_id.as_str(),
-            lease_owner_id,
-            fencing_token,
-            trusted_now,
-        )?;
-        transaction.commit().map_err(sqlite_error)
-    }
-
-    fn renew_lease(&self, request: &SchedulerLeaseRenewRequest) -> PortResult<ScheduledWork> {
-        if request.lease_expires_at_unix_ms <= request.work.lease_expires_at_unix_ms {
-            return Err(PortError::invalid_data());
-        }
-        let request_hash = canonical_request_hash(request)?;
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
-        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
-        if transition_status(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_lease_renew",
-            &request_hash,
-        )? {
-            let renewed = load_valid_scheduler_lease(
-                &transaction,
-                &request.work.tenant_id,
-                request.work.action_id.as_str(),
-                trusted_now,
-                true,
-            )?
-            .ok_or_else(PortError::conflict)?;
-            if renewed.lease_owner_id != request.work.lease_owner_id
-                || renewed.fencing_token != request.work.fencing_token
-            {
-                return Err(PortError::conflict());
-            }
-            if renewed.lease_expires_at_unix_ms < request.lease_expires_at_unix_ms {
-                return Err(PortError::integrity_failure());
-            }
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(renewed);
-        }
-        if request.now_unix_ms.abs_diff(trusted_now) > MAX_CLOCK_SKEW_MS
-            || request.lease_expires_at_unix_ms <= trusted_now
-        {
-            return Err(PortError::invalid_data());
-        }
-        let current_plan = load_response_plan(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.work.action_id.as_str(),
-        )?
-        .ok_or_else(PortError::integrity_failure)?;
-        let current_snapshot =
-            decode_response_snapshot(&current_plan).map_err(|_| PortError::integrity_failure())?;
-        if current_snapshot.state.is_terminal() {
-            return Err(PortError::conflict());
-        }
-        validate_scheduler_work(&transaction, &request.work, trusted_now)?;
-        let (claim_id, claim_ordinal_sql): (String, i64) = transaction
-            .query_row(
-                r#"
-                SELECT claim_id, claim_ordinal
-                FROM security_scheduler_leases
-                WHERE tenant_id = ?1 AND action_id = ?2
-                "#,
-                params![
-                    request.work.tenant_id.as_str(),
-                    request.work.action_id.as_str()
-                ],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .map_err(sqlite_error)?;
-        RecordId::new(claim_id.clone()).map_err(|_| PortError::integrity_failure())?;
-        let lease_body_hash = scheduler_lease_body_hash(
-            request.work.tenant_id.as_str(),
-            request.work.action_id.as_str(),
-            &claim_id,
-            from_i64(claim_ordinal_sql)?,
-            request.work.lease_owner_id.as_str(),
-            request.lease_expires_at_unix_ms,
-            request.work.fencing_token,
-        )?;
-        let updated = transaction
-            .execute(
-                r#"
-                UPDATE security_scheduler_leases
-                SET lease_expires_at = ?5, lease_body_hash = ?6
-                WHERE tenant_id = ?1 AND action_id = ?2 AND lease_owner_id = ?3
-                  AND fencing_token = ?4 AND lease_expires_at = ?7
-                "#,
-                params![
-                    request.work.tenant_id.as_str(),
-                    request.work.action_id.as_str(),
-                    request.work.lease_owner_id.as_str(),
-                    to_i64(request.work.fencing_token)?,
-                    to_i64(request.lease_expires_at_unix_ms)?,
-                    lease_body_hash.as_slice(),
-                    to_i64(request.work.lease_expires_at_unix_ms)?
-                ],
-            )
-            .map_err(sqlite_error)?;
-        if updated != 1 {
-            return Err(PortError::conflict());
-        }
-        record_transition(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_lease_renew",
-            &request_hash,
-        )?;
-        let renewed = ScheduledWork {
-            lease_expires_at_unix_ms: request.lease_expires_at_unix_ms,
-            ..request.work.clone()
-        };
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(renewed)
-    }
-
-    fn record_retry(&self, request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState> {
-        if request.first_failure_at_unix_ms > request.now_unix_ms {
-            return Err(PortError::invalid_data());
-        }
-        let next_attempts = request
-            .expected_attempts
-            .checked_add(1)
-            .ok_or_else(PortError::invalid_data)?;
-        let request_hash = canonical_request_hash(request)?;
-        let key = SchedulerWorkKey {
-            tenant_id: request.work.tenant_id.clone(),
-            action_id: request.work.action_id.clone(),
-        };
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
-        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
-        if transition_status(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_retry",
-            &request_hash,
-        )? {
-            let stored =
-                load_scheduler_retry(&transaction, &key)?.ok_or_else(PortError::conflict)?;
-            if stored.attempts > next_attempts {
-                return Err(PortError::conflict());
-            }
-            if stored.attempts < next_attempts
-                || stored.last_error != request.error_code
-                || stored.first_failure_at_unix_ms != request.first_failure_at_unix_ms
-                || stored.not_before_unix_ms != request.not_before_unix_ms
-                || stored.health_event_id != request.health_event_id
-            {
-                return Err(PortError::integrity_failure());
-            }
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(stored);
-        }
-        if request.now_unix_ms.abs_diff(trusted_now) > MAX_CLOCK_SKEW_MS
-            || request.not_before_unix_ms <= trusted_now
-        {
-            return Err(PortError::invalid_data());
-        }
-        validate_scheduler_work(&transaction, &request.work, trusted_now)?;
-        let current = load_scheduler_retry(&transaction, &key)?;
-        let current_attempts = current.as_ref().map(|retry| retry.attempts).unwrap_or(0);
-        if current_attempts != request.expected_attempts {
-            return Err(PortError::conflict());
-        }
-        if let Some(current) = current.as_ref() {
-            if current.first_failure_at_unix_ms != request.first_failure_at_unix_ms
-                || current
-                    .health_event_id
-                    .as_ref()
-                    .is_some_and(|event_id| Some(event_id) != request.health_event_id.as_ref())
-                || current.health_event_delivered && request.health_event_id.is_none()
-            {
-                return Err(PortError::conflict());
-            }
-        } else if request.first_failure_at_unix_ms != request.now_unix_ms {
-            return Err(PortError::invalid_data());
-        }
-        let health_event_delivered = current
-            .as_ref()
-            .is_some_and(|retry| retry.health_event_delivered);
-        transaction
-            .execute(
-                r#"
-                INSERT INTO security_scheduler_retries (
-                    tenant_id, action_id, attempts, last_error, first_failure_at,
-                    not_before, health_event_id, health_event_delivered
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                ON CONFLICT (tenant_id, action_id) DO UPDATE SET
-                    attempts = excluded.attempts,
-                    last_error = excluded.last_error,
-                    first_failure_at = excluded.first_failure_at,
-                    not_before = excluded.not_before,
-                    health_event_id = excluded.health_event_id
-                "#,
-                params![
-                    request.work.tenant_id.as_str(),
-                    request.work.action_id.as_str(),
-                    i64::from(next_attempts),
-                    request.error_code.as_str(),
-                    to_i64(request.first_failure_at_unix_ms)?,
-                    to_i64(request.not_before_unix_ms)?,
-                    request.health_event_id.as_ref().map(RecordId::as_str),
-                    i64::from(health_event_delivered)
-                ],
-            )
-            .map_err(sqlite_error)?;
-        delete_scheduler_lease(&transaction, &request.work)?;
-        record_transition(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_retry",
-            &request_hash,
-        )?;
-        let retry = SchedulerRetryState {
-            key,
-            attempts: next_attempts,
-            last_error: request.error_code.clone(),
-            first_failure_at_unix_ms: request.first_failure_at_unix_ms,
-            not_before_unix_ms: request.not_before_unix_ms,
-            health_event_id: request.health_event_id.clone(),
-            health_event_delivered,
-        };
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(retry)
-    }
-
-    fn acknowledge_health_event(
-        &self,
-        request: &SchedulerHealthAckRequest,
-    ) -> PortResult<SchedulerRetryState> {
-        let request_hash = canonical_request_hash(request)?;
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
-        if transition_status(
-            &transaction,
-            request.key.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_health_ack",
-            &request_hash,
-        )? {
-            let stored = load_scheduler_retry(&transaction, &request.key)?
-                .ok_or_else(PortError::conflict)?;
-            if stored.health_event_id.as_ref() != Some(&request.event_id)
-                || !stored.health_event_delivered
-            {
-                return Err(PortError::integrity_failure());
-            }
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(stored);
-        }
-        let current = load_scheduler_retry(&transaction, &request.key)?
-            .ok_or_else(PortError::invalid_data)?;
-        if current.health_event_id.as_ref() != Some(&request.event_id) {
-            return Err(PortError::conflict());
-        }
-        if !current.health_event_delivered {
-            let updated = transaction
-                .execute(
-                    r#"
-                    UPDATE security_scheduler_retries
-                    SET health_event_delivered = 1
-                    WHERE tenant_id = ?1 AND action_id = ?2 AND health_event_id = ?3
-                      AND health_event_delivered = 0
-                    "#,
-                    params![
-                        request.key.tenant_id.as_str(),
-                        request.key.action_id.as_str(),
-                        request.event_id.as_str()
-                    ],
-                )
-                .map_err(sqlite_error)?;
-            if updated != 1 {
-                return Err(PortError::conflict());
-            }
-        }
-        record_transition(
-            &transaction,
-            request.key.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_health_ack",
-            &request_hash,
-        )?;
-        let stored = load_scheduler_retry(&transaction, &request.key)?
-            .ok_or_else(PortError::integrity_failure)?;
-        if !stored.health_event_delivered {
-            return Err(PortError::integrity_failure());
-        }
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(stored)
-    }
-
-    fn release_lease(&self, request: &SchedulerLeaseReleaseRequest) -> PortResult<()> {
-        let request_hash = canonical_request_hash(request)?;
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
-        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
-        if transition_status(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_lease_release",
-            &request_hash,
-        )? {
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(());
-        }
-        validate_scheduler_work(&transaction, &request.work, trusted_now)?;
-        delete_scheduler_lease(&transaction, &request.work)?;
-        if request.clear_retry_state {
-            transaction
-                .execute(
-                    "DELETE FROM security_scheduler_retries WHERE tenant_id = ?1 AND action_id = ?2",
-                    params![request.work.tenant_id.as_str(), request.work.action_id.as_str()],
-                )
-                .map_err(sqlite_error)?;
-        }
-        record_transition(
-            &transaction,
-            request.work.tenant_id.as_str(),
-            request.transition_id.as_str(),
-            "scheduler_lease_release",
-            &request_hash,
-        )?;
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(())
-    }
-}
 
 impl ResponseDispatchStore for SqliteSecurityStateStore {
     fn ensure_dispatch_ready(&self) -> PortResult<()> {
@@ -1168,4 +608,664 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
     }
 }
 
-include!("part_06_response_helpers.inc");
+pub(super) fn validate_initial_dispatch_history(
+    snapshot: &ResponseSnapshot,
+    authorization: &ResponseDispatchAuthorizationBody,
+) -> PortResult<()> {
+    let lease_expires_at_unix_ms = snapshot
+        .applying_lease_expires_at_unix_ms
+        .ok_or_else(PortError::invalid_data)?;
+    let valid = match (&authorization.approval, snapshot.mutations.as_slice()) {
+        (
+            ResponseDispatchApproval::Automatic,
+            [ResponseMutationRecord::Requested(requested), ResponseMutationRecord::Transition(applying)],
+        ) => {
+            snapshot.generation == 1
+                && requested.generation == 0
+                && requested.occurred_at_unix_ms == snapshot.plan.created_at_unix_ms
+                && applying.generation == 1
+                && applying.from_state == ResponseState::Planned
+                && applying.to_state == ResponseState::Applying
+                && applying.cause == ResponseTransitionCause::ApplyStarted
+                && applying.applying_lease_expires_at_unix_ms == Some(lease_expires_at_unix_ms)
+                && applying.scheduler_lease_owner_id.is_none()
+                && applying.scheduler_fencing_token.is_none()
+                && applying.occurred_at_unix_ms == authorization.authorized_at_unix_ms
+                && requested.transition_id != applying.transition_id
+        }
+        (
+            ResponseDispatchApproval::Governed {
+                admission_operation_version,
+                ..
+            },
+            [ResponseMutationRecord::Requested(requested), ResponseMutationRecord::Transition(awaiting), ResponseMutationRecord::Transition(applying)],
+        ) => {
+            *admission_operation_version > 0
+                && snapshot.generation == 2
+                && requested.generation == 0
+                && requested.occurred_at_unix_ms == snapshot.plan.created_at_unix_ms
+                && awaiting.generation == 1
+                && awaiting.from_state == ResponseState::Planned
+                && awaiting.to_state == ResponseState::AwaitingApproval
+                && awaiting.cause == ResponseTransitionCause::ApprovalRequested
+                && awaiting.applying_lease_expires_at_unix_ms.is_none()
+                && awaiting.scheduler_lease_owner_id.is_none()
+                && awaiting.scheduler_fencing_token.is_none()
+                && awaiting.occurred_at_unix_ms == snapshot.plan.created_at_unix_ms
+                && applying.generation == 2
+                && applying.from_state == ResponseState::AwaitingApproval
+                && applying.to_state == ResponseState::Applying
+                && applying.cause == ResponseTransitionCause::ApprovalSatisfied
+                && applying.applying_lease_expires_at_unix_ms == Some(lease_expires_at_unix_ms)
+                && applying.scheduler_lease_owner_id.is_none()
+                && applying.scheduler_fencing_token.is_none()
+                && applying.occurred_at_unix_ms == authorization.authorized_at_unix_ms
+                && requested.transition_id != awaiting.transition_id
+                && requested.transition_id != applying.transition_id
+                && awaiting.transition_id != applying.transition_id
+        }
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(PortError::invalid_data())
+    }
+}
+
+pub(super) fn validate_response_dispatch_request(
+    request: &ResponseDispatchCommitRequest,
+) -> PortResult<ResponseSnapshot> {
+    validate_canonical_json_body(
+        &request.authorization.canonical_body,
+        &request.authorization.body_hash,
+    )?;
+    let decoded_authorization: ResponseDispatchAuthorizationBody =
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            request.authorization.canonical_body.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| PortError::invalid_data())?;
+    if decoded_authorization != request.authorization.body
+        || decoded_authorization.schema_version != RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
+        || decoded_authorization.key.tenant_id != request.response_plan.tenant_id
+        || decoded_authorization.action_id != request.response_plan.action_id
+        || decoded_authorization.executor_authority_generation == 0
+    {
+        return Err(PortError::invalid_data());
+    }
+    let snapshot = decode_response_snapshot(&request.response_plan)?;
+    let mut normalized_snapshot = snapshot.clone();
+    normalized_snapshot.dispatch_authorization_hash = None;
+    let normalized_bytes =
+        canonical_json_bytes(&normalized_snapshot).map_err(|_| PortError::invalid_data())?;
+    let normalized_body_hash = Digest32::new(*sha256(&normalized_bytes).as_bytes());
+    let execution_dispatch = snapshot
+        .execution_dispatch
+        .as_ref()
+        .ok_or_else(PortError::invalid_data)?;
+    execution_dispatch
+        .validate_for_plan(&snapshot.plan)
+        .map_err(|_| PortError::invalid_data())?;
+    if snapshot.state != ResponseState::Applying
+        || snapshot.operator_page_required
+        || snapshot.applying_lease_expires_at_unix_ms
+            != Some(request.initial_lease.lease_expires_at_unix_ms)
+        || snapshot.due_at_unix_ms != Some(request.initial_lease.lease_expires_at_unix_ms)
+        || snapshot.plan.plan_hash != decoded_authorization.plan_hash
+        || snapshot.dispatch_authorization_hash != Some(request.authorization.body_hash)
+        || decoded_authorization.response_body_hash != normalized_body_hash
+        || snapshot.plan.operator_capability.capability_digest
+            != decoded_authorization.authorization_capability_hash
+        || decoded_authorization.authorized_at_unix_ms < snapshot.plan.created_at_unix_ms
+        || decoded_authorization.authorized_at_unix_ms >= snapshot.plan.expires_at_unix_ms
+        || request.initial_lease.lease_expires_at_unix_ms
+            <= decoded_authorization.authorized_at_unix_ms
+        || request.initial_lease.lease_expires_at_unix_ms > snapshot.plan.expires_at_unix_ms
+        || execution_dispatch.dispatch_id != decoded_authorization.key.dispatch_id
+        || execution_dispatch.executor_authority_id != decoded_authorization.executor_authority_id
+        || execution_dispatch.executor_authority_generation
+            != decoded_authorization.executor_authority_generation
+        || execution_dispatch.authorization_capability_hash
+            != decoded_authorization.authorization_capability_hash
+        || execution_dispatch.governed_intent_hash != decoded_authorization.governed_intent_hash
+        || execution_dispatch.policy_decision_hash != decoded_authorization.policy_decision_hash
+        || execution_dispatch.approval != decoded_authorization.approval
+        || execution_dispatch.authorized_at_unix_ms != decoded_authorization.authorized_at_unix_ms
+    {
+        return Err(PortError::invalid_data());
+    }
+    match (
+        &snapshot.plan.approval_requirement,
+        &decoded_authorization.approval,
+    ) {
+        (ResponseApprovalRequirement::Automatic, ResponseDispatchApproval::Automatic)
+        | (
+            ResponseApprovalRequirement::Governed { .. },
+            ResponseDispatchApproval::Governed { .. },
+        ) => {}
+        _ => return Err(PortError::invalid_data()),
+    }
+    if matches!(
+        request.mode,
+        ResponseDispatchCommitMode::GovernedCommittedResume
+            | ResponseDispatchCommitMode::GovernedCommittedExpiredResume
+    ) && !matches!(
+        (
+            &snapshot.plan.approval_requirement,
+            &decoded_authorization.approval,
+        ),
+        (
+            ResponseApprovalRequirement::Governed { .. },
+            ResponseDispatchApproval::Governed { .. }
+        )
+    ) {
+        return Err(PortError::invalid_data());
+    }
+    validate_initial_dispatch_history(&snapshot, &decoded_authorization)?;
+    Ok(snapshot)
+}
+
+
+
+pub(super) fn load_response_dispatch(
+    connection: &Connection,
+    key: &ResponseDispatchKey,
+) -> PortResult<Option<ResponseDispatchRecord>> {
+    type StoredDispatch = (
+        String,
+        String,
+        Vec<u8>,
+        Vec<u8>,
+        i64,
+        String,
+        Vec<u8>,
+        Vec<u8>,
+        i64,
+        String,
+        i64,
+        i64,
+    );
+    let stored: Option<StoredDispatch> = connection
+        .query_row(
+            r#"
+            SELECT action_id, commit_mode, authorization_body, authorization_body_hash,
+                   response_generation, response_state, response_body,
+                   response_body_hash, response_due_at, initial_lease_owner_id,
+                   initial_lease_expires_at, initial_fencing_token
+            FROM security_response_dispatches
+            WHERE tenant_id = ?1 AND dispatch_id = ?2
+            "#,
+            params![key.tenant_id.as_str(), key.dispatch_id.as_str()],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                    row.get(8)?,
+                    row.get(9)?,
+                    row.get(10)?,
+                    row.get(11)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    let Some((
+        action_id,
+        commit_mode,
+        authorization_body,
+        authorization_body_hash,
+        response_generation,
+        response_state,
+        response_body,
+        response_body_hash,
+        response_due_at,
+        initial_lease_owner_id,
+        initial_lease_expires_at,
+        initial_fencing_token,
+    )) = stored
+    else {
+        return Ok(None);
+    };
+    let action_id = ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?;
+    let authorization_body_hash = decode_digest(authorization_body_hash)?;
+    let canonical_authorization =
+        CanonicalBody::new(authorization_body).map_err(|_| PortError::integrity_failure())?;
+    validate_canonical_json_body(&canonical_authorization, &authorization_body_hash)
+        .map_err(|_| PortError::integrity_failure())?;
+    let authorization_body: ResponseDispatchAuthorizationBody =
+        chio_core::canonical::UntrustedJsonText::from_wire(canonical_authorization.as_bytes(), 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed())
+            .map_err(|_| PortError::integrity_failure())?;
+    let response_body_hash = decode_digest(response_body_hash)?;
+    let canonical_response =
+        CanonicalBody::new(response_body).map_err(|_| PortError::integrity_failure())?;
+    let response_plan = ResponsePlanRecord {
+        tenant_id: key.tenant_id.clone(),
+        action_id: action_id.clone(),
+        generation: from_i64(response_generation)?,
+        state: RecordId::new(response_state).map_err(|_| PortError::integrity_failure())?,
+        canonical_body: canonical_response,
+        body_hash: response_body_hash,
+        due_at_unix_ms: Some(from_i64(response_due_at)?),
+    };
+    let initial_work = ScheduledWork {
+        tenant_id: key.tenant_id.clone(),
+        action_id,
+        lease_owner_id: chio_security_types::ports::LeaseOwnerId::new(initial_lease_owner_id)
+            .map_err(|_| PortError::integrity_failure())?,
+        lease_expires_at_unix_ms: from_i64(initial_lease_expires_at)?,
+        fencing_token: from_i64(initial_fencing_token)?,
+    };
+    if initial_work.fencing_token == 0 {
+        return Err(PortError::integrity_failure());
+    }
+    let record = ResponseDispatchRecord {
+        authorization: ResponseDispatchAuthorization {
+            body: authorization_body,
+            canonical_body: canonical_authorization,
+            body_hash: authorization_body_hash,
+        },
+        response_plan,
+        initial_work,
+    };
+    let validation = ResponseDispatchCommitRequest {
+        mode: parse_response_dispatch_commit_mode(&commit_mode)?,
+        authorization: record.authorization.clone(),
+        response_plan: record.response_plan.clone(),
+        initial_lease: ResponseDispatchLease {
+            lease_owner_id: record.initial_work.lease_owner_id.clone(),
+            lease_expires_at_unix_ms: record.initial_work.lease_expires_at_unix_ms,
+        },
+    };
+    validate_response_dispatch_request(&validation).map_err(|_| PortError::integrity_failure())?;
+    if record.authorization.body.key != *key
+        || record.authorization.body.action_id != record.initial_work.action_id
+    {
+        return Err(PortError::integrity_failure());
+    }
+    let current = load_response_plan(
+        connection,
+        key.tenant_id.as_str(),
+        record.initial_work.action_id.as_str(),
+    )?
+    .ok_or_else(PortError::integrity_failure)?;
+    let current_snapshot =
+        decode_response_snapshot(&current).map_err(|_| PortError::integrity_failure())?;
+    if current.generation < record.response_plan.generation
+        || current_snapshot.plan.plan_hash != record.authorization.body.plan_hash
+    {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(Some(record))
+}
+
+pub(super) fn prepared_binding_from_response_dispatch(
+    record: &ResponseDispatchRecord,
+) -> PreparedActiveResponseDispatchBinding {
+    prepared_binding_from_response_authorization(&record.authorization.body)
+}
+
+pub(super) fn prepared_binding_from_response_authorization(
+    authorization: &ResponseDispatchAuthorizationBody,
+) -> PreparedActiveResponseDispatchBinding {
+    PreparedActiveResponseDispatchBinding {
+        schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
+        tenant_id: authorization.key.tenant_id.clone(),
+        action_id: authorization.action_id.clone(),
+        plan_hash: authorization.plan_hash,
+        dispatch_id: authorization.key.dispatch_id.clone(),
+        executor_authority_id: authorization.executor_authority_id.clone(),
+        executor_authority_generation: authorization.executor_authority_generation,
+        authorized_at_unix_ms: authorization.authorized_at_unix_ms,
+        authorization_capability_hash: authorization.authorization_capability_hash,
+        governed_intent_hash: authorization.governed_intent_hash,
+        policy_decision_hash: authorization.policy_decision_hash,
+        approval: authorization.approval.clone(),
+    }
+}
+
+pub(super) fn canonical_prepared_dispatch_binding(
+    binding: &PreparedActiveResponseDispatchBinding,
+) -> PortResult<(Vec<u8>, Digest32)> {
+    let body = canonical_json_bytes(binding).map_err(|_| PortError::invalid_data())?;
+    if body.len() > 1_048_576 {
+        return Err(PortError::invalid_data());
+    }
+    let hash = Digest32::new(body_hash(&body));
+    Ok((body, hash))
+}
+
+pub(super) fn load_response_dispatch_for_identity(
+    connection: &Connection,
+    tenant_id: &TenantId,
+    action_id: &ActionId,
+    dispatch_id: &RecordId,
+) -> PortResult<Option<ResponseDispatchRecord>> {
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT dispatch_id
+            FROM security_response_dispatches
+            WHERE tenant_id = ?1 AND (action_id = ?2 OR dispatch_id = ?3)
+            ORDER BY dispatch_id ASC
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    let dispatch_ids = statement
+        .query_map(
+            params![tenant_id.as_str(), action_id.as_str(), dispatch_id.as_str()],
+            |row| row.get::<_, String>(0),
+        )
+        .map_err(sqlite_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(sqlite_error)?;
+    if dispatch_ids.len() > 1 {
+        return Err(PortError::integrity_failure());
+    }
+    let Some(stored_dispatch_id) = dispatch_ids.into_iter().next() else {
+        return Ok(None);
+    };
+    let stored_dispatch_id =
+        RecordId::new(stored_dispatch_id).map_err(|_| PortError::integrity_failure())?;
+    load_response_dispatch(
+        connection,
+        &ResponseDispatchKey {
+            tenant_id: tenant_id.clone(),
+            dispatch_id: stored_dispatch_id,
+        },
+    )
+}
+
+pub(super) fn load_automatic_response_dispatch_fence(
+    connection: &Connection,
+    tenant_id: &TenantId,
+    action_id: &ActionId,
+    dispatch_id: &RecordId,
+) -> PortResult<Option<AutomaticResponseDispatchFenceRecord>> {
+    type StoredFence = (String, String, Vec<u8>, Vec<u8>, i64);
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT dispatch_id, action_id, prepared_binding_body,
+                   prepared_binding_hash, fenced_at
+            FROM security_response_dispatch_fences
+            WHERE tenant_id = ?1 AND (action_id = ?2 OR dispatch_id = ?3)
+            ORDER BY dispatch_id ASC
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    let stored = statement
+        .query_map(
+            params![tenant_id.as_str(), action_id.as_str(), dispatch_id.as_str()],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
+        )
+        .map_err(sqlite_error)?
+        .collect::<Result<Vec<StoredFence>, _>>()
+        .map_err(sqlite_error)?;
+    if stored.len() > 1 {
+        return Err(PortError::integrity_failure());
+    }
+    let Some((stored_dispatch_id, stored_action_id, body, stored_hash, fenced_at)) =
+        stored.into_iter().next()
+    else {
+        return Ok(None);
+    };
+    let binding = chio_core::canonical::UntrustedJsonText::from_wire(&body, 64 * 1024 * 1024)
+.and_then(|input| input.decode_signed::<PreparedActiveResponseDispatchBinding>())
+        .map_err(|_| PortError::integrity_failure())?;
+    validate_automatic_response_dispatch_fence_binding_shape(&binding)?;
+    let (canonical_body, canonical_hash) = canonical_prepared_dispatch_binding(&binding)
+        .map_err(|_| PortError::integrity_failure())?;
+    if canonical_body != body
+        || canonical_hash != decode_digest(stored_hash)?
+        || &binding.tenant_id != tenant_id
+        || binding.action_id.as_str() != stored_action_id.as_str()
+        || binding.dispatch_id.as_str() != stored_dispatch_id.as_str()
+    {
+        return Err(PortError::integrity_failure());
+    }
+    let fenced_at_unix_ms = from_i64(fenced_at)?;
+    if fenced_at_unix_ms == 0 {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(Some(AutomaticResponseDispatchFenceRecord {
+        prepared_dispatch_binding: binding,
+        binding_hash: canonical_hash,
+        fenced_at_unix_ms,
+    }))
+}
+
+pub(super) fn validate_automatic_response_dispatch_fence_binding_shape(
+    binding: &PreparedActiveResponseDispatchBinding,
+) -> PortResult<()> {
+    if binding.schema_version != PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
+        || binding.executor_authority_generation == 0
+        || binding.authorized_at_unix_ms == 0
+        || binding.plan_hash.is_zero()
+        || binding.authorization_capability_hash.is_zero()
+        || binding.governed_intent_hash.is_zero()
+        || binding.policy_decision_hash.is_zero()
+        || !matches!(&binding.approval, ResponseDispatchApproval::Automatic)
+    {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(())
+}
+
+pub(super) fn validate_all_automatic_response_dispatch_fences(connection: &Connection) -> PortResult<()> {
+    type StoredFenceIdentity = (String, String, String);
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT tenant_id, action_id, dispatch_id
+            FROM security_response_dispatch_fences
+            ORDER BY tenant_id ASC, action_id ASC, dispatch_id ASC
+            "#,
+        )
+        .map_err(|_| PortError::integrity_failure())?;
+    let identities = statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .map_err(|_| PortError::integrity_failure())?
+        .collect::<Result<Vec<StoredFenceIdentity>, _>>()
+        .map_err(|_| PortError::integrity_failure())?;
+    drop(statement);
+    for (tenant_id, action_id, dispatch_id) in identities {
+        let tenant_id = TenantId::new(tenant_id).map_err(|_| PortError::integrity_failure())?;
+        let action_id = ActionId::new(action_id).map_err(|_| PortError::integrity_failure())?;
+        let dispatch_id = RecordId::new(dispatch_id).map_err(|_| PortError::integrity_failure())?;
+        if load_automatic_response_dispatch_fence(connection, &tenant_id, &action_id, &dispatch_id)?
+            .is_none()
+        {
+            return Err(PortError::integrity_failure());
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn load_response_dispatch_commit_mode(
+    connection: &Connection,
+    key: &ResponseDispatchKey,
+) -> PortResult<Option<ResponseDispatchCommitMode>> {
+    connection
+        .query_row(
+            "SELECT commit_mode FROM security_response_dispatches WHERE tenant_id = ?1 AND dispatch_id = ?2",
+            params![key.tenant_id.as_str(), key.dispatch_id.as_str()],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(sqlite_error)?
+        .map(|value| parse_response_dispatch_commit_mode(&value))
+        .transpose()
+}
+
+pub(super) const fn response_dispatch_commit_mode(mode: ResponseDispatchCommitMode) -> &'static str {
+    match mode {
+        ResponseDispatchCommitMode::Fresh => "fresh",
+        ResponseDispatchCommitMode::GovernedCommittedResume => "governed_committed_resume",
+        ResponseDispatchCommitMode::GovernedCommittedExpiredResume => {
+            "governed_committed_expired_resume"
+        }
+    }
+}
+
+pub(super) fn parse_response_dispatch_commit_mode(value: &str) -> PortResult<ResponseDispatchCommitMode> {
+    match value {
+        "fresh" => Ok(ResponseDispatchCommitMode::Fresh),
+        "governed_committed_resume" => Ok(ResponseDispatchCommitMode::GovernedCommittedResume),
+        "governed_committed_expired_resume" => {
+            Ok(ResponseDispatchCommitMode::GovernedCommittedExpiredResume)
+        }
+        _ => Err(PortError::integrity_failure()),
+    }
+}
+
+pub(super) fn load_response_dispatch_recovery(
+    connection: &Connection,
+    request: &ResponseDispatchRecoveryRequest,
+    request_hash: &[u8; 32],
+) -> PortResult<Option<ResponseDispatchRecoveryOutcome>> {
+    type StoredRecovery = (String, String, String, Vec<u8>, String, String, i64, i64);
+    let stored: Option<StoredRecovery> = connection
+        .query_row(
+            r#"
+            SELECT dispatch_id, action_id, recovery_id, request_hash, outcome,
+                   lease_owner_id, lease_expires_at, fencing_token
+            FROM security_response_dispatch_recoveries
+            WHERE tenant_id = ?1 AND recovery_id = ?2
+            "#,
+            params![request.key.tenant_id.as_str(), request.recovery_id.as_str()],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    let Some((
+        dispatch_id,
+        action_id,
+        recovery_id,
+        stored_hash,
+        outcome,
+        lease_owner_id,
+        lease_expires_at,
+        fencing_token,
+    )) = stored
+    else {
+        return Ok(None);
+    };
+    if dispatch_id != request.key.dispatch_id.as_str()
+        || action_id != request.action_id.as_str()
+        || recovery_id != request.recovery_id.as_str()
+        || stored_hash.as_slice() != request_hash
+    {
+        return Err(PortError::conflict());
+    }
+    let work = ScheduledWork {
+        tenant_id: request.key.tenant_id.clone(),
+        action_id: request.action_id.clone(),
+        lease_owner_id: chio_security_types::ports::LeaseOwnerId::new(lease_owner_id)
+            .map_err(|_| PortError::integrity_failure())?,
+        lease_expires_at_unix_ms: from_i64(lease_expires_at)?,
+        fencing_token: from_i64(fencing_token)?,
+    };
+    if work.lease_owner_id != request.lease_owner_id {
+        return Err(PortError::integrity_failure());
+    }
+    let outcome = match outcome.as_str() {
+        "live_lease"
+            if request
+                .expected_fencing_token
+                .is_none_or(|expected| expected == work.fencing_token) =>
+        {
+            ResponseDispatchRecoveryOutcome::LiveLease(work)
+        }
+        "takeover"
+            if request
+                .expected_fencing_token
+                .is_none_or(|expected| work.fencing_token > expected) =>
+        {
+            ResponseDispatchRecoveryOutcome::Takeover(work)
+        }
+        "live_lease" | "takeover" => return Err(PortError::integrity_failure()),
+        _ => return Err(PortError::integrity_failure()),
+    };
+    Ok(Some(outcome))
+}
+
+pub(super) fn record_response_dispatch_recovery(
+    transaction: &Transaction<'_>,
+    request: &ResponseDispatchRecoveryRequest,
+    request_hash: &[u8; 32],
+    outcome: &ResponseDispatchRecoveryOutcome,
+) -> PortResult<()> {
+    let (outcome_name, work, fencing_is_bound) = match outcome {
+        ResponseDispatchRecoveryOutcome::LiveLease(work) => (
+            "live_lease",
+            work,
+            request
+                .expected_fencing_token
+                .is_none_or(|expected| expected == work.fencing_token),
+        ),
+        ResponseDispatchRecoveryOutcome::Takeover(work) => (
+            "takeover",
+            work,
+            request
+                .expected_fencing_token
+                .is_none_or(|expected| work.fencing_token > expected),
+        ),
+    };
+    if work.tenant_id != request.key.tenant_id
+        || work.action_id != request.action_id
+        || work.lease_owner_id != request.lease_owner_id
+        || !fencing_is_bound
+    {
+        return Err(PortError::integrity_failure());
+    }
+    transaction
+        .execute(
+            r#"
+            INSERT INTO security_response_dispatch_recoveries (
+                recovery_id, tenant_id, dispatch_id, action_id, request_hash,
+                outcome, lease_owner_id, lease_expires_at, fencing_token
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "#,
+            params![
+                request.recovery_id.as_str(),
+                request.key.tenant_id.as_str(),
+                request.key.dispatch_id.as_str(),
+                request.action_id.as_str(),
+                request_hash.as_slice(),
+                outcome_name,
+                work.lease_owner_id.as_str(),
+                to_i64(work.lease_expires_at_unix_ms)?,
+                to_i64(work.fencing_token)?
+            ],
+        )
+        .map_err(sqlite_error)?;
+    Ok(())
+}

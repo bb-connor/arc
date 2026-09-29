@@ -1,4 +1,7 @@
-struct StoredAttestedFindingResponseOutboxRow {
+use super::*;
+
+
+pub(super) struct StoredAttestedFindingResponseOutboxRow {
     tenant_id: String,
     batch_id: String,
     ordinal: i64,
@@ -25,7 +28,7 @@ struct StoredAttestedFindingResponseOutboxRow {
     last_error_code: Option<String>,
 }
 
-fn response_planning_state(value: &str) -> PortResult<AttestedFindingResponsePlanningState> {
+pub(super) fn response_planning_state(value: &str) -> PortResult<AttestedFindingResponsePlanningState> {
     match value {
         "pending" => Ok(AttestedFindingResponsePlanningState::Pending),
         "planned" => Ok(AttestedFindingResponsePlanningState::Planned),
@@ -34,7 +37,7 @@ fn response_planning_state(value: &str) -> PortResult<AttestedFindingResponsePla
     }
 }
 
-fn response_planning_state_name(value: AttestedFindingResponsePlanningState) -> &'static str {
+pub(super) fn response_planning_state_name(value: AttestedFindingResponsePlanningState) -> &'static str {
     match value {
         AttestedFindingResponsePlanningState::Pending => "pending",
         AttestedFindingResponsePlanningState::Planned => "planned",
@@ -42,7 +45,7 @@ fn response_planning_state_name(value: AttestedFindingResponsePlanningState) -> 
     }
 }
 
-fn response_admission_state(value: &str) -> PortResult<AttestedFindingResponseAdmissionState> {
+pub(super) fn response_admission_state(value: &str) -> PortResult<AttestedFindingResponseAdmissionState> {
     match value {
         "pending" => Ok(AttestedFindingResponseAdmissionState::Pending),
         "prepared" => Ok(AttestedFindingResponseAdmissionState::Prepared),
@@ -52,7 +55,7 @@ fn response_admission_state(value: &str) -> PortResult<AttestedFindingResponseAd
     }
 }
 
-fn response_admission_state_name(value: AttestedFindingResponseAdmissionState) -> &'static str {
+pub(super) fn response_admission_state_name(value: AttestedFindingResponseAdmissionState) -> &'static str {
     match value {
         AttestedFindingResponseAdmissionState::Pending => "pending",
         AttestedFindingResponseAdmissionState::Prepared => "prepared",
@@ -61,7 +64,7 @@ fn response_admission_state_name(value: AttestedFindingResponseAdmissionState) -
     }
 }
 
-fn response_completion_state(value: &str) -> PortResult<AttestedFindingResponseCompletionState> {
+pub(super) fn response_completion_state(value: &str) -> PortResult<AttestedFindingResponseCompletionState> {
     match value {
         "not_started" => Ok(AttestedFindingResponseCompletionState::NotStarted),
         "pending" => Ok(AttestedFindingResponseCompletionState::Pending),
@@ -74,7 +77,7 @@ fn response_completion_state(value: &str) -> PortResult<AttestedFindingResponseC
     }
 }
 
-fn response_completion_state_name(value: AttestedFindingResponseCompletionState) -> &'static str {
+pub(super) fn response_completion_state_name(value: AttestedFindingResponseCompletionState) -> &'static str {
     match value {
         AttestedFindingResponseCompletionState::NotStarted => "not_started",
         AttestedFindingResponseCompletionState::Pending => "pending",
@@ -86,7 +89,7 @@ fn response_completion_state_name(value: AttestedFindingResponseCompletionState)
     }
 }
 
-fn response_completion_outcome(
+pub(super) fn response_completion_outcome(
     value: &str,
 ) -> PortResult<AttestedFindingResponseCompletionOutcome> {
     match value {
@@ -99,7 +102,7 @@ fn response_completion_outcome(
     }
 }
 
-fn response_completion_outcome_name(
+pub(super) fn response_completion_outcome_name(
     value: AttestedFindingResponseCompletionOutcome,
 ) -> &'static str {
     match value {
@@ -111,7 +114,7 @@ fn response_completion_outcome_name(
     }
 }
 
-fn validate_attested_finding_response_plan_publication(
+pub(super) fn validate_attested_finding_response_plan_publication(
     publication: &AttestedFindingResponsePlanPublication,
 ) -> PortResult<()> {
     let body = &publication.body;
@@ -133,7 +136,7 @@ fn validate_attested_finding_response_plan_publication(
         .map_err(|_| PortError::integrity_failure())
 }
 
-fn validate_attested_finding_response_outbox_record(
+pub(super) fn validate_attested_finding_response_outbox_record(
     record: &AttestedFindingResponseOutboxRecord,
 ) -> PortResult<()> {
     if record.ordinal >= MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN
@@ -290,7 +293,7 @@ fn validate_attested_finding_response_outbox_record(
     Ok(())
 }
 
-fn read_attested_finding_response_outbox_row(
+pub(super) fn read_attested_finding_response_outbox_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<StoredAttestedFindingResponseOutboxRow> {
     Ok(StoredAttestedFindingResponseOutboxRow {
@@ -321,7 +324,7 @@ fn read_attested_finding_response_outbox_row(
     })
 }
 
-const ATTESTED_FINDING_RESPONSE_OUTBOX_COLUMNS: &str = r#"
+pub(super) const ATTESTED_FINDING_RESPONSE_OUTBOX_COLUMNS: &str = r#"
     tenant_id, batch_id, ordinal, evidence_id, finding_id, finding_hash,
     action_id, reservation_id, planning_state, admission_state,
     completion_state, execution_dispatch_id, prepared_dispatch_binding,
@@ -331,7 +334,7 @@ const ATTESTED_FINDING_RESPONSE_OUTBOX_COLUMNS: &str = r#"
     next_attempt_at, last_error_code
 "#;
 
-fn decode_attested_finding_response_outbox_row(
+pub(super) fn decode_attested_finding_response_outbox_row(
     stored: StoredAttestedFindingResponseOutboxRow,
 ) -> PortResult<AttestedFindingResponseOutboxRecord> {
     let tenant_id = TenantId::new(stored.tenant_id).map_err(|_| PortError::integrity_failure())?;
@@ -443,7 +446,7 @@ fn decode_attested_finding_response_outbox_row(
     Ok(record)
 }
 
-fn load_attested_finding_response_outbox_record(
+pub(super) fn load_attested_finding_response_outbox_record(
     connection: &Connection,
     key: &AttestedFindingResponseOutboxKey,
 ) -> PortResult<Option<AttestedFindingResponseOutboxRecord>> {
@@ -464,7 +467,7 @@ fn load_attested_finding_response_outbox_record(
         .transpose()
 }
 
-fn verify_response_outbox_batch_binding(
+pub(super) fn verify_response_outbox_batch_binding(
     connection: &Connection,
     record: &AttestedFindingResponseOutboxRecord,
 ) -> PortResult<()> {
@@ -483,7 +486,7 @@ fn verify_response_outbox_batch_binding(
     Ok(())
 }
 
-fn validate_attested_finding_response_outbox_schema(connection: &Connection) -> PortResult<()> {
+pub(super) fn validate_attested_finding_response_outbox_schema(connection: &Connection) -> PortResult<()> {
     if !table_definition_is_exact(
         connection,
         "security_attested_finding_response_outbox",
@@ -513,7 +516,7 @@ fn validate_attested_finding_response_outbox_schema(connection: &Connection) -> 
     Ok(())
 }
 
-fn scan_attested_finding_response_outbox(
+pub(super) fn scan_attested_finding_response_outbox(
     connection: &Connection,
     predicate: &str,
     now_unix_ms: u64,

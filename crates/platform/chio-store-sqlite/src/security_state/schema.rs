@@ -1,3 +1,16 @@
+use super::*;
+
+
+pub(super) const SECURITY_STATE_STORE_SCHEMA_KEY: &str = "security_state";
+pub(super) const SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+pub(super) const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
+    "security_transitions",
+    "security_flow_contexts",
+    "security_response_effects",
+    "security_scheduler_retries",
+    "chio_tool_receipts",
+];
+
 // tenant-read-contract: security_advisory_events; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_attested_finding_batch_items; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_attested_finding_batches; class=tenant-predicate; principal=security-runtime
@@ -52,7 +65,7 @@
 // tenant-read-contract: security_transitions; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_verified_events; class=tenant-predicate; principal=security-runtime
 // Contracts: docs/security/trust-boundary-inventory.json
-fn migrate(connection: &Connection) -> PortResult<()> {
+pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
     connection
         .execute_batch(
             r#"
@@ -1113,5 +1126,3 @@ fn migrate(connection: &Connection) -> PortResult<()> {
         }
     }
 }
-
-include!("part_02_tail.inc");

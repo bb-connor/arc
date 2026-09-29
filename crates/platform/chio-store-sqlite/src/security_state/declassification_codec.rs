@@ -1,5 +1,9 @@
+use super::*;
 
-fn declassification_state_name(state: DeclassificationUseState) -> &'static str {
+
+
+
+pub(super) fn declassification_state_name(state: DeclassificationUseState) -> &'static str {
     match state {
         DeclassificationUseState::ConsumedPendingDispatch => "consumed_pending_dispatch",
         DeclassificationUseState::Released => "released",
@@ -8,7 +12,7 @@ fn declassification_state_name(state: DeclassificationUseState) -> &'static str 
     }
 }
 
-fn parse_declassification_state(value: &str) -> PortResult<DeclassificationUseState> {
+pub(super) fn parse_declassification_state(value: &str) -> PortResult<DeclassificationUseState> {
     match value {
         "consumed_pending_dispatch" => Ok(DeclassificationUseState::ConsumedPendingDispatch),
         "released" => Ok(DeclassificationUseState::Released),
@@ -18,7 +22,7 @@ fn parse_declassification_state(value: &str) -> PortResult<DeclassificationUseSt
     }
 }
 
-fn encode_declassification_binding(
+pub(super) fn encode_declassification_binding(
     binding: &DeclassificationTransitionBinding,
 ) -> PortResult<Vec<u8>> {
     let canonical = canonical_json_bytes(binding).map_err(|_| PortError::invalid_data())?;
@@ -28,7 +32,7 @@ fn encode_declassification_binding(
     Ok(canonical)
 }
 
-fn decode_declassification_binding(bytes: &[u8]) -> PortResult<DeclassificationTransitionBinding> {
+pub(super) fn decode_declassification_binding(bytes: &[u8]) -> PortResult<DeclassificationTransitionBinding> {
     if bytes.len() > 4_096 {
         return Err(PortError::integrity_failure());
     }
@@ -42,7 +46,7 @@ fn decode_declassification_binding(bytes: &[u8]) -> PortResult<DeclassificationT
     Ok(binding)
 }
 
-fn validate_declassification_binding_identity(
+pub(super) fn validate_declassification_binding_identity(
     binding: &DeclassificationTransitionBinding,
     tenant_id: &TenantId,
     grant_id: &GrantId,
@@ -63,14 +67,14 @@ fn validate_declassification_binding_identity(
     Ok(())
 }
 
-fn declassification_phase_name(phase: DeclassificationEvidencePhase) -> &'static str {
+pub(super) fn declassification_phase_name(phase: DeclassificationEvidencePhase) -> &'static str {
     match phase {
         DeclassificationEvidencePhase::Consumption => "consumption",
         DeclassificationEvidencePhase::Outcome => "outcome",
     }
 }
 
-fn parse_declassification_phase(value: &str) -> PortResult<DeclassificationEvidencePhase> {
+pub(super) fn parse_declassification_phase(value: &str) -> PortResult<DeclassificationEvidencePhase> {
     match value {
         "consumption" => Ok(DeclassificationEvidencePhase::Consumption),
         "outcome" => Ok(DeclassificationEvidencePhase::Outcome),
@@ -78,7 +82,7 @@ fn parse_declassification_phase(value: &str) -> PortResult<DeclassificationEvide
     }
 }
 
-fn decode_declassification_receipt(
+pub(super) fn decode_declassification_receipt(
     receipt: &ReceiptAppendRequest,
 ) -> Result<ActiveDefenseReceiptBody, ()> {
     let body =
@@ -102,7 +106,7 @@ fn decode_declassification_receipt(
     Ok(body)
 }
 
-fn validate_declassification_consumption_evidence(
+pub(super) fn validate_declassification_consumption_evidence(
     request: &DeclassificationConsumptionEvidenceCommit,
 ) -> PortResult<()> {
     let body = decode_declassification_receipt(&request.receipt)
@@ -133,7 +137,7 @@ fn validate_declassification_consumption_evidence(
     Ok(())
 }
 
-fn validate_declassification_outcome_evidence(
+pub(super) fn validate_declassification_outcome_evidence(
     request: &DeclassificationOutcomeEvidenceCommit,
 ) -> PortResult<()> {
     let body = decode_declassification_receipt(&request.receipt)
@@ -168,7 +172,7 @@ fn validate_declassification_outcome_evidence(
 
 
 
-type DeclassificationEvidenceRow = (
+pub(super) type DeclassificationEvidenceRow = (
     String,
     String,
     String,
@@ -191,7 +195,7 @@ type DeclassificationEvidenceRow = (
     Option<String>,
 );
 
-fn decode_declassification_evidence_row(
+pub(super) fn decode_declassification_evidence_row(
     row: DeclassificationEvidenceRow,
 ) -> PortResult<DeclassificationEvidenceRecord> {
     let (
@@ -329,7 +333,7 @@ fn decode_declassification_evidence_row(
     })
 }
 
-fn declassification_evidence_row(
+pub(super) fn declassification_evidence_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<DeclassificationEvidenceRow> {
     Ok((
@@ -356,20 +360,20 @@ fn declassification_evidence_row(
     ))
 }
 
-struct DeclassificationEvidenceCommit<'a> {
-    tenant_id: &'a TenantId,
-    grant_id: &'a GrantId,
-    phase: DeclassificationEvidencePhase,
-    request_hash: Digest32,
-    state: DeclassificationUseState,
-    transition_binding: &'a DeclassificationTransitionBinding,
-    predecessor_evidence_id: Option<&'a OpaqueReceiptRef>,
-    receipt: &'a ReceiptAppendRequest,
+pub(super) struct DeclassificationEvidenceCommit<'a> {
+    pub(super) tenant_id: &'a TenantId,
+    pub(super) grant_id: &'a GrantId,
+    pub(super) phase: DeclassificationEvidencePhase,
+    pub(super) request_hash: Digest32,
+    pub(super) state: DeclassificationUseState,
+    pub(super) transition_binding: &'a DeclassificationTransitionBinding,
+    pub(super) predecessor_evidence_id: Option<&'a OpaqueReceiptRef>,
+    pub(super) receipt: &'a ReceiptAppendRequest,
 }
 
 
 
-fn declassification_evidence_matches(
+pub(super) fn declassification_evidence_matches(
     record: &DeclassificationEvidenceRecord,
     expected: &DeclassificationEvidenceCommit<'_>,
 ) -> bool {
@@ -383,51 +387,12 @@ fn declassification_evidence_matches(
         && record.receipt == *expected.receipt
 }
 
-
-
-fn normalize_sql(value: &str) -> String {
-    let mut normalized = String::with_capacity(value.len());
-    let mut characters = value.chars().peekable();
-    let mut quote_terminator = None;
-    let mut pending_space = false;
-    while let Some(character) = characters.next() {
-        if let Some(terminator) = quote_terminator {
-            normalized.push(character);
-            if character == terminator {
-                if characters.peek() == Some(&terminator) {
-                    if let Some(escaped_terminator) = characters.next() {
-                        normalized.push(escaped_terminator);
-                    }
-                } else {
-                    quote_terminator = None;
-                }
-            }
-            continue;
-        }
-        if character.is_whitespace() {
-            pending_space = true;
-            continue;
-        }
-        if pending_space && !normalized.is_empty() {
-            normalized.push(' ');
-        }
-        pending_space = false;
-        normalized.push(character);
-        quote_terminator = match character {
-            '\'' | '"' | '`' => Some(character),
-            '[' => Some(']'),
-            _ => None,
-        };
-    }
-    normalized
-}
-
 #[cfg(test)]
-fn load_declassification_use_record(connection: &Connection, query: &DeclassificationUseQuery) -> PortResult<Option<DeclassificationUseRecord>> {
+pub(super) fn load_declassification_use_record(connection: &Connection, query: &DeclassificationUseQuery) -> PortResult<Option<DeclassificationUseRecord>> {
     declassification::load_legacy_use(connection, query)
 }
 
 #[cfg(test)]
-fn load_declassification_evidence_record(connection: &Connection, query: &DeclassificationEvidenceQuery) -> PortResult<Option<DeclassificationEvidenceRecord>> {
+pub(super) fn load_declassification_evidence_record(connection: &Connection, query: &DeclassificationEvidenceQuery) -> PortResult<Option<DeclassificationEvidenceRecord>> {
     declassification::load_legacy_evidence(connection, query)
 }
