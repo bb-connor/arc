@@ -28,10 +28,13 @@ For the local demo, the trust service and hosted edge are separate processes:
 From the repo root:
 
 ```bash
-docker compose -f examples/docker/compose.yaml up --build
+docker compose -f examples/docker/compose.yaml up --build chio-trust-demo
 ```
 
-That publishes three defaults used throughout the rest of this tutorial:
+The trust service starts immediately. The hosted edge requires the explicit
+[enforcing host setup](../security/native-launch-examples.md) and either section 4
+below or the Docker `enforced-native` profile with a qualified host override.
+After configuring both services, the tutorial uses these endpoints and credentials:
 
 - hosted edge: `http://127.0.0.1:8931`
 - trust service and receipt viewer: `http://127.0.0.1:8940`
@@ -39,9 +42,8 @@ That publishes three defaults used throughout the rest of this tutorial:
 - admin token for the edge's admin routes: `demo-admin-token`
 - control token the edge and you present to the trust service: `demo-control-token`
 
-If you prefer to run the processes directly instead of Docker, phase `309`
-already qualified the equivalent `chio trust serve` plus
-`chio mcp serve-http --control-url ...` topology.
+The earlier phase `309` results describe the historical demo topology. They do
+not qualify the current enforced native host configuration.
 
 ## 3. Write A Policy
 
@@ -77,29 +79,16 @@ You can save this as `tutorial-policy.yaml` or reuse
 The upstream demo tool is a tiny MCP server that exposes `echo_text`:
 [examples/docker/mock_mcp_server.py](../../examples/docker/mock_mcp_server.py).
 
-To put Chio in front of it without Docker, first provision the signed
-manifest and the signed native-launch policy that bind the exact command the
-edge is allowed to run. The provisioner spawns the server once, records the
-tool surface it advertises, and signs it with demo-only keys at migration
-stage `Disabled`, which authorizes the launch without cage containment. The
-target must be the canonical interpreter path, which is what the edge
-resolves `python3` to as well, and neither the interpreter nor the wrapped
-script may be writable by other users; a checkout made under a permissive
-umask needs `chmod go-w examples/docker/mock_mcp_server.py` first.
+Configure the [enforcing host inputs](../security/native-launch-examples.md),
+including reviewed Python runtime read grants, then provision the exact command.
+Discovery itself is confined. Disabled and Shadow policies cannot authorize it.
 
 ```bash
-PYTHON3="$(python3 -c 'import sys, os; print(os.path.realpath(sys.executable))')"
-chio security provision-native-mcp-demo \
-  --output-dir "$PWD/tutorial-security" \
-  --discover-tools \
-  --target "$PYTHON3" \
-  --target-arg "$PWD/examples/docker/mock_mcp_server.py" \
-  --working-directory "$PWD" \
-  --execution-uid "$(id -u)" \
-  --execution-gid "$(id -g)" \
-  --server-id tutorial-echo \
-  --server-name "Tutorial Echo" \
-  --server-version 1 > tutorial-security.provision-report.json
+source scripts/lib/provision-mcp-launch.sh
+PYTHON3="$(chio_resolve_python python3)"
+chio_provision_mcp_launch "$(command -v chio)" "$PWD/tutorial-security" \
+  tutorial-echo "Tutorial Echo" 1 "$PWD" \
+  "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
 ```
 
 Then give the edge three distinct bearer credentials: the control token it

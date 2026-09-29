@@ -1,8 +1,8 @@
 """Explicit operator provisioning for local native MCP demos.
 
-The signed policy uses migration stage Disabled. It authorizes the exact command
-and discovered manifest, but provides no OS containment. Production operators
-must supply their own signed launch policy and publisher trust configuration.
+The signed policy uses migration stage Enforced. Discovery requires a qualified
+Linux host, a cage helper, an independent receipt anchor and reviewed read grants.
+Production operators retain ownership of publisher trust and signed policy.
 """
 
 import os
@@ -40,14 +40,17 @@ def provision_native_demo(
 ) -> dict:
     """Provision a fresh policy and return one process-host server configuration.
 
-    Provisioning starts the command for tool discovery. It does not invoke its
-    tools. Existing output is refused; rebuilding Chio requires a
+    Provisioning starts the command inside an enforced cage for discovery. It
+    does not invoke its tools. Existing output is refused; rebuilding Chio requires a
     fresh policy because the authorization binds that executable's digest.
     An explicit environment replaces subprocess inheritance during discovery;
     operators must separately supply it when starting the process host.
+    Enforcement inputs come from the operator's CHIO_CAGE_INIT,
+    CHIO_RECEIPT_ANCHOR_ROOT and CHIO_CAGE_READ_PATHS_FILE environment settings.
     """
     if not command or not command[0]:
         raise ValueError("A native MCP command is required")
+    cage_arguments = _native_cage_arguments()
     target = shutil.which(command[0])
     if target is None:
         raise ValueError("Native MCP executable was not found")
@@ -58,7 +61,8 @@ def provision_native_demo(
     arguments = [
         str(Path(chio).resolve(strict=True)),
         "security",
-        "provision-native-mcp-demo",
+        "provision-reference-runtime",
+        *cage_arguments,
         "--output-dir",
         str(output),
         "--discover-tools",
@@ -93,3 +97,27 @@ def provision_native_demo(
         "launch_policy": str(output / "cage-launch-policy.json"),
         "launch_policy_signer": (output / "cage-policy-signer").read_text().strip(),
     }
+
+
+def _native_cage_arguments() -> list[str]:
+    arguments = ["--stage", "enforced"]
+    for variable, flag in (
+        ("CHIO_CAGE_INIT", "--cage-init"),
+        ("CHIO_RECEIPT_ANCHOR_ROOT", "--receipt-rollback-anchor-root"),
+    ):
+        path = os.environ.get(variable, "")
+        if not os.path.isabs(path):
+            raise ValueError(f"{variable} must name an absolute path on the enforcing host")
+        arguments.extend([flag, path])
+    grants = os.environ.get("CHIO_CAGE_READ_PATHS_FILE", "")
+    if not os.path.isabs(grants):
+        raise ValueError("CHIO_CAGE_READ_PATHS_FILE must name the reviewed read-grants file")
+    with open(grants, encoding="utf-8") as handle:
+        for line in handle:
+            path = line.rstrip("\r\n")
+            if not path:
+                continue
+            if not os.path.isabs(path):
+                raise ValueError("read grants must be absolute paths")
+            arguments.extend(["--read-path", path])
+    return arguments

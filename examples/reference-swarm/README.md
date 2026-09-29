@@ -5,8 +5,8 @@ three Chio edges, with the swarm authority verifying the delegation before
 and after the run and every tool call leaving a receipt in trust-control.
 
 This is an integration fixture, not a qualified secure-swarm deployment.
-The smoke uses a signed `Disabled` native-launch profile on every architecture.
-It does not switch to `Enforced` on x86_64. The signed task graph is checked by
+Native launches require the explicit [enforcing host inputs](../../docs/security/native-launch-examples.md).
+The signed task graph is checked by
 the orchestrator but is not yet bound to the edge-issued capability identities.
 The kernel supports `require_swarm_admission()` (Chio YAML:
 `kernel.require_swarm_admission: true`), but that setting alone does not wire

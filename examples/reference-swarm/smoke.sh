@@ -3,9 +3,9 @@
 # wrapping the reference tools, the orchestrator with its two workers, then
 # an evidence export verified offline.
 #
-# Every edge launch uses the provisioner's explicitly Disabled demo profile.
-# This remains unconfined on x86_64 too. It is a protocol integration exercise,
-# not evidence for the Enforced Linux confinement or security launch gate.
+# Every edge launch requires the configured Enforced reference-runtime profile.
+# This remains a protocol integration exercise; a successful run does not
+# complete the secure-swarm or native host qualification gates.
 set -euo pipefail
 
 EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -13,7 +13,7 @@ ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 source "${ROOT}/examples/_shared/hello-http-common.sh"
 source "${ROOT}/scripts/lib/provision-mcp-launch.sh"
 
-echo "reference swarm: Disabled demo profile, not confinement qualification" >&2
+echo "reference swarm: enforcing host configuration required; integration fixture" >&2
 
 ARTIFACT_ROOT="${EXAMPLE_ROOT}/artifacts/live/$(date -u +"%Y%m%dT%H%M%SZ")"
 LOG_DIR="${ARTIFACT_ROOT}/logs"
@@ -117,7 +117,7 @@ for _ in \$(seq 1 100); do
   kill -0 "\${pid}" 2>/dev/null || break
   sleep 0.1
 done
-CHIO_PROVISION_REUSE=1 CHIO_BIN="${CHIO_BIN}" EDGE_ROLE=reader EDGE_LISTEN="127.0.0.1:${READER_PORT}" \\
+CHIO_BIN="${CHIO_BIN}" EDGE_ROLE=reader EDGE_LISTEN="127.0.0.1:${READER_PORT}" \\
 EDGE_PRIVATE_STATE="${PRIVATE_STATE}/reader" EDGE_SESSION_DB="${PRIVATE_STATE}/reader-sessions.sqlite3" \\
 EDGE_TOOL="${TOOLS_DIR}/chio-tool-repo-reader" EDGE_ROOT="${REPOSITORY}" \\
 CHIO_CONTROL_URL="${CONTROL_URL}" CHIO_CONTROL_TOKEN="${SERVICE_TOKEN}" CHIO_WORKLOAD_TOKEN="${WORKLOAD_TOKEN}" \\

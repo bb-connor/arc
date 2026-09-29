@@ -236,8 +236,9 @@ curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
    keys through independent registration. Ensure the exact executable, argv,
    working directory, file digests, and operator ceilings match the signed cage
    policy. `chio security provision-native-mcp-demo` creates demo-only private
-   signers at migration stage `Disabled`; it must not be used as evidence of
-   production containment.
+   signers for offline preparation at migration stage `Disabled`; those artifacts
+   cannot launch tools. Native runtime use requires an Enforced reference-runtime
+   policy, the cage helper and independent receipt anchor.
 
 2. Create a dedicated session HMAC keyring as a regular mode `0600` file under
    a mode `0700` operator-owned directory. Generate each `keyBase64` from 32

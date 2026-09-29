@@ -43,7 +43,7 @@ class FakeProvisioner:
         if self.fail:
             raise subprocess.CalledProcessError(3, command)
         output_dir = command[command.index("--output-dir") + 1]
-        os.makedirs(output_dir, mode=0o700)
+        os.makedirs(output_dir, mode=0o700, exist_ok=True)
         for name, content in (
             ("signed-manifest.json", "{}"),
             ("manifest-public-key", MANIFEST_KEY),
@@ -75,7 +75,15 @@ class EntrypointTests(unittest.TestCase):
         trust_service = trust_service or FakeTrustService()
         calls = []
         with tempfile.TemporaryDirectory() as provision_dir:
-            environment = dict(environment, CHIO_PROVISION_DIR=provision_dir)
+            grants = os.path.join(provision_dir, "read-paths.txt")
+            pathlib.Path(grants).write_text("/usr/lib\n/opt/chio/examples\n", encoding="utf-8")
+            environment = dict(
+                environment,
+                CHIO_PROVISION_DIR=provision_dir,
+                CHIO_CAGE_INIT="/usr/local/bin/chio-cage-init",
+                CHIO_RECEIPT_ANCHOR_ROOT="/independent-anchor",
+                CHIO_CAGE_READ_PATHS_FILE=grants,
+            )
             with mock.patch.dict(os.environ, environment, clear=True):
                 with mock.patch.object(module.subprocess, "run", provisioner):
                     with mock.patch.object(module.urllib.request, "urlopen", trust_service):
@@ -128,7 +136,11 @@ class EntrypointTests(unittest.TestCase):
 
         self.assertEqual(len(provisioning), 1)
         command, environment = provisioning[0]
-        self.assertEqual(command[:3], [module.EXECUTABLE, "security", "provision-native-mcp-demo"])
+        self.assertEqual(command[:3], [module.EXECUTABLE, "security", "provision-reference-runtime"])
+        self.assertEqual(command[command.index("--stage") + 1], "enforced")
+        self.assertEqual(command[command.index("--cage-init") + 1], "/usr/local/bin/chio-cage-init")
+        self.assertEqual(command[command.index("--receipt-rollback-anchor-root") + 1], "/independent-anchor")
+        self.assertEqual([command[i + 1] for i, value in enumerate(command) if value == "--read-path"], ["/usr/lib", "/opt/chio/examples"])
         self.assertIn("--discover-tools", command)
         self.assertEqual(command[command.index("--target") + 1], target)
         self.assertEqual(command[command.index("--target-arg") + 1], module.MOCK_SERVER)
@@ -146,6 +158,51 @@ class EntrypointTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as refused:
             self.launch(DISTINCT, provisioner=FakeProvisioner(fail=True))
         self.assertIn("provisioning the demo launch failed", str(refused.exception))
+
+    def test_missing_enforcement_inputs_refuse_before_provisioning(self):
+        module = load_entrypoint()
+        configured = {
+            "CHIO_CAGE_INIT": "/helper",
+            "CHIO_RECEIPT_ANCHOR_ROOT": "/anchor",
+            "CHIO_CAGE_READ_PATHS_FILE": "/grants",
+        }
+        for missing in configured:
+            with self.subTest(missing=missing):
+                environment = {key: value for key, value in configured.items() if key != missing}
+                with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(module.subprocess, "run") as provision:
+                    with self.assertRaisesRegex(SystemExit, missing):
+                        module.provision_launch("test", "Test", "1")
+                    provision.assert_not_called()
+
+    def test_reprovisioning_preserves_authority_and_session_custody(self):
+        module = load_entrypoint()
+        provisioner = FakeProvisioner()
+        with tempfile.TemporaryDirectory() as root:
+            grants = pathlib.Path(root) / "read-paths.txt"
+            grants.write_text("/usr/lib\n", encoding="utf-8")
+            environment = {
+                "CHIO_PROVISION_DIR": root,
+                "CHIO_CAGE_INIT": "/helper",
+                "CHIO_RECEIPT_ANCHOR_ROOT": "/anchor",
+                "CHIO_CAGE_READ_PATHS_FILE": str(grants),
+            }
+            with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(module.subprocess, "run", provisioner):
+                first = module.provision_launch("test", "Test", "1")
+                marker = pathlib.Path(root) / "security" / "retained-authority"
+                marker.write_bytes(b"retained")
+                keyring = pathlib.Path(first["resume_hmac_keyring"]).read_bytes()
+                second = module.provision_launch("test", "Test", "1")
+                self.assertEqual(marker.read_bytes(), b"retained")
+                self.assertEqual(pathlib.Path(second["resume_hmac_keyring"]).read_bytes(), keyring)
+
+    def test_relative_read_grants_are_refused(self):
+        module = load_entrypoint()
+        with tempfile.TemporaryDirectory() as root:
+            grants = pathlib.Path(root) / "read-paths.txt"
+            grants.write_text("relative/path\n", encoding="utf-8")
+            with mock.patch.dict(os.environ, {"CHIO_CAGE_INIT": "/helper", "CHIO_RECEIPT_ANCHOR_ROOT": "/anchor", "CHIO_CAGE_READ_PATHS_FILE": str(grants)}, clear=True):
+                with self.assertRaisesRegex(SystemExit, "read grants must be absolute"):
+                    module.native_cage_arguments()
 
     def test_an_unusable_authority_key_refuses_to_launch(self):
         with self.assertRaises(SystemExit) as refused:

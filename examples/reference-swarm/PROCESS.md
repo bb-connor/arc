@@ -6,8 +6,8 @@ invocation budget, and retains single-use continuations in the existing durable
 admission authority. Native MCP tools in this profile require verified Enforced
 cage launch with no network destinations. A missing prerequisite refuses startup.
 
-This path is being qualified for M5. The existing `smoke.sh` keeps its Disabled
-integration-only behavior. The commands below do not yet produce the complete M5
+This path is being qualified for M5. The separate `smoke.sh` also requires Enforced
+native launch but remains an integration-only task-authority fixture. The commands below do not yet produce the complete M5
 scenario, accounting, confinement and terminal-outcome acceptance artifact.
 
 ## Initialize

@@ -14,6 +14,8 @@ use crate::{
     generate_markdown_report, load_results_from_dir, load_scenarios_from_dir, CompatibilityReport,
 };
 
+mod native_launch;
+
 const SERVER_STARTUP_ATTEMPTS: usize = 900;
 const SERVER_STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -574,6 +576,7 @@ fn provision_native_mcp_security(
     runtime_state: &ConformanceRuntimeState,
     log_path: &Path,
 ) -> Result<ConformanceNativeSecurity, RunnerError> {
+    let cage_arguments = native_launch::configured_cage_arguments()?;
     let security_directory = runtime_state.root().join("native-mcp-security");
     let target_executable = resolve_python_executable(&options.python_binary)?;
     let source_upstream_server_script = fs::canonicalize(&options.upstream_server_script)?;
@@ -589,7 +592,8 @@ fn provision_native_mcp_security(
     let output = Command::new(chio_executable)
         .current_dir(&working_directory)
         .arg("security")
-        .arg("provision-native-mcp-demo")
+        .arg("provision-reference-runtime")
+        .args(cage_arguments)
         .arg("--output-dir")
         .arg(&security_directory)
         .arg("--tools-fixture")
@@ -612,7 +616,7 @@ fn provision_native_mcp_security(
         .arg("0.1.0")
         .output()
         .map_err(|source| RunnerError::Spawn {
-            command: "chio security provision-native-mcp-demo".to_string(),
+            command: "chio security provision-reference-runtime".to_string(),
             source,
         })?;
 
@@ -622,7 +626,7 @@ fn provision_native_mcp_security(
     log.sync_all()?;
     if !output.status.success() {
         return Err(RunnerError::ProcessFailed {
-            command: "chio security provision-native-mcp-demo".to_string(),
+            command: "chio security provision-reference-runtime".to_string(),
             status: output.status.code().unwrap_or(1),
             log_path: log_path.display().to_string(),
         });

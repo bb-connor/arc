@@ -1,5 +1,7 @@
 # mini-SWE-agent recovery through Chio
 
+Current reruns of the native fixtures require the [enforcing host inputs](../../docs/security/native-launch-examples.md). Historical Disabled-stage results below are retained as historical evidence; those policies cannot launch tools in the current runtime.
+
 This qualification runs the installed mini-SWE-agent 2.4.6 coding loop with
 Chio checkpoints and mediated commands. The upstream agent is inherited from
 [its pinned release](https://github.com/SWE-agent/mini-swe-agent/blob/a83fcae82d2a08f0ee0c688f9d137b3566c097f8/src/minisweagent/agents/default.py).

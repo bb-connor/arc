@@ -1,6 +1,6 @@
 # Docker Quickstart Example
 
-This example is the deployable local onboarding path for Chio. It starts:
+This example combines the trust service with an optional hosted native MCP edge:
 
 - `chio trust serve` with the receipt dashboard on `http://127.0.0.1:8940`
 - `chio mcp serve-http` on `http://127.0.0.1:8931`
@@ -11,15 +11,25 @@ This example is the deployable local onboarding path for Chio. It starts:
 From this directory:
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build chio-trust-demo
+```
+
+The hosted MCP edge is in the `enforced-native` profile. Configure the
+[enforcing host inputs](../../docs/security/native-launch-examples.md) and supply
+a qualified host-specific Compose override that mounts those exact paths and
+supports native cage enforcement. The stock topology does not establish those
+host properties. Then run:
+
+```bash
+docker compose -f compose.yaml -f /path/to/qualified-native-host.yaml \
+  --profile enforced-native up -d --build
 python3 smoke_client.py
 ```
 
-At every start the edge container provisions the signed manifest and the
-signed native-launch policy for the wrapped mock server into a private tmpfs
-and launches only that exact command; the demo-only signers never leave the
-container. Migration stage `Disabled` authorizes the launch without cage
-containment.
+The edge provisions an Enforced policy and confines discovery. Existing authority
+and session keys are retained on process restart. Disabled and Shadow policies
+cannot launch tools. The example signers stay in the private container storage;
+operator-managed persistent storage is required for custody across replacement.
 
 The stack runs with three distinct demo credentials: `demo-token` for clients
 of the hosted edge, `demo-admin-token` for the edge's admin routes, and

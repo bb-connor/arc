@@ -22,6 +22,7 @@ services:
       start_period: 5s
 
   chio-mcp-demo:
+    profiles: [enforced-native]
     image: chio-mcp-demo:local
     build:
       context: ../..
@@ -33,9 +34,12 @@ services:
       CHIO_CONTROL_URL: http://chio-trust-demo:8940
       CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
       CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
-    # The entrypoint provisions the signed manifest and native-launch policy
-    # for the wrapped mock server at every start; the demo-only signers live
-    # only in this private tmpfs.
+      CHIO_CAGE_INIT: ${CHIO_CAGE_INIT:-}
+      CHIO_RECEIPT_ANCHOR_ROOT: ${CHIO_RECEIPT_ANCHOR_ROOT:-}
+      CHIO_CAGE_READ_PATHS_FILE: ${CHIO_CAGE_READ_PATHS_FILE:-}
+    # A qualified host override must mount the configured static cage helper,
+    # independent receipt anchor and reviewed read grants at these exact paths.
+    # The entrypoint requires Enforced provisioning; there is no inactive fallback.
     tmpfs:
       - /run/chio-provision:rw,noexec,nosuid,nodev,size=67108864,mode=0700,uid=10001,gid=10001
     ports:

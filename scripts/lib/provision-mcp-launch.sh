@@ -11,9 +11,8 @@
 # canonicalized, because the policy binds the exact executable the edge will
 # run and the edge canonicalizes the wrapped command the same way. The tool
 # surface is discovered from the target itself. The output directory must be
-# an absolute path whose parent exists; a prior provision left there by this
-# helper is replaced, because every provision binds the digest of the chio
-# executable that made it and a rebuilt binary invalidates the old one.
+# an absolute path whose parent exists. Existing material is revalidated by
+# the provisioner, preserving migration and receipt custody across restarts.
 #
 # On success the following are exported:
 #
@@ -28,9 +27,11 @@
 # Splice "${CHIO_LAUNCH_FLAGS[@]}" before `--` and "${CHIO_LAUNCH_COMMAND[@]}"
 # after it so the launched command equals the bound one by construction.
 #
-# Migration stage Disabled is legacy-authorized demo mode, not cage
-# containment; the execution identity recorded in the policy is the invoking
-# user, which must not be root.
+# Requires a qualified enforcing Linux host and explicit CHIO_CAGE_INIT,
+# CHIO_RECEIPT_ANCHOR_ROOT and CHIO_CAGE_READ_PATHS_FILE. The latter lists the
+# reviewed absolute read paths, one per line, including interpreter runtime
+# dependencies for dynamic targets. The execution identity is the invoking
+# user, which must not be root. Discovery itself runs inside the enforced cage.
 
 chio_canonical_path() {
   python3 - "$1" <<'PY'
@@ -142,6 +143,12 @@ chio_provision_mcp_launch() {
     echo "chio_provision_mcp_launch: ${chio} is not an executable chio binary" >&2
     return 1
   fi
+  local cage_init="${CHIO_CAGE_INIT:-}" anchor_root="${CHIO_RECEIPT_ANCHOR_ROOT:-}"
+  local read_paths_file="${CHIO_CAGE_READ_PATHS_FILE:-}"
+  if [[ "${cage_init}" != /* || ! -x "${cage_init}" || "${anchor_root}" != /* || ! -d "${anchor_root}" || "${read_paths_file}" != /* || ! -f "${read_paths_file}" ]]; then
+    echo "chio_provision_mcp_launch: configure absolute CHIO_CAGE_INIT (executable), CHIO_RECEIPT_ANCHOR_ROOT (independent anchor directory), and CHIO_CAGE_READ_PATHS_FILE (reviewed read grants)" >&2
+    return 1
+  fi
 
   local canonical_target canonical_workdir
   canonical_target="$(chio_resolve_target "${target}")" || return 1
@@ -160,12 +167,6 @@ chio_provision_mcp_launch() {
       echo "chio_provision_mcp_launch: ${output_dir} exists and is not a prior provision" >&2
       return 1
     fi
-    # A relaunch keeps its provisioned material so the sessions it issued can
-    # be restored; the provisioner revalidates it byte for byte. Anything else
-    # starts from a fresh provision.
-    if [[ "${CHIO_PROVISION_REUSE:-0}" != "1" ]]; then
-      rm -rf -- "${output_dir}"
-    fi
   fi
 
   local -a target_args=("$@")
@@ -176,7 +177,10 @@ chio_provision_mcp_launch() {
     fi
   done
   local -a provision=(
-    "${chio}" security provision-native-mcp-demo
+    "${chio}" security provision-reference-runtime
+    --stage enforced
+    --cage-init "${cage_init}"
+    --receipt-rollback-anchor-root "${anchor_root}"
     --output-dir "${output_dir}"
     --discover-tools
     --target "${canonical_target}"
@@ -187,6 +191,15 @@ chio_provision_mcp_launch() {
     --server-name "${server_name}"
     --server-version "${server_version}"
   )
+  local read_path
+  while IFS= read -r read_path || [[ -n "${read_path}" ]]; do
+    [[ -z "${read_path}" ]] && continue
+    if [[ "${read_path}" != /* ]]; then
+      echo "chio_provision_mcp_launch: read grants must be absolute paths" >&2
+      return 1
+    fi
+    provision+=(--read-path "${read_path}")
+  done < "${read_paths_file}"
   for argument in ${target_args[@]+"${target_args[@]}"}; do
     provision+=(--target-arg "${argument}")
   done

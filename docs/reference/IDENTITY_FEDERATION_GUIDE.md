@@ -40,22 +40,15 @@ same Chio subject and therefore the same receipt attribution path.
 
 Every launch below wraps the repository's mock MCP server and passes the
 signed manifest and native-launch policy provisioned for that exact command.
-Provision them once, with demo-only signers at migration stage `Disabled`, and
-export what the launches reference:
+Configure the [enforcing host inputs](../security/native-launch-examples.md),
+including reviewed Python runtime read grants, then provision and export them:
 
 ```bash
-PYTHON3="$(python3 -c 'import sys, os; print(os.path.realpath(sys.executable))')"
-chio security provision-native-mcp-demo \
-  --output-dir "$PWD/federation-security" \
-  --discover-tools \
-  --target "$PYTHON3" \
-  --target-arg "$PWD/examples/docker/mock_mcp_server.py" \
-  --working-directory "$PWD" \
-  --execution-uid "$(id -u)" \
-  --execution-gid "$(id -g)" \
-  --server-id wrapped-http-mock \
-  --server-name "Wrapped HTTP Mock" \
-  --server-version 1 > federation-security.provision-report.json
+source scripts/lib/provision-mcp-launch.sh
+PYTHON3="$(chio_resolve_python python3)"
+chio_provision_mcp_launch "$(command -v chio)" "$PWD/federation-security" \
+  wrapped-http-mock "Wrapped HTTP Mock" 1 "$PWD" \
+  "$PYTHON3" "$PWD/examples/docker/mock_mcp_server.py"
 export CHIO_SIGNED_MANIFEST="$PWD/federation-security/signed-manifest.json"
 export CHIO_MANIFEST_PUBLIC_KEY="$(cat federation-security/manifest-public-key)"
 export CHIO_CAGE_POLICY="$PWD/federation-security/cage-launch-policy.json"

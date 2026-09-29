@@ -231,7 +231,7 @@ def main():
         command(operator, "session", "run", "--state", session, expected=1)
         assert not (session / "run").exists() and not calls
         # Authority is deliberately issued by this separate test harness.
-        # Production session commands never call this Disabled-stage provisioner.
+        # Production session commands never call this explicit fixture provisioner.
         bindings = {}
         for name, expected in request["servers"].items():
             configured = provision_native_demo(

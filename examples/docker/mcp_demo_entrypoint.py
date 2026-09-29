@@ -7,17 +7,16 @@ trust service accepts the workload token only for capability issuance. The
 credentials reach the edge through its environment, never through argv.
 
 Before the launch, the entrypoint provisions the signed manifest and the
-signed native-launch policy that bind the exact wrapped command, with
-demo-only signers at migration stage Disabled, into a private directory that
-lives only as long as the container, and pins the trust service's current
-capability authority key.
+signed native-launch policy that bind the exact wrapped command at migration
+stage Enforced. The operator supplies the cage helper, independent receipt
+anchor and reviewed filesystem grants on a qualified Linux host. Discovery
+is confined; existing authority and session material survives a restart.
 """
 
 import base64
 import json
 import os
 import re
-import shutil
 import subprocess
 import urllib.request
 
@@ -73,27 +72,59 @@ def control_authority_public_key(control_url: str, control_token: str) -> str:
 
 
 def write_resume_hmac_keyring(path: str) -> str:
-    """Write a fresh private resume keyring for this container's sessions."""
+    """Keep existing session custody, or create a fresh private resume keyring.
+
+    The Rust reader validates existing keyrings and refuses symlinks, invalid
+    contents or unsafe permissions before serving sessions.
+    """
+    if os.path.lexists(path):
+        return path
     key = base64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode("ascii")
     keyring = {
         "schema": "chio.remote-mcp.resume-hmac-keyring.v1",
         "current": {"keyId": "demo-" + os.urandom(4).hex(), "version": 1, "keyBase64": key},
         "previous": [],
     }
-    if os.path.lexists(path):
-        os.remove(path)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(keyring, handle)
     return path
 
 
+def native_cage_arguments() -> list[str]:
+    """Require explicit enforcement inputs before provisioning any artifacts."""
+    options = (
+        ("CHIO_CAGE_INIT", "--cage-init"),
+        ("CHIO_RECEIPT_ANCHOR_ROOT", "--receipt-rollback-anchor-root"),
+    )
+    arguments = ["--stage", "enforced"]
+    for variable, flag in options:
+        path = os.environ.get(variable, "")
+        if not os.path.isabs(path):
+            raise SystemExit(f"{variable} must name an absolute path on the enforcing host")
+        arguments.extend([flag, path])
+    grants = os.environ.get("CHIO_CAGE_READ_PATHS_FILE", "")
+    if not os.path.isabs(grants):
+        raise SystemExit("CHIO_CAGE_READ_PATHS_FILE must name the reviewed read-grants file")
+    try:
+        with open(grants, encoding="utf-8") as handle:
+            for line in handle:
+                path = line.rstrip("\r\n")
+                if not path:
+                    continue
+                if not os.path.isabs(path):
+                    raise SystemExit("read grants must be absolute paths")
+                arguments.extend(["--read-path", path])
+    except OSError as error:
+        raise SystemExit(f"could not read CHIO_CAGE_READ_PATHS_FILE: {error}") from error
+    return arguments
+
+
 def provision_launch(server_id: str, server_name: str, server_version: str) -> dict:
     """Provision the launch material for the mock server and return the edge flags."""
+    cage_arguments = native_cage_arguments()
     target = os.path.realpath("/usr/bin/python3")
     output_dir = os.path.join(provision_root(), "security")
-    if os.path.isdir(output_dir):
-        shutil.rmtree(output_dir)
     environment = {
         name: value
         for name, value in os.environ.items()
@@ -104,7 +135,8 @@ def provision_launch(server_id: str, server_name: str, server_version: str) -> d
             [
                 EXECUTABLE,
                 "security",
-                "provision-native-mcp-demo",
+                "provision-reference-runtime",
+                *cage_arguments,
                 "--output-dir",
                 output_dir,
                 "--discover-tools",

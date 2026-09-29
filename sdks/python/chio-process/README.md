@@ -27,9 +27,12 @@ packages outside the checkout. Registry publication is a separate release step.
 For operator-owned local demos, `chio_process.launch.provision_native_demo`
 calls the CLI's explicit native MCP provisioner and returns a host server
 configuration containing the signed launch policy and pinned signer. It starts
-the command for tool discovery. Supply a fresh output directory and retain the
-resulting policy for restart. This uses migration stage Disabled and provides
-no OS containment. Production operators must provision their own launch policy;
+the command inside an enforced cage for tool discovery. Configure the operator
+environment variables `CHIO_CAGE_INIT`, `CHIO_RECEIPT_ANCHOR_ROOT` and
+`CHIO_CAGE_READ_PATHS_FILE` with the static helper, independent anchor directory
+and a file listing reviewed absolute read paths, one per line. Supply a fresh output directory and retain the
+resulting policy for restart. This requires a qualified enforcing Linux host. Production operators retain
+ownership of their launch policy and publisher trust;
 the process host never infers authorization from discovery alone.
 
 ```python
