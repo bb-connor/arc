@@ -74,5 +74,49 @@
   "error-codegen": {
     "bytes": 2028,
     "sha256": "5c3809e50fedfcaa6cb630e16dfa576eb4e730b439784726f7729f773cec9d9e"
+  },
+  "clippy-terminal": {
+    "bytes": 8843,
+    "sha256": "a1f4a1fa2fb00dd1cbaaa13559b372655a8611c6c6adf5dab9b0bacf78a39c2d"
+  },
+  "format-terminal": {
+    "bytes": 30,
+    "sha256": "8c3652f78a020595ddeec5507bab173ec2f8cb2e9298118a48263268a5babec1"
+  },
+  "review-red": {
+    "bytes": 9120,
+    "sha256": "5d83442eeb35ae4e5ad678dd3ae3b980c088482b935865ae2eccd08df5b9142a"
+  },
+  "review-expiry-red": {
+    "bytes": 2654,
+    "sha256": "7ee85b45f128da31cb6eecd73c6dd57523dcae077627657d297839064f8bf8dd"
+  },
+  "review-suite": {
+    "bytes": 79201,
+    "sha256": "6cd5e722ff0c42b41394972e30f209c56fb6d41c3696e7803e973ff406e73cb6"
+  },
+  "review-clippy": {
+    "bytes": 1783,
+    "sha256": "830a9c681f6370117b86b821dbf517abf711fc7d6b2aa53e2018bfe452ca5e1a"
+  },
+  "review-format": {
+    "bytes": 30,
+    "sha256": "e30b181558ca0dbdf2b87b6afae22eab2ad6385fb1e8c96d467aac51eb797591"
+  },
+  "review-trust-gate": {
+    "bytes": 91,
+    "sha256": "2fbd264769eeea26e257f5574304cbc87862a007d5babf7e0abada8a808b051f"
+  },
+  "review-negative-gate": {
+    "bytes": 163,
+    "sha256": "f97a29016fc87fb3fac15f5700ddd4115744d27afb59248565f73249046bc815"
+  },
+  "review-hygiene": {
+    "bytes": 52079,
+    "sha256": "6a7a78d8dc963bd40f604e152dcec2d2755c7fbcbd17fc0baf0e5b8bd4190fed"
+  },
+  "openai-default-check": {
+    "bytes": 5116,
+    "sha256": "0c6d57c18ff8a8e45c76483409ea1665f759fabc904c4f4be7a8ace303e8f182"
   }
 }

@@ -45,6 +45,33 @@ The first four passed. The hygiene gate failed only two base-identical files:
 repository code generator. The initial `clippy` log records two test assertions
 using `expect_err` in modules that only permit `unwrap`; they were corrected.
 
+`clippy-terminal` uses the same 13-package selection and OpenAI feature with
+`cargo clippy --lib --tests -- -D warnings`: exit 0. `format-terminal` records
+`rustfmt --edition 2021 --config skip_children=true --check` on all 66 changed
+Rust files: exit 0.
+
+## Review repair qualification
+
+Implementation candidate `53858afa39` was reviewed once. Repair commit
+`68fb96f436` contains the production fixes and six regression cases.
+
+| Log | Command scope | Terminal result |
+| --- | --- | --- |
+| `review-red` | Same 13 packages/features, `cargo test --lib --no-fail-fast review_regression` | Exit 101, all six regressions failed for the intended reasons |
+| `review-expiry-red` | Same selection, `cargo test --lib review_regression_final_token_observation` | Exit 101, expired short-lived token accepted before repair |
+| `review-suite` | Same full test command as above | Exit 0, 889 passed, zero failed/ignored, 58 targets |
+| `review-clippy` | Same selection, `cargo clippy --lib --tests -- -D warnings` | Exit 0 |
+| `review-format` | Rustfmt check on all 67 changed Rust files | Exit 0 |
+| `review-trust-gate` | Trust-boundary script | Exit 0, 364 constructors, 85 tables, 170 SQL contracts |
+| `review-negative-gate` | Negative-assertion script | Exit 0, baseline unchanged at 1260 |
+| `review-hygiene` | Rust file hygiene script | Exit 1, same two base-identical failures outside changed owners |
+| `openai-default-check` | `CARGO_INCREMENTAL=0 cargo check -p chio-openai-adapter --no-default-features --lib` | Exit 0; OpenAI sources unchanged by the repair |
+
+[qualification.json](qualification.json) pins the reviewed and repaired commits,
+reader owners, test totals and known gate failures. The
+[review report](final-review.md) and [execution ledger](execution-ledger.md)
+record findings, dispositions and their costs.
+
 No whole-workspace, hosted, release, x86_64 native-enforcement or M5 evidence is
-claimed. The final review and qualification additions are recorded alongside
-this evidence after completion.
+claimed. No second review was dispatched. All review findings are addressed;
+the source/behavior evidence above is local qualification.

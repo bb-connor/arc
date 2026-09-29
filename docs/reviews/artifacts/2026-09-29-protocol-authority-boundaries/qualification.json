@@ -1,0 +1,57 @@
+{
+  "base": "1d4f3b4ad37fd505df11bcbb86775ee5c481bbb4",
+  "reviewed_candidate": "53858afa39a1637c258f56696867ac844ce4aec9",
+  "repair_commit": "68fb96f4363cc365325221ccef1e89636626ea7f",
+  "suite": {
+    "passed": 889,
+    "failed": 0,
+    "ignored": 0,
+    "targets": 58,
+    "packages": 13,
+    "exit_code": 0
+  },
+  "reader_owners": [
+    "crates/protocol/chio-a2a-adapter/src/auth.rs",
+    "crates/protocol/chio-a2a-adapter/src/invoke.rs",
+    "crates/protocol/chio-a2a-adapter/src/mapping.rs",
+    "crates/protocol/chio-a2a-adapter/src/task_registry.rs",
+    "crates/protocol/chio-a2a-adapter/src/transport.rs",
+    "crates/protocol/chio-mcp-adapter/src/framing.rs",
+    "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs",
+    "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc",
+    "crates/protocol/chio-mcp-adapter/src/transport/utils.rs",
+    "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs",
+    "crates/protocol/chio-mcp-edge/src/authorization.rs",
+    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs",
+    "crates/protocol/chio-openai-adapter/src/adapter.rs",
+    "crates/protocol/chio-openai-adapter/src/input.rs",
+    "crates/protocol/chio-openai-adapter/src/lib.rs",
+    "crates/protocol/chio-openai-adapter/src/streaming.rs",
+    "crates/protocol/chio-openai-adapter/src/transport.rs",
+    "crates/protocol/chio-provider-adapter-core/src/sse.rs"
+  ],
+  "raw_input_baseline_files": 289,
+  "sealed_proof_owners": 13,
+  "hygiene_failures": [
+    {
+      "path": "crates/platform/chio-control-plane/src/security/active_response.rs",
+      "lines": 2003,
+      "cap": 2002,
+      "sha256": "19d518b60bfd442761e296f95d6af76a0855161706f469345cbffc055383018e",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/budget_store/tests.rs",
+      "lines": 2482,
+      "cap": 2479,
+      "sha256": "d277912ff467b3318c866ff327344f5c7d5b58b6d8481bee31bfe9848fe9e5c3",
+      "unchanged_from_base": true
+    }
+  ],
+  "review_findings_unresolved": 0,
+  "release_qualified": false
+}

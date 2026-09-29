@@ -68,7 +68,10 @@ The [September 29 protocol batch](2026-09-29-protocol-authority-boundaries-execu
 reviews 22 decoder owners across MCP edge/adapter, A2A, OpenAI and the shared SSE
 reader. It repairs OAuth cache lifetime, task expiry, writer deadline and bounded
 stream paths; typed parser and clock failures retain their sources and redacted
-codes. It adds the cage-required launch proof to the seal gate. Broader semantic
+codes. Final review repairs serialize OAuth observations, check final advertised
+expiry, isolate expired writer commands and retain uncollected task results until
+TTL expiry. The 13-package local campaign passes 889 tests. It adds the
+cage-required launch proof to the seal gate. Broader semantic
 error-source migration and other protocol/product ingress remain queued.
 
 The next owner batch is native/hosted MCP authority: remove the existing
@@ -78,6 +81,9 @@ launch or transport mocks. Continue the original-byte and rejection contracts
 through `chio-mcp-remote`, `chio-hosted-mcp` and `chio-a2a-edge`. Finish the newly
 counted policy UTC reads (`resolve_current_time`, `evaluate_audited`) through the
 shared clock. No compatibility alias should replace the removed launch path.
+Also clear the two base-identical file-hygiene overages recorded by this batch
+(`active_response.rs` and SQLite `budget_store/tests.rs`) through their existing
+responsibility owners, preserving the current caps.
 
 ### 3. Compiler enforcement and secret ownership (implemented)
 
