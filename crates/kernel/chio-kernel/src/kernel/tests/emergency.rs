@@ -1,3 +1,4 @@
+use super::*;
 // Emergency kill-switch tests.
 //
 // Included by `src/kernel/tests.rs`, which already imported `super::*`
@@ -9,9 +10,9 @@
 // `thread` and `ChioScope` are already in scope from `tests/all.rs` via
 // the surrounding `tests.rs` `include!`s. Only pull in items that are not
 // already imported.
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
-use std::time::Duration;
+
+
+
 
 fn kernel_with_echo() -> (ChioKernel, Keypair, ChioScope) {
     let mut kernel = make_kernel(make_config());

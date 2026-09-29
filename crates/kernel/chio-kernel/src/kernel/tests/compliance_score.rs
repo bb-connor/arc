@@ -1,3 +1,4 @@
+use super::*;
 // Compliance-score tests.
 //
 // Included by `src/kernel/tests.rs`, which already pulled in `super::*`
@@ -8,11 +9,9 @@
 //   * zero denies in 1000 calls -> score > 900
 //   * revoked capability        -> score < 500
 
-use crate::compliance_score::{
-    compliance_score, ComplianceScoreConfig, ComplianceScoreInputs,
-};
-use crate::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
-use crate::operator_report::ComplianceReport;
+
+
+
 
 fn clean_report() -> ComplianceReport {
     ComplianceReport {

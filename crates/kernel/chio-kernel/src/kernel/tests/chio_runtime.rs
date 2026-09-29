@@ -1,3 +1,4 @@
+use super::*;
 // Chio runtime admission hook tests.
 //
 // These cover the generic pre-dispatch hook that Chio 7.0 uses to deny
@@ -7,7 +8,7 @@ struct DenyingRuntimeAdmissionHook {
     calls: std::sync::Arc<AtomicU64>,
 }
 
-struct AllowingRuntimeAdmissionHook {
+pub(super) struct AllowingRuntimeAdmissionHook {
     calls: std::sync::Arc<AtomicU64>,
 }
 
@@ -28,7 +29,7 @@ struct ReleaseTrackingRuntimeAdmissionHook {
     continuation_id: Option<&'static str>,
 }
 
-struct FailingReleaseRuntimeAdmissionHook {
+pub(super) struct FailingReleaseRuntimeAdmissionHook {
     calls: std::sync::Arc<AtomicU64>,
     releases: std::sync::Arc<AtomicU64>,
     expected_request_id: &'static str,
@@ -36,25 +37,25 @@ struct FailingReleaseRuntimeAdmissionHook {
     lease_id: &'static str,
 }
 
-struct FailingAfterSideEffectServer {
+pub(super) struct FailingAfterSideEffectServer {
     id: String,
     tools: Vec<String>,
     invocations: std::sync::Arc<AtomicU64>,
 }
 
-struct UrlElicitationBeforeSideEffectServer {
+pub(super) struct UrlElicitationBeforeSideEffectServer {
     id: String,
     tools: Vec<String>,
     stream_attempts: std::sync::Arc<AtomicU64>,
 }
 
-struct CancellationAfterSideEffectServer {
+pub(super) struct CancellationAfterSideEffectServer {
     id: String,
     tools: Vec<String>,
     side_effects: std::sync::Arc<AtomicU64>,
 }
 
-struct IncompleteAfterSideEffectServer {
+pub(super) struct IncompleteAfterSideEffectServer {
     id: String,
     tools: Vec<String>,
     side_effects: std::sync::Arc<AtomicU64>,
@@ -75,13 +76,13 @@ struct IncompleteStreamAfterSideEffectServer {
 // A registered server passes pre-dispatch validation, performs a side effect,
 // then returns ToolNotRegistered from dispatch. An unregistered server would be
 // denied before runtime admission and never reach the generic dispatch-error arm.
-struct ToolNotRegisteredDispatchServer {
+pub(super) struct ToolNotRegisteredDispatchServer {
     id: String,
     tools: Vec<String>,
     side_effects: std::sync::Arc<AtomicU64>,
 }
 
-struct NoopNestedFlowClient;
+pub(super) struct NoopNestedFlowClient;
 
 impl RuntimeAdmissionHook for DenyingRuntimeAdmissionHook {
     fn name(&self) -> &str {
@@ -2206,7 +2207,7 @@ fn drop_guard_reverse_failure_records_cleanup_fault() {
 
 // --- RFC-0002 drop-guard unwind tests ---
 
-fn make_fabricated_drop_charge() -> BudgetChargeResult {
+pub(super) fn make_fabricated_drop_charge() -> BudgetChargeResult {
     BudgetChargeResult {
         grant_index: 0,
         cost_charged: 5,
@@ -2234,7 +2235,7 @@ fn make_fabricated_drop_charge() -> BudgetChargeResult {
 /// the monetary reversal fails and records a fault receipt. Authorizing the hold
 /// first models the real admission so the pre-dispatch monetary unwind is a
 /// genuine, clean, receipt-free reversal.
-fn authorize_fabricated_drop_hold(
+pub(super) fn authorize_fabricated_drop_hold(
     kernel: &ChioKernel,
     capability_id: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {

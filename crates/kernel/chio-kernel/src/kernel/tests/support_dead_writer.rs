@@ -1,7 +1,8 @@
+use super::*;
 /// A receipt store whose supervised commit writer has died. Appends would still
 /// nominally succeed, but the writer flag reports serving-closed, so the kernel
 /// pre-dispatch gate must fail closed before any tool executes.
-struct DeadWriterReceiptStore;
+pub(in crate::kernel::tests) struct DeadWriterReceiptStore;
 
 impl ReceiptStore for DeadWriterReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
@@ -26,7 +27,7 @@ impl ReceiptStore for DeadWriterReceiptStore {
 /// before any tool executes, and the fail-closed deny it builds must not be
 /// masked into an error by attempting to persist itself through the same closed
 /// writer.
-struct RejectingDeadWriterReceiptStore;
+pub(in crate::kernel::tests) struct RejectingDeadWriterReceiptStore;
 
 impl ReceiptStore for RejectingDeadWriterReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
@@ -54,7 +55,7 @@ impl ReceiptStore for RejectingDeadWriterReceiptStore {
 /// lineage write was attempted so a test can prove the pre-dispatch gate denies
 /// BEFORE any writer-backed metadata write runs. Arming is deferred so capability
 /// issuance during test setup (which also records lineage) still succeeds.
-struct SnapshotTrackingDeadWriterStore {
+pub(in crate::kernel::tests) struct SnapshotTrackingDeadWriterStore {
     snapshot_attempted: std::sync::Arc<AtomicBool>,
     fail_snapshots: std::sync::Arc<AtomicBool>,
 }

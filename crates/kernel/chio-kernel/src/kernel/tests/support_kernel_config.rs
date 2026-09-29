@@ -1,4 +1,5 @@
-fn make_config() -> KernelConfig {
+use super::*;
+pub(in crate::kernel::tests) fn make_config() -> KernelConfig {
     KernelConfig {
         keypair: make_keypair(),
         ca_public_keys: vec![],
@@ -19,7 +20,7 @@ fn make_config() -> KernelConfig {
     }
 }
 
-fn make_kernel(config: KernelConfig) -> ChioKernel {
+pub(in crate::kernel::tests) fn make_kernel(config: KernelConfig) -> ChioKernel {
     let mut kernel = ChioKernel::new(config);
     kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     kernel

@@ -569,9 +569,8 @@ fn assert_monetary_capture_receipt_metadata(
     Ok(())
 }
 
-mod drop_durability {
-    include!("support_monetary_drop_durability.rs");
-}
+#[path = "support_monetary_drop_durability.rs"]
+mod drop_durability;
 
 fn assert_payment_authorization_retained(
     receipt: &ChioReceipt,

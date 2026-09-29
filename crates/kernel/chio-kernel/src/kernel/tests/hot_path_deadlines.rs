@@ -1,3 +1,4 @@
+use super::*;
 // Hot-path deadline and writer-watchdog behavior: a hung guard or tool server
 // fails closed within budget without pinning a worker, a dispatch deadline runs
 // the full cancellation unwind, and a wedged writer denies before any tool side
@@ -45,7 +46,7 @@ impl Guard for RecordingGuard {
 }
 
 /// A tool server whose `invoke` never returns, modeling a wedged tool server.
-struct HangingToolServer {
+pub(super) struct HangingToolServer {
     id: String,
     tools: Vec<String>,
     invocations: Arc<AtomicU64>,

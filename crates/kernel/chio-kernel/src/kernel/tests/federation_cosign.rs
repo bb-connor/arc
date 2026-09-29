@@ -1,3 +1,4 @@
+use super::*;
 // Cross-kernel federation bilateral co-signing tests.
 //
 // Included by `src/kernel/tests.rs`; shares helpers (`make_config`,
@@ -12,13 +13,8 @@
 //     artifact behind,
 //   * missing peer pin fails closed.
 
-use chio_core::capability::features::CapabilityNegotiation;
-use chio_federation::{
-    bilateral::BilateralCoSigningError, bilateral::BilateralCoSigningProtocol,
-    bilateral::CoSigningRequest, bilateral::CoSigningResponse, bilateral::InProcessCoSigner,
-    trust_establishment::FederationPeer, trust_establishment::KernelTrustExchange,
-    trust_establishment::PeerHandshakeEnvelope,
-};
+
+
 
 #[tokio::test(flavor = "current_thread")]
 async fn concurrent_duplicate_request_ids_keep_federation_scopes_isolated(
@@ -66,7 +62,7 @@ async fn concurrent_duplicate_request_ids_keep_federation_scopes_isolated(
     Ok(())
 }
 
-struct CountingRejectingCosigner {
+pub(super) struct CountingRejectingCosigner {
     calls: std::sync::Arc<AtomicU64>,
 }
 
@@ -82,7 +78,9 @@ impl BilateralCoSigningProtocol for CountingRejectingCosigner {
     }
 }
 
-include!("../../../tests/support/treaty_dsse.rs");
+#[path = "../../../tests/support/treaty_dsse.rs"]
+mod treaty_dsse;
+use treaty_dsse::*;
 
 struct ForgedTreatyMetadataAdmissionHook;
 
@@ -118,7 +116,7 @@ impl RuntimeAdmissionHook for ForgedTreatyMetadataAdmissionHook {
     }
 }
 
-struct FailingAppendReceiptStore {
+pub(super) struct FailingAppendReceiptStore {
     called: std::sync::Arc<AtomicBool>,
 }
 
@@ -208,7 +206,7 @@ fn federation_receipt_context_fixture(
     (kernel, request, receipt, append_calls, cosigner_calls)
 }
 
-fn handshake_and_pin(
+pub(super) fn handshake_and_pin(
     local: &KernelTrustExchange,
     remote_kernel_id: &str,
     remote_keypair: &Keypair,

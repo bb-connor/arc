@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn governed_monetary_allow_receipt_contains_approval_metadata() {
     let mut kernel = make_kernel(make_monetary_config());

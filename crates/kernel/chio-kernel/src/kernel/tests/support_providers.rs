@@ -1,5 +1,6 @@
-struct FilesystemResourceProvider;
-struct ExamplePromptProvider;
+use super::*;
+pub(super) struct FilesystemResourceProvider;
+pub(super) struct ExamplePromptProvider;
 
 impl ResourceProvider for FilesystemResourceProvider {
     fn list_resources(&self) -> Vec<ResourceDefinition> {

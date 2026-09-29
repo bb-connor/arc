@@ -1,4 +1,5 @@
-struct CallerContextProbe {
+use super::*;
+pub(super) struct CallerContextProbe {
     observations: std::sync::Arc<Mutex<Vec<(String, crate::ToolInvocationContext, bool)>>>,
     stream: bool,
 }

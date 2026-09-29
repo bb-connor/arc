@@ -1,3 +1,4 @@
+use super::*;
 struct RevocationWindowServer {
     id: String,
     tools: Vec<String>,
@@ -58,7 +59,7 @@ struct RecordingExecutionNonceStore {
 }
 
 #[derive(Clone, Copy)]
-enum PostDispatchApprovalCommitFailure {
+pub(super) enum PostDispatchApprovalCommitFailure {
     OwnershipLost,
     StoreError,
 }
@@ -107,7 +108,7 @@ impl GovernedApprovalReplayStore for PostDispatchFailingApprovalReplayStore {
     }
 }
 
-struct CountingDispatchServer {
+pub(super) struct CountingDispatchServer {
     id: String,
     tool: String,
     invocations: std::sync::Arc<AtomicU64>,
@@ -142,7 +143,7 @@ struct PostDispatchApprovalCommitFixture {
     invocations: std::sync::Arc<AtomicU64>,
 }
 
-fn post_dispatch_approval_commit_fixture(
+pub(super) fn post_dispatch_approval_commit_fixture(
     request_id: &str,
     failure: PostDispatchApprovalCommitFailure,
 ) -> PostDispatchApprovalCommitFixture {
@@ -329,7 +330,7 @@ fn install_revocation_window_server(
     (started, released, release_notify, invocations)
 }
 
-fn request_with_replayed_approval(
+pub(super) fn request_with_replayed_approval(
     request_id: &str,
 ) -> Result<
     (
@@ -462,7 +463,7 @@ fn request_with_panicking_execution_nonce_store(
     })
 }
 
-fn request_with_recording_execution_nonce_store(
+pub(super) fn request_with_recording_execution_nonce_store(
     request_id: &str,
 ) -> Result<
     (

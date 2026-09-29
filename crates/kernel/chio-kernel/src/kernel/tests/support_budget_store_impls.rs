@@ -1,3 +1,4 @@
+use super::*;
 macro_rules! delegate_authority_fenced_budget_methods {
     ($field:ident) => {
         fn try_charge_cost_with_ids_and_authority(

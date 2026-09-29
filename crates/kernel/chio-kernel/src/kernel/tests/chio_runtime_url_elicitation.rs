@@ -1,3 +1,4 @@
+use super::*;
 /// Sibling-sum delegation fixture whose child capabilities target a tool server
 /// that returns `UrlElicitationsRequired` after dispatch entry. Parent share
 /// is 5000 bps and each child claims 4000 bps, so child_a alone fits but

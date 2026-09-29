@@ -1,53 +1,21 @@
 use super::*;
-use std::io::{Read, Write};
-use std::net::TcpListener;
-use std::path::{Path, PathBuf};
-use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Mutex, MutexGuard};
-use std::thread;
 
-use chio_core::capability::{
-    attenuation::{
-        compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
-        DelegationLinkBody,
-    },
-    governance::{
-        CallChainContinuationAudience, CallChainContinuationToken, CallChainContinuationTokenBody,
-        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-        GovernedAutonomyContext, GovernedAutonomyTier, GovernedCallChainContext,
-        GovernedTransactionIntent, GovernedUpstreamCallChainProof,
-        GovernedUpstreamCallChainProofBody, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
-        GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY,
-    },
-    scope::{
-        ChioScope, Constraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant,
-    },
-    token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody},
-};
-use chio_core::credit::{
-    CreditBondArtifact, CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites,
-    CreditBondReport, CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
-    CreditScorecardSummary, ExposureLedgerQuery, ExposureLedgerSummary, SignedCreditBond,
-    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
-};
-use chio_core::crypto::{Keypair, PublicKey};
-use chio_core::receipt::{
-    body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
-    metadata::GuardEvidence,
-};
-use chio_core::session::{
-    CompleteOperation, CompletionArgument, CompletionReference, CreateMessageOperation,
-    GetPromptOperation, OperationContext, RequestId, SamplingMessage, SamplingTool,
-    SamplingToolChoice, SessionAnchorReference, SessionAuthContext, SessionId, SessionOperation,
-    ToolCallOperation,
-};
-use chio_core::{
-    PromptArgument, PromptDefinition, PromptMessage, PromptResult, ReadResourceOperation,
-    ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
-};
-use chio_link::{ExchangeRate, PriceOracle, PriceOracleError};
-use rusqlite::{params, Connection, OptionalExtension, Row};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 fn signed_capability_from_row(
     row: &Row<'_>,
@@ -66,7 +34,7 @@ fn signed_capability_from_row(
         .transpose()
 }
 
-struct SqliteReceiptStore {
+pub(super) struct SqliteReceiptStore {
     connection: Mutex<Connection>,
     // Test-double analogue of the real store's writer-actor signer install
     // (`enable_background_checkpoints`). `None` until installed;
@@ -878,7 +846,7 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 }
 
-struct SqliteRevocationStore {
+pub(super) struct SqliteRevocationStore {
     path: PathBuf,
 }
 
@@ -938,13 +906,15 @@ impl RevocationStore for SqliteRevocationStore {
     }
 }
 
-fn make_keypair() -> Keypair {
+pub(super) fn make_keypair() -> Keypair {
     Keypair::generate()
 }
 
-include!("support_kernel_config.rs");
+#[path = "support_kernel_config.rs"]
+mod kernel_config;
+use kernel_config::{make_config, make_kernel};
 
-fn make_signed_receipt(kp: &Keypair, id: &str) -> ChioReceipt {
+pub(super) fn make_signed_receipt(kp: &Keypair, id: &str) -> ChioReceipt {
     ChioReceipt::sign(
         ChioReceiptBody {
             id: id.to_string(),
@@ -975,7 +945,7 @@ fn make_signed_receipt(kp: &Keypair, id: &str) -> ChioReceipt {
     .expect("sign receipt")
 }
 
-fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
+pub(super) fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
@@ -987,7 +957,7 @@ fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
     ))
 }
 
-fn make_elicited_content() -> CreateElicitationResult {
+pub(super) fn make_elicited_content() -> CreateElicitationResult {
     CreateElicitationResult {
         action: chio_core::session::ElicitationAction::Accept,
         content: Some(serde_json::json!({
@@ -996,7 +966,7 @@ fn make_elicited_content() -> CreateElicitationResult {
     }
 }
 
-fn make_grant(server: &str, tool: &str) -> ToolGrant {
+pub(super) fn make_grant(server: &str, tool: &str) -> ToolGrant {
     ToolGrant {
         server_id: server.to_string(),
         tool_name: tool.to_string(),
@@ -1009,14 +979,14 @@ fn make_grant(server: &str, tool: &str) -> ToolGrant {
     }
 }
 
-fn make_scope(grants: Vec<ToolGrant>) -> ChioScope {
+pub(super) fn make_scope(grants: Vec<ToolGrant>) -> ChioScope {
     ChioScope {
         grants,
         ..ChioScope::default()
     }
 }
 
-fn make_capability(
+pub(super) fn make_capability(
     kernel: &ChioKernel,
     subject_kp: &Keypair,
     scope: ChioScope,
@@ -1027,7 +997,7 @@ fn make_capability(
         .unwrap()
 }
 
-fn make_direct_attenuated_capability(
+pub(super) fn make_direct_attenuated_capability(
     issuer: &Keypair,
     subject: &PublicKey,
     scope: ChioScope,
@@ -1062,7 +1032,7 @@ fn make_direct_attenuated_capability(
     .expect("sign attenuated capability")
 }
 
-fn make_request(
+pub(super) fn make_request(
     request_id: &str,
     cap: &CapabilityToken,
     tool: &str,
@@ -1077,7 +1047,7 @@ fn make_request(
     )
 }
 
-fn make_request_with_arguments(
+pub(super) fn make_request_with_arguments(
     request_id: &str,
     cap: &CapabilityToken,
     tool: &str,
@@ -1104,7 +1074,7 @@ fn make_request_with_arguments(
     }
 }
 
-fn make_operation_context(
+pub(super) fn make_operation_context(
     session_id: &SessionId,
     request_id: &str,
     agent_id: &str,
@@ -1116,7 +1086,7 @@ fn make_operation_context(
     )
 }
 
-fn session_tool_call(response: SessionOperationResponse) -> Option<ToolCallResponse> {
+pub(super) fn session_tool_call(response: SessionOperationResponse) -> Option<ToolCallResponse> {
     if let SessionOperationResponse::ToolCall(response) = response {
         Some(response)
     } else {
@@ -1124,7 +1094,7 @@ fn session_tool_call(response: SessionOperationResponse) -> Option<ToolCallRespo
     }
 }
 
-fn session_capability_list(response: SessionOperationResponse) -> Option<Vec<CapabilityToken>> {
+pub(super) fn session_capability_list(response: SessionOperationResponse) -> Option<Vec<CapabilityToken>> {
     if let SessionOperationResponse::CapabilityList { capabilities } = response {
         Some(capabilities)
     } else {
@@ -1132,7 +1102,7 @@ fn session_capability_list(response: SessionOperationResponse) -> Option<Vec<Cap
     }
 }
 
-fn session_root_list(response: SessionOperationResponse) -> Option<Vec<RootDefinition>> {
+pub(super) fn session_root_list(response: SessionOperationResponse) -> Option<Vec<RootDefinition>> {
     if let SessionOperationResponse::RootList { roots } = response {
         Some(roots)
     } else {
@@ -1140,7 +1110,7 @@ fn session_root_list(response: SessionOperationResponse) -> Option<Vec<RootDefin
     }
 }
 
-fn session_resource_list(response: SessionOperationResponse) -> Option<Vec<ResourceDefinition>> {
+pub(super) fn session_resource_list(response: SessionOperationResponse) -> Option<Vec<ResourceDefinition>> {
     if let SessionOperationResponse::ResourceList { resources } = response {
         Some(resources)
     } else {
@@ -1148,7 +1118,7 @@ fn session_resource_list(response: SessionOperationResponse) -> Option<Vec<Resou
     }
 }
 
-fn session_resource_read(response: SessionOperationResponse) -> Option<Vec<ResourceContent>> {
+pub(super) fn session_resource_read(response: SessionOperationResponse) -> Option<Vec<ResourceContent>> {
     if let SessionOperationResponse::ResourceRead { contents } = response {
         Some(contents)
     } else {
@@ -1156,7 +1126,7 @@ fn session_resource_read(response: SessionOperationResponse) -> Option<Vec<Resou
     }
 }
 
-fn session_prompt_list(response: SessionOperationResponse) -> Option<Vec<PromptDefinition>> {
+pub(super) fn session_prompt_list(response: SessionOperationResponse) -> Option<Vec<PromptDefinition>> {
     if let SessionOperationResponse::PromptList { prompts } = response {
         Some(prompts)
     } else {
@@ -1164,7 +1134,7 @@ fn session_prompt_list(response: SessionOperationResponse) -> Option<Vec<PromptD
     }
 }
 
-fn session_prompt_get(response: SessionOperationResponse) -> Option<PromptResult> {
+pub(super) fn session_prompt_get(response: SessionOperationResponse) -> Option<PromptResult> {
     if let SessionOperationResponse::PromptGet { prompt } = response {
         Some(prompt)
     } else {
@@ -1172,7 +1142,7 @@ fn session_prompt_get(response: SessionOperationResponse) -> Option<PromptResult
     }
 }
 
-fn session_completion(response: SessionOperationResponse) -> Option<CompletionResult> {
+pub(super) fn session_completion(response: SessionOperationResponse) -> Option<CompletionResult> {
     if let SessionOperationResponse::Completion { completion } = response {
         Some(completion)
     } else {
@@ -1180,7 +1150,7 @@ fn session_completion(response: SessionOperationResponse) -> Option<CompletionRe
     }
 }
 
-fn tool_call_value_output(output: Option<ToolCallOutput>) -> Option<serde_json::Value> {
+pub(super) fn tool_call_value_output(output: Option<ToolCallOutput>) -> Option<serde_json::Value> {
     if let Some(ToolCallOutput::Value(value)) = output {
         Some(value)
     } else {
@@ -1188,7 +1158,7 @@ fn tool_call_value_output(output: Option<ToolCallOutput>) -> Option<serde_json::
     }
 }
 
-fn tool_call_stream_output(output: Option<ToolCallOutput>) -> Option<ToolCallStream> {
+pub(super) fn tool_call_stream_output(output: Option<ToolCallOutput>) -> Option<ToolCallStream> {
     if let Some(ToolCallOutput::Stream(stream)) = output {
         Some(stream)
     } else {
@@ -1196,7 +1166,7 @@ fn tool_call_stream_output(output: Option<ToolCallOutput>) -> Option<ToolCallStr
     }
 }
 
-fn assert_content_addressed_receipt_id(id: &str) {
+pub(super) fn assert_content_addressed_receipt_id(id: &str) {
     assert_eq!(id.len(), 64, "receipt id should be a SHA-256 hex digest");
     assert!(
         id.chars()
@@ -1205,7 +1175,7 @@ fn assert_content_addressed_receipt_id(id: &str) {
     );
 }
 
-fn make_chain_bound_delegation_link(
+pub(super) fn make_chain_bound_delegation_link(
     capability_id: &str,
     delegator_kp: &Keypair,
     delegatee: &PublicKey,
@@ -1228,7 +1198,7 @@ fn make_chain_bound_delegation_link(
     .unwrap()
 }
 
-fn make_chain_bound_capability(
+pub(super) fn make_chain_bound_capability(
     kernel: &ChioKernel,
     id: &str,
     subject: PublicKey,
@@ -1270,14 +1240,14 @@ fn make_chain_bound_capability(
     .unwrap()
 }
 
-fn set_capability_trust_root_for_scope(kernel: &ChioKernel, scope: &ChioScope) {
+pub(super) fn set_capability_trust_root_for_scope(kernel: &ChioKernel, scope: &ChioScope) {
     kernel.set_capability_trust_root(
         kernel.config.keypair.public_key(),
         scope_hash(scope).unwrap(),
     );
 }
 
-struct V2DelegatedChildInput<'a> {
+pub(super) struct V2DelegatedChildInput<'a> {
     kernel: &'a ChioKernel,
     parent: &'a CapabilityToken,
     parent_kp: &'a Keypair,
@@ -1288,7 +1258,7 @@ struct V2DelegatedChildInput<'a> {
     share_bps: u16,
 }
 
-fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken {
+pub(super) fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken {
     let parent_scope_hash = scope_hash(input.parent_scope).unwrap();
     let child_scope_hash = scope_hash(&input.child_scope).unwrap();
     let issued_at = current_unix_timestamp();
@@ -1339,40 +1309,40 @@ fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken 
     .unwrap()
 }
 
-struct EchoServer {
+pub(super) struct EchoServer {
     id: String,
     tools: Vec<String>,
 }
 
-struct SideEffectServer {
+pub(super) struct SideEffectServer {
     id: String,
     tools: Vec<String>,
     invocations: std::sync::Arc<AtomicU64>,
 }
 
-struct IncompleteServer {
+pub(super) struct IncompleteServer {
     id: String,
 }
 
-struct StreamingServer {
+pub(super) struct StreamingServer {
     id: String,
     chunks: Vec<serde_json::Value>,
 }
 
-struct EventDrainServer {
+pub(super) struct EventDrainServer {
     id: String,
     events: Vec<ToolServerEvent>,
 }
 
-struct FailingEventDrainServer {
+pub(super) struct FailingEventDrainServer {
     id: String,
 }
 
-struct NestedFlowServer {
+pub(super) struct NestedFlowServer {
     id: String,
 }
 
-struct MockNestedFlowClient {
+pub(super) struct MockNestedFlowClient {
     roots: Vec<RootDefinition>,
     sampled_message: CreateMessageResult,
     elicited_content: CreateElicitationResult,
@@ -1383,10 +1353,10 @@ struct MockNestedFlowClient {
     resources_list_changed_count: u32,
 }
 
-struct DocsResourceProvider;
-struct StubPaymentAdapter;
-struct DecliningPaymentAdapter;
-struct PrepaidSettledPaymentAdapter;
+pub(super) struct DocsResourceProvider;
+pub(super) struct StubPaymentAdapter;
+pub(super) struct DecliningPaymentAdapter;
+pub(super) struct PrepaidSettledPaymentAdapter;
 
 impl EchoServer {
     fn new(id: &str, tools: Vec<&str>) -> Self {
@@ -1957,7 +1927,7 @@ impl ResourceProvider for DocsResourceProvider {
 }
 
 #[derive(Default)]
-struct AppendOnlyReceiptStore;
+pub(super) struct AppendOnlyReceiptStore;
 
 impl ReceiptStore for AppendOnlyReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
@@ -1971,14 +1941,16 @@ impl ReceiptStore for AppendOnlyReceiptStore {
         Ok(())
     }
 }
-include!("support_dead_writer.rs");
+#[path = "support_dead_writer.rs"]
+mod dead_writer;
+use dead_writer::*;
 
 /// A store that reports retention support but, like the real prefix-watermark
 /// store, cannot honor a tenant-scoped policy (it inherits the default
 /// `supports_tenant_scoped_retention` = false). Used to prove the attach path
 /// rejects a tenant-scoped retention config before spawning the worker.
 #[derive(Default)]
-struct RetentionCapableReceiptStore;
+pub(super) struct RetentionCapableReceiptStore;
 
 impl ReceiptStore for RetentionCapableReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
@@ -2001,7 +1973,7 @@ impl ReceiptStore for RetentionCapableReceiptStore {
 /// that implements point loads, so an evicted parent receipt still resolves from
 /// the store after the bounded mirror drops it.
 #[derive(Default)]
-struct PointLookupReceiptStore {
+pub(super) struct PointLookupReceiptStore {
     chio: std::sync::Mutex<std::collections::HashMap<String, ChioReceipt>>,
 }
 
@@ -2036,7 +2008,7 @@ impl ReceiptStore for PointLookupReceiptStore {
 /// point load with a read-boundary error, exercising the fail-closed
 /// error-propagation path.
 #[derive(Default)]
-struct ErroringReceiptStore;
+pub(super) struct ErroringReceiptStore;
 
 impl ReceiptStore for ErroringReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
@@ -2070,7 +2042,7 @@ impl ReceiptStore for ErroringReceiptStore {
 }
 
 #[derive(Default)]
-struct FailingCheckpointHydrationReceiptStore;
+pub(super) struct FailingCheckpointHydrationReceiptStore;
 
 impl ReceiptStore for FailingCheckpointHydrationReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
@@ -2092,7 +2064,7 @@ impl ReceiptStore for FailingCheckpointHydrationReceiptStore {
 }
 
 #[derive(Default)]
-struct FailingSessionAnchorReceiptStore;
+pub(super) struct FailingSessionAnchorReceiptStore;
 
 impl ReceiptStore for FailingSessionAnchorReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
@@ -2128,7 +2100,7 @@ struct RecordedSessionAnchor {
 }
 
 #[derive(Default)]
-struct RecordingSessionAnchorReceiptStore {
+pub(super) struct RecordingSessionAnchorReceiptStore {
     anchors: std::sync::Arc<Mutex<Vec<RecordedSessionAnchor>>>,
 }
 
@@ -2165,7 +2137,7 @@ impl ReceiptStore for RecordingSessionAnchorReceiptStore {
 }
 
 #[derive(Default)]
-struct FailingRequestLineageReceiptStore;
+pub(super) struct FailingRequestLineageReceiptStore;
 
 impl ReceiptStore for FailingRequestLineageReceiptStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
@@ -2195,3 +2167,8 @@ impl ReceiptStore for FailingRequestLineageReceiptStore {
         ))
     }
 }
+
+#[path = "support_receipt_store_extensions.rs"]
+mod receipt_store_extensions;
+#[path = "support_budget_store_impls.rs"]
+mod budget_store_impls;

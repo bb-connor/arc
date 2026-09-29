@@ -1,18 +1,7 @@
-use crate::admission_operation::{
-    AdmissionAttachment, AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult,
-    AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationError, AdmissionOperationId,
-    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreError,
-    AdmissionOperationV1, AdmissionProjectionCapabilities, AdmissionReplayClassification,
-    AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection, AdmissionTerminalReplay,
-    QualifiedAdmissionOperationStore, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
-};
-use crate::receipt_store::{QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError};
-use crate::tool_outcome::{
-    validate_evaluation_store_successor, validate_terminal_store_pair, CanonicalInvocationBlobV1,
-    CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1, QualifiedToolOutcomeStore,
-    RawInvocationOutcomeV1, ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore,
-    ToolOutcomeStoreError,
-};
+use super::*;
+
+
+
 
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
@@ -51,7 +40,7 @@ mod runtime_participant;
 #[path = "durable_admission/security_binding.rs"]
 mod security_binding;
 
-use receipt_projection::AdmissionReceiptProjectionStore;
+
 
 #[test]
 fn durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ephemeral_mode() {
@@ -201,7 +190,7 @@ struct TestAdmissionState {
     payment_release_evidence: Option<crate::tool_outcome::PersistedMonetaryReleaseEvidenceV1>,
 }
 
-struct TestAdmissionOperationStore {
+pub(super) struct TestAdmissionOperationStore {
     caller_share_times: std::sync::Mutex<Vec<u64>>,
     recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults,
     native_recovery: native_acquisition::TestNative,
@@ -448,7 +437,7 @@ impl ReceiptStore for TestAdmissionOperationStore {
     }
 }
 
-struct QualifiedDurablePaymentAdapter {
+pub(super) struct QualifiedDurablePaymentAdapter {
     authorization_references: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
     settlement_actions: std::sync::Arc<std::sync::Mutex<Vec<&'static str>>>,
     settlement_references: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
@@ -1206,14 +1195,14 @@ impl ToolOutcomeStore for TestAdmissionOperationStore {
 
 impl QualifiedToolOutcomeStore for TestAdmissionOperationStore {}
 
-fn assert_same_receipt(left: &ChioReceipt, right: &ChioReceipt) {
+pub(super) fn assert_same_receipt(left: &ChioReceipt, right: &ChioReceipt) {
     assert_eq!(
         chio_core::canonical::canonical_json_bytes(left).expect("canonical left receipt"),
         chio_core::canonical::canonical_json_bytes(right).expect("canonical right receipt")
     );
 }
 
-fn admission_test_fence() -> StoreMutationFence {
+pub(super) fn admission_test_fence() -> StoreMutationFence {
     StoreMutationFence {
         store_uuid: "test-admission-authority".to_string(),
         lease_id: "test-admission-lease".to_string(),
@@ -1221,7 +1210,7 @@ fn admission_test_fence() -> StoreMutationFence {
     }
 }
 
-struct DurableAdmissionCheckingServer {
+pub(super) struct DurableAdmissionCheckingServer {
     id: String,
     tools: Vec<String>,
     invocations: std::sync::Arc<AtomicU64>,
@@ -1306,7 +1295,7 @@ impl ToolServerConnection for DurableIncompleteStreamServer {
     }
 }
 
-fn durable_admission_fixture(
+pub(super) fn durable_admission_fixture(
     request_id: &str,
 ) -> (
     ChioKernel,
@@ -1317,7 +1306,7 @@ fn durable_admission_fixture(
     durable_admission_fixture_with_grants(request_id, vec![make_grant("durable-server", "mutate")])
 }
 
-fn durable_admission_fixture_with_grants(
+pub(super) fn durable_admission_fixture_with_grants(
     request_id: &str,
     grants: Vec<ToolGrant>,
 ) -> (
@@ -2108,7 +2097,7 @@ fn durable_pre_dispatch_denial_commits_terminal_compensation() {
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
 
-struct VersionlessPostInvocationHook;
+pub(super) struct VersionlessPostInvocationHook;
 
 impl crate::post_invocation::PostInvocationHook for VersionlessPostInvocationHook {
     fn name(&self) -> &str {
@@ -2124,7 +2113,7 @@ impl crate::post_invocation::PostInvocationHook for VersionlessPostInvocationHoo
     }
 }
 
-struct StableRedactingPostInvocationHook {
+pub(super) struct StableRedactingPostInvocationHook {
     replacement: &'static str,
 }
 

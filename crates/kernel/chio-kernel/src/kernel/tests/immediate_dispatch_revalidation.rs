@@ -1,3 +1,4 @@
+use super::*;
 struct ImmediateReadyMutationHook {
     mutable_state: std::sync::Arc<AtomicBool>,
     revalidations: std::sync::Arc<AtomicU64>,

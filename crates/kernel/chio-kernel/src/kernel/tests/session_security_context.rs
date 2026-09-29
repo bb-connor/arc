@@ -1,3 +1,4 @@
+use super::*;
 struct SessionSecurityContextAuthority;
 
 impl SecurityInvocationContextAuthority for SessionSecurityContextAuthority {

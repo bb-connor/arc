@@ -1,4 +1,5 @@
-struct DurableUrlElicitationServer {
+use super::*;
+pub(super) struct DurableUrlElicitationServer {
     store: std::sync::Arc<TestAdmissionOperationStore>,
 }
 

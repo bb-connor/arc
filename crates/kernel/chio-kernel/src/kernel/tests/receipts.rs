@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn dead_commit_writer_denies_before_the_tool_executes() {
     let mut kernel = make_kernel(make_config());

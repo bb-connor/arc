@@ -1,16 +1,17 @@
-struct MonetaryCostServer {
+use super::*;
+pub(super) struct MonetaryCostServer {
     id: String,
     reported_cost: Option<ToolInvocationCost>,
 }
 
-struct FailingMonetaryServer {
+pub(super) struct FailingMonetaryServer {
     id: String,
 }
 
 /// A monetary tool server that dispatches a pass-through but reports that it
 /// does not measure realized cost, mirroring the sidecar mediated route's
 /// pre-execution authorization gate.
-struct UnmeasuredCostServer {
+pub(super) struct UnmeasuredCostServer {
     id: String,
 }
 
@@ -38,18 +39,18 @@ impl ToolServerConnection for UnmeasuredCostServer {
     }
 }
 
-struct CountingMonetaryServer {
+pub(super) struct CountingMonetaryServer {
     id: String,
     invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
-struct PendingMonetaryServer {
+pub(super) struct PendingMonetaryServer {
     id: String,
     started: std::sync::Arc<tokio::sync::Notify>,
     invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
-struct StaticPriceOracle {
+pub(super) struct StaticPriceOracle {
     rates: std::collections::BTreeMap<(String, String), Result<ExchangeRate, PriceOracleError>>,
 }
 
@@ -241,7 +242,7 @@ impl ToolServerConnection for PendingMonetaryServer {
     }
 }
 
-fn make_monetary_grant(
+pub(super) fn make_monetary_grant(
     server: &str,
     tool: &str,
     max_cost_per_invocation: u64,
@@ -267,7 +268,7 @@ fn make_monetary_grant(
     }
 }
 
-fn make_monetary_config() -> KernelConfig {
+pub(super) fn make_monetary_config() -> KernelConfig {
     KernelConfig {
         keypair: make_keypair(),
         ca_public_keys: vec![],
@@ -288,7 +289,7 @@ fn make_monetary_config() -> KernelConfig {
     }
 }
 
-struct SiblingSumMonetaryFixture {
+pub(super) struct SiblingSumMonetaryFixture {
     kernel: ChioKernel,
     child_a: CapabilityToken,
     child_b: CapabilityToken,
@@ -297,7 +298,7 @@ struct SiblingSumMonetaryFixture {
     path: PathBuf,
 }
 
-fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture {
+pub(super) fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture {
     let path = unique_receipt_db_path(prefix);
     let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut kernel = make_kernel(make_monetary_config());
@@ -361,7 +362,7 @@ fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture 
     }
 }
 
-struct SiblingSumInvocationFixture {
+pub(super) struct SiblingSumInvocationFixture {
     kernel: ChioKernel,
     child_a: CapabilityToken,
     child_b: CapabilityToken,
@@ -370,13 +371,13 @@ struct SiblingSumInvocationFixture {
     path: PathBuf,
 }
 
-fn make_invocation_limited_grant(server: &str, tool: &str, max_invocations: u32) -> ToolGrant {
+pub(super) fn make_invocation_limited_grant(server: &str, tool: &str, max_invocations: u32) -> ToolGrant {
     let mut grant = make_grant(server, tool);
     grant.max_invocations = Some(max_invocations);
     grant
 }
 
-fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixture {
+pub(super) fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixture {
     let path = unique_receipt_db_path(prefix);
     let seed_store = SqliteReceiptStore::open(&path).unwrap();
     let mut kernel = make_kernel(make_monetary_config());
@@ -442,7 +443,7 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
     }
 }
 
-fn spawn_payment_test_server(
+pub(super) fn spawn_payment_test_server(
     status_code: u16,
     body: serde_json::Value,
 ) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
@@ -463,7 +464,7 @@ fn spawn_payment_test_server(
     (format!("http://{address}"), request_rx, handle)
 }
 
-fn spawn_bound_acp_test_server() -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
+pub(super) fn spawn_bound_acp_test_server() -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
     let address = listener
         .local_addr()
@@ -592,7 +593,7 @@ fn http_status_text(status_code: u16) -> &'static str {
     }
 }
 
-fn make_governed_monetary_grant(
+pub(super) fn make_governed_monetary_grant(
     server: &str,
     tool: &str,
     max_cost_per_invocation: u64,
@@ -616,21 +617,21 @@ fn make_governed_monetary_grant(
     grant
 }
 
-fn with_minimum_runtime_assurance(mut grant: ToolGrant, tier: RuntimeAssuranceTier) -> ToolGrant {
+pub(super) fn with_minimum_runtime_assurance(mut grant: ToolGrant, tier: RuntimeAssuranceTier) -> ToolGrant {
     grant
         .constraints
         .push(Constraint::MinimumRuntimeAssurance(tier));
     grant
 }
 
-fn with_minimum_autonomy_tier(mut grant: ToolGrant, tier: GovernedAutonomyTier) -> ToolGrant {
+pub(super) fn with_minimum_autonomy_tier(mut grant: ToolGrant, tier: GovernedAutonomyTier) -> ToolGrant {
     grant
         .constraints
         .push(Constraint::MinimumAutonomyTier(tier));
     grant
 }
 
-fn make_governed_acp_monetary_grant(
+pub(super) fn make_governed_acp_monetary_grant(
     server: &str,
     tool: &str,
     seller: &str,
@@ -653,7 +654,7 @@ fn make_governed_acp_monetary_grant(
     grant
 }
 
-fn make_governed_intent(
+pub(super) fn make_governed_intent(
     id: &str,
     server: &str,
     tool: &str,
@@ -683,7 +684,7 @@ fn make_governed_intent(
     }
 }
 
-struct GovernedAcpIntentFixture<'a> {
+pub(super) struct GovernedAcpIntentFixture<'a> {
     id: &'a str,
     server: &'a str,
     tool: &'a str,
@@ -695,7 +696,7 @@ struct GovernedAcpIntentFixture<'a> {
     currency: &'a str,
 }
 
-fn make_governed_acp_intent(fixture: GovernedAcpIntentFixture<'_>) -> GovernedTransactionIntent {
+pub(super) fn make_governed_acp_intent(fixture: GovernedAcpIntentFixture<'_>) -> GovernedTransactionIntent {
     GovernedTransactionIntent {
         id: fixture.id.to_string(),
         server_id: fixture.server.to_string(),
@@ -722,7 +723,7 @@ fn make_governed_acp_intent(fixture: GovernedAcpIntentFixture<'_>) -> GovernedTr
     }
 }
 
-fn make_runtime_attestation(
+pub(super) fn make_runtime_attestation(
     tier: RuntimeAssuranceTier,
 ) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
@@ -751,7 +752,7 @@ fn make_runtime_attestation(
     }
 }
 
-fn make_trusted_azure_runtime_attestation(
+pub(super) fn make_trusted_azure_runtime_attestation(
 ) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
@@ -771,7 +772,7 @@ fn make_trusted_azure_runtime_attestation(
     }
 }
 
-fn make_trusted_google_runtime_attestation(
+pub(super) fn make_trusted_google_runtime_attestation(
 ) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
@@ -795,7 +796,7 @@ fn make_trusted_google_runtime_attestation(
     }
 }
 
-fn make_trusted_nitro_runtime_attestation(
+pub(super) fn make_trusted_nitro_runtime_attestation(
 ) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
@@ -817,7 +818,7 @@ fn make_trusted_nitro_runtime_attestation(
     }
 }
 
-fn make_attestation_trust_policy() -> chio_core::capability::trust_policy::AttestationTrustPolicy {
+pub(super) fn make_attestation_trust_policy() -> chio_core::capability::trust_policy::AttestationTrustPolicy {
     chio_core::capability::trust_policy::AttestationTrustPolicy {
         rules: vec![
             chio_core::capability::trust_policy::AttestationTrustRule {
@@ -862,7 +863,7 @@ fn make_attestation_trust_policy() -> chio_core::capability::trust_policy::Attes
     }
 }
 
-fn make_attested_attestation_trust_policy(
+pub(super) fn make_attested_attestation_trust_policy(
 ) -> chio_core::capability::trust_policy::AttestationTrustPolicy {
     chio_core::capability::trust_policy::AttestationTrustPolicy {
         rules: vec![chio_core::capability::trust_policy::AttestationTrustRule {
@@ -878,7 +879,7 @@ fn make_attested_attestation_trust_policy(
     }
 }
 
-fn make_metered_billing_context(
+pub(super) fn make_metered_billing_context(
     quote_id: &str,
     provider: &str,
     units: u64,
@@ -904,7 +905,7 @@ fn make_metered_billing_context(
     }
 }
 
-fn make_governed_call_chain_context(
+pub(super) fn make_governed_call_chain_context(
     chain_id: &str,
     parent_request_id: &str,
 ) -> GovernedCallChainContext {
@@ -917,7 +918,7 @@ fn make_governed_call_chain_context(
     }
 }
 
-fn make_governed_upstream_call_chain_proof(
+pub(super) fn make_governed_upstream_call_chain_proof(
     signer: &Keypair,
     subject: &PublicKey,
     call_chain: &GovernedCallChainContext,
@@ -940,7 +941,7 @@ fn make_governed_upstream_call_chain_proof(
     .unwrap()
 }
 
-fn attach_governed_upstream_call_chain_proof(
+pub(super) fn attach_governed_upstream_call_chain_proof(
     intent: &mut GovernedTransactionIntent,
     proof: &GovernedUpstreamCallChainProof,
 ) {
@@ -955,7 +956,7 @@ fn attach_governed_upstream_call_chain_proof(
     intent.context = Some(serde_json::Value::Object(context));
 }
 
-struct GovernedCallChainContinuationTokenFixture<'a> {
+pub(super) struct GovernedCallChainContinuationTokenFixture<'a> {
     signer: &'a Keypair,
     subject: &'a PublicKey,
     call_chain: &'a GovernedCallChainContext,
@@ -966,7 +967,7 @@ struct GovernedCallChainContinuationTokenFixture<'a> {
     governed_intent_hash: Option<&'a str>,
 }
 
-fn make_governed_call_chain_continuation_token(
+pub(super) fn make_governed_call_chain_continuation_token(
     fixture: GovernedCallChainContinuationTokenFixture<'_>,
 ) -> CallChainContinuationToken {
     let now = current_unix_timestamp();
@@ -1001,7 +1002,7 @@ fn make_governed_call_chain_continuation_token(
     .unwrap()
 }
 
-fn attach_governed_call_chain_continuation_token(
+pub(super) fn attach_governed_call_chain_continuation_token(
     intent: &mut GovernedTransactionIntent,
     token: &CallChainContinuationToken,
 ) {
@@ -1016,7 +1017,7 @@ fn attach_governed_call_chain_continuation_token(
     intent.context = Some(serde_json::Value::Object(context));
 }
 
-fn make_governed_autonomy_context(
+pub(super) fn make_governed_autonomy_context(
     tier: GovernedAutonomyTier,
     bond_id: Option<&str>,
 ) -> GovernedAutonomyContext {
@@ -1026,7 +1027,7 @@ fn make_governed_autonomy_context(
     }
 }
 
-struct CreditBondFixture<'a> {
+pub(super) struct CreditBondFixture<'a> {
     signer: &'a Keypair,
     cap: &'a CapabilityToken,
     server: &'a str,
@@ -1037,7 +1038,7 @@ struct CreditBondFixture<'a> {
     runtime_assurance_met: bool,
 }
 
-fn make_credit_bond(fixture: CreditBondFixture<'_>) -> SignedCreditBond {
+pub(super) fn make_credit_bond(fixture: CreditBondFixture<'_>) -> SignedCreditBond {
     let now = current_unix_timestamp();
     let report = CreditBondReport {
         schema: CREDIT_BOND_REPORT_SCHEMA.to_string(),
@@ -1112,7 +1113,7 @@ fn make_credit_bond(fixture: CreditBondFixture<'_>) -> SignedCreditBond {
     .unwrap()
 }
 
-fn make_governed_approval_token(
+pub(super) fn make_governed_approval_token(
     approver: &Keypair,
     subject: &PublicKey,
     intent: &GovernedTransactionIntent,
@@ -1139,7 +1140,7 @@ fn make_governed_approval_token(
 // --- Monetary enforcement tests ---
 
 #[derive(Clone)]
-struct TrackingPaymentAdapter {
+pub(super) struct TrackingPaymentAdapter {
     authorized: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     captured: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
@@ -1235,7 +1236,7 @@ fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {
 }
 
 /// Build a kernel that has a DPoP store configured and a single DPoP-required grant.
-fn make_dpop_kernel_and_cap(
+pub(super) fn make_dpop_kernel_and_cap(
     agent_kp: &Keypair,
     server: &str,
     tool: &str,
@@ -1275,7 +1276,7 @@ fn make_dpop_kernel_and_cap(
 }
 
 /// Build a valid DPoP proof for a given request context.
-fn make_dpop_proof(
+pub(super) fn make_dpop_proof(
     agent_kp: &Keypair,
     cap: &CapabilityToken,
     server: &str,
@@ -1306,7 +1307,7 @@ fn make_dpop_proof(
 
 /// A budget store spy that authorizes holds normally but returns `Err` on every
 /// reverse. Used to exercise the drop-guard pending-reversal escalation path.
-struct ReverseFailingBudgetStore {
+pub(super) struct ReverseFailingBudgetStore {
     inner: InMemoryBudgetStore,
 }
 

@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn kernel_rejects_classical_capability_under_pq_required_floor() {
     let keypair = make_keypair();

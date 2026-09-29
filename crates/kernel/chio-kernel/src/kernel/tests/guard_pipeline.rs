@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn guard_denies_request() {
     let mut kernel = make_kernel(make_config());

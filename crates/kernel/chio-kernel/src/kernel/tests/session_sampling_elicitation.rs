@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn sampling_validation_requires_policy_and_negotiation() {
     let mut kernel = make_kernel(make_config());

@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn allow_verdict_carries_signed_execution_nonce_and_verifies() {
     let (kernel, agent_kp, scope, _cfg) = kernel_with_nonce();
@@ -929,7 +930,7 @@ fn reconcile_kernel_and_cap() -> (ChioKernel, Keypair, CapabilityToken, Executio
     (kernel, agent_kp, cap, cfg)
 }
 
-fn reserve_request(request_id: &str, cap: &CapabilityToken, agent_kp: &Keypair) -> ToolCallRequest {
+pub(super) fn reserve_request(request_id: &str, cap: &CapabilityToken, agent_kp: &Keypair) -> ToolCallRequest {
     ToolCallRequest {
         request_id: request_id.to_string(),
         capability: cap.clone(),
@@ -1673,7 +1674,7 @@ fn delegated_reserve_request(
     }
 }
 
-fn install_strict_nonce_store(kernel: &mut ChioKernel) {
+pub(super) fn install_strict_nonce_store(kernel: &mut ChioKernel) {
     let cfg = ExecutionNonceConfig {
         nonce_ttl_secs: 30,
         nonce_store_capacity: 1024,
@@ -2137,7 +2138,7 @@ fn delegated_reserving_child_with_non_monetary_grant_sibling_share_freed_after_t
 // would never reclaim it.
 // ---------------------------------------------------------------------------
 
-struct StampFailingBudgetStore {
+pub(super) struct StampFailingBudgetStore {
     inner: InMemoryBudgetStore,
     fail_mark: std::sync::Arc<AtomicBool>,
 }

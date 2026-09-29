@@ -1,3 +1,4 @@
+use super::*;
 impl SqliteReceiptStore {
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, ReceiptStoreError> {
         self.connection.lock().map_err(|_| {

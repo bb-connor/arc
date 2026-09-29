@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn governed_monetary_denial_without_required_runtime_assurance_consumes_no_budget() {
     let mut kernel = make_kernel(make_monetary_config());

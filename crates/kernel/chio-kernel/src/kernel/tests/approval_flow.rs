@@ -1,3 +1,4 @@
+use super::*;
 // HITL kernel-level flow tests.
 //
 // Included by `src/kernel/tests.rs`; the test module imports from the
@@ -12,34 +13,22 @@
 // focused test against the primitives is faster and still covers every
 // approval behaviour.
 
-use std::sync::Arc as StdArc;
+
 
 // Note: `GovernedApprovalDecision`, `GovernedApprovalToken`,
 // `GovernedApprovalTokenBody`, and `Keypair` are already brought into
 // scope by `tests/all.rs`. Only pull in HITL-specific items. These
 // paths intentionally resolve through `crate::approval*` so the test
 // exercises the same type identities that downstream consumers see.
-use crate::approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalContext, ApprovalDecision, ApprovalGuard,
-    ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalToken, HitlVerdict,
-    InMemoryApprovalStore,
-};
-use crate::approval_channels::RecordingChannel;
-use crate::governed_active_response::{
-    GovernedActiveResponseDispatchCommit, GovernedActiveResponseRequest,
-};
-use crate::threshold_approval::ThresholdApprovalRequirementResolver;
-use chio_core::capability::governance::{
-    GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntentBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
-    ACTIVE_RESPONSE_SERVER_ID, GOVERNED_RESPONSE_PLAN_SCHEMA, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
-};
-use chio_core::capability::threshold_approval::{
-    ThresholdApprovalRequirement, ThresholdApproverIdentity,
-};
-use chio_log_redact::redacted;
 
-struct FixedThresholdRequirement(ThresholdApprovalRequirement);
+
+
+
+
+
+
+
+pub(super) struct FixedThresholdRequirement(ThresholdApprovalRequirement);
 
 impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
     fn resolve_requirement(
@@ -52,7 +41,7 @@ impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
     }
 }
 
-type CoreKeypair = Keypair;
+pub(super) type CoreKeypair = Keypair;
 
 struct ActiveResponseFixture<'a> {
     kernel: &'a ChioKernel,
@@ -173,7 +162,7 @@ impl ActiveResponseFixture<'_> {
     }
 }
 
-fn hitl_make_request() -> ToolCallRequest {
+pub(super) fn hitl_make_request() -> ToolCallRequest {
     let subject_kp = CoreKeypair::generate();
     let cap_builder_kernel = make_kernel(make_config());
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -181,7 +170,7 @@ fn hitl_make_request() -> ToolCallRequest {
     make_request("hitl-req-1", &cap, "read_file", "srv-a")
 }
 
-fn hitl_sign_token(
+pub(super) fn hitl_sign_token(
     approver: &CoreKeypair,
     subject: &CoreKeypair,
     approval_id: &str,

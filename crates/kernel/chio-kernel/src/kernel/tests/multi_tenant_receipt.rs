@@ -1,3 +1,4 @@
+use super::*;
 // Multi-tenant receipt isolation tests.
 //
 // Included by `src/kernel/tests.rs`. Shares helper items from
@@ -11,13 +12,10 @@
 //     tenant_id is `None`;
 //   * the tenant tag is never read from the `ToolCallRequest` itself.
 
-use chio_core_types::session::{
-    EnterpriseFederationMethod, EnterpriseIdentityContext, OAuthBearerFederatedClaims,
-    OAuthBearerSessionAuthInput,
-};
-use std::collections::BTreeMap;
 
-fn oauth_auth_with_enterprise_tenant(tenant: &str) -> SessionAuthContext {
+
+
+pub(super) fn oauth_auth_with_enterprise_tenant(tenant: &str) -> SessionAuthContext {
     SessionAuthContext::streamable_http_oauth_bearer_with_claims(OAuthBearerSessionAuthInput {
         principal: Some(format!("oidc:https://issuer.example#sub:user-{tenant}")),
         issuer: Some("https://issuer.example".to_string()),

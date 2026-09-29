@@ -1,3 +1,4 @@
+use super::*;
 struct MutatingPaymentAdapter {
     mutable_state: std::sync::Arc<AtomicBool>,
     authorizations: std::sync::Arc<AtomicU64>,

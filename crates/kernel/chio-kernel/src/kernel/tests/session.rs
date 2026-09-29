@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn session_lifecycle_is_hosted_by_kernel() {
     let kernel = make_kernel(make_config());

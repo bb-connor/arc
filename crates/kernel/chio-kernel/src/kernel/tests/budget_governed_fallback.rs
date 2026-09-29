@@ -1,3 +1,4 @@
+use super::*;
 #[test]
 fn governed_denial_does_not_block_later_matching_grant() {
     let mut kernel = make_kernel(make_config());

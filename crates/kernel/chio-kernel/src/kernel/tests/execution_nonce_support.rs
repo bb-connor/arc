@@ -1,9 +1,7 @@
-use crate::execution_nonce::{
-    mint_execution_nonce, verify_execution_nonce, ExecutionNonceConfig, ExecutionNonceError,
-    InMemoryExecutionNonceStore, NonceBinding,
-};
+use super::*;
 
-fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig) {
+
+pub(super) fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig) {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
     let cfg = ExecutionNonceConfig {
@@ -18,7 +16,7 @@ fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig)
     (kernel, agent_kp, scope, cfg)
 }
 
-fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> NonceBinding {
+pub(super) fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> NonceBinding {
     let parameter_hash =
         chio_core::receipt::decision::ToolCallAction::from_parameters(request.arguments.clone())
             .unwrap()
@@ -33,7 +31,7 @@ fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> Nonc
     }
 }
 
-fn mint_nonce_for_request(
+pub(super) fn mint_nonce_for_request(
     kernel: &ChioKernel,
     cap: &CapabilityToken,
     request: &ToolCallRequest,

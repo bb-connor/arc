@@ -1,3 +1,4 @@
+use super::*;
 // Memory-provenance tests.
 //
 // Included by `src/kernel/tests.rs`. Shares helper items from

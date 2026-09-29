@@ -1,3 +1,4 @@
+use super::*;
 // Post-admission drop-guard disposition-table property test. For every combination of
 // {monetary, non-monetary} x {pre-dispatch, post-dispatch} x {lease
 // present, absent}, a directly constructed PostAdmissionDropGuard must
@@ -8,7 +9,7 @@
 //   - pre-dispatch drop: no receipt; reservations released iff a
 //     chio_runtime admission block was present.
 
-use proptest::prelude::*;
+
 
 struct CountingReleaseRuntimeAdmissionHook {
     releases: std::sync::Arc<AtomicU64>,
