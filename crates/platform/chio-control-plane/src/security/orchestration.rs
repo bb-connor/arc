@@ -968,11 +968,9 @@ impl ActiveDefenseServices for ProductionActiveDefenseOrchestrator {
     }
 }
 
-include!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/security/orchestration_teardown.inc"
-));
+mod teardown;
+use teardown::*;
 
-#[cfg(test)]
-#[path = "orchestration_retained_teardown_tests.rs"]
-mod retained_teardown_supervisor_tests;
+
+
+pub use teardown::ProductionActiveDefenseHost;

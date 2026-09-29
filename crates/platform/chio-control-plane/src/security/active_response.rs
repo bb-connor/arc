@@ -2,7 +2,6 @@
 mod authority_tests;
 mod committed_readback;
 mod config;
-mod expired_resume;
 mod request;
 
 use self::config::{readiness, validate_lease_duration};
@@ -36,7 +35,36 @@ use chio_security_types::{ResponseApprovalRequirement, ResponsePlan, ResponseSta
 use std::sync::Arc;
 use thiserror::Error;
 
-include!("active_response/executor.inc");
+pub const MAX_ACTIVE_RESPONSE_LEASE_DURATION_MS: u64 = 60_000;
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum DurableActiveResponseExecutorConfigError {
+    #[error("active-response execution lease duration must be nonzero")]
+    ZeroLeaseDuration,
+    #[error("active-response execution lease duration {actual_ms} exceeds maximum {maximum_ms}")]
+    LeaseDurationTooLong { actual_ms: u64, maximum_ms: u64 },
+    #[error("active-response executor authority identifier is invalid")]
+    InvalidAuthorityId,
+}
+
+pub struct DurableActiveResponseExecutor<
+    S: ResponseDispatchStore + ?Sized,
+    E: EffectPort + ?Sized,
+    R: SecurityReceiptSink + ActiveResponseReceiptProofSource + ?Sized,
+    A: SecurityAlertPort + ?Sized,
+> {
+    identity: ActiveResponseExecutorAuthorityIdentity,
+    lease_owner_id: LeaseOwnerId,
+    store: Arc<S>,
+    effects: Arc<E>,
+    receipts: Arc<R>,
+    alerts: Arc<A>,
+    clock: Arc<dyn Clock>,
+    lease_duration_ms: u64,
+    response_executor: ResponseExecutor<S, E, R, A>,
+}
+mod executor;
+use executor::prepared_binding_from_dispatch_record;
 #[cfg(test)]
 mod tests {
     use super::super::adapters::NativeSecurityReceiptSink;

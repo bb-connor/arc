@@ -3,7 +3,7 @@
 use super::*;
 
 impl AttestedFindingAdmissionArtifacts {
-    pub(super) fn into_admission_request(
+    pub(in crate::security::event_consumer) fn into_admission_request(
         self,
         response_plan: ResponsePlan,
     ) -> Result<ActiveResponseAdmissionRequest, chio_kernel::KernelError> {
@@ -48,7 +48,7 @@ impl AttestedFindingAdmissionArtifacts {
             }
         }
     }
-    pub(super) fn into_simulation_request(
+    pub(in crate::security::event_consumer) fn into_simulation_request(
         self,
         response_plan: ResponsePlan,
     ) -> Result<chio_kernel::ActiveResponseSimulationRequest, chio_kernel::KernelError> {
