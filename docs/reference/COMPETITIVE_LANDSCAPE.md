@@ -1,5 +1,7 @@
 # Competitive Landscape: Agent Protocols, Payment Rails, and Security
 
+> See also: [docs/research/nvidia/05-competitive-analysis.md](../research/nvidia/05-competitive-analysis.md) (2026-09-28) for the NVIDIA Open Agent Safety Platform, ODIS, and the agent-authority vendors that this document, last updated 2026-03-21, predates.
+
 **Last updated:** 2026-03-21
 **Scope:** Protocols, payment mechanisms, identity standards, and infrastructure
 competing in the agent capability/security space.
