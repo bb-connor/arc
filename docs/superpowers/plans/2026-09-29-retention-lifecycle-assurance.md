@@ -56,9 +56,9 @@ Files: formal/tla revocation progress obligations, bounded solver/checker runner
 calibrated counterexamples and scheduled workflow evidence.
 Interfaces: original Revoke/Propagate/Attenuate/Evaluate actions and fairness.
 
-- [ ] Identify the solver explosion and use action-level progress obligations
+- [x] Identify the solver explosion and use action-level progress obligations
       rather than extending the historical hour-long search.
-- [ ] Mechanically check source-linked obligations at four authorities and eight
+- [x] Mechanically check source-linked obligations at four authorities and eight
       capabilities, with nonvacuous negative controls and explicit fairness.
-- [ ] Run the complete bounded acceptance set, record exact scope and update the
+- [x] Run the complete bounded acceptance set, record exact scope and update the
       original timeout disposition without calling a different check the old run.

@@ -1,0 +1,1178 @@
+{
+  "implementation_sha256": {
+    "scripts/formal/revocation_progress.py": "56b30cf026d3c39bef7e9aec551da59d76e0658f453faf92e79ffb99391af34b",
+    "scripts/check-revocation-progress.py": "85d272da7b95a335e55d3fbe7f75bfd7601a6fddc63ec1d8473b417ecffeda53"
+  },
+  "scope": "Inductive obligations for a manually translated 4-authority/8-capability progress projection; not mechanized TLA refinement or Rust equivalence",
+  "source_sha256": {
+    "formal/tla/RevocationPropagation.tla": "1fec98b59ddcc66380c2c56071886507cdfc4198ff7397928f5fb12d65f81e4b",
+    "formal/tla/RevocationPropagationPairRefinement.tla": "9c88c4538be4b9c7b91b89637401b432df170b06c0bc90db4c4eca3aa9ee8e2d"
+  },
+  "solver_version": "4.13.3",
+  "authorities": 4,
+  "capabilities": 8,
+  "epochs": "unbounded integers",
+  "fairness": "WF_vars(PropagateAny), manual well-founded argument",
+  "historical_query": "length 24 SMT query remains timed out; replaced operational gate, not a passing old query",
+  "results": [
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "unsat",
+      "reason": null,
+      "name": "init",
+      "negative": false,
+      "seconds": 0.014
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "unsat",
+      "reason": null,
+      "name": "rank_nonnegative",
+      "negative": false,
+      "seconds": 0.096
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "unsat",
+      "reason": null,
+      "name": "empty_pending_caught_up",
+      "negative": false,
+      "seconds": 0.135
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "unsat",
+      "reason": null,
+      "name": "revoke",
+      "negative": false,
+      "seconds": 0.026
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "unsat",
+      "reason": null,
+      "name": "propagate",
+      "negative": false,
+      "seconds": 0.028
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "unsat",
+      "reason": null,
+      "name": "evaluate",
+      "negative": false,
+      "seconds": 0.024
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "unsat",
+      "reason": null,
+      "name": "attenuate_or_stutter",
+      "negative": false,
+      "seconds": 0.021
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "sat",
+      "reason": null,
+      "name": "missing_recipient",
+      "negative": true,
+      "seconds": 0.026,
+      "counterexample": {
+        "clock": "2",
+        "rank": "43",
+        "epochs": {
+          "(0, 0)": "0",
+          "(0, 1)": "1",
+          "(0, 2)": "1",
+          "(0, 3)": "1",
+          "(0, 4)": "1",
+          "(0, 5)": "1",
+          "(0, 6)": "1",
+          "(0, 7)": "1",
+          "(1, 0)": "1",
+          "(1, 1)": "1",
+          "(1, 2)": "1",
+          "(1, 3)": "1",
+          "(1, 4)": "1",
+          "(1, 5)": "1",
+          "(1, 6)": "1",
+          "(1, 7)": "1",
+          "(2, 0)": "1",
+          "(2, 1)": "1",
+          "(2, 2)": "1",
+          "(2, 3)": "1",
+          "(2, 4)": "1",
+          "(2, 5)": "1",
+          "(2, 6)": "1",
+          "(2, 7)": "1",
+          "(3, 0)": "1",
+          "(3, 1)": "1",
+          "(3, 2)": "1",
+          "(3, 3)": "1",
+          "(3, 4)": "1",
+          "(3, 5)": "1",
+          "(3, 6)": "1",
+          "(3, 7)": "1"
+        },
+        "pending": [
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 3,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 3,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 4,
+            "epoch": "1"
+          }
+        ]
+      }
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "sat",
+      "reason": null,
+      "name": "forgot_observation",
+      "negative": true,
+      "seconds": 0.026,
+      "counterexample": {
+        "clock": "3",
+        "rank": "41",
+        "epochs": {
+          "(0, 0)": "2",
+          "(0, 1)": "1",
+          "(0, 2)": "1",
+          "(0, 3)": "1",
+          "(0, 4)": "1",
+          "(0, 5)": "1",
+          "(0, 6)": "1",
+          "(0, 7)": "1",
+          "(1, 0)": "1",
+          "(1, 1)": "1",
+          "(1, 2)": "1",
+          "(1, 3)": "1",
+          "(1, 4)": "1",
+          "(1, 5)": "1",
+          "(1, 6)": "1",
+          "(1, 7)": "1",
+          "(2, 0)": "1",
+          "(2, 1)": "1",
+          "(2, 2)": "1",
+          "(2, 3)": "1",
+          "(2, 4)": "1",
+          "(2, 5)": "1",
+          "(2, 6)": "1",
+          "(2, 7)": "1",
+          "(3, 0)": "2",
+          "(3, 1)": "1",
+          "(3, 2)": "1",
+          "(3, 3)": "1",
+          "(3, 4)": "1",
+          "(3, 5)": "1",
+          "(3, 6)": "1",
+          "(3, 7)": "1"
+        },
+        "pending": [
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 0,
+            "epoch": "2"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 0,
+            "epoch": "2"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 3,
+            "cap": 0,
+            "epoch": "2"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 6,
+            "epoch": "1"
+          }
+        ]
+      }
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "sat",
+      "reason": null,
+      "name": "retained_message",
+      "negative": true,
+      "seconds": 0.026,
+      "counterexample": {
+        "clock": "3",
+        "rank": "36",
+        "epochs": {
+          "(0, 0)": "2",
+          "(0, 1)": "1",
+          "(0, 2)": "1",
+          "(0, 3)": "1",
+          "(0, 4)": "1",
+          "(0, 5)": "1",
+          "(0, 6)": "1",
+          "(0, 7)": "1",
+          "(1, 0)": "1",
+          "(1, 1)": "1",
+          "(1, 2)": "1",
+          "(1, 3)": "1",
+          "(1, 4)": "1",
+          "(1, 5)": "1",
+          "(1, 6)": "1",
+          "(1, 7)": "1",
+          "(2, 0)": "1",
+          "(2, 1)": "1",
+          "(2, 2)": "1",
+          "(2, 3)": "1",
+          "(2, 4)": "1",
+          "(2, 5)": "1",
+          "(2, 6)": "1",
+          "(2, 7)": "1",
+          "(3, 0)": "2",
+          "(3, 1)": "1",
+          "(3, 2)": "1",
+          "(3, 3)": "1",
+          "(3, 4)": "1",
+          "(3, 5)": "1",
+          "(3, 6)": "1",
+          "(3, 7)": "1"
+        },
+        "pending": [
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 0,
+            "epoch": "2"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 0,
+            "epoch": "2"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 3,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 0,
+            "epoch": "2"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 0,
+            "epoch": "2"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 5,
+            "epoch": "1"
+          }
+        ]
+      }
+    },
+    {
+      "passed": true,
+      "feasible": "sat",
+      "verdict": "sat",
+      "reason": null,
+      "name": "repeated_revoke",
+      "negative": true,
+      "seconds": 0.024,
+      "counterexample": {
+        "clock": "2",
+        "rank": "34",
+        "epochs": {
+          "(0, 0)": "1",
+          "(0, 1)": "1",
+          "(0, 2)": "1",
+          "(0, 3)": "1",
+          "(0, 4)": "1",
+          "(0, 5)": "1",
+          "(0, 6)": "1",
+          "(0, 7)": "1",
+          "(1, 0)": "1",
+          "(1, 1)": "1",
+          "(1, 2)": "1",
+          "(1, 3)": "1",
+          "(1, 4)": "1",
+          "(1, 5)": "1",
+          "(1, 6)": "1",
+          "(1, 7)": "1",
+          "(2, 0)": "1",
+          "(2, 1)": "1",
+          "(2, 2)": "1",
+          "(2, 3)": "1",
+          "(2, 4)": "1",
+          "(2, 5)": "1",
+          "(2, 6)": "1",
+          "(2, 7)": "1",
+          "(3, 0)": "1",
+          "(3, 1)": "1",
+          "(3, 2)": "1",
+          "(3, 3)": "1",
+          "(3, 4)": "1",
+          "(3, 5)": "1",
+          "(3, 6)": "1",
+          "(3, 7)": "1"
+        },
+        "pending": [
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 2,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 0,
+            "to": 3,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 0,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 1,
+            "to": 2,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 6,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 0,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 0,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 4,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 5,
+            "epoch": "1"
+          },
+          {
+            "from": 2,
+            "to": 1,
+            "cap": 7,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 0,
+            "cap": 1,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 2,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 3,
+            "epoch": "1"
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "cap": 4,
+            "epoch": "1"
+          }
+        ]
+      }
+    }
+  ]
+}

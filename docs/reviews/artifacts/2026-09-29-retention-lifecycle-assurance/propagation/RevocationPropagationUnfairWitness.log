@@ -1,0 +1,41 @@
+TLC2 Version 2.19 of 08 August 2024
+Running breadth-first search Model-Checking with fp 92 and seed 8392260179609903838 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2077737] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /tmp/chio-propagation-tynl6ppv/RevocationPropagationUnfairWitness.tla
+Parsing file /tmp/chio-propagation-tynl6ppv/RevocationPropagationPairLiveness.tla
+Parsing file /tmp/Naturals.tla
+Parsing file /tmp/FiniteSets.tla
+Parsing file /tmp/Sequences.tla
+Semantic processing of module Naturals
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module RevocationPropagationPairLiveness
+Semantic processing of module RevocationPropagationUnfairWitness
+Starting... (2026-09-29 11:00:37)
+Implied-temporal checking--satisfiability problem has 1 branches.
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-09-29 11:00:37.
+Progress(4) at 2026-09-29 11:00:37: 171 states generated, 40 distinct states found, 0 states left on queue.
+Checking temporal properties for the complete state space with 40 total distinct states at (2026-09-29 11:00:37)
+Error: Temporal properties were violated.
+
+Error: The following behavior constitutes a counter-example:
+
+State 1: <Initial predicate>
+/\ pendingEpochs = {}
+/\ originEpoch = 0
+/\ observedEpoch = 0
+
+State 2: <AbsorbRemote line 67, col 5 to line 70, col 49 of module RevocationPropagationPairLiveness>
+/\ pendingEpochs = {}
+/\ originEpoch = 3
+/\ observedEpoch = 0
+
+State 3: <ObserveOther line 83, col 5 to line 86, col 47 of module RevocationPropagationPairLiveness>
+/\ pendingEpochs = {}
+/\ originEpoch = 3
+/\ observedEpoch = 2
+
+State 4: Stuttering
+Finished checking temporal properties in 00s at 2026-09-29 11:00:37
+171 states generated, 40 distinct states found, 0 states left on queue.
+Finished in 00s at (2026-09-29 11:00:37)

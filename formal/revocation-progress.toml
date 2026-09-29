@@ -1,0 +1,7 @@
+schema = "chio.revocation-progress-linkage.v1"
+solver_version = "4.13.3"
+scope = "Inductive obligations for a manually translated 4-authority/8-capability progress projection; not mechanized TLA refinement or Rust equivalence"
+
+[source_sha256]
+"formal/tla/RevocationPropagation.tla" = "1fec98b59ddcc66380c2c56071886507cdfc4198ff7397928f5fb12d65f81e4b"
+"formal/tla/RevocationPropagationPairRefinement.tla" = "9c88c4538be4b9c7b91b89637401b432df170b06c0bc90db4c4eca3aa9ee8e2d"

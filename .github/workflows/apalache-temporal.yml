@@ -2,7 +2,8 @@ name: apalache-temporal
 
 # Scheduled/manual liveness checks. Propagation uses an explicit finite
 # epoch-order quotient; the original 4-authority/8-capability SMT timeout
-# remains unverified. Full-model safety stays in apalache-safety.yml.
+# remains unverified. Inductive progress obligations supplement the quotient.
+# Full-model safety stays in apalache-safety.yml.
 
 on:
   workflow_dispatch:
@@ -43,6 +44,14 @@ jobs:
           set -euo pipefail
           command -v apalache-mc
           apalache-mc version || true
+
+      - name: Check source-pinned inductive progress obligations
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/revocation-progress"
+          "${RUNNER_TEMP}/revocation-progress/bin/pip" install z3-solver==4.13.3.0
+          "${RUNNER_TEMP}/revocation-progress/bin/python" scripts/tests/check-revocation-progress.test.py
+          "${RUNNER_TEMP}/revocation-progress/bin/python" scripts/check-revocation-progress.py \
+            --output output/revocation-propagation/progress
 
       - name: RevocationEventuallySeen finite reduction and witnesses
         shell: bash
