@@ -107,7 +107,7 @@ impl DispatchCredentialReservation<'_> {
             .verify_capability_full_pre_admit(
                 &request.capability,
                 request.federated_origin_kernel_id.as_deref(),
-                read_unix_timestamp()?,
+                self.kernel.read_authority_time()?.as_secs(),
             )
             .map_err(|error| invalid(&error))?;
         self.kernel.check_revocation(&request.capability)?;
@@ -126,7 +126,7 @@ impl DispatchCredentialReservation<'_> {
                 request,
                 &request.capability,
                 dpop_required,
-                read_unix_timestamp()?,
+                self.kernel.read_authority_time()?.as_secs(),
                 admission.requires_execution_nonce(),
             )?
             .refresh()?;
@@ -223,7 +223,7 @@ impl DispatchCredentialReservation<'_> {
             admission.operation(),
             original,
             &self.kernel.config.keypair.public_key(),
-            read_unix_timestamp_ms()?,
+            self.kernel.read_authority_time()?.get(),
         )
         .map_err(|error| invalid(&error.to_string()))?;
         Ok(Some(issued))

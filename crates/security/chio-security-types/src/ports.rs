@@ -4,8 +4,8 @@ pub use crate::deception::{
     WatermarkSequenceReservation, WatermarkSequenceReservationResult,
 };
 pub use crate::response_domains::{
-    RESPONSE_AFFECTED_SET_DOMAIN, RESPONSE_EFFECT_ID_DOMAIN, RESPONSE_REQUEST_ID_DOMAIN,
-    RESPONSE_TRANSITION_ID_DOMAIN,
+    ACTIVE_RESPONSE_AUTHORITY_SCHEMA, RESPONSE_AFFECTED_SET_DOMAIN, RESPONSE_EFFECT_ID_DOMAIN,
+    RESPONSE_REQUEST_ID_DOMAIN, RESPONSE_TRANSITION_ID_DOMAIN,
 };
 use crate::{InformationLabel, ResponseEffectKind, ResponseTarget};
 use alloc::boxed::Box;

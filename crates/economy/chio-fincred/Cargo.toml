@@ -16,5 +16,8 @@ name = "chio_fincred"
 chio-core-types = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
+[dev-dependencies]
+serde_json = { workspace = true }
+
 [lints]
 workspace = true

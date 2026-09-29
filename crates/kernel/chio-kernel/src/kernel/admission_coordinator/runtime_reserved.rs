@@ -72,8 +72,8 @@ impl ChioKernel {
         }))
         .map_err(|_| acquisition_error("reserved runtime revalidation panicked"))??;
         let _guard = runtime.lock_mutations()?;
-        let now =
-            runtime.refresh_trusted_time(read_unix_timestamp_ms()?.max(context.now_unix_ms))?;
+        let now = runtime
+            .refresh_trusted_time(self.read_authority_time()?.get().max(context.now_unix_ms))?;
         let (current, retained) = load_history(runtime, operation, now)?;
         if current != *operation || retained != history {
             return Err(acquisition_error(

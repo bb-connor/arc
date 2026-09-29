@@ -35,25 +35,29 @@ fn open_kernel(
     directory: &std::path::Path,
     authority: &SqliteAuthorityStore,
     signer: &Keypair,
+    clock: Arc<FlowTestClock>,
 ) -> TestResult<(ChioKernel, Arc<AtomicUsize>)> {
-    let mut kernel = ChioKernel::new(KernelConfig {
-        ca_public_keys: vec![signer.public_key()],
-        keypair: signer.clone(),
-        max_delegation_depth: 5,
-        policy_hash: chio_core::sha256_hex(b"native-flow-policy-test"),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: false,
-        allow_ephemeral_revocation_store: false,
-        checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            ca_public_keys: vec![signer.public_key()],
+            keypair: signer.clone(),
+            max_delegation_depth: 5,
+            policy_hash: chio_core::sha256_hex(b"native-flow-policy-test"),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: false,
+            allow_ephemeral_revocation_store: false,
+            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        },
+        clock,
+    );
     let receipts = SqliteReceiptStore::open(directory.join("receipts.db"))?;
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
     kernel.set_receipt_store_handle(Arc::new(receipts))?;
@@ -69,38 +73,71 @@ fn open_kernel(
     Ok((kernel, invocations))
 }
 
+// Test authority time is independent of scheduling, SQLite fsync and host load.
+// Process recovery reconstructs this epoch from its witness, never from wall time.
+const FIXTURE_EPOCH_MS: u64 = 1_800_000_000_000;
+
 pub(super) fn now_ms() -> PortResult<u64> {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| PortError::unavailable())?
-        .as_millis()
-        .try_into()
-        .map_err(|_| PortError::unavailable())
+    Ok(FIXTURE_EPOCH_MS)
 }
 
-#[derive(Default)]
 pub(super) struct FlowTestClock {
     pub mode: AtomicUsize,
+    unix_ms: std::sync::atomic::AtomicU64,
+}
+
+impl Default for FlowTestClock {
+    fn default() -> Self {
+        Self::at(FIXTURE_EPOCH_MS)
+    }
+}
+
+impl FlowTestClock {
+    fn at(unix_ms: u64) -> Self {
+        Self {
+            mode: AtomicUsize::new(0),
+            unix_ms: std::sync::atomic::AtomicU64::new(unix_ms),
+        }
+    }
+
+    fn snapshot(&self) -> u64 {
+        self.unix_ms.load(Ordering::SeqCst)
+    }
+
+    fn advance_to(&self, unix_ms: u64) -> TestResult {
+        self.unix_ms
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |previous| {
+                (unix_ms >= previous).then_some(unix_ms)
+            })
+            .map_err(|_| "fixture clock cannot regress")?;
+        Ok(())
+    }
 }
 
 impl chio_security_types::clock::Clock for FlowTestClock {
     fn read(
         &self,
-    ) -> core::result::Result<
-        chio_security_types::clock::ClockReading,
-        chio_security_types::clock::ClockError,
-    > {
-        let value: PortResult<u64> = match self.mode.load(Ordering::SeqCst) {
-            0 => now_ms(),
-            1 => Ok(0),
-            2 => Ok((1_u64 << 53) - 1),
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        use chio_security_types::clock::{ClockError, ClockReading, MonotonicInstant, UnixMillis};
+        let current_ms = self.snapshot();
+        let unix_ms = match self.mode.load(Ordering::SeqCst) {
+            0 => current_ms,
+            1 => 0,
+            2 => (1_u64 << 53) - 1,
             3 => panic!("native policy clock panic"),
-            _ => Err(PortError::unavailable()),
+            _ => return Err(ClockError::Unavailable),
         };
-        let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
-        chio_security_types::clock::Clock::read(
-            &chio_security_types::clock::FixedClock::from_millis(value),
-        )
+        // Wall-time fault modes must reach the wall-time rejection boundary,
+        // without an unrelated overflow in the fixture's monotonic domain.
+        let elapsed_ms = current_ms.saturating_sub(FIXTURE_EPOCH_MS);
+        let nanos = elapsed_ms
+            .checked_mul(1_000_000)
+            .ok_or(ClockError::Overflow)?;
+        Ok(ClockReading::new(
+            UnixMillis::new(unix_ms),
+            MonotonicInstant::from_nanos(nanos),
+        ))
     }
 }
 
@@ -108,6 +145,7 @@ impl chio_security_types::clock::Clock for FlowTestClock {
 /// to the resolver. The test-only hook joins supplied labels before budget.
 pub(super) struct Fixture {
     kernel: ChioKernel,
+    pub(super) clock: Arc<FlowTestClock>,
     authority: SqliteAuthorityStore,
     pub binding: NativeSecurityAuthorityBindingV1,
     pub request: ToolCallRequest,
@@ -181,9 +219,12 @@ impl Fixture {
         }
         let database = directory.path().join("admission.db");
         SqliteAuthorityStore::provision(&database, &locks)?;
-        let authority = SqliteAuthorityStore::open_serving(database, locks)?;
+        let clock = Arc::new(FlowTestClock::default());
+        let authority =
+            SqliteAuthorityStore::open_serving_with_clock(database, locks, clock.clone())?;
         let signer = Keypair::generate();
-        let (mut kernel, invocations) = open_kernel(directory.path(), &authority, &signer)?;
+        let (mut kernel, invocations) =
+            open_kernel(directory.path(), &authority, &signer, clock.clone())?;
         kernel.reconcile_durable_admission_startup()?;
 
         let agent = Keypair::generate();
@@ -226,7 +267,8 @@ impl Fixture {
         ));
 
         let source_path = directory.path().join("source.db");
-        let source_store = SqliteSecurityStateStore::open(&source_path)?;
+        let source_store =
+            SqliteSecurityStateStore::open_with_trusted_clock(&source_path, clock.clone())?;
         if declassification {
             // Explicitly select this lifecycle before retirement and native
             // initialization. Native dispatch never rewrites imported status.
@@ -272,6 +314,7 @@ impl Fixture {
         kernel.set_security_pre_dispatch_hook(hook.clone());
         Ok(Self {
             kernel,
+            clock,
             authority,
             binding,
             request,
@@ -349,13 +392,15 @@ impl Fixture {
             kernel,
             authority,
             _directory,
+            clock,
             ..
         } = self;
         drop(kernel);
         drop(authority);
-        let reopened = SqliteAuthorityStore::open_serving(
+        let reopened = SqliteAuthorityStore::open_serving_with_clock(
             _directory.path().join("admission.db"),
             _directory.path().join("locks"),
+            clock.clone(),
         )?;
         let current_fence = reopened.mutation_fence();
         assert!(current_fence.owner_epoch > fence.owner_epoch);
@@ -402,6 +447,7 @@ impl Fixture {
             kernel,
             authority,
             _directory,
+            clock,
             ..
         } = self;
         drop(kernel);
@@ -412,7 +458,8 @@ impl Fixture {
             let connection = rusqlite::Connection::open(&database)?;
             mutate(&connection)?;
         }
-        let reopened = SqliteAuthorityStore::open_serving(&database, &locks)?;
+        let reopened =
+            SqliteAuthorityStore::open_serving_with_clock(&database, &locks, clock.clone())?;
         reopened
             .admission_operation_store()
             .load_native_dispatch_ledger(operation, &reopened.mutation_fence(), now_ms()?)?
@@ -728,4 +775,14 @@ impl ToolServerConnection for CountingServer {
         self.0.fetch_add(1, Ordering::SeqCst);
         Ok(arguments)
     }
+}
+
+#[test]
+fn native_fixture_clock_uses_a_stable_authority_epoch() -> TestResult {
+    use chio_security_types::clock::Clock;
+    assert_eq!(now_ms()?, 1_800_000_000_000);
+    assert_eq!(FlowTestClock::default().unix_millis()?.get(), now_ms()?);
+    let fixture = Fixture::new(std::array::from_fn(|_| InformationLabel::bottom()))?;
+    assert_eq!(fixture.request.capability.issued_at, now_ms()? / 1000);
+    Ok(())
 }

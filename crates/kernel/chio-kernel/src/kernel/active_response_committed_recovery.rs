@@ -216,7 +216,7 @@ impl ChioKernel {
         }
         let verified = self.verify_active_response_admission_with_authorized_at(
             request,
-            super::read_unix_timestamp_ms()?,
+            self.read_authority_time()?.get(),
             binding.authorized_at_unix_ms,
         )?;
         let preflight = match &verified {
@@ -575,7 +575,7 @@ impl ChioKernel {
         let _dispatch_gate = installed.dispatch_gate.lock().map_err(|_| {
             never_committed_internal("active-response executor dispatch gate is poisoned")
         })?;
-        if super::read_unix_timestamp_ms()? < response_plan.expires_at_unix_ms {
+        if self.read_authority_time()?.get() < response_plan.expires_at_unix_ms {
             let request = current_request.ok_or_else(|| {
                 never_committed_denied(
                     "an exact current admission request is required before plan expiry",

@@ -17,10 +17,14 @@ impl SqliteAdmissionOperationStore {
         let fence = command.recovery_lease().store_fence();
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         qualification::verify_window(
             reservation,
-            schema::authority_validation_time(&transaction, trusted_now_unix_ms)?,
+            schema::authority_validation_time(
+                &transaction,
+                trusted_now_unix_ms,
+                &self.serving_owner,
+            )?,
         )?;
         let stored = load_by_operation_id_tx(&transaction, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;

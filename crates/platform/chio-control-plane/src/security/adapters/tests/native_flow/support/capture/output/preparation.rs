@@ -51,6 +51,7 @@ impl CapabilityAuthority for ReentrantWorkloadAuthority {
 }
 
 struct Classifier {
+    clock: Arc<FlowTestClock>,
     calls: AtomicUsize,
     expired: std::sync::atomic::AtomicBool,
     output_error: std::sync::Mutex<Option<String>>,
@@ -68,14 +69,15 @@ impl ClassificationPort for Classifier {
         assert_unlocked(&self.sequencer);
         if let Some(expiry) = self.expire_at {
             let remaining = expiry
-                .checked_sub(now_ms()?)
-                .filter(|ms| (1..60_000).contains(ms))
+                .checked_sub(self.clock.snapshot())
                 .ok_or_else(PortError::unavailable)?;
-            std::thread::sleep(std::time::Duration::from_millis(remaining));
-            assert!(
-                now_ms()? >= expiry,
-                "real clock did not reach original lease expiry"
-            );
+            if !(1..60_000).contains(&remaining) {
+                return Err(PortError::unavailable());
+            }
+            self.clock
+                .advance_to(expiry)
+                .map_err(|_| PortError::unavailable())?;
+            assert_eq!(self.clock.snapshot(), expiry);
             self.expired.store(true, Ordering::SeqCst);
         }
         let mut result = CountingEmptyClassifier::new().classify(request)?;
@@ -131,6 +133,7 @@ fn install_classifier(
     expire_at: Option<u64>,
 ) -> TestResult<Arc<Classifier>> {
     let classifier = Arc::new(Classifier {
+        clock: fixture.clock.clone(),
         calls: AtomicUsize::new(0),
         expired: std::sync::atomic::AtomicBool::new(false),
         output_error: std::sync::Mutex::new(None),
@@ -151,7 +154,7 @@ fn install_classifier(
         fixture.binding.clone(),
         super::super::super::super::registry(false, InformationLabel::bottom())?,
         classifier.clone(),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         config,
     )?;
     fixture
@@ -190,7 +193,10 @@ fn native_output_preparation_classifies_actual_value_and_ordered_stream_chunks()
         fixture
             .kernel
             .set_capability_authority(Box::new(ReentrantWorkloadAuthority {
-                inner: LocalCapabilityAuthority::new(fixture.signer.clone()),
+                inner: LocalCapabilityAuthority::new_with_clock(
+                    fixture.signer.clone(),
+                    fixture.clock.clone(),
+                ),
                 sequencer: classifier.sequencer.clone(),
                 calls: workload_calls.clone(),
             }));

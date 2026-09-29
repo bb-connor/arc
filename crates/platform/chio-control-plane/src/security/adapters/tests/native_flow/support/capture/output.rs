@@ -217,13 +217,15 @@ fn reopen(fixture: Fixture, expected: &NativeSecurityOutputJoinRecordV1) -> Test
         kernel,
         authority,
         _directory,
+        clock,
         ..
     } = fixture;
     drop(kernel);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
         _directory.path().join("admission.db"),
         _directory.path().join("locks"),
+        clock.clone(),
     )?;
     let store = authority.admission_operation_store();
     let port: &dyn AdmissionOperationStore = &store;

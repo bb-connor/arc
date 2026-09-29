@@ -148,7 +148,7 @@ impl ChioKernel {
             }
         };
 
-        let revalidation_now_unix_ms = read_unix_timestamp_ms()?;
+        let revalidation_now_unix_ms = self.read_authority_time()?.get();
         let readiness_result = {
             let mut readiness_drop_guard = PostAdmissionDropGuard::new(
                 self,
@@ -339,7 +339,7 @@ impl ChioKernel {
                             PreDispatchCleanupDeny {
                                 request,
                                 reason: &reason,
-                                timestamp: read_unix_timestamp()?,
+                                timestamp: self.read_authority_time()?.as_secs(),
                                 matched_grant_index,
                                 cap,
                                 budget_mutation,

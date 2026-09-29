@@ -120,7 +120,7 @@ impl SqliteAdmissionOperationStore {
         let fence = command.fence().map_err(invalid)?;
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
-        super::super::observed_time(&tx, decision_at)?;
+        super::super::observed_time(&tx, decision_at, &self.serving_owner)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         ensure_no_reserved_terminal_stage(&tx, operation.binding().operation_id())?;
         verify_catalog(&tx)?;
@@ -200,7 +200,7 @@ impl SqliteAdmissionOperationStore {
         let (mut current_rows, mut current_bytes) =
             super::super::history::ordered::latest_totals(&tx, &actual)?;
         let before = footprint(&tx)?;
-        let observed_at = super::super::observed_time(&tx, decision_at)?;
+        let observed_at = super::super::observed_time(&tx, decision_at, &self.serving_owner)?;
         if let NativeEgressCommand::CommitDeclassified { grant, .. } = &command {
             let (snapshot, generation) = crate::security_state::observe_native_flow_state(
                 &tx,
@@ -323,7 +323,8 @@ impl SqliteAdmissionOperationStore {
             ));
         }
         super::super::cutpoint(14)?;
-        let commit_at = super::super::observed_time(&tx, observed_at.max(decision_at))?;
+        let commit_at =
+            super::super::observed_time(&tx, observed_at.max(decision_at), &self.serving_owner)?;
         record
             .command
             .validate_observation(commit_at)

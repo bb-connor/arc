@@ -99,7 +99,7 @@ pub(crate) fn append_operation_commit_with_participant(
     }
     let current = load_admission_commit_head(transaction)?;
     validate_trusted_time(recorded_at_unix_ms, "recorded_at_unix_ms")?;
-    let authority_time = super::schema::observe_authority_time(transaction)?;
+    let authority_time = super::schema::observe_authority_time(transaction, owner)?;
     #[cfg(not(test))]
     let observed_at_unix_ms = Some(authority_time);
     #[cfg(test)]

@@ -1,5 +1,4 @@
 //! Live broker authority served over the existing authenticated authority RPC.
-use super::capture::trusted_now_ms;
 use super::{
     canonical, rejected, BrokerAdmissionParticipant, BrokerKernelAdmissionAuthority,
     BrokerNativeCaptureReader,
@@ -62,8 +61,8 @@ impl BrokerKernelAuthorityHandler {
         })
     }
 
-    fn require_recent_request(request_time: u64) -> Result<()> {
-        let now = trusted_now_ms()? / 1000;
+    fn require_recent_request(&self, request_time: u64) -> Result<()> {
+        let now = self.admission.trusted_now_ms()? / 1000;
         if now
             .checked_sub(request_time)
             .is_none_or(|age| age > MAX_REQUEST_AGE_SECONDS)
@@ -104,7 +103,7 @@ impl CapabilityLiveness for BrokerKernelAuthorityHandler {
         &self,
         request: &CapabilityLivenessRequest,
     ) -> Result<LiveParentCapability> {
-        Self::require_recent_request(request.now_unix_seconds)?;
+        self.require_recent_request(request.now_unix_seconds)?;
         validate_identifier(&request.parent_capability_id, "parent capability", 512)?;
         if request.expected_audience != self.audience {
             return Err(rejected());
@@ -132,7 +131,7 @@ impl CapabilityLiveness for BrokerKernelAuthorityHandler {
         let mut ids = vec![parent.id.as_str()];
         ids.extend(ancestors.iter().map(String::as_str));
         let (revoked, commit_index) = self.revocation_cut(&ids)?;
-        let now = trusted_now_ms()? / 1000;
+        let now = self.admission.trusted_now_ms()? / 1000;
         if revoked || now >= parent.expires_at {
             return Err(rejected());
         }
@@ -162,7 +161,7 @@ impl BrokerRevocations for BrokerKernelAuthorityHandler {
         &self,
         request: &BrokerRevocationRequest,
     ) -> Result<BrokerRevocationSnapshot> {
-        Self::require_recent_request(request.now_unix_seconds)?;
+        self.require_recent_request(request.now_unix_seconds)?;
         if request.broker_capability_id == request.revocation_id {
             return Err(rejected());
         }
@@ -170,7 +169,7 @@ impl BrokerRevocations for BrokerKernelAuthorityHandler {
             self.revocation_cut(&[&request.broker_capability_id, &request.revocation_id])?;
         Ok(BrokerRevocationSnapshot {
             revoked,
-            observed_at_unix_seconds: trusted_now_ms()? / 1000,
+            observed_at_unix_seconds: self.admission.trusted_now_ms()? / 1000,
             commit_index,
             authority_domain: self.revocation_domain.clone(),
         })
@@ -189,7 +188,7 @@ impl BrokerAuthorityHandler for BrokerKernelAuthorityHandler {
                     parent_capability_id: request.capability.body.parent_capability_id.clone(),
                     expected_subject: request.capability.body.subject.clone(),
                     expected_audience: self.audience.clone(),
-                    now_unix_seconds: trusted_now_ms()? / 1000,
+                    now_unix_seconds: self.admission.trusted_now_ms()? / 1000,
                 })?;
                 Ok(AuthorityResult::Prepared(context))
             }

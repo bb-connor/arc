@@ -1,3 +1,6 @@
+pub const EVENT_EVIDENCE_HASH_DOMAIN: &[u8] = b"chio.verified-security-event-evidence.v1\0";
+pub const EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN: &[u8] =
+    b"chio.verified-security-event-receipt-evidence.v1\0";
 use alloc::string::ToString;
 use alloc::vec::Vec;
 

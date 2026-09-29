@@ -16,8 +16,7 @@ const PASSPORT_PRESENTATION_DIGEST_DOMAIN: &[u8] =
     b"chio.financial-agent-passport.presentation-digest.v1\0";
 const PASSPORT_PRESENTATION_CHALLENGE_DIGEST_DOMAIN: &[u8] =
     b"chio.financial-agent-passport.presentation-challenge-digest.v1\0";
-const FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-artifact.v1\0";
-const FINANCIAL_SOURCE_DISCLOSURE_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-disclosure.v1\0";
+
 const MAX_FINANCIAL_SOURCE_ARTIFACTS: usize = 256;
 const MAX_FINANCIAL_BOUNDARY_PROOFS: usize = 32;
 const MAX_FINANCIAL_POSITIONS: usize = 64;

@@ -11,9 +11,9 @@
     "crates/kernel/chio-kernel/src/dpop.rs::signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input": 1,
     "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::inventory_preserves_every_retention_kind_owner_and_inclusive_horizon": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/budget_cross_currency.rs::cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs::chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs::federated_origin_without_runtime_hook_or_context_fails_closed": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs::completed_federated_replay_remains_closed_until_cosign_succeeds": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/admission_gates.rs::chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/admission_gates.rs::federated_origin_without_runtime_hook_or_context_fails_closed": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/recovery.rs::completed_federated_replay_remains_closed_until_cosign_succeeds": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::bounded_in_memory_artifact_store_loses_evidence_when_both_layers_evict": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_dispatch": 1,
@@ -22,7 +22,7 @@
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_receipt_context_fixture": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::installed_artifact_store_preserves_cosign_evidence_across_cache_eviction": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/support.rs::revoke": 1,
+    "crates/kernel/chio-kernel/src/kernel/tests/fixtures/revocation_store.rs::revoke": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support.rs::unique_receipt_db_path": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs::make_dpop_proof": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs::signed_nonce_for_request": 1,
@@ -56,7 +56,6 @@
     "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes": 1,
     "crates/platform/chio-control-plane/src/security/active_response.rs::system_now_unix_ms": 1,
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/tests.rs::now_unix_ms": 1,
-    "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs::now_ms": 1,
     "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter.rs::real_adapter_now_unix_seconds": 1,
     "crates/platform/chio-control-plane/src/security/scheduler_worker/tests.rs::current_unix_ms": 1,
     "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs::capability_revoke_observes_revocation_lag": 1,
@@ -71,7 +70,6 @@
     "crates/platform/chio-store-sqlite/benches/store_receipt_analytics_report.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/benches/store_receipt_write_throughput.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/part_02.inc::unique_db_path": 1,
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture/expiry_test_support.rs::now": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store_tests.rs::now_ms": 1,
     "crates/platform/chio-store-sqlite/src/agent_web_replay_store.rs::unix_now": 1,
     "crates/platform/chio-store-sqlite/src/approval_store.rs::open_colocated_creates_parent_dirs_for_a_file_uri_with_query": 1,
@@ -231,7 +229,7 @@
       "disposition": "fixture",
       "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
     },
-    "crates/kernel/chio-kernel/src/kernel/tests/support.rs::revoke": {
+    "crates/kernel/chio-kernel/src/kernel/tests/fixtures/revocation_store.rs::revoke": {
       "occurrences": 1,
       "disposition": "fixture",
       "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."

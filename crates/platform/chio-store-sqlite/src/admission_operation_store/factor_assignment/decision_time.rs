@@ -7,6 +7,7 @@ pub(super) fn classify_live(
     current: &DurableObligationV1,
     submission: &VerifiedFactorAssignmentSubmission,
     commit: &FactorAssignmentCommitV1<'_>,
+    owner: &SqliteServingOwner,
 ) -> Result<Option<AssignmentNotAppliedReasonV1>, AdmissionOperationStoreError> {
     let classify =
         |now| classify_not_applied(current, submission, commit.request, commit.offer, now);
@@ -17,6 +18,7 @@ pub(super) fn classify_live(
         != classify(schema::authority_validation_time(
             transaction,
             commit.trusted_now_unix_ms,
+            owner,
         )?)?
     {
         return Err(invariant(

@@ -1,3 +1,5 @@
+mod clock;
+
 // Exercise production capture with the real evaluation, policy and SQLite hold.
 use super::*;
 
@@ -19,7 +21,13 @@ impl Fixture {
         };
         use chio_kernel::dpop::replay_source::{DpopReplaySourceBinding, DpopReplaySourcePort};
         use chio_kernel::dpop::{DpopNonceStore, DpopProof, DpopProofBody};
-        let source = DpopNonceStore::new(16, std::time::Duration::from_secs(600))?;
+        let source = DpopNonceStore::with_clock(
+            16,
+            16,
+            chio_kernel::dpop::DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
+            std::time::Duration::from_secs(600),
+            self.clock.clone(),
+        )?;
         let store = self.authority.admission_operation_store();
         let fence = self.authority.mutation_fence();
         let authority_id = AdmissionIdentifier::try_new("authority", "native-capture-dpop")?;
@@ -159,7 +167,7 @@ fn run_capture_through_with_clearance(
         fixture.binding.clone(),
         super::super::registry(egress, clearance)?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         flow_config(),
     )?);
     fixture
@@ -238,7 +246,7 @@ fn native_atomic_capture_faults_roll_back_budget_and_operation_together() -> Tes
                 fixture.binding.clone(),
                 super::super::registry(egress, InformationLabel::bottom())?,
                 Arc::new(CountingEmptyClassifier::new()),
-                Arc::new(FlowTestClock::default()),
+                fixture.clock.clone(),
                 flow_config(),
             )?);
             fixture

@@ -14,16 +14,13 @@
 )]
 #![forbid(unsafe_code)]
 
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_PROOF_REGENERATION_INPUT_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-pub const CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA: &str = "chio.runtime.evidence-manifest.v1";
-pub const CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA: &str = "chio.runtime.proof-parity-report.v1";
-pub const CHIO_RUNTIME_PROOF_REGENERATION_INPUT_SCHEMA: &str =
-    "chio.runtime.proof-regeneration-input.v1";
-pub const CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA: &str =
-    "chio.runtime.proof-regeneration-report.v1";
-pub const CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA: &str = "chio.runtime.workflow-run-report.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

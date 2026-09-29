@@ -1,5 +1,5 @@
 //! The broker observes custody owned by the original native kernel lifecycle.
-use super::{canonical, rejected, trusted_now_ms, unavailable, BrokerNativeCaptureReader};
+use super::{canonical, rejected, unavailable, BrokerNativeCaptureReader};
 use crate::authority_ipc::{AuthorityControlRequest, BrokerAdmissionAuthority};
 use crate::budget::{
     AuthorizeExecutionHoldRequest, BrokerExecutionBudget, CaptureExecutionHoldRequest,
@@ -34,6 +34,10 @@ struct OriginalCustody {
 }
 
 impl BrokerKernelAdmissionAuthority {
+    pub(in crate::kernel_admission) fn trusted_now_ms(&self) -> Result<u64> {
+        self.reader.trusted_now_ms()
+    }
+
     pub fn new(
         reader: BrokerNativeCaptureReader,
         participant: Arc<BrokerAdmissionParticipant>,
@@ -128,7 +132,7 @@ impl BrokerKernelAdmissionAuthority {
 impl BrokerAdmissionAuthority for BrokerKernelAdmissionAuthority {
     fn prepare_execution(&self, request: &BrokerExecuteRequest) -> Result<TrustedExecutionContext> {
         request.validate_bounds()?;
-        let now = trusted_now_ms()?;
+        let now = self.reader.trusted_now_ms()?;
         let (operation, _) = self
             .reader
             .store
@@ -204,7 +208,7 @@ impl BrokerExecutionBudget for BrokerKernelAdmissionAuthority {
         request: &QueryExecutionHoldRequest,
     ) -> Result<ExecutionHoldState> {
         request.validate()?;
-        let now = trusted_now_ms()?;
+        let now = self.reader.trusted_now_ms()?;
         let Some(original) = self.original(&request.operation_id, now)? else {
             return Ok(ExecutionHoldState::Unknown);
         };
@@ -230,7 +234,7 @@ impl BrokerExecutionBudget for BrokerKernelAdmissionAuthority {
         request: &AuthorizeExecutionHoldRequest,
     ) -> Result<ExecutionHoldState> {
         request.validate()?;
-        let now = trusted_now_ms()?;
+        let now = self.reader.trusted_now_ms()?;
         let Some(original) = self.original(&request.operation_id, now)? else {
             return Ok(ExecutionHoldState::Unknown);
         };
@@ -256,7 +260,7 @@ impl BrokerExecutionBudget for BrokerKernelAdmissionAuthority {
         request: &ReverseExecutionHoldRequest,
     ) -> Result<ExecutionHoldState> {
         request.validate()?;
-        let now = trusted_now_ms()?;
+        let now = self.reader.trusted_now_ms()?;
         let original = self
             .original(&request.operation_id, now)?
             .ok_or_else(rejected)?;
@@ -280,7 +284,7 @@ impl BrokerExecutionBudget for BrokerKernelAdmissionAuthority {
         request: &CaptureExecutionHoldRequest,
     ) -> Result<ExecutionHoldState> {
         request.validate()?;
-        let now = trusted_now_ms()?;
+        let now = self.reader.trusted_now_ms()?;
         // The native witness authenticates the exact original request, aliases,
         // quota members, physical capture and authority commitments together.
         // Re-reading that same capture through the generic hold projection adds

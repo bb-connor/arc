@@ -1,22 +1,23 @@
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_PROOF_REGENERATION_INPUT_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA;
+pub use chio_core_types::runtime_schema::CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA;
 pub const CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA: &str = "chio.runtime.admission-profile.v1";
 pub const CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA: &str = "chio.runtime.admission-bundle.v1";
 pub const CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA: &str = "chio.runtime.verifier-trust-bundle.v1";
 pub const CHIO_RUNTIME_ADMISSION_REPORT_SCHEMA: &str = "chio.runtime.admission-report.v1";
-pub const CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA: &str = "chio.runtime.workflow-run-report.v1";
+
 pub const CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA: &str = "chio.runtime.step-evidence.v1";
-pub const CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA: &str = "chio.runtime.evidence-manifest.v1";
-pub const CHIO_RUNTIME_PROOF_REGENERATION_INPUT_SCHEMA: &str =
-    "chio.runtime.proof-regeneration-input.v1";
-pub const CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA: &str =
-    "chio.runtime.proof-regeneration-report.v1";
-pub const CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA: &str = "chio.runtime.proof-parity-report.v1";
+
 pub const CHIO_RUNTIME_ADMISSION_STORE_SCHEMA: &str = "chio.runtime.admission-store.v1";
 pub const CHIO_RUNTIME_TRUSTED_VERIFIERS_SCHEMA: &str = "chio.runtime.trusted-verifiers.v1";
 pub const CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA: &str = "chio.runtime.pheromone-policy.v1";
 pub const CHIO_RUNTIME_PHEROMONE_POLICY_DECISION_SCHEMA: &str =
     "chio.runtime.pheromone-policy-decision.v1";
 pub const CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA: &str = "chio.runtime.peer-weights.v1";
-pub const CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA: &str = "chio.runtime.trust-floor-state.v1";
+
 pub const CHIO_RUNTIME_ORCHESTRATION_PLAN_SCHEMA: &str = "chio.runtime.orchestration-plan.v1";
 pub const CHIO_RUNTIME_ORCHESTRATION_PROFILE_SCHEMA: &str = "chio.runtime.orchestration-profile.v1";
 pub const CHIO_RUNTIME_RUN_CONTRACT_SCHEMA: &str = "chio.runtime.run-contract.v1";
@@ -607,3 +608,67 @@ pub const CHIO_RUNTIME_FAILURE_CODES: &[&str] = &[
     "unsupported_treaty_scope_schema",
     "unsupported_trusted_verifiers_schema",
 ];
+
+#[cfg(test)]
+mod identity_fixture_tests {
+    use super::*;
+    #[test]
+    fn runtime_schema_identities_match_canonical_fixture() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let fixtures: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+            "../../../../spec/fixtures/shared-security-identifiers.json"
+        ))?;
+        for identity in [
+            CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
+            CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA,
+            CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
+            CHIO_RUNTIME_ADMISSION_REPORT_SCHEMA,
+            CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA,
+            CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA,
+            CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA,
+            CHIO_RUNTIME_PROOF_REGENERATION_INPUT_SCHEMA,
+            CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA,
+            CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA,
+            CHIO_RUNTIME_ADMISSION_STORE_SCHEMA,
+            CHIO_RUNTIME_TRUSTED_VERIFIERS_SCHEMA,
+            CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
+            CHIO_RUNTIME_PHEROMONE_POLICY_DECISION_SCHEMA,
+            CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA,
+            CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA,
+            CHIO_RUNTIME_ORCHESTRATION_PLAN_SCHEMA,
+            CHIO_RUNTIME_ORCHESTRATION_PROFILE_SCHEMA,
+            CHIO_RUNTIME_RUN_CONTRACT_SCHEMA,
+            CHIO_RUNTIME_ORCHESTRATION_RUN_REPORT_SCHEMA,
+            CHIO_RUNTIME_ORCHESTRATION_RESUME_PLAN_SCHEMA,
+            CHIO_RUNTIME_ORCHESTRATION_STATUS_REPORT_SCHEMA,
+            CHIO_RUNTIME_PROOF_DRIFT_REPORT_SCHEMA,
+            CHIO_RUNTIME_SUPERVISOR_PROFILE_SCHEMA,
+            CHIO_RUNTIME_RUN_LEASE_SCHEMA,
+            CHIO_RUNTIME_SCHEDULER_TICK_REPORT_SCHEMA,
+            CHIO_RUNTIME_EVIDENCE_SINK_HEALTH_REPORT_SCHEMA,
+            CHIO_RUNTIME_RECOVERY_DRILL_REPORT_SCHEMA,
+            CHIO_RUNTIME_ARTIFACT_RETENTION_PROFILE_SCHEMA,
+            CHIO_RUNTIME_ARTIFACT_RETENTION_PLAN_SCHEMA,
+            CHIO_RUNTIME_PROVIDER_BINDINGS_SCHEMA,
+            CHIO_RUNTIME_PROVIDER_HEALTH_REPORT_SCHEMA,
+            CHIO_RUNTIME_OPS_STATUS_REPORT_SCHEMA,
+        ] {
+            let fixture = fixtures
+                .iter()
+                .find(|row| row["identity"].as_str() == Some(identity))
+                .ok_or("missing runtime identity fixture")?;
+            let payload: serde_json::Value = serde_json::from_str(
+                fixture["canonical_payload"]
+                    .as_str()
+                    .ok_or("fixture payload")?,
+            )?;
+            let mut preimage = identity.as_bytes().to_vec();
+            preimage.extend_from_slice(&chio_core_types::canonical_json_bytes(&payload)?);
+            assert_eq!(
+                chio_core_types::sha256_hex(&preimage),
+                fixture["sha256"].as_str().ok_or("fixture digest")?
+            );
+        }
+        Ok(())
+    }
+}

@@ -87,7 +87,10 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                     DurableToolReturnContextInput {
                         security_invocation_context: Some(&prepared.context),
                         security_release_required: true,
-                        trusted_now_unix_ms: read_unix_timestamp_ms()?
+                        trusted_now_unix_ms: self
+                            .kernel
+                            .read_authority_time()?
+                            .get()
                             .max(input.trusted_now_unix_ms),
                         ..input
                     },

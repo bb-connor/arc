@@ -83,10 +83,11 @@ fn exercise_delivery(
     fixture.kernel.set_caller_executor(executor.clone())?;
     // Provision the independently owned executor before entering any signed
     // execution interval. Host setup is not part of the authorized handoff.
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &fixture._directory.path().join("executor.db"),
         executor.clone(),
         4,
+        fixture.clock.clone(),
     )?;
     let effects = AtomicUsize::new(0);
     let operation_id = super::nonce::execution::issue(&mut fixture)?;
@@ -142,8 +143,6 @@ fn exercise_delivery(
     assert_captured_quota(&fixture)?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     drop(store);
-    #[cfg(unix)]
-    let mut _clock = None;
     let historical_time = match mode {
         DeliveryMode::Live => None,
         #[cfg(unix)]
@@ -165,10 +164,7 @@ fn exercise_delivery(
                     .capability
                     .expires_at
                     .max(u64::try_from(nonce.expires_at())?);
-                _clock = Some(chio_kernel::scope_fixed_runtime_for_current_thread(
-                    until + 1,
-                    [],
-                ));
+                fixture.clock.advance_to((until + 1) * 1_000)?;
                 Some((until + 1) * 1_000)
             } else {
                 None

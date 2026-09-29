@@ -1,3 +1,6 @@
+pub const NATIVE_FLOW_DISPATCH_POLICY_SCHEMA: &str = "chio.native-flow-dispatch-policy.v1";
+pub const NATIVE_FLOW_DECLASSIFIED_DISPATCH_POLICY_SCHEMA: &str =
+    "chio.native-flow-dispatch-policy.v2";
 use alloc::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::String;

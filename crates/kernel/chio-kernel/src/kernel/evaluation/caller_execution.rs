@@ -134,7 +134,7 @@ impl ChioKernel {
             })?;
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,
-            read_unix_timestamp()?,
+            self.read_authority_time()?.as_secs(),
             Some(grant_index),
             metadata,
             "caller dispatch committed; authenticated executor claim required",
@@ -213,8 +213,10 @@ impl ChioKernel {
         if let Some(authorization) = self.committed_caller_authorization(nonce, arguments)? {
             return Ok(CallerStartResponse::Authorized(Box::new(authorization)));
         }
-        let mut request = self
-            .caller_reserved_request(&nonce.nonce.bound_to.request_id, read_unix_timestamp_ms()?)?;
+        let mut request = self.caller_reserved_request(
+            &nonce.nonce.bound_to.request_id,
+            self.read_authority_time()?.get(),
+        )?;
         request.execution_nonce = Some(nonce.clone());
         request.dpop_proof = credentials.dpop_proof;
         request.approval_token = credentials.approval_token;
@@ -425,8 +427,10 @@ impl ChioKernel {
                 "configured caller executor requires authenticated start and delivery; unsigned reports are not accepted".into(),
             ));
         }
-        let mut request = self
-            .caller_reserved_request(&nonce.nonce.bound_to.request_id, read_unix_timestamp_ms()?)?;
+        let mut request = self.caller_reserved_request(
+            &nonce.nonce.bound_to.request_id,
+            self.read_authority_time()?.get(),
+        )?;
         let presented = ToolCallAction::from_parameters(arguments.clone()).map_err(|error| {
             KernelError::DurableAdmission(format!(
                 "caller report arguments cannot be hashed: {error}"

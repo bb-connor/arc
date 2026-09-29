@@ -27,7 +27,7 @@ fn deployment() -> ActiveDefenseDeploymentConfig {
         deployment_digest: Digest32::new([0; 32]),
         response_authority: AuthorityRuntimeConfig {
             schema: AUTHORITY_RUNTIME_CONFIG_SCHEMA.to_string(),
-            protocol: ACTIVE_RESPONSE_AUTHORITY_PROTOCOL.to_string(),
+            protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
             response_execution_mode: ResponseExecutionMode::Live,
             socket_path: PathBuf::from("/run/chio/response-authority.sock"),
             store_path: PathBuf::from("/var/lib/chio/response-authority.db"),

@@ -69,7 +69,7 @@ impl ChioKernel {
                 resource: crate::OverloadResource::Allocation,
             });
         }
-        let now_unix_ms = read_unix_timestamp_ms()?;
+        let now_unix_ms = self.read_authority_time()?.get();
         let now = now_unix_ms / 1000;
         self.verify_capability_full_pre_admit(capability, None, now)
             .map_err(KernelError::GuardDenied)?;
@@ -173,7 +173,7 @@ impl ChioKernel {
         self.build_deny_response_with_metadata(
             request,
             reason,
-            read_unix_timestamp()?,
+            self.read_authority_time()?.as_secs(),
             None,
             extra_metadata,
         )
@@ -251,7 +251,7 @@ impl ChioKernel {
         self.build_deny_response_with_metadata(
             request,
             reason,
-            read_unix_timestamp()?,
+            self.read_authority_time()?.as_secs(),
             None,
             Some(metadata),
         )

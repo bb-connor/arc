@@ -558,8 +558,7 @@ use egress_restriction::{
 mod events;
 use events::{
     append_verified_in_transaction, load_event_identity, parse_trust_class,
-    scan_verified_partition, EVENT_EVIDENCE_HASH_DOMAIN, MAX_EVENT_SCAN_RESULTS,
-    RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN,
+    scan_verified_partition, MAX_EVENT_SCAN_RESULTS,
 };
 
 mod finding_batches;

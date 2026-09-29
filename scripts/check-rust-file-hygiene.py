@@ -356,7 +356,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/kernel/validation.rs": allow(
         "2026-12-31",
         "kernel capability and admission validation surface; capped to current size until split",
-        max_lines=2_679,
+        max_lines=2_549,
     ),
     "crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs": allow(
         "2026-11-30",
@@ -364,7 +364,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=2_131,
     ),
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs": allow(
-        "2026-12-31",
+        "2026-11-30",
         "cognition finding handler surface with authenticated status-operator standing and live service-bond renewal; capped to current size until split",
         max_lines=2_412,
     ),
@@ -400,11 +400,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "cognition purchase and recovery end-to-end regression suite with bounded buyer admission and durable replay coverage; capped to current size until split",
         max_lines=7_501,
         max_fragments=3,
-    ),
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/factor_assignment.rs": allow(
-        "2026-11-30",
-        "admission factor assignment store surface; capped to current size until split",
-        max_lines=2_078,
     ),
     "crates/platform/chio-store-sqlite/src/budget_store/composite_schema.rs": allow(
         "2026-11-30",
@@ -457,12 +452,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "serving-owner provisioning test suite with sequenced revocation stream coverage; capped to current size until split",
         max_lines=2_281,
     ),
-    "crates/kernel/chio-kernel/src/kernel/tests.rs": allow(
-        "2027-01-31",
-        "kernel test suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=38_940,
-        max_fragments=47,
-    ),
     "crates/protocol/chio-acp-proxy/src/lib.rs": allow(
         "2027-01-31",
         "ACP proxy surface assembled from include! fragments; capped until the fragments become modules",
@@ -478,7 +467,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/trust/chio-credentials/src/lib.rs": allow(
         "2027-01-31",
         "credentials surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=8_224,
+        max_lines=8_223,
         max_fragments=14,
     ),
     "crates/protocol/chio-mcp-remote/src/lib.rs": allow(
@@ -617,12 +606,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=2_168,
         max_fragments=1,
     ),
-    "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs": allow(
-        "2026-11-30",
-        "kernel monetary durability test support assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_162,
-        max_fragments=1,
-    ),
     "crates/security/chio-quarantine/src/state_machine.rs": allow(
         "2026-10-31",
         "quarantine state machine assembled from include! fragments; capped until the fragments become modules",
@@ -690,11 +673,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests/authorization.rs": allow(
         "2026-10-31",
         "MCP edge runtime authorization suite assembled from include! fragments; capped until the fragments become modules",
-        max_fragments=1,
-    ),
-    "crates/kernel/chio-kernel/tests/durable_admission_sqlite/federation_context.rs": allow(
-        "2026-10-31",
-        "durable admission federation context assembled from include! fragments; capped until the fragments become modules",
         max_fragments=1,
     ),
     "crates/products/chio-cli/src/bin/chio.rs": allow(

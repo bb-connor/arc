@@ -1,3 +1,5 @@
+use chio_fincred::FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN;
+use chio_fincred::FINANCIAL_SOURCE_DISCLOSURE_DIGEST_DOMAIN;
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
@@ -30,8 +32,6 @@ use crate::{
     CREDIT_SCORECARD_SCHEMA, EXPOSURE_LEDGER_SCHEMA,
 };
 
-const SOURCE_ARTIFACT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-artifact.v1\0";
-const SOURCE_DISCLOSURE_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-disclosure.v1\0";
 const SOURCE_CHECKPOINT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-checkpoint-digest.v1\0";
 const EXPOSURE_RECEIPT_MEMBER_SCHEMA_V1: &str = "chio.fincred.exposure-receipt-member.v1";
 const EXPOSURE_DECISION_MEMBER_SCHEMA_V1: &str = "chio.fincred.exposure-decision-member.v1";
@@ -538,7 +538,7 @@ fn source_bundle_artifact<T: Serialize>(
     Ok(FinancialSourceBundleArtifactV1 {
         role,
         artifact_schema: artifact_schema.to_string(),
-        artifact_digest: domain_digest(SOURCE_ARTIFACT_DIGEST_DOMAIN, &canonical),
+        artifact_digest: domain_digest(FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN, &canonical),
         canonical_artifact,
     })
 }

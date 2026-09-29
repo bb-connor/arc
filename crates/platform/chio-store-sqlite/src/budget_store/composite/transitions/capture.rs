@@ -179,19 +179,21 @@ impl SqliteBudgetStore {
             return Ok((decision, operation));
         }
         if let Some(binding) = admission.as_ref() {
+            let owner = self.serving_owner.as_deref().ok_or_else(|| {
+                BudgetStoreError::Invariant("admission capture requires a serving owner".to_owned())
+            })?;
             crate::admission_operation_store::verify_fresh_dpop_tx(
                 &transaction,
                 binding.operation,
                 binding.trusted_now_unix_ms,
+                owner,
             )
             .map_err(|error| map_admission_error(self, error))?;
-        }
-
-        if let Some(binding) = admission.as_ref() {
             crate::admission_operation_store::verify_fresh_approval_tx(
                 &transaction,
                 binding.operation,
                 binding.trusted_now_unix_ms,
+                owner,
             )
             .map_err(|error| map_admission_error(self, error))?;
         }
@@ -484,8 +486,11 @@ impl SqliteBudgetStore {
         #[cfg(feature = "admission-test-support")]
         let native_capture = native.is_some();
         if let Some(native) = native {
+            let owner = self.serving_owner.as_deref().ok_or_else(|| {
+                BudgetStoreError::Invariant("native capture requires a serving owner".to_owned())
+            })?;
             native
-                .verify_deadline(&transaction)
+                .verify_deadline(&transaction, owner)
                 .map_err(|error| map_admission_error(self, error))?;
         }
         #[cfg(feature = "admission-test-support")]

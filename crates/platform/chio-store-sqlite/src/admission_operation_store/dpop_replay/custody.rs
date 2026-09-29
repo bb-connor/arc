@@ -40,8 +40,9 @@ pub(in crate::admission_operation_store) fn dpop_clock_tx(
     tx: &Transaction<'_>,
     record: &DpopReplayMigrationRecordV1,
     trusted_now_unix_ms: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let observed = migration_time(tx, trusted_now_unix_ms)?;
+    let observed = migration_time(tx, trusted_now_unix_ms, owner)?;
     verify_source_clock_floor(record, observed)?;
     Ok(observed)
 }

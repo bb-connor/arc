@@ -9,8 +9,9 @@ use super::*;
 pub(crate) fn verify_trusted_time(
     transaction: &Transaction<'_>,
     decision_time: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<(), AdmissionOperationStoreError> {
-    authority_validation_time(transaction, decision_time).map(|_| ())
+    authority_validation_time(transaction, decision_time, owner).map(|_| ())
 }
 
 /// Time for live authorization checks, not for serialized decision evidence.
@@ -19,9 +20,10 @@ pub(crate) fn verify_trusted_time(
 pub(in crate::admission_operation_store) fn authority_validation_time(
     transaction: &Transaction<'_>,
     decision_time: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<u64, AdmissionOperationStoreError> {
     validate_trusted_time(decision_time, "trusted_now_unix_ms")?;
-    let observed = observe_authority_time(transaction)?;
+    let observed = observe_authority_time(transaction, owner)?;
     if decision_time.abs_diff(observed) > MAX_TRUSTED_CLOCK_SKEW_MS {
         return Err(invariant(
             "trusted_now_unix_ms exceeds the permitted system-clock skew",
@@ -32,14 +34,25 @@ pub(in crate::admission_operation_store) fn authority_validation_time(
 
 pub(in crate::admission_operation_store) fn observe_authority_time(
     transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
 ) -> Result<u64, AdmissionOperationStoreError> {
     let observed = match chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
         Some(fixed) => fixed
             .checked_mul(1_000)
             .ok_or_else(|| invariant("authority clock exceeds the persisted trusted-time range"))?,
         None => {
-            chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
+            let mut fence = owner.clock_fence.lock().map_err(|_| {
+                invariant(chio_security_types::clock::ClockError::Unavailable.code())
+            })?;
+            fence
+                .observe(
+                    owner
+                        .clock
+                        .read()
+                        .map_err(|error| invariant(error.code()))?,
+                )
                 .map_err(|error| invariant(error.code()))?
+                .unix_millis()
                 .get()
         }
     };

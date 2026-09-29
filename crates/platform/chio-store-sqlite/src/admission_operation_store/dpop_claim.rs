@@ -52,6 +52,7 @@ pub(crate) fn verify_fresh_dpop_tx(
     connection: &Transaction<'_>,
     operation: &AdmissionOperationV1,
     trusted_now_unix_ms: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<(), AdmissionOperationStoreError> {
     if operation.dpop_replay_ledger_digest().is_none() {
         return Ok(());
@@ -63,7 +64,7 @@ pub(crate) fn verify_fresh_dpop_tx(
         .ok_or_else(|| invariant("fresh dpop authority requires a live claim"))?;
     let source =
         dpop_replay::require_active_authority(connection, live.intent().credential().authority())?;
-    let observed = dpop_replay::dpop_clock_tx(connection, &source, trusted_now_unix_ms)?;
+    let observed = dpop_replay::dpop_clock_tx(connection, &source, trusted_now_unix_ms, owner)?;
     live.intent().credential().validate_at(observed)?;
     Ok(())
 }
@@ -84,7 +85,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let Some(stored) = load_by_operation_id_tx(&transaction, operation_id)? else {
             return Ok(None);
         };
@@ -124,7 +125,7 @@ impl SqliteAdmissionOperationStore {
         intent.validate()?;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(lease.store_fence()))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         verify_participant_recovery_tx(
             &transaction,
             &self.serving_owner,
@@ -153,7 +154,12 @@ impl SqliteAdmissionOperationStore {
                 "dpop operation has a live episode or exhausted its episode bound",
             ));
         }
-        let observed = dpop_replay::dpop_clock_tx(&transaction, &source, trusted_now_unix_ms)?;
+        let observed = dpop_replay::dpop_clock_tx(
+            &transaction,
+            &source,
+            trusted_now_unix_ms,
+            &self.serving_owner,
+        )?;
         intent.credential().validate_at(observed)?;
         capacity::require_available(&transaction, &source, operation, intent, observed)?;
         let ledger = ledger_digest(operation, intent)?;
@@ -222,7 +228,7 @@ impl SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(lease.store_fence()))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         verify_participant_recovery_tx(
             &transaction,
             &self.serving_owner,
@@ -356,6 +362,7 @@ pub(super) fn verify_transition_tx(
     previous: &AdmissionOperationV1,
     updated: &AdmissionOperationV1,
     now: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<(), AdmissionOperationStoreError> {
     verify_operation(tx, updated)?;
     let fresh_authorization =
@@ -363,7 +370,7 @@ pub(super) fn verify_transition_tx(
     let fresh_dispatch =
         previous.dispatch_commit().is_none() && updated.dispatch_commit().is_some();
     if (fresh_authorization || fresh_dispatch) && previous.dpop_replay_ledger_digest().is_some() {
-        verify_fresh_dpop_tx(tx, previous, now)?;
+        verify_fresh_dpop_tx(tx, previous, now, owner)?;
     }
     Ok(())
 }

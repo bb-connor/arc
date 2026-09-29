@@ -423,7 +423,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let result = load_by_operation_id_tx(&transaction, operation_id)?
             .map(|stored| {
                 stored.verify_decision_time(trusted_now_unix_ms)?;
@@ -478,7 +478,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let recovery = load_by_operation_id_tx(&transaction, operation_id)?
             .map(|stored| {
                 stored.verify_decision_time(trusted_now_unix_ms)?;
@@ -511,7 +511,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let stored = load_by_operation_id_tx(&transaction, operation_id)?;
         let issuance = stored
             .map(|stored| {
@@ -554,7 +554,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let stored = load_by_operation_id_tx(&transaction, operation_id)?;
         let reservation = stored
             .map(|stored| {
@@ -616,7 +616,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let Some(stored) = load_by_operation_id_tx(&transaction, operation_id)? else {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(None);
@@ -659,7 +659,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let fence = command.recovery_lease().store_fence();
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let result = self.apply_in_transaction(&transaction, command, trusted_now_unix_ms)?;
         if matches!(result, AdmissionCommandResult::Idempotent(_)) {
             transaction.commit().map_err(sqlite_error)?;
@@ -689,7 +689,11 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         validate_claim_request(&request, trusted_now_unix_ms)?;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(fence))?;
-        let validation_time = schema::authority_validation_time(&transaction, trusted_now_unix_ms)?;
+        let validation_time = schema::authority_validation_time(
+            &transaction,
+            trusted_now_unix_ms,
+            &self.serving_owner,
+        )?;
         if validation_time >= expires_at_unix_ms {
             return Err(AdmissionOperationError::LeaseExpired.into());
         }
@@ -721,7 +725,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         validate_claim_request(&request, trusted_now_unix_ms)?;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(request.fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let stored = load_by_operation_id_tx(&transaction, request.operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         let claim =
@@ -747,7 +751,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
     ) -> Result<(), AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(current_store_fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let stored = load_by_operation_id_tx(&transaction, claim.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         if stored.operation != *operation {
@@ -893,7 +897,8 @@ pub(super) fn claim_recovery_tx(
     trusted_now_unix_ms: u64,
 ) -> Result<ClaimWrite, AdmissionOperationStoreError> {
     {
-        let validation_time = schema::authority_validation_time(transaction, trusted_now_unix_ms)?;
+        let validation_time =
+            schema::authority_validation_time(transaction, trusted_now_unix_ms, owner)?;
         if validation_time >= request.expires_at_unix_ms {
             return Err(AdmissionOperationError::LeaseExpired.into());
         }
@@ -1077,12 +1082,14 @@ impl SqliteAdmissionOperationStore {
             &stored.operation,
             &updated,
             trusted_now_unix_ms,
+            &self.serving_owner,
         )?;
         dpop_claim::verify_transition_tx(
             transaction,
             &stored.operation,
             &updated,
             trusted_now_unix_ms,
+            &self.serving_owner,
         )?;
         let encoded = encode_operation(&updated)?;
         let changed = transaction

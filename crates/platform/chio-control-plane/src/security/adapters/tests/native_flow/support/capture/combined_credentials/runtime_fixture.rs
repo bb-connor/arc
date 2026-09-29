@@ -10,7 +10,7 @@ pub(super) fn install(fixture: &mut Fixture) -> TestResult {
     let local_kernel = "native-combined-runtime-kernel";
     fixture.kernel.set_federation_local_kernel_id(local_kernel);
     let path = fixture._directory.path().join("native-runtime.db");
-    let source = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(&path, fixture.clock.clone())?;
     let bundle = RuntimeAdmissionBundle {
         schema: CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA.into(),
         admission_id: "native-runtime-admission".into(),

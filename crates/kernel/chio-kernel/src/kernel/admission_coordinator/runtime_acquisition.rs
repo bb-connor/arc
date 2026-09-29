@@ -231,7 +231,7 @@ impl ChioKernel {
         let hook = self.runtime_admission_hook.as_ref().ok_or_else(|| {
             acquisition_error("native capture lost its original runtime verifier")
         })?;
-        let now = read_unix_timestamp_ms()?;
+        let now = self.read_authority_time()?.get();
         let context = RuntimeAdmissionRevalidationContext {
             request,
             admission_metadata: metadata,

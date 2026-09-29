@@ -305,6 +305,18 @@ impl DurableObligationV1 {
 }
 
 impl SqliteAdmissionOperationStore {
+    /// Observe this serving authority's clock under its current custody and
+    /// persisted time fence. Adapters use this instead of an independent clock;
+    /// every subsequent admission operation still validates time in its own transaction.
+    pub fn observed_authority_time(
+        &self,
+    ) -> Result<chio_security_types::clock::UnixMillis, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        schema::observe_authority_time(&transaction, &self.serving_owner)
+            .map(chio_security_types::clock::UnixMillis::new)
+    }
+
     pub(crate) fn open_alongside(
         connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
@@ -941,7 +953,11 @@ impl SqliteAdmissionOperationStore {
         validate_canonical_projection_size(&canonical)?;
         let context = projection.context();
         context.validate()?;
-        verify_trusted_time(transaction, context.trusted_time_unix_ms)?;
+        verify_trusted_time(
+            transaction,
+            context.trusted_time_unix_ms,
+            &self.serving_owner,
+        )?;
         crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
         verify_payment_terminal_source(
             transaction,
@@ -1118,7 +1134,7 @@ fn verify_stored_recovery_claim(
     if &historical_lease_id != claim.coordinator_lease_id() {
         return Err(AdmissionOperationStoreError::Fenced);
     }
-    if schema::authority_validation_time(transaction, trusted_now_unix_ms)?
+    if schema::authority_validation_time(transaction, trusted_now_unix_ms, owner)?
         >= claim.expires_at_unix_ms()
     {
         return Err(AdmissionOperationError::LeaseExpired.into());
@@ -1361,6 +1377,7 @@ pub(crate) fn begin_prepared_operation_tx(
     operation: &AdmissionOperationV1,
     fence: &StoreMutationFence,
     trusted_now_unix_ms: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<PreparedAdmissionBeginTxResult, AdmissionOperationStoreError> {
     operation.validate()?;
     if operation.state() != AdmissionOperationState::Prepared || operation.version() != 1 {
@@ -1381,7 +1398,7 @@ pub(crate) fn begin_prepared_operation_tx(
     if operation.coordinator_lease_epoch() != fence.owner_epoch {
         return Err(AdmissionOperationStoreError::Fenced);
     }
-    verify_trusted_time(transaction, trusted_now_unix_ms)?;
+    verify_trusted_time(transaction, trusted_now_unix_ms, owner)?;
     let encoded = encode_operation(operation)?;
     let replay_key = operation.replay_key();
     if let Some(existing) = load_by_replay_key_tx(transaction, &replay_key)? {

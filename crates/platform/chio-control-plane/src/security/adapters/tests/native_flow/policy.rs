@@ -19,7 +19,7 @@ fn native_policy_evidence_binds_exact_inputs_and_decision_without_payload() -> T
             fixture.binding.clone(),
             manifests,
             classifier.clone(),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             flow_config(),
         )?);
         let custody = fixture.run(resolver, || {})??;
@@ -94,7 +94,7 @@ fn native_policy_evidence_commits_large_manifest_without_retaining_its_payload()
         fixture.binding.clone(),
         registry_with_description(true, InformationLabel::bottom(), Some("x".repeat(300_000)))?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         flow_config(),
     )?);
     let custody = fixture.run(resolver, || {})??;
@@ -118,7 +118,7 @@ fn native_policy_evidence_retains_unused_category_policy_and_admitted_clearance(
         fixture.binding.clone(),
         registry(true, restricted_label())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         config,
     )?);
     let custody = fixture.run(resolver, || {})??;
@@ -168,7 +168,7 @@ fn oversized_native_policy_evidence_denies_before_any_egress_custody() -> TestRe
         fixture.binding.clone(),
         flow_registry(),
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         config,
     )?);
     assert!(matches!(

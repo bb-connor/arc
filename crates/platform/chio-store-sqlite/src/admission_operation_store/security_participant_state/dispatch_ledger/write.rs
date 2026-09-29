@@ -16,7 +16,7 @@ impl SqliteAdmissionOperationStore {
         let (policy_value, policy) = policy::decode(input.policy_json)?;
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(custody.lease.store_fence()))?;
-        let now = observed_time(&tx, custody.trusted_now_unix_ms)?;
+        let now = observed_time(&tx, custody.trusted_now_unix_ms, &self.serving_owner)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, custody.lease, now)?;
         ensure_no_reserved_terminal_stage(&tx, operation.binding().operation_id())?;
         storage::verify_coverage(&tx)?;
@@ -86,8 +86,13 @@ impl SqliteAdmissionOperationStore {
         let approval =
             governed_approval_claim::dispatch_snapshot(&tx, operation, input.grant_index)?;
         let dpop = dpop_claim::dispatch_snapshot(&tx, operation, input.grant_index)?;
-        governed_approval_claim::verify_fresh_approval_tx(&tx, operation, now)?;
-        dpop_claim::verify_fresh_dpop_tx(&tx, operation, now)?;
+        governed_approval_claim::verify_fresh_approval_tx(
+            &tx,
+            operation,
+            now,
+            &self.serving_owner,
+        )?;
+        dpop_claim::verify_fresh_dpop_tx(&tx, operation, now, &self.serving_owner)?;
         let record = Record {
             schema: SCHEMA.into(),
             operation: operation.to_persisted(),
@@ -127,7 +132,7 @@ impl SqliteAdmissionOperationStore {
             )
             .map_err(map_owner_error)?;
         storage::verify_coverage(&tx)?;
-        let commit_at = observed_time(&tx, now)?;
+        let commit_at = observed_time(&tx, now, &self.serving_owner)?;
         storage::verify_reference(&tx, &record)?;
         policy.validate_current(&tx, commit_at)?;
         verify_participant_recovery_tx(

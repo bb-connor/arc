@@ -37,7 +37,7 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<(), AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(active_fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let (verified, binding) =
             crate::economic_state_cache::load_anchored_terminal_projection_in_transaction(
                 &transaction,
@@ -82,7 +82,7 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(active_fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let (verified, binding) =
             crate::economic_state_cache::load_anchored_terminal_projection_in_transaction(
                 &transaction,
@@ -122,7 +122,7 @@ impl SqliteAdmissionOperationStore {
                 "terminal projection requires an advanced economic anchor",
             ));
         }
-        verify_trusted_time(transaction, apply_time_unix_ms)?;
+        verify_trusted_time(transaction, apply_time_unix_ms, &self.serving_owner)?;
         let stored = load_by_operation_id_tx(transaction, &context.operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
@@ -1268,6 +1268,7 @@ pub(crate) fn advance_budget_capture_tx(
         &updated,
         recovery_lease,
         trusted_now_unix_ms,
+        owner,
     )?;
     let updated = advance_named_participant_tx(
         transaction,
@@ -1573,10 +1574,17 @@ pub(super) fn advance_named_participant_tx(
             expected,
             updated,
             trusted_now_unix_ms,
+            owner,
         )?;
     }
     if !matches!(commit.kind, ParticipantMutation::DpopReplayClaim) {
-        dpop_claim::verify_transition_tx(transaction, expected, updated, trusted_now_unix_ms)?;
+        dpop_claim::verify_transition_tx(
+            transaction,
+            expected,
+            updated,
+            trusted_now_unix_ms,
+            owner,
+        )?;
     }
     let encoded = encode_operation(updated)?;
     let changed = transaction

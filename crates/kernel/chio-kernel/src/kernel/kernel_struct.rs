@@ -545,7 +545,7 @@ fn read_process_rss_bytes() -> Option<u64> {
 /// signing key, address, or internal state to the agent.
 pub struct ChioKernel {
     pub(super) clock: Arc<dyn chio_security_types::clock::Clock>,
-    pub(super) clock_fence: Mutex<chio_security_types::clock::ClockFence>,
+    pub(super) clock_fence: Arc<Mutex<chio_security_types::clock::ClockFence>>,
     pub(super) config: KernelConfig,
     pub(super) durable_admission_mode: crate::admission_operation::DurableAdmissionMode,
     pub(super) durable_admission_runtime: Option<DurableAdmissionRuntime>,

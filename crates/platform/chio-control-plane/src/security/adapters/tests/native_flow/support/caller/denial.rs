@@ -135,7 +135,7 @@ fn native_caller_changed_input_cannot_replace_original_reserved_join() -> TestRe
             fixture.binding.clone(),
             super::super::super::registry(false, super::super::super::restricted_label())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             config,
         )?
         .with_captured_lifecycle(),
@@ -210,10 +210,11 @@ fn native_caller_output_refusal_revocation_and_stop_never_release_raw_delivery()
         let key = pin(&mut fixture)?;
         reserve(&mut fixture)?;
         let authorization = start(&fixture)?;
-        let ledger = SqliteCallerExecutionLedger::provision(
+        let ledger = SqliteCallerExecutionLedger::provision_with_clock(
             &fixture._directory.path().join("executor.db"),
             authorization.authorization.executor.clone(),
             2,
+            fixture.clock.clone(),
         )?;
         let report = ledger.execute_once(
             &authorization,

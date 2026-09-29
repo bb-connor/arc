@@ -1,3 +1,4 @@
+use chio_security_types::ports::ACTIVE_RESPONSE_AUTHORITY_SCHEMA;
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -21,7 +22,6 @@ pub const ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA: &str =
 const ACTIVE_DEFENSE_DEPLOYMENT_DIGEST_DOMAIN: &[u8] =
     b"chio.active-defense.deployment-config.digest.v2\0";
 const MAX_DEPLOYMENT_CONFIG_BYTES: u64 = 1_048_576;
-const ACTIVE_RESPONSE_AUTHORITY_PROTOCOL: &str = "chio.active-response-policy-authority.v2";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -52,7 +52,7 @@ impl AuthorityRuntimeConfig {
 
     fn validate_with_deployment_digest(&self, require_deployment_digest: bool) -> Result<()> {
         if self.schema != AUTHORITY_RUNTIME_CONFIG_SCHEMA
-            || self.protocol != ACTIVE_RESPONSE_AUTHORITY_PROTOCOL
+            || self.protocol != ACTIVE_RESPONSE_AUTHORITY_SCHEMA
             || (require_deployment_digest && self.deployment_digest.is_zero())
             || self.store_digest.is_zero()
             || self.service_identity.process_id == 0

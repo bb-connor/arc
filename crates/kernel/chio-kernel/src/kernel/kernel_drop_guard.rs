@@ -6,9 +6,8 @@ use crate::admission_operation::AdmissionOperationV1;
 use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCallRequest};
 
 use super::{
-    merge_metadata_objects, read_unix_timestamp, read_unix_timestamp_ms,
-    scope_pre_invocation_guard_evidence, ChioKernel, KernelError, PreExecutionBudgetMutation,
-    VerifiedGovernedPayeeBinding,
+    merge_metadata_objects, scope_pre_invocation_guard_evidence, ChioKernel, KernelError,
+    PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
 };
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
@@ -177,8 +176,10 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// reports the ambiguity is built. The caller disarms the guard afterwards.
     pub(crate) fn terminalize_after_transport_failure(&mut self) -> Result<(), KernelError> {
         if let Some(operation) = self.durable_operation {
-            self.kernel
-                .terminalize_dispatch_committed_admission(operation, read_unix_timestamp_ms()?)?;
+            self.kernel.terminalize_dispatch_committed_admission(
+                operation,
+                self.kernel.read_authority_time()?.get(),
+            )?;
             self.mark_durable_operation_terminalized();
         }
         Ok(())
@@ -207,7 +208,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
             .build_cancelled_response_with_metadata_and_payee_binding(
                 self.request,
                 self.post_dispatch_reason,
-                read_unix_timestamp()?,
+                self.kernel.read_authority_time()?.as_secs(),
                 self.matched_grant_index,
                 receipt_metadata,
                 self.receipt_context.verified_payee_binding.as_ref(),

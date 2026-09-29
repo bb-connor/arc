@@ -82,7 +82,7 @@ fn race(pause: Pause, revoke: bool) -> TestResult {
     fixture
         .kernel
         .set_security_pre_dispatch_hook(Arc::new(PauseHook {
-            resolver: resolver(fixture.binding.clone(), None)?,
+            resolver: resolver(fixture.binding.clone(), None, fixture.clock.clone())?,
             pause,
             entered,
             resume: Mutex::new(waiting),
@@ -156,15 +156,24 @@ fn race(pause: Pause, revoke: bool) -> TestResult {
             drop(store);
             drop(kernel);
             drop(fixture.authority);
-            let authority = SqliteAuthorityStore::open_serving(
+            let authority = SqliteAuthorityStore::open_serving_with_clock(
                 fixture._directory.path().join("admission.db"),
                 fixture._directory.path().join("locks"),
+                fixture.clock.clone(),
             )?;
             assert!(authority.mutation_fence().owner_epoch > old_fence.owner_epoch);
-            let (mut recovered, invocations) =
-                open_kernel(fixture._directory.path(), &authority, &fixture.signer)?;
+            let (mut recovered, invocations) = open_kernel(
+                fixture._directory.path(),
+                &authority,
+                &fixture.signer,
+                fixture.clock.clone(),
+            )?;
             recovered.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
-            recovered.set_security_pre_dispatch_hook(Arc::new(resolver(fixture.binding, None)?));
+            recovered.set_security_pre_dispatch_hook(Arc::new(resolver(
+                fixture.binding,
+                None,
+                fixture.clock.clone(),
+            )?));
             recovered.reconcile_durable_admission_startup()?;
             let (current, _) = authority
                 .admission_operation_store()

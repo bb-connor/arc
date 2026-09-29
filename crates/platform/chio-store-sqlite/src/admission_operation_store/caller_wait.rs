@@ -51,7 +51,7 @@ impl SqliteAdmissionOperationStore {
         let lease = command.recovery_lease();
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
-        verify_trusted_time(&tx, now)?;
+        verify_trusted_time(&tx, now, &self.serving_owner)?;
         let stored = load_by_operation_id_tx(&tx, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         verify_stored_recovery_claim(

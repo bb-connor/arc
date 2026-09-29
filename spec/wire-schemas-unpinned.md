@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-168 of 506 identifier constants in the security crates are unpinned.
+166 of 509 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (26)
 
@@ -95,7 +95,7 @@ since been pinned is removed by the next `--update`.
 
 - `crates/kernel/chio-kernel-core/src/passport_verify.rs:46` `PORTABLE_PASSPORT_SCHEMA` = `chio.portable-agent-passport.v1`
 
-## crates/platform/chio-control-plane (43)
+## crates/platform/chio-control-plane (42)
 
 - `crates/platform/chio-control-plane/src/certify/schema.rs:7` `CERTIFICATION_PUBLIC_SEARCH_SCHEMA` = `chio.certify.search.v1`
 - `crates/platform/chio-control-plane/src/certify/schema.rs:8` `CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA` = `chio.certify.transparency.v1`
@@ -107,9 +107,8 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:31` `PASSPORT_ISSUANCE_REGISTRY_VERSION` = `chio.passport-issuance-offers.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:13` `SCIM_LIFECYCLE_REGISTRY_VERSION` = `chio.scim-lifecycle-registry.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:14` `SCIM_LIFECYCLE_RECORD_SCHEMA` = `chio.scim-lifecycle-record.v1`
-- `crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs:11` `DECLASSIFIED_SCHEMA` = `chio.native-flow-dispatch-policy.v2`
-- `crates/platform/chio-control-plane/src/security/event_consumer/admission.rs:229` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
-- `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:50` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
+- `crates/platform/chio-control-plane/src/security/event_consumer/admission.rs:43` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
+- `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:14` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:11` `ENTERPRISE_MIGRATION_CANARY_EVIDENCE_SCHEMA` = `chio.enterprise-migration-canary-evidence.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:13` `ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_SCHEMA` = `chio.enterprise-migration-cutover-attestation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:145` `DEFECT_DOMAIN` = `chio.finding.defect.v1`
@@ -141,9 +140,8 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/service_types/admission_authority.rs:20` `ADMISSION_AUTHORITY_RESPONSE_SCHEMA` = `chio.admission-authority-response.v1`
 - `crates/platform/chio-control-plane/src/trust_control/service_types/structured_budget.rs:4` `STRUCTURED_BUDGET_RESPONSE_SCHEMA` = `chio.structured-budget-response.v1`
 
-## crates/platform/chio-store-sqlite (18)
+## crates/platform/chio-store-sqlite (17)
 
-- `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs:7` `DECLASSIFIED_POLICY_SCHEMA` = `chio.native-flow-dispatch-policy.v2`
 - `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs:5` `FORMAT` = `chio.native-security-egress.v1`
 - `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs:6` `DECLASSIFIED_FORMAT` = `chio.native-security-egress.v2`
 - `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs:7` `FORMAT` = `chio.native-security-nonce-preflight-join.v1`
@@ -164,8 +162,8 @@ since been pinned is removed by the next `--update`.
 
 ## crates/security/chio-active-response-authority (4)
 
-- `crates/security/chio-active-response-authority/src/config.rs:17` `AUTHORITY_RUNTIME_CONFIG_SCHEMA` = `chio.active-response-authority.runtime-config.v2`
-- `crates/security/chio-active-response-authority/src/config.rs:19` `ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA` = `chio.active-defense.deployment-config.v2`
+- `crates/security/chio-active-response-authority/src/config.rs:18` `AUTHORITY_RUNTIME_CONFIG_SCHEMA` = `chio.active-response-authority.runtime-config.v2`
+- `crates/security/chio-active-response-authority/src/config.rs:20` `ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA` = `chio.active-defense.deployment-config.v2`
 - `crates/security/chio-active-response-authority/src/store.rs:31` `AUTHORITY_STORE_BUNDLE_SCHEMA` = `chio.active-response-authority.bundle.v1`
 - `crates/security/chio-active-response-authority/src/store.rs:32` `AUTHORITY_STORE_MANIFEST_SCHEMA` = `chio.active-response-authority.store-manifest.v1`
 
@@ -175,8 +173,8 @@ since been pinned is removed by the next `--update`.
 
 ## crates/security/chio-cage-plan (2)
 
-- `crates/security/chio-cage-plan/src/launch_protocol.rs:86` `LAUNCH_ENVELOPE_SCHEMA` = `chio.cage.launch-envelope.v1`
-- `crates/security/chio-cage-plan/src/launch_protocol.rs:87` `STATUS_RECORD_SCHEMA` = `chio.cage.status-record.v1`
+- `crates/security/chio-cage-plan/src/launch_protocol.rs:3` `LAUNCH_ENVELOPE_SCHEMA` = `chio.cage.launch-envelope.v1`
+- `crates/security/chio-cage-plan/src/launch_protocol.rs:4` `STATUS_RECORD_SCHEMA` = `chio.cage.status-record.v1`
 
 ## crates/security/chio-decoy (1)
 

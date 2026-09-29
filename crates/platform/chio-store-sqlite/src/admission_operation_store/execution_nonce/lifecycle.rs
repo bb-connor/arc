@@ -20,7 +20,7 @@ impl SqliteAdmissionOperationStore {
         let lease = command.recovery_lease();
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(lease.store_fence()))?;
-        verify_trusted_time(&transaction, now)?;
+        verify_trusted_time(&transaction, now, &self.serving_owner)?;
         let stored = load_by_operation_id_tx(&transaction, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         ensure_no_reserved_terminal_stage(&transaction, command.operation_id())?;
@@ -45,7 +45,13 @@ impl SqliteAdmissionOperationStore {
                 "nonce capture preparation has no ready nonce participant",
             ));
         }
-        let nonce = fresh_nonce(&transaction, &stored.operation, lease, now)?;
+        let nonce = fresh_nonce(
+            &transaction,
+            &stored.operation,
+            lease,
+            now,
+            &self.serving_owner,
+        )?;
         crate::budget_store::verify_nonce_budget_phase_tx(
             &transaction,
             &stored.operation,
@@ -86,8 +92,9 @@ fn fresh_nonce(
     operation: &AdmissionOperationV1,
     lease: &AdmissionRecoveryLease,
     now: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<AdmissionExecutionNonceReservationV1, AdmissionOperationStoreError> {
-    let validation_time = schema::authority_validation_time(transaction, now)?;
+    let validation_time = schema::authority_validation_time(transaction, now, owner)?;
     let nonce = verify_reservation(transaction, operation)?
         .ok_or_else(|| invariant("nonce capture lost its durable reservation"))?;
     nonce.require_operation_bound_profile()?;
@@ -102,7 +109,12 @@ fn fresh_nonce(
     }
     let original = retained_request::load_retained_request_tx(transaction, operation)?
         .ok_or_else(|| invariant("nonce capture lost its original request"))?;
-    threshold_approval::verify_nonce_capture_approval(transaction, operation, validation_time)?;
+    threshold_approval::verify_nonce_capture_approval(
+        transaction,
+        operation,
+        validation_time,
+        owner,
+    )?;
     let verification_time =
         crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
             transaction,
@@ -124,6 +136,7 @@ pub(in crate::admission_operation_store) fn verify_capture(
     updated: &AdmissionOperationV1,
     lease: &AdmissionRecoveryLease,
     now: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<bool, AdmissionOperationStoreError> {
     if operation
         .binding()
@@ -151,7 +164,7 @@ pub(in crate::admission_operation_store) fn verify_capture(
         if stored.operation != *operation {
             return Err(AdmissionOperationStoreError::Fenced);
         }
-        fresh_nonce(transaction, operation, lease, now)?;
+        fresh_nonce(transaction, operation, lease, now, owner)?;
     }
     Ok(false)
 }

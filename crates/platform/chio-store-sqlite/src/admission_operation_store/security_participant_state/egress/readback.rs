@@ -54,7 +54,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        super::super::observed_time(&tx, now)?;
+        super::super::observed_time(&tx, now, &self.serving_owner)?;
         super::super::verify_coverage(&tx).map_err(map_owner_error)?;
         let record = match load_operation(&tx, operation, "committed")? {
             Some(record) => Some(record),

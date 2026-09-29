@@ -97,6 +97,7 @@ impl Point {
 
 #[derive(Serialize, Deserialize)]
 pub(super) struct Witness {
+    clock_unix_ms: u64,
     directory: PathBuf,
     signer: String,
     binding: NativeSecurityAuthorityBindingV1,
@@ -106,8 +107,15 @@ pub(super) struct Witness {
     declassification_signer: Option<String>,
 }
 
+impl Witness {
+    fn clock(&self) -> Arc<FlowTestClock> {
+        Arc::new(FlowTestClock::at(self.clock_unix_ms))
+    }
+}
+
 pub(super) fn caller_restart_witness(fixture: &Fixture, disclosure: Option<&Keypair>) -> Witness {
     Witness {
+        clock_unix_ms: fixture.clock.snapshot(),
         directory: fixture._directory.path().to_path_buf(),
         signer: fixture.signer.seed_hex(),
         binding: fixture.binding.clone(),
@@ -245,6 +253,7 @@ fn sync_write(path: &Path, bytes: &[u8], append: bool) -> std::io::Result<()> {
 fn resolver(
     binding: NativeSecurityAuthorityBindingV1,
     disclosure: Option<&Keypair>,
+    clock: Arc<FlowTestClock>,
 ) -> TestResult<NativeFlowResolver> {
     let (registry, config) = match disclosure {
         Some(key) => (
@@ -268,7 +277,7 @@ fn resolver(
         binding,
         registry,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        clock,
         config,
     )?
     .with_captured_lifecycle())
@@ -338,6 +347,7 @@ fn run_child(profile: Profile, point: Point) -> TestResult {
         .set_security_pre_dispatch_hook(Arc::new(resolver(
             fixture.binding.clone(),
             disclosure.as_ref(),
+            fixture.clock.clone(),
         )?));
     if profile == Profile::Nonce {
         nonce::execution::install_nonce(&mut fixture, 120);
@@ -347,6 +357,7 @@ fn run_child(profile: Profile, point: Point) -> TestResult {
     sync_write(
         &root.join("witness.json"),
         &chio_core::canonical_json_bytes(&Witness {
+            clock_unix_ms: fixture.clock.snapshot(),
             directory: fixture._directory.path().to_path_buf(),
             signer: fixture.signer.seed_hex(),
             binding: fixture.binding.clone(),
@@ -384,7 +395,11 @@ fn run_child(profile: Profile, point: Point) -> TestResult {
     fixture
         .kernel
         .set_security_pre_dispatch_hook(Arc::new(ProcessHook {
-            resolver: resolver(fixture.binding.clone(), disclosure.as_ref())?,
+            resolver: resolver(
+                fixture.binding.clone(),
+                disclosure.as_ref(),
+                fixture.clock.clone(),
+            )?,
             point,
         }));
     fixture.kernel.register_tool_server(Box::new(EffectServer {

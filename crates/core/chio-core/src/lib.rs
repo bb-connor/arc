@@ -33,6 +33,7 @@ pub use chio_core_types::message;
 #[cfg(feature = "pq")]
 pub use chio_core_types::pq;
 pub use chio_core_types::receipt;
+pub use chio_core_types::security_event;
 pub use chio_core_types::session;
 pub use chio_core_types::signed_artifact;
 pub use chio_listing as listing;

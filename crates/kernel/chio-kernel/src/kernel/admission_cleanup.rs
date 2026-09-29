@@ -423,7 +423,7 @@ impl ChioKernel {
     where
         F: FnOnce() -> Result<(), KernelError>,
     {
-        let now_unix_ms = read_unix_timestamp_ms()?;
+        let now_unix_ms = self.read_authority_time()?.get();
         let claim_deadline_unix_ms =
             now_unix_ms
                 .checked_add(CLEANUP_CLAIM_LEASE_MS)

@@ -7,12 +7,12 @@
 use super::{AdmissionDigest, AdmissionIdentifier, AdmissionOperationStoreError};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::sha256_hex;
+use chio_core_types::runtime_replay::RUNTIME_REPLAY_SOURCE_DOMAIN;
+use chio_core_types::runtime_replay::RUNTIME_REPLAY_SOURCE_SCHEMA;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_RUNTIME_REPLAY_SOURCE_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_RUNTIME_REPLAY_SOURCE_MARKERS: usize = 16_384;
-const SOURCE_SCHEMA: &str = "chio.runtime-replay-source-seal.v1";
-const SOURCE_DOMAIN: &[u8] = b"chio.runtime-replay-source-seal.v1\0";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -115,7 +115,7 @@ impl RuntimeReplaySourceSnapshotV1 {
         .and_then(|input| input.decode_signed())
         .map_err(AdmissionOperationStoreError::from)?;
         let body = &evidence.body;
-        if body.schema != SOURCE_SCHEMA || body.link_count != 1 {
+        if body.schema != RUNTIME_REPLAY_SOURCE_SCHEMA || body.link_count != 1 {
             return Err(invalid("invalid source snapshot schema or link count"));
         }
         let device = identity_number(&body.device)?;
@@ -144,8 +144,9 @@ impl RuntimeReplaySourceSnapshotV1 {
             return Err(invalid("source marker counts disagree"));
         }
         let encoded_body = encode(body)?;
-        let mut preimage = Vec::with_capacity(SOURCE_DOMAIN.len() + encoded_body.len());
-        preimage.extend_from_slice(SOURCE_DOMAIN);
+        let mut preimage =
+            Vec::with_capacity(RUNTIME_REPLAY_SOURCE_DOMAIN.len() + encoded_body.len());
+        preimage.extend_from_slice(RUNTIME_REPLAY_SOURCE_DOMAIN);
         preimage.extend_from_slice(&encoded_body);
         if sha256_hex(&preimage) != evidence.inventory_sha256.as_str() {
             return Err(invalid("source snapshot inventory digest mismatch"));

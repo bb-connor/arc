@@ -98,7 +98,7 @@ impl SqliteAdmissionOperationStore {
         {
             let mut connection = self.connection()?;
             let tx = self.begin_write(&mut connection, Some(fence))?;
-            let observed = migration_time(&tx, trusted_now_unix_ms)?;
+            let observed = migration_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
             require_distinct_source(&tx, &candidate.snapshot)?;
             records::verify_all(&tx)?;
             if let Some(current) = records::load(&tx, security_authority_id.as_str())? {
@@ -154,7 +154,7 @@ impl SqliteAdmissionOperationStore {
         {
             let mut connection = self.connection()?;
             let tx = self.begin_write(&mut connection, Some(fence))?;
-            let observed = migration_time(&tx, trusted_now_unix_ms)?;
+            let observed = migration_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
             records::verify_all(&tx)?;
             let current = records::load(&tx, security_authority_id.as_str())?
                 .ok_or_else(|| invalid("source expectation disappeared"))?;
@@ -192,7 +192,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        migration_time(&tx, trusted_now_unix_ms)?;
+        migration_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
         verify_security_participant_migration_coverage(&tx).map_err(map_owner_error)?;
         let record = records::load(&tx, security_authority_id.as_str())?;
         if record.as_ref().is_some_and(|record| {
@@ -282,11 +282,15 @@ fn append_commit(
         .map_err(map_owner_error)
 }
 
-fn migration_time(tx: &Transaction<'_>, now: u64) -> Result<u64, AdmissionOperationStoreError> {
-    schema::authority_validation_time(tx, now)?;
+fn migration_time(
+    tx: &Transaction<'_>,
+    now: u64,
+    owner: &SqliteServingOwner,
+) -> Result<u64, AdmissionOperationStoreError> {
+    schema::authority_validation_time(tx, now, owner)?;
     // Caller skew validation must not let an ahead caller timestamp conceal an
     // independently observed authority-clock rollback or advance this ledger.
-    let observed = schema::observe_authority_time(tx)?;
+    let observed = schema::observe_authority_time(tx, owner)?;
     let high_water: i64 = tx
         .query_row(
             "SELECT COALESCE(MAX(observed_at_unix_ms), 0)

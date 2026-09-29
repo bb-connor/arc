@@ -277,6 +277,7 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
         authority,
         binding: native,
         _directory,
+        clock,
         ..
     } = fixture;
     drop(kernel);
@@ -284,9 +285,10 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
     // The old reader keeps its owner alive. Dropping it is required before a
     // new owner can open the same authority and read the historical decision.
     drop(reader);
-    let reopened = SqliteAuthorityStore::open_serving(
+    let reopened = SqliteAuthorityStore::open_serving_with_clock(
         _directory.path().join("admission.db"),
         _directory.path().join("locks"),
+        clock.clone(),
     )?;
     let reader = BrokerNativeCaptureReader::new(&reopened, native, participant)?;
     assert_eq!(reader.read_capture(&request, now_ms()?)?, Some(commit));
@@ -316,7 +318,7 @@ fn install_broker(
             credential_placement:
                 chio_secret_broker::daemon_runtime::ProviderPlacementConfig::BearerAuthorization,
         },
-        Arc::new(chio_secret_broker::daemon::SystemClock),
+        fixture.clock.clone(),
     )?;
     let selected = verifier.binding().clone();
     // No broker transport is invoked by this custody-read test. Its production

@@ -136,7 +136,10 @@ impl ToolServerConnection for BrokerMcpConnection {
             .verify_response(
                 self.authority.participant.as_ref(),
                 &result.structured_content,
-                super::trusted_now_ms().map_err(kernel_error)?,
+                self.authority
+                    .reader
+                    .trusted_now_ms()
+                    .map_err(kernel_error)?,
             )
             .map_err(kernel_error)?;
         let response = serde_json::to_value(result.structured_content)

@@ -9,7 +9,7 @@ fn runtime_expiry_after_native_verification_rolls_back_physical_capture() -> Tes
         fixture.binding.clone(),
         super::super::super::super::registry(false, InformationLabel::bottom())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         flow_config(),
     )?);
     fixture
@@ -18,7 +18,10 @@ fn runtime_expiry_after_native_verification_rolls_back_physical_capture() -> Tes
     fixture
         .authority
         .admission_operation_store()
-        .inject_native_capture_runtime_expiry_for_test()?;
+        .inject_native_capture_runtime_expiry_for_test({
+            let clock = fixture.clock.clone();
+            move |until| clock.advance_to(until).map_err(|error| error.to_string())
+        })?;
     let successes = Arc::new(AtomicUsize::new(0));
     fixture
         .kernel

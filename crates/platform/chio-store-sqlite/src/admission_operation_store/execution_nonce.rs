@@ -35,7 +35,7 @@ impl SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(lease.store_fence()))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let stored = load_by_operation_id_tx(&transaction, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         ensure_no_reserved_terminal_stage(&transaction, command.operation_id())?;
@@ -57,7 +57,11 @@ impl SqliteAdmissionOperationStore {
             crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
                 &transaction,
                 &stored.operation,
-                schema::authority_validation_time(&transaction, trusted_now_unix_ms)?,
+                schema::authority_validation_time(
+                    &transaction,
+                    trusted_now_unix_ms,
+                    &self.serving_owner,
+                )?,
             )?;
         let checked = AdmissionExecutionNonceReservationV1::from_canonical_bytes(
             reservation.canonical_bytes(),
@@ -94,6 +98,7 @@ impl SqliteAdmissionOperationStore {
                 &transaction,
                 &stored.operation,
                 trusted_now_unix_ms,
+                &self.serving_owner,
             )?;
         }
         let required_state = if requirements.approval && !single_owned_approval {

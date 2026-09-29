@@ -188,7 +188,7 @@ fn native_broker_authority_observes_original_lifecycle_without_mutating_custody(
             fixture.binding.clone(),
             super::super::super::super::registry(true, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             flow_config(),
         )?
         .with_captured_lifecycle();

@@ -3,12 +3,12 @@
 
 use super::*;
 use chio_security_types::flow::ToolFlowDeclaration;
+use chio_security_types::flow::NATIVE_FLOW_DECLASSIFIED_DISPATCH_POLICY_SCHEMA;
+use chio_security_types::flow::NATIVE_FLOW_DISPATCH_POLICY_SCHEMA;
 use serde::Serialize;
 use std::io::Write;
 
 const MAX_POLICY_BYTES: usize = 256 * 1024;
-const SCHEMA: &str = "chio.native-flow-dispatch-policy.v1";
-const DECLASSIFIED_SCHEMA: &str = "chio.native-flow-dispatch-policy.v2";
 
 /// Canonical historical policy inputs and decision. No reusable credentials or
 /// argument payload are retained. This is neither a durable ledger attachment
@@ -177,9 +177,9 @@ impl PreparedInputs {
         }
         let canonical = canonical_bounded(&Record {
             schema: if declassification {
-                DECLASSIFIED_SCHEMA
+                NATIVE_FLOW_DECLASSIFIED_DISPATCH_POLICY_SCHEMA
             } else {
-                SCHEMA
+                NATIVE_FLOW_DISPATCH_POLICY_SCHEMA
             },
             inputs: &self.0,
             decision: Decision {

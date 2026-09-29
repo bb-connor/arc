@@ -1,4 +1,4 @@
-// Real-clock expiry at capture and historical replay after issuance expires.
+// Deterministic expiry at capture and historical replay after issuance expires.
 use super::*;
 
 #[test]
@@ -10,14 +10,17 @@ fn native_nonce_expiry_at_final_commit_rolls_back_capture_without_reversing_tain
         fixture.binding.clone(),
         super::super::super::super::registry(false, InformationLabel::bottom())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         flow_config(),
     )?);
     fixture
         .kernel
         .set_security_pre_dispatch_hook(resolver.clone());
     let store = fixture.authority.admission_operation_store();
-    store.inject_native_capture_nonce_expiry_for_test()?;
+    store.inject_native_capture_nonce_expiry_for_test({
+        let clock = fixture.clock.clone();
+        move |until| clock.advance_to(until).map_err(|error| error.to_string())
+    })?;
     let successes = Arc::new(AtomicUsize::new(0));
     fixture
         .kernel
@@ -96,14 +99,8 @@ fn native_nonce_completed_receipt_replay_survives_expiry_without_new_authority()
     )?
     .checked_mul(1000)
     .ok_or("nonce expiry overflow")?;
-    if let Some(remaining) = expiry
-        .checked_sub(now_ms()?)
-        .filter(|remaining| *remaining > 0)
-    {
-        assert!(remaining < 60_000);
-        std::thread::sleep(std::time::Duration::from_millis(remaining));
-    }
-    assert!(now_ms()? >= expiry);
+    fixture.clock.advance_to(expiry)?;
+    assert_eq!(fixture.clock.snapshot(), expiry);
     let replay = fixture
         .kernel
         .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;

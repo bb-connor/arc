@@ -328,10 +328,13 @@ fn expired_predispatch_claim_can_be_read_and_released_but_not_used() -> Anchored
             0,
             GovernedApprovalClaimPhase::Dispatch,
         )?;
-        assert!(
-            crate::admission_operation_store::verify_fresh_approval_tx(&tx, &operation, now)
-                .is_err()
-        );
+        assert!(crate::admission_operation_store::verify_fresh_approval_tx(
+            &tx,
+            &operation,
+            now,
+            &fixture.store.serving_owner
+        )
+        .is_err());
     }
     fixture
         .store

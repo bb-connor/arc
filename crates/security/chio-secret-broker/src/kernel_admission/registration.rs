@@ -81,12 +81,13 @@ impl BrokerAdmissionParticipant {
         );
         // A rotating signer cannot silently change the authority generation
         // pinned above. Identity-qualified signing retains the backend's lease.
-        let client = BrokerIpcClient::new(
+        let client = BrokerIpcClient::new_with_clock(
             config,
             Arc::new(RegistrationSigner {
                 inner: authority_signer,
                 key: authority_key,
             }),
+            verifier.clock.clone(),
         )?;
         Ok(Self {
             client,

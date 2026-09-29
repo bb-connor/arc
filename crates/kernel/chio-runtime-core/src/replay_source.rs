@@ -4,6 +4,8 @@
 //! ownership, authorize a destination import, or provide rollback protection.
 
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
+use chio_core_types::runtime_replay::RUNTIME_REPLAY_SOURCE_DOMAIN;
+use chio_core_types::runtime_replay::RUNTIME_REPLAY_SOURCE_SCHEMA;
 use chio_kernel::admission_operation::AdmissionIdentifier;
 use chio_sqlite_file_identity::SqliteFileIdentity;
 use serde::{Deserialize, Serialize};
@@ -12,8 +14,6 @@ use crate::ChioRuntimeError;
 
 pub const MAX_RUNTIME_REPLAY_SOURCE_MARKERS: usize = 16_384;
 pub const MAX_RUNTIME_REPLAY_SOURCE_BYTES: usize = 8 * 1024 * 1024;
-const SOURCE_SCHEMA: &str = "chio.runtime-replay-source-seal.v1";
-const SOURCE_DOMAIN: &[u8] = b"chio.runtime-replay-source-seal.v1\0";
 
 #[cfg(test)]
 mod tests;
@@ -152,7 +152,7 @@ impl RuntimeReplaySourceSeal {
     ) -> Result<Self, ChioRuntimeError> {
         let marker_counts = validate_markers(&markers)?;
         Self::from_body(SealBody {
-            schema: SOURCE_SCHEMA.into(),
+            schema: RUNTIME_REPLAY_SOURCE_SCHEMA.into(),
             binding,
             device: identity.device.to_string(),
             inode: identity.inode.to_string(),
@@ -164,7 +164,7 @@ impl RuntimeReplaySourceSeal {
     }
 
     fn from_body(body: SealBody) -> Result<Self, ChioRuntimeError> {
-        if body.schema != SOURCE_SCHEMA
+        if body.schema != RUNTIME_REPLAY_SOURCE_SCHEMA
             || body.link_count != 1
             || !is_digest(&body.barrier_sha256)
             || validate_markers(&body.markers)? != body.marker_counts
@@ -178,8 +178,8 @@ impl RuntimeReplaySourceSeal {
         };
         let encoded = encode(&body)?;
         check_size(encoded.len())?;
-        let mut preimage = Vec::with_capacity(SOURCE_DOMAIN.len() + encoded.len());
-        preimage.extend_from_slice(SOURCE_DOMAIN);
+        let mut preimage = Vec::with_capacity(RUNTIME_REPLAY_SOURCE_DOMAIN.len() + encoded.len());
+        preimage.extend_from_slice(RUNTIME_REPLAY_SOURCE_DOMAIN);
         preimage.extend_from_slice(&encoded);
         let seal = Self {
             body,

@@ -24,12 +24,6 @@ pub use connection::BrokerKernelConnection;
 pub use connection::{BrokerMcpConnection, BrokerMcpToolConnection};
 pub use delivery::{NativeBrokerCompletionEvidence, NativeBrokerQuotaObservation};
 
-pub(super) fn trusted_now_ms() -> Result<u64> {
-    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
-        .map(chio_security_types::clock::UnixMillis::get)
-        .map_err(BrokerError::from)
-}
-
 /// Independently selected native and broker participants, pinned to a serving
 /// owner. This is historical accounting, not permission to send a provider
 /// request. Live parent checks and the broker's original prepared attempt still
@@ -42,6 +36,13 @@ pub struct BrokerNativeCaptureReader {
 }
 
 impl BrokerNativeCaptureReader {
+    fn trusted_now_ms(&self) -> Result<u64> {
+        self.store
+            .observed_authority_time()
+            .map(chio_security_types::clock::UnixMillis::get)
+            .map_err(unavailable)
+    }
+
     pub fn new(
         authority: &SqliteAuthorityStore,
         native: NativeSecurityAuthorityBindingV1,

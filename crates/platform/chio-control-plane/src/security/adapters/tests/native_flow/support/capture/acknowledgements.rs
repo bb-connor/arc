@@ -50,13 +50,15 @@ fn native_capture_witness_preserves_original_commit_indices_after_revocation_and
             kernel,
             authority,
             _directory,
+            clock,
             ..
         } = fixture;
         drop(kernel);
         drop(authority);
-        let reopened = SqliteAuthorityStore::open_serving(
+        let reopened = SqliteAuthorityStore::open_serving_with_clock(
             _directory.path().join("admission.db"),
             _directory.path().join("locks"),
+            clock.clone(),
         )?;
         let store = reopened.admission_operation_store();
         assert!(store
@@ -165,7 +167,7 @@ fn run_fault(mut fixture: Fixture, egress: bool, fault: Fault) -> TestResult {
         fixture.binding.clone(),
         super::super::super::registry(egress, InformationLabel::bottom())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         flow_config(),
     )?);
     fixture
@@ -289,13 +291,15 @@ fn reopen_capture(
         kernel,
         authority,
         _directory,
+        clock,
         ..
     } = fixture;
     drop(kernel);
     drop(authority);
-    let reopened = SqliteAuthorityStore::open_serving(
+    let reopened = SqliteAuthorityStore::open_serving_with_clock(
         _directory.path().join("admission.db"),
         _directory.path().join("locks"),
+        clock.clone(),
     )?;
     let fence = reopened.mutation_fence();
     assert!(fence.owner_epoch > old_fence.owner_epoch);

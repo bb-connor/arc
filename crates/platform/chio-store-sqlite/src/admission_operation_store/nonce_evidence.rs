@@ -27,7 +27,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, now)?;
+        verify_trusted_time(&transaction, now, &self.serving_owner)?;
         let result = if let Some(stored) = load_by_operation_id_tx(&transaction, operation_id)? {
             stored.verify_decision_time(now)?;
             let reserved = execution_nonce::verify_reservation(&transaction, &stored.operation)?;

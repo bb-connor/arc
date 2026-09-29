@@ -6,10 +6,9 @@ use super::{
     SecurityEventVerifierPort, Serialize, SignedSecurityEvent, TenantId, ToolCallAction,
     ToolOrigin, TrustLevel, UnverifiedSecurityEvent,
 };
+use chio_core_types::security_event::EVENT_EVIDENCE_HASH_DOMAIN;
+use chio_core_types::security_event::EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN;
 
-pub(super) const EVENT_EVIDENCE_HASH_DOMAIN: &[u8] = b"chio.verified-security-event-evidence.v1\0";
-pub(super) const RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN: &[u8] =
-    b"chio.verified-security-event-receipt-evidence.v1\0";
 pub const SECURITY_EVENT_RECEIPT_PROJECTION_VERSION: &str =
     "chio.security-event-receipt-projection.v1";
 
@@ -295,7 +294,7 @@ impl NativeSecurityEventVerifier {
         Ok(self.verified_event(
             event,
             ProducerTrustClass::VerifiedReceipt,
-            domain_hash(RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN, &canonical_receipt),
+            domain_hash(EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN, &canonical_receipt),
         ))
     }
 

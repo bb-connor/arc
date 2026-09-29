@@ -55,7 +55,7 @@ fn native_nonce_preflight_issues_without_dispatch_or_standalone_nonce_custody() 
         fixture.binding.clone(),
         super::super::registry(false, InformationLabel::bottom())?,
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         flow_config(),
     )?
     .with_captured_lifecycle();
@@ -176,7 +176,7 @@ fn native_nonce_preflight_callback_faults_deny_issuance_but_preserve_committed_t
             fixture.binding.clone(),
             super::super::registry(false, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             flow_config(),
         )?;
         fixture

@@ -18,7 +18,7 @@ pub(in crate::security::adapters::tests::native_flow::support) fn configure(
             fixture.binding.clone(),
             super::super::super::registry(egress, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             config,
         )?
         .with_captured_lifecycle(),

@@ -20,7 +20,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let observed_at = observed_time(&tx, trusted_now_unix_ms)?;
+        let observed_at = observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
         verify_coverage(&tx).map_err(map_owner_error)?;
         let initialized = records::load_metadata(&tx, binding.security_authority_id().as_str())?
             .ok_or_else(|| invalid("selected native initialization is absent"))?;

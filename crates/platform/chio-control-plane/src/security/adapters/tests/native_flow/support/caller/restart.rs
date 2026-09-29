@@ -10,6 +10,7 @@ pub(super) fn reopen(
     let previous_fence = fixture.authority.mutation_fence();
     let Fixture {
         kernel,
+        clock,
         authority,
         binding,
         request,
@@ -22,12 +23,14 @@ pub(super) fn reopen(
     } = fixture;
     drop(kernel);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
         _directory.path().join("admission.db"),
         _directory.path().join("locks"),
+        clock.clone(),
     )?;
     assert_ne!(authority.mutation_fence(), previous_fence);
-    let (mut kernel, invocations) = open_kernel(_directory.path(), &authority, &signer)?;
+    let (mut kernel, invocations) =
+        open_kernel(_directory.path(), &authority, &signer, clock.clone())?;
     let (_, original) = authority
         .admission_operation_store()
         .load_unambiguous_retained_tool_request(
@@ -41,6 +44,7 @@ pub(super) fn reopen(
     kernel.reconcile_durable_admission_startup()?;
     Ok(Fixture {
         kernel,
+        clock,
         authority,
         binding,
         request,

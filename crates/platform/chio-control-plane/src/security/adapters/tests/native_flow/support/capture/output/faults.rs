@@ -54,13 +54,15 @@ fn native_output_journal_lost_acknowledgement_recovers_history_without_release_a
             kernel,
             authority,
             _directory,
+            clock,
             ..
         } = fixture;
         drop(kernel);
         drop(authority);
-        let authority = SqliteAuthorityStore::open_serving(
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
             _directory.path().join("admission.db"),
             _directory.path().join("locks"),
+            clock.clone(),
         )?;
         let store = authority.admission_operation_store();
         let recovered = store
@@ -104,6 +106,7 @@ fn native_output_journal_locally_rehashed_history_cannot_replace_the_global_anch
         kernel,
         authority,
         _directory,
+        clock,
         ..
     } = fixture;
     drop(kernel);
@@ -133,8 +136,13 @@ fn native_output_journal_locally_rehashed_history_cannot_replace_the_global_anch
     )?;
     connection.execute_batch(&trigger)?;
     drop(connection);
-    assert!(
-        SqliteAuthorityStore::open_serving(&database, _directory.path().join("locks")).is_err()
-    );
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            _directory.path().join("locks"),
+            clock.clone()
+        ),
+        Err(chio_store_sqlite::SqliteServingOwnerError::Invalid(_))
+    ));
     Ok(())
 }

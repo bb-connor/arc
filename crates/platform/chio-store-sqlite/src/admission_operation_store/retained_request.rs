@@ -40,7 +40,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         let identifiers = {
             let mut statement = transaction
                 .prepare(
@@ -97,39 +97,43 @@ impl SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(fence))?;
-        let encoded =
-            match begin_prepared_operation_tx(&transaction, operation, fence, trusted_now_unix_ms)?
-            {
-                PreparedAdmissionBeginTxResult::Created { encoded } => encoded,
-                PreparedAdmissionBeginTxResult::ExactReplay {
-                    operation,
-                    terminal_replay,
-                } => {
-                    let retained = load_retained_request_tx(&transaction, &operation)?;
-                    if let Some(request) = request {
-                        if retained.as_ref().is_none_or(|retained| {
-                            retained.canonical_bytes() != request.canonical_bytes()
-                        }) {
-                            return Err(invariant(
-                                "original tool request replay is missing or changed",
-                            ));
-                        }
+        let encoded = match begin_prepared_operation_tx(
+            &transaction,
+            operation,
+            fence,
+            trusted_now_unix_ms,
+            &self.serving_owner,
+        )? {
+            PreparedAdmissionBeginTxResult::Created { encoded } => encoded,
+            PreparedAdmissionBeginTxResult::ExactReplay {
+                operation,
+                terminal_replay,
+            } => {
+                let retained = load_retained_request_tx(&transaction, &operation)?;
+                if let Some(request) = request {
+                    if retained.as_ref().is_none_or(|retained| {
+                        retained.canonical_bytes() != request.canonical_bytes()
+                    }) {
+                        return Err(invariant(
+                            "original tool request replay is missing or changed",
+                        ));
                     }
-                    transaction.commit().map_err(sqlite_error)?;
-                    return Ok(AdmissionBeginResult::ExactReplay {
-                        operation: *operation,
-                        terminal_replay,
-                    });
                 }
-                PreparedAdmissionBeginTxResult::Conflict {
+                transaction.commit().map_err(sqlite_error)?;
+                return Ok(AdmissionBeginResult::ExactReplay {
+                    operation: *operation,
+                    terminal_replay,
+                });
+            }
+            PreparedAdmissionBeginTxResult::Conflict {
+                existing_operation_id,
+            } => {
+                transaction.commit().map_err(sqlite_error)?;
+                return Ok(AdmissionBeginResult::Conflict {
                     existing_operation_id,
-                } => {
-                    transaction.commit().map_err(sqlite_error)?;
-                    return Ok(AdmissionBeginResult::Conflict {
-                        existing_operation_id,
-                    });
-                }
-            };
+                });
+            }
+        };
         let participant_digest = if let Some(request) = request {
             transaction
                 .execute(

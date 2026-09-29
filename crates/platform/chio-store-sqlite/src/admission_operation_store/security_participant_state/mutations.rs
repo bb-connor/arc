@@ -120,7 +120,7 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<history::Record, AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
-        observed_time(&tx, trusted_now_unix_ms)?;
+        observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
         verify_participant_recovery_tx(
             &tx,
             &self.serving_owner,
@@ -200,7 +200,7 @@ impl SqliteAdmissionOperationStore {
         // Source/history verification can take time. Recheck the actual lease
         // immediately before enabling writes, using the later trusted time for
         // expiry but retaining the independent observation as historical data.
-        let now = observed_time(&tx, trusted_now_unix_ms)?;
+        let now = observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
         verify_participant_recovery_tx(
             &tx,
             &self.serving_owner,

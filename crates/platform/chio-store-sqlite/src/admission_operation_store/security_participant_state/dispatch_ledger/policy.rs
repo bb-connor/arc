@@ -1,10 +1,10 @@
 //! Bind retained policy material to the physical operation and observed state.
 //! This validates storage provenance, not classifier or manifest trust roots.
 use super::*;
+use chio_security_types::flow::NATIVE_FLOW_DECLASSIFIED_DISPATCH_POLICY_SCHEMA;
+use chio_security_types::flow::NATIVE_FLOW_DISPATCH_POLICY_SCHEMA;
 use chio_security_types::ports::{Digest32, FlowJoinRequest, FlowStateSnapshot};
 
-const POLICY_SCHEMA: &str = "chio.native-flow-dispatch-policy.v1";
-const DECLASSIFIED_POLICY_SCHEMA: &str = "chio.native-flow-dispatch-policy.v2";
 const MAX_POLICY_BYTES: usize = 256 * 1024;
 
 #[derive(Deserialize)]
@@ -71,9 +71,9 @@ pub(super) fn decode(
     let declassified = policy.inputs.declassification.is_some();
     if policy.schema
         != if declassified {
-            DECLASSIFIED_POLICY_SCHEMA
+            NATIVE_FLOW_DECLASSIFIED_DISPATCH_POLICY_SCHEMA
         } else {
-            POLICY_SCHEMA
+            NATIVE_FLOW_DISPATCH_POLICY_SCHEMA
         }
         || policy.decision.declassification != declassified
         || (declassified && !policy.decision.effective_egress)

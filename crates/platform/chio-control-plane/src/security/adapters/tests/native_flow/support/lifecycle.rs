@@ -10,7 +10,7 @@ fn native_captured_lifecycle_invokes_once_and_replays_the_released_receipt() -> 
             fixture.binding.clone(),
             super::super::registry(egress, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             flow_config(),
         )?
         .with_captured_lifecycle();
@@ -84,6 +84,7 @@ enum Fault {
 
 struct FaultHook {
     resolver: NativeFlowResolver,
+    clock: Arc<FlowTestClock>,
     fault: Fault,
     entered: AtomicUsize,
     captured: AtomicUsize,
@@ -188,7 +189,9 @@ impl SecurityPreDispatchHook for FaultHook {
                     .ok_or_else(|| KernelError::Internal("policy deadline absent".into()))?;
                 let now = now_ms().map_err(|_| KernelError::Internal("clock failed".into()))?;
                 assert!(now < deadline, "capture must precede the injected expiry");
-                std::thread::sleep(std::time::Duration::from_millis(deadline - now + 1));
+                self.clock
+                    .advance_to(deadline)
+                    .map_err(|error| KernelError::Internal(error.to_string()))?;
                 Ok(())
             }
             Fault::RefuseOutput
@@ -206,10 +209,11 @@ fn fault_case(fault: Fault) -> TestResult {
             fixture.binding.clone(),
             super::super::registry(false, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             flow_config(),
         )?
         .with_captured_lifecycle(),
+        clock: fixture.clock.clone(),
         fault,
         entered: AtomicUsize::new(0),
         captured: AtomicUsize::new(0),
@@ -273,7 +277,7 @@ fn fault_case(fault: Fault) -> TestResult {
         .load_unambiguous_retained_tool_request(
             &AdmissionIdentifier::try_new("request", &fixture.request.request_id)?,
             &fence,
-            now_ms()?,
+            fixture.clock.snapshot(),
         )?
         .ok_or("original fault operation")?;
     assert_ne!(operation.state(), AdmissionOperationState::Completed);
@@ -286,7 +290,7 @@ fn fault_case(fault: Fault) -> TestResult {
             .load_native_security_output_join(
                 operation.binding().operation_id(),
                 &fence,
-                now_ms()?,
+                fixture.clock.snapshot(),
             )?
             .ok_or("original output join")?
             .1

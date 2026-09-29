@@ -40,7 +40,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         let custody = &input.custody;
         let operation = custody.operation;
         require_operation(operation)?;
-        let now = observed_time(tx, custody.trusted_now_unix_ms)?;
+        let now = observed_time(tx, custody.trusted_now_unix_ms, owner)?;
         verify_participant_recovery_tx(tx, owner, operation, custody.lease, now)?;
         ensure_no_reserved_terminal_stage(tx, operation.binding().operation_id())?;
         let original = retained_request::load_retained_request_tx(tx, operation)?
@@ -132,8 +132,8 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 "native capture lacks its complete verified credential set",
             ));
         }
-        governed_approval_claim::verify_fresh_approval_tx(tx, operation, now)?;
-        dpop_claim::verify_fresh_dpop_tx(tx, operation, now)?;
+        governed_approval_claim::verify_fresh_approval_tx(tx, operation, now, owner)?;
+        dpop_claim::verify_fresh_dpop_tx(tx, operation, now, owner)?;
         let nonce =
             crate::admission_operation_store::execution_nonce::verify_reservation(tx, operation)?;
         if nonce.as_ref().map(|value| value.canonical_bytes())
@@ -257,14 +257,15 @@ impl<'tx> VerifiedNativeCapture<'tx> {
     pub(crate) fn verify_deadline(
         &self,
         tx: &Transaction<'_>,
+        owner: &SqliteServingOwner,
     ) -> Result<(), AdmissionOperationStoreError> {
         if !std::ptr::eq(self.connection, &**tx) {
             return Err(invalid("native capture witness changed transactions"));
         }
-        let now = observed_time(tx, self.observed_at)?;
+        let now = observed_time(tx, self.observed_at, owner)?;
         self.validate_time(now)?;
-        governed_approval_claim::verify_fresh_approval_tx(tx, &self.operation, now)?;
-        dpop_claim::verify_fresh_dpop_tx(tx, &self.operation, now)?;
+        governed_approval_claim::verify_fresh_approval_tx(tx, &self.operation, now, owner)?;
+        dpop_claim::verify_fresh_dpop_tx(tx, &self.operation, now, owner)?;
         self.policy.validate_current(tx, now).map_err(|error| {
             invalid(format!(
                 "native capture policy before physical commit: {error}"
@@ -273,6 +274,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         #[cfg(feature = "admission-test-support")]
         let delayed = expiry_test_support::wait_after_verification(
             tx,
+            owner,
             self.runtime_valid_until_unix_ms,
             self.nonce_valid_until_unix_ms,
             self.policy
@@ -285,7 +287,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         // above and the captured credentials name the same immutable episodes
         // in this write transaction. Sample again after state verification,
         // followed only by bounded time checks and the physical commit.
-        let commit_now = super::super::super::schema::observe_authority_time(tx)?;
+        let commit_now = super::super::super::schema::observe_authority_time(tx, owner)?;
         if commit_now < now {
             return Err(invalid("native capture clock regressed before commit"));
         }

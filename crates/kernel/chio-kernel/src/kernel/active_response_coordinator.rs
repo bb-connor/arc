@@ -52,7 +52,7 @@ use super::{
     ActiveResponseExecutionRequest, ActiveResponseExecutionRequestParts,
     ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
 };
-use super::{read_unix_timestamp_ms, ChioKernel, KernelError};
+use super::{ChioKernel, KernelError};
 
 mod admission_request;
 
@@ -93,7 +93,7 @@ impl ChioKernel {
         request: &ActiveResponseAdmissionRequest,
     ) -> Result<PreparedActiveResponseAdmission, KernelError> {
         let verified_admission =
-            self.verify_active_response_admission_at(request, read_unix_timestamp_ms()?)?;
+            self.verify_active_response_admission_at(request, self.read_authority_time()?.get())?;
         self.prepare_verified_active_response_admission(request, verified_admission)
     }
 
@@ -379,7 +379,7 @@ impl ChioKernel {
             AdmissionOperationState::DispatchCommitted | AdmissionOperationState::Completed
         );
         if !committed_recovery {
-            let now_unix_ms = read_unix_timestamp_ms()?;
+            let now_unix_ms = self.read_authority_time()?.get();
             let verified = match self.verify_active_response_admission_with_authorized_at(
                 request,
                 now_unix_ms,
@@ -563,7 +563,7 @@ impl ChioKernel {
         })?;
         match prepared {
             PreparedActiveResponseAdmission::Automatic(expected) => {
-                let validation_now_unix_ms = read_unix_timestamp_ms()?;
+                let validation_now_unix_ms = self.read_authority_time()?.get();
                 let fresh = match self.verify_active_response_admission_with_authorized_at(
                     request,
                     validation_now_unix_ms,
@@ -657,7 +657,7 @@ impl ChioKernel {
         &self,
         request: &ActiveResponseAdmissionRequest,
     ) -> Result<(), KernelError> {
-        let now_unix_ms = read_unix_timestamp_ms()?;
+        let now_unix_ms = self.read_authority_time()?.get();
         let denial = match self.verify_active_response_admission_at(request, now_unix_ms) {
             Ok(_) => {
                 return Err(active_response_denied(

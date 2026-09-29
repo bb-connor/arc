@@ -17,7 +17,7 @@ use super::active_response_executor::{
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
     InstalledActiveResponseExecutor,
 };
-use super::{read_unix_timestamp, ChioKernel, KernelError};
+use super::{ChioKernel, KernelError};
 
 const ACTIVE_RESPONSE_POLICY_DECISION_SCHEMA: &str = "chio.active-response-policy-decision.v1";
 const ACTIVE_RESPONSE_POLICY_DECISION_DOMAIN: &[u8] = b"chio.active-response-policy-decision.v1\0";
@@ -405,7 +405,7 @@ impl ChioKernel {
         bindings: &VerifiedActiveResponseBindings,
     ) -> Result<VerifiedActiveResponseRequirement, KernelError> {
         let negotiated = self
-            .capability_negotiation_for_remote(None, read_unix_timestamp()?)
+            .capability_negotiation_for_remote(None, self.read_authority_time()?.as_secs())
             .map_err(active_response_policy_denied)?;
         if !negotiated.supports(GOVERNED_ACTIVE_RESPONSE_PLAN) {
             return Err(active_response_policy_denied(

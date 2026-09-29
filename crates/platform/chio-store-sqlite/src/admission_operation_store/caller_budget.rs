@@ -15,7 +15,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        verify_trusted_time(&transaction, now)?;
+        verify_trusted_time(&transaction, now, &self.serving_owner)?;
         let mut shares = Vec::new();
         {
             let mut statement = transaction

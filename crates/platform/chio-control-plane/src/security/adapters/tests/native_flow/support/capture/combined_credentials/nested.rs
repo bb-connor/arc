@@ -284,7 +284,7 @@ fn native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch() ->
                         fixture.binding.clone(),
                         super::super::super::super::registry(egress, InformationLabel::bottom())?,
                         Arc::new(CountingEmptyClassifier::new()),
-                        Arc::new(FlowTestClock::default()),
+                        fixture.clock.clone(),
                         flow_config(),
                     )?
                     .with_captured_lifecycle(),
@@ -358,7 +358,7 @@ fn public_nested_declassification_proof_reaches_native_untrusted_issuer_denial()
                 fixture.binding.clone(),
                 super::super::super::super::registry(false, InformationLabel::bottom())?,
                 classifier.clone(),
-                Arc::new(FlowTestClock::default()),
+                fixture.clock.clone(),
                 flow_config(),
             )?));
         let proofs = NestedToolCallProofs {

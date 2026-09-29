@@ -242,7 +242,7 @@ impl ChioKernel {
                 content_hash: receipt_content.content_hash,
                 canonical_content: receipt_content.canonical_content,
                 metadata,
-                timestamp: read_unix_timestamp()?,
+                timestamp: self.read_authority_time()?.as_secs(),
                 trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
                 tenant_id: None,
             },
@@ -432,7 +432,7 @@ impl ChioKernel {
             content_hash: receipt_content.content_hash,
             canonical_content: receipt_content.canonical_content,
             metadata: Some(security_admission_operation_metadata(terminal)),
-            timestamp: read_unix_timestamp()?,
+            timestamp: self.read_authority_time()?.as_secs(),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
         })?;
@@ -669,7 +669,7 @@ impl ChioKernel {
             content_hash: sha256_hex(&executor_receipt_bytes),
             canonical_content: executor_receipt_bytes,
             metadata,
-            timestamp: read_unix_timestamp()?,
+            timestamp: self.read_authority_time()?.as_secs(),
             trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
             tenant_id: executor_receipt.tenant_id.clone(),
         })?;

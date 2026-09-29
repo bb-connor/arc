@@ -55,6 +55,7 @@ fn execute_child(cut: Cut, combined_disclosure: bool) -> TestResult {
         .set_security_pre_dispatch_hook(Arc::new(resolver(
             fixture.binding.clone(),
             disclosure.as_ref(),
+            fixture.clock.clone(),
         )?));
     nonce::execution::install_nonce(&mut fixture, 120);
     let key = Keypair::generate();
@@ -73,10 +74,11 @@ fn execute_child(cut: Cut, combined_disclosure: bool) -> TestResult {
         )?;
     assert_eq!(reserved.verdict, Verdict::Allow, "{:?}", reserved.reason);
     let nonce = reserved.execution_nonce.ok_or("reserved nonce")?;
-    let ledger = SqliteCallerExecutionLedger::provision(
+    let ledger = SqliteCallerExecutionLedger::provision_with_clock(
         &fixture._directory.path().join("executor.db"),
         executor,
         2,
+        fixture.clock.clone(),
     )?;
     let root = PathBuf::from(std::env::var_os(ROOT).ok_or("process root")?);
     sync_write(
@@ -149,7 +151,11 @@ fn execute_child(cut: Cut, combined_disclosure: bool) -> TestResult {
         Cut::OutputJoined | Cut::OutputJoinedChangedClassification => fixture
             .kernel
             .set_security_pre_dispatch_hook(Arc::new(ProcessHook {
-                resolver: resolver(fixture.binding.clone(), disclosure.as_ref())?,
+                resolver: resolver(
+                    fixture.binding.clone(),
+                    disclosure.as_ref(),
+                    fixture.clock.clone(),
+                )?,
                 point: Point::OutputJoined,
             })),
         Cut::Finalization(name) => fixture
@@ -229,9 +235,10 @@ fn matrix(name: &str, cut: Cut, combined_disclosure: bool) -> TestResult {
 
 fn verify_restart(root: &Path, witness: &Witness, cut: Cut) -> TestResult {
     use chio_kernel::tool_outcome::ToolOutcomeStore;
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
         witness.directory.join("admission.db"),
         witness.directory.join("locks"),
+        witness.clock(),
     )?;
     assert!(authority.mutation_fence().owner_epoch > witness.fence.owner_epoch);
     let store = authority.admission_operation_store();
@@ -257,7 +264,8 @@ fn verify_restart(root: &Path, witness: &Witness, cut: Cut) -> TestResult {
         .caller_executor()
         .ok_or("executor pin")?
         .clone();
-    let (mut kernel, invocations) = open_kernel(&witness.directory, &authority, &signer)?;
+    let (mut kernel, invocations) =
+        open_kernel(&witness.directory, &authority, &signer, witness.clock())?;
     configure_caller_restart(&mut kernel, &original, witness)?;
     let disclosure = witness
         .declassification_signer
@@ -279,12 +287,16 @@ fn verify_restart(root: &Path, witness: &Witness, cut: Cut) -> TestResult {
             witness.binding.clone(),
             super::super::super::registry(true, InformationLabel::bottom())?,
             Arc::new(super::super::super::RestrictedClassifier),
-            Arc::new(FlowTestClock::default()),
+            witness.clock(),
             config,
         )?
         .with_captured_lifecycle()
     } else {
-        resolver(witness.binding.clone(), disclosure.as_ref())?
+        resolver(
+            witness.binding.clone(),
+            disclosure.as_ref(),
+            witness.clock(),
+        )?
     };
     let classification_rejections = Arc::new(AtomicUsize::new(0));
     kernel.set_security_pre_dispatch_hook(Arc::new(RecoveryOutput {
@@ -330,9 +342,10 @@ fn verify_restart(root: &Path, witness: &Witness, cut: Cut) -> TestResult {
                     root.join("authorization.json")
                 )?)?
             );
-            let ledger = SqliteCallerExecutionLedger::open(
+            let ledger = SqliteCallerExecutionLedger::open_with_clock(
                 &witness.directory.join("executor.db"),
                 executor,
+                witness.clock(),
             )?;
             let replayed_effects = AtomicUsize::new(0);
             let report = ledger.execute_once(

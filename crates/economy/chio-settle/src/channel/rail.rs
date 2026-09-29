@@ -19,7 +19,7 @@ use super::{
 
 const CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN: &[u8] =
     b"chio.channel.release-authorization.digest.v1\0";
-const SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN: &[u8] =
+pub const SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN: &[u8] =
     b"chio.channel.release-authorization.signed-digest.v1\0";
 
 pub const CHANNEL_RELEASE_ROOT_PUBLICATION_EFFECT_KIND: &str = "channel_release_root_publication";
@@ -726,4 +726,42 @@ pub(crate) fn verify_channel_release_preparation_parts(
         return Err(ChannelError::AuthorityVerification);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod identity_fixture_tests {
+    use super::*;
+
+    #[test]
+    fn shared_identifiers_match_canonical_fixture() -> Result<(), Box<dyn std::error::Error>> {
+        let fixtures: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+            "../../../../../spec/fixtures/shared-security-identifiers.json"
+        ))?;
+        for identity in [SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN] {
+            let text = std::str::from_utf8(identity)?;
+            let fixture = fixtures
+                .iter()
+                .find(|row| row["identity"].as_str() == Some(text))
+                .ok_or("missing independent identity fixture")?;
+            let payload: serde_json::Value = serde_json::from_str(
+                fixture["canonical_payload"]
+                    .as_str()
+                    .ok_or("fixture payload")?,
+            )?;
+            let canonical = chio_core::canonical_json_bytes(&payload)?;
+            assert_eq!(
+                std::str::from_utf8(&canonical)?,
+                fixture["canonical_payload"]
+                    .as_str()
+                    .ok_or("fixture canonical bytes")?
+            );
+            let mut preimage = identity.to_vec();
+            preimage.extend_from_slice(&canonical);
+            assert_eq!(
+                chio_core::sha256_hex(&preimage),
+                fixture["sha256"].as_str().ok_or("fixture digest")?
+            );
+        }
+        Ok(())
+    }
 }

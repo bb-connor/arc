@@ -524,7 +524,7 @@ impl ChioKernel {
             receipt.decision.as_ref(),
             &mut delivery_evaluation,
             purchase.as_ref(),
-            read_unix_timestamp_ms()? / 1_000,
+            self.read_authority_time()?.get() / 1_000,
         ) {
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding purchase replay output withheld");
         }
@@ -692,7 +692,7 @@ impl ChioKernel {
             request,
             recovery.as_ref(),
             recovery_status.as_ref(),
-            read_unix_timestamp_ms()? / 1_000,
+            self.read_authority_time()?.get() / 1_000,
         )
         .map_err(|reason| {
             KernelError::DurableAdmission(format!(
@@ -724,7 +724,7 @@ impl ChioKernel {
             // admission stage. Re-admit and reinstall the verified treaty
             // material before retrying the missing bilateral projection.
             if federation_scope.is_none() {
-                let now_unix_ms = read_unix_timestamp_ms()?;
+                let now_unix_ms = self.read_authority_time()?.get();
                 let treaty_admission = self.run_runtime_admission_hook(
                     request,
                     tool_return.raw.receipt_metadata_snapshot(),
@@ -1116,7 +1116,7 @@ impl ChioKernel {
         if delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_purchase_status(
                 purchase.as_ref(),
-                read_unix_timestamp_ms()? / 1_000,
+                self.read_authority_time()?.get() / 1_000,
             ) {
                 warn!(request_id = %request.request_id, reason = %redacted!(&denial), "finding purchase terminal output withheld");
                 #[cfg(feature = "finding-market")]
@@ -1147,7 +1147,9 @@ impl ChioKernel {
             .lookup_post_return_evaluation(admission.operation.binding().operation_id())
             .map_err(durable_outcome_store_error)?;
         let mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = read_unix_timestamp_ms()?
+        let trusted_now_unix_ms = self
+            .read_authority_time()?
+            .get()
             .max(stored_outcome.recorded_at_unix_ms())
             .max(
                 existing_evaluation
@@ -1210,7 +1212,7 @@ impl ChioKernel {
         if delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_purchase_status(
                 purchase.as_ref(),
-                read_unix_timestamp_ms()? / 1_000,
+                self.read_authority_time()?.get() / 1_000,
             ) {
                 warn!(request_id = %request.request_id, reason = %redacted!(&denial), "finding purchase final terminal output withheld");
                 #[cfg(feature = "finding-market")]
@@ -1227,7 +1229,7 @@ impl ChioKernel {
                 request,
                 recovery.as_ref(),
                 recovery_status.as_ref(),
-                read_unix_timestamp_ms()? / 1_000,
+                self.read_authority_time()?.get() / 1_000,
             ) {
                 warn!(request_id = %request.request_id, reason = %redacted!(&denial), "finding recovery final terminal output withheld");
                 terminal_finding_denial = Some(denial);

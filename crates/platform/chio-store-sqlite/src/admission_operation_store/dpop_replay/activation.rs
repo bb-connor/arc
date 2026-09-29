@@ -43,7 +43,7 @@ impl SqliteAdmissionOperationStore {
         {
             let mut connection = self.connection()?;
             let transaction = self.begin_write(&mut connection, Some(fence))?;
-            let observed = migration_time(&transaction, trusted_now_unix_ms)?;
+            let observed = migration_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
             expected
                 .snapshot
                 .validate_transition_time(observed)

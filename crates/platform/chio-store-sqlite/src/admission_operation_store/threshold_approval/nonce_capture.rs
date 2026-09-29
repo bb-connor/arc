@@ -10,6 +10,7 @@ pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
     transaction: &Transaction<'_>,
     operation: &AdmissionOperationV1,
     now: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<(), AdmissionOperationStoreError> {
     if !operation.binding().participant_requirements().approval {
         return Ok(());
@@ -26,6 +27,7 @@ pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
                 transaction,
                 operation,
                 now,
+                owner,
             );
         }
         return Err(invariant(

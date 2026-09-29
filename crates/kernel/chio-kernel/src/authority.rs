@@ -27,7 +27,7 @@ pub fn checked_capability_expiry(issued_at: u64, ttl_seconds: u64) -> Result<u64
     })
 }
 
-const DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS: u64 = 30;
+pub(crate) const DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS: u64 = 30;
 
 /// Fallible wall-clock port used only for capability authority issuance.
 /// A clock error denies issuance before any authority signing backend is used.

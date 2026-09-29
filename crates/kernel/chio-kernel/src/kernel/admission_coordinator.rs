@@ -126,6 +126,8 @@ const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
 #[derive(Clone)]
 pub(crate) struct DurableAdmissionRuntime {
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+    clock_fence: Arc<Mutex<chio_security_types::clock::ClockFence>>,
     store: Arc<dyn QualifiedAdmissionProjectionStore>,
     outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
     channel_terminal_authority: Option<Arc<dyn QualifiedChannelTerminalAuthority>>,
@@ -155,6 +157,8 @@ impl DurableAdmissionRuntime {
         outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
         fence: StoreMutationFence,
         kernel_id: &str,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+        clock_fence: Arc<Mutex<chio_security_types::clock::ClockFence>>,
     ) -> Result<Self, crate::admission_operation::AdmissionOperationError> {
         AdmissionIdentifier::try_new("store_uuid", fence.store_uuid.clone())?;
         AdmissionIdentifier::try_new("store_lease_id", fence.lease_id.clone())?;
@@ -164,6 +168,8 @@ impl DurableAdmissionRuntime {
         let claimant_id =
             AdmissionIdentifier::try_new("admission_claimant_id", format!("kernel:{kernel_id}"))?;
         Ok(Self {
+            clock,
+            clock_fence,
             store,
             outcome_store,
             channel_terminal_authority: None,
@@ -191,7 +197,7 @@ impl DurableAdmissionRuntime {
         &self,
         requested_unix_ms: u64,
     ) -> Result<u64, chio_security_types::clock::ClockError> {
-        let now = read_unix_timestamp_ms()?;
+        let now = super::clock::read(self.clock.as_ref(), &self.clock_fence)?.get();
         if now == 0 {
             return Err(chio_security_types::clock::ClockError::InvalidWindow);
         }

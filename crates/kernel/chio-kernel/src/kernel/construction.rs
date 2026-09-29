@@ -261,7 +261,7 @@ impl ChioKernel {
         let federation_dsse_envelopes_gauge;
         let mut kernel = Self {
             clock: clock.clone(),
-            clock_fence: Mutex::new(chio_security_types::clock::ClockFence::default()),
+            clock_fence: Arc::new(Mutex::new(chio_security_types::clock::ClockFence::default())),
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
             durable_admission_runtime: None,
@@ -282,7 +282,7 @@ impl ChioKernel {
             approval_store: None,
             dispatch_worker_count: 1,
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
-            capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
+            capability_authority: Box::new(LocalCapabilityAuthority::new_with_clock(authority_keypair, clock.clone())),
             capability_issuance_admission_authority: None,
             active_response_requirement_resolver: None,
             active_response_finding_authority: None,
@@ -804,6 +804,8 @@ impl ChioKernel {
             outcome_store,
             fence,
             &self.config.keypair.public_key().to_hex(),
+            self.clock.clone(),
+            self.clock_fence.clone(),
         )?);
         Ok(())
     }
@@ -1614,7 +1616,7 @@ impl ChioKernel {
             store.put_dual_signed(&receipt.id, &dual)?;
             store.put_dsse(&receipt.id, &dsse_envelope)?;
         }
-        let now = read_unix_timestamp()?;
+        let now = self.read_authority_time()?.as_secs();
         {
             let mut cache = match self.federation_dual_receipts.lock() {
                 Ok(g) => g,
@@ -1664,7 +1666,7 @@ impl ChioKernel {
     /// this method should call it; until then, capability revocation is
     /// delegated to natural expiration.
     pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
-        let now_unix_ms = read_unix_timestamp_ms()?;
+        let now_unix_ms = self.read_authority_time()?.get();
         let now = now_unix_ms / 1000;
         // Record the timestamp first so any concurrent reader that observes
         // `emergency_stopped == true` sees a non-zero `since` value.

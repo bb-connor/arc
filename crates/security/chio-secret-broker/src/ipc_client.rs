@@ -1,5 +1,6 @@
+use chio_security_types::clock::{Clock, ClockError, ClockFence, SystemClock};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
@@ -69,6 +70,8 @@ impl BrokerIpcClientConfig {
 pub struct BrokerIpcClient {
     config: BrokerIpcClientConfig,
     authority_signer: Arc<dyn SigningBackend>,
+    clock: Arc<dyn Clock>,
+    clock_fence: Mutex<ClockFence>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,11 +95,30 @@ impl BrokerIpcClient {
         config: BrokerIpcClientConfig,
         authority_signer: Arc<dyn SigningBackend>,
     ) -> Result<Self> {
+        Self::new_with_clock(config, authority_signer, Arc::new(SystemClock))
+    }
+
+    /// Compose control authorizations with the broker authority's trusted time.
+    pub fn new_with_clock(
+        config: BrokerIpcClientConfig,
+        authority_signer: Arc<dyn SigningBackend>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self> {
         config.validate()?;
         Ok(Self {
             config,
             authority_signer,
+            clock,
+            clock_fence: Mutex::new(ClockFence::default()),
         })
+    }
+
+    fn now_unix_seconds(&self) -> Result<u64> {
+        let mut fence = self
+            .clock_fence
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        Ok(fence.observe(self.clock.read()?)?.unix_millis().as_secs())
     }
 
     pub fn register_attempt(
@@ -109,7 +131,7 @@ impl BrokerIpcClient {
             registration: registration.clone(),
             request: request.clone(),
         };
-        let now = now_unix_seconds()?;
+        let now = self.now_unix_seconds()?;
         let payload = canonical_json_bytes(&authenticated).map_err(|error| {
             BrokerError::Invariant(format!("register-attempt payload encoding failed: {error}"))
         })?;
@@ -187,7 +209,7 @@ impl BrokerIpcClient {
             registration: registration.clone(),
             request: request.clone(),
         };
-        let now = now_unix_seconds()?;
+        let now = self.now_unix_seconds()?;
         let payload = canonical_json_bytes(&authenticated).map_err(|error| {
             BrokerError::Invariant(format!("prepare-dispatch payload encoding failed: {error}"))
         })?;
@@ -216,7 +238,7 @@ impl BrokerIpcClient {
             registration: registration.clone(),
             request: request.clone(),
         };
-        let now = now_unix_seconds()?;
+        let now = self.now_unix_seconds()?;
         let payload = canonical_json_bytes(&authenticated).map_err(|error| {
             BrokerError::Invariant(format!("release-attempt payload encoding failed: {error}"))
         })?;
@@ -697,12 +719,6 @@ fn decode_canonical_response<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Resu
             error,
         ))
     })
-}
-
-fn now_unix_seconds() -> Result<u64> {
-    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
-        .map(chio_security_types::clock::UnixMillis::as_secs)
-        .map_err(BrokerError::from)
 }
 
 #[cfg(test)]

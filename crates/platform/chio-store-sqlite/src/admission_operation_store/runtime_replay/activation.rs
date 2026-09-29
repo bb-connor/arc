@@ -38,7 +38,7 @@ impl SqliteAdmissionOperationStore {
         {
             let mut connection = self.connection()?;
             let transaction = self.begin_write(&mut connection, Some(fence))?;
-            let observed = migration_time(&transaction, trusted_now_unix_ms)?;
+            let observed = migration_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
             verify_all_records(&transaction).map_err(integrity_error)?;
             let current = load_record(&transaction, binding.runtime_authority_id().as_str())
                 .map_err(integrity_error)?

@@ -34,7 +34,10 @@ fn native_declassification_expiry_at_final_commit_retains_consumption_without_ca
             Ok(())
         }));
     let store = fixture.authority.admission_operation_store();
-    store.inject_native_capture_declassification_expiry_for_test()?;
+    store.inject_native_capture_declassification_expiry_for_test({
+        let clock = fixture.clock.clone();
+        move |until| clock.advance_to(until).map_err(|error| error.to_string())
+    })?;
     let response = fixture
         .kernel
         .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;

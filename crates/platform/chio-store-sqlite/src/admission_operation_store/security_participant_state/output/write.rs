@@ -15,7 +15,7 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<NativeSecurityOutputJoinRecordV1, AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
-        observed_time(&tx, decision_at)?;
+        observed_time(&tx, decision_at, &self.serving_owner)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         ensure_no_reserved_terminal_stage(&tx, operation.binding().operation_id())?;
         verify_catalog(&tx)?;
@@ -101,7 +101,7 @@ impl SqliteAdmissionOperationStore {
         )
         .map_err(invalid)?;
         let before = footprint(&tx)?;
-        let observed_at = observed_time(&tx, decision_at)?;
+        let observed_at = observed_time(&tx, decision_at, &self.serving_owner)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         let declassification =
             declassification::expected(&tx, operation, observed_at.max(decision_at))?;
@@ -241,7 +241,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        observed_time(&tx, now)?;
+        observed_time(&tx, now, &self.serving_owner)?;
         super::super::verify_coverage(&tx).map_err(map_owner_error)?;
         let Some(stored) = load_by_operation_id_tx(&tx, operation)? else {
             return Ok(None);

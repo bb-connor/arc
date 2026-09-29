@@ -31,7 +31,12 @@ impl SqliteAdmissionOperationStore {
         {
             let mut connection = self.connection()?;
             let tx = self.begin_write(&mut connection, Some(fence))?;
-            let observed = approval_clock_tx(&tx, expected.snapshot(), trusted_now_unix_ms)?;
+            let observed = approval_clock_tx(
+                &tx,
+                expected.snapshot(),
+                trusted_now_unix_ms,
+                &self.serving_owner,
+            )?;
             verify_all_records(&tx).map_err(integrity_error)?;
             let current = load_record(&tx, binding.approval_authority_id().as_str())
                 .map_err(integrity_error)?
@@ -91,12 +96,13 @@ pub(in crate::admission_operation_store) fn approval_clock_tx(
     tx: &Transaction<'_>,
     source: &GovernedApprovalReplaySourceSnapshot,
     decision_time: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<u64, AdmissionOperationStoreError> {
     // Require the authority's actual observation, not merely a caller timestamp
     // ahead within tolerated skew, to have reached the imported high-water.
-    let observed = schema::observe_authority_time(tx)?;
+    let observed = schema::observe_authority_time(tx, owner)?;
     verify_source_clock_floor(source, observed)?;
-    let effective = migration_time(tx, decision_time)?;
+    let effective = migration_time(tx, decision_time, owner)?;
     verify_source_clock_floor(source, effective)?;
     Ok(effective)
 }

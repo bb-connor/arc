@@ -10,9 +10,9 @@ use super::{
     CorrelationPartial, CorrelationPartitionKey, Digest32, EventAppend, EventId, OptionalExtension,
     PortError, PortResult, ProducerId, ProducerTrustClass, RuleId, SecurityEventVerificationRecord,
     SignedSecurityEvent, SqliteSecurityStateStore, TenantId, TransactionBehavior,
-    UnverifiedEventBatch, UnverifiedSecurityEvent, EVENT_EVIDENCE_HASH_DOMAIN,
-    MAX_EVENT_SCAN_RESULTS, RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN,
+    UnverifiedEventBatch, UnverifiedSecurityEvent, MAX_EVENT_SCAN_RESULTS,
 };
+use chio_core::security_event::{EVENT_EVIDENCE_HASH_DOMAIN, EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN};
 
 fn correlation_outcome_status_name(value: CorrelationOutcomeStatus) -> &'static str {
     match value {
@@ -505,7 +505,7 @@ fn validate_correlation_source_evidence(
             .map_err(|_| PortError::invalid_data())?;
             (
                 canonical_json_bytes(&receipt).map_err(|_| PortError::invalid_data())?,
-                RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN,
+                EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN,
             )
         }
     };

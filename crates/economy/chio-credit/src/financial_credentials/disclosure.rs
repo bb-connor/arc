@@ -200,7 +200,7 @@ fn validate_bundled_source_artifact(
         || !valid_digest(&artifact.artifact_digest)
         || artifact.canonical_artifact.len() > MAX_SOURCE_ARTIFACT_BYTES
         || domain_digest(
-            SOURCE_ARTIFACT_DIGEST_DOMAIN,
+            FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN,
             artifact.canonical_artifact.as_bytes(),
         ) != artifact.artifact_digest
     {

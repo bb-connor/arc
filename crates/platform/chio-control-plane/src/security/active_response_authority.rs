@@ -1,3 +1,4 @@
+pub use chio_security_types::ports::ACTIVE_RESPONSE_AUTHORITY_SCHEMA;
 use std::path::PathBuf;
 
 use chio_core::capability::governance::{GovernedApprovalToken, GovernedTransactionIntent};
@@ -37,7 +38,6 @@ pub use protocol::{
     ActiveResponseAuthorityProtocolServerConfig, ActiveResponseAuthorityServeOutcome,
 };
 
-pub const ACTIVE_RESPONSE_AUTHORITY_SCHEMA: &str = "chio.active-response-policy-authority.v2";
 pub const ACTIVE_RESPONSE_AUTHORITY_REQUEST_DOMAIN: &str =
     "chio.active-response-policy-authority.request.v2\0";
 pub const ACTIVE_RESPONSE_AUTHORITY_RESPONSE_DOMAIN: &str =

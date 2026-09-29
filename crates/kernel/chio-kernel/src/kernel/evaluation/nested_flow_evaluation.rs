@@ -111,7 +111,7 @@ impl ChioKernel {
             self.scope_receipt_tenant_id_for_request(&request.request_id, tenant_id.clone());
         let _tenant_scope = scope_receipt_tenant_id(tenant_id);
 
-        let now_unix_ms = read_unix_timestamp_ms()?;
+        let now_unix_ms = self.read_authority_time()?.get();
         let now = now_unix_ms / 1000;
 
         // Emergency kill switch: the nested-flow path also
@@ -760,7 +760,7 @@ impl ChioKernel {
         let mut credential_reservation = match self.reserve_admitted_dispatch_credentials(
             request,
             dpop_required,
-            read_unix_timestamp()?,
+            self.read_authority_time()?.as_secs(),
             durable_admission.as_ref(),
             matched_grant_index,
         ) {
@@ -774,7 +774,7 @@ impl ChioKernel {
                         self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                             request,
                             reason: &reason,
-                            timestamp: read_unix_timestamp()?,
+                            timestamp: self.read_authority_time()?.as_secs(),
                             matched_grant_index,
                             cap,
                             budget_mutation: &budget_mutation,
@@ -827,7 +827,7 @@ impl ChioKernel {
             .as_ref()
             .and_then(|prepared| prepared.connection.as_ref())
             .unwrap_or(server);
-        let revalidation_now_unix_ms = read_unix_timestamp_ms()?;
+        let revalidation_now_unix_ms = self.read_authority_time()?.get();
         let final_dispatch_admission = match readiness_result {
             Ok(readiness_waited) => self.revalidate_immediately_before_dispatch(
                 request,
@@ -966,7 +966,7 @@ impl ChioKernel {
                                     PreDispatchCleanupDeny {
                                         request,
                                         reason: &reason,
-                                        timestamp: read_unix_timestamp()?,
+                                        timestamp: self.read_authority_time()?.as_secs(),
                                         matched_grant_index,
                                         cap,
                                         budget_mutation: &budget_mutation,
@@ -1111,7 +1111,7 @@ impl ChioKernel {
         };
 
         if payment_authorization.is_some() {
-            let post_payment_now_unix_ms = read_unix_timestamp_ms()?;
+            let post_payment_now_unix_ms = self.read_authority_time()?.get();
             let post_payment_admission = self.revalidate_immediately_before_dispatch(
                 request,
                 durable_admission.as_ref(),
@@ -1176,7 +1176,7 @@ impl ChioKernel {
                     PreDispatchCleanupDeny {
                         request,
                         reason: &reason,
-                        timestamp: read_unix_timestamp()?,
+                        timestamp: self.read_authority_time()?.as_secs(),
                         matched_grant_index,
                         cap,
                         budget_mutation: &budget_mutation,
@@ -1203,7 +1203,7 @@ impl ChioKernel {
         let pool_claim = self.claim_finding_pool_immediately_before_dispatch(
             matched_grant,
             request,
-            read_unix_timestamp_ms()?,
+            self.read_authority_time()?.get(),
             durable_admission
                 .as_ref()
                 .map(|admission| admission.operation().binding().operation_id().as_str()),
@@ -1219,7 +1219,7 @@ impl ChioKernel {
                     PreDispatchCleanupDeny {
                         request,
                         reason: &reason,
-                        timestamp: read_unix_timestamp()?,
+                        timestamp: self.read_authority_time()?.as_secs(),
                         matched_grant_index,
                         cap,
                         budget_mutation: &budget_mutation,
@@ -1303,7 +1303,7 @@ impl ChioKernel {
                         PreDispatchCleanupDeny {
                             request,
                             reason: &reason,
-                            timestamp: read_unix_timestamp()?,
+                            timestamp: self.read_authority_time()?.as_secs(),
                             matched_grant_index,
                             cap,
                             budget_mutation: &budget_mutation,
@@ -1676,7 +1676,7 @@ impl ChioKernel {
                     "nested tool return lost its frozen dispatch context".into(),
                 )
             })?;
-            let recorded_at_unix_ms = read_unix_timestamp_ms()?.max(now_unix_ms);
+            let recorded_at_unix_ms = self.read_authority_time()?.get().max(now_unix_ms);
             match self.record_durable_tool_return(
                 admission,
                 DurableToolReturnInput {
@@ -1737,7 +1737,7 @@ impl ChioKernel {
             request,
             verified_finding_admission.recovery_binding(),
             verified_finding_admission.recovery_status(),
-            read_unix_timestamp_ms()? / 1_000,
+            self.read_authority_time()?.get() / 1_000,
         );
         if let Err(denial) = recovery_status {
             return self.deny_changed_ordinary_recovery_status(

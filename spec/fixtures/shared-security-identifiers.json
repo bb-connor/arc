@@ -1,0 +1,260 @@
+[
+  {
+    "kind": "schema",
+    "identity": "chio.active-response-policy-authority.v2",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "24098e239d3b01065e2e30a9b9e77dc700ad8d36fbfcff7d1b70ba4a515d5915"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.native-flow-dispatch-policy.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "9dff198feb246614a7d7c8687caea1f901b10431221fda4b48d88181f8112453"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.native-flow-dispatch-policy.v2",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "1a406d3a57fc5099b8a7ea1cb64ddf04da0bed0db56fc75f53736bee088647fd"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime-replay-source-seal.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "67a445c2d72a77100559000bfb58ea127eaad7837d566e290fa3bbc2b5f5b089"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.admission-bundle.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "f646b9b255d403c0af2a151b71621e50902fed93725b080fe5d6a981d29ace77"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.admission-profile.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "3a473b6ca16225ad83f37ff25cb32cfce4782120c3ac30176e4f5752cb12b52c"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.admission-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "45d7f626bc4aa804f447e13b6f00d3c456d3c73186261349ea889209f74bc955"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.admission-store.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "faef7ecc7cd0a11aa0505ccb74ac2b4d0c92f5d444a7fe8868a8ae8298fed487"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.artifact-retention-plan.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "ee239f4ebe7f76c140c3ceb8a9c3f0250f965d143a521a9bb5c9460b5c746c56"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.artifact-retention-profile.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "f84b6f378f3738656d9ec97c325cdf0166ec964759bed0537b267885e1e6da68"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.evidence-manifest.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "e6341ab6e16b17b2a6e7c3d1dd09969b6c976e0147bc9d83091c495c45df9813"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.evidence-sink-health-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "eeabc5d9fa0b202773b14d5d89fb3e0c818ca83683c48879f388623922bf9618"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.ops-status-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "0bcc9ed3560d8b2f3d85aa4fe762b99c20ff3c93c22d19a3b332764eb257bdc8"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.orchestration-plan.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "d4017deefd83f7c2d7c5e3b10864433e55e1c0b9c053afcb08558c55af677cbe"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.orchestration-profile.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "6654da3962b70031b23e30ce37cbc948b6b81a27f84d562f3d98f54df4d1768b"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.orchestration-resume-plan.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "995f3caba30800769fc8889241813538f9b12391e35d8471cb537ed59476550c"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.orchestration-run-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "41dd056bdc8f13b6d4ff7391bc857562095ad77528dcbfcf5ec5dac3aa3602b0"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.orchestration-status-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "8bc8f85b05273fdb52555132b1dc7cce6f62162196eadbd94586766e578adb5b"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.peer-weights.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "2d557075d6c45fc45be103220c82ea7da3ff7f27e899652306dae388be94896d"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.pheromone-policy-decision.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "a9713954b04a90df3753eadb82dd8574e61e20c853f6a29b34d92c5e15bdf10a"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.pheromone-policy.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "74cabf5eb5726d86dbd52860866fb7ed6b17fcab3d5009fd8d49557ec2ad0d95"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.proof-drift-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "67dba36c1e3cd598c9655da4407b25ce53dece58110ab0f6d695648fb82a8f6f"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.proof-parity-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "917c39ec4279e556d4364c7f9f97aeb182644d9abce5605eec1c2d695621f6eb"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.proof-regeneration-input.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "c5618abde44e8b31533e94c6a3c4774b74b48244a376f260082ef3d78911190a"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.proof-regeneration-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "d0c8d003c02e1e4a9755d66c17d7210ac0fecfe2ed8148b72ad0fdd230be1d3c"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.provider-bindings.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "9518f2c9ddabb5b5dd46d16060598db426d60f654e95f00bee7206b99df04103"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.provider-health-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "574265b365d8d981b59bbee61ff2b406fa3b8e8237faf6cda9f90b9bb02f815d"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.recovery-drill-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "f829384761079361c0d8c93b6b9636b22ece6a8ace0fcb9d32492b13822fadba"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.run-contract.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "c90455ef0ec077871bf47331c5b5e3a4ef00523d953214f37247b80dc44c0389"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.run-lease.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "f5848efe05a933715c54f237e5107d7cb3b3c0df2570dfb81c614faf334db2cc"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.scheduler-tick-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "0bc13e7fc359e1e46f9ea7308e5f5ae2abf997743e2094358cf6f21908d2c785"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.step-evidence.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "9bda3896910851af39319ab86ef7b683ed709852a02194f0ab167d1a35e3f772"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.supervisor-profile.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "d5fea261c48f01c45a493d3583c1ffb370bc6024402ccea899f0baa4e3167601"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.trust-floor-state.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "ef8d1660f915a170108693240ca62e86e3f5fabc11643aa19c852d3acf49167f"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.trusted-verifiers.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "580f5c57dcc24171ea2105484d37f2636993a8bf9c3cdbc1eb8da2263e8617ef"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.verifier-trust-bundle.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "79111ce1da870574909e358489ac3037e48242cb3d018caa2bfdd9e2220df01c"
+  },
+  {
+    "kind": "schema",
+    "identity": "chio.runtime.workflow-run-report.v1",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "3fd68ba7ab1c5bb089f3c929e14631ec98197ed267c58281629e450067e44737"
+  },
+  {
+    "kind": "domain",
+    "identity": "chio.channel.release-authorization.signed-digest.v1\u0000",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "d0666b4daaeeb34df87979c4976df7774d1d51a80b87749f8eb0c846a1f1adb8"
+  },
+  {
+    "kind": "domain",
+    "identity": "chio.fincred.source-artifact.v1\u0000",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "7659698b46a51d1695ed6cb008075fe8abd2f01242e74468ffb59d3a9f502c53"
+  },
+  {
+    "kind": "domain",
+    "identity": "chio.fincred.source-disclosure.v1\u0000",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "59c6a2b7d9c3def41ccd17d289390dfcc09f28eecae3bd90eda861b5d586467f"
+  },
+  {
+    "kind": "domain",
+    "identity": "chio.runtime-replay-source-seal.v1\u0000",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "8fdeaf171e37c0ca86b1d0637d691afeb2000ad0ef3dc1d1cf1a944f1cd08844"
+  },
+  {
+    "kind": "domain",
+    "identity": "chio.verified-security-event-evidence.v1\u0000",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "3d5fb31bf988868b79bebae0303822fdae2aedffec5ed915ac799098a883d865"
+  },
+  {
+    "kind": "domain",
+    "identity": "chio.verified-security-event-receipt-evidence.v1\u0000",
+    "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
+    "sha256": "4fe663a47944568d705b6f1b168dec1182109de647c334028c28b7a8d8a4a5c5"
+  }
+]

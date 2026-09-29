@@ -24,7 +24,7 @@ impl ChioKernel {
             self.build_deny_response_with_metadata_and_payee_binding(
                 request,
                 &reason,
-                read_unix_timestamp_ms()? / 1_000,
+                self.read_authority_time()?.get() / 1_000,
                 Some(matched_grant_index),
                 crate::finding_denial::denied_metadata(metadata, denial),
                 payee,
@@ -279,7 +279,7 @@ impl ChioKernel {
                 "payment_authorization_id": payment_authorization
                     .map(|authorization| authorization.authorization_id.as_str())
             }),
-            read_unix_timestamp_ms()?,
+            self.read_authority_time()?.get(),
             payment_unwind,
         )
     }
@@ -945,7 +945,9 @@ impl ChioKernel {
         // must present. Every other durable operation is compensated here.
         let nonce = match durable_admission {
             Some(admission) if admission.requires_execution_nonce() => {
-                match self.issue_durable_execution_nonce(admission, read_unix_timestamp_ms()?) {
+                match self
+                    .issue_durable_execution_nonce(admission, self.read_authority_time()?.get())
+                {
                     Ok(signed) => PreflightNonceSource::Durable(signed),
                     Err(error) => {
                         let reason = error.to_string();
@@ -1017,7 +1019,7 @@ impl ChioKernel {
             self.read_caller_participant_custody(
                 admission,
                 matched_grant_index,
-                read_unix_timestamp_ms()?,
+                self.read_authority_time()?.get(),
             )?;
             (runtime_admission_metadata, true)
         } else {

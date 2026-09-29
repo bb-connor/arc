@@ -66,6 +66,8 @@ mod execution_nonce;
 mod factor_assignment;
 #[path = "admission_operation_store_tests/governed_approval_replay.rs"]
 mod governed_approval_replay;
+#[path = "admission_operation_store_tests/injected_clock.rs"]
+mod injected_clock;
 #[path = "admission_operation_store_tests/integrity.rs"]
 mod integrity;
 #[path = "admission_operation_store_tests/legacy_clock.rs"]

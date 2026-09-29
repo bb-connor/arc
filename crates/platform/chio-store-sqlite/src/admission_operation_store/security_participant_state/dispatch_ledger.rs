@@ -79,7 +79,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        observed_time(&tx, trusted_now_unix_ms)?;
+        observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
         storage::verify_coverage(&tx)?;
         let Some(stored) = load_by_operation_id_tx(&tx, operation_id)? else {
             return Ok(None);

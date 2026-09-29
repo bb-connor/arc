@@ -25,8 +25,10 @@ pub(super) fn configure_original_selection(
     let profile = original.authority_profile();
     if let Some(binding) = profile.runtime() {
         use chio_runtime_core::*;
-        let source =
-            SqliteRuntimeOrchestrationStore::open(witness.directory.join("native-runtime.db"))?;
+        let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+            witness.directory.join("native-runtime.db"),
+            witness.clock(),
+        )?;
         let now = now_ms()?;
         // Recovery has no new signed admission inputs. This real hook preserves
         // the original authority selection but cannot authorize a new execution.
@@ -49,9 +51,12 @@ pub(super) fn configure_original_selection(
     if let Some(binding) = profile.approval() {
         kernel.set_operation_owned_governed_approval_source(
             binding.clone(),
-            Arc::new(chio_store_sqlite::SqliteGovernedApprovalReplaySource::open(
-                witness.directory.join("native-approval.db"),
-            )?),
+            Arc::new(
+                chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
+                    witness.directory.join("native-approval.db"),
+                    witness.clock(),
+                )?,
+            ),
         )?;
     }
     if let Some(binding) = profile.dpop() {
@@ -66,6 +71,7 @@ pub(super) fn configure_original_selection(
     kernel.set_security_pre_dispatch_hook(Arc::new(resolver(
         witness.binding.clone(),
         disclosure.as_ref(),
+        witness.clock(),
     )?));
     if witness.request.execution_nonce.is_some() {
         kernel.set_execution_nonce_store(
@@ -201,18 +207,24 @@ pub(super) fn verify(
         effects(root)?,
         if point.effected() { "effect\n" } else { "" }
     );
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
         witness.directory.join("admission.db"),
         witness.directory.join("locks"),
+        witness.clock(),
     )?;
     let fence = authority.mutation_fence();
     assert!(fence.owner_epoch > witness.fence.owner_epoch);
     assert!(
-        SqliteAuthorityStore::open_serving(
-            witness.directory.join("admission.db"),
-            witness.directory.join("locks")
-        )
-        .is_err(),
+        matches!(
+            SqliteAuthorityStore::open_serving_with_clock(
+                witness.directory.join("admission.db"),
+                witness.directory.join("locks"),
+                witness.clock()
+            ),
+            Err(chio_store_sqlite::SqliteServingOwnerError::AlreadyServing(
+                _
+            ))
+        ),
         "competing process owner must not enter serving mode"
     );
     let (before, original) = retained(&authority, &witness.request)?;
@@ -243,7 +255,8 @@ pub(super) fn verify(
         .ok_or("egress operation")?
         .1;
     let signer = Keypair::from_seed_hex(&witness.signer)?;
-    let (mut kernel, invocations) = open_kernel(&witness.directory, &authority, &signer)?;
+    let (mut kernel, invocations) =
+        open_kernel(&witness.directory, &authority, &signer, witness.clock())?;
     configure_original_selection(&mut kernel, &original, witness)?;
     match recovery {
         RecoveryMode::Serial => {}

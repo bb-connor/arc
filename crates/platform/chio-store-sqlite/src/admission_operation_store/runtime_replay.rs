@@ -109,7 +109,7 @@ impl SqliteAdmissionOperationStore {
         {
             let mut connection = self.connection()?;
             let transaction = self.begin_write(&mut connection, Some(fence))?;
-            let observed = migration_time(&transaction, trusted_now_unix_ms)?;
+            let observed = migration_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
             verify_all_records(&transaction).map_err(integrity_error)?;
             if let Some(existing) =
                 load_record(&transaction, runtime_authority_id.as_str()).map_err(integrity_error)?
@@ -188,7 +188,7 @@ impl SqliteAdmissionOperationStore {
         {
             let mut connection = self.connection()?;
             let transaction = self.begin_write(&mut connection, Some(fence))?;
-            let observed = migration_time(&transaction, trusted_now_unix_ms)?;
+            let observed = migration_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
             verify_all_records(&transaction).map_err(integrity_error)?;
             let current = load_record(&transaction, runtime_authority_id.as_str())
                 .map_err(integrity_error)?
@@ -232,7 +232,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
-        migration_time(&transaction, trusted_now_unix_ms)?;
+        migration_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         verify_runtime_replay_projection_coverage(&transaction).map_err(map_owner_error)?;
         let record =
             load_record(&transaction, runtime_authority_id.as_str()).map_err(integrity_error)?;
@@ -310,8 +310,9 @@ fn integrity_error(detail: impl std::fmt::Display) -> AdmissionOperationStoreErr
 fn migration_time(
     transaction: &Transaction<'_>,
     trusted_now_unix_ms: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let observed = schema::authority_validation_time(transaction, trusted_now_unix_ms)?;
+    let observed = schema::authority_validation_time(transaction, trusted_now_unix_ms, owner)?;
     let high_water: i64 = transaction
         .query_row(
             "SELECT COALESCE(MAX(observed_at_unix_ms), 0) FROM runtime_replay_migration_events",

@@ -7,6 +7,9 @@
 
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use chio_security_types::clock::{Clock, SystemClock};
 
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::AdmissionIdentifier;
@@ -20,6 +23,9 @@ use chio_sqlite_file_identity::{main_database_file_identity, SqliteFileIdentity}
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 
 use crate::store_connection::StoreConnection;
+
+mod clock;
+use clock::LedgerClock;
 
 const SCHEMA: &str = include_str!("caller_execution_ledger.sql");
 const APPLICATION_ID: i64 = 0x43484345;
@@ -47,6 +53,7 @@ pub struct SqliteCallerExecutionLedger {
     file_identity: SqliteFileIdentity,
     executor: CallerExecutorIdentityV1,
     max_operations: u32,
+    clock: LedgerClock,
 }
 
 impl SqliteCallerExecutionLedger {
@@ -58,6 +65,18 @@ impl SqliteCallerExecutionLedger {
         executor: CallerExecutorIdentityV1,
         max_operations: u32,
     ) -> Result<Self> {
+        Self::provision_with_clock(path, executor, max_operations, Arc::new(SystemClock))
+    }
+
+    /// Provision with the executor's trusted clock. All claim and report reads
+    /// share this clock and its fence; persisted wall-time custody survives reopen.
+    pub fn provision_with_clock(
+        path: &Path,
+        executor: CallerExecutorIdentityV1,
+        max_operations: u32,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self> {
+        let clock = LedgerClock::new(clock);
         if !(1..=64).contains(&max_operations) {
             return Err(invalid("invalid executor capacity"));
         }
@@ -100,7 +119,7 @@ impl SqliteCallerExecutionLedger {
         .map_err(storage)?;
         tx.execute(
             "INSERT INTO caller_executor_clock VALUES (1, ?1)",
-            [now_ms()?],
+            [clock.now_ms()?],
         )
         .map_err(storage)?;
         tx.commit().map_err(storage)?;
@@ -111,12 +130,30 @@ impl SqliteCallerExecutionLedger {
         )
         .and_then(|directory| directory.sync_all())
         .map_err(storage)?;
-        Self::open(&path, executor)
+        Self::open_owned(&path, executor, clock)
     }
 
     /// Open only an already provisioned exact executor/key epoch. Rotation
     /// needs an explicit history-preserving migration, never a fresh ledger.
     pub fn open(path: &Path, executor: CallerExecutorIdentityV1) -> Result<Self> {
+        Self::open_with_clock(path, executor, Arc::new(SystemClock))
+    }
+
+    /// Reopen using the executor's configured trusted clock. A clock behind the
+    /// durable high-water mark cannot serve the existing ledger.
+    pub fn open_with_clock(
+        path: &Path,
+        executor: CallerExecutorIdentityV1,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self> {
+        Self::open_owned(path, executor, LedgerClock::new(clock))
+    }
+
+    fn open_owned(
+        path: &Path,
+        executor: CallerExecutorIdentityV1,
+        clock: LedgerClock,
+    ) -> Result<Self> {
         validate_executor(&executor)?;
         let path = private_path(path)?;
         if !fs::symlink_metadata(&path).map_err(storage)?.is_file() {
@@ -154,7 +191,9 @@ impl SqliteCallerExecutionLedger {
         if claims > capacity {
             return Err(invalid("executor claim inventory exceeds capacity"));
         }
-        read_clock(&tx)?;
+        if clock.now_ms()? < read_clock(&tx)? {
+            return Err(invalid("executor authority clock regressed on reopen"));
+        }
         let foreign_keys: Option<String> = tx
             .query_row("PRAGMA foreign_key_check", [], |row| row.get(0))
             .optional()
@@ -172,6 +211,7 @@ impl SqliteCallerExecutionLedger {
             file_identity: identity,
             executor,
             max_operations: capacity,
+            clock,
         })
     }
 
@@ -208,7 +248,7 @@ impl SqliteCallerExecutionLedger {
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(storage)?;
             self.validate_live(&tx)?;
-            let now = advance_clock(&tx)?;
+            let now = advance_clock(&tx, &self.clock)?;
             let existing: Option<(Vec<u8>, String)> = tx.query_row(
                 "SELECT
                     CASE WHEN typeof(authorization) = 'blob' AND length(authorization) BETWEEN 1 AND 32768 THEN authorization END,
@@ -265,7 +305,7 @@ impl SqliteCallerExecutionLedger {
                 ],
             )
             .map_err(storage)?;
-            verified.require_live_at(u64::try_from(now_ms()?).map_err(storage)?)?;
+            verified.require_live_at(u64::try_from(self.clock.now_ms()?).map_err(storage)?)?;
             tx.commit().map_err(storage)?;
             // Commit failure is unresolved, never permission to invoke. Exact
             // readback confirms the particular claim that this call created.
@@ -277,7 +317,7 @@ impl SqliteCallerExecutionLedger {
                 return Err(invalid("executor claim acknowledgement changed"));
             }
         }
-        let started = u64::try_from(now_ms()?).map_err(storage)?;
+        let started = u64::try_from(self.clock.now_ms()?).map_err(storage)?;
         if started < claimed_at {
             return Err(invalid("executor clock regressed after claim"));
         }
@@ -291,7 +331,7 @@ impl SqliteCallerExecutionLedger {
         let observed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(effect))
             .map_err(|_| CallerExecutionLedgerError::OutcomeUnknown)?
             .map_err(|_| CallerExecutionLedgerError::OutcomeUnknown)?;
-        let completed = u64::try_from(now_ms()?).map_err(storage)?;
+        let completed = u64::try_from(self.clock.now_ms()?).map_err(storage)?;
         let report = SignedCallerDeliveryReportV1::sign(
             CallerDeliveryReportBodyV1 {
                 schema: CALLER_DELIVERY_REPORT_SCHEMA.into(),
@@ -326,7 +366,7 @@ impl SqliteCallerExecutionLedger {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(storage)?;
         self.validate_live(&tx)?;
-        advance_clock(&tx)?;
+        advance_clock(&tx, &self.clock)?;
         tx.execute(
             "INSERT INTO caller_executor_reports VALUES (?1, ?2, ?3)",
             params![kernel_key, operation_id, bytes],
@@ -473,8 +513,8 @@ fn validate_executor(executor: &CallerExecutorIdentityV1) -> Result<()> {
     Ok(())
 }
 
-fn advance_clock(connection: &Connection) -> Result<i64> {
-    let now = now_ms()?;
+fn advance_clock(connection: &Connection, clock: &LedgerClock) -> Result<i64> {
+    let now = clock.now_ms()?;
     let previous = read_clock(connection)?;
     if now < previous {
         return Err(invalid("executor authority clock regressed"));
@@ -503,17 +543,6 @@ fn read_clock(connection: &Connection) -> Result<i64> {
             |row| row.get(0),
         )
         .map_err(storage)
-}
-
-fn now_ms() -> Result<i64> {
-    let value =
-        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
-            .map_err(storage)?
-            .get();
-    if value == 0 || value >= (1_u64 << 53) {
-        return Err(invalid("executor clock is outside I-JSON range"));
-    }
-    i64::try_from(value).map_err(storage)
 }
 
 fn storage(error: impl std::fmt::Display) -> CallerExecutionLedgerError {

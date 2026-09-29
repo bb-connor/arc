@@ -290,7 +290,7 @@ impl ChioKernel {
                 })),
                 receipt_attribution_metadata(&operation.capability, None)?,
             ),
-            timestamp: read_unix_timestamp()?,
+            timestamp: self.read_authority_time()?.as_secs(),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
         })?;

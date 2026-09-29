@@ -1,3 +1,4 @@
+use chio_settle::channel::SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN;
 use std::sync::{Arc, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
@@ -43,8 +44,7 @@ const CHANNEL_RELEASE_PUBLISHER_SCHEMA_ANCHORS: &[&str] = &[
     "channel_lifecycle_records",
 ];
 const CHANNEL_RELEASE_PUBLISHER_SCHEMA: &str = include_str!("channel_release_publisher_store.sql");
-const CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN: &[u8] =
-    b"chio.channel.release-authorization.signed-digest.v1\0";
+
 const MAX_PUBLISHER_ARTIFACT_BYTES: usize = 1024 * 1024;
 #[cfg(test)]
 const MAX_FAILURE_DETAIL_BYTES: usize = 4 * 1024;
@@ -610,7 +610,7 @@ impl SqliteChannelReleasePublisherStore {
             }
             return Err(ChannelReleasePublisherError::Conflict);
         }
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&self.serving_owner, &transaction, trusted_now_unix_ms)?;
         validate_candidate_freshness(candidate, trusted_now_unix_ms)?;
         let lifecycle_json = encode(&candidate.closing_lifecycle, "closing channel lifecycle")?;
         let escrow_json = encode(&candidate.closing_escrow, "closing escrow reservation")?;
@@ -672,7 +672,7 @@ impl SqliteChannelReleasePublisherStore {
             .verify_authority_anchor(&connection)
             .map_err(owner_error)?;
         let transaction = connection.transaction().map_err(sqlite_error)?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&self.serving_owner, &transaction, trusted_now_unix_ms)?;
         validate_candidate(candidate)?;
         validate_candidate_freshness(candidate, trusted_now_unix_ms)?;
         let lifecycle_json = encode(&candidate.closing_lifecycle, "closing channel lifecycle")?;
@@ -721,7 +721,7 @@ impl SqliteChannelReleasePublisherStore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
+        verify_trusted_time(&self.serving_owner, &transaction, trusted_now_unix_ms)?;
         let (status, transaction_hash, failure_detail, mutation_kind) = match submission {
             SubmissionRecord::Submitted(transaction_hash)
                 if is_evm_transaction_hash(transaction_hash) =>

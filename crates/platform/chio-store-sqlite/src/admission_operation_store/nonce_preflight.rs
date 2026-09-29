@@ -86,7 +86,7 @@ pub(crate) fn bind_nonce_preflight_tx(
 ) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
     let operation = binding.operation;
     let now = binding.trusted_now_unix_ms;
-    verify_trusted_time(transaction, now)?;
+    verify_trusted_time(transaction, now, owner)?;
     verify_participant_recovery_tx(transaction, owner, operation, binding.recovery_lease, now)?;
     ensure_no_reserved_terminal_stage(transaction, operation.binding().operation_id())?;
     if operation.state() != AdmissionOperationState::Prepared
@@ -164,14 +164,14 @@ pub(crate) fn bind_nonce_preflight_tx(
         transaction, operation, request.grant_index,
         chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimPhase::NoncePreflight,
     )?;
-    governed_approval_claim::verify_fresh_approval_tx(transaction, operation, now)?;
+    governed_approval_claim::verify_fresh_approval_tx(transaction, operation, now, owner)?;
     dpop_claim::verify_dpop_budget_selection_tx(
         transaction,
         operation,
         request.grant_index,
         chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::NoncePreflight,
     )?;
-    dpop_claim::verify_fresh_dpop_tx(transaction, operation, now)?;
+    dpop_claim::verify_fresh_dpop_tx(transaction, operation, now, owner)?;
     if !matches!(
         decision,
         BudgetAuthorizeHoldDecision::Authorized(_)

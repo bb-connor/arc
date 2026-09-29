@@ -17,9 +17,6 @@ use super::{
 };
 
 pub(super) const MAX_EVENT_SCAN_RESULTS: u32 = 4_096;
-pub(super) const EVENT_EVIDENCE_HASH_DOMAIN: &[u8] = b"chio.verified-security-event-evidence.v1\0";
-pub(super) const RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN: &[u8] =
-    b"chio.verified-security-event-receipt-evidence.v1\0";
 
 fn trust_class_name(value: ProducerTrustClass) -> &'static str {
     match value {

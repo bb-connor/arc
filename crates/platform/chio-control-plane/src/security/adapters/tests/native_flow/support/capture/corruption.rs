@@ -79,13 +79,20 @@ fn native_capture_physical_corruption_denies_readback_and_reopen() -> TestResult
                 kernel,
                 authority,
                 _directory,
+                clock,
                 ..
             } = fixture;
             drop(kernel);
             drop(authority);
             assert!(
-                SqliteAuthorityStore::open_serving(&database, _directory.path().join("locks"))
-                    .is_err(),
+                matches!(
+                    SqliteAuthorityStore::open_serving_with_clock(
+                        &database,
+                        _directory.path().join("locks"),
+                        clock.clone()
+                    ),
+                    Err(chio_store_sqlite::SqliteServingOwnerError::Invalid(_))
+                ),
                 "corrupt owner reopen succeeded: egress={egress}, {mutation}"
             );
         }

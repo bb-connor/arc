@@ -76,7 +76,7 @@ fn resolver(fixture: &Fixture, authority: &Keypair) -> TestResult<NativeFlowReso
         fixture.binding.clone(),
         declassification_registry(&purpose),
         Arc::new(CountingEmptyClassifier::new()),
-        Arc::new(FlowTestClock::default()),
+        fixture.clock.clone(),
         config,
     )?)
 }

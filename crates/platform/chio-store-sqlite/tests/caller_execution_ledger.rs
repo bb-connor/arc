@@ -535,3 +535,6 @@ fn claimed_attempt_survives_process_death_without_redispatch() -> TestResult {
     }
     Ok(())
 }
+
+#[path = "caller_execution_ledger/injected_clock.rs"]
+mod injected_clock;

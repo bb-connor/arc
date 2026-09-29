@@ -13,7 +13,13 @@ impl Fixture {
         let (mut kernel, _, _, request, _) =
             request_with_replayed_approval("prepared-credentials")?;
         let clock = Arc::new(FixtureClock(AtomicU64::new(current_unix_timestamp())));
+        // This fixture switches clock domains after creating its signed inputs.
+        // No durable runtime owns the prior clock or fence.
+        assert!(kernel.durable_admission_runtime.is_none());
         kernel.clock = clock.clone();
+        kernel.clock_fence = Arc::new(std::sync::Mutex::new(
+            chio_security_types::clock::ClockFence::default(),
+        ));
         // Reuse the complete signed fixture, replacing its deliberately spent
         // approval backend and nonce backend with fresh, observable stores.
         let nonce = Arc::new(NonceState {

@@ -464,7 +464,7 @@ impl ChioKernel {
         let Some(next_visible_at_ms) = settlement_visible_at_ms else {
             return Ok(());
         };
-        let claim_now_ms = read_unix_timestamp_ms()?.max(next_visible_at_ms);
+        let claim_now_ms = self.read_authority_time()?.get().max(next_visible_at_ms);
         let claim = match runtime.claim_receipt(&receipt.id, receipt.timestamp, claim_now_ms) {
             Ok(Some(claim)) => claim,
             Ok(None) => {
@@ -484,7 +484,11 @@ impl ChioKernel {
             row_version: claim.row_version,
         };
         let status = self.run_settlement_observer(receipt, &idempotency_key);
-        runtime.record_claimed_status(&claim, &status, read_unix_timestamp_ms()?.max(claim_now_ms));
+        runtime.record_claimed_status(
+            &claim,
+            &status,
+            self.read_authority_time()?.get().max(claim_now_ms),
+        );
         Ok(())
     }
 

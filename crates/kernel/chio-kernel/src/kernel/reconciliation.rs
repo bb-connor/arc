@@ -220,7 +220,7 @@ impl ChioKernel {
                 "execution nonce store is not installed; cannot reconcile by nonce".to_string(),
             )
         })?;
-        let now_unix = read_unix_timestamp()?;
+        let now_unix = self.read_authority_time()?.as_secs();
         let now = i64::try_from(now_unix).unwrap_or(i64::MAX);
         verify_execution_nonce_without_consume(
             presented_nonce,

@@ -109,7 +109,7 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<SecurityParticipantStateInitialization, AdmissionOperationStoreError> {
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        let observed = observed_time(&tx, trusted_now_unix_ms)?;
+        let observed = observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
         let source = security_participant_migration::load_imported_source(&tx, authority.as_str())?;
         if source.expectation_id() != expectation
             || source
@@ -163,7 +163,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        observed_time(&tx, trusted_now_unix_ms)?;
+        observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
         verify_coverage(&tx).map_err(map_owner_error)?;
         let record = records::load(&tx, authority.as_str())?;
         if record
@@ -176,9 +176,13 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
-fn observed_time(tx: &Transaction<'_>, supplied: u64) -> Result<u64, AdmissionOperationStoreError> {
-    super::schema::authority_validation_time(tx, supplied)?;
-    let observed = super::schema::observe_authority_time(tx)?;
+fn observed_time(
+    tx: &Transaction<'_>,
+    supplied: u64,
+    owner: &SqliteServingOwner,
+) -> Result<u64, AdmissionOperationStoreError> {
+    super::schema::authority_validation_time(tx, supplied, owner)?;
+    let observed = super::schema::observe_authority_time(tx, owner)?;
     let high_water: i64 = tx.query_row(
         "SELECT MAX(value) FROM (
          SELECT COALESCE(MAX(initialized_at), 0) AS value FROM security_participant_state_initializations

@@ -210,7 +210,7 @@ fn native_dispatch_ledger_retains_exact_policy_and_custody_after_compensation() 
             fixture.binding.clone(),
             registry(egress, InformationLabel::bottom())?,
             classifier.clone(),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             flow_config(),
         )?);
         let custody = fixture.run_with_dispatch_ledger(resolver, 0)??;
@@ -257,7 +257,7 @@ fn native_dispatch_ledger_denies_unmatched_grant_without_retention() -> TestResu
             fixture.binding.clone(),
             registry(egress, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             flow_config(),
         )?);
         let result = fixture.run_with_dispatch_ledger(resolver, 1)?;
@@ -281,7 +281,7 @@ fn native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen() 
         let mut fixture = public_fixture()?;
         let resolver = Arc::new(NativeFlowResolver::new(
             fixture.binding.clone(), registry(false, InformationLabel::bottom())?,
-            Arc::new(CountingEmptyClassifier::new()), Arc::new(FlowTestClock::default()), flow_config(),
+            Arc::new(CountingEmptyClassifier::new()), fixture.clock.clone(), flow_config(),
         )?);
         let custody = fixture.run_with_dispatch_ledger(resolver, 0)??;
         let operation = custody.operation_id().clone();

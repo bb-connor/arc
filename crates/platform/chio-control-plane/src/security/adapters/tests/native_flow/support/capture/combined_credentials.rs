@@ -25,7 +25,7 @@ fn native_captured_lifecycle_executes_with_original_runtime_approval_and_dpop() 
                 fixture.binding.clone(),
                 super::super::super::registry(egress, InformationLabel::bottom())?,
                 Arc::new(CountingEmptyClassifier::new()),
-                Arc::new(FlowTestClock::default()),
+                fixture.clock.clone(),
                 flow_config(),
             )?
             .with_captured_lifecycle(),
@@ -104,10 +104,19 @@ fn assert_combined_completion(fixture: &Fixture, egress: bool) -> TestResult {
 impl Fixture {
     fn configure_native_capture_approval(&mut self) -> TestResult {
         let path = self._directory.path().join("native-approval.db");
-        drop(chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 16)?);
-        let source = Arc::new(chio_store_sqlite::SqliteGovernedApprovalReplaySource::open(
-            &path,
-        )?);
+        drop(
+            chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_clock(
+                &path,
+                16,
+                self.clock.clone(),
+            )?,
+        );
+        let source = Arc::new(
+            chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
+                &path,
+                self.clock.clone(),
+            )?,
+        );
         let store = self.authority.admission_operation_store();
         let fence = self.authority.mutation_fence();
         let authority = AdmissionIdentifier::try_new("authority", "native-combined-approval")?;
@@ -275,7 +284,7 @@ fn native_combined_credentials_deny_missing_proof_or_changed_approved_intent_bef
             fixture.binding.clone(),
             super::super::super::registry(false, InformationLabel::bottom())?,
             Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(FlowTestClock::default()),
+            fixture.clock.clone(),
             flow_config(),
         )?);
         fixture.kernel.set_security_pre_dispatch_hook(resolver);

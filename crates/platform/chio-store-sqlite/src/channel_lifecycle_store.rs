@@ -838,6 +838,7 @@ impl SqliteChannelLifecycleStore {
             &operation,
             fence,
             trusted_now_unix_ms,
+            &self.serving_owner,
         )
         .map_err(admission_error)?
         {

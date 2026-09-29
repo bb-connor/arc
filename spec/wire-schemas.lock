@@ -106,7 +106,7 @@ first_seen = "b39b131271"
 
 [[schema]]
 value = "chio.active-response-policy-authority.v2"
-files = ["crates/platform/chio-control-plane/src/security/active_response_authority.rs", "crates/security/chio-active-response-authority/src/config.rs"]
+files = ["crates/security/chio-security-types/src/response_domains.rs"]
 first_seen = "ff2ea2a8d2"
 
 [[schema]]
@@ -3391,12 +3391,12 @@ first_seen = "7e54c14a60"
 
 [[schema]]
 value = "chio.native-flow-dispatch-policy.v1"
-files = ["crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs", "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs"]
+files = ["crates/security/chio-security-types/src/flow.rs"]
 first_seen = "7e54c14a60"
 
 [[schema]]
 value = "chio.native-flow-dispatch-policy.v2"
-files = ["crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs", "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs"]
+files = ["crates/security/chio-security-types/src/flow.rs"]
 first_seen = "252b259d44"
 
 [[schema]]
@@ -4691,37 +4691,37 @@ first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.runtime-replay-source-seal.v1"
-files = ["crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs", "crates/kernel/chio-runtime-core/src/replay_source.rs"]
+files = ["crates/core/chio-core-types/src/runtime_replay.rs"]
 first_seen = "7e54c14a60"
 
 [[schema]]
 value = "chio.runtime.admission-bundle.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.admission-profile.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.admission-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.admission-store.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.artifact-retention-plan.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.artifact-retention-profile.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
@@ -4746,12 +4746,12 @@ first_seen = "2a36f21acf"
 
 [[schema]]
 value = "chio.runtime.evidence-manifest.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime-proof-parity/src/lib.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/core/chio-core-types/src/runtime_schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.evidence-sink-health-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
@@ -4776,7 +4776,7 @@ first_seen = "3502577fac"
 
 [[schema]]
 value = "chio.runtime.ops-status-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
@@ -4786,77 +4786,77 @@ first_seen = "3502577fac"
 
 [[schema]]
 value = "chio.runtime.orchestration-plan.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.orchestration-profile.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.orchestration-resume-plan.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.orchestration-run-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.orchestration-status-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.peer-weights.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.pheromone-policy-decision.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.pheromone-policy.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.proof-drift-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.proof-parity-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime-proof-parity/src/lib.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/core/chio-core-types/src/runtime_schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.proof-regeneration-input.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime-proof-parity/src/lib.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/core/chio-core-types/src/runtime_schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.proof-regeneration-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime-proof-parity/src/lib.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/core/chio-core-types/src/runtime_schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.provider-bindings.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.provider-health-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.recovery-drill-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
@@ -4871,12 +4871,12 @@ first_seen = "1b9620751d"
 
 [[schema]]
 value = "chio.runtime.run-contract.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.run-lease.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
@@ -4891,17 +4891,17 @@ first_seen = "1b9620751d"
 
 [[schema]]
 value = "chio.runtime.scheduler-tick-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.step-evidence.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.supervisor-profile.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
@@ -4926,7 +4926,7 @@ first_seen = "1b9620751d"
 
 [[schema]]
 value = "chio.runtime.trust-floor-state.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs", "crates/trust/chio-pheromone/src/lib.rs"]
+files = ["crates/core/chio-core-types/src/runtime_schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
@@ -4941,17 +4941,17 @@ first_seen = "1b234492f4"
 
 [[schema]]
 value = "chio.runtime.trusted-verifiers.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.verifier-trust-bundle.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]
 value = "chio.runtime.workflow-run-report.v1"
-files = ["crates/kernel/chio-runtime-core/src/schema.rs", "crates/kernel/chio-runtime-proof-parity/src/lib.rs", "crates/kernel/chio-runtime/src/lib.rs"]
+files = ["crates/core/chio-core-types/src/runtime_schema.rs"]
 first_seen = "bb358ba692"
 
 [[schema]]

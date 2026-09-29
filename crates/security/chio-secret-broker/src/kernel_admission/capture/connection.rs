@@ -1,7 +1,7 @@
 //! Kernel-owned delivery over the independently configured broker control port.
 use super::delivery::CapturedBrokerDelivery;
 use super::original::OriginalBrokerRequest;
-use super::{canonical, rejected, trusted_now_ms, BrokerNativeCaptureReader};
+use super::{canonical, rejected, BrokerNativeCaptureReader};
 use crate::kernel_admission::BrokerAdmissionParticipant;
 use crate::{BrokerError, Result};
 use chio_kernel::admission_operation::{AdmissionOperationId, AdmissionOperationState};
@@ -87,7 +87,7 @@ impl BrokerKernelConnection {
         crate::store::AttemptRegistration,
         crate::protocol::BrokerExecuteRequest,
     )> {
-        let now = trusted_now_ms()?;
+        let now = self.reader.trusted_now_ms()?;
         let original = self.original_delivery(context, now)?;
         if !matches!(
             original.operation.state(),
@@ -117,7 +117,11 @@ impl BrokerKernelConnection {
         // The daemon still checks current parent/revocation authority and owns
         // provider deduplication. This connector never retries a lost reply.
         let response = self.participant.client.execute(&delivery.execute)?;
-        delivery.verify_response(self.participant.as_ref(), &response, trusted_now_ms()?)?;
+        delivery.verify_response(
+            self.participant.as_ref(),
+            &response,
+            self.reader.trusted_now_ms()?,
+        )?;
         serde_json::to_value(response).map_err(|_| rejected())
     }
 
@@ -126,7 +130,7 @@ impl BrokerKernelConnection {
         context: &ToolInvocationContext,
         arguments: &serde_json::Value,
     ) -> Result<CapturedBrokerDelivery> {
-        let now = trusted_now_ms()?;
+        let now = self.reader.trusted_now_ms()?;
         let dispatch = context.dispatch().ok_or_else(rejected)?;
         let original = self.original_delivery(dispatch, now)?;
         let request = original.retained.request_for_revalidation();

@@ -94,36 +94,6 @@ def allow(
 # fewest declarations first: a single misspelled domain is a rename, a value
 # declared in four places has four call sites to reconcile first.
 DEBT: dict[str, DomainDebt] = {
-    r"chio.channel.release-authorization.signed-digest.v1\0": allow(
-        "2026-12-31",
-        "declared in 2 places across chio-settle, chio-store-sqlite; retires when one module owns the value and the rest import it",
-        declarations=2,
-    ),
-    r"chio.fincred.source-artifact.v1\0": allow(
-        "2027-01-31",
-        "declared in 2 places across chio-credentials, chio-credit; retires when one module owns the value and the rest import it",
-        declarations=2,
-    ),
-    r"chio.fincred.source-disclosure.v1\0": allow(
-        "2027-01-31",
-        "declared in 2 places across chio-credentials, chio-credit; retires when one module owns the value and the rest import it",
-        declarations=2,
-    ),
-    r"chio.runtime-replay-source-seal.v1\0": allow(
-        "2027-01-31",
-        "declared in 2 places across chio-kernel, chio-runtime-core; retires when one module owns the value and the rest import it",
-        declarations=2,
-    ),
-    r"chio.verified-security-event-evidence.v1\0": allow(
-        "2027-01-31",
-        "declared in 2 places across chio-control-plane, chio-store-sqlite; retires when one module owns the value and the rest import it",
-        declarations=2,
-    ),
-    r"chio.verified-security-event-receipt-evidence.v1\0": allow(
-        "2027-01-31",
-        "declared in 2 places across chio-control-plane, chio-store-sqlite; retires when one module owns the value and the rest import it",
-        declarations=2,
-    ),
     r"CHIO-CHANNEL-TERMINAL-OUTCOME-COMMITMENT-V1\0": allow(
         "2026-10-31",
         "channel terminal outcome signing domain, uppercase convention; retires with a versioned rename",
@@ -165,17 +135,17 @@ DEBT: dict[str, DomainDebt] = {
         shape=True,
     ),
     r"chio-decoy-public-ref-index-v1": allow(
-        "2026-10-31",
+        "2026-11-30",
         "decoy registry hyphen convention, unterminated; retires with the decoy domain migration",
         shape=True,
     ),
     r"chio-decoy-quarantine-name-v1": allow(
-        "2026-10-31",
+        "2026-11-30",
         "decoy registry hyphen convention, unterminated; retires with the decoy domain migration",
         shape=True,
     ),
     r"chio-decoy-transition-index-v1": allow(
-        "2026-10-31",
+        "2026-11-30",
         "decoy registry hyphen convention, unterminated; retires with the decoy domain migration",
         shape=True,
     ),
@@ -205,32 +175,32 @@ DEBT: dict[str, DomainDebt] = {
         shape=True,
     ),
     r"chio:active-defense-evidence-id:v1": allow(
-        "2026-11-30",
+        "2026-12-31",
         "active-defense evidence id, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:correlated-finding:v1": allow(
-        "2026-11-30",
+        "2026-12-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:declassification-consumption:v1": allow(
-        "2026-11-30",
+        "2026-12-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:declassification-outcome:v1": allow(
-        "2026-11-30",
+        "2026-12-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:detector-health:v1": allow(
-        "2026-11-30",
+        "2026-12-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:effect-transition:v1": allow(
-        "2026-11-30",
+        "2026-12-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
@@ -245,42 +215,42 @@ DEBT: dict[str, DomainDebt] = {
         shape=True,
     ),
     r"chio:active-defense-receipt:response-completion:v1": allow(
-        "2026-12-31",
+        "2027-01-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:response-plan:v1": allow(
-        "2026-12-31",
+        "2027-01-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:response-state-transition:v1": allow(
-        "2026-12-31",
+        "2027-01-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:scheduler-health:v1": allow(
-        "2026-12-31",
+        "2027-01-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:active-defense-receipt:tripwire-observation:v1": allow(
-        "2026-12-31",
+        "2027-01-31",
         "active-defense receipt body digest, colon convention, unterminated; retires with the receipt domain migration",
         shape=True,
     ),
     r"chio:dpop-replay-source-inventory:v1\0": allow(
-        "2026-12-31",
+        "2027-01-31",
         "colon convention; retires with a versioned rename",
         shape=True,
     ),
     r"chio:governed-approval-replay-source-inventory:v1\0": allow(
-        "2026-12-31",
+        "2027-01-31",
         "colon convention; retires with a versioned rename",
         shape=True,
     ),
     r"chio:response-plan:v1\0": allow(
-        "2026-12-31",
+        "2027-01-31",
         "colon convention; retires with a versioned rename",
         shape=True,
     ),
