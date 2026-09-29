@@ -384,6 +384,14 @@ claimed by this item.
 
 ### H11. A dependency budget for privileged helpers
 
+September 29 implementation: `chio-cage-init` is now an isolated package with a
+72-package normal musl graph, an exact ceiling of 72 and zero denied dependencies.
+The broker ceiling is 481. Hostile dependency injection and release-package
+selection gates pass. The aarch64 static artifact is measured separately from
+unperformed native x86 enforcement; see the
+[execution record](../../reviews/2026-09-29-security-module-boundaries-execution.md).
+The census below records the original motivation rather than current counts.
+
 **Census.** `chio-cage`, the package that ships the confinement helper binary
 `chio-cage-init`, has a normal-dependency **package graph** of **344 unique
 crates**,

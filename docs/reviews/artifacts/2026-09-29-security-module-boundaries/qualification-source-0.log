@@ -1,0 +1,4 @@
+chio-cage-init (chio-cage-init) on x86_64-unknown-linux-musl: 72 packages, ceiling 72 (measured 2026-09-29); 0 denied
+chio-secret-broker (chio-secret-brokerd) on x86_64-unknown-linux-musl: 481 packages, ceiling 481 (measured 2026-09-29); 0 denied
+
+Dependency budget check passed

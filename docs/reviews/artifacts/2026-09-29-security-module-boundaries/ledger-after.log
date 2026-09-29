@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'security::adapters::tests::native_flow::ledger::native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen' (759795) panicked at crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/ledger.rs:295:9:
+UPDATE admission_operation_native_dispatch_ledger SET canonical_record = CAST('{}' AS BLOB): invalid sqlite authority store: admission operation invariant failed: native security state: urn:chio:error:attest:signed-json-invalid-shape
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test security::adapters::tests::native_flow::ledger::native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen ... FAILED
+
+failures:
+
+failures:
+    security::adapters::tests::native_flow::ledger::native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1178 filtered out; finished in 5.27s
+

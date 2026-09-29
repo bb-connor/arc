@@ -1,0 +1,42 @@
+[
+  {
+    "name": "control-owner-final",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-a1a504b68c12a9ea",
+      "security::",
+      "--skip",
+      "security::adapters::tests::native_flow",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 60.833
+  },
+  {
+    "name": "native-ledger-final",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-a1a504b68c12a9ea",
+      "native_dispatch_ledger_",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "seconds": 40.052
+  },
+  {
+    "name": "sqlite-security-integration",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/security_state-0173038d0b4f4428",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 3.559
+  },
+  {
+    "name": "sqlite-dispatch-integration",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/response_dispatch-dfdfe2a38c4fcaf1",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 3.828
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "chio-control-plane": {
+    "original": 1179,
+    "final": 1180,
+    "removed": {},
+    "added": {
+      "reserved_plan_reconstruction_rejects_rebound_or_corrupt_publication": 1
+    }
+  },
+  "chio-secret-broker": {
+    "original": 181,
+    "final": 181,
+    "removed": {},
+    "added": {}
+  },
+  "chio-store-sqlite": {
+    "original": 1890,
+    "final": 1890,
+    "removed": {},
+    "added": {}
+  },
+  "chio-cage": {
+    "original": 24,
+    "final": 24,
+    "removed": {},
+    "added": {}
+  }
+}

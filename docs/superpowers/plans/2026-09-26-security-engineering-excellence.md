@@ -601,6 +601,14 @@ the Packet 0 baseline, not by file size alone.
 
 Priority is by trust-surface criticality, not line count:
 
+September 29 execution: ranks 1-4 have named module/privacy owners with separate
+mechanical, visibility and formatting commits. The final review additionally
+sealed broker authority results, retained credential custody and reserved
+response-plan construction. See the
+[execution and qualification record](../../reviews/2026-09-29-security-module-boundaries-execution.md).
+Rank 5 and the wider declaration-consolidation queue remain open; the packet-wide
+checkboxes below are not claims that every owner has been completed.
+
 | Rank | Logical module | Logical lines | Why first |
 | --- | --- | --- | --- |
 | 1 | `chio-security-types/src/ports.rs` | 5,033 | Defines the trait boundary every security adapter implements; 4 gate-visible lines |

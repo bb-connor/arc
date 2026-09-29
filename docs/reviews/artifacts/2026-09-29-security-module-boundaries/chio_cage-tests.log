@@ -1,0 +1,23 @@
+
+running 18 tests
+test launch::linux_child_custody_tests::child_reaper_start_failure_reaps_synchronously ... ok
+test launch::platform::seccomp_validation_tests::launch_revalidates_unlisted_constraint_keys ... ignored, requires the native x86_64 compiler boundary
+test launch::linux_child_custody_tests::child_reaper_send_failure_reaps_synchronously ... ok
+test launch::platform::stdio_tests::swapped_live_stdio_descriptors_fail_identity_verification ... ok
+test launch::linux_child_custody_tests::acknowledged_child_reaper_handoff_reaps ... ok
+test launch::platform::tests::helper_identity_control_rejects_same_bytes_different_identity ... ok
+test launch::platform::stdio_tests::swapped_extra_and_missing_stdio_roles_fail_plan_validation ... ok
+test launch::platform::tests::architecture_syscall_tables_cover_reviewed_profiles ... ok
+test launch::platform::tests::required_enforcement_comparison_is_exact ... ok
+test launch::platform::tests::seccomp_control_rejects_forbidden_socket_before_default_deny ... ok
+test linux::tests::path_identity_control_rejects_changed_retained_resource_identity ... ok
+test tests::descriptor_purpose_rejects_unknown_nested_fields ... ok
+test launch::platform::tests::seccomp_rejects_peer_process_authority_in_every_profile ... ok
+test tests::environment_is_minimal_and_credentials_fail_closed ... ok
+test tests::every_syscall_profile_is_default_deny_and_has_no_network_creation ... ok
+test tests::signature_is_verified_before_permissions_are_read ... ok
+test tests::admission_fails_closed_on_unqualified_linux_architecture ... ok
+test launch::linux_child_custody_tests::child_supervisor_retries_sigkill_until_reaped ... ok
+
+test result: ok. 17 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.52s
+

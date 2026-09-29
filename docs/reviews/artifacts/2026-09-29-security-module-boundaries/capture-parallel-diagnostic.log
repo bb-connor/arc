@@ -1,0 +1,23 @@
+
+running 5 tests
+
+thread 'security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_acknowledgement_faults_preserve_committed_accounting' (795903) panicked at crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_test_support.rs:176:42:
+injected native capture panic after commit
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting' (795905) panicked at crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_test_support.rs:268:39:
+injected native capture readback panic after commit
+
+thread 'security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_lost_ack_retains_owned_dpop_without_reclaim' (795904) panicked at crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/acknowledgements.rs:208:5:
+CaptureError, egress=true: Some("guard denied the request: durable admission failed: combined admission capture invariant failed: budget state invariant violated: admission operation invariant failed: native security state: native capture policy before physical commit: admission operation invariant failed: native security state: native dispatch policy is stale or expired")
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_lost_ack_retains_owned_dpop_without_reclaim ... FAILED
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_preserves_original_commit_indices_after_revocation_and_reopen ... ok
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_acknowledgement_faults_preserve_committed_accounting has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting has been running for over 60 seconds
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_witness_rejects_missing_or_substituted_revocation_history ... ok
+
+thread 'security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting' (795905) panicked at crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_test_support.rs:268:39:
+injected native capture readback panic after commit
+test security::adapters::tests::native_flow::support::capture::acknowledgements::native_capture_readback_faults_preserve_committed_accounting ... ok
+
+STOPPED: parallel wall-clock policies expired under debug-profile CPU contention; not a passing suite.

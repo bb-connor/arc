@@ -1,0 +1,25 @@
+[
+  {
+    "name": "broker-review-final",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_secret_broker-266c2b9056f44f66",
+      "--skip",
+      "process_boundary_tests",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 8.821
+  },
+  {
+    "name": "control-review-final",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_control_plane-b5b19522b90f02ce",
+      "security::",
+      "--skip",
+      "security::adapters::tests::native_flow",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 61.955
+  }
+]

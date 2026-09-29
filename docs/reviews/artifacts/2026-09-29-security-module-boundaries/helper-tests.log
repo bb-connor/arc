@@ -1,0 +1,53 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling thiserror-impl v1.0.69
+   Compiling percent-encoding v2.3.2
+   Compiling curve25519-dalek v4.1.3
+   Compiling idna v1.1.0
+   Compiling enumflags2_derive v0.7.12 (/tmp/arc-security-launch/third_party/enumflags2-derive-chio)
+   Compiling thiserror-impl v2.0.18
+   Compiling form_urlencoded v1.2.2
+   Compiling url v2.5.8
+   Compiling enumflags2 v0.7.12
+   Compiling ed25519-dalek v2.2.0
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling seccompiler v0.5.0 (/tmp/arc-security-launch/third_party/seccompiler-chio)
+   Compiling thiserror v1.0.69
+   Compiling thiserror v2.0.18
+   Compiling landlock v0.4.4
+   Compiling nono-chio v0.53.0-chio.3 (/tmp/arc-security-launch/third_party/nono-chio)
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+   Compiling chio-cage-init v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-init)
+    Finished `test` profile [unoptimized] target(s) in 27.51s
+     Running unittests src/lib.rs (target/debug/deps/chio_cage_init-4cf85da275dea5c7)
+
+running 1 test
+test exec::tests::exact_target_argv_is_used_and_mutation_is_rejected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/chio_cage_init-4ef739962059953b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/entrypoint.rs (target/debug/deps/entrypoint-8d4e017b6d76d1d3)
+
+running 1 test
+test standalone_helper_rejects_missing_control_descriptor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

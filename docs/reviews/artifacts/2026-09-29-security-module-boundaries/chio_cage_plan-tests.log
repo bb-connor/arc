@@ -1,0 +1,10 @@
+
+running 5 tests
+test execution_identity::tests::rejects_root_zero_unsorted_duplicate_and_primary_groups ... ok
+test seccomp_plan::tests::construction_rejects_constraints_for_unlisted_syscalls ... ok
+test execution_identity::tests::accepts_bounded_canonical_non_root_identity ... ok
+test seccomp_plan::tests::construction_rejects_unconfined_limits_and_invalid_arguments ... ok
+test seccomp_plan::tests::wire_decode_uses_the_same_plan_validator_and_closed_syscall_keys ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

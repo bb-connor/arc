@@ -41,8 +41,10 @@ The four-owner part of item 2 is implemented and locally qualified in the
 continues with the remaining product/protocol owners. The compiler and
 secret-ownership implementation in item 3 is recorded in the
 [September 29 execution record](2026-09-29-compiler-secret-hardening-execution.md).
-The next distinct implementation package is item 4. This continuation does not
-erase the other queues.
+The four production owners and helper portion of item 4 are implemented in the
+[module-boundary record](2026-09-29-security-module-boundaries-execution.md).
+Kernel test ownership and declaration consolidation remain in item 4. This
+continuation does not erase the other queues.
 
 ### 2. Remaining authority boundaries and rejection semantics
 
@@ -86,16 +88,18 @@ Reference: [hardening spec](../superpowers/specs/2026-09-26-hardening-toolchain-
 
 ### 4. Structural boundaries, helper isolation and declaration ownership
 
-Complete Packet 7's real module/privacy cuts: security ports, broker service,
-SQLite security state, control-plane security composition and kernel tests.
-The first three still use textual includes. Preserve separate mechanical,
-visibility and formatting diffs so behavior changes remain reviewable.
+The September 29 batch converts security ports, broker service, SQLite security
+state and control-plane composition into named module/privacy owners, with
+separate mechanical, visibility and formatting commits. Complete the remaining
+kernel test ownership cut and retain unchanged test inventories.
 
-Split `chio-cage-init` from the broad cage package as H11 requires. Its current
-budget still measures `chio-cage` at a ceiling of 260 packages and records
-network/runtime dependencies as pending removals. Measure the resulting helper
-package and artifact separately, then tighten the budget. Consolidate duplicate
-schema and domain declarations with their owners and canonical fixtures.
+`chio-cage-init` is now a standalone package with a 72-package normal musl graph
+and zero denied dependencies. Shared contracts live in `chio-cage-plan`; the
+parent cage retains supervision. The available aarch64 static artifact is
+measured separately from unperformed native x86_64 enforcement qualification.
+Consolidate duplicate schema and domain declarations with their owners and
+canonical fixtures. Also replace native-flow fixtures' load-sensitive wall clocks
+with one deterministic authority clock before repeating the parallel campaign.
 Prefer one authoritative definition and direct imports over new compatibility
 layers. These broad structural changes remain separately reviewable successor
 work under the existing plan's sequencing.

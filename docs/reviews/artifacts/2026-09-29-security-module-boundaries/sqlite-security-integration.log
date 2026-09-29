@@ -1,0 +1,38 @@
+
+running 33 tests
+test correlation_ingress_orders_due_event_time_ahead_of_a_future_fifo_prefix ... ok
+test correlation_ingress_pending_snapshot_survives_a_concurrent_acknowledgement ... ok
+test concurrent_joins_retain_every_restriction_and_new_sessions_inherit ... ok
+test correlation_ingress_upgrades_the_known_legacy_pending_index ... ok
+test acknowledged_correlation_tombstone_source_binding_corruption_fails_readiness ... ok
+test corrupt_canonical_hash_fails_closed_on_read ... ok
+test egress_dispatch_commitment_is_idempotent_and_immutable ... ok
+test egress_fence_binds_the_canonical_request_hash ... ok
+test egress_fence_rejects_corrupt_flow_state ... ok
+test generation_change_invalidates_an_egress_fence ... ok
+test injected_clock_controls_scheduler_lease_and_overlay_mutations ... ok
+test lineage_change_invalidates_every_principal_context ... ok
+test isolation_epoch_must_be_verified_and_preserves_lineage_taint ... ok
+test lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens ... ok
+test correlation_schema_drift_fails_startup ... ok
+test missing_flow_context_generation_fails_closed ... ok
+test new_lineage_inherits_existing_epoch_and_cannot_bootstrap_a_new_epoch ... ok
+test no_op_shared_label_joins_preserve_sibling_context_integrity ... ok
+test migration_is_idempotent_and_preserves_existing_tables ... ok
+test missing_flow_epoch_or_session_row_fails_closed ... ok
+test overlay_effect_identity_cannot_cross_action_boundaries ... ok
+test response_effect_owner_migration_rejects_unbound_existing_intent ... ok
+test overlapping_overlay_contributions_are_removed_independently ... ok
+test response_effect_generation_migration_preserves_existing_intent ... ok
+test scheduler_retry_health_migration_preserves_age_conservatively ... ok
+test security_state_rejects_ephemeral_sqlite_paths ... ok
+test scheduler_and_effect_reads_verify_canonical_hashes ... ok
+test scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent ... ok
+test session_taint_is_shared_across_lineages_within_an_epoch ... ok
+test session_change_invalidates_same_session_fences_across_lineages ... ok
+test scheduler_takeover_fences_stale_overlay_mutations ... ok
+test verified_event_capacity_and_rule_index_roll_back_as_one_sqlite_transaction ... ok
+test verified_event_correlation_is_durable_and_advisory_events_remain_segregated ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.54s
+

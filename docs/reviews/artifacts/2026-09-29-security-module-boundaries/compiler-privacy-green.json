@@ -1,0 +1,21 @@
+[
+  {
+    "probe": "broker-authorities",
+    "rejected": true,
+    "cargo_exit": 101,
+    "privacy_diagnostics": [
+      "error[E0603]: struct `ValidatedBrokerAuditAuthorities` is private\n   --> crates/security/chio-secret-broker/src/service/ipc.rs:318:74\n    |\n318 | #[allow(dead_code)] fn boundary_probe_audit(value: super::authorization::ValidatedBrokerAuditAuthorities) { let _ = value.validated...\n    |                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private struct\n    |\nnote: the struct `ValidatedBrokerAuditAuthorities` is defined here\n   --> crates/security/chio-secret-broker/src/service/authorization.rs:416:1\n    |\n416 | struct ValidatedBrokerAuditAuthorities {\n    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n",
+      "error[E0616]: field `revocation_set` of struct `ValidatedBrokerAuthorities` is private\n   --> crates/security/chio-secret-broker/src/service/ipc.rs:317:122\n    |\n317 | ...tion::ValidatedBrokerAuthorities) { let _ = value.revocation_set; }\n    |                                                      ^^^^^^^^^^^^^^ private field\n    |\nhelp: a method `revocation_set` also exists, call it with parentheses\n    |\n317 | #[allow(dead_code)] fn boundary_probe_authority(value: super::authorization::ValidatedBrokerAuthorities) { let _ = value.revocation_set(); }\n    |                                                                                                                                        ++\n\n",
+      "error[E0616]: field `validated_at_unix_seconds` of struct `ValidatedBrokerAuditAuthorities` is private\n   --> crates/security/chio-secret-broker/src/service/ipc.rs:318:123\n    |\n318 | ...atedBrokerAuditAuthorities) { let _ = value.validated_at_unix_seconds; }\n    |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^ private field\n\n",
+      "error[E0624]: method `retained_prepared_dispatches` is private\n   --> crates/security/chio-secret-broker/src/service/ipc.rs:319:93\n    |\n319 |   #[allow(dead_code)] fn boundary_probe_secret(service: &super::BrokerService) { drop(service.retained_prepared_dispatches()); }\n    |                                                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private method\n    |\n   ::: crates/security/chio-secret-broker/src/service/custody.rs:28:5\n    |\n 28 | /     fn retained_prepared_dispatches(\n 29 | |         &self,\n 30 | |     ) -> Result<MutexGuard<'_, BTreeMap<String, RetainedPreparedDispatch>>> {\n    | |___________________________________________________________________________- private method defined here\n\n"
+    ]
+  },
+  {
+    "probe": "response-reservation",
+    "rejected": true,
+    "cargo_exit": 101,
+    "privacy_diagnostics": [
+      "error[E0616]: field `admission_artifact_digest` of struct `ReservedAttestedFindingResponsePlan` is private\n    --> crates/platform/chio-control-plane/src/security/event_consumer/coordinator.rs:1025:114\n     |\n1025 | ...eservedAttestedFindingResponsePlan) { value.admission_artifact_digest = None; }\n     |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^ private field\n\n"
+    ]
+  }
+]

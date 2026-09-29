@@ -1,0 +1,146 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+    Finished `test` profile [unoptimized] target(s) in 4m 05s
+     Running unittests src/lib.rs (target/debug/deps/chio_security_types-a7049790367f6634)
+
+running 24 tests
+test clock::tests::authority_expiry_and_skew_boundaries_are_exact ... ok
+test flow::tests::bottom_is_unique_public_label ... ok
+test flow::tests::blank_principal_and_compartment_are_rejected ... ok
+test clock::tests::conversions_never_wrap_or_substitute_epoch_zero ... ok
+test clock::tests::clock_fence_refuses_regression_without_replacing_the_high_water ... ok
+test clock::tests::retries_cannot_extend_authority_when_wall_time_stops ... ok
+test flow::tests::configured_limits_cannot_widen_protocol_limits ... ok
+test flow::tests::borrowed_identifier_is_validated_before_owned_allocation ... ok
+test declassification::tests::validated_body_round_trips_strictly ... ok
+test declassification::tests::invalid_time_and_top_target_reject_before_signing ... ok
+test flow::tests::configured_cardinality_overflow_is_rejected ... ok
+test flow::tests::information_label_order_rejects_reversed_readers_and_partial_constraints ... ok
+test flow::tests::known_and_top_canonical_vectors_round_trip ... ok
+test flow::tests::noncanonical_input_normalizes_to_identical_canonical_bytes ... ok
+test flow::tests::owner_must_be_its_own_reader ... ok
+test flow::tests::unknown_and_variant_payload_fields_are_rejected ... ok
+test flow::tests::duplicate_reader_and_compartment_values_are_rejected ... ok
+test flow::tests::duplicate_owner_json_is_rejected ... ok
+test flow::tests::tool_flow_declaration_is_strict_and_canonical ... ok
+test flow::tests::information_label_schema_positive_and_negative_vectors ... ok
+test flow::tests::internal_control_identifier_is_rejected_by_schema_and_runtime ... ok
+test flow::tests::c1_control_identifier_is_rejected_by_schema_and_runtime ... ok
+test flow::tests::utf8_identifier_limit_is_normative_in_bytes ... ok
+test flow::tests::schema_and_runtime_enforce_every_default_cardinality_bound ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/capability_set_suspension.rs (target/debug/deps/capability_set_suspension-799b6128477bba93)
+
+running 4 tests
+test affected_set_commitment_uses_canonical_object_key_order ... ok
+test affected_set_commitment_binds_tenant_order_and_membership ... ok
+test wrong_set_contribution_and_noncanonical_snapshot_fail_closed ... ok
+test effect_scoped_contributions_compose_and_remove_out_of_order ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/egress_restriction.rs (target/debug/deps/egress_restriction-c310697fab351c4b)
+
+running 2 tests
+test egress_overlay_contracts_bind_session_effect_ttl_and_fence ... ok
+test destination_set_requires_nonempty_strict_canonical_order ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/event.rs (target/debug/deps/event-9be7945587a1f372)
+
+running 3 tests
+test correlated_finding_preserves_event_to_source_receipt_cardinality_and_order ... ok
+test event_constructor_enforces_time_and_evidence_bounds ... ok
+test portable_event_and_finding_reject_unknown_or_inconsistent_shapes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/issuance_freeze.rs (target/debug/deps/issuance_freeze-5243eb63219cd752)
+
+running 4 tests
+test snapshot_order_and_admission_operation_shapes_are_closed ... ok
+test installed_identity_survives_bounded_external_lease_renewal_and_takeover ... ok
+test external_fence_and_exact_set_rebinding_fail_validation ... ok
+test overlapping_freezes_are_effect_scoped_and_remove_out_of_order ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ports_compile.rs (target/debug/deps/ports_compile-b4570fdc81ada2a9)
+
+running 7 tests
+test identifiers_reject_noncanonical_decoding ... ok
+test authoritative_record_sets_are_strictly_sorted_and_unique ... ok
+test bounded_collections_reject_excess_items ... ok
+test one_fake_can_satisfy_every_port_contract ... ok
+test canonical_bodies_enforce_the_protocol_byte_ceiling ... ok
+test strict_port_shapes_reject_unknown_fields ... ok
+test port_errors_preserve_the_failure_class ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/response.rs (target/debug/deps/response-01b41766daa3c54a)
+
+running 16 tests
+test execution_binding_rejects_unsupported_wire_versions ... ok
+test execution_binding_preserves_its_closed_wire_shape ... ok
+test permanent_revocation_is_not_a_reversible_effect_kind ... ok
+test response_targets_and_mutation_records_reject_unknown_fields ... ok
+test response_plan_rejects_zero_cryptographic_commitments ... ok
+test response_transition_matrix_contains_only_the_specified_edges ... ok
+test prepared_dispatch_binding_is_strict_and_plan_bound ... ok
+test response_execution_binding_is_preserved_in_authorization ... ok
+test execution_binding_rejection_carries_the_compared_versions ... ok
+test response_plans_and_authorization_require_explicit_execution ... ok
+test live_execution_rules_name_the_binding_that_refused ... ok
+test prepared_dispatch_binding_rejects_unknown_serialized_fields ... ok
+test fresh_live_admission_refuses_simulated_plans ... ok
+test mutation_capacity_reserves_the_complete_sixty_four_effect_lifecycle ... ok
+test mutation_capacity_accepts_the_exact_bound_and_rejects_one_more ... ok
+test mutation_capacity_tracks_rollback_failure_and_retry_boundaries ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/response_dispatch.rs (target/debug/deps/response_dispatch-e36a9a5540bbda2e)
+
+running 4 tests
+test dispatch_lease_and_load_outcome_are_explicit ... ok
+test dispatch_recovery_binds_the_exact_action_and_fencing_observation ... ok
+test execution_dispatch_binding_rejects_zero_and_mismatched_authority_fields ... ok
+test dispatch_authorization_binds_every_security_identity ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/session_throttle.rs (target/debug/deps/session_throttle-3e7de0d7da9a86e7)
+
+running 3 tests
+test limits_are_nonzero_and_bounded ... ok
+test window_identity_is_aligned_deterministic_and_effect_scoped ... ok
+test versions_bind_each_independent_contribution_and_out_of_order_removal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_security_types
+
+running 3 tests
+test crates/security/chio-security-types/src/response_execution.rs - response_execution::FreshLiveAdmission (line 107) - compile fail ... ok
+test crates/security/chio-security-types/src/response_execution.rs - response_execution::ResponseExecutionBinding (line 27) - compile fail ... ok
+test crates/security/chio-security-types/src/clock.rs - clock::MonotonicInstant (line 56) - compile fail ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+

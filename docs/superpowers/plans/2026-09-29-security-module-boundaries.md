@@ -33,10 +33,10 @@
 
 **Interfaces:** Preserve the public `ports::*` API and no-std support; move private validation and commitment helpers into their responsible modules.
 
-- [ ] Capture existing inventory and declaration boundaries; relocate complete Rust items without logic changes.
-- [ ] Restrict construction and helper visibility; keep public reexports explicit.
-- [ ] Run security-types unit/integration tests and no-default-features check. Expected: passing, unchanged test inventory.
-- [ ] Commit mechanical relocation, privacy, and formatting separately.
+- [x] Capture existing inventory and declaration boundaries; relocate complete Rust items without logic changes.
+- [x] Restrict construction and helper visibility; keep public reexports explicit.
+- [x] Run security-types unit/integration tests and no-default-features check. Expected: passing, unchanged test inventory.
+- [x] Commit mechanical relocation, privacy, and formatting separately.
 
 ### Task 2: Broker service
 
@@ -44,10 +44,10 @@
 
 **Interfaces:** Preserve `BrokerService`, IPC framing, bounded zeroizing parsing, prepared dispatch and durable failure projections. Do not expose secret-bearing fields beyond their owner.
 
-- [ ] Relocate complete items and tests, retaining typed rejection and absolute-deadline behavior.
-- [ ] Restrict internal helpers to service or IPC ownership and retain private parser state.
-- [ ] Run broker unit tests excluding the separately qualified process campaign; explicitly exercise wire, authority-time, prepared IPC, and deadline cases. Expected: passing inventory and no secret ownership regression.
-- [ ] Commit relocation, privacy, and formatting separately.
+- [x] Relocate complete items and tests, retaining typed rejection and absolute-deadline behavior.
+- [x] Restrict internal helpers to service or IPC ownership and retain private parser state.
+- [x] Run broker unit tests excluding the separately qualified process campaign; explicitly exercise wire, authority-time, prepared IPC, and deadline cases. Expected: passing inventory and no secret ownership regression.
+- [x] Commit relocation, privacy, and formatting separately.
 
 ### Task 3: SQLite security state
 
@@ -55,10 +55,10 @@
 
 **Interfaces:** Preserve `SqliteSecurityStateStore` and existing native transaction adapters. Keep connections and lifecycle custody private to security state.
 
-- [ ] Move declarations and implementations into their responsibility owners; preserve SQL and integrity checks byte-for-byte.
-- [ ] Restrict sibling access through `pub(super)` and narrow explicit exports.
-- [ ] Run SQLite security-state, native flow, response, correlation, deadline, and retention owner tests. Expected: passing, unchanged test inventory.
-- [ ] Commit relocation, privacy, and formatting separately.
+- [x] Move declarations and implementations into their responsibility owners; preserve SQL and integrity checks byte-for-byte.
+- [x] Restrict sibling access through `pub(super)` and narrow explicit exports.
+- [x] Run SQLite security-state, native flow, response, correlation, deadline, and retention owner tests. Expected: passing, unchanged test inventory.
+- [x] Commit relocation, privacy, and formatting separately.
 
 ### Task 4: Control-plane security composition
 
@@ -66,10 +66,10 @@
 
 **Interfaces:** Preserve existing production adapter and orchestrator APIs, effect ownership, admission checks, and committed recovery.
 
-- [ ] Cut implementation and test support into named modules, update imports and narrowly scoped test fixtures.
-- [ ] Minimize visibility and remove obsolete fragments.
-- [ ] Run the control-plane security owner tests and strict Clippy for all four changed owners. Expected: passing, no dropped tests.
-- [ ] Ratchet hygiene and commit relocation, privacy, and formatting independently.
+- [x] Cut implementation and test support into named modules, update imports and narrowly scoped test fixtures.
+- [x] Minimize visibility and remove obsolete fragments.
+- [x] Run the control-plane security owner tests and strict Clippy for all four changed owners. Expected: passing, no dropped tests.
+- [x] Ratchet hygiene and commit relocation, privacy, and formatting independently.
 
 ### Task 5: Minimal confinement helper
 
@@ -77,13 +77,20 @@
 
 **Interfaces:** One shared plan/launch/status wire contract and validation implementation. Parent owns launch supervision, child owns bootstrap and confinement. Preserve executable name `chio-cage-init`.
 
-- [ ] Extract helper contracts and child bootstrap; remove the broad cage binary and bootstrap export.
-- [ ] Update all helper recipes and test binary discovery to the new package.
-- [ ] Measure normal musl graph, set exact ceiling, retire pending dependencies into denials; document the required JSON codec exception.
-- [ ] Run gate self-tests including denied-dependency injection, cage/init tests and host compile checks, and measure available helper artifact linkage. Expected: focused checks pass; graph contains no denied dependency.
-- [ ] Record native x86_64 enforcement limitations separately from host compile/test evidence.
+- [x] Extract helper contracts and child bootstrap; remove the broad cage binary and bootstrap export.
+- [x] Update all helper recipes and test binary discovery to the new package.
+- [x] Measure normal musl graph, set exact ceiling, retire pending dependencies into denials; document the required JSON codec exception.
+- [x] Run gate self-tests including denied-dependency injection, cage/init tests and host compile checks, and measure available helper artifact linkage. Expected: focused checks pass; graph contains no denied dependency.
+- [x] Record native x86_64 enforcement limitations separately from host compile/test evidence.
 
 ### Completion
 
-- [ ] One fresh whole-batch review, one fix pass if needed, final focused verification.
-- [ ] Record each task's result, evidence, scope rulings, and next batch in a committed execution report.
+- [x] One fresh whole-batch review, one fix pass if needed, final focused verification.
+- [x] Record each task's result, evidence, scope rulings, and next batch in a committed execution report.
+
+
+Completion evidence: [execution record](../../reviews/2026-09-29-security-module-boundaries-execution.md).
+The control-plane qualification uses the focused owner selection, three native
+ledger cases and exact compiler privacy probes. The slow parallel native-flow
+campaign remains explicitly unqualified after its diagnosed wall-clock expiry;
+no full-workspace, native x86 or hosted acceptance is inferred from this batch.

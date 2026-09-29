@@ -1,0 +1,14 @@
+[
+  {
+    "probe": "broker-authorities",
+    "rejected": false,
+    "cargo_exit": 0,
+    "privacy_diagnostics": []
+  },
+  {
+    "probe": "response-reservation",
+    "rejected": false,
+    "cargo_exit": 0,
+    "privacy_diagnostics": []
+  }
+]

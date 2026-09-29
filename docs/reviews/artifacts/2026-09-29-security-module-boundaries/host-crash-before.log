@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'security::active_defense_host_tests::dropping_after_primary_worker_crash_recovers_and_lifts_a_ttl_overlay' (799262) panicked at crates/platform/chio-control-plane/src/security/active_defense_host_tests.rs:1173:25:
+primary worker did not crash
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test security::active_defense_host_tests::dropping_after_primary_worker_crash_recovers_and_lifts_a_ttl_overlay ... FAILED
+
+failures:
+
+failures:
+    security::active_defense_host_tests::dropping_after_primary_worker_crash_recovers_and_lifts_a_ttl_overlay
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1178 filtered out; finished in 31.60s
+

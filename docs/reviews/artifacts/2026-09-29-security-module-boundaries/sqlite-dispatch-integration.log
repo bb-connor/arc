@@ -1,0 +1,36 @@
+
+running 31 tests
+test automatic_dispatch_fence_rejects_alternate_id_for_same_action ... ok
+test automatic_dispatch_commit_wins_before_fence ... ok
+test automatic_dispatch_fence_retry_recovers_after_persisted_result_is_lost ... ok
+test automatic_dispatch_fence_wins_before_commit ... ok
+test automatic_dispatch_fence_retry_rejects_corrupt_persisted_hash ... ok
+test automatic_dispatch_fences_are_tenant_independent ... ok
+test delayed_scheduler_renewal_and_retry_replays_remain_idempotent ... ok
+test dispatch_readiness_rejects_a_corrupt_schema ... ok
+test dispatch_readiness_rejects_canonical_but_invalid_fence_binding ... ok
+test dispatch_recovery_rejects_non_due_work_without_a_live_lease ... ok
+test durable_commit_winner_survives_simultaneous_two_handle_retries ... ok
+test earlier_renewal_replay_returns_the_current_successor_lease ... ok
+test durable_fence_winner_survives_simultaneous_two_handle_retries ... ok
+test empty_scheduler_claim_replay_rejects_corrupt_commit_time ... ok
+test exact_claim_replay_returns_the_current_renewed_lease ... ok
+test live_dispatch_recovery_rejects_unfenced_wrong_owner_and_stale_fencing_token ... ok
+test historical_governed_commit_is_unclaimable_until_zero_effect_terminalization ... ok
+test load_dispatch_reports_missing_explicitly ... ok
+test response_receipt_cursor_is_plan_bound_and_exactly_cas_idempotent ... ok
+test atomic_dispatch_is_idempotent_bound_and_recoverable_after_crash ... ok
+test scheduler_lease::corrupt_scheduler_lease_expiry_blocks_validation_effect_renew_retry_and_release ... ok
+test scheduler_lease::scheduler_claim_replay_rejects_a_missing_claim_row ... ok
+test scheduler_lease::scheduler_claim_replay_rejects_corrupt_lease_provenance ... ok
+test scheduler_lease::scheduler_renewal_replay_rejects_corrupt_lease_provenance ... ok
+test scheduled_response_cas_sequences_one_fence_and_rejects_forged_mutation_fences ... ok
+test scheduler_lease_body_hash_covers_dispatch_and_takeover_origins ... ok
+test simultaneous_two_handle_commit_and_fence_preserve_durable_exclusivity ... ok
+test superseded_retry_replay_returns_a_stale_conflict ... ok
+test scheduler_lease::terminal_response_work_rejects_scheduler_lease_renewal ... ok
+test tenant_isolation::exact_dispatch_id_cannot_cross_tenants_after_restart ... ok
+test exact_dispatch_recovery_is_live_idempotent_and_fenced_after_restart ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.80s
+
