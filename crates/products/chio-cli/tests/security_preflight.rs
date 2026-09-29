@@ -42,7 +42,8 @@ fn provision(root: &Path) -> Provision {
     let output = Command::new(chio())
         .args(["security", "provision-native-mcp-demo", "--output-dir"])
         .arg(&directory)
-        .arg("--discover-tools")
+        .arg("--tools-fixture")
+        .arg(conformance_fixture("reviewed-tools.json"))
         .arg("--target")
         .arg(python3())
         .arg("--target-arg")
@@ -178,7 +179,7 @@ fn inactive_provisioned_launch_is_always_refused() {
 }
 
 #[test]
-fn an_unbound_wrapped_command_is_refused_before_the_launch() {
+fn inactive_policy_cannot_authorize_a_different_wrapped_command() {
     let temporary = tempfile::tempdir().expect("create test directory");
     let root = temporary
         .path()
@@ -197,7 +198,7 @@ fn an_unbound_wrapped_command_is_refused_before_the_launch() {
     assert!(launch["message"]
         .as_str()
         .expect("launch message")
-        .contains("would refuse this launch"));
+        .contains("requires an enforced migration stage"));
     assert_eq!(context(launch, "launch"), "refused");
 }
 

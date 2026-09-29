@@ -78,8 +78,8 @@ inventory, not Rust macro expansion or a semantic proof of all network effects.
 | C25 | `bench/chio-loadgen/src/stack.rs::StackHarness::boot_inner` | Load harness | Configured benchmark stack, not production authority |
 | C26 | `crates/protocol/chio-mcp-edge/src/fuzz.rs::make_kernel` | Fuzz harness | Adversarial parser/edge input; not production authority |
 | C27 | `crates/protocol/chio-acp-edge/src/fuzz.rs::make_kernel` | Fuzz harness | Adversarial parser/edge input; not production authority |
-| C28 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs::open_kernel` | Included test fixture | Included by native-flow tests under `cfg(test)`; M3 native host acceptance fixture |
-| C29 | `crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc::build_real_adapter_runtime` | Included test fixture | Event-consumer test composition; not a separate public factory |
+| C28 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs::open_kernel` (retired physical production-site entry) | Included test fixture | Included by native-flow tests under `cfg(test)`; M3 native host acceptance fixture |
+| C29 | `crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter.rs::build_real_adapter_runtime` (retired physical production-site entry) | Included test fixture | Event-consumer test composition; not a separate public factory |
 | C30 | `crates/products/chio-cli/src/cli/process_host/state.rs::kernel` | Durable process host factory | Process host, crash/recovery, nonce-custody and run/call-evidence gates; native deployment also requires its configured cage/broker authorities |
 | C31 | `examples/rust-runtime-consumer/src/main.rs::open` | Offline Rust embedding example | The standalone consumer in [Rust preview packages](rust-preview-packages.md) runs allowed and denied calls, verifies receipts and checks one effect after process restart. Fixed demonstration identity, ephemeral transparency/revocation stores; no production deployment claim |
 
@@ -88,7 +88,8 @@ Remote construction is gated by the public factory's
 `remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition`
 test first failed because the unsupported profile was accepted. The fix rejects
 from the verified registry before launch preparation or store acquisition. The
-same test requires a valid unconstrained factory and nonzero launch preparation.
+same test requires unconstrained manifests to reach exactly one native launch
+preparation attempt; the test factory refuses authority and no stores are acquired.
 The initial 59 remote-MCP library tests passed in
 `/tmp/chio-m4-remote-startup-fixed.log`. This is local component evidence, not
 exact-candidate hosted qualification. The retained-profile restore regression
@@ -362,10 +363,10 @@ separate requirements; this table alone does not qualify a deployment.
 | D043-D044 | `crates/kernel/chio-kernel/src/provider_verdict.rs` | Provider mediated verdict boundary | P01, M1-M3 and flow gates |
 | D045 | `crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs` | Benchmark harness, not deployment authority | C23-C25 |
 | D046 | `crates/kernel/chio-runtime-harness/src/kernel.rs` | Deterministic loopback proof harness | C16, harness and proof CLI |
-| D047 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_process_races.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
-| D048 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
-| D049-D050 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
-| D051-D052 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
+| D047 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery/races.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
+| D048 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
+| D049-D050 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery/restart.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
+| D051-D052 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
 | D053 | `crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs` | Configured operator purchase host | C17/P10, domain authority and recovery tests |
 | D054 | `crates/platform/chio-http-core/src/authority.rs` | HTTP authorization kernel host | C06-C07/P06, HTTP authority tests |
 | D055 | `crates/products/chio-api-protect/src/proxy/mediated.rs` | Authenticated caller control and retained report | P07, exact M3 dependency gate |
@@ -384,5 +385,16 @@ separate requirements; this table alone does not qualify a deployment.
 | D083-D084 | `crates/kernel/chio-kernel/src/provider_verdict.rs` | Provider verdict APIs retain verified registry and optional host security context | P06, provider lowering and missing/forged-sidecar cases |
 | D085-D086 | `crates/products/chio-api-protect/src/proxy/mediated.rs` | Mediated reservation endpoint, never execution permission | P07, API-protect caller and M3 dependency gates |
 | D087, D089 | `crates/kernel/chio-process/src/lib.rs::ProcessRuntime::invoke_with_recovery` | Original operation/request and ancestor capability binding; optional trusted security context is refreshed before kernel evaluation | C30, `host_flow_identity_is_bound_to_the_original_process_operation`, nonce and crash/recovery gates |
-| D088 | `crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs::caller_lookup_waits_for_original_coordinator` | Included reconciliation fixture | P01/P07, native process restart and exact M3 dependency gate |
+| D088 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery/restart.rs::caller_lookup_waits_for_original_coordinator` | Included reconciliation fixture | P01/P07, native process restart and exact M3 dependency gate |
 | D090-D091 | `examples/rust-runtime-consumer/src/main.rs::{initial,recover}` | Two initial kernel calls (allow/deny) and original-outcome recovery | C31, offline Rust package consumer with independently counted effect |
+
+The September 29 enforced-native batch teaches the constructor inventory to
+recognize `new_*` constructors, including injected clocks and function pointers.
+C16 now records `ChioKernel::new_with_clock`. C28/C29 and D047-D052/D088 moved
+into explicitly test-owned directories in the preceding module work; their
+production-source inventory entries are retired, with runtime fixtures retained.
+Native provisioning discovery is now an explicit no-bypass scan root. The
+removed uncaged child no longer has a production supervision exception. The
+launch gate checks top-level migration rejection, process release, evidence
+validation, receipt persistence and transport construction in order; its
+mutation calibration removes, weakens and reorders those phases.

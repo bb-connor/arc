@@ -149,7 +149,7 @@ references = 1
 id = "C16"
 path = "crates/kernel/chio-runtime-harness/src/kernel.rs"
 symbol = "execute_runtime_loopback_step"
-target = "ChioKernel::new"
+target = "ChioKernel::new_with_clock"
 references = 1
 
 [[constructor_sites]]
@@ -226,20 +226,6 @@ references = 1
 id = "C27"
 path = "crates/protocol/chio-acp-edge/src/fuzz.rs"
 symbol = "make_kernel"
-target = "ChioKernel::new"
-references = 1
-
-[[constructor_sites]]
-id = "C28"
-path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs"
-symbol = "open_kernel"
-target = "ChioKernel::new"
-references = 1
-
-[[constructor_sites]]
-id = "C29"
-path = "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc"
-symbol = "build_real_adapter_runtime"
 target = "ChioKernel::new"
 references = 1
 
@@ -569,48 +555,6 @@ target = ".evaluate_tool_call_with_metadata"
 references = 1
 
 [[dispatch_sites]]
-id = "D047"
-path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_races.rs"
-symbol = "race"
-target = ".evaluate_tool_call_blocking_with_security_context"
-references = 4
-
-[[dispatch_sites]]
-id = "D048"
-path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs"
-symbol = "run_child"
-target = ".evaluate_tool_call_blocking_with_security_context"
-references = 1
-
-[[dispatch_sites]]
-id = "D049"
-path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs"
-symbol = "verify"
-target = ".evaluate_tool_call_blocking_with_security_context"
-references = 2
-
-[[dispatch_sites]]
-id = "D050"
-path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs"
-symbol = "verify"
-target = ".reconcile_caller_execution_blocking"
-references = 1
-
-[[dispatch_sites]]
-id = "D051"
-path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs"
-symbol = "Fixture::deny_native"
-target = ".evaluate_tool_call_blocking_with_security_context"
-references = 1
-
-[[dispatch_sites]]
-id = "D052"
-path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs"
-symbol = "Fixture::run_policy"
-target = ".evaluate_tool_call_blocking_with_security_context"
-references = 1
-
-[[dispatch_sites]]
 id = "D053"
 path = "crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs"
 symbol = "FindingOperatorPurchaseExecutor::execute_new"
@@ -860,14 +804,6 @@ id = "D087"
 path = "crates/kernel/chio-process/src/lib.rs"
 symbol = "ProcessRuntime::invoke_with_recovery"
 target = ".evaluate_tool_call_with_metadata"
-references = 1
-
-# Test-only late-caller calibration uses the existing mediated reconciliation API.
-[[dispatch_sites]]
-id = "D088"
-path = "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_restart.rs"
-symbol = "caller_lookup_waits_for_original_coordinator"
-target = ".reconcile_caller_execution_blocking"
 references = 1
 
 [[constructor_sites]]

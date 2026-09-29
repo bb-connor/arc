@@ -225,9 +225,9 @@ impl<'ast> Visit<'ast> for ConstructorVisitor {
             .last()
             .is_some_and(|name| FACTORIES.contains(&name.as_str()) || is_dispatch_entry(name))
             || (names.iter().any(|name| name == "ChioKernel")
-                && names
-                    .last()
-                    .is_some_and(|name| matches!(name.as_str(), "new" | "default")))
+                && names.last().is_some_and(|name| {
+                    matches!(name.as_str(), "new" | "default") || name.starts_with("new_")
+                }))
         {
             *self
                 .references
@@ -319,6 +319,19 @@ mod tests {
                 .references
                 .get(&("outer::nested".to_string(), "build_kernel".to_string())),
             Some(&1)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn injected_clock_constructors_and_function_pointers_are_inventoried() -> Result<(), syn::Error>
+    {
+        let visitor = inspect("fn host() { let factory = ChioKernel::new_with_clock; ChioKernel::new_with_clock(config, clock); }")?;
+        assert_eq!(
+            visitor
+                .references
+                .get(&("host".into(), "ChioKernel::new_with_clock".into())),
+            Some(&2)
         );
         Ok(())
     }

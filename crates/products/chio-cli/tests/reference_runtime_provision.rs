@@ -824,11 +824,22 @@ fn shadow_discovery_refuses_before_executing_the_target() {
         .arg(&fixture.target)
         .arg("--target-arg")
         .arg(&marker)
-        .args(["--execution-uid", "10001", "--execution-gid", "10001"])
+        .args([
+            "--execution-uid",
+            "10001",
+            "--execution-gid",
+            "10001",
+            "--server-id",
+            "shadow-discovery-reader",
+        ])
         .output()
         .expect("run shadow discovery");
     assert!(!rejected.status.success());
-    assert!(stderr(&rejected).contains("live MCP discovery requires an enforced migration stage"));
+    assert!(
+        stderr(&rejected).contains("live MCP discovery requires an enforced migration stage"),
+        "{}",
+        stderr(&rejected)
+    );
     assert!(!marker.exists());
     assert!(!output.exists());
 }

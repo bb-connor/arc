@@ -17,8 +17,6 @@ mod source;
 const SOURCE_INVENTORY_PATH: &str = "formal/adapter-source-inventory.toml";
 const MCP_LAUNCH_SOURCE: &str =
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc";
-const MCP_LIFECYCLE_SOURCE: &str =
-    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -64,6 +62,7 @@ struct CallFact {
 #[derive(Clone, Debug)]
 struct FunctionFacts {
     compatibility_surface: bool,
+    statements: Vec<String>,
     calls: Vec<CallFact>,
     paths: BTreeSet<String>,
     binaries: Vec<String>,
@@ -108,11 +107,6 @@ const EXCEPTION_RULES: &[ExceptionRule] = &[
         MCP_LAUNCH_SOURCE,
         "StdioMcpTransport::from_launched_process",
         "std::thread::Builder::new().name(\"chio-mcp-child\".to_string())",
-    ),
-    mcp_thread_rule(
-        MCP_LIFECYCLE_SOURCE,
-        "detach_legacy_child_reaper",
-        "std::thread::Builder::new().name(\"chio-mcp-legacy-reaper\".to_string())",
     ),
     ExceptionRule {
         path: "crates/protocol/chio-acp-proxy/src/transport.rs",
@@ -479,18 +473,44 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
 }
 
 fn require_native_launch_gate(source: &SourceFacts) -> Result<(), String> {
-    require_call_tokens(
-        source,
-        "StdioMcpTransport::spawn_legacy_authorized",
-        "Self::spawn_legacy_with_gate_and_timeouts",
-        &["||authorization.revalidate()"],
-    )?;
-    require_call_tokens(
-        source,
-        "StdioMcpTransport::spawn_legacy_with_gate_and_timeouts",
-        "dispatch_native_launch",
-        &["NativeLaunchRequirement::LegacyAllowed,||{prelaunch()?;child_command.spawn()"],
-    )
+    let function = "StdioMcpTransport::spawn_with_timeouts";
+    let facts = source
+        .functions
+        .get(function)
+        .ok_or_else(|| format!("native launch function missing: {function}"))?;
+    // These are source-shape obligations, backed by the owning runtime tests.
+    // Each phase must be a top-level statement in this order. A guard hidden
+    // in a closure or after process release cannot satisfy the contract.
+    let phases = [
+        (
+            "ifletErr(error)=validate_cage_migration_identity(&server_id,&migration).and_then(|()|{migration.require_enforced().map_err(",
+            "returnErr(merge_cleanup_failures(error,",
+        ),
+        (
+            "letlaunch_result=chio_cage::launch_prepared(prepared,launch_options);",
+            "",
+        ),
+        (
+            "ifletErr(error)=validate_cage_evidence(child.evidence(),&expected){",
+            "returnErr(fail_caged_child(",
+        ),
+        (
+            "matchcage_receipts.persistence.persist(",
+            "Err(error)=>returnErr(fail_caged_child(error,child,&cage_receipts,None))",
+        ),
+        ("lettransport=Self::from_launched_process(", ""),
+    ];
+    let mut statements = facts.statements.iter();
+    for (prefix, required) in phases {
+        if !statements
+            .any(|statement| statement.starts_with(prefix) && statement.contains(required))
+        {
+            return Err(format!(
+                "native launch phase missing, reordered, or not fail-closed: {function}::{prefix}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn load_source_inventory(root: &Path) -> Result<SourceInventory, String> {
@@ -768,6 +788,7 @@ impl FunctionVisitor {
                 compatibility_surface: attrs.iter().any(|attribute| {
                     normalize_tokens(attribute).contains("feature=\"compatibility-surface\"")
                 }),
+                statements: block.stmts.iter().map(normalize_tokens).collect(),
                 calls: body.calls,
                 paths: body.paths,
                 binaries: body.binaries,
@@ -1034,44 +1055,69 @@ mod tests {
     #[test]
     fn supervision_thread_exception_does_not_authorize_a_process_launch_in_its_closure() {
         let safe = r#"
-            fn detach_legacy_child_reaper(mut child: Child) {
-                std::thread::Builder::new().name("chio-mcp-legacy-reaper".to_string())
-                    .spawn(move || { child.wait(); });
+            impl StdioMcpTransport {
+                fn from_launched_process(mut child: Child) {
+                    std::thread::Builder::new().name("chio-mcp-child".to_string())
+                        .spawn(move || { child.wait(); });
+                }
             }
         "#;
-        assert!(validate_fixture(MCP_LIFECYCLE_SOURCE, safe).is_ok());
+        assert!(validate_fixture(MCP_LAUNCH_SOURCE, safe).is_ok());
         let unsafe_source = safe.replace("child.wait();", "Command::new(\"tool\").spawn();");
-        assert!(validate_fixture(MCP_LIFECYCLE_SOURCE, &unsafe_source).is_err());
+        assert!(validate_fixture(MCP_LAUNCH_SOURCE, &unsafe_source).is_err());
     }
 
     #[test]
-    fn native_launch_gate_must_propagate_reauthorization_before_spawning() -> Result<(), String> {
+    fn native_launch_gate_requires_authority_evidence_and_receipts_in_order() -> Result<(), String>
+    {
         let safe = r#"
             impl StdioMcpTransport {
-                fn spawn_legacy_authorized() {
-                    Self::spawn_legacy_with_gate_and_timeouts(
-                        command, args, || authorization.revalidate(), request_timeouts)?;
-                }
-                fn spawn_legacy_with_gate_and_timeouts() {
-                    dispatch_native_launch(NativeLaunchRequirement::LegacyAllowed,
-                        || { prelaunch()?; child_command.spawn() }, || Err(error))?;
+                fn spawn_with_timeouts() {
+                    if let Err(error) = validate_cage_migration_identity(&server_id, &migration)
+                        .and_then(|()| { migration.require_enforced().map_err(convert) }) {
+                        return Err(merge_cleanup_failures(error, []));
+                    }
+                    let launch_result = chio_cage::launch_prepared(prepared, launch_options);
+                    if let Err(error) = validate_cage_evidence(child.evidence(), &expected) {
+                        return Err(fail_caged_child(error, child, &cage_receipts, None));
+                    }
+                    match cage_receipts.persistence.persist(record) {
+                        Ok(receipt) => cage_receipts.enforcement_receipt = Some(receipt),
+                        Err(error) => return Err(fail_caged_child(error, child, &cage_receipts, None)),
+                    }
+                    let transport = Self::from_launched_process(child)?;
                 }
             }
         "#;
         require_native_launch_gate(&parse_source(safe, MCP_LAUNCH_SOURCE)?)?;
         for (from, to) in [
-            ("prelaunch()?;", "let _ = prelaunch();"),
+            ("migration.require_enforced()", "Ok(())"),
+            ("validate_cage_migration_identity", "ignore_migration_identity"),
+            ("return Err(merge_cleanup_failures", "let _ = Err(merge_cleanup_failures"),
+            ("validate_cage_evidence", "ignore_cage_evidence"),
+            ("return Err(fail_caged_child", "let _ = Err(fail_caged_child"),
+            ("cage_receipts.persistence.persist", "skip_persistence"),
             (
-                "prelaunch()?; child_command.spawn()",
-                "child_command.spawn()?; prelaunch()",
+                "Err(error) => return Err(fail_caged_child(error, child, &cage_receipts, None)),",
+                "Err(error) => ignore_persistence_failure(error),",
             ),
-            ("authorization.revalidate()", "Ok(())"),
+            (
+                "let launch_result = chio_cage::launch_prepared(prepared, launch_options);",
+                "let launch_result = (|| { chio_cage::launch_prepared(prepared, launch_options) })();",
+            ),
         ] {
-            let mutated = safe.replace(from, to);
+            let mutated = safe.replacen(from, to, 1);
             assert_ne!(safe, mutated);
             let facts = parse_source(&mutated, MCP_LAUNCH_SOURCE)?;
             assert!(require_native_launch_gate(&facts).is_err(), "{mutated}");
         }
+        let mut reordered = parse_source(safe, MCP_LAUNCH_SOURCE)?;
+        let function = reordered
+            .functions
+            .get_mut("StdioMcpTransport::spawn_with_timeouts")
+            .ok_or_else(|| "missing fixture launch".to_string())?;
+        function.statements.swap(0, 1);
+        assert!(require_native_launch_gate(&reordered).is_err());
         Ok(())
     }
 
