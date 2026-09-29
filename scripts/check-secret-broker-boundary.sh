@@ -208,18 +208,18 @@ run_tests "authority IPC signed response binding" yes \
   authority_ipc::tests::authority_rpc_requires_signed_exact_responses_and_full_capabilities
 
 run_tests "authority RPC completion time and audit binding" yes "$(cat <<'EOF'
-service::tests::authority_rpc_completion_rejects_future_expired_and_unavailable_time
-service::tests::authority_rpc_completion_time_is_bound_into_independently_verified_audit
-service::tests::authority_rpc_completion_uses_current_trusted_time
+service::tests::authority_time::authority_rpc_completion_rejects_future_expired_and_unavailable_time
+service::tests::authority_time::authority_rpc_completion_time_is_bound_into_independently_verified_audit
+service::tests::authority_time::authority_rpc_completion_uses_current_trusted_time
 EOF
 )" cargo test --locked -p chio-secret-broker --lib authority_rpc_completion_
 
 if [[ "$(uname -s)" == "Linux" ]]; then
   run_tests "prepared broker descriptor binding and deadlines" yes "$(cat <<'EOF'
-service::tests::prepared_connection_tests::prepared_connection_expiry_eof_and_trickle_release_capacity
-service::tests::prepared_connection_tests::prepared_connection_lifetime_respects_capability_and_nonce_expiry
-service::tests::prepared_connection_tests::prepared_connection_rejects_unauthorized_capacity_and_substituted_frames
-service::tests::prepared_connection_tests::prepared_connection_waits_without_blocking_control_and_executes_once
+service::ipc::prepared::tests::prepared_connection_expiry_eof_and_trickle_release_capacity
+service::ipc::prepared::tests::prepared_connection_lifetime_respects_capability_and_nonce_expiry
+service::ipc::prepared::tests::prepared_connection_rejects_unauthorized_capacity_and_substituted_frames
+service::ipc::prepared::tests::prepared_connection_waits_without_blocking_control_and_executes_once
 EOF
 )" cargo test --locked -p chio-secret-broker --lib prepared_connection_tests::
 
@@ -283,7 +283,7 @@ if [[ "${mode}" == "--release" ]]; then
     export CARGO_TARGET_DIR="$workspace/$CARGO_TARGET_DIR"
   fi
   cargo build --locked --target x86_64-unknown-linux-musl \
-    -p chio-cage --bin chio-cage-init
+    -p chio-cage-init --bin chio-cage-init
   cargo build --locked --target x86_64-unknown-linux-musl \
     -p chio-secret-broker --bin chio-broker-mcp
   cargo build --locked -p chio-keyring --bins

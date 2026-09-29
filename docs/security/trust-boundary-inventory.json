@@ -86,15 +86,18 @@
     "crates/platform/chio-control-plane/src/scim_lifecycle.rs",
     "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs",
     "crates/platform/chio-control-plane/src/security/active_response_authority/validation.rs",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_01.inc",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_02.inc",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_03.inc",
+    "crates/platform/chio-control-plane/src/security/adapters/declassification_outbox.rs",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/alert.rs",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/containment.rs",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/egress.rs",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/throttle.rs",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs",
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs",
-    "crates/platform/chio-control-plane/src/security/adapters_parts/part_01.inc",
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc",
+    "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs",
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs",
     "crates/platform/chio-control-plane/src/security/migration_evidence.rs",
     "crates/platform/chio-control-plane/src/security/response_simulation.rs",
     "crates/platform/chio-control-plane/src/signed_input.rs",
@@ -188,16 +191,19 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
     "crates/platform/chio-store-sqlite/src/rollback_generation.rs",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/codec.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/containment.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/declassification_codec.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/finding_batches.rs",
     "crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs",
     "crates/platform/chio-store-sqlite/src/security_state/participant_source/evidence.rs",
     "crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_03.rs",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_response_helpers.inc",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/response_journal.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/response_outbox.rs",
+    "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs",
     "crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs",
     "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs",
@@ -220,11 +226,8 @@
     "crates/security/chio-secret-broker/src/protocol.rs",
     "crates/security/chio-secret-broker/src/provision.rs",
     "crates/security/chio-secret-broker/src/receipt.rs",
-    "crates/security/chio-secret-broker/src/service_parts/ipc_prepared.inc",
-    "crates/security/chio-secret-broker/src/service_parts/ipc_response.inc",
-    "crates/security/chio-secret-broker/src/service_parts/tests_01_sections/cases.inc",
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs",
+    "crates/security/chio-secret-broker/src/service/ipc/prepared.rs",
+    "crates/security/chio-secret-broker/src/service/ipc/response.rs",
     "crates/security/chio-secret-broker/src/sqlite.rs",
     "crates/trust/chio-credentials/src/financial.rs",
     "crates/trust/chio-credentials/src/financial/validation.rs",
@@ -883,23 +886,23 @@
     "crates/platform/chio-control-plane/src/scim_lifecycle.rs::load::from_wire",
     "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs::call::from_wire",
     "crates/platform/chio-control-plane/src/security/active_response_authority/validation.rs::decode_authority_request::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_01.inc::decode_capability_set_suspension_spec::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_01.inc::decode_session_throttle_limits::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_01.inc::verify_canonical_json_contribution::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_02.inc::decode_issuance_freeze_spec::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_03.inc::decode_egress_restriction::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_03.inc::decode_session_suspension::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/declassification_outbox.rs::compact_once::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/declassification_outbox.rs::reconcile_stranded_active::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/alert.rs::verify_canonical_json_contribution::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/containment.rs::decode_session_suspension::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/egress.rs::decode_egress_restriction::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::decode_issuance_freeze_spec::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs::decode_capability_set_suspension_spec::from_wire",
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/throttle.rs::decode_session_throttle_limits::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::load_due::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::load_persisted_alert_command::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::validate_request::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs::classify_output::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters_parts/part_01.inc::compact_once::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters_parts/part_01.inc::reconcile_stranded_active::from_wire",
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc::correlate::from_wire",
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc::ensure_supported_policy::from_wire",
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc::parse_bound_body::from_wire",
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc::verify_internal_event::from_wire",
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc::verify_receipt_event::from_wire",
+    "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::correlate::from_wire",
+    "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::ensure_supported_policy::from_wire",
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::parse_bound_body::from_wire",
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_internal_event::from_wire",
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_receipt_event::from_wire",
     "crates/platform/chio-control-plane/src/security/migration_evidence.rs::from_canonical_bytes::from_wire",
     "crates/platform/chio-control-plane/src/security/migration_evidence.rs::from_canonical_bytes::from_wire",
     "crates/platform/chio-control-plane/src/security/response_simulation.rs::capture::from_wire",
@@ -1030,36 +1033,36 @@
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_snapshot::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/containment.rs::decode_containment_command_contribution::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/containment.rs::load_containment_overlay_command::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/containment.rs::load_containment_overlay_command::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/containment.rs::load_containment_overlay_command::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/correlation.rs::validate_correlation_source_evidence::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/correlation.rs::validate_correlation_source_evidence::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/correlation.rs::validate_stored_correlation_ingress::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/declassification_codec.rs::decode_declassification_binding::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/declassification_codec.rs::decode_declassification_receipt::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::load_automatic_response_dispatch_fence::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::load_response_dispatch::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs::validate_response_dispatch_request::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::decode_egress_command_contribution::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/finding_batches.rs::load_attested_finding_batch_record::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::decode_canonical::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::decode_freeze_spec::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_snapshot::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/participant_source/evidence.rs::from_canonical_bytes::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc::decode_label::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc::validate_canonical_json_body::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_03.rs::decode_declassification_binding::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_03.rs::decode_declassification_receipt::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs::load_attested_finding_batch_record::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs::validate_correlation_source_evidence::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs::validate_correlation_source_evidence::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs::validate_stored_correlation_ingress::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_response_helpers.inc::decode_response_snapshot::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_response_helpers.inc::validate_response_dispatch_request::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::decode_containment_command_contribution::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::decode_session_throttle_limits::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::load_automatic_response_dispatch_fence::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::load_containment_overlay_command::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::load_containment_overlay_command::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::load_containment_overlay_command::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::load_response_dispatch::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::load_session_throttle_command::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::load_session_throttle_command::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs::load_session_throttle_command::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs::decode_egress_command_contribution::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs::load_egress_restriction_command::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs::load_egress_restriction_command::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs::decode_attested_finding_response_outbox_row::from_wire",
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs::decode_attested_finding_response_outbox_row::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/response_journal.rs::decode_response_snapshot::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/response_outbox.rs::decode_attested_finding_response_outbox_row::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/response_outbox.rs::decode_attested_finding_response_outbox_row::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::decode_session_throttle_limits::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command::from_wire",
     "crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::inspect::from_wire",
     "crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::remove_for_relocation::from_wire",
     "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs::decode_slot::from_wire",
@@ -1096,9 +1099,9 @@
     "crates/security/chio-secret-broker/src/receipt.rs::decode_stored_failure_receipt::from_wire",
     "crates/security/chio-secret-broker/src/receipt.rs::decode_stored_receipt::from_wire",
     "crates/security/chio-secret-broker/src/receipt.rs::load_completed::from_wire",
-    "crates/security/chio-secret-broker/src/service_parts/ipc_prepared.inc::prepare_connection::from_wire",
-    "crates/security/chio-secret-broker/src/service_parts/ipc_prepared.inc::prepare_connection::from_wire",
-    "crates/security/chio-secret-broker/src/service_parts/ipc_response.inc::validate_signed_broker_execute_failure::from_wire",
+    "crates/security/chio-secret-broker/src/service/ipc/prepared.rs::prepare_connection::from_wire",
+    "crates/security/chio-secret-broker/src/service/ipc/prepared.rs::prepare_connection::from_wire",
+    "crates/security/chio-secret-broker/src/service/ipc/response.rs::validate_signed_broker_execute_failure::from_wire",
     "crates/security/chio-secret-broker/src/sqlite.rs::load_attempt_row::from_wire",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_wire",
     "crates/trust/chio-credentials/src/financial.rs::decode_versioned_agent_passport::from_wire",
@@ -1731,8 +1734,7 @@
     "crates/platform/chio-control-plane/src/reputation.rs::load_passport_verifier_policy::from_value",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::extract_active_defense_body::from_value",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs::flush::from_slice",
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs::matrix_with_recovery::from_slice",
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc::verify_receipt_event::from_value",
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_receipt_event::from_value",
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs::strict_artifact_ingress::from_str",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::verify_terminal::from_value",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::verify_terminal::from_value",
@@ -1768,16 +1770,6 @@
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_value",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value",
-    "crates/security/chio-secret-broker/src/service_parts/tests_01_sections/cases.inc::stalled_same_uid_client_is_bounded_and_next_request_is_served::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs::nonreading_client_write_backpressure_is_bounded_and_next_request_succeeds::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs::pre_evidence_execute_fault_does_not_stop_the_endpoint::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs::trickling_same_uid_client_cannot_extend_the_absolute_read_deadline::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::exchange::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepare_connection::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepare_connection::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepared_connection_lifetime_respects_capability_and_nonce_expiry::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepared_connection_rejects_unauthorized_capacity_and_substituted_frames::from_slice",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepared_connection_waits_without_blocking_control_and_executes_once::from_slice",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value",
     "crates/trust/chio-credentials/src/financial.rs::decode_versioned_agent_passport_value::from_value",
     "crates/trust/chio-credentials/src/financial.rs::decode_versioned_agent_passport_value::from_value",
@@ -1891,175 +1883,175 @@
     "watermark_sequence_operations_v1": [
       "crates/platform/chio-store-sqlite/src/sealed_decoy_registry.rs"
     ],
-    "security_declassification_uses": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
-    ],
-    "security_declassification_evidence_identity": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
-    ],
-    "security_declassification_receipt_outbox": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
-    ],
-    "security_declassification_tombstones": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
-    ],
     "security_attested_finding_batches": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_correlation_ingress": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_correlation_outcomes": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_attested_finding_batch_items": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
+    ],
+    "security_declassification_uses": [
+      "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
+    ],
+    "security_declassification_evidence_identity": [
+      "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
+    ],
+    "security_declassification_receipt_outbox": [
+      "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
+    ],
+    "security_declassification_tombstones": [
+      "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_attested_finding_response_outbox": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs"
     ],
     "security_isolation_epochs": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_principal_flow_state": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_lineage_flow_state": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_session_flow_state": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_session_memberships": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_flow_contexts": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_flow_sequences": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_egress_fences": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_event_ids": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_verified_events": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_advisory_events": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_correlation_events": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_correlation_partition_heads": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_correlation_partials": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_response_plans": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_response_receipt_cursors": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_response_dispatches": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_response_dispatch_fences": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_response_effects": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_effect_contributions": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_overlay_state": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_containment_overlay_commands": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_session_throttle_state": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_session_throttle_effects": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_session_throttle_windows": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_session_throttle_invocations": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_session_throttle_commands": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_capability_set_suspension_state": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_capability_set_suspension_effects": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_capability_set_suspension_members": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_capability_set_suspension_commands": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_issuance_freeze_state": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_issuance_freeze_effects": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_issuance_freeze_commands": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_egress_restriction_state": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_egress_restriction_effects": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_egress_restriction_destinations": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_egress_restriction_commands": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_lineage_fences": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_scheduler_claims": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_scheduler_leases": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_scheduler_fence_sequences": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_scheduler_retries": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_response_dispatch_recoveries": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_transitions": [
-      "crates/platform/chio-store-sqlite/src/security_state_parts/part_02.rs"
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ]
   },
   "unscoped_sql": [
@@ -3335,6 +3327,21 @@
       "contract": "The optional SQL tenant comes only from effective_read_scope; None requires an explicit administrative context. Signed tenant is rechecked after decode."
     },
     {
+      "path": "crates/platform/chio-store-sqlite/src/security_state.rs",
+      "owner": "active_defense_overlay_inventory",
+      "sha256": "b004a2156d3dcec3ffa3e2c2f04b2242e1fec84f9d5eab49e6df879aa72b1f94",
+      "tables": [
+        "security_capability_set_suspension_effects",
+        "security_effect_contributions",
+        "security_egress_restriction_effects",
+        "security_issuance_freeze_effects",
+        "security_session_throttle_effects"
+      ],
+      "sql": "SELECT (SELECT COUNT(*) FROM security_effect_contributions), (SELECT COUNT(*) FROM security_session_throttle_effects), (SELECT COUNT(*) FROM security_capability_set_suspension_effects), (SELECT COUNT(*) FROM security_issuance_freeze_effects), (SELECT COUNT(*) FROM security_egress_restriction_effects)",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
       "path": "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs",
       "owner": "ensure_capability_set_suspensions_ready",
       "sha256": "3fce703a92ee0880603d30e50bdd1e88f573ff693894ddcaf62dd67bf4c88f1b",
@@ -3357,6 +3364,259 @@
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
     {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/containment.rs",
+      "owner": "ensure_containment_overlays_ready",
+      "sha256": "26ebddf637ecfa4303da0c668e47b877680a504d1641b2953995ae449e2b55d9",
+      "tables": [
+        "security_containment_overlay_commands"
+      ],
+      "sql": "SELECT tenant_id, idempotency_key FROM security_containment_overlay_commands ORDER BY tenant_id, idempotency_key",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/containment.rs",
+      "owner": "ensure_containment_overlays_ready",
+      "sha256": "38056d66958c3f1e96ad6a593efc1a7e94d86b598e04fcfb23a5289ae5954397",
+      "tables": [
+        "security_overlay_state"
+      ],
+      "sql": "SELECT tenant_id, target_id FROM security_overlay_state ORDER BY tenant_id, target_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
+      "owner": "count_pending_correlation_events",
+      "sha256": "65b8836535c75187fa018b59949492cea37280c00f3c31f78f1681b38a95ee32",
+      "tables": [
+        "security_correlation_ingress"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_correlation_ingress WHERE acknowledged = 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
+      "owner": "ensure_correlation_ingress_ready",
+      "sha256": "ebc4b4f5d1e84ca05d865ce167c2b7899a72e5a372e419e56cd8101955b2416b",
+      "tables": [
+        "security_correlation_outcomes"
+      ],
+      "sql": "SELECT tenant_id, rule_id, event_id FROM security_correlation_outcomes ORDER BY tenant_id, rule_id, event_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
+      "owner": "load_pending_correlation_events",
+      "sha256": "2eb6d90ece50046ce51347b944fa0d5cafc7c8a4464f1c4185406aa526bb9344",
+      "tables": [
+        "security_correlation_ingress"
+      ],
+      "sql": "SELECT tenant_id, event_id, producer_id, event_time, received_at, body, body_hash, source_evidence, evidence_hash, acknowledged FROM security_correlation_ingress WHERE acknowledged = 0 ORDER BY event_time, sequence LIMIT ?1",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs",
+      "owner": "validate_attested_finding_batch_records",
+      "sha256": "6b492ca9ef00e195f2255a3efbdea6e8b751e4889e4e4b051d039d996a879004",
+      "tables": [
+        "security_attested_finding_batches"
+      ],
+      "sql": "SELECT tenant_id, batch_id FROM security_attested_finding_batches WHERE ?1 IS NULL OR tenant_id > ?1 OR (tenant_id = ?1 AND batch_id > ?2) ORDER BY tenant_id, batch_id LIMIT 256",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
+      "owner": "migrate_declassification_tenant_keys",
+      "sha256": "84c2705c3a930636a2c58e020c41a236a7d5d0caee63f5ad1a085835c00f09d9",
+      "tables": [
+        "security_declassification_evidence_identity"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_evidence_identity",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
+      "owner": "migrate_declassification_tenant_keys",
+      "sha256": "a2f242d7fb09a6882cb19e68e500467d630cff70a3d40bd9cbffa42e8d91fed5",
+      "tables": [
+        "security_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_receipt_outbox",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
+      "owner": "migrate_declassification_tenant_keys",
+      "sha256": "f60f397bbfe3c073388193b9b574ba0157d9c77ce1258f19e2a6bb0e69074828",
+      "tables": [
+        "security_declassification_tombstones"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_declassification_tombstones",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "26ad3854e58cd6bc1f4299d165ee8ab4fd703e3ab47e6a21307152c13d3928b2",
+      "tables": [
+        "security_response_dispatch_recoveries"
+      ],
+      "sql": "SELECT recovery_id, tenant_id, dispatch_id, action_id, request_hash, outcome, lease_owner_id, lease_expires_at, fencing_token FROM security_response_dispatch_recoveries LIMIT 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "2b16d6997e7c54f183a958a413f1f6f955c139e46585659bb1b7bcfeae5ddfd2",
+      "tables": [
+        "security_response_plans"
+      ],
+      "sql": "UPDATE security_response_plans SET generation = generation WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "48898599af35c1e51cf9ebc54dd5779dc29ad150e8c213ee7069e4c6cb7287a6",
+      "tables": [
+        "security_response_dispatch_fences"
+      ],
+      "sql": "UPDATE security_response_dispatch_fences SET fenced_at = fenced_at WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "6aaebce69c275c5f7d0b9c2547c6d74adeb9a822fe85d4f218bf3d83ccdb9b1c",
+      "tables": [
+        "security_scheduler_leases"
+      ],
+      "sql": "UPDATE security_scheduler_leases SET fencing_token = fencing_token WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "79144c57bcfa7f3bfc89976fa0ba4b6edc000d4baee6b3c982fd3f9f61939b58",
+      "tables": [
+        "security_response_dispatch_recoveries"
+      ],
+      "sql": "UPDATE security_response_dispatch_recoveries SET fencing_token = fencing_token WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "a6cdf46f88bd98c464adcd386985241d4515fa147c2ddb4c891895c43cbe9ce0",
+      "tables": [
+        "security_response_dispatches"
+      ],
+      "sql": "UPDATE security_response_dispatches SET initial_fencing_token = initial_fencing_token WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "a8c138e2e7e8bbecbfec1e9bf53d560cea9d49468f43214802bdc1bb66a1b3ac",
+      "tables": [
+        "security_response_dispatch_fences"
+      ],
+      "sql": "SELECT dispatch_id, tenant_id, action_id, prepared_binding_body, prepared_binding_hash, fenced_at FROM security_response_dispatch_fences LIMIT 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "d3f9cb1f61dbceb7cc453e8ac2fb190efc50de46db9e64e649c2456fc9ce094f",
+      "tables": [
+        "security_response_receipt_cursors"
+      ],
+      "sql": "SELECT tenant_id, action_id, plan_hash, generation, current_evidence_id FROM security_response_receipt_cursors LIMIT 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "ensure_dispatch_ready",
+      "sha256": "d45879dbdc942e7044d718a63952c145c3f2c005cbdbb0821d844e03e41949e2",
+      "tables": [
+        "security_response_receipt_cursors"
+      ],
+      "sql": "UPDATE security_response_receipt_cursors SET generation = generation WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
+      "owner": "validate_all_automatic_response_dispatch_fences",
+      "sha256": "8eb1509b3bee471b9235ad79ac153823a9139e4b221a98814b0f1b8cc299b91b",
+      "tables": [
+        "security_response_dispatch_fences"
+      ],
+      "sql": "SELECT tenant_id, action_id, dispatch_id FROM security_response_dispatch_fences ORDER BY tenant_id ASC, action_id ASC, dispatch_id ASC",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs",
+      "owner": "ensure_egress_restrictions_ready",
+      "sha256": "5643b4354d37de329d32438b5d983dbf5eae24611b9f5cda946895377dac18b1",
+      "tables": [
+        "security_egress_restriction_state"
+      ],
+      "sql": "SELECT tenant_id, session_id FROM security_egress_restriction_state ORDER BY tenant_id, session_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs",
+      "owner": "ensure_egress_restrictions_ready",
+      "sha256": "e7062192d302b7208327f8c9d7ceea5c6289fb1ecb64c2ae2cf6d0a6a1e82d2a",
+      "tables": [
+        "security_egress_restriction_commands"
+      ],
+      "sql": "SELECT tenant_id, idempotency_key FROM security_egress_restriction_commands ORDER BY tenant_id, idempotency_key",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/finding_batches.rs",
+      "owner": "ensure_attested_finding_batches_ready",
+      "sha256": "30c7783fefc2a950a486b395a2d559f6ee8f47945b01dcecd1d1e17eeb9f5341",
+      "tables": [
+        "security_attested_finding_batch_items"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_attested_finding_batch_items WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/finding_batches.rs",
+      "owner": "ensure_attested_finding_batches_ready",
+      "sha256": "48cf42a6e7d8cd6d508ee8317a64ad26b83ce161a0dce439bcf3033eeda4af19",
+      "tables": [
+        "security_attested_finding_batches"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_attested_finding_batches WHERE 0",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
       "path": "crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs",
       "owner": "ensure_issuance_freezes_ready",
       "sha256": "b3dedda66ec4e8b79055cb8951a16ab94631da762a7817ac7f4e31aa97fe38e3",
@@ -3375,6 +3635,83 @@
         "security_flow_contexts"
       ],
       "sql": "SELECT tenant_id, principal_id, lineage_id, session_id, isolation_epoch_id, generation FROM security_flow_contexts",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/response_outbox.rs",
+      "owner": "attested_finding_response_outbox_health",
+      "sha256": "dc23e9f74c4ae2ab9802e57e632c30b5fbaa089ed9eac4c52c4b87c54f999b1a",
+      "tables": [
+        "security_attested_finding_response_outbox"
+      ],
+      "sql": "SELECT COALESCE(SUM(CASE WHEN planning_state = 'pending' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'planned' AND admission_state = 'pending' AND completion_state = 'not_started' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'planned' AND admission_state = 'pending' AND completion_state = 'not_started' AND admission_artifact_digest IS NULL THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'pending' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'outcome_unknown_after_dispatch' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'failed' OR admission_state = 'rejected' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN admission_state = 'expired' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'activated' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'failed_before_effect' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'rolled_back_after_partial' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'simulated' THEN 1 ELSE 0 END), 0) FROM security_attested_finding_response_outbox",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/response_outbox.rs",
+      "owner": "ensure_attested_finding_response_outbox_ready",
+      "sha256": "25b3a980d91ead000757cd0f0534372a3f45f3f29eb060a424874ee64e243d7f",
+      "tables": [
+        "security_attested_finding_response_outbox"
+      ],
+      "sql": "SELECT tenant_id, action_id FROM security_attested_finding_response_outbox ORDER BY tenant_id, action_id",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/response_outbox.rs",
+      "owner": "scan_attested_finding_response_outbox",
+      "sha256": "2c615cb2a32e2f38eb6d53a1e5adf3ba9b323d393a00d1be2ea1e8482382d0b3",
+      "tables": [
+        "security_attested_finding_response_outbox"
+      ],
+      "sql": "SELECT {ATTESTED_FINDING_RESPONSE_OUTBOX_COLUMNS} FROM security_attested_finding_response_outbox WHERE {predicate} AND next_attempt_at <= ?1 ORDER BY CASE WHEN completion_state = 'outcome_unknown_after_dispatch' THEN 0 WHEN admission_state = 'prepared' THEN 1 WHEN planning_state = 'planned' THEN 2 ELSE 3 END ASC, rowid ASC LIMIT ?2",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs",
+      "owner": "ensure_response_dispatch_commit_mode_column",
+      "sha256": "672a479bf737d8a5ceb89d653e2cce4f1b883041bbe7560b689a612dc998c747",
+      "tables": [
+        "security_response_dispatches"
+      ],
+      "sql": "SELECT COUNT(*) FROM security_response_dispatches WHERE commit_mode NOT IN ('fresh', 'governed_committed_resume', 'governed_committed_expired_resume')",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs",
+      "owner": "ensure_response_effect_generation_column",
+      "sha256": "dedee0c3b14fc6fe9540c7a13304e9b425707485dd228c27ab45970d7c4ac0b8",
+      "tables": [
+        "security_response_effects"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM security_response_effects WHERE scheduler_lease_owner_id IS NULL OR scheduler_lease_owner_id = '')",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs",
+      "owner": "ensure_scheduler_lease_body_hash_column",
+      "sha256": "779361a4363cbfb1926cad20beae83cc1fac0bc479e99b5735aa5b4e8d0bfe74",
+      "tables": [
+        "security_scheduler_leases"
+      ],
+      "sql": "SELECT EXISTS( SELECT 1 FROM security_scheduler_leases WHERE lease_body_hash IS NULL OR length(lease_body_hash) != 32 )",
+      "principal": "security-runtime",
+      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs",
+      "owner": "ensure_scheduler_lease_body_hash_column",
+      "sha256": "a8aefd147e8606376bad3f5cba020153eff8e365e31fa164554f1d288c0c7c48",
+      "tables": [
+        "security_scheduler_leases"
+      ],
+      "sql": "SELECT tenant_id, action_id, claim_id, claim_ordinal, lease_owner_id, lease_expires_at, fencing_token, lease_body_hash FROM security_scheduler_leases ORDER BY tenant_id, action_id",
       "principal": "security-runtime",
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
@@ -3577,308 +3914,7 @@
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
     {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "owner": "active_defense_overlay_inventory",
-      "sha256": "b004a2156d3dcec3ffa3e2c2f04b2242e1fec84f9d5eab49e6df879aa72b1f94",
-      "tables": [
-        "security_capability_set_suspension_effects",
-        "security_effect_contributions",
-        "security_egress_restriction_effects",
-        "security_issuance_freeze_effects",
-        "security_session_throttle_effects"
-      ],
-      "sql": "SELECT (SELECT COUNT(*) FROM security_effect_contributions), (SELECT COUNT(*) FROM security_session_throttle_effects), (SELECT COUNT(*) FROM security_capability_set_suspension_effects), (SELECT COUNT(*) FROM security_issuance_freeze_effects), (SELECT COUNT(*) FROM security_egress_restriction_effects)",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "owner": "migrate_declassification_tenant_keys",
-      "sha256": "84c2705c3a930636a2c58e020c41a236a7d5d0caee63f5ad1a085835c00f09d9",
-      "tables": [
-        "security_declassification_evidence_identity"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_declassification_evidence_identity",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "owner": "migrate_declassification_tenant_keys",
-      "sha256": "a2f242d7fb09a6882cb19e68e500467d630cff70a3d40bd9cbffa42e8d91fed5",
-      "tables": [
-        "security_declassification_receipt_outbox"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_declassification_receipt_outbox",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_01.rs",
-      "owner": "migrate_declassification_tenant_keys",
-      "sha256": "f60f397bbfe3c073388193b9b574ba0157d9c77ce1258f19e2a6bb0e69074828",
-      "tables": [
-        "security_declassification_tombstones"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_declassification_tombstones",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
-      "owner": "ensure_response_effect_generation_column",
-      "sha256": "dedee0c3b14fc6fe9540c7a13304e9b425707485dd228c27ab45970d7c4ac0b8",
-      "tables": [
-        "security_response_effects"
-      ],
-      "sql": "SELECT EXISTS(SELECT 1 FROM security_response_effects WHERE scheduler_lease_owner_id IS NULL OR scheduler_lease_owner_id = '')",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
-      "owner": "ensure_scheduler_lease_body_hash_column",
-      "sha256": "779361a4363cbfb1926cad20beae83cc1fac0bc479e99b5735aa5b4e8d0bfe74",
-      "tables": [
-        "security_scheduler_leases"
-      ],
-      "sql": "SELECT EXISTS( SELECT 1 FROM security_scheduler_leases WHERE lease_body_hash IS NULL OR length(lease_body_hash) != 32 )",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
-      "owner": "ensure_scheduler_lease_body_hash_column",
-      "sha256": "a8aefd147e8606376bad3f5cba020153eff8e365e31fa164554f1d288c0c7c48",
-      "tables": [
-        "security_scheduler_leases"
-      ],
-      "sql": "SELECT tenant_id, action_id, claim_id, claim_ordinal, lease_owner_id, lease_expires_at, fencing_token, lease_body_hash FROM security_scheduler_leases ORDER BY tenant_id, action_id",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc",
-      "owner": "validate_attested_finding_batch_records",
-      "sha256": "6b492ca9ef00e195f2255a3efbdea6e8b751e4889e4e4b051d039d996a879004",
-      "tables": [
-        "security_attested_finding_batches"
-      ],
-      "sql": "SELECT tenant_id, batch_id FROM security_attested_finding_batches WHERE ?1 IS NULL OR tenant_id > ?1 OR (tenant_id = ?1 AND batch_id > ?2) ORDER BY tenant_id, batch_id LIMIT 256",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
-      "owner": "count_pending_correlation_events",
-      "sha256": "65b8836535c75187fa018b59949492cea37280c00f3c31f78f1681b38a95ee32",
-      "tables": [
-        "security_correlation_ingress"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_correlation_ingress WHERE acknowledged = 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
-      "owner": "ensure_attested_finding_batches_ready",
-      "sha256": "30c7783fefc2a950a486b395a2d559f6ee8f47945b01dcecd1d1e17eeb9f5341",
-      "tables": [
-        "security_attested_finding_batch_items"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_attested_finding_batch_items WHERE 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
-      "owner": "ensure_attested_finding_batches_ready",
-      "sha256": "48cf42a6e7d8cd6d508ee8317a64ad26b83ce161a0dce439bcf3033eeda4af19",
-      "tables": [
-        "security_attested_finding_batches"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_attested_finding_batches WHERE 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
-      "owner": "ensure_correlation_ingress_ready",
-      "sha256": "ebc4b4f5d1e84ca05d865ce167c2b7899a72e5a372e419e56cd8101955b2416b",
-      "tables": [
-        "security_correlation_outcomes"
-      ],
-      "sql": "SELECT tenant_id, rule_id, event_id FROM security_correlation_outcomes ORDER BY tenant_id, rule_id, event_id",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_05.rs",
-      "owner": "load_pending_correlation_events",
-      "sha256": "2eb6d90ece50046ce51347b944fa0d5cafc7c8a4464f1c4185406aa526bb9344",
-      "tables": [
-        "security_correlation_ingress"
-      ],
-      "sql": "SELECT tenant_id, event_id, producer_id, event_time, received_at, body, body_hash, source_evidence, evidence_hash, acknowledged FROM security_correlation_ingress WHERE acknowledged = 0 ORDER BY event_time, sequence LIMIT ?1",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "26ad3854e58cd6bc1f4299d165ee8ab4fd703e3ab47e6a21307152c13d3928b2",
-      "tables": [
-        "security_response_dispatch_recoveries"
-      ],
-      "sql": "SELECT recovery_id, tenant_id, dispatch_id, action_id, request_hash, outcome, lease_owner_id, lease_expires_at, fencing_token FROM security_response_dispatch_recoveries LIMIT 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "2b16d6997e7c54f183a958a413f1f6f955c139e46585659bb1b7bcfeae5ddfd2",
-      "tables": [
-        "security_response_plans"
-      ],
-      "sql": "UPDATE security_response_plans SET generation = generation WHERE 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "48898599af35c1e51cf9ebc54dd5779dc29ad150e8c213ee7069e4c6cb7287a6",
-      "tables": [
-        "security_response_dispatch_fences"
-      ],
-      "sql": "UPDATE security_response_dispatch_fences SET fenced_at = fenced_at WHERE 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "6aaebce69c275c5f7d0b9c2547c6d74adeb9a822fe85d4f218bf3d83ccdb9b1c",
-      "tables": [
-        "security_scheduler_leases"
-      ],
-      "sql": "UPDATE security_scheduler_leases SET fencing_token = fencing_token WHERE 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "79144c57bcfa7f3bfc89976fa0ba4b6edc000d4baee6b3c982fd3f9f61939b58",
-      "tables": [
-        "security_response_dispatch_recoveries"
-      ],
-      "sql": "UPDATE security_response_dispatch_recoveries SET fencing_token = fencing_token WHERE 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "a6cdf46f88bd98c464adcd386985241d4515fa147c2ddb4c891895c43cbe9ce0",
-      "tables": [
-        "security_response_dispatches"
-      ],
-      "sql": "UPDATE security_response_dispatches SET initial_fencing_token = initial_fencing_token WHERE 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "a8c138e2e7e8bbecbfec1e9bf53d560cea9d49468f43214802bdc1bb66a1b3ac",
-      "tables": [
-        "security_response_dispatch_fences"
-      ],
-      "sql": "SELECT dispatch_id, tenant_id, action_id, prepared_binding_body, prepared_binding_hash, fenced_at FROM security_response_dispatch_fences LIMIT 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "d3f9cb1f61dbceb7cc453e8ac2fb190efc50de46db9e64e649c2456fc9ce094f",
-      "tables": [
-        "security_response_receipt_cursors"
-      ],
-      "sql": "SELECT tenant_id, action_id, plan_hash, generation, current_evidence_id FROM security_response_receipt_cursors LIMIT 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_scheduler_and_dispatch.inc",
-      "owner": "ensure_dispatch_ready",
-      "sha256": "d45879dbdc942e7044d718a63952c145c3f2c005cbdbb0821d844e03e41949e2",
-      "tables": [
-        "security_response_receipt_cursors"
-      ],
-      "sql": "UPDATE security_response_receipt_cursors SET generation = generation WHERE 0",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs",
-      "owner": "ensure_containment_overlays_ready",
-      "sha256": "26ebddf637ecfa4303da0c668e47b877680a504d1641b2953995ae449e2b55d9",
-      "tables": [
-        "security_containment_overlay_commands"
-      ],
-      "sql": "SELECT tenant_id, idempotency_key FROM security_containment_overlay_commands ORDER BY tenant_id, idempotency_key",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs",
-      "owner": "ensure_containment_overlays_ready",
-      "sha256": "38056d66958c3f1e96ad6a593efc1a7e94d86b598e04fcfb23a5289ae5954397",
-      "tables": [
-        "security_overlay_state"
-      ],
-      "sql": "SELECT tenant_id, target_id FROM security_overlay_state ORDER BY tenant_id, target_id",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs",
-      "owner": "validate_all_automatic_response_dispatch_fences",
-      "sha256": "8eb1509b3bee471b9235ad79ac153823a9139e4b221a98814b0f1b8cc299b91b",
-      "tables": [
-        "security_response_dispatch_fences"
-      ],
-      "sql": "SELECT tenant_id, action_id, dispatch_id FROM security_response_dispatch_fences ORDER BY tenant_id ASC, action_id ASC, dispatch_id ASC",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
-      "owner": "ensure_egress_restrictions_ready",
-      "sha256": "5643b4354d37de329d32438b5d983dbf5eae24611b9f5cda946895377dac18b1",
-      "tables": [
-        "security_egress_restriction_state"
-      ],
-      "sql": "SELECT tenant_id, session_id FROM security_egress_restriction_state ORDER BY tenant_id, session_id",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
-      "owner": "ensure_egress_restrictions_ready",
-      "sha256": "e7062192d302b7208327f8c9d7ceea5c6289fb1ecb64c2ae2cf6d0a6a1e82d2a",
-      "tables": [
-        "security_egress_restriction_commands"
-      ],
-      "sql": "SELECT tenant_id, idempotency_key FROM security_egress_restriction_commands ORDER BY tenant_id, idempotency_key",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
+      "path": "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs",
       "owner": "ensure_session_throttles_ready",
       "sha256": "5fc683a3f569a6a6303b008808629546087092d18ab1af3bc5880faad5e91576",
       "tables": [
@@ -3889,57 +3925,13 @@
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
     {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs",
+      "path": "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs",
       "owner": "ensure_session_throttles_ready",
       "sha256": "b63311fd2e9baffb03f793fb76e8118b6debaa01bf0e57a6a71240e80b84ea56",
       "tables": [
         "security_session_throttle_state"
       ],
       "sql": "SELECT tenant_id, session_id FROM security_session_throttle_state ORDER BY tenant_id, session_id",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs",
-      "owner": "attested_finding_response_outbox_health",
-      "sha256": "dc23e9f74c4ae2ab9802e57e632c30b5fbaa089ed9eac4c52c4b87c54f999b1a",
-      "tables": [
-        "security_attested_finding_response_outbox"
-      ],
-      "sql": "SELECT COALESCE(SUM(CASE WHEN planning_state = 'pending' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'planned' AND admission_state = 'pending' AND completion_state = 'not_started' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'planned' AND admission_state = 'pending' AND completion_state = 'not_started' AND admission_artifact_digest IS NULL THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'pending' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'outcome_unknown_after_dispatch' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN planning_state = 'failed' OR admission_state = 'rejected' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN admission_state = 'expired' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'activated' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'failed_before_effect' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_outcome = 'rolled_back_after_partial' THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN completion_state = 'simulated' THEN 1 ELSE 0 END), 0) FROM security_attested_finding_response_outbox",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs",
-      "owner": "ensure_attested_finding_response_outbox_ready",
-      "sha256": "25b3a980d91ead000757cd0f0534372a3f45f3f29eb060a424874ee64e243d7f",
-      "tables": [
-        "security_attested_finding_response_outbox"
-      ],
-      "sql": "SELECT tenant_id, action_id FROM security_attested_finding_response_outbox ORDER BY tenant_id, action_id",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_09.rs",
-      "owner": "scan_attested_finding_response_outbox",
-      "sha256": "2c615cb2a32e2f38eb6d53a1e5adf3ba9b323d393a00d1be2ea1e8482382d0b3",
-      "tables": [
-        "security_attested_finding_response_outbox"
-      ],
-      "sql": "SELECT {ATTESTED_FINDING_RESPONSE_OUTBOX_COLUMNS} FROM security_attested_finding_response_outbox WHERE {predicate} AND next_attempt_at <= ?1 ORDER BY CASE WHEN completion_state = 'outcome_unknown_after_dispatch' THEN 0 WHEN admission_state = 'prepared' THEN 1 WHEN planning_state = 'planned' THEN 2 ELSE 3 END ASC, rowid ASC LIMIT ?2",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state_parts/part_10.rs",
-      "owner": "ensure_response_dispatch_commit_mode_column",
-      "sha256": "672a479bf737d8a5ceb89d653e2cce4f1b883041bbe7560b689a612dc998c747",
-      "tables": [
-        "security_response_dispatches"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_response_dispatches WHERE commit_mode NOT IN ('fresh', 'governed_committed_resume', 'governed_committed_expired_resume')",
       "principal": "security-runtime",
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     }
@@ -3989,8 +3981,7 @@
     "crates/platform/chio-control-plane/src/reputation.rs::load_passport_verifier_policy::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::extract_active_defense_body::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs::flush::from_slice": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs::matrix_with_recovery::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc::verify_receipt_event::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_receipt_event::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs::strict_artifact_ingress::from_str": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::verify_terminal::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
     "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs::serialize::custom_deserialize": "Custom field deserialization and typed Value conversion after an outer original-byte reader. No authority token is constructed.",
@@ -4020,15 +4011,6 @@
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes.",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_01_sections/cases.inc::stalled_same_uid_client_is_bounded_and_next_request_is_served::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs::nonreading_client_write_backpressure_is_bounded_and_next_request_succeeds::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs::pre_evidence_execute_fault_does_not_stop_the_endpoint::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs::trickling_same_uid_client_cannot_extend_the_absolute_read_deadline::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::exchange::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepare_connection::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepared_connection_lifetime_respects_capability_and_nonce_expiry::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepared_connection_rejects_unauthorized_capacity_and_substituted_frames::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::prepared_connection_waits_without_blocking_control_and_executes_once::from_slice": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial.rs::decode_versioned_agent_passport_value::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial.rs::deserialize::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
@@ -5110,14 +5092,8 @@
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs": [
       "flush::from_slice"
     ],
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs": [
-      "matrix_with_recovery::from_slice"
-    ],
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc": [
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs": [
       "verify_receipt_event::from_value"
-    ],
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc": [
-      "real_adapter_finding::from_value"
     ],
     "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs": [
       "sync_peer_child_receipts::from_value",
@@ -6277,17 +6253,17 @@
       "validate_artifact_records::from_value",
       "validate_policy_records::from_value"
     ],
-    "crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc": [
-      "child_main::from_slice"
-    ],
-    "crates/security/chio-cage/src/launch/linux_parts/part_02.rs": [
+    "crates/security/chio-cage/src/launch/linux.rs": [
       "read_status::from_slice"
-    ],
-    "crates/security/chio-cage/src/lib_parts/part_01.rs": [
-      "for_native_architecture::custom_deserialize"
     ],
     "crates/security/chio-cage/src/receipt.rs": [
       "verify_signed_cage_receipt::from_value"
+    ],
+    "crates/security/chio-cage-init/src/bootstrap.rs": [
+      "child_main::from_slice"
+    ],
+    "crates/security/chio-cage-plan/src/model.rs": [
+      "for_native_architecture::custom_deserialize"
     ],
     "crates/security/chio-decoy/src/materialize.rs": [
       "serialize::custom_deserialize"
@@ -6349,22 +6325,6 @@
     "crates/security/chio-secret-broker/src/prepared_mcp.rs": [
       "serve_prepared_broker_mcp::from_value"
     ],
-    "crates/security/chio-secret-broker/src/service_parts/tests_01_sections/cases.inc": [
-      "stalled_same_uid_client_is_bounded_and_next_request_is_served::from_slice"
-    ],
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs": [
-      "nonreading_client_write_backpressure_is_bounded_and_next_request_succeeds::from_slice",
-      "pre_evidence_execute_fault_does_not_stop_the_endpoint::from_slice",
-      "trickling_same_uid_client_cannot_extend_the_absolute_read_deadline::from_slice"
-    ],
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs": [
-      "exchange::from_slice",
-      "prepare_connection::from_slice",
-      "prepare_connection::from_slice",
-      "prepared_connection_lifetime_respects_capability_and_nonce_expiry::from_slice",
-      "prepared_connection_rejects_unauthorized_capacity_and_substituted_frames::from_slice",
-      "prepared_connection_waits_without_blocking_control_and_executes_once::from_slice"
-    ],
     "crates/security/chio-security-types/src/deception.rs": [
       "checked_next::custom_deserialize"
     ],
@@ -6379,15 +6339,17 @@
       "visit_seq::custom_deserialize",
       "visit_seq::custom_deserialize"
     ],
-    "crates/security/chio-security-types/src/ports_parts/part_01.rs": [
-      "fmt::custom_deserialize",
-      "fmt::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/bounded.rs": [
       "fmt::custom_deserialize",
       "fmt::custom_deserialize",
       "fmt::custom_deserialize",
       "is_empty::custom_deserialize",
       "is_empty::custom_deserialize",
       "is_empty::custom_deserialize"
+    ],
+    "crates/security/chio-security-types/src/ports/identifiers.rs": [
+      "fmt::custom_deserialize",
+      "fmt::custom_deserialize"
     ],
     "crates/tooling/chio-conformance/src/bin/chio_econsim_runner.rs": [
       "run::from_slice"
@@ -7125,17 +7087,9 @@
       "kind": "bounded-original-reader",
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO."
     },
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs": {
-      "kind": "fixture",
-      "contract": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed."
-    },
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc": {
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs": {
       "kind": "bounded-original-reader",
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO."
-    },
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
     "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs": {
       "kind": "typed-value-conversion",
@@ -8081,21 +8035,21 @@
       "kind": "reviewed-signed-owner",
       "contract": "Constrained original-byte input; residual decoder sites require individual raw_decoder_contracts."
     },
-    "crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/security/chio-cage/src/launch/linux_parts/part_02.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/security/chio-cage/src/lib_parts/part_01.rs": {
+    "crates/security/chio-cage/src/launch/linux.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/security/chio-cage/src/receipt.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+    },
+    "crates/security/chio-cage-init/src/bootstrap.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/security/chio-cage-plan/src/model.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/security/chio-decoy/src/materialize.rs": {
       "kind": "raw-input-baseline",
@@ -8161,18 +8115,6 @@
       "kind": "bounded-original-reader",
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO."
     },
-    "crates/security/chio-secret-broker/src/service_parts/tests_01_sections/cases.inc": {
-      "kind": "fixture",
-      "contract": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed."
-    },
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs": {
-      "kind": "fixture",
-      "contract": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed."
-    },
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs": {
-      "kind": "fixture",
-      "contract": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed."
-    },
     "crates/security/chio-security-types/src/deception.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -8185,7 +8127,11 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/security/chio-security-types/src/ports_parts/part_01.rs": {
+    "crates/security/chio-security-types/src/ports/bounded.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/security/chio-security-types/src/ports/identifiers.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -8757,7 +8703,7 @@
       "evidence_kind": "native-authority",
       "tests": [
         {
-          "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_output_tests.rs",
+          "path": "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/output.rs",
           "test": "native_output_journal_rejects_stale_lease_generation_and_substituted_artifacts"
         }
       ]
@@ -9832,131 +9778,6 @@
       ],
       "retained_typed_conversions": []
     },
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_02_tail.inc": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
-      "migrations": [
-        [
-          "decode_label",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "validate_canonical_json_body",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_03.rs": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
-      "migrations": [
-        [
-          "decode_declassification_receipt",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "decode_declassification_binding",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_06_response_helpers.inc": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
-      "migrations": [
-        [
-          "validate_response_dispatch_request",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "decode_response_snapshot",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_07.rs": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
-      "migrations": [
-        [
-          "load_session_throttle_command",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "load_session_throttle_command",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "load_session_throttle_command",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "decode_session_throttle_limits",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "load_containment_overlay_command",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "load_containment_overlay_command",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "load_containment_overlay_command",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "decode_containment_command_contribution",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "load_automatic_response_dispatch_fence",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "load_response_dispatch",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/platform/chio-store-sqlite/src/security_state_parts/part_08.rs": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
-      "migrations": [
-        [
-          "load_egress_restriction_command",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "load_egress_restriction_command",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "decode_egress_command_contribution",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
     "crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs": {
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
       "migrations": [
@@ -9978,6 +9799,138 @@
       "migrations": [
         [
           "decode_slot",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/codec.rs": {
+      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+      "migrations": [
+        [
+          "decode_label",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "validate_canonical_json_body",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/declassification_codec.rs": {
+      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+      "migrations": [
+        [
+          "decode_declassification_receipt",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "decode_declassification_binding",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/response_journal.rs": {
+      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+      "migrations": [
+        [
+          "decode_response_snapshot",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs": {
+      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+      "migrations": [
+        [
+          "load_automatic_response_dispatch_fence",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "load_response_dispatch",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs": {
+      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+      "migrations": [
+        [
+          "load_session_throttle_command",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "load_session_throttle_command",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "load_session_throttle_command",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "decode_session_throttle_limits",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/containment.rs": {
+      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+      "migrations": [
+        [
+          "load_containment_overlay_command",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "load_containment_overlay_command",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "load_containment_overlay_command",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "decode_containment_command_contribution",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs": {
+      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+      "migrations": [
+        [
+          "load_egress_restriction_command",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "load_egress_restriction_command",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "decode_egress_command_contribution",
           "decode_signed",
           "64 * 1024 * 1024"
         ]
@@ -11018,54 +10971,6 @@
       ],
       "retained_typed_conversions": []
     },
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_01.inc": {
-      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-      "migrations": [
-        [
-          "decode_capability_set_suspension_spec",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "decode_session_throttle_limits",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "verify_canonical_json_contribution",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_02.inc": {
-      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-      "migrations": [
-        [
-          "decode_issuance_freeze_spec",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_03.inc": {
-      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-      "migrations": [
-        [
-          "decode_session_suspension",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "decode_egress_restriction",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs": {
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
       "migrations": [
@@ -11105,62 +11010,6 @@
       "migrations": [],
       "retained_typed_conversions": [
         "flush::from_slice"
-      ]
-    },
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_process_recovery.rs": {
-      "contract": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-      "migrations": [],
-      "retained_typed_conversions": [
-        "matrix_with_recovery::from_slice"
-      ]
-    },
-    "crates/platform/chio-control-plane/src/security/adapters_parts/part_01.inc": {
-      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-      "migrations": [
-        [
-          "compact_once",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "reconcile_stranded_active",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc": {
-      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-      "migrations": [
-        [
-          "ensure_supported_policy",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "correlate",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "verify_receipt_event",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "verify_internal_event",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ],
-        [
-          "parse_bound_body",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": [
-        "verify_receipt_event::from_value"
       ]
     },
     "crates/platform/chio-control-plane/src/security/migration_evidence.rs": {
@@ -11566,7 +11415,139 @@
         "serve_prepared_broker_mcp::from_value"
       ]
     },
-    "crates/security/chio-secret-broker/src/service_parts/ipc_prepared.inc": {
+    "crates/security/chio-secret-broker/src/sqlite.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "load_attempt_row",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/alert.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "verify_canonical_json_contribution",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "decode_capability_set_suspension_spec",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/throttle.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "decode_session_throttle_limits",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "decode_issuance_freeze_spec",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/containment.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "decode_session_suspension",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/egress.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "decode_egress_restriction",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/adapters/declassification_outbox.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "compact_once",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "reconcile_stranded_active",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "ensure_supported_policy",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "correlate",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs": {
+      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+      "migrations": [
+        [
+          "verify_receipt_event",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "verify_internal_event",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ],
+        [
+          "parse_bound_body",
+          "decode_signed",
+          "64 * 1024 * 1024"
+        ]
+      ],
+      "retained_typed_conversions": [
+        "verify_receipt_event::from_value"
+      ]
+    },
+    "crates/security/chio-secret-broker/src/service/ipc/prepared.rs": {
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
       "migrations": [
         [
@@ -11582,52 +11563,13 @@
       ],
       "retained_typed_conversions": []
     },
-    "crates/security/chio-secret-broker/src/service_parts/ipc_response.inc": {
+    "crates/security/chio-secret-broker/src/service/ipc/response.rs": {
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
       "migrations": [
         [
           "validate_signed_broker_execute_failure",
           "decode_canonical",
           "MAX_WIRE_BYTES"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/security/chio-secret-broker/src/service_parts/tests_01_sections/cases.inc": {
-      "contract": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-      "migrations": [],
-      "retained_typed_conversions": [
-        "stalled_same_uid_client_is_bounded_and_next_request_is_served::from_slice"
-      ]
-    },
-    "crates/security/chio-secret-broker/src/service_parts/tests_03.rs": {
-      "contract": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-      "migrations": [],
-      "retained_typed_conversions": [
-        "nonreading_client_write_backpressure_is_bounded_and_next_request_succeeds::from_slice",
-        "pre_evidence_execute_fault_does_not_stop_the_endpoint::from_slice",
-        "trickling_same_uid_client_cannot_extend_the_absolute_read_deadline::from_slice"
-      ]
-    },
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs": {
-      "contract": "Explicit test include fragment or inline test module. Readers consume fixture output, not production ingress; module inclusion was reviewed.",
-      "migrations": [],
-      "retained_typed_conversions": [
-        "exchange::from_slice",
-        "prepare_connection::from_slice",
-        "prepare_connection::from_slice",
-        "prepared_connection_lifetime_respects_capability_and_nonce_expiry::from_slice",
-        "prepared_connection_rejects_unauthorized_capacity_and_substituted_frames::from_slice",
-        "prepared_connection_waits_without_blocking_control_and_executes_once::from_slice"
-      ]
-    },
-    "crates/security/chio-secret-broker/src/sqlite.rs": {
-      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-      "migrations": [
-        [
-          "load_attempt_row",
-          "decode_signed",
-          "64 * 1024 * 1024"
         ]
       ],
       "retained_typed_conversions": []

@@ -55,10 +55,10 @@
     "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_materializes_threshold_approval_against_runtime_policy_hash": 1,
     "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes": 1,
     "crates/platform/chio-control-plane/src/security/active_response.rs::system_now_unix_ms": 1,
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_04.inc::now_unix_ms": 1,
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs::now_ms": 1,
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc::real_adapter_now_unix_seconds": 1,
-    "crates/platform/chio-control-plane/src/security/scheduler_worker_parts/part_02.inc::current_unix_ms": 1,
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/tests.rs::now_unix_ms": 1,
+    "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs::now_ms": 1,
+    "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter.rs::real_adapter_now_unix_seconds": 1,
+    "crates/platform/chio-control-plane/src/security/scheduler_worker/tests.rs::current_unix_ms": 1,
     "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs::capability_revoke_observes_revocation_lag": 1,
     "crates/platform/chio-control-plane/src/trust_control/cluster/deltas_tests.rs::temp_budget_db": 1,
     "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs::unique_temp_path": 1,
@@ -128,7 +128,7 @@
     "crates/platform/chio-store-sqlite/tests/session_throttles.rs::now_unix_ms": 1,
     "crates/platform/chio-store-sqlite/tests/tenant_isolation.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/tests/threshold_kernel_lifecycle/support.rs::now": 1,
-    "crates/security/chio-cage/src/launch/linux_parts/part_02.rs::unix_time_ms": 1,
+    "crates/security/chio-cage-init/src/status.rs::unix_time_ms": 1,
     "crates/security/chio-keyring/tests/independent_services.rs::now_millis": 1,
     "crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs::now_unix_seconds": 1,
     "crates/security/chio-secret-broker/src/process_boundary_tests/native.rs::run_native_delivery_with_cutpoint": 2,
@@ -137,7 +137,7 @@
     "crates/security/chio-secret-broker/src/process_boundary_tests/native_host.rs::new": 2,
     "crates/security/chio-secret-broker/src/process_boundary_tests/native_keyring.rs::new_with_interruption": 1,
     "crates/security/chio-secret-broker/src/process_boundary_tests/native_response_tests.rs::reject_signed_capture_substitutions": 1,
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::now": 1,
+    "crates/security/chio-secret-broker/src/service/ipc/prepared/tests.rs::now": 1,
     "crates/security/chio-secret-broker/tests/no_secret_crossing.rs::exercise_brokerd_process": 1
   },
   "kernel_sqlite_review_2026_09_28": {
@@ -788,26 +788,6 @@
       "disposition": "fixture",
       "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
     },
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port_parts/part_04.inc::now_unix_ms": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
-    },
-    "crates/platform/chio-control-plane/src/security/adapters/native_flow_test_support.rs::now_ms": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
-    },
-    "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_06.inc::real_adapter_now_unix_seconds": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
-    },
-    "crates/platform/chio-control-plane/src/security/scheduler_worker_parts/part_02.inc::current_unix_ms": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
-    },
     "crates/platform/chio-control-plane/src/trust_control/budget_handlers.rs::generated_budget_event_id": {
       "occurrences": 1,
       "disposition": "migrated",
@@ -923,12 +903,22 @@
       "disposition": "fixture",
       "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
     },
-    "crates/security/chio-secret-broker/src/service_parts/tests_prepared.rs::now": {
+    "crates/security/chio-secret-broker/tests/no_secret_crossing.rs::exercise_brokerd_process": {
       "occurrences": 1,
       "disposition": "fixture",
       "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
     },
-    "crates/security/chio-secret-broker/tests/no_secret_crossing.rs::exercise_brokerd_process": {
+    "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter.rs::real_adapter_now_unix_seconds": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/platform/chio-control-plane/src/security/scheduler_worker/tests.rs::current_unix_ms": {
+      "occurrences": 1,
+      "disposition": "fixture",
+      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    },
+    "crates/security/chio-secret-broker/src/service/ipc/prepared/tests.rs::now": {
       "occurrences": 1,
       "disposition": "fixture",
       "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."

@@ -6,7 +6,7 @@ version = 1
 
 [[schema]]
 value = "chio-cage-compiler.v2"
-files = ["crates/security/chio-cage/src/lib_parts/part_01.rs"]
+files = ["crates/security/chio-cage-plan/src/model.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
@@ -386,7 +386,7 @@ first_seen = "b39b131271"
 
 [[schema]]
 value = "chio.attested-finding-admission-artifacts.v1"
-files = ["crates/platform/chio-control-plane/src/security/event_consumer_parts/part_03.inc"]
+files = ["crates/platform/chio-control-plane/src/security/event_consumer/admission.rs"]
 first_seen = "b39b131271"
 
 [[schema]]
@@ -636,32 +636,32 @@ first_seen = "6ea79bb5da"
 
 [[schema]]
 value = "chio.cage.compiled-sandbox-profile.v2"
-files = ["crates/security/chio-cage/src/lib_parts/part_01.rs"]
+files = ["crates/security/chio-cage/src/lib.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
 value = "chio.cage.enforcement-prepared.v1"
-files = ["crates/security/chio-cage/src/enforcement.rs"]
+files = ["crates/security/chio-cage-plan/src/enforcement.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
 value = "chio.cage.enforcement-record.v1"
-files = ["crates/security/chio-cage/src/enforcement.rs"]
+files = ["crates/security/chio-cage-plan/src/enforcement.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
 value = "chio.cage.exec-transition-observed.v1"
-files = ["crates/security/chio-cage/src/enforcement.rs"]
+files = ["crates/security/chio-cage-plan/src/enforcement.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
 value = "chio.cage.init-plan.v2"
-files = ["crates/security/chio-cage/src/lib_parts/part_01.rs"]
+files = ["crates/security/chio-cage-plan/src/model.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
 value = "chio.cage.launch-envelope.v1"
-files = ["crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc"]
+files = ["crates/security/chio-cage-plan/src/launch_protocol.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
@@ -676,7 +676,7 @@ first_seen = "3d3e4b4d9d"
 
 [[schema]]
 value = "chio.cage.status-record.v1"
-files = ["crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc"]
+files = ["crates/security/chio-cage-plan/src/launch_protocol.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
@@ -4991,7 +4991,7 @@ first_seen = "b39b131271"
 
 [[schema]]
 value = "chio.security-event-receipt-projection.v1"
-files = ["crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc"]
+files = ["crates/platform/chio-control-plane/src/security/event_consumer/verification.rs"]
 first_seen = "b39b131271"
 
 [[schema]]

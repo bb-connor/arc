@@ -56,23 +56,23 @@ main() {
   run_tests "automatic response bypasses governed approval port" cargo test -p chio-quarantine --lib approval::tests::automatic_plans_never_traverse_the_governed_port -- --exact
   run_tests "automatic response commit wins before fencing" cargo test -p chio-kernel --lib kernel::tests::automatic_active_response_fence::two_kernels_commit_wins_before_the_automatic_fence -- --exact
   run_tests "automatic response fence wins against inflight commit" cargo test -p chio-kernel --lib kernel::tests::automatic_active_response_fence::two_kernels_fence_wins_against_an_inflight_automatic_commit -- --exact
-  run_tests "prepared outbox failure cancels admission before expiry" cargo test -p chio-control-plane --lib security::event_consumer::tests::admission_prepared_persistence_failure_cancels_before_pending_expiry -- --exact
-  run_tests "prepared outbox acknowledgement loss preserves admission" cargo test -p chio-control-plane --lib security::event_consumer::tests::admission_prepared_ack_loss_preserves_reservation_and_executes_once -- --exact
-  run_tests "real approval adapter cold recovery" cargo test -p chio-control-plane --lib security::event_consumer::tests::real_kernel_approval_adapter_prepares_reconstructs_commits_and_cold_resumes_once -- --exact
-  run_tests "real approval adapter mutation denial" cargo test -p chio-control-plane --lib security::event_consumer::tests::real_kernel_approval_adapter_rejects_projection_mutations_before_store_changes -- --exact
-  run_tests "operation-committed dispatch exact resume" cargo test -p chio-control-plane --lib security::event_consumer::tests::operation_committed_dispatch_resumes_after_executor_readback_is_missing -- --exact
-  run_tests "rewritten prepared binding remains outcome unknown" cargo test -p chio-control-plane --lib security::event_consumer::tests::rewritten_prepared_binding_resume_failure_stays_outcome_unknown -- --exact
-  run_tests "authoritative never-committed terminalization" cargo test -p chio-control-plane --lib security::event_consumer::tests::authoritative_never_committed_probe_closes_prepared_dispatch_terminally -- --exact
+  run_tests "prepared outbox failure cancels admission before expiry" cargo test -p chio-control-plane --lib security::event_consumer::tests::admission_prepared_persistence_failure_cancels_before_pending_expiry::admission_prepared_persistence_failure_cancels_before_pending_expiry -- --exact
+  run_tests "prepared outbox acknowledgement loss preserves admission" cargo test -p chio-control-plane --lib security::event_consumer::tests::admission_prepared_ack_loss_preserves_reservation_and_executes_once::admission_prepared_ack_loss_preserves_reservation_and_executes_once -- --exact
+  run_tests "real approval adapter cold recovery" cargo test -p chio-control-plane --lib security::event_consumer::admission::real_adapter_tests::real_kernel_approval_adapter_prepares_reconstructs_commits_and_cold_resumes_once::real_kernel_approval_adapter_prepares_reconstructs_commits_and_cold_resumes_once -- --exact
+  run_tests "real approval adapter mutation denial" cargo test -p chio-control-plane --lib security::event_consumer::admission::real_adapter_tests::real_kernel_approval_adapter_rejects_projection_mutations_before_store_changes::real_kernel_approval_adapter_rejects_projection_mutations_before_store_changes -- --exact
+  run_tests "operation-committed dispatch exact resume" cargo test -p chio-control-plane --lib security::event_consumer::tests::operation_committed_dispatch_resumes_after_executor_readback_is_missing::operation_committed_dispatch_resumes_after_executor_readback_is_missing -- --exact
+  run_tests "rewritten prepared binding remains outcome unknown" cargo test -p chio-control-plane --lib security::event_consumer::tests::rewritten_prepared_binding_resume_failure_stays_outcome_unknown::rewritten_prepared_binding_resume_failure_stays_outcome_unknown -- --exact
+  run_tests "authoritative never-committed terminalization" cargo test -p chio-control-plane --lib security::event_consumer::tests::authoritative_never_committed_probe_closes_prepared_dispatch_terminally::authoritative_never_committed_probe_closes_prepared_dispatch_terminally -- --exact
 
   # The executor supplies the six crash boundaries. Each concrete backend must
   # also prove exact apply/remove recovery through its durable adapter contract.
   run_tests "every effect kind six-boundary crash matrix" cargo test -p chio-quarantine --test response_executor executor_every_effect_kind_six_boundary_crash_matrix_converges_exactly_once -- --exact
   run_tests "stale takeover cannot apply pending effect" cargo test -p chio-quarantine --test response_executor executor_crash_stale_takeover_pending_apply_never_calls_effect_port -- --exact
   run_tests "stale takeover cannot roll back pending effect" cargo test -p chio-quarantine --test response_executor executor_crash_stale_takeover_pending_rollback_never_calls_effect_port -- --exact
-  run_tests "EscalateAlert backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::escalate_alert_recovers_page_ack_loss_retry_and_backend_restart -- --exact
-  run_tests "ThrottleSession backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::throttle_backend_recovers_apply_and_remove_ack_loss_across_restart -- --exact
-  run_tests "RestrictEgress backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped -- --exact
-  run_tests "SuspendSession backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::suspend_session_apply_and_ack_loss_query_bind_the_exact_contribution -- --exact
+  run_tests "EscalateAlert backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::escalate_alert_recovers_page_ack_loss_retry_and_backend_restart::escalate_alert_recovers_page_ack_loss_retry_and_backend_restart -- --exact
+  run_tests "ThrottleSession backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::throttle_backend_recovers_apply_and_remove_ack_loss_across_restart::throttle_backend_recovers_apply_and_remove_ack_loss_across_restart -- --exact
+  run_tests "RestrictEgress backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped::restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped -- --exact
+  run_tests "SuspendSession backend recovery" cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::suspend_session_apply_and_ack_loss_query_bind_the_exact_contribution::suspend_session_apply_and_ack_loss_query_bind_the_exact_contribution -- --exact
   run_tests "SuspendCapabilitySet backend recovery" cargo test -p chio-control-plane --test capability_set_suspension_backend apply_and_remove_ack_loss_reconcile_across_backend_restart -- --exact
   run_tests "FreezeIssuance backend recovery" cargo test -p chio-control-plane --test issuance_freeze_backend apply_and_remove_reconcile_every_ack_loss_boundary -- --exact
 
@@ -107,9 +107,9 @@ main() {
 
   # Exercise both the scheduler state machine and the production SQLite worker.
   run_tests "scheduler stale-worker lease takeover" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_contention_waits_for_expiry_and_stale_takeover_loses -- --exact
-  run_tests "production worker restart replays claim and releases lease" cargo test -p chio-control-plane --lib security::scheduler_worker::tests::sqlite_worker_restart_replays_lost_claim_ack_and_shutdown_releases_lease -- --exact
-  run_tests "production worker claims simultaneous due work deterministically" cargo test -p chio-control-plane --lib security::scheduler_worker::tests::sqlite_worker_claims_simultaneously_due_actions_transactionally_in_deterministic_order -- --exact
-  run_tests "production worker stale-fence takeover" cargo test -p chio-control-plane --lib security::scheduler_worker::tests::sqlite_worker_stale_fence_loses_after_expiry_takeover -- --exact
+  run_tests "production worker restart replays claim and releases lease" cargo test -p chio-control-plane --lib security::scheduler_worker::scheduler::sqlite_worker_restart_replays_lost_claim_ack_and_shutdown_releases_lease::sqlite_worker_restart_replays_lost_claim_ack_and_shutdown_releases_lease -- --exact
+  run_tests "production worker claims simultaneous due work deterministically" cargo test -p chio-control-plane --lib security::scheduler_worker::tests::sqlite_worker_claims_simultaneously_due_actions_transactionally_in_deterministic_order::sqlite_worker_claims_simultaneously_due_actions_transactionally_in_deterministic_order -- --exact
+  run_tests "production worker stale-fence takeover" cargo test -p chio-control-plane --lib security::scheduler_worker::scheduler::sqlite_worker_stale_fence_loses_after_expiry_takeover::sqlite_worker_stale_fence_loses_after_expiry_takeover -- --exact
 
   # Receipt validation and durable production evidence must agree on the exact
   # effect/response transition lineage and must never claim false completion.

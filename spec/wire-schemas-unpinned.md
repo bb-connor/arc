@@ -102,14 +102,14 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/certify/schema.rs:9` `CERTIFICATION_CONSUMPTION_POLICY_PROFILE_V1` = `chio.certify.consume.v1`
 - `crates/platform/chio-control-plane/src/federation_policy.rs:15` `FEDERATION_ADMISSION_POLICY_RECORD_SCHEMA` = `chio.permissionless-federation-policy.v1`
 - `crates/platform/chio-control-plane/src/federation_policy.rs:17` `FEDERATION_ADMISSION_POLICY_REGISTRY_VERSION` = `chio.permissionless-federation-policy-registry.v1`
-- `crates/platform/chio-control-plane/src/keyring_runtime.rs:1274` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
+- `crates/platform/chio-control-plane/src/keyring_runtime.rs:1273` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:30` `PASSPORT_STATUS_REGISTRY_VERSION` = `chio.passport-status-registry.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:31` `PASSPORT_ISSUANCE_REGISTRY_VERSION` = `chio.passport-issuance-offers.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:13` `SCIM_LIFECYCLE_REGISTRY_VERSION` = `chio.scim-lifecycle-registry.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:14` `SCIM_LIFECYCLE_RECORD_SCHEMA` = `chio.scim-lifecycle-record.v1`
 - `crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs:11` `DECLASSIFIED_SCHEMA` = `chio.native-flow-dispatch-policy.v2`
-- `crates/platform/chio-control-plane/src/security/event_consumer_parts/part_01.inc:68` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
-- `crates/platform/chio-control-plane/src/security/event_consumer_parts/part_03.inc:20` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
+- `crates/platform/chio-control-plane/src/security/event_consumer/admission.rs:229` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
+- `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:50` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:11` `ENTERPRISE_MIGRATION_CANARY_EVIDENCE_SCHEMA` = `chio.enterprise-migration-canary-evidence.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:13` `ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_SCHEMA` = `chio.enterprise-migration-cutover-attestation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:145` `DEFECT_DOMAIN` = `chio.finding.defect.v1`
@@ -169,11 +169,14 @@ since been pinned is removed by the next `--update`.
 - `crates/security/chio-active-response-authority/src/store.rs:31` `AUTHORITY_STORE_BUNDLE_SCHEMA` = `chio.active-response-authority.bundle.v1`
 - `crates/security/chio-active-response-authority/src/store.rs:32` `AUTHORITY_STORE_MANIFEST_SCHEMA` = `chio.active-response-authority.store-manifest.v1`
 
-## crates/security/chio-cage (3)
+## crates/security/chio-cage (1)
 
-- `crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc:31` `LAUNCH_ENVELOPE_SCHEMA` = `chio.cage.launch-envelope.v1`
-- `crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc:32` `STATUS_RECORD_SCHEMA` = `chio.cage.status-record.v1`
-- `crates/security/chio-cage/src/lib_parts/part_01.rs:35` `COMPILED_SANDBOX_PROFILE_SCHEMA` = `chio.cage.compiled-sandbox-profile.v2`
+- `crates/security/chio-cage/src/lib.rs:60` `COMPILED_SANDBOX_PROFILE_SCHEMA` = `chio.cage.compiled-sandbox-profile.v2`
+
+## crates/security/chio-cage-plan (2)
+
+- `crates/security/chio-cage-plan/src/launch_protocol.rs:86` `LAUNCH_ENVELOPE_SCHEMA` = `chio.cage.launch-envelope.v1`
+- `crates/security/chio-cage-plan/src/launch_protocol.rs:87` `STATUS_RECORD_SCHEMA` = `chio.cage.status-record.v1`
 
 ## crates/security/chio-decoy (1)
 

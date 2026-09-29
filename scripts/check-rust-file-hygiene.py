@@ -151,7 +151,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=4_512,
     ),
     "crates/products/chio-cli/tests/certify.rs": allow(
-        "2026-12-31",
+        "2027-01-31",
         "existing oversized CLI certify integration suite; capped to current size until split",
         max_lines=3_645,
     ),
@@ -181,7 +181,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=3_456,
     ),
     "crates/products/chio-cli/tests/proof_cli_contract/support.rs": allow(
-        "2026-12-31",
+        "2027-01-31",
         "launch proof CLI contract support module; capped to current size until split",
         max_lines=3_896,
     ),
@@ -203,15 +203,15 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/core/chio-core-types/src/capability/tests.rs": allow(
         "2026-12-31",
         "existing oversized capability type test suite; capped to current size until split; covers time-checked verification, attenuation narrowing, and wildcard/concrete reflection regressions",
-        max_lines=3_163,
+        max_lines=3_147,
     ),
     "crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs": allow(
-        "2026-10-31",
+        "2026-11-30",
         "existing oversized runtime buyer review integration suite; capped to current size until split",
         max_lines=2_068,
     ),
     "crates/kernel/chio-runtime-core/tests/runtime_admission.rs": allow(
-        "2026-12-31",
+        "2027-01-31",
         "runtime admission integration suite; capped to current size after swarm authority split",
         max_lines=3_673,
         max_fragments=1,
@@ -222,9 +222,9 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=2_789,
     ),
     "crates/platform/chio-transaction-passport/tests/cognition_market.rs": allow(
-        "2026-11-30",
+        "2026-12-31",
         "cognition-market transaction passport regression suite; capped to current size until split",
-        max_lines=2_655,
+        max_lines=2_615,
         max_fragments=2,
     ),
     "crates/trust/chio-selective-disclosure/src/lib.rs": allow(
@@ -235,7 +235,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-risk-comptroller/src/lib.rs": allow(
         "2026-10-31",
         "launch risk comptroller verifier surface; capped to current size until split",
-        max_lines=1_356,
+        max_lines=1_327,
     ),
     "crates/economy/chio-web3/src/tests.rs": allow(
         "2026-12-31",
@@ -265,7 +265,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-proof-room/src/lib.rs": allow(
         "2026-10-31",
         "Proof Room product surface; capped to current size until split",
-        max_lines=1_196,
+        max_lines=1_170,
     ),
     "crates/economy/chio-settle/src/evm/tests.rs": allow(
         "2026-11-30",
@@ -280,7 +280,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/receipt_store.rs": allow(
         "2027-01-31",
         "receipt store hot-path module with anchored receipt, lineage metadata, checkpoint, and retention writes plus qualified read verification; capped to current size until split",
-        max_lines=5_630,
+        max_lines=5_293,
     ),
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs": allow(
         "2027-01-31",
@@ -300,20 +300,20 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs": allow(
         "2026-12-31",
         "trust-control cluster and reports surface with mixed-version revocation cursor coverage; capped to current size until split",
-        max_lines=2_696,
+        max_lines=2_605,
     ),
     "crates/platform/chio-store-sqlite/src/budget_store/tests.rs": allow(
-        "2026-11-30",
+        "2026-12-31",
         "existing oversized budget store test suite; capped to current size until split",
         max_lines=2_479,
     ),
     "crates/economy/chio-web3/src/settlement_proof.rs": allow(
-        "2026-10-31",
+        "2026-11-30",
         "web3 settlement proof surface; capped to current size until split",
         max_lines=2_053,
     ),
     "crates/products/chio-wall/src/commands.rs": allow(
-        "2026-10-31",
+        "2026-11-30",
         "wall command surface; capped to current size until split",
         max_lines=2_048,
     ),
@@ -346,27 +346,27 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/admission_operation_tests.rs": allow(
         "2026-11-30",
         "durable admission operation regression suite with authoritative outcome binding coverage; capped to current size until split",
-        max_lines=2_356,
+        max_lines=2_090,
     ),
     "crates/kernel/chio-kernel/src/admission_operation/projection.rs": allow(
         "2026-10-31",
         "durable admission projection surface with current-status denial binding; capped to current size until split",
-        max_lines=2_096,
+        max_lines=2_014,
     ),
     "crates/kernel/chio-kernel/src/kernel/validation.rs": allow(
         "2026-12-31",
         "kernel capability and admission validation surface; capped to current size until split",
-        max_lines=2_747,
+        max_lines=2_679,
     ),
     "crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs": allow(
         "2026-11-30",
         "capital liability control surface; capped to current size until split",
-        max_lines=2_166,
+        max_lines=2_131,
     ),
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs": allow(
-        "2026-11-30",
+        "2026-12-31",
         "cognition finding handler surface with authenticated status-operator standing and live service-bond renewal; capped to current size until split",
-        max_lines=2_426,
+        max_lines=2_412,
     ),
     "crates/economy/chio-finding/tests/challenge_families.rs": allow(
         "2026-11-30",
@@ -379,42 +379,42 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=2_219,
     ),
     "crates/trust/chio-finding-verifier/src/verify.rs": allow(
-        "2026-10-31",
+        "2026-11-30",
         "cognition finding verifier with current authority standing and terminal-receipt-checkpoint role separation; capped to current size until split",
         max_lines=2_107,
     ),
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_challenge_enforcement_e2e_tests.rs": allow(
         "2027-01-31",
         "cognition challenge enforcement end-to-end regression suite with unavailable-status, authority-rotation, and bounded admission coverage; capped to current size until split",
-        max_lines=8_088,
+        max_lines=8_061,
         max_fragments=1,
     ),
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_market_exit_tests.rs": allow(
-        "2026-12-31",
+        "2027-01-31",
         "cognition market exit regression suite with status-gated activation, admission-view, and replay coverage; capped to current size until split",
-        max_lines=3_609,
+        max_lines=3_569,
         max_fragments=2,
     ),
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_wedge_purchase_e2e_tests.rs": allow(
         "2027-01-31",
         "cognition purchase and recovery end-to-end regression suite with bounded buyer admission and durable replay coverage; capped to current size until split",
-        max_lines=7_576,
+        max_lines=7_501,
         max_fragments=3,
     ),
     "crates/platform/chio-store-sqlite/src/admission_operation_store/factor_assignment.rs": allow(
         "2026-11-30",
         "admission factor assignment store surface; capped to current size until split",
-        max_lines=2_211,
+        max_lines=2_078,
     ),
     "crates/platform/chio-store-sqlite/src/budget_store/composite_schema.rs": allow(
-        "2026-10-31",
+        "2026-11-30",
         "durable composite budget schema and migration surface; capped to current size until split",
-        max_lines=2_104,
+        max_lines=2_058,
     ),
     "crates/platform/chio-store-sqlite/src/finding_market_store.rs": allow(
         "2026-11-30",
         "cognition finding market authority store with atomic status and sales-blocked participation fences; capped to current size until split",
-        max_lines=2_328,
+        max_lines=2_287,
     ),
     "crates/platform/chio-store-sqlite/src/finding_challenge_store_tests.rs": allow(
         "2027-01-31",
@@ -430,7 +430,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/finding_purchase_store.rs": allow(
         "2026-12-31",
         "cognition purchase and recovery authority store with atomic finding-status and sales-block reservation gates; capped until split",
-        max_lines=3_385,
+        max_lines=3_292,
     ),
     "crates/platform/chio-store-sqlite/src/finding_purchase_store_tests.rs": allow(
         "2026-12-31",
@@ -440,12 +440,12 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs": allow(
         "2026-12-31",
         "fiscal persistence surface; capped to current size until split",
-        max_lines=2_937,
+        max_lines=2_931,
     ),
     "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs": allow(
         "2026-12-31",
         "serving-owner commit chain persistence surface; capped to current size until split",
-        max_lines=2_851,
+        max_lines=2_554,
     ),
     "crates/products/chio-cli/src/cli/dispatch/finding/unit_tests.rs": allow(
         "2026-11-30",
@@ -460,20 +460,8 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/kernel/tests.rs": allow(
         "2027-01-31",
         "kernel test suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=40_754,
-        max_fragments=48,
-    ),
-    "crates/platform/chio-control-plane/src/security/adapters.rs": allow(
-        "2027-01-31",
-        "control-plane security adapter surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=13_956,
-        max_fragments=40,
-    ),
-    "crates/platform/chio-store-sqlite/src/security_state.rs": allow(
-        "2027-01-31",
-        "SQLite security-state store assembled from include! fragments; capped until the fragments become modules",
-        max_lines=13_473,
-        max_fragments=13,
+        max_lines=38_940,
+        max_fragments=47,
     ),
     "crates/protocol/chio-acp-proxy/src/lib.rs": allow(
         "2027-01-31",
@@ -490,20 +478,8 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/trust/chio-credentials/src/lib.rs": allow(
         "2027-01-31",
         "credentials surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=10_253,
-        max_fragments=15,
-    ),
-    "crates/platform/chio-control-plane/src/security/event_consumer.rs": allow(
-        "2027-01-31",
-        "security event consumer assembled from include! fragments; capped until the fragments become modules",
-        max_lines=9_412,
-        max_fragments=8,
-    ),
-    "crates/security/chio-secret-broker/src/service.rs": allow(
-        "2027-01-31",
-        "secret broker service assembled from include! fragments; capped until the fragments become modules",
-        max_lines=9_371,
-        max_fragments=16,
+        max_lines=8_224,
+        max_fragments=14,
     ),
     "crates/protocol/chio-mcp-remote/src/lib.rs": allow(
         "2027-01-31",
@@ -514,7 +490,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs": allow(
         "2027-01-31",
         "finding challenge coordinator assembled from include! fragments; capped until the fragments become modules",
-        max_lines=7_173,
+        max_lines=7_159,
         max_fragments=14,
     ),
     "xtask/src/fixtures.rs": allow(
@@ -526,13 +502,13 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-acp-edge/src/lib.rs": allow(
         "2027-01-31",
         "ACP edge surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=6_101,
-        max_fragments=11,
+        max_lines=5_768,
+        max_fragments=10,
     ),
     "crates/platform/chio-store-sqlite/src/finding_challenge_store.rs": allow(
         "2027-01-31",
         "finding challenge store assembled from include! fragments; capped until the fragments become modules",
-        max_lines=6_031,
+        max_lines=5_863,
         max_fragments=12,
     ),
     "crates/protocol/chio-a2a-edge/src/lib.rs": allow(
@@ -541,52 +517,28 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=5_913,
         max_fragments=11,
     ),
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port.rs": allow(
-        "2027-01-31",
-        "security effect port adapter assembled from include! fragments; capped until the fragments become modules",
-        max_lines=5_061,
-        max_fragments=4,
-    ),
-    "crates/security/chio-security-types/src/ports.rs": allow(
-        "2027-01-31",
-        "security port surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=5_033,
-        max_fragments=4,
-    ),
-    "crates/platform/chio-control-plane/src/security/scheduler_worker.rs": allow(
-        "2027-01-31",
-        "response scheduler worker assembled from include! fragments; capped until the fragments become modules",
-        max_lines=5_004,
-        max_fragments=4,
-    ),
     "crates/kernel/chio-kernel/src/budget_store/in_memory.rs": allow(
-        "2027-01-31",
+        "2026-12-31",
         "in-memory budget store assembled from include! fragments; capped until the fragments become modules",
-        max_lines=4_024,
-        max_fragments=4,
+        max_lines=3_184,
+        max_fragments=3,
     ),
     "crates/platform/chio-store-sqlite/src/finding_status_store.rs": allow(
         "2027-01-31",
         "finding status store assembled from include! fragments; capped until the fragments become modules",
-        max_lines=4_015,
+        max_lines=3_982,
         max_fragments=1,
     ),
-    "crates/security/chio-cage/src/launch/linux.rs": allow(
-        "2027-01-31",
-        "cage Linux launch path assembled from include! fragments; capped until the fragments become modules",
-        max_lines=3_946,
-        max_fragments=4,
-    ),
     "crates/kernel/chio-kernel/src/security_admission_operation.rs": allow(
-        "2026-12-31",
+        "2027-01-31",
         "kernel security admission operation assembled from include! fragments; capped until the fragments become modules",
-        max_lines=3_612,
+        max_lines=3_589,
         max_fragments=3,
     ),
     "crates/platform/chio-store-sqlite/tests/security_state_contract.rs": allow(
         "2026-12-31",
         "security-state store contract suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=3_596,
+        max_lines=3_206,
         max_fragments=2,
     ),
     "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs": allow(
@@ -610,38 +562,30 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/core/chio-core-types/src/receipt/security.rs": allow(
         "2026-12-31",
         "security receipt projection assembled from include! fragments; capped until the fragments become modules",
-        max_lines=3_157,
+        max_lines=3_155,
         max_fragments=2,
     ),
     "crates/platform/chio-control-plane/src/security/active_response.rs": allow(
-        "2026-12-31",
+        "2026-10-31",
         "control-plane active response surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_976,
-        max_fragments=2,
+        max_lines=2_002,
     ),
     "crates/platform/chio-store-sqlite/tests/security_state.rs": allow(
         "2026-12-31",
         "security-state store suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_931,
+        max_lines=2_929,
         max_fragments=2,
     ),
     "crates/platform/chio-store-sqlite/tests/response_dispatch.rs": allow(
-        "2026-12-31",
+        "2026-11-30",
         "response dispatch store suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_833,
+        max_lines=2_332,
         max_fragments=1,
     ),
     "crates/security/chio-cage/src/lib.rs": allow(
-        "2026-11-30",
+        "2026-10-31",
         "cage crate surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_438,
-        max_fragments=2,
-    ),
-    "crates/platform/chio-control-plane/src/security/orchestration.rs": allow(
-        "2026-11-30",
-        "security orchestration surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_380,
-        max_fragments=1,
+        max_lines=1_975,
     ),
     "third_party/regress-chio/tests/tests.rs": allow(
         "2026-11-30",
@@ -652,25 +596,25 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/security_admission_operation_store.rs": allow(
         "2026-11-30",
         "SQLite admission-operation store assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_373,
+        max_lines=2_372,
         max_fragments=2,
     ),
     "crates/security/chio-keyring/src/sqlite.rs": allow(
         "2026-11-30",
         "keyring SQLite store assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_270,
+        max_lines=2_159,
         max_fragments=2,
     ),
     "crates/kernel/chio-kernel/src/kernel/active_response_coordinator.rs": allow(
-        "2026-11-30",
+        "2026-10-31",
         "kernel active response coordinator assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_212,
+        max_lines=2_046,
         max_fragments=1,
     ),
     "crates/security/chio-quarantine/src/executor.rs": allow(
         "2026-11-30",
         "quarantine executor assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_191,
+        max_lines=2_168,
         max_fragments=1,
     ),
     "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs": allow(
@@ -680,9 +624,8 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_fragments=1,
     ),
     "crates/security/chio-quarantine/src/state_machine.rs": allow(
-        "2026-11-30",
+        "2026-10-31",
         "quarantine state machine assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_151,
         max_fragments=1,
     ),
     "crates/platform/chio-agent-web-interop/tests/agent_web_interop/core_tests.rs": allow(
@@ -694,13 +637,11 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/tooling/chio-conformance/tests/active_defense.rs": allow(
         "2026-10-31",
         "active-defense conformance suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_103,
-        max_fragments=2,
+        max_fragments=1,
     ),
     "crates/security/chio-quarantine/tests/state_machine.rs": allow(
         "2026-10-31",
         "quarantine state machine suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_023,
         max_fragments=1,
     ),
     "crates/kernel/chio-kernel/src/budget_store.rs": allow(
@@ -722,13 +663,13 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-agent-web-interop/src/lib.rs": allow(
         "2026-10-31",
         "agent-web interop surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=1_480,
+        max_lines=1_425,
         max_fragments=1,
     ),
     "crates/platform/chio-manifest/src/lib.rs": allow(
         "2026-10-31",
         "manifest surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=1_392,
+        max_lines=1_385,
         max_fragments=1,
     ),
     "crates/economy/chio-credit/src/lib.rs": allow(
