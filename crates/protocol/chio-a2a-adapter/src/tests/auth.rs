@@ -811,7 +811,7 @@ fn protocol_boundary_short_oauth_expiry_is_never_cached() {
         Keypair::generate().public_key().to_hex(),
     ))
     .expect("discover");
-    for ttl in [None, Some(0), Some(1), Some(30)] {
+    for ttl in [None, Some(1), Some(30)] {
         adapter
             .store_cached_bearer_token(
                 "key".into(),

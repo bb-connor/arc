@@ -6,10 +6,12 @@ impl A2aAdapter {
         &self,
         cache_key: &str,
     ) -> Result<Option<String>, AdapterError> {
-        let now = self.clock.read()?;
         let mut cache = self.token_cache.lock().map_err(|_| {
             AdapterError::AuthNegotiation("OAuth token cache lock poisoned".to_string())
         })?;
+        // Sampling and publishing the observation share the cache lock so a
+        // concurrent lookup cannot publish a newer sample ahead of this one.
+        let now = self.clock.read()?;
         // Refuse clock faults before returning even an otherwise valid cache hit.
         for entry in cache.iter_mut() {
             match entry.deadline.remaining(now) {
@@ -31,7 +33,19 @@ impl A2aAdapter {
         expires_in: Option<u64>,
         requested_at: ClockReading,
     ) -> Result<(), AdapterError> {
+        let mut cache = self.token_cache.lock().map_err(|_| {
+            AdapterError::AuthNegotiation("OAuth token cache lock poisoned".to_string())
+        })?;
         let now = self.clock.read()?;
+        // This is the final observation before the acquisition returns its
+        // token. Even a token too short-lived to cache must still be live here.
+        if let Some(seconds) = expires_in {
+            let millis = seconds.checked_mul(1000).ok_or(ClockError::Overflow)?;
+            if millis == 0 {
+                return Err(ClockError::Expired.into());
+            }
+            AuthorityDeadline::for_timeout_ms(requested_at, millis)?.remaining(now)?;
+        }
         let cache_ttl = expires_in
             .and_then(|ttl| ttl.checked_sub(OAUTH_CACHE_SKEW_SECS))
             .filter(|ttl| *ttl > 0);
@@ -47,9 +61,6 @@ impl A2aAdapter {
             })
             .transpose()?
             .flatten();
-        let mut cache = self.token_cache.lock().map_err(|_| {
-            AdapterError::AuthNegotiation("OAuth token cache lock poisoned".to_string())
-        })?;
         // Unknown expiry and lifetimes exhausted by skew or network latency
         // permit this acquisition only, never indefinite cache reuse.
         cache.retain(|entry| entry.cache_key != cache_key);

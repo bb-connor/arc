@@ -42,3 +42,31 @@ fn protocol_boundary_writer_supervisor_refuses_expired_queue_entry() {
         "MCP stdin command expired before dispatch"
     );
 }
+
+#[test]
+fn review_regression_writer_expiry_does_not_disconnect_healthy_commands() {
+    let bytes = Arc::new(Mutex::new(Vec::new()));
+    let (tx, rx) = mpsc::sync_channel(2);
+    let (expired_tx, expired_rx) = mpsc::sync_channel(1);
+    let (healthy_tx, healthy_rx) = mpsc::sync_channel(1);
+    tx.send(WriterCommand {
+        bytes: b"expired".to_vec(),
+        deadline: Some(Instant::now()),
+        completion: Some(expired_tx),
+    })
+    .unwrap();
+    tx.send(WriterCommand {
+        bytes: b"healthy".to_vec(),
+        deadline: Instant::now().checked_add(Duration::from_secs(10)),
+        completion: Some(healthy_tx),
+    })
+    .unwrap();
+    drop(tx);
+    run_stdio_writer(Box::new(Capture(bytes.clone())), rx);
+    assert_eq!(&*bytes.lock().unwrap(), b"healthy");
+    assert_eq!(
+        expired_rx.recv().unwrap().unwrap_err(),
+        "MCP stdin command expired before dispatch"
+    );
+    assert_eq!(healthy_rx.recv().unwrap(), Ok(()));
+}

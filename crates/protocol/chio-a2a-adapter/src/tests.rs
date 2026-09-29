@@ -34,6 +34,8 @@ mod discovery_registry;
 mod invoke_manifest;
 #[path = "tests/kernel_receipts.rs"]
 mod kernel_receipts;
+#[path = "tests/oauth_cache_review.rs"]
+mod oauth_cache_review;
 #[path = "tests/protocol.rs"]
 mod protocol;
 #[path = "tests/protocol_boundaries.rs"]

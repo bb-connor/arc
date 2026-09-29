@@ -126,3 +126,44 @@ fn protocol_boundary_nested_capacity_and_clock_faults_are_atomic() {
     assert_eq!(runtime.pending_background_tasks.len(), MAX_NESTED_TASKS);
     assert_eq!(runtime.tasks.len(), MAX_NESTED_TASKS);
 }
+
+#[test]
+fn review_regression_nested_capacity_preserves_uncollected_results_until_expiry() {
+    let now = FixedClock::from_millis(1000).read().unwrap();
+    let clock = Arc::new(TestClock(Mutex::new(Ok(now))));
+    let mut runtime = NestedFlowTaskRuntime {
+        clock: clock.clone(),
+        ..Default::default()
+    };
+    let first = create(&mut runtime, 1000).unwrap();
+    let first_id = first["task"]["taskId"].as_str().unwrap().to_string();
+    runtime
+        .tasks
+        .get_mut(&first_id)
+        .unwrap()
+        .mark_cancelled("retained", now);
+    for _ in 1..MAX_NESTED_TASKS {
+        create(&mut runtime, 1000).unwrap();
+    }
+    assert!(matches!(
+        create(&mut runtime, 1000),
+        Err(AdapterError::TaskCapacity)
+    ));
+    let response = runtime
+        .handle_tasks_result(
+            json!(1),
+            &json!({"taskId":first_id}),
+            &mut NoDispatch,
+            &mut Vec::new(),
+        )
+        .unwrap();
+    assert_eq!(response["error"]["code"], -32800);
+    assert_eq!(response["error"]["message"], "retained");
+    *clock.0.lock().unwrap() = Ok(ClockReading::new(
+        UnixMillis::new(2000),
+        MonotonicInstant::from_nanos(1_000_000_000),
+    ));
+    create(&mut runtime, 1000).unwrap();
+    assert_eq!(runtime.tasks.len(), 1);
+    assert!(!runtime.tasks.contains_key(&first_id));
+}

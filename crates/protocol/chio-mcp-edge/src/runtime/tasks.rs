@@ -224,9 +224,8 @@ impl ChioMcpEdge {
     pub(super) fn ensure_deferred_task_capacity(&mut self, id: &Value) -> Result<(), Value> {
         self.prune_expired_tasks()
             .map_err(|error| task_clock_error(id.clone(), error))?;
-        if self.tasks.len() >= MAX_DEFERRED_MCP_TASKS {
-            self.prune_terminal_tasks();
-        }
+        // Preserve every task's result until its advertised TTL expires,
+        // including terminal results that the caller has not collected yet.
         if self.tasks.len() >= MAX_DEFERRED_MCP_TASKS {
             return Err(jsonrpc_error(
                 id.clone(),
@@ -252,11 +251,6 @@ impl ChioMcpEdge {
         }
         self.retain_live_background_tasks();
         Ok(observed)
-    }
-
-    pub(super) fn prune_terminal_tasks(&mut self) {
-        self.tasks.retain(|_, task| !task.is_terminal());
-        self.retain_live_background_tasks();
     }
 
     pub(super) fn retain_live_background_tasks(&mut self) {

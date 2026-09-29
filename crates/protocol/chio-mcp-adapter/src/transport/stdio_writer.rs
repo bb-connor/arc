@@ -124,17 +124,20 @@ pub(super) fn run_stdio_writer(
     writer_rx: mpsc::Receiver<WriterCommand>,
 ) {
     while let Ok(command) = writer_rx.recv() {
-        let result = if command
+        if command
             .deadline
             .is_some_and(|deadline| Instant::now() >= deadline)
         {
-            Err("MCP stdin command expired before dispatch".to_string())
-        } else {
-            writer
-                .write_all(&command.bytes)
-                .and_then(|()| writer.flush())
-                .map_err(|error| error.to_string())
-        };
+            if let Some(completion) = command.completion {
+                let _ = completion
+                    .try_send(Err("MCP stdin command expired before dispatch".to_string()));
+            }
+            continue;
+        }
+        let result = writer
+            .write_all(&command.bytes)
+            .and_then(|()| writer.flush())
+            .map_err(|error| error.to_string());
         let failed = result.is_err();
         if let Some(completion) = command.completion {
             let _ = completion.try_send(result);

@@ -127,6 +127,50 @@ fn protocol_boundary_sequence_exhaustion_and_pagination_cannot_wrap() {
     assert_eq!(response["result"]["items"], json!([2]));
 }
 
+#[test]
+fn review_regression_edge_capacity_preserves_uncollected_results_until_expiry() {
+    let clock = Arc::new(ProtocolClock::new());
+    let mut edge = edge_with_clock(clock.clone());
+    let first_id = queue_task(&mut edge);
+    edge.tasks
+        .get_mut(&first_id)
+        .unwrap()
+        .mark_completed(json!({"content": []}), ProtocolClock::at(0));
+    for _ in 1..MAX_DEFERRED_MCP_TASKS {
+        queue_task(&mut edge);
+    }
+    let error = edge.ensure_deferred_task_capacity(&json!(9)).unwrap_err();
+    assert_eq!(
+        error["error"]["message"],
+        "urn:chio:error:transport:task-capacity-exceeded"
+    );
+    let response = edge.handle_tasks_result(json!(10), json!({"taskId":first_id}));
+    assert_eq!(response["result"]["content"], json!([]));
+    clock.advance(10);
+    edge.ensure_deferred_task_capacity(&json!(11)).unwrap();
+    assert!(edge.tasks.is_empty());
+}
+
+#[test]
+fn review_regression_channel_preserves_original_decoder_cause() {
+    use std::error::Error;
+    let (tx, mut rx) = mpsc::channel();
+    let (cancel_tx, _cancel_rx) = mpsc::channel();
+    let bytes = b"{\"authority\":\"secret-first\",\"authority\":\"secret-second\"}\n";
+    pump_client_messages(&bytes[..], tx, cancel_tx);
+    let error = next_client_message(&mut rx).unwrap_err();
+    assert!(matches!(
+        error,
+        AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
+    assert!(error.source().is_some());
+    assert_eq!(
+        error.to_string(),
+        "urn:chio:error:attest:signed-json-invalid-input"
+    );
+    assert!(!format!("{error:?}").contains("secret"));
+}
+
 pub(super) fn make_kernel_with_clock(
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> (ChioKernel, Keypair) {

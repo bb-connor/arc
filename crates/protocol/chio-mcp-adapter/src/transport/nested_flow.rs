@@ -216,9 +216,8 @@ impl NestedFlowTaskRuntime {
 
     fn prepare_task(&mut self) -> Result<ClockReading, AdapterError> {
         let now = self.prune_expired()?;
-        if self.tasks.len() >= MAX_NESTED_TASKS {
-            self.tasks.retain(|_, task| !task.is_terminal());
-        }
+        // Terminal results remain owned by the caller until their original TTL
+        // expires. A new request cannot reclaim another task's result custody.
         if self.tasks.len() >= MAX_NESTED_TASKS {
             return Err(AdapterError::TaskCapacity);
         }

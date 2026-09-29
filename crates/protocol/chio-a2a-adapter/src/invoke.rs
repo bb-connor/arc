@@ -458,14 +458,6 @@ impl A2aAdapter {
                 )));
             }
         }
-        if let Some(seconds) = response.expires_in {
-            let millis = seconds.checked_mul(1000).ok_or(ClockError::Overflow)?;
-            if millis == 0 {
-                return Err(ClockError::Expired.into());
-            }
-            AuthorityDeadline::for_timeout_ms(requested_at, millis)?
-                .remaining(self.clock.read()?)?;
-        }
         self.store_cached_bearer_token(
             cache_key,
             response.access_token.clone(),

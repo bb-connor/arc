@@ -73,9 +73,7 @@ pub(in crate::runtime) fn next_client_message(
 ) -> Result<Value, AdapterError> {
     match client_rx.recv() {
         Ok(ClientInbound::Message(message)) => Ok(message),
-        Ok(ClientInbound::ParseError(error)) => Err(AdapterError::ParseError(format!(
-            "failed to parse MCP edge message: {error}"
-        ))),
+        Ok(ClientInbound::ParseError(error)) => Err(error),
         Ok(ClientInbound::ReadError(error)) => Err(AdapterError::ConnectionFailed(format!(
             "failed to read MCP edge request: {error}"
         ))),
@@ -106,8 +104,7 @@ pub(in crate::runtime) fn pump_client_messages<R: BufRead>(
                 );
                 let inbound = match error {
                     AdapterError::ConnectionFailed(message) => ClientInbound::ReadError(message),
-                    AdapterError::ParseError(message) => ClientInbound::ParseError(message),
-                    other => ClientInbound::ParseError(other.to_string()),
+                    other => ClientInbound::ParseError(other),
                 };
                 if sender.send(inbound).is_err() || stop_after_send {
                     return;

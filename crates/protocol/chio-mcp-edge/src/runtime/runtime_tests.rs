@@ -3421,7 +3421,9 @@ fn stdio_pump_rejects_delimiterless_jsonrpc_frame() {
         .unwrap_or_else(|error| panic!("pump did not report parse error: {error}"));
     match inbound {
         ClientInbound::ParseError(message) => {
-            assert!(message.contains("newline delimiter"));
+            assert!(
+                matches!(message, AdapterError::ParseError(reason) if reason.contains("newline delimiter"))
+            );
         }
         ClientInbound::Message(_) | ClientInbound::ReadError(_) | ClientInbound::Closed => {
             panic!("expected parse error for delimiterless frame")
@@ -3450,7 +3452,12 @@ fn stdio_pump_rejects_oversized_jsonrpc_frame() {
         .unwrap_or_else(|error| panic!("pump did not report oversized frame: {error}"));
     match inbound {
         ClientInbound::ParseError(message) => {
-            assert_eq!(message, "urn:chio:error:attest:signed-json-too-large");
+            assert!(matches!(
+                message,
+                AdapterError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::TooLarge { .. }
+                )
+            ));
         }
         ClientInbound::Message(_) | ClientInbound::ReadError(_) | ClientInbound::Closed => {
             panic!("expected parse error for oversized frame")

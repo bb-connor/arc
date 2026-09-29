@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) enum ClientInbound {
     Message(Value),
-    ParseError(String),
+    ParseError(AdapterError),
     ReadError(String),
     Closed,
 }
