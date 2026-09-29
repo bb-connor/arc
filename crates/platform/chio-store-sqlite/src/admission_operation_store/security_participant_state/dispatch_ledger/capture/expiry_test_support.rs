@@ -99,10 +99,11 @@ pub(super) fn wait_after_verification(
     };
     let until = until.ok_or_else(|| invalid("expiry cutpoint lacks selected credential"))?;
     let before = super::super::super::super::schema::observe_authority_time(tx, owner)?;
-    until
-        .checked_sub(before)
-        .filter(|remaining| (1..60_000).contains(remaining))
-        .ok_or_else(|| invalid("expiry cutpoint missed its bounded live credential window"))?;
+    // Clock advancement is synchronous, so the old real-sleep duration cap
+    // does not apply. Preserve the selected credential's exact deadline.
+    if until <= before {
+        return Err(invalid("expiry cutpoint requires a live credential"));
+    }
     let _: i32 = tx
         .query_row(
             "SELECT native_capture_expiry_advance(?1)",

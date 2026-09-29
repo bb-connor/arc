@@ -68,10 +68,9 @@ impl ClassificationPort for Classifier {
         assert_eq!(request.tenant_id.as_str(), "native-tenant");
         assert_unlocked(&self.sequencer);
         if let Some(expiry) = self.expire_at {
-            let remaining = expiry
-                .checked_sub(self.clock.snapshot())
-                .ok_or_else(PortError::unavailable)?;
-            if !(1..60_000).contains(&remaining) {
+            // This callback advances time synchronously. Require a live lease,
+            // without carrying over the old real-sleep duration restriction.
+            if expiry <= self.clock.snapshot() {
                 return Err(PortError::unavailable());
             }
             self.clock

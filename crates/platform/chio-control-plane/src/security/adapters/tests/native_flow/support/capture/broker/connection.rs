@@ -294,7 +294,7 @@ fn native_broker_connection_prepares_original_and_refuses_misbound_acknowledgeme
 }
 
 fn accept_control(listener: &UnixListener) -> TestResult<UnixStream> {
-    let deadline = Instant::now() + Duration::from_secs(30);
+    let deadline = Instant::now() + Duration::from_secs(120);
     let stream = loop {
         match listener.accept() {
             Ok((stream, _)) => break stream,
@@ -303,10 +303,12 @@ fn accept_control(listener: &UnixListener) -> TestResult<UnixStream> {
             {
                 std::thread::sleep(Duration::from_millis(5));
             }
-            Err(error) => return Err(error.into()),
+            Err(error) => return Err(format!("broker peer accept deadline: {error}").into()),
         }
     };
-    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(2)))?;
+    // Execution connects before capture, so this read spans the real capture
+    // transaction. This is a host scheduling deadline, not an authority window.
+    stream.set_read_timeout(Some(Duration::from_secs(120)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(30)))?;
     Ok(stream)
 }

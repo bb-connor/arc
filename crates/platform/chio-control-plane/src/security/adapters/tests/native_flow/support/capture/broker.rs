@@ -335,7 +335,9 @@ fn install_broker(
         chio_secret_broker::ipc_client::BrokerIpcClientConfig {
             socket_path: fixture._directory.path().join("b.sock"),
             tenant_scope: "native-broker-tenant".into(),
-            timeout_ms: 1000,
+            // Transport scheduling includes real SQLite verification under the
+            // parallel debug corpus. Signed authority time is independently fixed.
+            timeout_ms: 30_000,
             expected_peer: chio_secret_broker::ipc_client::BrokerPeerIdentity {
                 process_id: std::process::id(),
                 user_id,

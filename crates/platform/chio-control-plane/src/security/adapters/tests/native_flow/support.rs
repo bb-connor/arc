@@ -462,7 +462,7 @@ impl Fixture {
             SqliteAuthorityStore::open_serving_with_clock(&database, &locks, clock.clone())?;
         reopened
             .admission_operation_store()
-            .load_native_dispatch_ledger(operation, &reopened.mutation_fence(), now_ms()?)?
+            .load_native_dispatch_ledger(operation, &reopened.mutation_fence(), clock.snapshot())?
             .ok_or_else(|| "reopened native dispatch ledger is absent".into())
     }
 

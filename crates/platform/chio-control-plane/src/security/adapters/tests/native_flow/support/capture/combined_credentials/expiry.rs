@@ -5,6 +5,9 @@ use chio_kernel::budget_store::BudgetMutationKind;
 #[test]
 fn runtime_expiry_after_native_verification_rolls_back_physical_capture() -> TestResult {
     let mut fixture = Fixture::combined_native_credentials()?;
+    // The report's inclusive 60s age expires at epoch + 60001ms. Create the
+    // 60s operation lease two milliseconds later so runtime expiry is first.
+    fixture.clock.advance_to(now_ms()? + 2)?;
     let resolver = Arc::new(NativeFlowResolver::new(
         fixture.binding.clone(),
         super::super::super::super::registry(false, InformationLabel::bottom())?,
@@ -66,14 +69,18 @@ fn runtime_expiry_after_native_verification_rolls_back_physical_capture() -> Tes
         .load_unambiguous_retained_tool_request(
             &AdmissionIdentifier::try_new("request", &fixture.request.request_id)?,
             &fence,
-            now_ms()?,
+            fixture.clock.snapshot(),
         )?
         .ok_or("original failed capture")?;
     assert_eq!(operation.state(), AdmissionOperationState::CapturePending);
     assert!(operation.dispatch_commit().is_none());
     assert!(operation.native_dispatch_ledger_digest().is_none());
     assert!(store
-        .load_native_dispatch_capture(operation.binding().operation_id(), &fence, now_ms()?,)?
+        .load_native_dispatch_capture(
+            operation.binding().operation_id(),
+            &fence,
+            fixture.clock.snapshot(),
+        )?
         .is_none());
     let usage = fixture
         .authority
@@ -97,17 +104,25 @@ fn runtime_expiry_after_native_verification_rolls_back_physical_capture() -> Tes
         0
     );
     let (_, runtime) = store
-        .load_runtime_participant_history(operation.binding().operation_id(), &fence, now_ms()?)?
+        .load_runtime_participant_history(
+            operation.binding().operation_id(),
+            &fence,
+            fixture.clock.snapshot(),
+        )?
         .ok_or("retained runtime")?;
     let (_, approval) = store
         .load_governed_approval_claim_history(
             operation.binding().operation_id(),
             &fence,
-            now_ms()?,
+            fixture.clock.snapshot(),
         )?
         .ok_or("retained approval")?;
     let (_, dpop) = store
-        .load_dpop_replay_claim_history(operation.binding().operation_id(), &fence, now_ms()?)?
+        .load_dpop_replay_claim_history(
+            operation.binding().operation_id(),
+            &fence,
+            fixture.clock.snapshot(),
+        )?
         .ok_or("retained DPoP")?;
     assert_eq!((runtime.len(), approval.len(), dpop.len()), (1, 1, 1));
     assert_eq!(
@@ -120,7 +135,11 @@ fn runtime_expiry_after_native_verification_rolls_back_physical_capture() -> Tes
     );
     assert_eq!(dpop[0].disposition, chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition::ReservedBeforeDispatch);
     let ledger = store
-        .load_native_dispatch_ledger(operation.binding().operation_id(), &fence, now_ms()?)?
+        .load_native_dispatch_ledger(
+            operation.binding().operation_id(),
+            &fence,
+            fixture.clock.snapshot(),
+        )?
         .ok_or("preparation survived capture rollback")?;
     drop(store);
     assert_eq!(
