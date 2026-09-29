@@ -4,10 +4,12 @@
 //! `responses.create` function-call items into the shared Chio
 //! [`chio_tool_call_fabric::ToolInvocation`] shape.
 
+use chio_security_types::clock::{Clock, ClockError, SystemClock};
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::time::SystemTime;
+use std::sync::Arc;
+use std::time::{Duration, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_tool_call_fabric::{
@@ -62,13 +64,30 @@ impl From<String> for OpenAiAdapterConfig {
 }
 
 /// OpenAI Responses provider adapter.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct OpenAiAdapter {
     config: OpenAiAdapterConfig,
+    clock: Arc<dyn Clock>,
     admitted_security: Option<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>>,
 }
 
+impl std::fmt::Debug for OpenAiAdapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenAiAdapter")
+            .field("config", &self.config)
+            .field("admitted_security", &self.admitted_security)
+            .finish_non_exhaustive()
+    }
+}
+
 impl OpenAiAdapter {
+    /// Share the authority owner's trusted time for provenance stamping.
+    #[must_use]
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
     /// Build a raw provider projection with no manifest authority attached.
     ///
     /// Use [`Self::new_with_registry`] whenever lifted calls may execute as
@@ -76,6 +95,7 @@ impl OpenAiAdapter {
     pub fn new(config: impl Into<OpenAiAdapterConfig>) -> Self {
         Self {
             config: config.into(),
+            clock: Arc::new(SystemClock),
             admitted_security: None,
         }
     }
@@ -110,6 +130,7 @@ impl OpenAiAdapter {
         }
         Ok(Self {
             config: config.into(),
+            clock: Arc::new(SystemClock),
             admitted_security: Some(admitted_security),
         })
     }
@@ -201,12 +222,7 @@ impl OpenAiAdapter {
             }
             None => None,
         };
-        let arguments: Value = serde_json::from_str(&call.function.arguments).map_err(|error| {
-            ProviderError::BadToolArgs(format!(
-                "function_call `{}` arguments were not valid JSON: {error}",
-                call.id
-            ))
-        })?;
+        let arguments = crate::input::arguments(&call.function.arguments)?;
         let arguments = canonical_json_bytes(&arguments).map_err(|error| {
             ProviderError::BadToolArgs(format!(
                 "function_call `{}` arguments failed canonical JSON encoding: {error}",
@@ -225,7 +241,9 @@ impl OpenAiAdapter {
                 principal: Principal::OpenAiOrg {
                     org_id: org_id.to_string(),
                 },
-                received_at: SystemTime::now(),
+                received_at: UNIX_EPOCH
+                    .checked_add(Duration::from_millis(self.clock.unix_millis()?.get()))
+                    .ok_or(ClockError::Overflow)?,
             },
             bridge_security,
         })
@@ -292,9 +310,7 @@ fn lower_tool_outputs(
 }
 
 fn parse_tool_result(result: ToolResult) -> Result<Vec<PendingToolOutput>, ProviderError> {
-    let value: Value = serde_json::from_slice(&result.0).map_err(|error| {
-        ProviderError::Malformed(format!("OpenAI ToolResult was not JSON: {error}"))
-    })?;
+    let value = crate::input::read_json(&result.0)?;
 
     let entries = match &value {
         Value::Array(values) => values
@@ -470,9 +486,7 @@ struct ParsedPayload {
 }
 
 fn parse_payload(raw: ProviderRequest) -> Result<ParsedPayload, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!("responses.create payload was not JSON: {error}"))
-    })?;
+    let value = crate::input::read_json(&raw.0)?;
     let org_id_from_header = match value.get("headers") {
         Some(headers) => extract_org_id_header(headers)?,
         None => None,
@@ -487,11 +501,13 @@ fn parse_payload(raw: ProviderRequest) -> Result<ParsedPayload, ProviderError> {
 fn response_body(value: Value) -> Result<Value, ProviderError> {
     for field in ["body", "response", "payload"] {
         if let Some(nested) = value.get(field) {
-            return chio_provider_adapter_core::nested_response_body(nested).ok_or_else(|| {
-                ProviderError::Malformed(format!(
-                    "responses.create envelope field `{field}` was not a JSON object or string body"
-                ))
-            });
+            return match nested {
+                Value::Object(_) => Ok(nested.clone()),
+                Value::String(body) => crate::input::read_json(body.as_bytes()).map_err(Into::into),
+                _ => Err(ProviderError::Malformed(
+                    "urn:chio:error:transport:invalid-request-shape".into(),
+                )),
+            };
         }
     }
 

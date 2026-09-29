@@ -2,6 +2,13 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ProviderError {
+    #[error("urn:chio:error:transport:stream-capacity-exceeded")]
+    StreamCapacityExceeded,
+    #[error("{code}", code = .0.code())]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    /// Peer JSON rejection. The local parser cause is retained; Display is redacted.
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("rate limited by upstream: retry after {retry_after_ms}ms")]
     RateLimited { retry_after_ms: u64 },
     #[error("upstream content policy denied request: {0}")]

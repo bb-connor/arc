@@ -192,7 +192,10 @@ data: {"type":"content_block_start","index":0,"content_block":
         .gate_sse_stream(stream, |_invocation| Ok(allow_verdict()))
         .expect_err("invalid event JSON should fail closed");
 
-    assert!(err.to_string().contains("SSE data was not JSON"));
+    assert!(matches!(
+        err,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
 }
 
 #[test]
@@ -402,7 +405,7 @@ fn content_block_stop_is_forwarded_when_pre_verdict_frames_reach_limit() {
 }
 
 #[test]
-fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
+fn non_append_start_frame_rejects_at_shared_frame_byte_limit() {
     let adapter = adapter();
     let padding = "x".repeat(2 * 1024 * 1024 + 2048);
     let stream = format!(
@@ -419,6 +422,11 @@ fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
         .gate_sse_stream(stream.as_bytes(), |_invocation| Ok(allow_verdict()))
         .expect_err("oversized non-append raw frame should fail closed");
 
-    assert!(matches!(err, ProviderError::Malformed(_)));
-    assert!(err.to_string().contains("raw frame bytes"));
+    assert!(matches!(
+        err,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::TooLarge {
+            bound: 1_048_576,
+            ..
+        })
+    ));
 }

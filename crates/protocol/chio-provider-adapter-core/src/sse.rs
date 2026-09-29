@@ -1,6 +1,10 @@
 use chio_tool_call_fabric::ProviderError;
 use serde_json::Value;
 
+const MAX_STREAM_BYTES: usize = 16 * 1024 * 1024;
+const MAX_FRAME_BYTES: usize = 1024 * 1024;
+const MAX_STREAM_FRAMES: usize = 16_384;
+
 /// Parsed SSE frame with original bytes retained for exact forwarding.
 ///
 /// `done` is set when the frame's `data` payload equals the stream terminator
@@ -81,6 +85,7 @@ pub fn parse_sse_frames(
     raw: &[u8],
     options: SseParseOptions,
 ) -> Result<Vec<SseFrame>, ProviderError> {
+    chio_core::canonical::UntrustedJsonText::from_wire(raw, MAX_STREAM_BYTES)?;
     std::str::from_utf8(raw).map_err(|error| {
         ProviderError::Malformed(format!(
             "{} SSE bytes were not UTF-8: {error}",
@@ -112,9 +117,19 @@ pub fn parse_sse_frames(
             ))
         })?;
 
+        if frame_raw.len().saturating_add(raw_line.len()) > MAX_FRAME_BYTES {
+            return Err(chio_core::canonical::UntrustedJsonError::TooLarge {
+                bytes: frame_raw.len().saturating_add(raw_line.len()),
+                bound: MAX_FRAME_BYTES,
+            }
+            .into());
+        }
         frame_raw.extend_from_slice(raw_line);
         if text.is_empty() {
             if !lines.is_empty() {
+                if frames.len() >= MAX_STREAM_FRAMES {
+                    return Err(ProviderError::StreamCapacityExceeded);
+                }
                 frames.push(parse_sse_frame(
                     &lines,
                     std::mem::take(&mut frame_raw),
@@ -132,6 +147,9 @@ pub fn parse_sse_frames(
     }
 
     if !lines.is_empty() {
+        if frames.len() >= MAX_STREAM_FRAMES {
+            return Err(ProviderError::StreamCapacityExceeded);
+        }
         frames.push(parse_sse_frame(&lines, frame_raw, options)?);
     }
 
@@ -199,12 +217,13 @@ fn parse_sse_frame(
     let data = if data_lines.is_empty() {
         None
     } else {
-        Some(serde_json::from_str::<Value>(&data_text).map_err(|error| {
-            ProviderError::Malformed(format!(
-                "{} SSE data was not JSON: {error}",
-                options.provider_label
-            ))
-        })?)
+        Some(
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                data_text.as_bytes(),
+                MAX_FRAME_BYTES,
+            )?
+            .decode_signed::<Value>()?,
+        )
     };
 
     if options.cross_check_event_type {
@@ -237,4 +256,24 @@ fn parse_sse_frame(
         raw,
         done: false,
     })
+}
+
+#[cfg(test)]
+mod boundary_tests {
+    use super::*;
+    #[test]
+    fn protocol_boundary_sse_frame_quota_and_ambiguous_payload_refuse() {
+        let bytes = "data: {}\n\n".repeat(MAX_STREAM_FRAMES + 1);
+        assert!(matches!(
+            parse_sse_frames(bytes.as_bytes(), SseParseOptions::ignoring_unknown("test")),
+            Err(ProviderError::StreamCapacityExceeded)
+        ));
+        let duplicate = b"data: {\"authority\":1,\"authority\":2}\n\n";
+        assert!(matches!(
+            parse_sse_frames(duplicate, SseParseOptions::ignoring_unknown("test")),
+            Err(ProviderError::UntrustedInput(
+                chio_core::canonical::UntrustedJsonError::SignedInput(_)
+            ))
+        ));
+    }
 }

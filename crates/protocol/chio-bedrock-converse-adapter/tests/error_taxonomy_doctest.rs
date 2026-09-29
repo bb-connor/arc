@@ -412,6 +412,9 @@ fn require_provider_error<T>(
         ProviderError::VerdictBudgetExceeded { .. } => "VerdictBudgetExceeded",
         ProviderError::Malformed(_) => "Malformed",
         ProviderError::Other(_) => "Other",
+        ProviderError::Clock(_) => "Clock",
+        ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
+        ProviderError::UntrustedInput(_) => "UntrustedInput",
     };
 
     if actual != expected {

@@ -40,7 +40,8 @@ The adapter projects upstream Mistral failures onto `chio_tool_call_fabric::Prov
 | `ProviderError::Upstream5xx` | `{"status":503,"body":"service unavailable"}` | HTTP transport boundary | Any 5xx status from `api.mistral.ai`, classified by `map_http_status`. |
 | `ProviderError::TransportTimeout` | `{"transport":"timeout","timeout_ms":60000}` | HTTP transport boundary | The request exceeds `MistralHttpTransport`'s configured timeout (60s default, set via `HttpTransportConfig::with_timeout`). |
 | `ProviderError::VerdictBudgetExceeded` | `{"provider":"mistral","observed_ms":300,"budget_ms":250}` | current adapter path | The caller's verdict evaluator returns this error; `gate_sse_stream` runs it through the shared `gate_openai_sse_tool_calls`, which propagates the error unchanged before any bytes are forwarded. |
-| `ProviderError::Malformed` | `{"id":"chatcmpl_no_tool","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"no tool call here"},"finish_reason":"stop"}]}` | current adapter path | `lift_batch` requires at least one `tool_calls` entry; also non-JSON bytes, an API-version drift (`ensure_supported_api_version`), an unparseable envelope field (`response_body`), or a malformed `tool_calls` shape. |
+| `ProviderError::Malformed` | `{"id":"chatcmpl_no_tool","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"no tool call here"},"finish_reason":"stop"}]}` | current adapter path | `lift_batch` requires at least one `tool_calls` entry; also non-stream JSON bytes, an API-version drift (`ensure_supported_api_version`), an unparseable envelope field (`response_body`), or a malformed `tool_calls` shape. |
+| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original SSE JSON; local parser source retained and public error text redacted. |
 <!-- error-taxonomy:end -->
 
 ## API pin

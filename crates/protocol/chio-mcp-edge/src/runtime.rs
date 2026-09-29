@@ -36,7 +36,7 @@ use chio_kernel::{
 use chio_manifest::ToolManifest;
 #[cfg(test)]
 use chio_manifest::{LatencyHint, ToolDefinition};
-use chrono::{SecondsFormat, Utc};
+use chrono::SecondsFormat;
 use serde::Serialize;
 use serde_json::{json, Value};
 use uuid::Uuid;

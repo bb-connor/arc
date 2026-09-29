@@ -55,8 +55,8 @@ pub(super) fn respond_to_upstream_nested_flow(
         "sampling/createMessage" => {
             let operation: CreateMessageOperation = serde_json::from_value(params.clone())
                 .map_err(|error| {
-                    AdapterError::ParseError(format!(
-                        "failed to parse sampling/createMessage params: {error}"
+                    AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(
+                        error,
                     ))
                 })?;
             if let Some(task) = parse_requested_task(&params)? {
@@ -69,7 +69,7 @@ pub(super) fn respond_to_upstream_nested_flow(
                         parent_request_id,
                         operation,
                         task,
-                    ),
+                    )?,
                 )
             } else {
                 match nested_flow_bridge.create_message(operation) {
@@ -101,7 +101,7 @@ pub(super) fn respond_to_upstream_nested_flow(
                         parent_request_id,
                         operation,
                         task,
-                    ),
+                    )?,
                 )
             } else {
                 match nested_flow_bridge.create_elicitation(operation) {

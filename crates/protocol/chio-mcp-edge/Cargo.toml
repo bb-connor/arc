@@ -20,6 +20,7 @@ chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-cross-protocol = { workspace = true }
 chio-edge-metrics = { workspace = true }
 chio-kernel = { workspace = true }
+chio-security-types = { workspace = true }
 chio-manifest = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 serde = { workspace = true }

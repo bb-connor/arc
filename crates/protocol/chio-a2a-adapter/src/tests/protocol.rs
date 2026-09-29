@@ -1,3 +1,5 @@
+use super::*;
+
 #[tokio::test]
 async fn a2a_contract_resolver_rejects_loopback_answers() {
     let mut contract = HttpEgressContract::permissive_for_tests("127.0.0.1:80");
@@ -110,11 +112,7 @@ fn parse_tool_input_rejects_unknown_top_level_fields() {
     }))
     .expect_err("unknown top-level tool input fields must fail closed");
 
-    let message = error.to_string();
-    assert!(
-        message.contains("unknown field") && message.contains("typoed_field"),
-        "unexpected unknown-field error: {message}"
-    );
+    assert_unknown_input_field(error, "typoed_field");
 }
 
 #[test]
@@ -127,11 +125,7 @@ fn parse_tool_input_rejects_unknown_follow_up_fields() {
     }))
     .expect_err("unknown follow-up fields must fail closed");
 
-    let message = error.to_string();
-    assert!(
-        message.contains("unknown field") && message.contains("extra"),
-        "unexpected unknown-field error: {message}"
-    );
+    assert_unknown_input_field(error, "extra");
 }
 
 #[test]
@@ -148,11 +142,7 @@ fn parse_tool_input_rejects_unknown_push_authentication_fields() {
     }))
     .expect_err("unknown nested push authentication fields must fail closed");
 
-    let message = error.to_string();
-    assert!(
-        message.contains("unknown field") && message.contains("extra"),
-        "unexpected unknown-field error: {message}"
-    );
+    assert_unknown_input_field(error, "extra");
 }
 
 #[test]
@@ -228,9 +218,8 @@ async fn build_get_task_url_appends_tenant_and_history_length() {
 
 #[tokio::test]
 async fn build_send_message_url_appends_tenant_path_segment() {
-    let send_url =
-        build_send_message_url("http://localhost:9000/api", Some("tenant-alpha"), false)
-            .expect("build send message URL");
+    let send_url = build_send_message_url("http://localhost:9000/api", Some("tenant-alpha"), false)
+        .expect("build send message URL");
     let stream_url =
         build_send_message_url("http://localhost:9000/api", Some("tenant-alpha"), true)
             .expect("build stream message URL");
@@ -247,9 +236,8 @@ async fn build_send_message_url_appends_tenant_path_segment() {
 
 #[tokio::test]
 async fn build_cancel_task_url_appends_tenant_path_segment() {
-    let url =
-        build_cancel_task_url("http://localhost:9000/api", "task-1", Some("tenant-alpha"))
-            .expect("build cancel task URL");
+    let url = build_cancel_task_url("http://localhost:9000/api", "task-1", Some("tenant-alpha"))
+        .expect("build cancel task URL");
 
     assert_eq!(
         url.as_str(),
@@ -383,8 +371,7 @@ async fn sse_line_reader_consumes_chunk_on_byte_counter_overflow_error() {
     let mut line = String::new();
     let mut total_bytes = u64::MAX;
 
-    let error =
-        read_sse_line(&mut reader, &mut line, &mut total_bytes, u64::MAX).unwrap_err();
+    let error = read_sse_line(&mut reader, &mut line, &mut total_bytes, u64::MAX).unwrap_err();
 
     assert!(error.to_string().contains("byte counter overflowed"));
     assert!(line.is_empty());
@@ -462,4 +449,26 @@ async fn sse_parser_rejects_too_many_chunks() {
     let error = parse_sse_stream(body.as_bytes(), Ok).unwrap_err();
 
     assert!(error.to_string().contains("chunk"));
+}
+
+fn assert_unknown_input_field(error: AdapterError, field: &str) {
+    use std::error::Error;
+    assert!(matches!(
+        &error,
+        AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(_))
+    ));
+    assert_eq!(
+        error.to_string(),
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    );
+    assert!(!format!("{error:?}").contains(field));
+    let cause = error
+        .source()
+        .and_then(Error::source)
+        .expect("original parser source");
+    let cause = cause
+        .downcast_ref::<serde_json::Error>()
+        .expect("typed JSON cause");
+    assert!(cause.to_string().contains("unknown field"));
+    assert!(cause.to_string().contains(field));
 }

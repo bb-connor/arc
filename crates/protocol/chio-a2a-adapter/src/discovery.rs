@@ -531,13 +531,6 @@ fn task_state_is_terminal_or_interrupted(state: Option<&str>) -> bool {
     )
 }
 
-fn unix_timestamp_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
-}
-
 fn binding_label(binding: &A2aProtocolBinding) -> &'static str {
     match binding {
         A2aProtocolBinding::JsonRpc => "JSONRPC",
@@ -551,13 +544,22 @@ fn dispatch_message_id(context: &ToolDispatchContext) -> String {
     format!("chio-a2a-{}", context.idempotency_key())
 }
 
-fn next_message_id(counter: &AtomicU64, server_id: &str, skill_id: &str) -> String {
-    let seq = counter.fetch_add(1, Ordering::Relaxed) + 1;
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-    format!("chio-a2a-{server_id}-{skill_id}-{nanos}-{seq}")
+fn next_message_id(
+    counter: &AtomicU64,
+    server_id: &str,
+    skill_id: &str,
+    clock: &dyn Clock,
+) -> Result<String, AdapterError> {
+    let now = clock.unix_millis()?;
+    let seq = counter
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            value.checked_add(1)
+        })
+        .map_err(|_| ClockError::Overflow)?;
+    Ok(format!(
+        "chio-a2a-{server_id}-{skill_id}-{}-{seq}",
+        now.get()
+    ))
 }
 
 fn derive_chio_server_id(agent_card_url: &Url) -> String {

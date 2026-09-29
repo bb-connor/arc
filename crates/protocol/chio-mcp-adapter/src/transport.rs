@@ -173,7 +173,12 @@ mod tests {
         let mut reader = BufReader::new(&input[..]);
         let err = read_line(&mut reader).unwrap_err();
         assert!(
-            matches!(err, AdapterError::ParseError(_)),
+            matches!(
+                err,
+                AdapterError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::SignedInput(_)
+                )
+            ),
             "expected ParseError, got: {err}"
         );
     }
@@ -187,7 +192,12 @@ mod tests {
             Err(err) => err,
         };
         assert!(
-            matches!(err, AdapterError::ParseError(_)),
+            matches!(
+                err,
+                AdapterError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::TooLarge { .. }
+                )
+            ),
             "expected ParseError for oversized frame, got: {err}"
         );
     }
@@ -348,40 +358,44 @@ for line in sys.stdin:
     fn background_tick_can_complete_multiple_nested_flow_tasks() {
         let mut runtime = NestedFlowTaskRuntime::default();
         let parent_request_id = RequestId::new("parent-1");
-        let task_a = runtime.create_message_task(
-            "nested-upstream-1".to_string(),
-            parent_request_id.to_string(),
-            CreateMessageOperation {
-                messages: vec![],
-                model_preferences: None,
-                system_prompt: None,
-                include_context: None,
-                temperature: None,
-                max_tokens: 32,
-                stop_sequences: vec![],
-                metadata: None,
-                tools: vec![],
-                tool_choice: None,
-            },
-            RequestedTask { ttl: None },
-        );
-        let task_b = runtime.create_message_task(
-            "2".to_string(),
-            parent_request_id.to_string(),
-            CreateMessageOperation {
-                messages: vec![],
-                model_preferences: None,
-                system_prompt: None,
-                include_context: None,
-                temperature: None,
-                max_tokens: 32,
-                stop_sequences: vec![],
-                metadata: None,
-                tools: vec![],
-                tool_choice: None,
-            },
-            RequestedTask { ttl: None },
-        );
+        let task_a = runtime
+            .create_message_task(
+                "nested-upstream-1".to_string(),
+                parent_request_id.to_string(),
+                CreateMessageOperation {
+                    messages: vec![],
+                    model_preferences: None,
+                    system_prompt: None,
+                    include_context: None,
+                    temperature: None,
+                    max_tokens: 32,
+                    stop_sequences: vec![],
+                    metadata: None,
+                    tools: vec![],
+                    tool_choice: None,
+                },
+                RequestedTask { ttl: None },
+            )
+            .expect("task admitted");
+        let task_b = runtime
+            .create_message_task(
+                "2".to_string(),
+                parent_request_id.to_string(),
+                CreateMessageOperation {
+                    messages: vec![],
+                    model_preferences: None,
+                    system_prompt: None,
+                    include_context: None,
+                    temperature: None,
+                    max_tokens: 32,
+                    stop_sequences: vec![],
+                    metadata: None,
+                    tools: vec![],
+                    tool_choice: None,
+                },
+                RequestedTask { ttl: None },
+            )
+            .expect("task admitted");
         let task_id_a = task_a["task"]["taskId"].as_str().unwrap().to_string();
         let task_id_b = task_b["task"]["taskId"].as_str().unwrap().to_string();
         assert_eq!(task_a["task"]["ownership"]["workOwner"], "task");
@@ -421,23 +435,25 @@ for line in sys.stdin:
     fn tasks_result_includes_nested_task_lineage_in_related_task_meta() {
         let mut runtime = NestedFlowTaskRuntime::default();
         let parent_request_id = RequestId::new("parent-1");
-        let created = runtime.create_message_task(
-            "nested-upstream-7".to_string(),
-            parent_request_id.to_string(),
-            CreateMessageOperation {
-                messages: vec![],
-                model_preferences: None,
-                system_prompt: None,
-                include_context: None,
-                temperature: None,
-                max_tokens: 32,
-                stop_sequences: vec![],
-                metadata: None,
-                tools: vec![],
-                tool_choice: None,
-            },
-            RequestedTask { ttl: None },
-        );
+        let created = runtime
+            .create_message_task(
+                "nested-upstream-7".to_string(),
+                parent_request_id.to_string(),
+                CreateMessageOperation {
+                    messages: vec![],
+                    model_preferences: None,
+                    system_prompt: None,
+                    include_context: None,
+                    temperature: None,
+                    max_tokens: 32,
+                    stop_sequences: vec![],
+                    metadata: None,
+                    tools: vec![],
+                    tool_choice: None,
+                },
+                RequestedTask { ttl: None },
+            )
+            .expect("task admitted");
         let task_id = created["task"]["taskId"].as_str().unwrap().to_string();
 
         let mut bridge = MockNestedFlowBridge;

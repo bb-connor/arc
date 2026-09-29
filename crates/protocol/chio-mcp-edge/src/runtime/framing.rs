@@ -22,9 +22,13 @@ pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Val
             continue;
         }
 
-        return serde_json::from_str(trimmed).map(Some).map_err(|error| {
-            AdapterError::ParseError(format!("failed to parse MCP edge message: {error}"))
-        });
+        return chio_core::canonical::UntrustedJsonText::from_wire(
+            trimmed.as_bytes(),
+            MAX_STDIO_MCP_FRAME_BYTES,
+        )?
+        .decode_signed()
+        .map(Some)
+        .map_err(Into::into);
     }
 }
 
@@ -61,12 +65,13 @@ fn read_bounded_line(
 
         reader.consume(take);
         if exceeds_limit {
-            if !has_newline {
-                discard_remaining_line(reader)?;
+            // The connection is terminal. Draining an attacker-controlled tail
+            // could block forever and would discard the original size bound.
+            return Err(chio_core::canonical::UntrustedJsonError::TooLarge {
+                bytes: bytes.len().saturating_add(take),
+                bound: max_bytes,
             }
-            return Err(AdapterError::ParseError(format!(
-                "MCP edge JSON-RPC frame exceeded {max_bytes} bytes"
-            )));
+            .into());
         }
 
         if has_newline {
@@ -75,33 +80,8 @@ fn read_bounded_line(
     }
 
     String::from_utf8(bytes).map(Some).map_err(|error| {
-        AdapterError::ParseError(format!("MCP edge JSON-RPC frame was not UTF-8: {error}"))
+        chio_core::canonical::UntrustedJsonError::NotUtf8(error.utf8_error()).into()
     })
-}
-
-fn discard_remaining_line(reader: &mut impl BufRead) -> Result<(), AdapterError> {
-    loop {
-        let (take, has_newline) = {
-            let available = reader.fill_buf().map_err(|error| {
-                AdapterError::ConnectionFailed(format!("failed to read MCP edge request: {error}"))
-            })?;
-            if available.is_empty() {
-                return Ok(());
-            }
-
-            let take = match available.iter().position(|byte| *byte == b'\n') {
-                Some(index) => index + 1,
-                None => available.len(),
-            };
-            let has_newline = available.get(take.saturating_sub(1)) == Some(&b'\n');
-            (take, has_newline)
-        };
-
-        reader.consume(take);
-        if has_newline {
-            return Ok(());
-        }
-    }
 }
 
 #[cfg(test)]
@@ -110,6 +90,17 @@ mod tests {
     use std::io::BufReader;
 
     use super::*;
+
+    #[test]
+    fn protocol_boundary_rejects_duplicate_authority_keys() {
+        let bytes = br#"{"jsonrpc":"2.0","params":{"_meta":{"chioRequestId":"first","chioRequestId":"second"}}}
+"#;
+        let error = read_jsonrpc_frame(&mut &bytes[..]).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "urn:chio:error:attest:signed-json-invalid-input"
+        );
+    }
 
     #[test]
     fn frame_reader_returns_none_on_clean_eof() {
@@ -144,29 +135,30 @@ mod tests {
         let mut reader = BufReader::new(input.as_bytes());
         let err = read_jsonrpc_frame(&mut reader).unwrap_err();
         assert!(
-            matches!(err, AdapterError::ParseError(_)),
+            matches!(
+                err,
+                AdapterError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::TooLarge { .. }
+                )
+            ),
             "expected ParseError, got: {err}"
         );
     }
 
     #[test]
-    fn frame_reader_discards_oversized_frame_tail_before_next_frame() {
-        let tainted = r#"{"jsonrpc":"2.0","id":7,"method":"cancel"}"#;
-        let next = r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#;
-        let input = format!(
-            "{}{tainted}\n{next}\n",
-            "x".repeat(MAX_STDIO_MCP_FRAME_BYTES + 1)
+    fn protocol_boundary_oversized_frame_refuses_without_draining_tail() {
+        let input = vec![b'x'; MAX_STDIO_MCP_FRAME_BYTES + 50];
+        let mut reader = BufReader::with_capacity(1, input.as_slice());
+        let error = read_jsonrpc_frame(&mut reader).unwrap_err();
+        assert!(matches!(
+            error,
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::TooLarge { .. })
+        ));
+        assert_eq!(reader.buffer(), b"");
+        assert_eq!(
+            reader.get_ref().len(),
+            49,
+            "reader drained attacker-controlled tail"
         );
-        let mut reader = BufReader::with_capacity(1, input.as_bytes());
-
-        let err = read_jsonrpc_frame(&mut reader).unwrap_err();
-        assert!(
-            matches!(err, AdapterError::ParseError(ref message) if message.contains("exceeded")),
-            "expected oversized ParseError, got: {err}"
-        );
-        let frame = read_jsonrpc_frame(&mut reader)
-            .unwrap()
-            .unwrap_or_else(|| panic!("expected next clean frame"));
-        assert_eq!(frame["method"], "ping");
     }
 }

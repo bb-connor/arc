@@ -74,7 +74,10 @@ impl<R: BufRead, W: Write + Send> EdgeNestedFlowClient<'_, R, W> {
         params: Value,
         _child_request_id: &RequestId,
     ) -> Result<Value, chio_kernel::KernelError> {
-        *self.request_counter += 1;
+        *self.request_counter = self
+            .request_counter
+            .checked_add(1)
+            .ok_or(chio_security_types::clock::ClockError::Overflow)?;
         let request_id = format!("edge-client-{}", *self.request_counter);
         let request = attach_related_task_meta_to_message(
             json!({
@@ -184,7 +187,10 @@ impl<W: Write + Send> QueuedEdgeNestedFlowClient<'_, W> {
         params: Value,
         _child_request_id: &RequestId,
     ) -> Result<Value, chio_kernel::KernelError> {
-        *self.request_counter += 1;
+        *self.request_counter = self
+            .request_counter
+            .checked_add(1)
+            .ok_or(chio_security_types::clock::ClockError::Overflow)?;
         let request_id = format!("edge-client-{}", *self.request_counter);
         let request = attach_related_task_meta_to_message(
             json!({
@@ -293,7 +299,9 @@ impl<R: BufRead + Send, W: Write + Send> NestedFlowClient for EdgeNestedFlowClie
             chio_kernel::KernelError::Internal("roots/list response missing 'roots'".to_string())
         })?;
         let roots: Vec<RootDefinition> = serde_json::from_value(roots_value).map_err(|error| {
-            chio_kernel::KernelError::Internal(format!("failed to parse roots: {error}"))
+            chio_kernel::KernelError::UntrustedInput(
+                chio_core::canonical::UntrustedJsonError::Decode(error),
+            )
         })?;
 
         queue_progress_notification(
@@ -351,9 +359,9 @@ impl<R: BufRead + Send, W: Write + Send> NestedFlowClient for EdgeNestedFlowClie
         let result =
             self.send_client_request("sampling/createMessage", params, &child_context.request_id)?;
         let message: CreateMessageResult = serde_json::from_value(result).map_err(|error| {
-            chio_kernel::KernelError::Internal(format!(
-                "failed to parse sampling/createMessage result: {error}"
-            ))
+            chio_kernel::KernelError::UntrustedInput(
+                chio_core::canonical::UntrustedJsonError::Decode(error),
+            )
         })?;
 
         queue_progress_notification(
@@ -416,9 +424,9 @@ impl<R: BufRead + Send, W: Write + Send> NestedFlowClient for EdgeNestedFlowClie
             self.send_client_request("elicitation/create", params, &child_context.request_id)?;
         let elicitation: CreateElicitationResult =
             serde_json::from_value(result).map_err(|error| {
-                chio_kernel::KernelError::Internal(format!(
-                    "failed to parse elicitation/create result: {error}"
-                ))
+                chio_kernel::KernelError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::Decode(error),
+                )
             })?;
         capture_accepted_url_elicitation(
             self.accepted_url_elicitations,
@@ -549,7 +557,9 @@ impl<W: Write + Send> NestedFlowClient for QueuedEdgeNestedFlowClient<'_, W> {
             chio_kernel::KernelError::Internal("roots/list response missing 'roots'".to_string())
         })?;
         let roots: Vec<RootDefinition> = serde_json::from_value(roots_value).map_err(|error| {
-            chio_kernel::KernelError::Internal(format!("failed to parse roots: {error}"))
+            chio_kernel::KernelError::UntrustedInput(
+                chio_core::canonical::UntrustedJsonError::Decode(error),
+            )
         })?;
 
         queue_progress_notification(
@@ -607,9 +617,9 @@ impl<W: Write + Send> NestedFlowClient for QueuedEdgeNestedFlowClient<'_, W> {
         let result =
             self.send_client_request("sampling/createMessage", params, &child_context.request_id)?;
         let message: CreateMessageResult = serde_json::from_value(result).map_err(|error| {
-            chio_kernel::KernelError::Internal(format!(
-                "failed to parse sampling/createMessage result: {error}"
-            ))
+            chio_kernel::KernelError::UntrustedInput(
+                chio_core::canonical::UntrustedJsonError::Decode(error),
+            )
         })?;
 
         queue_progress_notification(
@@ -672,9 +682,9 @@ impl<W: Write + Send> NestedFlowClient for QueuedEdgeNestedFlowClient<'_, W> {
             self.send_client_request("elicitation/create", params, &child_context.request_id)?;
         let elicitation: CreateElicitationResult =
             serde_json::from_value(result).map_err(|error| {
-                chio_kernel::KernelError::Internal(format!(
-                    "failed to parse elicitation/create result: {error}"
-                ))
+                chio_kernel::KernelError::UntrustedInput(
+                    chio_core::canonical::UntrustedJsonError::Decode(error),
+                )
             })?;
         capture_accepted_url_elicitation(
             self.accepted_url_elicitations,

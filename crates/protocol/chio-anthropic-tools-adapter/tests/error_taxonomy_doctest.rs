@@ -138,6 +138,9 @@ fn readme_taxonomy_envelopes_are_class_specific() -> Result<(), String> {
             "Malformed" => {
                 require_body_string(&row, "/event", "content_block_delta")?;
             }
+            "UntrustedInput" => {
+                require_body_string(&row, "/data", "not-json")?;
+            }
             other => {
                 return Err(format!(
                     "unexpected ProviderError class documented: {other}"
@@ -152,7 +155,12 @@ fn readme_taxonomy_envelopes_are_class_specific() -> Result<(), String> {
 #[test]
 fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     let classes = classes(&taxonomy_rows()?);
-    for required in ["BadToolArgs", "Malformed", "VerdictBudgetExceeded"] {
+    for required in [
+        "BadToolArgs",
+        "Malformed",
+        "UntrustedInput",
+        "VerdictBudgetExceeded",
+    ] {
         if !classes.contains(required) {
             return Err(format!(
                 "README taxonomy did not cover current class {required}"
@@ -176,6 +184,11 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     let malformed =
         adapter.gate_sse_stream(&malformed_delta_stream(), |_invocation| Ok(allow_verdict()));
     require_provider_error(malformed, "Malformed")?;
+
+    let invalid_json = adapter.gate_sse_stream(b"event: message\ndata: not-json\n\n", |_| {
+        Ok(allow_verdict())
+    });
+    require_provider_error(invalid_json, "UntrustedInput")?;
 
     let budget = adapter.gate_sse_stream(&tool_use_stream(), |_invocation| {
         Err(ProviderError::VerdictBudgetExceeded {
@@ -332,6 +345,9 @@ fn require_provider_error<T>(
         ProviderError::VerdictBudgetExceeded { .. } => "VerdictBudgetExceeded",
         ProviderError::Malformed(_) => "Malformed",
         ProviderError::Other(_) => "Other",
+        ProviderError::Clock(_) => "Clock",
+        ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
+        ProviderError::UntrustedInput(_) => "UntrustedInput",
     };
 
     if actual != expected {

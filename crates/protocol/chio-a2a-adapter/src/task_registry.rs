@@ -2,6 +2,7 @@
 struct A2aTaskRegistry {
     path: PathBuf,
     lock: Mutex<()>,
+    clock: ClockSource,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,23 +80,31 @@ impl A2aTaskRegistryRecordError {
 }
 
 impl A2aTaskRegistry {
+    #[cfg(test)]
     fn open(path: &std::path::Path) -> Result<Self, AdapterError> {
+        Self::open_with_clock(path, ClockSource::default())
+    }
+
+    fn open_with_clock(path: &std::path::Path, clock: ClockSource) -> Result<Self, AdapterError> {
         let registry = Self {
             path: path.to_path_buf(),
             lock: Mutex::new(()),
+            clock,
         };
         let _ = registry.load()?;
         Ok(registry)
     }
 
     fn load(&self) -> Result<A2aPersistedTaskRegistry, AdapterError> {
-        match fs::read(&self.path) {
-            Ok(bytes) => {
-                let registry: A2aPersistedTaskRegistry = serde_json::from_slice(&bytes)
-                    .map_err(|error| AdapterError::Lifecycle(format!(
-                        "failed to parse A2A task registry {}: {error}",
-                        self.path.display()
-                    )))?;
+        match fs::File::open(&self.path) {
+            Ok(file) => {
+                let mut bytes = Vec::new();
+                file.take(MAX_A2A_JSON_BYTES as u64 + 1)
+                    .read_to_end(&mut bytes)
+                    .map_err(AdapterError::Io)?;
+                let registry: A2aPersistedTaskRegistry =
+                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_A2A_JSON_BYTES)?
+                        .decode_signed()?;
                 if registry.version != TASK_REGISTRY_VERSION {
                     return Err(AdapterError::Lifecycle(format!(
                         "unsupported A2A task registry version `{}` in {}",
@@ -103,15 +112,22 @@ impl A2aTaskRegistry {
                         self.path.display()
                     )));
                 }
+                for (task_id, record) in &registry.tasks {
+                    if task_id != &record.task_id
+                        || task_id.trim().is_empty()
+                        || record.first_seen_at > record.last_seen_at
+                    {
+                        return Err(AdapterError::Lifecycle(
+                            "task registry identity or time mismatch".into(),
+                        ));
+                    }
+                }
                 Ok(registry)
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 Ok(A2aPersistedTaskRegistry::default())
             }
-            Err(error) => Err(AdapterError::Lifecycle(format!(
-                "failed to read A2A task registry {}: {error}",
-                self.path.display()
-            ))),
+            Err(error) => Err(AdapterError::Io(error)),
         }
     }
 
@@ -233,7 +249,12 @@ impl A2aTaskRegistry {
             ))
         })?;
         let mut registry = self.load().map_err(A2aTaskRegistryRecordError::Fatal)?;
-        let now = unix_timestamp_now();
+        let now = self
+            .clock
+            .unix_millis()
+            .map_err(AdapterError::Clock)
+            .map_err(A2aTaskRegistryRecordError::Fatal)?
+            .as_secs();
         let mut first_rebind_conflict = None;
         let mut changed = false;
         for observation in seen {
@@ -294,9 +315,12 @@ fn task_observations_from_value(value: &Value) -> Result<Vec<A2aTaskObservation>
     }
     if let Some(update) = value.get("statusUpdate") {
         validate_status_update(update)?;
-        let task_id = update.get("taskId").and_then(Value::as_str).ok_or_else(|| {
-            AdapterError::Protocol("A2A status update must contain string `taskId`".to_string())
-        })?;
+        let task_id = update
+            .get("taskId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                AdapterError::Protocol("A2A status update must contain string `taskId`".to_string())
+            })?;
         let state = update
             .get("status")
             .and_then(|status| status.get("state"))
@@ -309,9 +333,14 @@ fn task_observations_from_value(value: &Value) -> Result<Vec<A2aTaskObservation>
     }
     if let Some(update) = value.get("artifactUpdate") {
         validate_artifact_update(update)?;
-        let task_id = update.get("taskId").and_then(Value::as_str).ok_or_else(|| {
-            AdapterError::Protocol("A2A artifact update must contain string `taskId`".to_string())
-        })?;
+        let task_id = update
+            .get("taskId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                AdapterError::Protocol(
+                    "A2A artifact update must contain string `taskId`".to_string(),
+                )
+            })?;
         observations.push(A2aTaskObservation {
             task_id: observed_task_id(task_id),
             state: None,
@@ -358,7 +387,11 @@ fn validate_task_record_binding(
             "A2A task `{}` attempted to rebind from tenant `{}` to `{}`",
             record.task_id,
             record.tenant.as_deref().unwrap_or("none"),
-            context.selected_interface.tenant.as_deref().unwrap_or("none")
+            context
+                .selected_interface
+                .tenant
+                .as_deref()
+                .unwrap_or("none")
         )));
     }
     if record.partner != context.partner {

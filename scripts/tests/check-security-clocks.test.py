@@ -20,6 +20,15 @@ class ClockGateTests(unittest.TestCase):
         self.assertEqual(found["owner.rs::admit"], 2)
         self.assertEqual(found["owner.rs::trait AnotherClock"], 1)
 
+    def test_protocol_clock_aliases_are_caught(self):
+        found = gate.sites("protocol.rs", """
+            use chrono::Utc as Wall;
+            fn dispatch() { Utc::now(); Wall::now(); }
+        """)
+        self.assertEqual(found["protocol.rs::dispatch"], 2)
+        for owner in ("mcp-edge", "mcp-adapter", "a2a-adapter", "openai-adapter"):
+            self.assertIn(f"crates/protocol/chio-{owner}/", gate.ROOTS)
+
     def test_documentation_and_native_adapter_are_not_debt(self):
         self.assertEqual(gate.sites("owner.rs", '''
             // SystemTime::now()

@@ -82,7 +82,8 @@ one valid inline JSON object.
 | `ProviderError::Upstream5xx` | `{"error":{"code":503,"message":"The service is currently unavailable.","status":"UNAVAILABLE"}}` | HTTP transport boundary | Any 5xx status from the Generative Language API. |
 | `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://generativelanguage.googleapis.com","timeout_ms":60000}` | HTTP transport boundary | The request exceeds the transport's configured timeout (60s default). |
 | `ProviderError::VerdictBudgetExceeded` | `{"provider":"gemini","event":"functionCall","observed_ms":300,"budget_ms":250}` | current adapter path | The caller's verdict evaluator returns this error; `gate_sse_stream` propagates it unchanged. |
-| `ProviderError::Malformed` | `{"candidates":[{"content":{"parts":[{"text":"no tool call here"}]}}]}` | current adapter path | `lift_batch` requires at least one `functionCall` part; also non-JSON bytes, an unparseable envelope, or a malformed `functionCall` / `functionResponse` shape. |
+| `ProviderError::Malformed` | `{"candidates":[{"content":{"parts":[{"text":"no tool call here"}]}}]}` | current adapter path | `lift_batch` requires at least one `functionCall` part; also non-stream JSON bytes, an unparseable envelope, or a malformed `functionCall` / `functionResponse` shape. |
+| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original SSE JSON; local parser source retained and public error text redacted. |
 <!-- error-taxonomy:end -->
 
 ## Testing

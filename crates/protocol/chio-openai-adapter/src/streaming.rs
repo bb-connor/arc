@@ -627,11 +627,7 @@ fn tool_call_name(item: &Value) -> Option<String> {
 fn arguments_string(value: &Value) -> Result<String, ProviderError> {
     match value {
         Value::String(text) => {
-            serde_json::from_str::<Value>(text).map_err(|error| {
-                ProviderError::BadToolArgs(format!(
-                    "OpenAI SSE tool-call arguments were not valid JSON: {error}"
-                ))
-            })?;
+            crate::input::arguments(text)?;
             Ok(text.to_string())
         }
         Value::Object(_) => serde_json::to_string(value).map_err(|error| {

@@ -17,6 +17,7 @@ base64 = "0.22"
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-egress-contract = { workspace = true }
 chio-kernel = { workspace = true }
+chio-security-types = { workspace = true }
 chio-manifest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -13,6 +13,8 @@
 
 #![forbid(unsafe_code)]
 
+mod input;
+
 use std::collections::BTreeMap;
 
 use chio_core::capability::{
@@ -55,6 +57,10 @@ pub use transport::{
 /// Errors produced by the OpenAI adapter.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenAiAdapterError {
+    /// Rejected peer bytes, with a redacted code and a retained local cause.
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     /// A tool/function was not found.
     #[error("function not found: {0}")]
     FunctionNotFound(String),
@@ -354,7 +360,7 @@ impl ChioOpenAiAdapter {
             }
         };
 
-        let arguments = match serde_json::from_str::<Value>(&tool_call.function.arguments) {
+        let arguments = match input::arguments(&tool_call.function.arguments) {
             Ok(args) => args,
             Err(e) => {
                 return denied_tool_call_result(
@@ -512,10 +518,10 @@ impl ChioOpenAiAdapter {
             .enumerate()
             .map(|(index, call)| {
                 let parsed =
-                    serde_json::from_value::<OpenAiToolCall>(call.clone()).map_err(|e| {
-                        OpenAiAdapterError::InvalidRequest(format!(
-                            "tool_calls[{index}] is malformed: {e}"
-                        ))
+                    serde_json::from_value::<OpenAiToolCall>(call.clone()).map_err(|error| {
+                        OpenAiAdapterError::UntrustedInput(
+                            chio_core::canonical::UntrustedJsonError::Decode(error),
+                        )
                     })?;
                 validate_tool_call(parsed, &format!("tool_calls[{index}]"))
             })

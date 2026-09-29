@@ -1,8 +1,8 @@
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use chio_core::{
     CompletionResult, PromptDefinition, PromptResult, ResourceContent, ResourceDefinition,
@@ -33,3 +33,7 @@ const LEGACY_CHILD_REAP_TIMEOUT: Duration = Duration::from_secs(2);
 
 include!("stdio_parts/transport.inc");
 include!("stdio_parts/lifecycle_and_tests.inc");
+
+#[path = "stdio_writer.rs"]
+mod writer;
+use writer::{run_stdio_writer, BoundedStdioWriter, WriterCommand};

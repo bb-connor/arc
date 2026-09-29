@@ -1,0 +1,78 @@
+{
+  "boundary-red": {
+    "bytes": 9017,
+    "sha256": "75c800c9739a4ebdf0d9c36d29f868d98de9dccf9d116dbd2c61b5538026b02b"
+  },
+  "decoders-red": {
+    "bytes": 5758,
+    "sha256": "9b08f121712fefb205c4f9c029576fba0d0c4ca91c66cf2eb0d9ee5d7bee3972"
+  },
+  "boundary-green": {
+    "bytes": 3733,
+    "sha256": "6f96ff7c94feec7fe6327d30372697f45083f2f12e13ddc6fc9c2931e6a44756"
+  },
+  "suite": {
+    "bytes": 51449,
+    "sha256": "e67b5e8d2e199641918464fce0ad5730a07574cf81630fcd97dcc3cdb7052cec"
+  },
+  "suite-final": {
+    "bytes": 3595,
+    "sha256": "6960c3b0e0f371aca446c3a6a931928b5f5a9ebbb067249c305e1ed6c5c4ec45"
+  },
+  "suite-v3": {
+    "bytes": 48883,
+    "sha256": "03900619faf2df571773f54fb5f1591d49ed38fd6518023a0ce87779846da565"
+  },
+  "a2a-terminal": {
+    "bytes": 13106,
+    "sha256": "5eee8d87895a584a6a573de23426c9f7121b77d9da3998c8b8e5a6d10679254e"
+  },
+  "openai-terminal": {
+    "bytes": 3323,
+    "sha256": "17f29c2a662d609fb3c45cf9b6a909f8c80468d9ec0f602c0d47080c9625e1ac"
+  },
+  "suite-terminal": {
+    "bytes": 88710,
+    "sha256": "79b837f8d4f907616719bccdeeae5736e1f2af56961d415bf03f3e769f734921"
+  },
+  "suite-terminal-v2": {
+    "bytes": 79186,
+    "sha256": "1e99374458db73089fde2bdc14d3a0455452da283f5500065bb247cf6b7a6559"
+  },
+  "suite-terminal-v3": {
+    "bytes": 78328,
+    "sha256": "1e1b28f0fbce612811645cdd629071de2dcf8a9ffb8ae1dadb5c560b1582ff99"
+  },
+  "clippy": {
+    "bytes": 9878,
+    "sha256": "39b74861545f1740e2905167b74afd32faadbe26b29db9dca80c7a65189be9a8"
+  },
+  "clock-calibration": {
+    "bytes": 101,
+    "sha256": "921b60a7fd52e978fbb551cacd29df2d6708879400278e1fcc70fceeb0c6f8e0"
+  },
+  "clock-gate": {
+    "bytes": 60,
+    "sha256": "379775b037eaf9011569ca33773ac8d7a5d42cb1145ab677c1df61a7eaae885e"
+  },
+  "trust-gate-terminal": {
+    "bytes": 91,
+    "sha256": "2fbd264769eeea26e257f5574304cbc87862a007d5babf7e0abada8a808b051f"
+  },
+  "negative-gate": {
+    "bytes": 163,
+    "sha256": "f97a29016fc87fb3fac15f5700ddd4115744d27afb59248565f73249046bc815"
+  },
+  "hygiene-v3": {
+    "bytes": 52079,
+    "sha256": "723d9d621a23593b732bf19bf4e4196faae27ca41883833aaf9711939232ed84"
+  },
+  "format": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "error-codegen": {
+    "bytes": 2028,
+    "sha256": "5c3809e50fedfcaa6cb630e16dfa576eb4e730b439784726f7729f773cec9d9e"
+  }
+}

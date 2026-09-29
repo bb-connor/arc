@@ -1,5 +1,6 @@
 use super::tool_calls::ToolCallRequestContext;
 use super::*;
+use chio_security_types::clock::{AuthorityDeadline, ClockError, ClockReading, MonotonicInstant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -36,9 +37,9 @@ pub(super) struct EdgeTask {
     #[serde(skip)]
     pub(super) final_outcome: Option<EdgeTaskFinalOutcome>,
     #[serde(skip)]
-    pub(super) background_ready_at_ms: u64,
+    pub(super) background_ready_at: MonotonicInstant,
     #[serde(skip)]
-    pub(super) expires_at_ms: u64,
+    pub(super) deadline: AuthorityDeadline,
 }
 
 #[derive(Debug, Clone)]
@@ -71,11 +72,11 @@ impl EdgeTask {
         operation: ToolCallOperation,
         ttl: Option<u64>,
         background_start_delay_millis: u64,
-    ) -> Self {
-        let now = iso8601_now();
-        let now_ms = unix_now_millis();
+        observed: ClockReading,
+    ) -> Result<Self, ClockError> {
+        let now = task_timestamp(observed)?;
         let ttl_millis = ttl.unwrap_or(DEFAULT_MCP_TASK_TTL_MILLIS);
-        Self {
+        Ok(Self {
             task_id,
             status: EdgeTaskStatus::Working,
             status_message: Some("The operation is now in progress.".to_string()),
@@ -91,9 +92,11 @@ impl EdgeTask {
             context,
             operation,
             final_outcome: None,
-            background_ready_at_ms: now_ms.saturating_add(background_start_delay_millis),
-            expires_at_ms: now_ms.saturating_add(ttl_millis),
-        }
+            background_ready_at: observed
+                .monotonic()
+                .checked_add_millis(background_start_delay_millis)?,
+            deadline: AuthorityDeadline::for_timeout_ms(observed, ttl_millis)?,
+        })
     }
 
     pub(super) fn is_terminal(&self) -> bool {
@@ -103,11 +106,13 @@ impl EdgeTask {
         )
     }
 
-    pub(super) fn touch(&mut self) {
-        self.last_updated_at = iso8601_now();
+    pub(super) fn touch(&mut self, observed: ClockReading) {
+        if let Ok(timestamp) = task_timestamp(observed) {
+            self.last_updated_at = timestamp;
+        }
     }
 
-    pub(super) fn mark_completed(&mut self, result: Value) {
+    pub(super) fn mark_completed(&mut self, result: Value, observed: ClockReading) {
         self.status = if tool_result_is_error(&result) {
             EdgeTaskStatus::Failed
         } else {
@@ -115,17 +120,23 @@ impl EdgeTask {
         };
         self.status_message = task_status_message(&self.status, &result);
         self.final_outcome = Some(EdgeTaskFinalOutcome::Result(result));
-        self.touch();
+        self.touch(observed);
     }
 
-    pub(super) fn mark_cancelled(&mut self, reason: &str) {
+    pub(super) fn mark_cancelled(&mut self, reason: &str, observed: ClockReading) {
         self.status = EdgeTaskStatus::Cancelled;
         self.status_message = Some(reason.to_string());
         self.final_outcome = Some(EdgeTaskFinalOutcome::Result(tool_error_result(reason)));
-        self.touch();
+        self.touch(observed);
     }
 
-    pub(super) fn mark_jsonrpc_error(&mut self, code: i64, message: String, data: Option<Value>) {
+    pub(super) fn mark_jsonrpc_error(
+        &mut self,
+        code: i64,
+        message: String,
+        data: Option<Value>,
+        observed: ClockReading,
+    ) {
         self.status = EdgeTaskStatus::Failed;
         self.status_message = Some(message.clone());
         self.final_outcome = Some(EdgeTaskFinalOutcome::JsonRpcError {
@@ -133,34 +144,33 @@ impl EdgeTask {
             message,
             data,
         });
-        self.touch();
+        self.touch(observed);
     }
 
-    pub(super) fn record_outcome(&mut self, outcome: ToolCallEdgeOutcome) {
+    pub(super) fn record_outcome(&mut self, outcome: ToolCallEdgeOutcome, observed: ClockReading) {
         match outcome {
-            ToolCallEdgeOutcome::Result(result) => self.mark_completed(result),
-            ToolCallEdgeOutcome::Cancelled { reason } => self.mark_cancelled(&reason),
+            ToolCallEdgeOutcome::Result(result) => self.mark_completed(result, observed),
+            ToolCallEdgeOutcome::Cancelled { reason } => self.mark_cancelled(&reason, observed),
             ToolCallEdgeOutcome::JsonRpcError {
                 code,
                 message,
                 data,
-            } => self.mark_jsonrpc_error(code, message, data),
+            } => self.mark_jsonrpc_error(code, message, data, observed),
         }
     }
 
-    pub(super) fn background_ready(&self) -> bool {
-        unix_now_millis() >= self.background_ready_at_ms
-    }
-
-    pub(super) fn is_expired_at(&self, now_ms: u64) -> bool {
-        now_ms >= self.expires_at_ms
+    pub(super) fn background_ready(&self, observed: ClockReading) -> bool {
+        observed.monotonic() >= self.background_ready_at
     }
 }
 
 impl ChioMcpEdge {
-    pub(super) fn next_task_id(&mut self) -> String {
-        self.task_counter += 1;
-        format!("mcp-edge-task-{}", self.task_counter)
+    pub(super) fn next_task_id(&mut self) -> Result<String, ClockError> {
+        self.task_counter = self
+            .task_counter
+            .checked_add(1)
+            .ok_or(ClockError::Overflow)?;
+        Ok(format!("mcp-edge-task-{}", self.task_counter))
     }
 
     pub(super) fn create_tool_call_task(
@@ -175,15 +185,26 @@ impl ChioMcpEdge {
         if let Err(response) = self.ensure_deferred_task_capacity(&id) {
             return response;
         }
-        let task_id = self.next_task_id();
-        let task = EdgeTask::new(
+        let observed = match self.prune_expired_tasks() {
+            Ok(now) => now,
+            Err(error) => return task_clock_error(id, error),
+        };
+        let task_id = match self.next_task_id() {
+            Ok(id) => id,
+            Err(error) => return task_clock_error(id, error),
+        };
+        let task = match EdgeTask::new(
             task_id.clone(),
             session_id,
             context,
             operation,
             requested_task.ttl,
             self.background_task_start_delay_millis(),
-        );
+            observed,
+        ) {
+            Ok(task) => task,
+            Err(error) => return task_clock_error(id, error),
+        };
         let task_view = task.clone();
         self.tasks.insert(task_id, task);
         if queue_background {
@@ -201,7 +222,8 @@ impl ChioMcpEdge {
     }
 
     pub(super) fn ensure_deferred_task_capacity(&mut self, id: &Value) -> Result<(), Value> {
-        self.prune_expired_tasks();
+        self.prune_expired_tasks()
+            .map_err(|error| task_clock_error(id.clone(), error))?;
         if self.tasks.len() >= MAX_DEFERRED_MCP_TASKS {
             self.prune_terminal_tasks();
         }
@@ -209,16 +231,27 @@ impl ChioMcpEdge {
             return Err(jsonrpc_error(
                 id.clone(),
                 JSONRPC_INVALID_PARAMS,
-                "too many deferred tasks are pending",
+                "urn:chio:error:transport:task-capacity-exceeded",
             ));
         }
         Ok(())
     }
 
-    pub(super) fn prune_expired_tasks(&mut self) {
-        let now_ms = unix_now_millis();
-        self.tasks.retain(|_, task| !task.is_expired_at(now_ms));
+    pub(super) fn prune_expired_tasks(&mut self) -> Result<ClockReading, ClockError> {
+        let observed = self.kernel.authority_clock_reading()?;
+        let mut expired = Vec::new();
+        for (id, task) in &mut self.tasks {
+            match task.deadline.remaining(observed) {
+                Ok(_) => {}
+                Err(ClockError::Expired) => expired.push(id.clone()),
+                Err(error) => return Err(error),
+            }
+        }
+        for id in expired {
+            self.tasks.remove(&id);
+        }
         self.retain_live_background_tasks();
+        Ok(observed)
     }
 
     pub(super) fn prune_terminal_tasks(&mut self) {
@@ -232,7 +265,10 @@ impl ChioMcpEdge {
     }
 
     pub(super) fn handle_tasks_list(&mut self, id: Value, params: Value) -> Value {
-        self.prune_expired_tasks();
+        let _observed = match self.prune_expired_tasks() {
+            Ok(now) => now,
+            Err(error) => return task_clock_error(id, error),
+        };
         let session_id = match self.ready_session_id(&id) {
             Ok(session_id) => session_id,
             Err(response) => return response,
@@ -253,7 +289,7 @@ impl ChioMcpEdge {
         }
 
         let page_size = self.config.page_size.max(1);
-        let end = (start + page_size).min(tasks.len());
+        let end = start + page_size.min(tasks.len() - start);
         let next_cursor = (end < tasks.len()).then(|| end.to_string());
         let page = tasks[start..end]
             .iter()
@@ -271,7 +307,10 @@ impl ChioMcpEdge {
     }
 
     pub(super) fn handle_tasks_get(&mut self, id: Value, params: Value) -> Value {
-        self.prune_expired_tasks();
+        let _observed = match self.prune_expired_tasks() {
+            Ok(now) => now,
+            Err(error) => return task_clock_error(id, error),
+        };
         let session_id = match self.ready_session_id(&id) {
             Ok(session_id) => session_id,
             Err(response) => return response,
@@ -300,7 +339,10 @@ impl ChioMcpEdge {
     }
 
     pub(super) fn handle_tasks_cancel(&mut self, id: Value, params: Value) -> Value {
-        self.prune_expired_tasks();
+        let observed = match self.prune_expired_tasks() {
+            Ok(now) => now,
+            Err(error) => return task_clock_error(id, error),
+        };
         let session_id = match self.ready_session_id(&id) {
             Ok(session_id) => session_id,
             Err(response) => return response,
@@ -345,7 +387,7 @@ impl ChioMcpEdge {
             };
         }
 
-        task.mark_cancelled("task cancelled by client");
+        task.mark_cancelled("task cancelled by client", observed);
         self.dequeue_background_task(&task_id);
         let task_view = task.clone();
         self.queue_task_status_notification(&task_view);
@@ -357,7 +399,10 @@ impl ChioMcpEdge {
     }
 
     pub(super) fn handle_tasks_result(&mut self, id: Value, params: Value) -> Value {
-        self.prune_expired_tasks();
+        let observed = match self.prune_expired_tasks() {
+            Ok(now) => now,
+            Err(error) => return task_clock_error(id, error),
+        };
         let session_id = match self.ready_session_id(&id) {
             Ok(session_id) => session_id,
             Err(response) => return response,
@@ -397,7 +442,7 @@ impl ChioMcpEdge {
             let mut task_view = None;
             if let Some(task) = self.tasks.get_mut(&task_id) {
                 if !task.is_terminal() {
-                    task.record_outcome(result);
+                    task.record_outcome(result, observed);
                     task_view = Some(task.clone());
                 }
             }
@@ -417,7 +462,10 @@ impl ChioMcpEdge {
         reader: &mut R,
         writer: &mut W,
     ) -> Value {
-        self.prune_expired_tasks();
+        let observed = match self.prune_expired_tasks() {
+            Ok(now) => now,
+            Err(error) => return task_clock_error(id, error),
+        };
         let session_id = match self.ready_session_id(&id) {
             Ok(session_id) => session_id,
             Err(response) => return response,
@@ -461,7 +509,7 @@ impl ChioMcpEdge {
             let mut task_view = None;
             if let Some(task) = self.tasks.get_mut(&task_id) {
                 if !task.is_terminal() {
-                    task.record_outcome(result);
+                    task.record_outcome(result, observed);
                     task_view = Some(task.clone());
                 }
             }
@@ -482,7 +530,10 @@ impl ChioMcpEdge {
         cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Value {
-        self.prune_expired_tasks();
+        let observed = match self.prune_expired_tasks() {
+            Ok(now) => now,
+            Err(error) => return task_clock_error(id, error),
+        };
         let session_id = match self.ready_session_id(&id) {
             Ok(session_id) => session_id,
             Err(response) => return response,
@@ -527,7 +578,7 @@ impl ChioMcpEdge {
             let mut task_view = None;
             if let Some(task) = self.tasks.get_mut(&task_id) {
                 if !task.is_terminal() {
-                    task.record_outcome(result);
+                    task.record_outcome(result, observed);
                     task_view = Some(task.clone());
                 }
             }
@@ -561,6 +612,8 @@ impl ChioMcpEdge {
         let mut processed_any = false;
 
         for _ in 0..MAX_BACKGROUND_TASKS_PER_TICK {
+            // Every dispatch checks expiry, including tasks delayed behind other work.
+            let observed = self.prune_expired_tasks()?;
             let Some(task_id) = self.pending_background_tasks.first().cloned() else {
                 break;
             };
@@ -574,7 +627,7 @@ impl ChioMcpEdge {
                 continue;
             }
 
-            if !task.background_ready() {
+            if !task.background_ready(observed) {
                 self.pending_background_tasks.push(task_id);
                 continue;
             }
@@ -594,7 +647,7 @@ impl ChioMcpEdge {
             let mut task_view = None;
             if let Some(task) = self.tasks.get_mut(&task_id) {
                 if !task.is_terminal() {
-                    task.record_outcome(result);
+                    task.record_outcome(result, observed);
                     task_view = Some(task.clone());
                 }
             }
@@ -611,6 +664,8 @@ impl ChioMcpEdge {
         let mut processed_any = false;
 
         for _ in 0..MAX_BACKGROUND_TASKS_PER_TICK {
+            // Every dispatch checks expiry, including tasks delayed behind other work.
+            let observed = self.prune_expired_tasks()?;
             let Some(task_id) = self.pending_background_tasks.first().cloned() else {
                 break;
             };
@@ -624,7 +679,7 @@ impl ChioMcpEdge {
                 continue;
             }
 
-            if !task.background_ready() {
+            if !task.background_ready(observed) {
                 self.pending_background_tasks.push(task_id);
                 continue;
             }
@@ -639,7 +694,7 @@ impl ChioMcpEdge {
             let mut task_view = None;
             if let Some(task) = self.tasks.get_mut(&task_id) {
                 if !task.is_terminal() {
-                    task.record_outcome(result);
+                    task.record_outcome(result, observed);
                     task_view = Some(task.clone());
                 }
             }
@@ -664,4 +719,20 @@ impl ChioMcpEdge {
         self.flush_pending_notifications(writer)?;
         Ok(())
     }
+}
+
+fn task_timestamp(observed: ClockReading) -> Result<String, ClockError> {
+    let millis = i64::try_from(observed.unix_millis().get()).map_err(|_| ClockError::Overflow)?;
+    chrono::DateTime::from_timestamp_millis(millis)
+        .map(|time| time.to_rfc3339_opts(SecondsFormat::Secs, true))
+        .ok_or(ClockError::Overflow)
+}
+
+fn task_clock_error(id: Value, error: ClockError) -> Value {
+    jsonrpc_error_with_data(
+        id,
+        -32603,
+        error.code(),
+        Some(json!({ "chioError": error.code() })),
+    )
 }

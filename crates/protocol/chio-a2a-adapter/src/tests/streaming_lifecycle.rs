@@ -1,3 +1,5 @@
+use super::*;
+
 #[tokio::test]
 async fn adapter_invoke_stream_returns_none_without_stream_flag() {
     let Some(server) = FakeA2aServer::spawn_jsonrpc() else {
@@ -189,12 +191,10 @@ async fn adapter_streaming_registry_corruption_fails_closed() {
     server.join();
 
     let error = stream_result.expect_err("corrupt stream registry should fail closed");
-    assert!(
-        error
-            .to_string()
-            .contains("failed to parse A2A task registry"),
-        "unexpected stream error: {error}"
-    );
+    assert!(matches!(
+        error,
+        KernelError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
 
     let _ = fs::remove_file(registry_path);
 }
@@ -231,12 +231,10 @@ async fn adapter_streaming_registry_corruption_with_rebind_phrase_fails_closed()
 
     let error = stream_result
         .expect_err("corrupt stream registry path text must not bypass fail-closed handling");
-    assert!(
-        error
-            .to_string()
-            .contains("failed to parse A2A task registry"),
-        "unexpected stream error: {error}"
-    );
+    assert!(matches!(
+        error,
+        KernelError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
 
     let _ = fs::remove_file(registry_path);
 }
@@ -710,14 +708,13 @@ async fn adapter_http_json_push_notification_config_crud_roundtrip() {
     let requests = server.requests();
     assert_eq!(requests.len(), 5);
     assert!(requests[1].starts_with("POST /tasks/task-1/pushNotificationConfigs HTTP/1.1"));
-    assert!(
-        requests[2].starts_with("GET /tasks/task-1/pushNotificationConfigs/config-1 HTTP/1.1")
-    );
+    assert!(requests[2].starts_with("GET /tasks/task-1/pushNotificationConfigs/config-1 HTTP/1.1"));
     assert!(requests[3].starts_with(
         "GET /tasks/task-1/pushNotificationConfigs?pageSize=25&pageToken=page-2 HTTP/1.1"
     ));
-    assert!(requests[4]
-        .starts_with("DELETE /tasks/task-1/pushNotificationConfigs/config-1 HTTP/1.1"));
+    assert!(
+        requests[4].starts_with("DELETE /tasks/task-1/pushNotificationConfigs/config-1 HTTP/1.1")
+    );
     server.join();
 }
 

@@ -190,8 +190,16 @@ fn input_mode_essence(mode: &str) -> &str {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 pub enum AdapterError {
+    #[error("urn:chio:error:transport:upstream-failure")]
+    Io(#[from] std::io::Error),
+    #[error("{code}", code = .0.code())]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    /// Rejected peer bytes, with a redacted code and a retained local cause.
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("invalid A2A URL: {0}")]
     InvalidUrl(String),
 
@@ -282,7 +290,11 @@ fn build_tool_definition(
     if !skill.tags.is_empty() {
         description.push_str(&format!("\n\nTags: {}", skill.tags.join(", ")));
     }
-    if let Some(examples) = skill.examples.as_ref().filter(|examples| !examples.is_empty()) {
+    if let Some(examples) = skill
+        .examples
+        .as_ref()
+        .filter(|examples| !examples.is_empty())
+    {
         description.push_str(&format!("\n\nExamples: {}", examples.join(" | ")));
     }
 
@@ -433,7 +445,9 @@ fn build_tool_definition(
     input_schema
         .as_object_mut()
         .ok_or_else(|| {
-            AdapterError::Protocol("internal A2A input schema template was not an object".to_string())
+            AdapterError::Protocol(
+                "internal A2A input schema template was not an object".to_string(),
+            )
         })?
         .insert("oneOf".to_string(), Value::Array(one_of));
 
@@ -653,8 +667,9 @@ fn select_supported_interface(
 }
 
 fn parse_tool_input(arguments: Value) -> Result<A2aToolInvocation, AdapterError> {
-    let input: A2aToolInput = serde_json::from_value(arguments)
-        .map_err(|error| AdapterError::InvalidToolInput(error.to_string()))?;
+    let input: A2aToolInput = serde_json::from_value(arguments).map_err(|error| {
+        AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+    })?;
     let mixed_send_fields = send_message_fields_present(&input);
     let active_management_modes = [
         input.get_task.is_some(),
@@ -776,4 +791,25 @@ fn send_message_fields_present(input: &A2aToolInput) -> bool {
         || input.history_length.is_some()
         || input.return_immediately.is_some()
         || input.stream.unwrap_or(false)
+}
+
+impl std::fmt::Debug for AdapterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UntrustedInput(error) => std::fmt::Debug::fmt(error, f),
+            Self::Io(_) => f.write_str("A2aIoFailure"),
+            Self::Clock(error) => std::fmt::Debug::fmt(error, f),
+            _ => f.write_str("A2aAdapterError"),
+        }
+    }
+}
+
+impl AdapterError {
+    fn into_kernel_error(self) -> KernelError {
+        match self {
+            Self::UntrustedInput(error) => KernelError::UntrustedInput(error),
+            Self::Clock(error) => KernelError::Clock(error),
+            other => KernelError::ToolServerError(other.to_string()),
+        }
+    }
 }

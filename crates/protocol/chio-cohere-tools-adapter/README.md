@@ -64,7 +64,8 @@ The adapter projects upstream Cohere failures onto
 | `ProviderError::Upstream5xx` | `{"status": 503, "body": {"message": "service unavailable"}}` | HTTP transport boundary | Any 5xx status from the upstream API. |
 | `ProviderError::TransportTimeout` | `{"transport": "timeout", "elapsed_ms": 5000}` | HTTP transport boundary | The request exceeds the transport's configured timeout (`HttpTransportError::Timeout`, mapped to `ProviderError::TransportTimeout`). |
 | `ProviderError::VerdictBudgetExceeded` | `{"observed_ms": 300, "budget_ms": 250}` | current adapter path | The caller's verdict evaluator returns this error; `gate_sse_stream` propagates it unchanged. |
-| `ProviderError::Malformed` | `{"event": "tool-call-end", "frame": "missing-tool_call"}` | current adapter path | `lift_batch` requires at least one `tool_calls` entry; also non-JSON payload bytes, an envelope field that is not a JSON object or string body, a malformed `tool_call` block, or a streamed `tool-call-end` frame missing `tool_call`. |
+| `ProviderError::Malformed` | `{"event": "tool-call-end", "frame": "missing-tool_call"}` | current adapter path | `lift_batch` requires at least one `tool_calls` entry; also non-stream JSON payload bytes, an envelope field that is not a JSON object or string body, a malformed `tool_call` block, or a streamed `tool-call-end` frame missing `tool_call`. |
+| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original SSE JSON; local parser source retained and public error text redacted. |
 <!-- error-taxonomy:end -->
 
 ## API pin

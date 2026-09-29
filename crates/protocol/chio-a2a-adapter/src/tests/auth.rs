@@ -1,3 +1,5 @@
+use super::*;
+
 #[tokio::test]
 async fn adapter_oauth2_client_credentials_fetches_token_and_caches_it() {
     let Some(server) = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_required() else {
@@ -58,11 +60,12 @@ async fn oauth_client_credentials_form_fallback_rejects_cross_origin_redirect() 
     let Some(target_listener) = bind_fake_a2a_listener("OAuth redirect target listener") else {
         return;
     };
-    let target_address = target_listener.local_addr().expect("target listener address");
+    let target_address = target_listener
+        .local_addr()
+        .expect("target listener address");
     let target_base_url = format!("http://{target_address}");
 
-    let Some(initial_listener) = bind_fake_a2a_listener("OAuth redirect initial listener")
-    else {
+    let Some(initial_listener) = bind_fake_a2a_listener("OAuth redirect initial listener") else {
         return;
     };
     let initial_address = initial_listener
@@ -194,8 +197,7 @@ fn oauth_client_credentials_rejects_padded_access_token() {
         let request = read_http_request(&mut stream);
         assert!(request.starts_with("POST /oauth/token HTTP/1.1"));
         assert!(request.contains("grant_type=client_credentials"));
-        let body =
-            r#"{"access_token":" opaque-token ","token_type":"bearer","expires_in":3600}"#;
+        let body = r#"{"access_token":" opaque-token ","token_type":"bearer","expires_in":3600}"#;
         write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -248,8 +250,7 @@ fn oauth_client_credentials_rejects_control_access_token() {
         let request = read_http_request(&mut stream);
         assert!(request.starts_with("POST /oauth/token HTTP/1.1"));
         assert!(request.contains("grant_type=client_credentials"));
-        let body =
-            r#"{"access_token":"opaque\n-token","token_type":"bearer","expires_in":3600}"#;
+        let body = r#"{"access_token":"opaque\n-token","token_type":"bearer","expires_in":3600}"#;
         write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -302,8 +303,7 @@ fn oauth_client_credentials_accepts_padded_bearer_token_type() {
         let request = read_http_request(&mut stream);
         assert!(request.starts_with("POST /oauth/token HTTP/1.1"));
         assert!(request.contains("grant_type=client_credentials"));
-        let body =
-            r#"{"access_token":"opaque-token","token_type":"  bEaReR  ","expires_in":3600}"#;
+        let body = r#"{"access_token":"opaque-token","token_type":"  bEaReR  ","expires_in":3600}"#;
         write!(
             stream,
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -510,6 +510,7 @@ async fn adapter_http_basic_security_without_configured_credentials_fails_closed
             egress_contract: None,
         },
         token_cache: Mutex::new(Vec::new()),
+        clock: ClockSource::default(),
         timeout: Duration::from_secs(2),
         request_counter: AtomicU64::new(0),
         partner_policy: None,
@@ -612,9 +613,7 @@ fn adapter_api_key_query_security_rejects_empty_value_before_dispatch() {
     let error = adapter
         .resolve_request_auth(&adapter.agent_card.skills[0])
         .expect_err("empty API key query value should fail closed before dispatch");
-    assert!(error
-        .to_string()
-        .contains("request query parameter value"));
+    assert!(error.to_string().contains("request query parameter value"));
 }
 
 #[tokio::test]
@@ -720,6 +719,7 @@ async fn adapter_api_key_query_security_without_configured_value_fails_closed() 
             egress_contract: None,
         },
         token_cache: Mutex::new(Vec::new()),
+        clock: ClockSource::default(),
         timeout: Duration::from_secs(2),
         request_counter: AtomicU64::new(0),
         partner_policy: None,
@@ -799,4 +799,30 @@ async fn adapter_jsonrpc_mtls_security_uses_client_certificate_for_discovery_and
     assert!(requests[0].starts_with("GET /.well-known/agent-card.json HTTP/1.1"));
     assert!(requests[1].starts_with("POST /rpc HTTP/1.1"));
     server.join();
+}
+
+#[test]
+fn protocol_boundary_short_oauth_expiry_is_never_cached() {
+    let Some(server) = FakeA2aServer::spawn_http_json() else {
+        return;
+    };
+    let adapter = A2aAdapter::discover(test_adapter_config(
+        server.base_url(),
+        Keypair::generate().public_key().to_hex(),
+    ))
+    .expect("discover");
+    for ttl in [None, Some(0), Some(1), Some(30)] {
+        adapter
+            .store_cached_bearer_token(
+                "key".into(),
+                "secret".into(),
+                ttl,
+                adapter.clock.read().expect("clock"),
+            )
+            .expect("store");
+        assert_eq!(
+            adapter.lookup_cached_bearer_token("key").expect("lookup"),
+            None
+        );
+    }
 }

@@ -422,7 +422,10 @@ async fn malformed_upstream_body_fails_closed() {
         .send_chat_completions(b"{}")
         .await
         .expect_err("a non-JSON body must fail closed");
-    assert!(matches!(error, ProviderError::Malformed(_)));
+    assert!(matches!(
+        error,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
 }
 
 // ---- wiremock: real reqwest HttpTransport end to end ----

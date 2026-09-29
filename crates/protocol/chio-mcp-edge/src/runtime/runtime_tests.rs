@@ -456,31 +456,7 @@ impl PromptProvider for ExamplePromptProvider {
 }
 
 fn make_kernel() -> (ChioKernel, Keypair) {
-    let keypair = Keypair::generate();
-    let config = KernelConfig {
-        keypair: keypair.clone(),
-        ca_public_keys: vec![],
-        max_delegation_depth: 5,
-        policy_hash: "edge-policy".to_string(),
-        allow_sampling: true,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    };
-    let mut kernel = ChioKernel::new(config);
-    kernel.register_tool_server(Box::new(EchoServer));
-    kernel.register_resource_provider(Box::new(DocsResourceProvider));
-    kernel.register_resource_provider(Box::new(FilesystemResourceProvider));
-    kernel.register_prompt_provider(Box::new(ExamplePromptProvider));
-    (kernel, keypair)
+    protocol_boundaries::make_kernel_with_clock(Arc::new(chio_security_types::clock::SystemClock))
 }
 
 fn make_web3_required_kernel() -> (ChioKernel, Keypair) {
@@ -2821,7 +2797,7 @@ fn task_augmented_tool_call_completes_via_tasks_result_and_tracks_status() {
 }
 
 #[test]
-fn task_with_zero_ttl_expires_before_get() {
+fn task_with_zero_ttl_is_rejected_before_creation() {
     let mut edge = make_streaming_edge(10);
     edge.set_session_auth_context(SessionAuthContext::streamable_http_static_bearer(
         "agent",
@@ -2852,24 +2828,12 @@ fn task_with_zero_ttl_expires_before_get() {
             }
         }))
         .unwrap();
-    let task_id = create["result"]["task"]["taskId"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    let get = edge
-        .handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 3,
-            "method": "tasks/get",
-            "params": { "taskId": task_id }
-        }))
-        .unwrap();
-
-    assert!(get["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("task not found"));
+    assert_eq!(
+        create["error"]["data"]["chioError"],
+        "urn:chio:error:kernel:clock-invalid-window"
+    );
+    assert!(edge.tasks.is_empty());
+    assert!(edge.pending_background_tasks.is_empty());
 }
 
 #[test]
@@ -2968,10 +2932,10 @@ fn task_creation_rejects_deferred_task_map_over_cap() {
         }))
         .unwrap();
 
-    assert!(rejected["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("too many deferred tasks"));
+    assert_eq!(
+        rejected["error"]["message"],
+        "urn:chio:error:transport:task-capacity-exceeded"
+    );
 }
 
 #[test]
@@ -3099,7 +3063,17 @@ fn request_cancelled_errors_record_cancelled_task_terminal_state() {
         )
         .unwrap();
     let task_id = "mcp-edge-task-cancelled".to_string();
-    let mut task = EdgeTask::new(task_id.clone(), session_id, context, operation, None, 0);
+    let observed = edge.kernel.authority_clock_reading().unwrap();
+    let mut task = EdgeTask::new(
+        task_id.clone(),
+        session_id,
+        context,
+        operation,
+        None,
+        0,
+        observed,
+    )
+    .unwrap();
 
     let outcome = edge.tool_call_error_outcome(
         &task.session_id,
@@ -3109,7 +3083,7 @@ fn request_cancelled_errors_record_cancelled_task_terminal_state() {
         },
         Some(task_id.as_str()),
     );
-    task.record_outcome(outcome);
+    task.record_outcome(outcome, observed);
 
     assert_eq!(task.status, EdgeTaskStatus::Cancelled);
     assert_eq!(
@@ -3476,7 +3450,7 @@ fn stdio_pump_rejects_oversized_jsonrpc_frame() {
         .unwrap_or_else(|error| panic!("pump did not report oversized frame: {error}"));
     match inbound {
         ClientInbound::ParseError(message) => {
-            assert!(message.contains("exceeded"));
+            assert_eq!(message, "urn:chio:error:attest:signed-json-too-large");
         }
         ClientInbound::Message(_) | ClientInbound::ReadError(_) | ClientInbound::Closed => {
             panic!("expected parse error for oversized frame")
@@ -4510,3 +4484,6 @@ fn serve_stdio_refreshes_roots_after_list_changed_notification() {
     assert_eq!(session.roots()[0].uri, "file:///workspace/project-b");
     assert_eq!(session.roots()[0].name.as_deref(), Some("Project B"));
 }
+
+#[path = "runtime_tests/protocol_boundaries.rs"]
+mod protocol_boundaries;

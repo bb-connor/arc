@@ -1,24 +1,3 @@
-fn run_stdio_writer(mut writer: Box<dyn Write + Send>, writer_rx: mpsc::Receiver<WriterCommand>) {
-    while let Ok(command) = writer_rx.recv() {
-        let result = writer
-            .write_all(&command.bytes)
-            .and_then(|()| writer.flush())
-            .map_err(|error| error.to_string());
-        let failed = result.is_err();
-        if let Some(completion) = command.completion {
-            let _ = completion.try_send(result);
-        } else if let Err(error) = result {
-            warn!(
-                target: "chio_mcp_adapter::transport",
-                "asynchronous MCP stdin write failed: {error}"
-            );
-        }
-        if failed {
-            break;
-        }
-    }
-}
-
 fn merge_cleanup_failures<const N: usize>(
     primary: AdapterError,
     cleanup: [(&str, Result<(), AdapterError>); N],
@@ -293,12 +272,8 @@ fn persist_pre_fully_enforced_terminal(
 }
 
 fn now_unix_ms() -> Result<u64, AdapterError> {
-    let elapsed = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|_| {
-        AdapterError::ConnectionFailed("system clock is before the Unix epoch".to_string())
-    })?;
-    u64::try_from(elapsed.as_millis()).map_err(|_| {
-        AdapterError::ConnectionFailed("system clock does not fit cage receipt time".to_string())
-    })
+    use chio_security_types::clock::{Clock, SystemClock};
+    Ok(SystemClock.unix_millis()?.get())
 }
 
 fn validate_cage_required_inputs(

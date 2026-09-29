@@ -13,6 +13,7 @@ pub struct A2aAdapter {
     oauth_token_endpoint_override: Option<String>,
     transport_config: A2aTransportConfig,
     token_cache: Mutex<Vec<A2aCachedBearerToken>>,
+    clock: ClockSource,
     timeout: Duration,
     request_counter: AtomicU64,
     partner_policy: Option<A2aPartnerPolicy>,
@@ -21,6 +22,7 @@ pub struct A2aAdapter {
 
 impl A2aAdapter {
     pub fn discover(config: A2aAdapterConfig) -> Result<Self, AdapterError> {
+        config.clock.read()?;
         config.validate_request_auth_material()?;
         let agent_card_url = normalize_agent_card_url(&config.agent_card_url)?;
         let transport_config = A2aTransportConfig {
@@ -84,13 +86,14 @@ impl A2aAdapter {
             oauth_token_endpoint_override: config.oauth_token_endpoint_override,
             transport_config,
             token_cache: Mutex::new(Vec::new()),
+            clock: config.clock.clone(),
             timeout: config.timeout,
             request_counter: AtomicU64::new(0),
             partner_policy: config.partner_policy,
             task_registry: config
                 .task_registry_path
                 .as_ref()
-                .map(|path| A2aTaskRegistry::open(path.as_path()))
+                .map(|path| A2aTaskRegistry::open_with_clock(path.as_path(), config.clock.clone()))
                 .transpose()?,
         })
     }
@@ -340,7 +343,10 @@ impl A2aAdapter {
                             supported = false;
                             break;
                         };
-                        validate_url_auth_value("request query parameter value", &query_param.value)?;
+                        validate_url_auth_value(
+                            "request query parameter value",
+                            &query_param.value,
+                        )?;
                         query_params.push(query_param);
                         Ok(None)
                     }
@@ -437,6 +443,7 @@ impl A2aAdapter {
             return Ok(bearer_request_header(access_token));
         }
 
+        let requested_at = self.clock.read()?;
         let response = request_client_credentials_token(
             &token_endpoint,
             credentials,
@@ -451,10 +458,19 @@ impl A2aAdapter {
                 )));
             }
         }
+        if let Some(seconds) = response.expires_in {
+            let millis = seconds.checked_mul(1000).ok_or(ClockError::Overflow)?;
+            if millis == 0 {
+                return Err(ClockError::Expired.into());
+            }
+            AuthorityDeadline::for_timeout_ms(requested_at, millis)?
+                .remaining(self.clock.read()?)?;
+        }
         self.store_cached_bearer_token(
             cache_key,
             response.access_token.clone(),
             response.expires_in,
+            requested_at,
         )?;
         Ok(bearer_request_header(response.access_token))
     }
@@ -485,53 +501,6 @@ impl A2aAdapter {
             Some(metadata.token_endpoint.as_str()),
             required_scopes,
         )
-    }
-
-    fn lookup_cached_bearer_token(&self, cache_key: &str) -> Result<Option<String>, AdapterError> {
-        let now = SystemTime::now();
-        let mut cache = self.token_cache.lock().map_err(|_| {
-            AdapterError::AuthNegotiation("OAuth token cache lock poisoned".to_string())
-        })?;
-        cache.retain(|entry| {
-            entry
-                .expires_at
-                .map(|expires_at| expires_at > now)
-                .unwrap_or(true)
-        });
-        Ok(cache
-            .iter()
-            .find(|entry| entry.cache_key == cache_key)
-            .map(|entry| entry.access_token.clone()))
-    }
-
-    fn store_cached_bearer_token(
-        &self,
-        cache_key: String,
-        access_token: String,
-        expires_in: Option<u64>,
-    ) -> Result<(), AdapterError> {
-        let expires_at = expires_in.and_then(|expires_in| {
-            let effective_ttl = expires_in.saturating_sub(OAUTH_CACHE_SKEW_SECS);
-            if effective_ttl == 0 {
-                None
-            } else {
-                Some(SystemTime::now() + Duration::from_secs(effective_ttl))
-            }
-        });
-        let mut cache = self.token_cache.lock().map_err(|_| {
-            AdapterError::AuthNegotiation("OAuth token cache lock poisoned".to_string())
-        })?;
-        if let Some(existing) = cache.iter_mut().find(|entry| entry.cache_key == cache_key) {
-            existing.access_token = access_token;
-            existing.expires_at = expires_at;
-        } else {
-            cache.push(A2aCachedBearerToken {
-                cache_key,
-                access_token,
-                expires_at,
-            });
-        }
-        Ok(())
     }
 
     fn invoke_skill(
@@ -763,7 +732,8 @@ impl A2aAdapter {
                         &self.request_counter,
                         self.manifest.server_id.as_str(),
                         skill.id.as_str(),
-                    ),
+                        &self.clock,
+                    )?,
                 },
                 context_id: input.context_id,
                 task_id: input.task_id,
@@ -1129,9 +1099,9 @@ impl A2aAdapter {
             |value| {
                 let response: A2aJsonRpcResponse<Value> =
                     serde_json::from_value(value).map_err(|error| {
-                        AdapterError::Protocol(format!(
-                            "failed to decode A2A JSON-RPC stream event: {error}"
-                        ))
+                        AdapterError::UntrustedInput(
+                            chio_core::canonical::UntrustedJsonError::Decode(error),
+                        )
                     })?;
                 if response.jsonrpc != "2.0" {
                     return Err(AdapterError::Protocol(format!(
@@ -1239,9 +1209,9 @@ impl A2aAdapter {
             |value| {
                 let response: A2aJsonRpcResponse<Value> =
                     serde_json::from_value(value).map_err(|error| {
-                        AdapterError::Protocol(format!(
-                            "failed to decode A2A JSON-RPC stream event: {error}"
-                        ))
+                        AdapterError::UntrustedInput(
+                            chio_core::canonical::UntrustedJsonError::Decode(error),
+                        )
                     })?;
                 if response.jsonrpc != "2.0" {
                     return Err(AdapterError::Protocol(format!(
@@ -1282,7 +1252,12 @@ impl A2aAdapter {
     }
 
     fn manifest_skill(&self, tool_name: &str) -> Option<&A2aAgentSkill> {
-        if !self.manifest.tools.iter().any(|tool| tool.name == tool_name) {
+        if !self
+            .manifest
+            .tools
+            .iter()
+            .any(|tool| tool.name == tool_name)
+        {
             return None;
         }
         self.agent_card
@@ -1314,9 +1289,7 @@ fn decode_jsonrpc_result<T>(
         } else {
             format!("{method} response")
         };
-        AdapterError::Protocol(format!(
-            "A2A JSON-RPC {response_label} omitted `result`"
-        ))
+        AdapterError::Protocol(format!("A2A JSON-RPC {response_label} omitted `result`"))
     })
 }
 
@@ -1345,7 +1318,7 @@ impl ToolServerConnection for A2aAdapter {
         };
         let response = self
             .invoke_skill(tool_name, skill, arguments, None)
-            .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+            .map_err(AdapterError::into_kernel_error)?;
         Ok(response)
     }
 
@@ -1361,7 +1334,7 @@ impl ToolServerConnection for A2aAdapter {
         };
         let response = self
             .invoke_skill(tool_name, skill, arguments, Some(context))
-            .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+            .map_err(AdapterError::into_kernel_error)?;
         Ok(response)
     }
 
@@ -1397,11 +1370,10 @@ impl A2aAdapter {
         let Some(skill) = self.manifest_skill(tool_name) else {
             return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
         };
-        let invocation = parse_tool_input(arguments)
-            .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+        let invocation = parse_tool_input(arguments).map_err(AdapterError::into_kernel_error)?;
         let request_auth = self
             .resolve_request_auth(skill)
-            .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+            .map_err(AdapterError::into_kernel_error)?;
         match invocation {
             A2aToolInvocation::SendMessage(input) => {
                 if !input.stream {
@@ -1413,13 +1385,17 @@ impl A2aAdapter {
                     ));
                 }
                 if let Some(task_id) = input.task_id.as_deref() {
-                    self.validate_task_binding(tool_name, task_id, "send_streaming_message.task_id")
-                        .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+                    self.validate_task_binding(
+                        tool_name,
+                        task_id,
+                        "send_streaming_message.task_id",
+                    )
+                    .map_err(AdapterError::into_kernel_error)?;
                 }
 
                 let request = self
                     .build_send_message_request(skill, input, dispatch)
-                    .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+                    .map_err(AdapterError::into_kernel_error)?;
                 let result = match self.selected_binding {
                     A2aProtocolBinding::JsonRpc => {
                         self.invoke_stream_jsonrpc(request, &request_auth)
@@ -1428,13 +1404,17 @@ impl A2aAdapter {
                         self.invoke_stream_http_json(request, &request_auth)
                     }
                 }
-                .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+                .map_err(AdapterError::into_kernel_error)?;
                 match &result {
                     ToolServerStreamResult::Complete(stream)
                     | ToolServerStreamResult::Incomplete { stream, .. } => {
                         for chunk in &stream.chunks {
-                            self.record_stream_task_activity(tool_name, &chunk.data, "stream_event")
-                                .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+                            self.record_stream_task_activity(
+                                tool_name,
+                                &chunk.data,
+                                "stream_event",
+                            )
+                            .map_err(AdapterError::into_kernel_error)?;
                         }
                     }
                 }
@@ -1447,7 +1427,7 @@ impl A2aAdapter {
                     ));
                 }
                 self.validate_task_binding(tool_name, &input.id, "subscribe_task")
-                    .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+                    .map_err(AdapterError::into_kernel_error)?;
                 let result = match self.selected_binding {
                     A2aProtocolBinding::JsonRpc => {
                         self.subscribe_task_jsonrpc(input, &request_auth)
@@ -1456,7 +1436,7 @@ impl A2aAdapter {
                         self.subscribe_task_http_json(input, &request_auth)
                     }
                 }
-                .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+                .map_err(AdapterError::into_kernel_error)?;
                 match &result {
                     ToolServerStreamResult::Complete(stream)
                     | ToolServerStreamResult::Incomplete { stream, .. } => {
@@ -1466,7 +1446,7 @@ impl A2aAdapter {
                                 &chunk.data,
                                 "subscribe_event",
                             )
-                                .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+                            .map_err(AdapterError::into_kernel_error)?;
                         }
                     }
                 }

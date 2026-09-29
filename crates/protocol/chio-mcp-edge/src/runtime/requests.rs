@@ -329,7 +329,7 @@ impl ChioMcpEdge {
         }
 
         let page_size = self.config.page_size.max(1);
-        let end = (start + page_size).min(visible_tools.len());
+        let end = start + page_size.min(visible_tools.len() - start);
         let next_cursor = (end < visible_tools.len()).then(|| end.to_string());
         let tools = visible_tools[start..end]
             .iter()

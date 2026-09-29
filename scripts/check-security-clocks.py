@@ -18,7 +18,9 @@ import sys
 ROOT = Path(__file__).resolve().parent.parent
 INVENTORY = ROOT / "scripts/security-clock-inventory.json"
 ROOTS = ("crates/security/", "crates/kernel/", "crates/guards/",
-         "crates/platform/chio-control-plane/", "crates/platform/chio-store-sqlite/")
+         "crates/platform/chio-control-plane/", "crates/platform/chio-store-sqlite/",
+         "crates/protocol/chio-mcp-edge/", "crates/protocol/chio-mcp-adapter/",
+         "crates/protocol/chio-a2a-adapter/", "crates/protocol/chio-openai-adapter/")
 ADAPTER = "crates/security/chio-security-types/src/clock/system.rs"
 PORT = "crates/security/chio-security-types/src/clock.rs"
 spec = importlib.util.spec_from_file_location("negative_assertions", ROOT / "scripts/check-negative-assertions.py")
@@ -30,7 +32,7 @@ spec.loader.exec_module(lexer)
 def sites(path, source):
     scanned = lexer.blank_rust_noise(source)
     functions = [(m.start(), m.group(1)) for m in lexer.FN_ITEM.finditer(scanned)]
-    names = {"SystemTime"} | set(re.findall(r"\bSystemTime\s+as\s+(\w+)", scanned))
+    names = {"SystemTime", "Utc"} | set(re.findall(r"\b(?:SystemTime|Utc)\s+as\s+(\w+)", scanned))
     calls = re.compile(r"\b(?:" + "|".join(sorted(names)) + r")\s*::\s*now\s*\(")
     result = Counter()
     for match in calls.finditer(scanned):

@@ -4,9 +4,7 @@ use std::time::Duration;
 
 use chio_core::session::CreateElicitationOperation;
 use chio_kernel::KernelError;
-use chrono::{SecondsFormat, Utc};
 use serde_json::json;
-use tracing::debug;
 
 use crate::edge::AdapterError;
 use crate::framing::read_jsonrpc_frame;
@@ -115,14 +113,8 @@ pub(super) fn parse_create_elicitation_operation(
     }
 
     serde_json::from_value(normalized).map_err(|error| {
-        AdapterError::ParseError(format!(
-            "failed to parse elicitation/create params: {error}"
-        ))
+        AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
     })
-}
-
-pub(super) fn iso8601_now() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 pub(super) fn build_related_task_meta(
@@ -226,7 +218,6 @@ pub(super) fn send_line(
 ) -> Result<(), AdapterError> {
     let line = serde_json::to_string(value)
         .map_err(|e| AdapterError::ParseError(format!("failed to serialize JSON-RPC: {e}")))?;
-    debug!("-> {line}");
     writer
         .write_all(line.as_bytes())
         .map_err(|e| AdapterError::ConnectionFailed(format!("failed to write to stdin: {e}")))?;

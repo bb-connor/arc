@@ -3203,3 +3203,25 @@ codes:
     stability: stable
     consumed_by:
       - chio-kernel
+  - urn: "urn:chio:error:transport:task-capacity-exceeded"
+    domain: transport
+    severity: error
+    string_code: "CHIO-MCP-TASK-CAPACITY"
+    summary: "The bounded deferred-task registry has no available capacity."
+    help: "Wait for pending work to complete or expire before submitting another task."
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-edge
+      - chio-mcp-adapter
+  - urn: "urn:chio:error:transport:stream-capacity-exceeded"
+    domain: transport
+    severity: error
+    summary: "The provider stream exceeded its bounded frame count."
+    help: "Use a bounded response or split the operation before retrying."
+    string_code: "CHIO-PROVIDER-STREAM-CAPACITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-provider-adapter-core
+      - chio-openai-adapter

@@ -70,3 +70,11 @@ and `tracing` support the async transport.
 `NativeChioServiceBuilder` is the authoring surface for an in-process tool
 server: register tool, resource, and prompt handlers and emit a manifest without
 adapting an external MCP process.
+
+`transport/stdio_writer.rs` owns bounded write admission and supervisor dispatch.
+A queued command carries its original monotonic deadline, checked before both
+queue admission and physical write initiation. This does not make an already
+started blocking OS write cancellable. Task TTLs are checked independently in
+`transport/nested_flow.rs`; its 128-entry registry refuses excess pending work.
+These modules preserve request ownership on clock faults and retain terminal
+outcomes even when result encoding fails after the bridge effect.

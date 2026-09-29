@@ -1,18 +1,24 @@
+use chio_security_types::clock::{AuthorityDeadline, Clock, ClockError, ClockReading, SystemClock};
 use std::collections::BTreeMap;
 use std::io::Write;
+use std::sync::Arc;
+
+const MAX_NESTED_TASKS: usize = 128;
+const MAX_TASK_TTL_MS: u64 = 86_400_000;
+const DEFAULT_TASK_TTL_MS: u64 = 600_000;
 
 use chio_core::session::{
     CreateElicitationOperation, CreateMessageOperation, TaskOwnershipSnapshot,
 };
-use chio_kernel::NestedFlowBridge;
+use chio_kernel::{KernelError, NestedFlowBridge};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::edge::AdapterError;
 
 use super::utils::{
-    attach_related_task_meta_to_result, build_related_task_meta, iso8601_now, json_rpc_error,
-    json_rpc_result, map_nested_flow_error_code, send_line, MAX_BACKGROUND_TASKS_PER_TICK,
+    attach_related_task_meta_to_result, build_related_task_meta, json_rpc_error, json_rpc_result,
+    map_nested_flow_error_code, send_line, MAX_BACKGROUND_TASKS_PER_TICK,
     TASK_POLL_INTERVAL_MILLIS,
 };
 
@@ -64,6 +70,8 @@ pub(super) struct NestedFlowTask {
     operation: NestedFlowTaskOperation,
     #[serde(skip)]
     final_outcome: Option<NestedFlowTaskFinalOutcome>,
+    #[serde(skip)]
+    deadline: AuthorityDeadline,
 }
 
 impl NestedFlowTask {
@@ -73,9 +81,15 @@ impl NestedFlowTask {
         parent_request_id: Option<String>,
         operation: CreateMessageOperation,
         ttl: Option<u64>,
-    ) -> Self {
-        let now = iso8601_now();
-        Self {
+        observed: ClockReading,
+    ) -> Result<Self, AdapterError> {
+        let now = task_timestamp(observed)?;
+        let ttl_ms = ttl.unwrap_or(DEFAULT_TASK_TTL_MS);
+        if ttl_ms > MAX_TASK_TTL_MS {
+            return Err(ClockError::InvalidWindow.into());
+        }
+        let deadline = AuthorityDeadline::for_timeout_ms(observed, ttl_ms)?;
+        Ok(Self {
             task_id,
             status: NestedFlowTaskStatus::Working,
             status_message: Some("The operation is now in progress.".to_string()),
@@ -88,7 +102,8 @@ impl NestedFlowTask {
             parent_request_id,
             operation: NestedFlowTaskOperation::CreateMessage(operation),
             final_outcome: None,
-        }
+            deadline,
+        })
     }
 
     fn new_create_elicitation(
@@ -97,9 +112,15 @@ impl NestedFlowTask {
         parent_request_id: Option<String>,
         operation: CreateElicitationOperation,
         ttl: Option<u64>,
-    ) -> Self {
-        let now = iso8601_now();
-        Self {
+        observed: ClockReading,
+    ) -> Result<Self, AdapterError> {
+        let now = task_timestamp(observed)?;
+        let ttl_ms = ttl.unwrap_or(DEFAULT_TASK_TTL_MS);
+        if ttl_ms > MAX_TASK_TTL_MS {
+            return Err(ClockError::InvalidWindow.into());
+        }
+        let deadline = AuthorityDeadline::for_timeout_ms(observed, ttl_ms)?;
+        Ok(Self {
             task_id,
             status: NestedFlowTaskStatus::Working,
             status_message: Some("The operation is now in progress.".to_string()),
@@ -112,7 +133,8 @@ impl NestedFlowTask {
             parent_request_id,
             operation: NestedFlowTaskOperation::CreateElicitation(operation),
             final_outcome: None,
-        }
+            deadline,
+        })
     }
 
     pub(super) fn is_terminal(&self) -> bool {
@@ -124,46 +146,91 @@ impl NestedFlowTask {
         )
     }
 
-    fn touch(&mut self) {
-        self.last_updated_at = iso8601_now();
+    fn touch(&mut self, observed: ClockReading) {
+        if let Ok(timestamp) = task_timestamp(observed) {
+            self.last_updated_at = timestamp;
+        }
     }
 
-    fn mark_completed(&mut self, result: serde_json::Value) {
+    fn mark_completed(&mut self, result: serde_json::Value, observed: ClockReading) {
         self.status = NestedFlowTaskStatus::Completed;
         self.status_message = Some("The operation completed successfully.".to_string());
         self.final_outcome = Some(NestedFlowTaskFinalOutcome::Result(result));
-        self.touch();
+        self.touch(observed);
     }
 
-    fn mark_failed(&mut self, code: i64, message: String) {
+    fn mark_failed(&mut self, code: i64, message: String, observed: ClockReading) {
         self.status = NestedFlowTaskStatus::Failed;
         self.status_message = Some(message.clone());
         self.final_outcome = Some(NestedFlowTaskFinalOutcome::Error { code, message });
-        self.touch();
+        self.touch(observed);
     }
 
-    fn mark_cancelled(&mut self, reason: &str) {
+    fn mark_cancelled(&mut self, reason: &str, observed: ClockReading) {
         self.status = NestedFlowTaskStatus::Cancelled;
         self.status_message = Some(reason.to_string());
         self.final_outcome = Some(NestedFlowTaskFinalOutcome::Error {
             code: -32800,
             message: reason.to_string(),
         });
-        self.touch();
+        self.touch(observed);
     }
 }
 
-#[derive(Debug, Default)]
 pub(super) struct NestedFlowTaskRuntime {
     task_counter: u64,
+    clock: Arc<dyn Clock>,
     pub(super) tasks: BTreeMap<String, NestedFlowTask>,
     pending_background_tasks: Vec<String>,
 }
 
+impl Default for NestedFlowTaskRuntime {
+    fn default() -> Self {
+        Self {
+            task_counter: 0,
+            clock: Arc::new(SystemClock),
+            tasks: BTreeMap::new(),
+            pending_background_tasks: Vec::new(),
+        }
+    }
+}
+
 impl NestedFlowTaskRuntime {
-    fn next_task_id(&mut self) -> String {
-        self.task_counter += 1;
-        format!("nested-client-task-{}", self.task_counter)
+    fn prune_expired(&mut self) -> Result<ClockReading, AdapterError> {
+        let now = self.clock.read()?;
+        let mut expired = Vec::new();
+        for (id, task) in &mut self.tasks {
+            match task.deadline.remaining(now) {
+                Ok(_) => {}
+                Err(ClockError::Expired) => expired.push(id.clone()),
+                Err(error) => return Err(error.into()),
+            }
+        }
+        for id in expired {
+            self.tasks.remove(&id);
+        }
+        self.pending_background_tasks
+            .retain(|id| self.tasks.contains_key(id));
+        Ok(now)
+    }
+
+    fn prepare_task(&mut self) -> Result<ClockReading, AdapterError> {
+        let now = self.prune_expired()?;
+        if self.tasks.len() >= MAX_NESTED_TASKS {
+            self.tasks.retain(|_, task| !task.is_terminal());
+        }
+        if self.tasks.len() >= MAX_NESTED_TASKS {
+            return Err(AdapterError::TaskCapacity);
+        }
+        Ok(now)
+    }
+
+    fn next_task_id(&mut self) -> Result<String, AdapterError> {
+        self.task_counter = self
+            .task_counter
+            .checked_add(1)
+            .ok_or(ClockError::Overflow)?;
+        Ok(format!("nested-client-task-{}", self.task_counter))
     }
 
     pub(super) fn create_message_task(
@@ -172,19 +239,21 @@ impl NestedFlowTaskRuntime {
         parent_request_id: String,
         operation: CreateMessageOperation,
         requested_task: RequestedTask,
-    ) -> serde_json::Value {
-        let task_id = self.next_task_id();
+    ) -> Result<serde_json::Value, AdapterError> {
+        let observed = self.prepare_task()?;
+        let task_id = self.next_task_id()?;
         let task = NestedFlowTask::new_create_message(
             task_id.clone(),
             owner_request_id,
             Some(parent_request_id),
             operation,
             requested_task.ttl,
-        );
+            observed,
+        )?;
         let task_view = task.clone();
         self.tasks.insert(task_id.clone(), task);
         self.pending_background_tasks.push(task_id);
-        json!({ "task": task_view })
+        Ok(json!({ "task": task_view }))
     }
 
     pub(super) fn create_elicitation_task(
@@ -193,26 +262,32 @@ impl NestedFlowTaskRuntime {
         parent_request_id: String,
         operation: CreateElicitationOperation,
         requested_task: RequestedTask,
-    ) -> serde_json::Value {
-        let task_id = self.next_task_id();
+    ) -> Result<serde_json::Value, AdapterError> {
+        let observed = self.prepare_task()?;
+        let task_id = self.next_task_id()?;
         let task = NestedFlowTask::new_create_elicitation(
             task_id.clone(),
             owner_request_id,
             Some(parent_request_id),
             operation,
             requested_task.ttl,
-        );
+            observed,
+        )?;
         let task_view = task.clone();
         self.tasks.insert(task_id.clone(), task);
         self.pending_background_tasks.push(task_id);
-        json!({ "task": task_view })
+        Ok(json!({ "task": task_view }))
     }
 
     pub(super) fn handle_tasks_list(
-        &self,
+        &mut self,
         id: serde_json::Value,
         params: &serde_json::Value,
     ) -> serde_json::Value {
+        let _observed = match self.prune_expired() {
+            Ok(now) => now,
+            Err(error) => return json_rpc_error(id, -32603, &error.to_string()),
+        };
         let start = match parse_cursor(params) {
             Ok(start) => start,
             Err(message) => return json_rpc_error(id, -32602, &message),
@@ -223,7 +298,7 @@ impl NestedFlowTaskRuntime {
             return json_rpc_error(id, -32602, "cursor is out of range");
         }
 
-        let end = (start + 50).min(tasks.len());
+        let end = start + 50.min(tasks.len() - start);
         let next_cursor = (end < tasks.len()).then(|| end.to_string());
         let page = tasks[start..end]
             .iter()
@@ -240,10 +315,14 @@ impl NestedFlowTaskRuntime {
     }
 
     pub(super) fn handle_tasks_get(
-        &self,
+        &mut self,
         id: serde_json::Value,
         params: &serde_json::Value,
     ) -> serde_json::Value {
+        let _observed = match self.prune_expired() {
+            Ok(now) => now,
+            Err(error) => return json_rpc_error(id, -32603, &error.to_string()),
+        };
         let task_id = match parse_task_id(params) {
             Ok(task_id) => task_id,
             Err(message) => return json_rpc_error(id, -32602, &message),
@@ -261,6 +340,10 @@ impl NestedFlowTaskRuntime {
         id: serde_json::Value,
         params: &serde_json::Value,
     ) -> serde_json::Value {
+        let observed = match self.prune_expired() {
+            Ok(now) => now,
+            Err(error) => return json_rpc_error(id, -32603, &error.to_string()),
+        };
         let task_id = match parse_task_id(params) {
             Ok(task_id) => task_id,
             Err(message) => return json_rpc_error(id, -32602, &message),
@@ -280,7 +363,7 @@ impl NestedFlowTaskRuntime {
             );
         }
 
-        task.mark_cancelled("The task was cancelled by request.");
+        task.mark_cancelled("The task was cancelled by request.", observed);
         self.pending_background_tasks
             .retain(|pending| pending != &task_id);
         json_rpc_result(id, serde_json::to_value(task).unwrap_or_else(|_| json!({})))
@@ -293,13 +376,11 @@ impl NestedFlowTaskRuntime {
         nested_flow_bridge: &mut dyn NestedFlowBridge,
         writer: &mut impl Write,
     ) -> Result<serde_json::Value, AdapterError> {
+        self.prune_expired()?;
         let task_id = match parse_task_id(params) {
             Ok(task_id) => task_id,
             Err(message) => return Ok(json_rpc_error(id, -32602, &message)),
         };
-
-        self.pending_background_tasks
-            .retain(|pending| pending != &task_id);
 
         if !self.tasks.contains_key(&task_id) {
             return Ok(json_rpc_error(
@@ -352,12 +433,14 @@ impl NestedFlowTaskRuntime {
         writer: &mut impl Write,
     ) -> Result<(), AdapterError> {
         for _ in 0..MAX_BACKGROUND_TASKS_PER_TICK {
+            self.prune_expired()?;
             let Some(task_id) = self.pending_background_tasks.first().cloned() else {
                 break;
             };
-            self.pending_background_tasks.remove(0);
 
             if !self.tasks.contains_key(&task_id) {
+                self.pending_background_tasks
+                    .retain(|pending| pending != &task_id);
                 continue;
             }
 
@@ -366,6 +449,8 @@ impl NestedFlowTaskRuntime {
                 .get(&task_id)
                 .is_some_and(NestedFlowTask::is_terminal)
             {
+                self.pending_background_tasks
+                    .retain(|pending| pending != &task_id);
                 continue;
             }
 
@@ -390,44 +475,43 @@ impl NestedFlowTaskRuntime {
         nested_flow_bridge: &mut dyn NestedFlowBridge,
         _writer: &mut impl Write,
     ) -> Result<(), AdapterError> {
+        let observed = self.prune_expired()?;
         let Some(mut task) = self.tasks.remove(task_id) else {
             return Ok(());
         };
 
         if !task.is_terminal() {
-            match task.operation.clone() {
-                NestedFlowTaskOperation::CreateMessage(operation) => {
-                    match nested_flow_bridge.create_message(operation) {
-                        Ok(result) => {
-                            let result = serde_json::to_value(result).map_err(|error| {
-                                AdapterError::ParseError(format!(
-                                    "failed to serialize sampling/createMessage result: {error}"
-                                ))
-                            })?;
-                            task.mark_completed(result);
-                        }
-                        Err(error) => {
-                            task.mark_failed(map_nested_flow_error_code(&error), error.to_string());
-                        }
-                    }
-                }
-                NestedFlowTaskOperation::CreateElicitation(operation) => {
-                    match nested_flow_bridge.create_elicitation(operation) {
-                        Ok(result) => {
-                            let result = serde_json::to_value(result).map_err(|error| {
-                                AdapterError::ParseError(format!(
-                                    "failed to serialize elicitation/create result: {error}"
-                                ))
-                            })?;
-                            task.mark_completed(result);
-                        }
-                        Err(error) => {
-                            task.mark_failed(map_nested_flow_error_code(&error), error.to_string());
-                        }
-                    }
-                }
+            let result = match task.operation.clone() {
+                NestedFlowTaskOperation::CreateMessage(operation) => nested_flow_bridge
+                    .create_message(operation)
+                    .and_then(|value| {
+                        serde_json::to_value(value).map_err(|error| {
+                            KernelError::UntrustedInput(
+                                chio_core::canonical::UntrustedJsonError::Decode(error),
+                            )
+                        })
+                    }),
+                NestedFlowTaskOperation::CreateElicitation(operation) => nested_flow_bridge
+                    .create_elicitation(operation)
+                    .and_then(|value| {
+                        serde_json::to_value(value).map_err(|error| {
+                            KernelError::UntrustedInput(
+                                chio_core::canonical::UntrustedJsonError::Decode(error),
+                            )
+                        })
+                    }),
+            };
+            match result {
+                Ok(result) => task.mark_completed(result, observed),
+                Err(error) => task.mark_failed(
+                    map_nested_flow_error_code(&error),
+                    error.to_string(),
+                    observed,
+                ),
             }
         }
+        self.pending_background_tasks
+            .retain(|pending| pending != task_id);
 
         self.tasks.insert(task_id.to_string(), task);
         Ok(())
@@ -440,9 +524,15 @@ pub(super) fn parse_requested_task(
     let Some(task) = params.get("task").cloned() else {
         return Ok(None);
     };
-    serde_json::from_value(task).map(Some).map_err(|_| {
-        AdapterError::ParseError("task must be an object with an optional numeric ttl".into())
-    })
+    let task: RequestedTask =
+        serde_json::from_value(task).map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
+    if task
+        .ttl
+        .is_some_and(|ttl| ttl == 0 || ttl > MAX_TASK_TTL_MS)
+    {
+        return Err(ClockError::InvalidWindow.into());
+    }
+    Ok(Some(task))
 }
 
 fn parse_cursor(params: &serde_json::Value) -> Result<usize, String> {
@@ -476,3 +566,14 @@ fn nested_flow_task_status_label(status: NestedFlowTaskStatus) -> &'static str {
         NestedFlowTaskStatus::Cancelled => "cancelled",
     }
 }
+
+fn task_timestamp(observed: ClockReading) -> Result<String, ClockError> {
+    let millis = i64::try_from(observed.unix_millis().get()).map_err(|_| ClockError::Overflow)?;
+    chrono::DateTime::from_timestamp_millis(millis)
+        .map(|time| time.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+        .ok_or(ClockError::Overflow)
+}
+
+#[cfg(test)]
+#[path = "nested_flow_tests.rs"]
+mod boundary_tests;

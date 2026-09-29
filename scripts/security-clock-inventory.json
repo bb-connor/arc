@@ -4,6 +4,8 @@
   "sites": {
     "crates/guards/chio-guards/src/behavioral_profile.rs::default_now": 1,
     "crates/guards/chio-guards/tests/behavioral_profile.rs::unique_db_path": 1,
+    "crates/guards/chio-policy/src/conditions.rs::resolve_current_time": 1,
+    "crates/guards/chio-policy/src/receipt.rs::evaluate_audited": 1,
     "crates/guards/chio-policy/tests/compile_policy.rs::write_temp_threat_intel_pattern_db": 1,
     "crates/guards/chio-wasm-guards/src/host.rs::core_module_get_time_unix_secs": 1,
     "crates/guards/chio-wasm-guards/src/host.rs::get_time_unix_secs": 1,
@@ -126,6 +128,9 @@
     "crates/platform/chio-store-sqlite/tests/session_throttles.rs::now_unix_ms": 1,
     "crates/platform/chio-store-sqlite/tests/tenant_isolation.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/tests/threshold_kernel_lifecycle/support.rs::now": 1,
+    "crates/protocol/chio-a2a-adapter/src/tests/support.rs::unique_path": 1,
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::legacy_launch_rejects_discovered_tool_surface_drift": 1,
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::write_stdio_server_script": 1,
     "crates/security/chio-cage-init/src/status.rs::unix_time_ms": 1,
     "crates/security/chio-keyring/tests/independent_services.rs::now_millis": 1,
     "crates/security/chio-secret-broker/src/process_boundary_tests/fixture.rs::now_unix_seconds": 1,
@@ -920,6 +925,16 @@
       "occurrences": 1,
       "disposition": "fixture",
       "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
+    }
+  },
+  "protocol_owners_review_2026_09_29": {
+    "contract": "Four adapter owners have no production ambient wall reads. StdIO I/O waits use checked monotonic Instant. UTC spellings now scanned as well as SystemTime; two previously uncounted policy reads are explicitly remaining work.",
+    "newly_classified": {
+      "crates/protocol/chio-a2a-adapter/src/tests/support.rs::unique_path": "filesystem nonce fixture only",
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::legacy_launch_rejects_discovered_tool_surface_drift": "filesystem nonce fixture only",
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::write_stdio_server_script": "filesystem nonce fixture only",
+      "crates/guards/chio-policy/src/receipt.rs::evaluate_audited": "policy production debt, pending owner migration",
+      "crates/guards/chio-policy/src/conditions.rs::resolve_current_time": "policy production debt, pending owner migration"
     }
   }
 }

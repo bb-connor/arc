@@ -97,7 +97,13 @@ pub(in crate::runtime) fn pump_client_messages<R: BufRead>(
                 return;
             }
             Err(error) => {
-                let stop_after_send = matches!(error, AdapterError::ConnectionFailed(_));
+                let stop_after_send = matches!(
+                    error,
+                    AdapterError::ConnectionFailed(_)
+                        | AdapterError::UntrustedInput(
+                            chio_core::canonical::UntrustedJsonError::TooLarge { .. }
+                        )
+                );
                 let inbound = match error {
                     AdapterError::ConnectionFailed(message) => ClientInbound::ReadError(message),
                     AdapterError::ParseError(message) => ClientInbound::ParseError(message),

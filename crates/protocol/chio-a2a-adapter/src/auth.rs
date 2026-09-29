@@ -141,9 +141,11 @@ fn enforce_egress_contract(
             "A2A outbound HTTP requires an HttpEgressContract".to_string(),
         ));
     };
-    contract.enforce_url_with_dns(target_url, 0).map_err(|err| {
-        AdapterError::InvalidUrl(format!("HttpEgressContract rejects A2A URL: {err}"))
-    })?;
+    contract
+        .enforce_url_with_dns(target_url, 0)
+        .map_err(|err| {
+            AdapterError::InvalidUrl(format!("HttpEgressContract rejects A2A URL: {err}"))
+        })?;
     Ok(())
 }
 
@@ -202,11 +204,7 @@ fn dispatch_with_redirect_validation<F>(
     mut send: F,
 ) -> Result<ureq::Response, AdapterError>
 where
-    F: FnMut(
-        &str,
-        bool,
-        &HttpEgressContract,
-    ) -> Result<ureq::Response, AdapterError>,
+    F: FnMut(&str, bool, &HttpEgressContract) -> Result<ureq::Response, AdapterError>,
 {
     let Some(contract) = transport_config.egress_contract.as_ref() else {
         return Err(AdapterError::InvalidUrl(
@@ -250,7 +248,9 @@ where
                 ))
             })?;
         let previous_url = Url::parse(&current_url).map_err(|error| {
-            AdapterError::InvalidUrl(format!("invalid A2A redirect source `{current_url}`: {error}"))
+            AdapterError::InvalidUrl(format!(
+                "invalid A2A redirect source `{current_url}`: {error}"
+            ))
         })?;
         let cross_origin = !same_origin(&previous_url, &next_url);
         if cross_origin && !allow_cross_origin_redirects {
@@ -275,15 +275,21 @@ fn read_json_response_with_contract<T: for<'de> Deserialize<'de>>(
     let mut body = Vec::new();
     response
         .into_reader()
-        .take(contract.max_response_bytes.saturating_add(1))
+        .take(contract.max_response_bytes.min(MAX_A2A_JSON_BYTES as u64) + 1)
         .read_to_end(&mut body)
-        .map_err(|error| AdapterError::Remote(format!("failed to read A2A response from {context}: {error}")))?;
+        .map_err(|error| {
+            AdapterError::Remote(format!(
+                "failed to read A2A response from {context}: {error}"
+            ))
+        })?;
     contract
         .enforce_response_bytes(body.len() as u64)
-        .map_err(|err| AdapterError::Protocol(format!("HttpEgressContract rejects A2A response: {err}")))?;
-    serde_json::from_slice::<T>(&body).map_err(|error| {
-        AdapterError::Protocol(format!("failed to decode A2A JSON from {context}: {error}"))
-    })
+        .map_err(|err| {
+            AdapterError::Protocol(format!("HttpEgressContract rejects A2A response: {err}"))
+        })?;
+    chio_core::canonical::UntrustedJsonText::from_wire(&body, MAX_A2A_JSON_BYTES)?
+        .decode_signed()
+        .map_err(Into::into)
 }
 
 fn read_sse_response_with_contract<F>(
@@ -296,7 +302,9 @@ where
     F: Fn(Value) -> Result<Value, AdapterError>,
 {
     let contract = transport_config.egress_contract.as_ref().ok_or_else(|| {
-        AdapterError::InvalidUrl("A2A streaming response reads require an HttpEgressContract".to_string())
+        AdapterError::InvalidUrl(
+            "A2A streaming response reads require an HttpEgressContract".to_string(),
+        )
     })?;
     enforce_ureq_content_length(contract, &response, context)?;
     parse_sse_stream_with_limit(
@@ -392,7 +400,12 @@ where
             "expected {SSE_CONTENT_TYPE} response, got {content_type}"
         )));
     }
-    read_sse_response_with_contract(response, request_url.as_str(), transport_config, decode_event)
+    read_sse_response_with_contract(
+        response,
+        request_url.as_str(),
+        transport_config,
+        decode_event,
+    )
 }
 
 fn post_json<T: for<'de> Deserialize<'de>, B: Serialize>(
@@ -449,8 +462,7 @@ fn post_form_json<T: for<'de> Deserialize<'de>>(
                 .post(target)
                 .set("Content-Type", "application/x-www-form-urlencoded")
                 .set("Accept", "application/json");
-            let request =
-                apply_request_headers(request, request_headers, strip_sensitive_headers);
+            let request = apply_request_headers(request, request_headers, strip_sensitive_headers);
             request
                 .send_string(body)
                 .map_err(|error| map_ureq_error_with_contract(error, contract))
@@ -501,7 +513,12 @@ where
             "expected {SSE_CONTENT_TYPE} response, got {content_type}"
         )));
     }
-    read_sse_response_with_contract(response, request_url.as_str(), transport_config, decode_event)
+    read_sse_response_with_contract(
+        response,
+        request_url.as_str(),
+        transport_config,
+        decode_event,
+    )
 }
 
 fn build_optional_default_tls_config(

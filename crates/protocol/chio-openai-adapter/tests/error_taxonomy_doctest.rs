@@ -54,7 +54,7 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
     for required in [
         "RateLimited",
         "ContentPolicy",
-        "BadToolArgs",
+        "UntrustedInput",
         "Upstream5xx",
         "TransportTimeout",
         "VerdictBudgetExceeded",
@@ -86,7 +86,7 @@ fn readme_taxonomy_envelopes_are_class_specific() -> Result<(), String> {
                 require_status(&row, 400)?;
                 require_error_code(&row, "content_policy_violation")?;
             }
-            "BadToolArgs" => {
+            "UntrustedInput" => {
                 require_body_string(&row, "/type", "function_call")?;
                 require_body_string(&row, "/call_id", "call_bad_args")?;
                 let arguments = row
@@ -155,7 +155,7 @@ fn readme_taxonomy_envelopes_are_class_specific() -> Result<(), String> {
 #[test]
 fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     let classes = classes(&taxonomy_rows()?);
-    for required in ["BadToolArgs", "Malformed", "VerdictBudgetExceeded"] {
+    for required in ["UntrustedInput", "Malformed", "VerdictBudgetExceeded"] {
         if !classes.contains(required) {
             return Err(format!(
                 "README taxonomy did not cover current class {required}"
@@ -174,7 +174,7 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
             }
         ]
     }))?);
-    require_provider_error(bad_args, "BadToolArgs")?;
+    require_provider_error(bad_args, "UntrustedInput")?;
 
     let malformed = adapter.gate_sse_stream(malformed_delta_stream().as_bytes(), |_invocation| {
         Ok(allow_verdict())
@@ -336,6 +336,9 @@ fn require_provider_error<T>(
         ProviderError::VerdictBudgetExceeded { .. } => "VerdictBudgetExceeded",
         ProviderError::Malformed(_) => "Malformed",
         ProviderError::Other(_) => "Other",
+        ProviderError::Clock(_) => "Clock",
+        ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
+        ProviderError::UntrustedInput(_) => "UntrustedInput",
     };
 
     if actual != expected {

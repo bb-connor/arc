@@ -9,9 +9,9 @@ The current batch has its own implementation and verification record below; this
 
 | Work | Current recorded scope | Interpretation |
 | --- | --- | --- |
-| Decoder classification | 298 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel and SQLite baseline owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
+| Decoder classification | 289 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite and four protocol adapter baseline owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
-| Ambient clocks | 140 occurrences at 135 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks now share their configured authority owners; other owners remain. |
+| Ambient clocks | 145 occurrences at 140 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters now use the shared clock; expanded scanning adds three fixture sites and two previously uncounted policy UTC reads. Other owners remain. |
 | Negative assertions | Baseline contains 1,260 assertions at 1,177 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
 | Schema/domain duplication | Wire lock records 163 identifiers declared in multiple files; domain gate has 32 shape exceptions and zero duplicate byte domains | Six duplicated byte domains and 37 schema duplicates retired with 43 canonical identity pins. Remaining schema consolidation and domain-shape repairs stay queued. |
@@ -61,8 +61,23 @@ real contract, not a mass syntactic replacement.
 References: corrections 1D/1F/3A/4A/4B, Packet 8, packets 10.2/10.3, and
 [pass 8 U1](2026-09-26-security-review-pass-8.md). Original proof-type and error
 counts in the reviews are historical; do not quote them as today's unresolved
-defect count. The twelve registered sealed proof types are bounded delivered work,
+defect count. The thirteen registered sealed proof types are bounded delivered work,
 not a workspace-wide proof-result audit.
+
+The [September 29 protocol batch](2026-09-29-protocol-authority-boundaries-execution.md)
+reviews 22 decoder owners across MCP edge/adapter, A2A, OpenAI and the shared SSE
+reader. It repairs OAuth cache lifetime, task expiry, writer deadline and bounded
+stream paths; typed parser and clock failures retain their sources and redacted
+codes. It adds the cage-required launch proof to the seal gate. Broader semantic
+error-source migration and other protocol/product ingress remain queued.
+
+The next owner batch is native/hosted MCP authority: remove the existing
+`LegacyNativeLaunchAuthorization` / `NativeMcpLaunch::LegacyAuthorized` path
+and migrate CLI, hosted and remote factories and their test fixtures to enforced
+launch or transport mocks. Continue the original-byte and rejection contracts
+through `chio-mcp-remote`, `chio-hosted-mcp` and `chio-a2a-edge`. Finish the newly
+counted policy UTC reads (`resolve_current_time`, `evaluate_audited`) through the
+shared clock. No compatibility alias should replace the removed launch path.
 
 ### 3. Compiler enforcement and secret ownership (implemented)
 

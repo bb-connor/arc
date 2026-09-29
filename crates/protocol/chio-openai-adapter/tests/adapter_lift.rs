@@ -396,7 +396,83 @@ fn lift_fails_closed_for_malformed_arguments() {
     }))))
     .expect_err("malformed arguments should deny lift");
 
-    assert!(err
-        .to_string()
-        .contains("tool arguments failed schema validation"));
+    assert!(matches!(
+        err,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Canonicalization(
+            _
+        ))
+    ));
+}
+
+#[test]
+fn protocol_boundary_rejects_duplicate_arguments() {
+    let adapter = chio_openai::OpenAiAdapter::new("org-test");
+    let raw = chio_tool_call_fabric::ProviderRequest(br#"{"output":[{"type":"function_call","call_id":"call-1","name":"read","arguments":"{\"path\":\"a\",\"path\":\"b\"}"}]}"#.to_vec());
+    let error = adapter
+        .lift_batch(raw)
+        .expect_err("duplicate arguments must reject");
+    assert!(error.to_string().contains("urn:chio:error:attest:"));
+}
+
+#[test]
+fn protocol_boundary_provider_payload_and_nested_arguments_fail_precisely() {
+    let adapter = OpenAiAdapter::new("org-test");
+    for arguments in [
+        "{\"x\":1,\"x\":2}",
+        "{\"x\":9007199254740993}",
+        "[]",
+        "null",
+    ] {
+        let error = adapter.lift_batch(raw(json!({"output":[{"type":"function_call", "call_id":"1", "name":"read", "arguments":arguments}]}))).unwrap_err();
+        assert!(matches!(error, ProviderError::UntrustedInput(_)));
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains(arguments));
+    }
+    let error = adapter
+        .lift_batch(raw(json!({"body": "{\"output\":[],\"output\":[]}"})))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
+    let error = adapter
+        .lift_batch(ProviderRequest(vec![b' '; 16 * 1024 * 1024 + 1]))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::TooLarge { .. })
+    ));
+}
+
+#[test]
+fn protocol_boundary_provenance_uses_injected_clock_and_rejects_faults() {
+    use chio_security_types::clock::*;
+    let payload = || {
+        raw(
+            json!({"output":[{"type":"function_call", "call_id":"1", "name":"read", "arguments":"{}"}]}),
+        )
+    };
+    let adapter =
+        OpenAiAdapter::new("org-test").with_clock(Arc::new(FixedClock::from_millis(1234)));
+    let calls = adapter.lift_batch(payload()).unwrap();
+    assert_eq!(
+        calls[0]
+            .provenance
+            .received_at
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+        1234
+    );
+    struct Failed;
+    impl Clock for Failed {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            Err(ClockError::Unavailable)
+        }
+    }
+    let adapter = adapter.with_clock(Arc::new(Failed));
+    assert!(matches!(
+        adapter.lift_batch(payload()),
+        Err(ProviderError::Clock(ClockError::Unavailable))
+    ));
 }

@@ -153,6 +153,14 @@ impl McpServerCapabilities {
 /// Errors that can occur during MCP adaptation.
 #[derive(Debug, thiserror::Error)]
 pub enum AdapterError {
+    #[error("urn:chio:error:transport:task-capacity-exceeded")]
+    TaskCapacity,
+    #[error("{code}", code = .0.code())]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    /// Rejected peer bytes, with a redacted code and a retained local cause.
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("MCP server connection failed: {0}")]
     ConnectionFailed(String),
 

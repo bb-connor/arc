@@ -1,3 +1,5 @@
+use super::*;
+
 #[tokio::test]
 async fn adapter_invokes_http_json_binding() {
     let Some(server) = FakeA2aServer::spawn_http_json() else {
@@ -235,6 +237,7 @@ async fn build_send_message_request_propagates_interface_tenant() {
             egress_contract: None,
         },
         token_cache: Mutex::new(Vec::new()),
+        clock: ClockSource::default(),
         timeout: Duration::from_secs(2),
         request_counter: AtomicU64::new(0),
         partner_policy: None,
@@ -256,7 +259,7 @@ async fn build_send_message_request_propagates_interface_tenant() {
                 return_immediately: None,
                 stream: false,
             },
-        None,
+            None,
         )
         .expect("build send message request");
 
@@ -322,7 +325,7 @@ async fn build_send_message_request_rejects_history_length_without_capability() 
                 return_immediately: None,
                 stream: false,
             },
-        None,
+            None,
         )
         .expect_err("history_length without capability should fail");
     assert!(error
@@ -354,7 +357,7 @@ async fn build_send_message_request_rejects_text_when_skill_declares_json_only_i
                 return_immediately: None,
                 stream: false,
             },
-        None,
+            None,
         )
         .expect_err("JSON-only A2A skill must reject text parts");
     assert!(
@@ -387,7 +390,7 @@ async fn build_send_message_request_rejects_data_when_skill_declares_text_only_i
                 return_immediately: None,
                 stream: false,
             },
-        None,
+            None,
         )
         .expect_err("text-only A2A skill must reject JSON data parts");
     assert!(
@@ -596,7 +599,7 @@ async fn build_send_message_request_accepts_parameterized_text_and_json_input_mo
                 return_immediately: None,
                 stream: false,
             },
-        None,
+            None,
         )
         .expect("parameterized text and JSON modes should admit both part shapes");
 
@@ -652,7 +655,7 @@ async fn empty_default_input_modes_accept_text_and_json() {
                 return_immediately: None,
                 stream: false,
             },
-        None,
+            None,
         )
         .expect("empty default input modes should admit text and JSON parts");
 

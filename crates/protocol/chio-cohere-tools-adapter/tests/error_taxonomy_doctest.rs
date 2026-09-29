@@ -106,6 +106,7 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
         "TransportTimeout",
         "VerdictBudgetExceeded",
         "Malformed",
+        "UntrustedInput",
     ] {
         if !classes.contains(required) {
             return Err(format!(
@@ -124,7 +125,7 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
 #[test]
 fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     let classes = classes(&taxonomy_rows()?);
-    for required in ["BadToolArgs", "Malformed", "VerdictBudgetExceeded"] {
+    for required in ["BadToolArgs", "UntrustedInput", "VerdictBudgetExceeded"] {
         if !classes.contains(required) {
             return Err(format!(
                 "README taxonomy did not cover current class {required}"
@@ -148,7 +149,7 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
         .gate_sse_stream(b"event: tool-call-end\ndata: not-json\n\n", |_invocation| {
             Ok(allow_verdict())
         });
-    require_provider_error(nonjson, "Malformed")?;
+    require_provider_error(nonjson, "UntrustedInput")?;
 
     let budget = adapter.gate_sse_stream(&tool_call_stream(), |_invocation| {
         Err(ProviderError::VerdictBudgetExceeded {
@@ -259,6 +260,9 @@ fn require_provider_error<T>(
         ProviderError::VerdictBudgetExceeded { .. } => "VerdictBudgetExceeded",
         ProviderError::Malformed(_) => "Malformed",
         ProviderError::Other(_) => "Other",
+        ProviderError::Clock(_) => "Clock",
+        ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
+        ProviderError::UntrustedInput(_) => "UntrustedInput",
     };
 
     if actual != expected {

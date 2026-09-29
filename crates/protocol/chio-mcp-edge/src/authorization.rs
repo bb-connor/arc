@@ -52,7 +52,7 @@ pub fn negotiate_authorization_capabilities(
         return Ok(CapabilityNegotiation::v1_default());
     };
     let peer: CapabilityNegotiation = serde_json::from_value(profile.clone())
-        .map_err(|error| invalid(&format!("invalid MCP authorization capabilities: {error}")))?;
+        .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
     authorization_capabilities()
         .negotiated_with(&peer)
         .map_err(|error| invalid(&format!("invalid MCP authorization capabilities: {error}")))

@@ -355,8 +355,16 @@ fn malformed_done_tool_call_arguments_fail_closed() {
         .gate_sse_stream(raw.as_bytes(), |_| Ok(allow_verdict()))
         .expect_err("invalid done arguments should fail closed");
 
-    assert!(matches!(err, ProviderError::BadToolArgs(_)));
-    assert!(err.to_string().contains("arguments"));
+    assert!(matches!(
+        err,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Canonicalization(
+            _
+        ))
+    ));
+    assert_eq!(
+        err.to_string(),
+        "urn:chio:error:attest:signed-json-canonicalization"
+    );
 }
 
 #[test]
@@ -444,6 +452,8 @@ fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
         .gate_sse_stream(raw.as_bytes(), |_| Ok(allow_verdict()))
         .expect_err("oversized non-append raw frame should fail closed");
 
-    assert!(matches!(err, ProviderError::Malformed(_)));
-    assert!(err.to_string().contains("raw frame bytes"));
+    assert!(matches!(
+        err,
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::TooLarge { .. })
+    ));
 }

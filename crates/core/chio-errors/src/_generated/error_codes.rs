@@ -3521,6 +3521,32 @@ pub const KERNEL_DPOP_RESERVATION_OWNERSHIP: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-kernel"],
 };
 
+pub const TRANSPORT_TASK_CAPACITY_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:task-capacity-exceeded",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The bounded deferred-task registry has no available capacity.",
+    help: "Wait for pending work to complete or expire before submitting another task.",
+    string_code: "CHIO-MCP-TASK-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-edge", "chio-mcp-adapter"],
+};
+
+pub const TRANSPORT_STREAM_CAPACITY_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:stream-capacity-exceeded",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The provider stream exceeded its bounded frame count.",
+    help: "Use a bounded response or split the operation before retrying.",
+    string_code: "CHIO-PROVIDER-STREAM-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-provider-adapter-core", "chio-openai-adapter"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -3784,6 +3810,8 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_DPOP_WINDOW_OVERFLOW,
     KERNEL_FINANCIAL_BUDGET_EXCEEDED,
     KERNEL_DPOP_RESERVATION_OWNERSHIP,
+    TRANSPORT_TASK_CAPACITY_EXCEEDED,
+    TRANSPORT_STREAM_CAPACITY_EXCEEDED,
 ];
 
 #[must_use]

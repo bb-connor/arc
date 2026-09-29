@@ -599,102 +599,6 @@ struct ActiveRequest {
     sender: mpsc::SyncSender<RequestMessage>,
 }
 
-struct WriterCommand {
-    bytes: Vec<u8>,
-    completion: Option<mpsc::SyncSender<Result<(), String>>>,
-}
-
-struct BoundedStdioWriter {
-    writer_tx: mpsc::SyncSender<WriterCommand>,
-    shutdown_requested: Arc<AtomicBool>,
-    buffer: Vec<u8>,
-    deadline: Instant,
-}
-
-impl BoundedStdioWriter {
-    fn new(
-        writer_tx: mpsc::SyncSender<WriterCommand>,
-        shutdown_requested: Arc<AtomicBool>,
-        timeout: Duration,
-    ) -> Self {
-        Self {
-            writer_tx,
-            shutdown_requested,
-            buffer: Vec::new(),
-            deadline: Instant::now() + timeout,
-        }
-    }
-}
-
-impl Write for BoundedStdioWriter {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if self.buffer.len().saturating_add(bytes.len()) > MAX_STDIO_MCP_FRAME_BYTES + 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "outbound MCP JSON-RPC frame exceeded the transport limit",
-            ));
-        }
-        self.buffer.extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        if self.buffer.is_empty() {
-            return Ok(());
-        }
-        let (completion_tx, completion_rx) = mpsc::sync_channel(1);
-        let command = WriterCommand {
-            bytes: std::mem::take(&mut self.buffer),
-            completion: Some(completion_tx),
-        };
-        self.writer_tx
-            .try_send(command)
-            .map_err(|error| match error {
-                mpsc::TrySendError::Full(_) => {
-                    io::Error::new(io::ErrorKind::WouldBlock, "MCP stdin writer queue is full")
-                }
-                mpsc::TrySendError::Disconnected(_) => io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    "MCP stdin writer supervisor disconnected",
-                ),
-            })?;
-        let remaining = self.deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            return Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "MCP stdin write exceeded its deadline",
-            ));
-        }
-        loop {
-            if self.shutdown_requested.load(Ordering::Acquire) {
-                return Err(io::Error::new(
-                    io::ErrorKind::Interrupted,
-                    "MCP stdin write cancelled by shutdown",
-                ));
-            }
-            let remaining = self.deadline.saturating_duration_since(Instant::now());
-            if remaining.is_zero() {
-                return Err(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "MCP stdin write exceeded its deadline",
-                ));
-            }
-            let poll = std::cmp::min(UPSTREAM_REQUEST_POLL_INTERVAL, remaining);
-            match completion_rx.recv_timeout(poll) {
-                Ok(Ok(())) => return Ok(()),
-                Ok(Err(error)) => return Err(io::Error::new(io::ErrorKind::BrokenPipe, error)),
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::BrokenPipe,
-                        "MCP stdin writer completion disconnected",
-                    ))
-                }
-            }
-        }
-    }
-}
-
 /// Spawns an MCP server as a subprocess and communicates via stdio.
 ///
 /// MCP uses newline-delimited JSON-RPC over stdin/stdout. Each message is a
@@ -1357,7 +1261,10 @@ impl StdioMcpTransport {
                 .lock()
                 .map_err(|e| AdapterError::ConnectionFailed(format!("lock poisoned: {e}")))?;
             let id = inner.next_id;
-            inner.next_id += 1;
+            inner.next_id = inner
+                .next_id
+                .checked_add(1)
+                .ok_or(chio_security_types::clock::ClockError::Overflow)?;
             let request_id = json!(id);
             *active_request = Some(ActiveRequest {
                 id,
@@ -1569,7 +1476,7 @@ impl StdioMcpTransport {
             .writer_tx
             .clone();
         let mut writer =
-            BoundedStdioWriter::new(writer_tx, Arc::clone(&self.shutdown_requested), timeout);
+            BoundedStdioWriter::new(writer_tx, Arc::clone(&self.shutdown_requested), timeout)?;
         action(&mut writer)
     }
 
@@ -1646,6 +1553,7 @@ impl StdioMcpTransport {
         if let Some(writer_tx) = writer_tx {
             let _ = writer_tx.try_send(WriterCommand {
                 bytes,
+                deadline: None,
                 completion: None,
             });
         }
@@ -1718,8 +1626,9 @@ impl StdioMcpTransport {
     ) -> Result<McpToolResult, AdapterError> {
         let result =
             self.send_request_with_nested_flow("tools/call", params, nested_flow_bridge)?;
-        serde_json::from_value(result)
-            .map_err(|e| AdapterError::ParseError(format!("failed to parse tool result: {e}")))
+        serde_json::from_value(result).map_err(|error| {
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+        })
     }
 }
 
@@ -1752,8 +1661,12 @@ impl McpTransport for StdioMcpTransport {
             AdapterError::ParseError("tools/list response missing 'tools'".into())
         })?;
 
-        let tools: Vec<McpToolInfo> = serde_json::from_value(tools_value.clone())
-            .map_err(|e| AdapterError::ParseError(format!("failed to parse tool list: {e}")))?;
+        let tools: Vec<McpToolInfo> =
+            serde_json::from_value(tools_value.clone()).map_err(|error| {
+                AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(
+                    error,
+                ))
+            })?;
 
         Ok(tools)
     }
@@ -1806,7 +1719,7 @@ impl McpTransport for StdioMcpTransport {
             AdapterError::ParseError("resources/list response missing 'resources'".into())
         })?;
         serde_json::from_value(resources_value.clone()).map_err(|error| {
-            AdapterError::ParseError(format!("failed to parse resources: {error}"))
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
         })
     }
 
@@ -1818,7 +1731,7 @@ impl McpTransport for StdioMcpTransport {
             )
         })?;
         serde_json::from_value(templates_value.clone()).map_err(|error| {
-            AdapterError::ParseError(format!("failed to parse resource templates: {error}"))
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
         })
     }
 
@@ -1828,7 +1741,7 @@ impl McpTransport for StdioMcpTransport {
             AdapterError::ParseError("resources/read response missing 'contents'".into())
         })?;
         let contents = serde_json::from_value(contents_value.clone()).map_err(|error| {
-            AdapterError::ParseError(format!("failed to parse resource contents: {error}"))
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
         })?;
         Ok(Some(contents))
     }
@@ -1838,8 +1751,9 @@ impl McpTransport for StdioMcpTransport {
         let prompts_value = result.get("prompts").ok_or_else(|| {
             AdapterError::ParseError("prompts/list response missing 'prompts'".into())
         })?;
-        serde_json::from_value(prompts_value.clone())
-            .map_err(|error| AdapterError::ParseError(format!("failed to parse prompts: {error}")))
+        serde_json::from_value(prompts_value.clone()).map_err(|error| {
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+        })
     }
 
     fn get_prompt(
@@ -1855,7 +1769,7 @@ impl McpTransport for StdioMcpTransport {
             }),
         )?;
         let prompt = serde_json::from_value(result).map_err(|error| {
-            AdapterError::ParseError(format!("failed to parse prompt result: {error}"))
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
         })?;
         Ok(Some(prompt))
     }
@@ -1887,7 +1801,7 @@ impl McpTransport for StdioMcpTransport {
             AdapterError::ParseError("completion/complete response missing 'completion'".into())
         })?;
         let completion = serde_json::from_value(completion_value.clone()).map_err(|error| {
-            AdapterError::ParseError(format!("failed to parse prompt completion: {error}"))
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
         })?;
         Ok(Some(completion))
     }
@@ -1919,7 +1833,7 @@ impl McpTransport for StdioMcpTransport {
             AdapterError::ParseError("completion/complete response missing 'completion'".into())
         })?;
         let completion = serde_json::from_value(completion_value.clone()).map_err(|error| {
-            AdapterError::ParseError(format!("failed to parse resource completion: {error}"))
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
         })?;
         Ok(Some(completion))
     }

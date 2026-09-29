@@ -207,6 +207,28 @@
     "crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs",
     "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs",
+    "crates/protocol/chio-a2a-adapter/src/auth.rs",
+    "crates/protocol/chio-a2a-adapter/src/invoke.rs",
+    "crates/protocol/chio-a2a-adapter/src/mapping.rs",
+    "crates/protocol/chio-a2a-adapter/src/task_registry.rs",
+    "crates/protocol/chio-a2a-adapter/src/transport.rs",
+    "crates/protocol/chio-mcp-adapter/src/framing.rs",
+    "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs",
+    "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc",
+    "crates/protocol/chio-mcp-adapter/src/transport/utils.rs",
+    "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs",
+    "crates/protocol/chio-mcp-edge/src/authorization.rs",
+    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs",
+    "crates/protocol/chio-openai-adapter/src/adapter.rs",
+    "crates/protocol/chio-openai-adapter/src/input.rs",
+    "crates/protocol/chio-openai-adapter/src/lib.rs",
+    "crates/protocol/chio-openai-adapter/src/streaming.rs",
+    "crates/protocol/chio-openai-adapter/src/transport.rs",
+    "crates/protocol/chio-provider-adapter-core/src/sse.rs",
     "crates/security/chio-active-response-authority/src/config.rs",
     "crates/security/chio-active-response-authority/src/store.rs",
     "crates/security/chio-flow/src/classification.rs",
@@ -1069,6 +1091,15 @@
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_evaluation_connection::from_wire",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_outcome_connection::from_wire",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::verify_outcome_projection::from_wire",
+    "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire",
+    "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire",
+    "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire",
+    "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame::from_wire",
+    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame::from_wire",
+    "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire",
+    "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire",
+    "crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frame::from_wire",
+    "crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frames::from_wire",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire",
     "crates/security/chio-active-response-authority/src/store.rs::decode_canonical::from_wire",
     "crates/security/chio-flow/src/classification.rs::validate_field_path::from_wire",
@@ -1764,6 +1795,41 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/state_converters.rs::parse_underwriting_lifecycle_state::from_value",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value",
+    "crates/protocol/chio-a2a-adapter/src/invoke.rs::invoke_stream_jsonrpc::from_value",
+    "crates/protocol/chio-a2a-adapter/src/invoke.rs::subscribe_task_jsonrpc::from_value",
+    "crates/protocol/chio-a2a-adapter/src/mapping.rs::parse_tool_input::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs::respond_to_upstream_nested_flow::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs::parse_requested_task::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::call_tool_with_params::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::complete_prompt_argument::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::complete_resource_argument::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::get_prompt::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::list_prompts::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::list_resource_templates::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::list_resources::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::list_tools::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::read_resource::from_value",
+    "crates/protocol/chio-mcp-adapter/src/transport/utils.rs::parse_create_elicitation_operation::from_value",
+    "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs::parse_url_elicitation_required_error::from_value",
+    "crates/protocol/chio-mcp-edge/src/authorization.rs::negotiate_authorization_capabilities::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::list_roots::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::list_roots::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_progress_token::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_execution_nonce::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_governed_intent::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value",
+    "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_slice",
+    "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value",
     "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice",
     "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value",
     "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value",
@@ -4021,7 +4087,37 @@
     "crates/trust/chio-credentials/src/oid4vp.rs::inspect_oid4vp_direct_post_response::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/oid4vp.rs::verify_oid4vp_direct_post_response::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/oid4vp.rs::verify_signed_oid4vp_request_object::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/portable_sd_jwt.rs::verify_chio_passport_sd_jwt_vc::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result."
+    "crates/trust/chio-credentials/src/portable_sd_jwt.rs::verify_chio_passport_sd_jwt_vc::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/protocol/chio-a2a-adapter/src/invoke.rs::invoke_stream_jsonrpc::from_value": "SSE Values become typed A2A envelopes only after the bounded duplicate-aware transport reader. Protocol version, error precedence, task binding and kernel admission remain separate required checks.",
+    "crates/protocol/chio-a2a-adapter/src/invoke.rs::subscribe_task_jsonrpc::from_value": "SSE Values become typed A2A envelopes only after the bounded duplicate-aware transport reader. Protocol version, error precedence, task binding and kernel admission remain separate required checks.",
+    "crates/protocol/chio-a2a-adapter/src/mapping.rs::parse_tool_input::from_value": "Tool arguments are already decoded untrusted Values projected into explicit A2A operation shapes. Caller capabilities remain the kernel responsibility; the projected invocation is not a proof.",
+    "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs::respond_to_upstream_nested_flow::from_value": "Sampling requests are shape conversions of bounded duplicate-checked frames. NestedFlowBridge performs the authenticated flow decision, and deferred tasks retain finite local deadlines and bounded capacity.",
+    "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs::parse_requested_task::from_value": "Requested task metadata is untrusted, bounded to a finite TTL, and cannot authorize the bridge. Local private task state binds the actual owner request and operation; expiry and clock faults refuse before dispatch.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::call_tool_with_params::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::complete_prompt_argument::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::complete_resource_argument::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::get_prompt::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::list_prompts::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::list_resource_templates::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::list_resources::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::list_tools::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::read_resource::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+    "crates/protocol/chio-mcp-adapter/src/transport/utils.rs::parse_create_elicitation_operation::from_value": "Elicitation params are untrusted data from the bounded frame reader; default form mode is the protocol field default, not a compatibility authority path. NestedFlowBridge evaluates authorization.",
+    "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs::parse_url_elicitation_required_error::from_value": "URL-required errors contain untrusted typed elicitations. HTTPS/URL and operation shape checks precede the kernel-owned elicitation path; a URL or decoded request grants no authority.",
+    "crates/protocol/chio-mcp-edge/src/authorization.rs::negotiate_authorization_capabilities::from_value": "Initialize-only feature negotiation from an already decoded object. Features cannot mint authority; the kernel validates signed artifacts against installed authorities and forbids per-call negotiation upgrades.",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::list_roots::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_progress_token::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_execution_nonce::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_governed_intent::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
+    "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_slice": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation.",
+    "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness."
   },
   "proofs": [
     {
@@ -4072,6 +4168,10 @@
       "type": "PreparedNativeFlowDispatch",
       "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
       "contract": "Private borrowed resolver and kernel custody, no Deserialize/Clone; live dispatch remains bound to captured policy, operation and authority deadline."
+    },
+    {
+      "type": "CageRequiredLaunch",
+      "path": "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc"
     }
   ],
   "frost_secret_owner": "crates/platform/chio-store-sqlite/src/frost_store/ceremony/inbox.rs",
@@ -5926,9 +6026,6 @@
     "crates/products/chio-wall/src/commands.rs": [
       "read_json_file::from_slice"
     ],
-    "crates/protocol/chio-a2a-adapter/src/auth.rs": [
-      "read_json_response_with_contract::from_slice"
-    ],
     "crates/protocol/chio-a2a-adapter/src/fuzz.rs": [
       "fuzz_a2a_envelope_decode::from_str",
       "jsonrpc_decode_event::from_value"
@@ -5939,12 +6036,6 @@
     ],
     "crates/protocol/chio-a2a-adapter/src/mapping.rs": [
       "parse_tool_input::from_value"
-    ],
-    "crates/protocol/chio-a2a-adapter/src/task_registry.rs": [
-      "load::from_slice"
-    ],
-    "crates/protocol/chio-a2a-adapter/src/transport.rs": [
-      "process_sse_event::from_str"
     ],
     "crates/protocol/chio-a2a-edge/src/bridge.rs": [
       "extract_capability_ref::from_value"
@@ -6031,9 +6122,6 @@
     "crates/protocol/chio-groq-tools-adapter/src/response.rs": [
       "function_calls::from_slice"
     ],
-    "crates/protocol/chio-mcp-adapter/src/framing.rs": [
-      "read_jsonrpc_frame::from_str"
-    ],
     "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs": [
       "respond_to_upstream_nested_flow::from_value"
     ],
@@ -6059,9 +6147,6 @@
     ],
     "crates/protocol/chio-mcp-edge/src/authorization.rs": [
       "negotiate_authorization_capabilities::from_value"
-    ],
-    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs": [
-      "read_jsonrpc_frame::from_str"
     ],
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs": [
       "create_elicitation::from_value",
@@ -6141,20 +6226,11 @@
     "crates/protocol/chio-ollama-tools-adapter/src/streaming.rs": [
       "gate_sse_stream::from_str"
     ],
-    "crates/protocol/chio-openai-adapter/src/adapter.rs": [
-      "invocation_from_call::from_str",
-      "parse_payload::from_slice",
-      "parse_tool_result::from_slice"
+    "crates/protocol/chio-openai-adapter/src/input.rs": [
+      "arguments::from_slice"
     ],
     "crates/protocol/chio-openai-adapter/src/lib.rs": [
-      "execute_tool_call::from_str",
       "extract_tool_calls::from_value"
-    ],
-    "crates/protocol/chio-openai-adapter/src/streaming.rs": [
-      "arguments_string::from_str"
-    ],
-    "crates/protocol/chio-openai-adapter/src/transport.rs": [
-      "send_chat_completions::from_slice"
     ],
     "crates/protocol/chio-openapi/src/extensions.rs": [
       "from_operation::from_value"
@@ -6168,9 +6244,6 @@
     "crates/protocol/chio-provider-adapter-core/src/response.rs": [
       "nested_response_body::from_str",
       "openai_tool_call_to_function_call::from_str"
-    ],
-    "crates/protocol/chio-provider-adapter-core/src/sse.rs": [
-      "parse_sse_frame::from_str"
     ],
     "crates/protocol/chio-provider-conformance/src/bin/record/anthropic.rs": [
       "record_anthropic::from_str"
@@ -7711,29 +7784,17 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/protocol/chio-a2a-adapter/src/auth.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/protocol/chio-a2a-adapter/src/fuzz.rs": {
       "kind": "example-or-fuzz",
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
     },
     "crates/protocol/chio-a2a-adapter/src/invoke.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "SSE Values become typed A2A envelopes only after the bounded duplicate-aware transport reader. Protocol version, error precedence, task binding and kernel admission remain separate required checks."
     },
     "crates/protocol/chio-a2a-adapter/src/mapping.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
-    "crates/protocol/chio-a2a-adapter/src/task_registry.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-a2a-adapter/src/transport.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Tool arguments are already decoded untrusted Values projected into explicit A2A operation shapes. Caller capabilities remain the kernel responsibility; the projected invocation is not a proof."
     },
     "crates/protocol/chio-a2a-edge/src/bridge.rs": {
       "kind": "typed-value-conversion",
@@ -7823,49 +7884,41 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/protocol/chio-mcp-adapter/src/framing.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Sampling requests are shape conversions of bounded duplicate-checked frames. NestedFlowBridge performs the authenticated flow decision, and deferred tasks retain finite local deadlines and bounded capacity."
     },
     "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Requested task metadata is untrusted, bounded to a finite TTL, and cannot authorize the bridge. Local private task state binds the actual owner request and operation; expiry and clock faults refuse before dispatch."
     },
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results."
     },
     "crates/protocol/chio-mcp-adapter/src/transport/utils.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Elicitation params are untrusted data from the bounded frame reader; default form mode is the protocol field default, not a compatibility authority path. NestedFlowBridge evaluates authorization."
     },
     "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "URL-required errors contain untrusted typed elicitations. HTTPS/URL and operation shape checks precede the kernel-owned elicitation path; a URL or decoded request grants no authority."
     },
     "crates/protocol/chio-mcp-edge/src/authorization.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
-    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Initialize-only feature negotiation from an already decoded object. Features cannot mint authority; the kernel validates signed artifacts against installed authorities and forbids per-call negotiation upgrades."
     },
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use."
     },
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness."
     },
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof."
     },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs": {
       "kind": "raw-input-baseline",
@@ -7919,21 +7972,9 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/protocol/chio-openai-adapter/src/adapter.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/protocol/chio-openai-adapter/src/lib.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-openai-adapter/src/streaming.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-openai-adapter/src/transport.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-protocol-reader",
+      "contract": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness."
     },
     "crates/protocol/chio-openapi/src/extensions.rs": {
       "kind": "typed-value-conversion",
@@ -7948,10 +7989,6 @@
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/protocol/chio-provider-adapter-core/src/response.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-provider-adapter-core/src/sse.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -8382,6 +8419,10 @@
     "crates/trust/chio-weights/src/card.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/protocol/chio-openai-adapter/src/input.rs": {
+      "kind": "reviewed-protocol-reader",
+      "contract": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation."
     }
   },
   "tenant_runtime_families": {
@@ -11571,6 +11612,231 @@
           "decode_canonical",
           "MAX_WIRE_BYTES"
         ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-a2a-adapter/src/auth.rs": {
+      "contract": "HTTP peer JSON is read up to the lesser of the egress contract and 16 MiB plus a sentinel. Original bytes are duplicate-checked with full-width native numeric preservation before typed response validation. OAuth credentials and peer metadata do not mint kernel authority.",
+      "migrations": [
+        "read_json_response_with_contract::from_slice"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-a2a-adapter/src/invoke.rs": {
+      "contract": "SSE Values become typed A2A envelopes only after the bounded duplicate-aware transport reader. Protocol version, error precedence, task binding and kernel admission remain separate required checks.",
+      "migrations": [
+        "invoke_stream_jsonrpc::from_value",
+        "subscribe_task_jsonrpc::from_value"
+      ],
+      "retained_typed_conversions": [
+        "invoke_stream_jsonrpc::from_value",
+        "subscribe_task_jsonrpc::from_value"
+      ]
+    },
+    "crates/protocol/chio-a2a-adapter/src/mapping.rs": {
+      "contract": "Tool arguments are already decoded untrusted Values projected into explicit A2A operation shapes. Caller capabilities remain the kernel responsibility; the projected invocation is not a proof.",
+      "migrations": [
+        "parse_tool_input::from_value"
+      ],
+      "retained_typed_conversions": [
+        "parse_tool_input::from_value"
+      ]
+    },
+    "crates/protocol/chio-a2a-adapter/src/task_registry.rs": {
+      "contract": "Local correlation registry has bounded original-byte decoding, exact schema and map-key/record identity checks. Every follow-up validates server, tool, endpoint, tenant, partner and binding. This is trusted local correlation storage, not a portable authentication proof or signed durable admission store.",
+      "migrations": [
+        "load::from_slice"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-a2a-adapter/src/transport.rs": {
+      "contract": "SSE original event text is bounded and duplicate-checked before the JSON-RPC or HTTP event validator. Total stream, line, event and chunk quotas apply. Peer stream data is never a verified authority result.",
+      "migrations": [
+        "process_sse_event::from_str"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-adapter/src/framing.rs": {
+      "contract": "Original stdio peer frames are bounded at 1 MiB and decoded with UntrustedJsonText before map construction. Typed responses and security metadata cannot hide duplicate keys. No raw frame logging. Reader failure terminalizes the upstream connection.",
+      "migrations": [
+        "read_jsonrpc_frame::from_str"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs": {
+      "contract": "Sampling requests are shape conversions of bounded duplicate-checked frames. NestedFlowBridge performs the authenticated flow decision, and deferred tasks retain finite local deadlines and bounded capacity.",
+      "migrations": [
+        "respond_to_upstream_nested_flow::from_value"
+      ],
+      "retained_typed_conversions": [
+        "respond_to_upstream_nested_flow::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs": {
+      "contract": "Requested task metadata is untrusted, bounded to a finite TTL, and cannot authorize the bridge. Local private task state binds the actual owner request and operation; expiry and clock faults refuse before dispatch.",
+      "migrations": [
+        "parse_requested_task::from_value"
+      ],
+      "retained_typed_conversions": [
+        "parse_requested_task::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc": {
+      "contract": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
+      "migrations": [
+        "call_tool_with_params::from_value",
+        "complete_prompt_argument::from_value",
+        "complete_resource_argument::from_value",
+        "get_prompt::from_value",
+        "list_prompts::from_value",
+        "list_resource_templates::from_value",
+        "list_resources::from_value",
+        "list_tools::from_value",
+        "read_resource::from_value"
+      ],
+      "retained_typed_conversions": [
+        "call_tool_with_params::from_value",
+        "complete_prompt_argument::from_value",
+        "complete_resource_argument::from_value",
+        "get_prompt::from_value",
+        "list_prompts::from_value",
+        "list_resource_templates::from_value",
+        "list_resources::from_value",
+        "list_tools::from_value",
+        "read_resource::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-adapter/src/transport/utils.rs": {
+      "contract": "Elicitation params are untrusted data from the bounded frame reader; default form mode is the protocol field default, not a compatibility authority path. NestedFlowBridge evaluates authorization.",
+      "migrations": [
+        "parse_create_elicitation_operation::from_value"
+      ],
+      "retained_typed_conversions": [
+        "parse_create_elicitation_operation::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs": {
+      "contract": "URL-required errors contain untrusted typed elicitations. HTTPS/URL and operation shape checks precede the kernel-owned elicitation path; a URL or decoded request grants no authority.",
+      "migrations": [
+        "parse_url_elicitation_required_error::from_value"
+      ],
+      "retained_typed_conversions": [
+        "parse_url_elicitation_required_error::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-edge/src/authorization.rs": {
+      "contract": "Initialize-only feature negotiation from an already decoded object. Features cannot mint authority; the kernel validates signed artifacts against installed authorities and forbids per-call negotiation upgrades.",
+      "migrations": [
+        "negotiate_authorization_capabilities::from_value"
+      ],
+      "retained_typed_conversions": [
+        "negotiate_authorization_capabilities::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs": {
+      "contract": "Original newline-delimited peer bytes bounded to 1 MiB before allocation, then UntrustedJsonText lossless native decoding. Duplicate keys and ambiguous numbers rejected before capability metadata becomes a Value. Oversized input terminates the connection without draining its tail.",
+      "migrations": [
+        "read_jsonrpc_frame::from_str"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs": {
+      "contract": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
+      "migrations": [
+        "create_elicitation::from_value",
+        "create_elicitation::from_value",
+        "create_message::from_value",
+        "create_message::from_value",
+        "list_roots::from_value",
+        "list_roots::from_value"
+      ],
+      "retained_typed_conversions": [
+        "create_elicitation::from_value",
+        "create_elicitation::from_value",
+        "create_message::from_value",
+        "create_message::from_value",
+        "list_roots::from_value",
+        "list_roots::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs": {
+      "contract": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+      "migrations": [
+        "parse_progress_token::from_value",
+        "parse_request_approval_artifacts::from_value",
+        "parse_request_approval_artifacts::from_value",
+        "parse_request_approval_artifacts::from_value",
+        "parse_request_execution_nonce::from_value",
+        "parse_request_governed_intent::from_value",
+        "parse_request_model_metadata::from_value",
+        "parse_request_supplemental_authorization::from_value"
+      ],
+      "retained_typed_conversions": [
+        "parse_progress_token::from_value",
+        "parse_request_approval_artifacts::from_value",
+        "parse_request_approval_artifacts::from_value",
+        "parse_request_approval_artifacts::from_value",
+        "parse_request_execution_nonce::from_value",
+        "parse_request_governed_intent::from_value",
+        "parse_request_model_metadata::from_value",
+        "parse_request_supplemental_authorization::from_value"
+      ]
+    },
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs": {
+      "contract": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
+      "migrations": [
+        "create_message::from_value",
+        "refresh_roots_from_client_with_channel::from_value"
+      ],
+      "retained_typed_conversions": [
+        "create_message::from_value",
+        "refresh_roots_from_client_with_channel::from_value"
+      ]
+    },
+    "crates/protocol/chio-openai-adapter/src/adapter.rs": {
+      "contract": "Provider envelopes, nested string bodies and tool-result bytes use bounded original-text readers. Tool arguments retain original text through I-JSON canonicalization and object-shape validation. Registry metadata is attached only from a verified manifest registry; organization headers and provenance timestamps are untrusted attribution, not authority.",
+      "migrations": [
+        "invocation_from_call::from_str",
+        "parse_payload::from_slice",
+        "parse_tool_result::from_slice"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-openai-adapter/src/input.rs": {
+      "contract": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation.",
+      "migrations": [],
+      "retained_typed_conversions": [
+        "arguments::from_slice"
+      ]
+    },
+    "crates/protocol/chio-openai-adapter/src/lib.rs": {
+      "contract": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness.",
+      "migrations": [
+        "execute_tool_call::from_str",
+        "extract_tool_calls::from_value"
+      ],
+      "retained_typed_conversions": [
+        "extract_tool_calls::from_value"
+      ]
+    },
+    "crates/protocol/chio-openai-adapter/src/streaming.rs": {
+      "contract": "Arguments from SSE fragments are checked as bounded original I-JSON object text before evaluation. Frame decoding occurs in the shared bounded duplicate-aware SSE reader. Verdicts are fabric decisions, not proofs accepted from the peer.",
+      "migrations": [
+        "arguments_string::from_str"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-openai-adapter/src/transport.rs": {
+      "contract": "HTTP Chat Completions response bytes use the bounded native reader before extracting calls. Transport egress and kernel/provider admission are separate mandatory owners.",
+      "migrations": [
+        "send_chat_completions::from_slice"
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-provider-adapter-core/src/sse.rs": {
+      "contract": "Original SSE bytes have a 16 MiB whole-buffer bound and 1 MiB per-JSON-frame bound. UntrustedJsonText rejects ambiguous peer fields before the event-type check and provider projection. Frames carry no authority.",
+      "migrations": [
+        "parse_sse_frame::from_str"
       ],
       "retained_typed_conversions": []
     }

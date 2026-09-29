@@ -53,8 +53,8 @@ impl ChioMcpEdge {
             let result =
                 self.send_client_request(reader, writer, "sampling/createMessage", params)?;
             let message: CreateMessageResult = serde_json::from_value(result).map_err(|error| {
-                AdapterError::ParseError(format!(
-                    "failed to parse sampling/createMessage result: {error}"
+                AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(
+                    error,
                 ))
             })?;
 
@@ -141,8 +141,9 @@ impl ChioMcpEdge {
         let roots_value = result.get("roots").cloned().ok_or_else(|| {
             AdapterError::ParseError("roots/list response missing 'roots'".into())
         })?;
-        let roots: Vec<RootDefinition> = serde_json::from_value(roots_value)
-            .map_err(|error| AdapterError::ParseError(format!("failed to parse roots: {error}")))?;
+        let roots: Vec<RootDefinition> = serde_json::from_value(roots_value).map_err(|error| {
+            AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+        })?;
 
         self.kernel
             .replace_session_roots(session_id, roots.clone())
@@ -168,7 +169,10 @@ impl ChioMcpEdge {
         method: &str,
         params: Value,
     ) -> Result<Value, AdapterError> {
-        self.client_request_counter += 1;
+        self.client_request_counter = self
+            .client_request_counter
+            .checked_add(1)
+            .ok_or(chio_security_types::clock::ClockError::Overflow)?;
         let request_id = format!("edge-client-{}", self.client_request_counter);
         write_jsonrpc_line(
             writer,
@@ -227,7 +231,10 @@ impl ChioMcpEdge {
         method: &str,
         params: Value,
     ) -> Result<Value, AdapterError> {
-        self.client_request_counter += 1;
+        self.client_request_counter = self
+            .client_request_counter
+            .checked_add(1)
+            .ok_or(chio_security_types::clock::ClockError::Overflow)?;
         let request_id = format!("edge-client-{}", self.client_request_counter);
         write_jsonrpc_line(
             writer,
