@@ -1,0 +1,1 @@
+Synthetic runner calibration only. The child prints complete progress and a libtest success line, then deliberately remains alive. The one-second driver deadline terminates it with SIGTERM (-15), records timed_out=true, and refuses qualification. This is not a retention workload result.

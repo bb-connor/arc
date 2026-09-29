@@ -96,3 +96,8 @@ boundary = "native receipt after durable append and signature verification"
 path = "crates/platform/chio-control-plane/src/security/active_response/tests/lifecycle_trace.rs"
 symbol = "durable_lifecycle_trace_links_commits_effects_and_signed_receipts"
 boundary = "real store restart and lost acknowledgement evidence emitter"
+
+[[hook]]
+path = "crates/security/chio-quarantine/src/executor.rs"
+symbol = "effect_command_id"
+boundary = "native command domain, operation and attempt identity"

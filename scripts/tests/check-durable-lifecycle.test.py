@@ -3,13 +3,14 @@
 import argparse
 import copy
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from formal.durable_lifecycle import validate_durable_trace
+from formal.durable_lifecycle import canonical_fixture, validate_durable_trace
 spec = importlib.util.spec_from_file_location("lifecycle", Path(__file__).resolve().parents[1] / "check-response-lifecycle.py")
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
@@ -24,7 +25,7 @@ class DurableEvidenceTests(unittest.TestCase):
         self.assertEqual(set(validate(TRACE)), {"happy", "effect_ack_loss", "receipt_ack_loss"})
         for mutant in ["missing_commit", "reorder_commit", "missing_receipt", "invalid_signature", "cross_action",
                        "result_mismatch", "early_effect", "false_completion", "duplicate_command", "missing_restart",
-                       "substituted_recovery", "unknown_schema", "unknown_field", "reordered_receipt", "missing_command", "substituted_command"]:
+                       "substituted_recovery", "unknown_schema", "unknown_field", "reordered_receipt", "missing_command", "substituted_command", "intermediate_hash", "command_fence", "command_owner", "command_expiry", "command_kind", "command_id", "missing_snapshot", "snapshot_prefix"]:
             document = copy.deepcopy(TRACE)
             trace = document["scenarios"]["happy"]
             events = trace["events"]
@@ -49,6 +50,24 @@ class DurableEvidenceTests(unittest.TestCase):
                 events[a], events[b] = events[b], events[a]
             elif mutant == "missing_command": trace["commands"].pop()
             elif mutant == "substituted_command": trace["commands"][0]["request"]["target"]["session_id"] = "other-session"
+            elif mutant == "intermediate_hash": events[commits[0]]["body_hash"] = "00" * 32
+            elif mutant == "command_fence": trace["commands"][0]["request"]["scheduler_fencing_token"] = 999
+            elif mutant == "command_owner": trace["commands"][0]["request"]["scheduler_lease_owner_id"] = "other-owner"
+            elif mutant == "command_expiry": trace["commands"][0]["request"]["plan_expires_at_unix_ms"] = 0
+            elif mutant == "command_kind": trace["commands"][0]["request"]["effect_kind"] = "quarantine"
+            elif mutant == "missing_snapshot": trace["committed_snapshots"].pop(next(iter(trace["committed_snapshots"])))
+            elif mutant == "snapshot_prefix":
+                first = events[commits[0]]
+                key = str(first["generation"])
+                snapshot = json.loads(bytes.fromhex(trace["committed_snapshots"][key]))
+                snapshot["mutations"][0]["record"]["transition_id"] = "substituted-prefix"
+                raw = canonical_fixture(snapshot)
+                trace["committed_snapshots"][key] = raw.hex()
+                first["body_hash"] = hashlib.sha256(raw).hexdigest()
+            elif mutant == "command_id":
+                for command in trace["commands"]: command["request"]["idempotency_key"] = "fabricated"
+                for i in effects: events[i]["idempotency_key"] = "fabricated"
+
             with self.subTest(mutant=mutant), self.assertRaises(ValueError):
                 validate(document)
 

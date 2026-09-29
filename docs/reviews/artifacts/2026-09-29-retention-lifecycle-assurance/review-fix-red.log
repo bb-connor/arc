@@ -1,0 +1,59 @@
+FFFFFF
+======================================================================
+FAIL: test_real_evidence_and_refusal_controls (__main__.DurableEvidenceTests.test_real_evidence_and_refusal_controls) (mutant='intermediate_hash')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/arc-security-launch/scripts/tests/check-durable-lifecycle.test.py", line 61, in test_real_evidence_and_refusal_controls
+    with self.subTest(mutant=mutant), self.assertRaises(ValueError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_real_evidence_and_refusal_controls (__main__.DurableEvidenceTests.test_real_evidence_and_refusal_controls) (mutant='command_fence')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/arc-security-launch/scripts/tests/check-durable-lifecycle.test.py", line 61, in test_real_evidence_and_refusal_controls
+    with self.subTest(mutant=mutant), self.assertRaises(ValueError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_real_evidence_and_refusal_controls (__main__.DurableEvidenceTests.test_real_evidence_and_refusal_controls) (mutant='command_owner')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/arc-security-launch/scripts/tests/check-durable-lifecycle.test.py", line 61, in test_real_evidence_and_refusal_controls
+    with self.subTest(mutant=mutant), self.assertRaises(ValueError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_real_evidence_and_refusal_controls (__main__.DurableEvidenceTests.test_real_evidence_and_refusal_controls) (mutant='command_expiry')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/arc-security-launch/scripts/tests/check-durable-lifecycle.test.py", line 61, in test_real_evidence_and_refusal_controls
+    with self.subTest(mutant=mutant), self.assertRaises(ValueError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_real_evidence_and_refusal_controls (__main__.DurableEvidenceTests.test_real_evidence_and_refusal_controls) (mutant='command_kind')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/arc-security-launch/scripts/tests/check-durable-lifecycle.test.py", line 61, in test_real_evidence_and_refusal_controls
+    with self.subTest(mutant=mutant), self.assertRaises(ValueError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_real_evidence_and_refusal_controls (__main__.DurableEvidenceTests.test_real_evidence_and_refusal_controls) (mutant='command_id')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/arc-security-launch/scripts/tests/check-durable-lifecycle.test.py", line 61, in test_real_evidence_and_refusal_controls
+    with self.subTest(mutant=mutant), self.assertRaises(ValueError):
+                                      ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.995s
+
+FAILED (failures=6)

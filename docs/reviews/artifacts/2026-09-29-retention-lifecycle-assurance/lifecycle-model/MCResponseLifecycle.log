@@ -1,6 +1,6 @@
 TLC2 Version 2.19 of 08 August 2024
-Running breadth-first search Model-Checking with fp 20 and seed -1356487217670610348 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2091347] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
-Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycle.tla
+Running breadth-first search Model-Checking with fp 77 and seed -196670538766451396 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2099174] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /tmp/chio-response-model-aj5sri_f/ResponseLifecycle.tla
 Parsing file /tmp/Naturals.tla
 Parsing file /tmp/FiniteSets.tla
 Parsing file /tmp/Sequences.tla
@@ -8,16 +8,16 @@ Semantic processing of module Naturals
 Semantic processing of module Sequences
 Semantic processing of module FiniteSets
 Semantic processing of module ResponseLifecycle
-Starting... (2026-09-29 11:14:41)
+Starting... (2026-09-29 11:24:07)
 Computing initial states...
 Computed 2 initial states...
-Finished computing initial states: 4 distinct states generated at 2026-09-29 11:14:42.
+Finished computing initial states: 4 distinct states generated at 2026-09-29 11:24:08.
 Model checking completed. No error has been found.
   Estimates of the probability that TLC did not check all reachable states
   because two distinct states had the same fingerprint:
   calculated (optimistic):  val = 2.3E-9
-  based on the actual fingerprints:  val = 8.0E-11
+  based on the actual fingerprints:  val = 4.8E-10
 571360 states generated, 87810 distinct states found, 0 states left on queue.
 The depth of the complete state graph search is 33.
 The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 7 and the 95th percentile is 3).
-Finished in 03s at (2026-09-29 11:14:44)
+Finished in 03s at (2026-09-29 11:24:11)

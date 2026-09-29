@@ -1,0 +1,46 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+    Finished `test` profile [unoptimized] target(s) in 1m 41s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-6f473b5a99446578)
+
+running 25 tests
+test security::active_response::tests::automatic_fence_boundary::malformed_existing_fence_outcome_is_reported_as_unknown ... ok
+test security::active_response::tests::automatic_fence_boundary::forged_canonical_shaped_dispatch_id_is_rejected_before_store_mutation ... ok
+test security::active_response::tests::automatic_fence_boundary::forged_execution_dispatch_id_is_rejected_before_store_access ... ok
+test security::active_response::tests::automatic_fence_boundary::malformed_fenced_outcome_is_reported_as_unknown ... ok
+test security::active_response::tests::fail_closed::malformed_hash_record_and_authority_mismatch_fail_closed ... ok
+test security::active_response::tests::fail_closed::rejects_oversized_execution_lease ... ok
+test security::active_response::tests::fail_closed::expired_request_and_approval_mode_mismatch_fail_before_commit ... ok
+test security::active_response::tests::existing_dispatch_collision_is_rejected_before_mutation ... ok
+test security::active_response::tests::committed_effect_request_ambiguity_cannot_be_terminal_failed ... ok
+test security::active_response::tests::authoritative_effect_rejection_returns_failed_before_any_effect_evidence ... ok
+test security::active_response::tests::committed_retry_remains_exact_after_wall_clock_advances ... ok
+test security::active_response::tests::fail_closed::ambiguous_effect_port_error_reports_unknown_and_remains_retryable ... ok
+test security::active_response::tests::fresh_dispatch_commits_executes_and_maps_exact_durable_evidence ... ok
+test security::active_response::tests::governed_dispatch_commits_exact_approval_and_executes ... ok
+test security::active_response::tests::activated_dispatch_replays_original_proof_after_expiry_and_rollback_start ... ok
+test security::active_response::tests::readiness_probes_dispatch_effect_receipt_and_alert_durability ... ok
+test security::active_response::tests::committed_partial_apply_then_full_rollback_returns_signed_terminal_outcome ... ok
+test security::active_response::tests::activated_dispatch_replays_original_proof_after_full_lift ... ok
+test security::active_response::tests::same_dispatch_retry_after_ack_loss_recovers_without_reapplying_effect ... ok
+test security::active_response::tests::two_workers_sharing_one_executor_signer_cannot_execute_one_live_lease ... ok
+test security::active_response::tests::existing_dispatch_rejects_a_foreign_live_scheduler_lease ... ok
+test security::active_response::tests::authoritative_effect_rejection_after_scheduler_takeover_terminally_recovers ... ok
+test security::active_response::tests::persisted_apply_failure_recovers_after_receipt_ack_loss_and_lease_expiry ... ok
+test security::active_response::tests::takeover_recovers_completed_effect_before_rolling_back_expired_lease ... ok
+test security::active_response::tests::lifecycle_trace::durable_lifecycle_trace_links_commits_effects_and_signed_receipts ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1158 filtered out; finished in 6.06s
+

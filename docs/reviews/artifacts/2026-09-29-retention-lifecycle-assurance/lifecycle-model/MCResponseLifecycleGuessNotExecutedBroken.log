@@ -1,7 +1,7 @@
 TLC2 Version 2.19 of 08 August 2024
-Running breadth-first search Model-Checking with fp 6 and seed -4040631270168696789 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2091606] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
-Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycleGuessNotExecutedBroken.tla
-Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycle.tla
+Running breadth-first search Model-Checking with fp 28 and seed 710446328815515270 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2099439] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /tmp/chio-response-model-aj5sri_f/ResponseLifecycleGuessNotExecutedBroken.tla
+Parsing file /tmp/chio-response-model-aj5sri_f/ResponseLifecycle.tla
 Parsing file /tmp/Naturals.tla
 Parsing file /tmp/FiniteSets.tla
 Parsing file /tmp/Sequences.tla
@@ -10,10 +10,10 @@ Semantic processing of module Sequences
 Semantic processing of module FiniteSets
 Semantic processing of module ResponseLifecycle
 Semantic processing of module ResponseLifecycleGuessNotExecutedBroken
-Starting... (2026-09-29 11:14:52)
+Starting... (2026-09-29 11:24:18)
 Computing initial states...
 Computed 2 initial states...
-Finished computing initial states: 4 distinct states generated at 2026-09-29 11:14:52.
+Finished computing initial states: 4 distinct states generated at 2026-09-29 11:24:18.
 Error: Invariant ReceiptStateTruthful is violated.
 Error: The behavior up to this point is:
 State 1: <Initial predicate>
@@ -60,7 +60,7 @@ State 4: <AcknowledgeEffect line 211, col 5 to line 224, col 86 of module Respon
 /\ effect = <<<<"apply_failed", "planned">>, <<"planned", "none">>>>
 /\ clock = 0
 
-172 states generated, 101 distinct states found, 72 states left on queue.
+199 states generated, 114 distinct states found, 79 states left on queue.
 The depth of the complete state graph search is 4.
-The average outdegree of the complete state graph is 4 (minimum is 0, the maximum 7 and the 95th percentile is 7).
-Finished in 00s at (2026-09-29 11:14:52)
+The average outdegree of the complete state graph is 3 (minimum is 0, the maximum 7 and the 95th percentile is 7).
+Finished in 01s at (2026-09-29 11:24:18)

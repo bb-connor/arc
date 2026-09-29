@@ -14,7 +14,11 @@ use tracing::field::{Field, Visit};
 use tracing_subscriber::{layer::Context, prelude::*, Layer, Registry};
 
 #[derive(Clone, Default)]
-struct Capture(Arc<Mutex<Vec<Value>>>);
+struct Capture {
+    events: Arc<Mutex<Vec<Value>>>,
+    commits: Arc<Mutex<BTreeMap<u64, String>>>,
+    store: Arc<Mutex<std::sync::Weak<SqliteSecurityStateStore>>>,
+}
 struct Fields(Map<String, Value>);
 impl Visit for Fields {
     fn record_str(&mut self, field: &Field, value: &str) {
@@ -36,7 +40,45 @@ impl<S: tracing::Subscriber> Layer<S> for Capture {
         if event.metadata().target() == "chio::response_lifecycle" {
             let mut fields = Fields(Map::new());
             event.record(&mut fields);
-            require_success(self.0.lock(), "capture lock").push(Value::Object(fields.0));
+            if fields.0.get("boundary") == Some(&json!("response_commit")) {
+                // Production drops its connection guard before this callback. Use
+                // a weak reference so collecting readbacks cannot retain an owner
+                // across the restart boundary exercised below.
+                let store = require_success(self.store.lock(), "capture store")
+                    .upgrade()
+                    .unwrap_or_else(|| panic!("commit without a live store"));
+                let field = |name: &str| {
+                    fields
+                        .0
+                        .get(name)
+                        .and_then(Value::as_str)
+                        .unwrap_or_else(|| panic!("missing commit field {name}"))
+                };
+                let record = require_success(
+                    store.load_plan(&ResponsePlanKey {
+                        tenant_id: require_success(
+                            TenantId::new(field("tenant_id")),
+                            "commit tenant",
+                        ),
+                        action_id: require_success(
+                            ActionId::new(field("action_id")),
+                            "commit action",
+                        ),
+                    }),
+                    "read committed snapshot",
+                )
+                .unwrap_or_else(|| panic!("missing committed snapshot"));
+                assert_eq!(
+                    Some(record.generation),
+                    fields.0.get("generation").and_then(Value::as_u64)
+                );
+                let prior = require_success(self.commits.lock(), "capture commits").insert(
+                    record.generation,
+                    hex::encode(record.canonical_body.as_bytes()),
+                );
+                assert!(prior.is_none(), "duplicate committed generation");
+            }
+            require_success(self.events.lock(), "capture lock").push(Value::Object(fields.0));
         }
     }
 }
@@ -98,7 +140,7 @@ struct Owners {
     receipts: Arc<Receipts>,
 }
 impl Owners {
-    fn open(root: &Path, clock: &Arc<FixedClock>, scenario: &str) -> Self {
+    fn open(root: &Path, clock: &Arc<FixedClock>, scenario: &str, capture: &Capture) -> Self {
         let store = Arc::new(require_success(
             SqliteSecurityStateStore::open_with_trusted_clock(
                 root.join("state.db"),
@@ -108,6 +150,7 @@ impl Owners {
             ),
             "open state",
         ));
+        *require_success(capture.store.lock(), "attach capture") = Arc::downgrade(&store);
         let evidence = Arc::new(require_success(
             SqliteReceiptStore::open(root.join("receipts.db")),
             "open receipts",
@@ -278,7 +321,7 @@ fn durable_lifecycle_trace_links_commits_effects_and_signed_receipts() {
             ActiveResponseExecutionApproval::Automatic,
         );
         {
-            let owners = Owners::open(root.path(), &clock, scenario);
+            let owners = Owners::open(root.path(), &clock, scenario, &capture);
             let first = owners.executor(&clock).execute_source(&request);
             if scenario == "happy" {
                 require_success(first, "activate");
@@ -292,7 +335,7 @@ fn durable_lifecycle_trace_links_commits_effects_and_signed_receipts() {
         // Every store, writer, executor and backend owner is dropped before recovery.
         tracing::debug!(target: "chio::response_lifecycle", boundary = "restart");
         {
-            let owners = Owners::open(root.path(), &clock, "recovery");
+            let owners = Owners::open(root.path(), &clock, "recovery", &capture);
             let executor = owners.executor(&clock);
             let recovered =
                 require_success(executor.execute_source(&request), "recover activation");
@@ -347,7 +390,7 @@ fn durable_lifecycle_trace_links_commits_effects_and_signed_receipts() {
             );
         }
         tracing::debug!(target: "chio::response_lifecycle", boundary = "restart");
-        let owners = Owners::open(root.path(), &clock, "readback");
+        let owners = Owners::open(root.path(), &clock, "readback", &capture);
         let key = ResponsePlanKey {
             tenant_id: request.response_plan.tenant_id.clone(),
             action_id: request.response_plan.action_id.clone(),
@@ -389,7 +432,7 @@ fn durable_lifecycle_trace_links_commits_effects_and_signed_receipts() {
             2,
             "exactly one durable command per apply/remove"
         );
-        let events = require_success(capture.0.lock(), "captured events").clone();
+        let events = require_success(capture.events.lock(), "captured events").clone();
         let mut receipts = Map::new();
         for event in &events {
             if event["boundary"] != "receipt_persisted" {
@@ -443,7 +486,7 @@ fn durable_lifecycle_trace_links_commits_effects_and_signed_receipts() {
             snapshot.mutations.as_slice().len(),
             "every generation has a durable signed receipt"
         );
-        scenarios.insert(scenario.into(), json!({"events": events, "commands": commands, "snapshot": snapshot, "snapshot_canonical": hex::encode(record.canonical_body.as_bytes()), "receipts": receipts}));
+        scenarios.insert(scenario.into(), json!({"events": events, "committed_snapshots": require_success(capture.commits.lock(), "committed snapshots").clone(), "commands": commands, "snapshot": snapshot, "snapshot_canonical": hex::encode(record.canonical_body.as_bytes()), "receipts": receipts}));
     }
     if let Ok(path) = std::env::var("CHIO_DURABLE_LIFECYCLE_TRACE") {
         require_success(

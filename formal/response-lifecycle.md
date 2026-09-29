@@ -51,7 +51,10 @@ native command journal, final response body and stored signed receipts.
 
 The checker independently verifies Ed25519 signatures against the pinned public
 test key, evidence IDs, receipt body hashes, mutation/plan bindings, native
-command results, commit/request/acknowledgement order and restart placement. Its
+command identities, lease authority, expiry and results, commit/request/acknowledgement
+order and restart placement. Each commit has a canonical readback snapshot whose
+hash and mutation prefix are checked. The collector holds only a weak store
+reference, so these readbacks do not retain an owner across restart. Its
 canonical encoder intentionally accepts only the fixture's ASCII/integer JSON
 subset. The public test key and trace file do not establish trusted production
 capture. The scheduled lane requires this generated artifact and runs mutation

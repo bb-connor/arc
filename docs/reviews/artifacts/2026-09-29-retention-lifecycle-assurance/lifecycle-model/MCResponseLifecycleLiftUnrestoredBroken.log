@@ -1,7 +1,7 @@
 TLC2 Version 2.19 of 08 August 2024
-Running breadth-first search Model-Checking with fp 111 and seed -4162244268805506413 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2091636] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
-Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycleLiftUnrestoredBroken.tla
-Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycle.tla
+Running breadth-first search Model-Checking with fp 73 and seed -294270092036209574 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2099467] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /tmp/chio-response-model-aj5sri_f/ResponseLifecycleLiftUnrestoredBroken.tla
+Parsing file /tmp/chio-response-model-aj5sri_f/ResponseLifecycle.tla
 Parsing file /tmp/Naturals.tla
 Parsing file /tmp/FiniteSets.tla
 Parsing file /tmp/Sequences.tla
@@ -10,10 +10,10 @@ Semantic processing of module Sequences
 Semantic processing of module FiniteSets
 Semantic processing of module ResponseLifecycle
 Semantic processing of module ResponseLifecycleLiftUnrestoredBroken
-Starting... (2026-09-29 11:14:53)
+Starting... (2026-09-29 11:24:20)
 Computing initial states...
 Computed 2 initial states...
-Finished computing initial states: 4 distinct states generated at 2026-09-29 11:14:54.
+Finished computing initial states: 4 distinct states generated at 2026-09-29 11:24:20.
 Error: Invariant NoFalseCleanLift is violated.
 Error: The behavior up to this point is:
 State 1: <Initial predicate>
@@ -104,7 +104,7 @@ State 8: <Lift line 316, col 5 to line 321, col 87 of module ResponseLifecycle>
 /\ effect = <<<<"planned", "planned">>, <<"applied", "none">>>>
 /\ clock = 0
 
-8371 states generated, 2400 distinct states found, 989 states left on queue.
+8808 states generated, 2515 distinct states found, 1023 states left on queue.
 The depth of the complete state graph search is 8.
 The average outdegree of the complete state graph is 2 (minimum is 0, the maximum 7 and the 95th percentile is 4).
-Finished in 01s at (2026-09-29 11:14:54)
+Finished in 01s at (2026-09-29 11:24:20)

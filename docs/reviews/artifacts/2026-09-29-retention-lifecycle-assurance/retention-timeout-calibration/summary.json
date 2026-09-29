@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/tmp/arc-security-launch/.superpowers/sdd/2026-09-29-retention-lifecycle-assurance/timeout-calibration.py",
+    "--exact",
+    "retention_workload_commits_are_serialized_on_writer",
+    "--nocapture"
+  ],
+  "binary_sha256": "69389169a8d8e7a26a27fc34f9759c810827f60b34eb38b7190703ae2effda2e",
+  "cases": 1,
+  "sync_delay_ms": 3,
+  "timeout_seconds": 1,
+  "timed_out": true,
+  "workload": "public-API retention operation model; ChaCha seed [7;32]",
+  "provenance": "caller-supplied executable; hash is not a source-build attestation",
+  "exit_code": -15,
+  "seconds": 1.004,
+  "completed_cases": [
+    0
+  ],
+  "passed": false
+}

@@ -40,7 +40,7 @@ evidence, not hosted qualification, deployment authorization or release approval
 The durable checker independently verifies Ed25519 signatures with the pinned
 public test key, content-addressed evidence, native command bindings and results,
 commit/receipt order, truthful acknowledgements, restart placement and final
-snapshot hashes. Sixteen corruptions of the actual emitted artifact must fail.
+snapshot hashes. Twenty-four corruptions of the actual emitted artifact must fail.
 The workflow now requires that artifact; it cannot quietly omit durable linkage.
 The capture test runs in a bounded child process to avoid tracing-core's shared
 callsite registration interacting with subscriber-free parallel tests.
@@ -102,9 +102,31 @@ candidate-wide qualification as separately bounded acceptance work.
 
 ## Final verification
 
-The repaired capture fixture passes alongside all 25 selected response tests in
-parallel (6.02 seconds). The 19 adjacent native receipt/effect adapter tests also
-pass. The regenerated trace has the same digest as the artifact accepted by the
-finite-model gate. All sixteen trace corruptions reject; changed Rust files pass
-rustfmt and the diff passes whitespace checks. Final post-isolation Clippy and
-fresh review are recorded when their terminal results are available.
+The [fresh review](artifacts/2026-09-29-retention-lifecycle-assurance/final-review.md)
+found two Important checker gaps: unchecked native command authority/identifiers
+and intermediate commit hashes. Six failing refusal regressions reproduced them.
+One fix pass derives command identities, binds their full authority and expiry
+to the signed request, and captures/verifies every committed snapshot and exact
+mutation prefix without retaining store owners.
+
+Post-fix evidence is terminal:
+
+- All 25 response tests pass in parallel, including isolated real-port capture
+  (6.06 seconds); the 19 adjacent receipt/effect adapter tests passed separately.
+- All 24 corruptions of the actual emitted artifact reject, including the six
+  review reproductions, missing snapshots and substituted mutation prefixes.
+- The finite lifecycle positive model and eight named counterexamples pass with
+  that artifact required. Every recorded production-hook hash and trace digest
+  matches the final source/artifact bytes.
+- `cargo clippy --locked --offline -p chio-control-plane --lib --tests -- -D warnings`
+  passes after the fix (52.73 seconds). Changed Rust files pass rustfmt and the
+  diff passes whitespace checks.
+- A one-second synthetic driver calibration prints a success line and then
+  stalls. The retention runner terminates it with SIGTERM, preserves the summary
+  and refuses qualification. This is a runner control, not workload evidence.
+
+Both Important findings are fixed, with no deferred minors. The workflow uses
+one fresh review and one tested fix pass; there was no second review. The
+[execution ledger](artifacts/2026-09-29-retention-lifecycle-assurance/execution-ledger.md)
+records the five explicit scope rulings and their costs. The branch and worktree
+remain local; preexisting `output/` is preserved.

@@ -64,7 +64,7 @@ def receipt_transition(record):
 
 
 def validate_scenario(name, trace, validate_runtime_trace):
-    require(set(trace) == {"snapshot", "snapshot_canonical", "events", "commands", "receipts"}, "unexpected scenario fields")
+    require(set(trace) == {"snapshot", "snapshot_canonical", "committed_snapshots", "events", "commands", "receipts"}, "unexpected scenario fields")
     snapshot, events = trace["snapshot"], trace["events"]
     raw = bytes.fromhex(trace["snapshot_canonical"])
     require(canonical_fixture(snapshot) == raw, "snapshot bytes differ from readback")
@@ -83,7 +83,21 @@ def validate_scenario(name, trace, validate_runtime_trace):
                              policy={field: plan[field] for field in ["policy_hash", "policy_version"]})
     commands = {}
     for command in trace["commands"]:
+        require(set(command) == {"request", "result"}, "unexpected native command fields")
         req, result = command["request"], command["result"]
+        require(set(req) == {"tenant_id", "action_id", "plan_hash", "effect_id", "effect_kind", "target",
+                             "plan_expires_at_unix_ms", "operation", "idempotency_key", "expected_version_hash",
+                             "scheduler_lease_owner_id", "scheduler_fencing_token", "canonical_contribution", "contribution_hash"}
+                and set(result) == {"effect_id", "resulting_version_hash", "applied"}, "unexpected native request/result fields")
+        require(req["effect_kind"] == planned["kind"] and req["plan_expires_at_unix_ms"] == plan["expires_at_unix_ms"],
+                "native command kind or expiry mismatch")
+        # These fixtures exercise first-attempt apply/removal, including replay
+        # of the same command after lost acknowledgement, never a new attempt.
+        identity = {field: req[field] for field in ["tenant_id", "action_id", "plan_hash", "effect_id", "operation"]}
+        identity["attempt"] = 0
+        expected_id = "response_effect_command:" + hashlib.sha256(
+            b"chio.response-effect-command.v1\0" + canonical_fixture(identity)).hexdigest()
+        require(req["idempotency_key"] == expected_id, "native command identity mismatch")
         key = req["effect_id"], req["operation"]
         require(key not in commands, "duplicate native command")
         require(req["tenant_id"] == plan["tenant_id"] and req["action_id"] == plan["action_id"]
@@ -123,6 +137,16 @@ def validate_scenario(name, trace, validate_runtime_trace):
             require((first == 0 and generation == 1) or (first > 0 and first == generation),
                     "unexpected atomic commit range")
             require(event["action_id"] == plan["action_id"], "cross-action commit")
+            observed_raw = bytes.fromhex(trace["committed_snapshots"][str(generation)])
+            observed_snapshot = json.loads(observed_raw)
+            require(canonical_fixture(observed_snapshot) == observed_raw
+                    and hashlib.sha256(observed_raw).hexdigest() == event["body_hash"], "intermediate commit hash mismatch")
+            require(set(observed_snapshot) == set(snapshot)
+                    and observed_snapshot["generation"] == generation
+                    and observed_snapshot["mutations"] == mutations[:generation+1], "committed mutation prefix mismatch")
+            for field in ["schema_version", "plan", "execution_dispatch", "dispatch_authorization_hash"]:
+                require(observed_snapshot[field] == snapshot[field], f"committed {field} substitution")
+            require(observed_snapshot["state"] == event["state"], "committed snapshot state mismatch")
             for covered in range(first, generation + 1):
                 mutation = mutations[covered]
                 kind, record = mutation["record_type"], mutation["record"]
@@ -153,6 +177,8 @@ def validate_scenario(name, trace, validate_runtime_trace):
                               m["record_type"] == "effect_requested" if key[1] == "apply" else
                               m["record_type"] == "rollback" and m["record"]["outcome"]["outcome"] == "requested")]
             require(len(candidates) == 1 and receipt_transition(candidates[0]) in persisted, "native effect before durable signed request")
+            for field in ["scheduler_fencing_token", "scheduler_lease_owner_id"]:
+                require(request[field] == candidates[0][field], f"native command {field} authority mismatch")
             external[key] = index
         elif boundary == "receipt_persisted":
             transition = event["transition_id"]
@@ -174,6 +200,8 @@ def validate_scenario(name, trace, validate_runtime_trace):
             if kind in {"effect_requested", "effect_applied", "rollback"}:
                 require(signed["kind"] == "effect_transition" and body["effect"] == expected_effect
                         and body["generation"] == record["effect_generation"], "signed effect substitution")
+                for field in ["scheduler_fencing_token", "scheduler_lease_owner_id"]:
+                    require(body[field] == record[field], f"signed effect {field} mismatch")
                 outcome = "requested" if kind == "effect_requested" else "applied" if kind == "effect_applied" else {
                     "requested": "rollback_requested", "restored": "restored"}[record["outcome"]["outcome"]]
                 require(body["outcome"]["state"] == outcome, "signed effect outcome mismatch")
@@ -193,6 +221,9 @@ def validate_scenario(name, trace, validate_runtime_trace):
             raise ValueError("unexpected durable trace boundary")
     require(len(committed) == len(mutations) == len(persisted) == len(receipts), "incomplete durable generations")
     require(set(external) == set(commands), "incomplete external journal linkage")
+    require(set(trace["committed_snapshots"]) == {str(e["generation"]) for e in events if e["boundary"] == "response_commit"},
+            "incomplete committed snapshot inventory")
+    require(trace["committed_snapshots"][str(snapshot["generation"])] == trace["snapshot_canonical"], "final reopen snapshot mismatch")
     require(committed[len(mutations)-1][1]["body_hash"] == hashlib.sha256(raw).hexdigest(), "final committed body differs from reopened store")
     require(len(restarts) == 2 and restarts[1] > max(p[0] for p in persisted.values()), "missing final restart readback")
     first_effect = external[(planned["effect_id"], "apply")]

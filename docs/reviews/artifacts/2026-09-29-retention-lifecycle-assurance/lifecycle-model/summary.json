@@ -72,7 +72,13 @@
       "path": "crates/platform/chio-control-plane/src/security/active_response/tests/lifecycle_trace.rs",
       "symbol": "durable_lifecycle_trace_links_commits_effects_and_signed_receipts",
       "boundary": "real store restart and lost acknowledgement evidence emitter",
-      "sha256": "bd3e99c3f52f03ad1e7e7e2da8f82332c131f385db59da99cfd5a6a465309d49"
+      "sha256": "099dde37e9d3faa1ec3fd032256d5c23289863c7046a08def70ce3587a633383"
+    },
+    {
+      "path": "crates/security/chio-quarantine/src/executor.rs",
+      "symbol": "effect_command_id",
+      "boundary": "native command domain, operation and attempt identity",
+      "sha256": "0281ff8efe8a9d55aa92bdb433c7df5f2166f2a0151f9df0a9401fb4877229a8"
     }
   ],
   "results": [
@@ -131,7 +137,7 @@
       "exit_code": 12
     }
   ],
-  "durable_trace_sha256": "3303825666e749c063d2a9e6269fcbba5d2b5bece6dc1801dfc76d3626489160",
+  "durable_trace_sha256": "21f3d4a6d67979defc2e4801ff5b0cbb0ff39fc16638342867e748b37f930dcc",
   "durable_scenarios": {
     "effect_ack_loss": {
       "generations": 10,

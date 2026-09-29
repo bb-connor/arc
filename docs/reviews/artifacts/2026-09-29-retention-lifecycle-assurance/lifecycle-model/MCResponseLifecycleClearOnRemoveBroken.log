@@ -1,7 +1,7 @@
 TLC2 Version 2.19 of 08 August 2024
-Running breadth-first search Model-Checking with fp 17 and seed 2392697718221500508 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2091541] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
-Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycleClearOnRemoveBroken.tla
-Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycle.tla
+Running breadth-first search Model-Checking with fp 11 and seed -4595963270264251282 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2099309] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /tmp/chio-response-model-aj5sri_f/ResponseLifecycleClearOnRemoveBroken.tla
+Parsing file /tmp/chio-response-model-aj5sri_f/ResponseLifecycle.tla
 Parsing file /tmp/Naturals.tla
 Parsing file /tmp/FiniteSets.tla
 Parsing file /tmp/Sequences.tla
@@ -10,10 +10,10 @@ Semantic processing of module Sequences
 Semantic processing of module FiniteSets
 Semantic processing of module ResponseLifecycle
 Semantic processing of module ResponseLifecycleClearOnRemoveBroken
-Starting... (2026-09-29 11:14:48)
+Starting... (2026-09-29 11:24:15)
 Computing initial states...
 Computed 2 initial states...
-Finished computing initial states: 4 distinct states generated at 2026-09-29 11:14:49.
+Finished computing initial states: 4 distinct states generated at 2026-09-29 11:24:15.
 Error: Invariant OverlapPreserved is violated.
 Error: The behavior up to this point is:
 State 1: <Initial predicate>
@@ -74,11 +74,11 @@ State 5: <RequestEffect line 190, col 5 to line 196, col 86 of module ResponseLi
 State 6: <ExecuteEffect line 201, col 5 to line 208, col 64 of module ResponseLifecycle>
 /\ dispatch = <<"committed", "committed">>
 /\ state = <<"applying", "applying">>
-/\ overlay = <<{1}, {}>>
+/\ overlay = <<{2}, {}>>
 /\ owner = <<1, 1>>
 /\ mode = <<"live", "live">>
 /\ restricted = <<TRUE, FALSE>>
-/\ journal = <<<<"applied", "none">>, <<"none", "none">>>>
+/\ journal = <<<<"none", "none">>, <<"applied", "none">>>>
 /\ effect = <<<<"requested", "planned">>, <<"requested", "none">>>>
 /\ clock = 0
 
@@ -148,7 +148,7 @@ State 12: <ExecuteRollback line 292, col 5 to line 302, col 64 of module Respons
 /\ effect = <<<<"requested", "planned">>, <<"rollback_requested", "none">>>>
 /\ clock = 0
 
-35316 states generated, 8242 distinct states found, 2155 states left on queue.
+35423 states generated, 8264 distinct states found, 2163 states left on queue.
 The depth of the complete state graph search is 12.
 The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 7 and the 95th percentile is 4).
-Finished in 01s at (2026-09-29 11:14:49)
+Finished in 01s at (2026-09-29 11:24:16)
