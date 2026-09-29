@@ -412,151 +412,44 @@ fn exact_target_mismatch_is_rejected() {
     );
 }
 
-fn conformance_fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../tests/conformance/fixtures/mcp_core")
-        .join(name)
-        .canonicalize()
-        .expect("canonical conformance fixture path")
-}
-
-/// The interpreter behind `python3`, asked of the interpreter itself so a
-/// version-manager shim on PATH does not stand in for it.
-fn python3() -> PathBuf {
-    let output = Command::new("python3")
-        .args(["-c", "import sys; print(sys.executable)"])
-        .output()
-        .expect("run python3");
-    assert!(
-        output.status.success(),
-        "python3 is not a working interpreter"
-    );
-    PathBuf::from(String::from_utf8_lossy(&output.stdout).trim())
-        .canonicalize()
-        .expect("canonical python3 path")
-}
-
-fn provision_mock_server(output: &Path, surface: &[&str]) -> Output {
-    let mut command = Command::new(chio());
-    command
-        .args(["security", "provision-native-mcp-demo", "--output-dir"])
-        .arg(output)
-        .args(surface)
-        .arg("--target")
-        .arg(python3())
-        .arg("--target-arg")
-        .arg(conformance_fixture("mock_mcp_server.py"))
-        .args([
-            "--execution-uid",
-            "10001",
-            "--execution-gid",
-            "10001",
-            "--server-id",
-            "conformance-mcp-core",
-            "--server-name",
-            "Conformance Fixture",
-            "--server-version",
-            "0.1.0",
-        ]);
-    command.output().expect("run native MCP demo provisioner")
-}
-
 #[test]
-fn discovered_surface_equals_the_reviewed_fixture_and_reruns_idempotently() {
-    let temporary = tempfile::tempdir().expect("create test directory");
-    let root = temporary
-        .path()
-        .canonicalize()
-        .expect("canonical test directory");
-    let discovered = root.join("discovered");
-    let reviewed = root.join("reviewed");
-    let fixture = conformance_fixture("reviewed-tools.json");
-
-    let first = provision_mock_server(&discovered, &["--discover-tools"]);
-    assert_success(&first);
-    let from_fixture = provision_mock_server(
-        &reviewed,
-        &["--tools-fixture", fixture.to_str().expect("fixture path")],
-    );
-    assert_success(&from_fixture);
-
-    assert_eq!(
-        fs::read(discovered.join("reviewed-tools.json")).expect("discovered surface"),
-        fs::read(reviewed.join("reviewed-tools.json")).expect("reviewed surface"),
-        "the surface discovered from the live server must equal the reviewed fixture"
-    );
-    let discovered_report: serde_json::Value =
-        serde_json::from_slice(&first.stdout).expect("discovered report json");
-    let reviewed_report: serde_json::Value =
-        serde_json::from_slice(&from_fixture.stdout).expect("reviewed report json");
-    assert_eq!(discovered_report["reviewedToolsSource"], "discovered");
-    assert_eq!(reviewed_report["reviewedToolsSource"], "fixture");
-    assert_eq!(
-        discovered_report["reviewedToolsDigest"],
-        reviewed_report["reviewedToolsDigest"]
-    );
-    assert_eq!(
-        discovered_report["reviewedToolCount"],
-        reviewed_report["reviewedToolCount"]
-    );
-    let policy: serde_json::Value = serde_json::from_slice(
-        &fs::read(discovered.join("cage-launch-policy.json")).expect("cage policy"),
-    )
-    .expect("cage policy json");
-    assert_eq!(
-        policy["body"]["runtime"]["target_argv"],
-        serde_json::json!([
-            python3().to_str().expect("python path"),
-            conformance_fixture("mock_mcp_server.py")
-                .to_str()
-                .expect("server path")
+fn disabled_preparation_has_no_live_discovery_option() {
+    let (temporary, tools, target, _) = setup();
+    let marker = temporary.path().join("executed");
+    // The target uses its first argument as a marker, so the refusal is proved
+    // by absence of an effect, not just the command's exit status.
+    write_executable(&target, b"#!/bin/sh\nprintf launched > \"$1\"\n");
+    let output = temporary.path().join("discovery");
+    let rejected = Command::new(chio())
+        .args([
+            "security",
+            "provision-native-mcp-demo",
+            "--discover-tools",
+            "--output-dir",
         ])
-    );
-
-    let rerun = provision_mock_server(&discovered, &["--discover-tools"]);
-    assert_success(&rerun);
-    assert_eq!(first.stdout, rerun.stdout);
-}
-
-#[test]
-fn discovery_refuses_a_target_that_does_not_serve_tools() {
-    let (temporary, _tools, target_a, _target_b) = setup();
-    let output = temporary
-        .path()
-        .canonicalize()
-        .expect("canonical test directory")
-        .join("silent");
-    let mut command = Command::new(chio());
-    command
-        .args(["security", "provision-native-mcp-demo", "--output-dir"])
         .arg(&output)
-        .arg("--discover-tools")
         .arg("--target")
-        .arg(&target_a)
-        .args([
-            "--execution-uid",
-            "10001",
-            "--execution-gid",
-            "10001",
-            "--server-id",
-            "silent-target",
-        ]);
-    let outcome = command.output().expect("run native MCP demo provisioner");
-    assert!(
-        !outcome.status.success(),
-        "a silent target must not provision"
-    );
-    let stderr = String::from_utf8_lossy(&outcome.stderr);
-    assert!(
-        stderr.contains("closed its output before answering tools/list")
-            || stderr.contains("closed its input before the MCP handshake"),
-        "unexpected stderr: {stderr}"
-    );
-    assert!(!output.exists(), "a failed discovery must publish nothing");
+        .arg(&target)
+        .arg("--target-arg")
+        .arg(&marker)
+        .args(["--execution-uid", "10001", "--execution-gid", "10001"])
+        .output()
+        .expect("run disabled discovery");
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr)
+        .contains("unexpected argument '--discover-tools'"));
+    assert!(!marker.exists());
+    assert!(!output.exists());
+    let prepared = provision(&output, &tools, &target);
+    assert_success(&prepared);
+    assert!(!marker.exists());
+    let rerun = provision(&output, &tools, &target);
+    assert_success(&rerun);
+    assert_eq!(prepared.stdout, rerun.stdout);
 }
 
 #[test]
-fn a_tool_surface_source_is_required_and_exclusive() {
+fn disabled_preparation_requires_a_reviewed_fixture() {
     let (temporary, tools, target_a, _target_b) = setup();
     let output = temporary.path().join("unsourced");
     let without = Command::new(chio())
@@ -582,7 +475,7 @@ fn a_tool_surface_source_is_required_and_exclusive() {
     assert!(!both.status.success());
     let stderr = String::from_utf8_lossy(&both.stderr);
     assert!(
-        stderr.contains("cannot be used with"),
+        stderr.contains("unexpected argument '--discover-tools'"),
         "unexpected stderr: {stderr}"
     );
 }

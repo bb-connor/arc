@@ -537,6 +537,12 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_fragments=2,
     ),
 
+    "crates/guards/chio-policy/src/evaluate.rs": allow(
+        "2026-12-31",
+        "policy evaluation production fragments remain pending module ownership; tests are a separate module",
+        max_lines=1_909,
+        max_fragments=4,
+    ),
     "third_party/regress-chio/tests/unicodesets.rs": allow(
         "2026-12-31",
         "vendored regress unicode-set suite assembled from include! fragments; capped until the fragments become modules",

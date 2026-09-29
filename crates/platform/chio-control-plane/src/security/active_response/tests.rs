@@ -1910,5 +1910,7 @@ mod automatic_fence_boundary {
     }
 }
 
+#[path = "tests/fail_closed.rs"]
 mod fail_closed;
+#[path = "tests/lifecycle_trace.rs"]
 mod lifecycle_trace;

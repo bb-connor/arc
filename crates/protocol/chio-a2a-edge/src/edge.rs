@@ -294,20 +294,20 @@ impl ChioA2aEdge {
         Err(A2aEdgeError::ToolNotFound(skill_id.to_string()))
     }
 
-    fn jsonrpc_error_response(id: Value, error: A2aEdgeError) -> Value {
-        let (code, message) = match error {
+    fn jsonrpc_error_response(id: Value, error: A2aEdgeError) -> A2aJsonRpcResponse {
+        let (code, message) = match &error {
             A2aEdgeError::UntrustedInput(error) => (-32602, error.code().to_string()),
             A2aEdgeError::TaskCapacity => (
                 -32602,
                 "urn:chio:error:transport:task-capacity-exceeded".to_string(),
             ),
             A2aEdgeError::ToolNotFound(message) | A2aEdgeError::InvalidRequest(message) => {
-                (-32602, message)
+                (-32602, message.clone())
             }
             other => (-32603, other.to_string()),
         };
 
-        Self::jsonrpc_error_payload(id, code, &message)
+        A2aJsonRpcResponse::with_error(Self::jsonrpc_error_payload(id, code, &message), error)
     }
 
     fn jsonrpc_error_payload(id: Value, code: i64, message: &str) -> Value {
@@ -658,16 +658,20 @@ impl ChioA2aEdge {
             "message/stream" => self.handle_jsonrpc_stream_message(id, params, kernel, execution),
             "task/get" => self.handle_jsonrpc_task_get(id, params, kernel, execution),
             "task/cancel" => self.handle_jsonrpc_task_cancel(id, params, kernel, execution),
-            _ => json!({
+            _ => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "error": {
                     "code": -32601,
                     "message": "method not found"
                 }
-            }),
+            })),
         };
-        A2aJsonRpcResponse::from_optional(should_respond.then_some(response))
+        if should_respond {
+            response
+        } else {
+            response.suppress_wire_response()
+        }
     }
 
     fn handle_jsonrpc_send_message(
@@ -676,7 +680,7 @@ impl ChioA2aEdge {
         params: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         let (skill_id, request) =
             match self.parse_jsonrpc_send_message_params(params, "SendMessage") {
                 Ok(parsed) => parsed,
@@ -684,11 +688,11 @@ impl ChioA2aEdge {
             };
 
         match self.handle_send_message(&skill_id, &request, kernel, execution) {
-            Ok(response) => json!({
+            Ok(response) => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            }),
+            })),
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
@@ -699,7 +703,7 @@ impl ChioA2aEdge {
         params: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         let (skill_id, request) =
             match self.parse_jsonrpc_send_message_params(params, "SendStreamingMessage") {
                 Ok(parsed) => parsed,
@@ -707,11 +711,11 @@ impl ChioA2aEdge {
             };
 
         match self.handle_stream_message(&skill_id, &request, kernel, execution) {
-            Ok(response) => json!({
+            Ok(response) => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            }),
+            })),
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
@@ -722,7 +726,7 @@ impl ChioA2aEdge {
         params: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         let now = match kernel.authority_clock_reading() {
             Ok(now) => now,
             Err(error) => return Self::jsonrpc_error_response(id, error.into()),
@@ -739,11 +743,11 @@ impl ChioA2aEdge {
         }
 
         match self.resolve_task(&task_id, execution) {
-            Ok(response) => json!({
+            Ok(response) => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            }),
+            })),
             Err(A2aEdgeError::InvalidRequest(_)) if self.tasks.contains_key(&task_id) => {
                 self.complete_task(&task_id, kernel, execution, id)
             }
@@ -757,11 +761,11 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
         id: Value,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
             return Self::jsonrpc_error_response(id, error);
         }
-        let Some(mut task) = self.tasks.get(task_id).cloned() else {
+        let Some(task) = self.tasks.get_mut(task_id) else {
             return Self::jsonrpc_error_response(
                 id,
                 A2aEdgeError::ToolNotFound(task_id.to_string()),
@@ -774,19 +778,23 @@ impl ChioA2aEdge {
             );
         }
         if task.response.status != TaskStatus::Working {
-            return json!({
+            return A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&task.response).unwrap_or(Value::Null)
-            });
+            }));
         }
 
         if let Err(error) = kernel
             .authority_clock_reading()
             .and_then(|now| task.deadline.remaining(now))
         {
+            if error == ClockError::Expired {
+                self.tasks.remove(task_id);
+            }
             return Self::jsonrpc_error_response(id, error.into());
         }
+        let request = task.request.clone();
         let orchestrated = match execute_orchestrated_a2a_request(
             &self.config.peer_capabilities,
             kernel,
@@ -794,7 +802,7 @@ impl ChioA2aEdge {
                 Ok(registry) => registry,
                 Err(error) => return Self::jsonrpc_error_response(id, error),
             },
-            task.request,
+            request,
         ) {
             Ok(orchestrated) => orchestrated,
             Err(error) => return Self::jsonrpc_error_response(id, error),
@@ -813,11 +821,11 @@ impl ChioA2aEdge {
                 );
             }
         };
-        json!({
+        A2aJsonRpcResponse::response(json!({
             "jsonrpc": "2.0",
             "id": id,
             "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-        })
+        }))
     }
 
     fn handle_jsonrpc_task_cancel(
@@ -826,7 +834,7 @@ impl ChioA2aEdge {
         params: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         let now = match kernel.authority_clock_reading() {
             Ok(now) => now,
             Err(error) => return Self::jsonrpc_error_response(id, error.into()),
@@ -863,17 +871,17 @@ impl ChioA2aEdge {
                     "deferred_task_poll",
                 ));
                 let response = task.response.clone();
-                json!({
+                A2aJsonRpcResponse::response(json!({
                     "jsonrpc": "2.0",
                     "id": id,
                     "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-                })
+                }))
             }
-            TaskStatus::Cancelled => json!({
+            TaskStatus::Cancelled => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&task.response).unwrap_or(Value::Null)
-            }),
+            })),
             status => Self::jsonrpc_error_response(
                 id,
                 A2aEdgeError::InvalidRequest(format!(

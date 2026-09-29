@@ -125,22 +125,49 @@ impl TaskStatus {
 }
 
 /// Result of handling a JSON-RPC message.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct A2aJsonRpcResponse {
     value: Option<Value>,
+    local_error: Option<std::sync::Arc<A2aEdgeError>>,
 }
 
 impl A2aJsonRpcResponse {
     pub fn response(value: Value) -> Self {
-        Self { value: Some(value) }
+        Self {
+            value: Some(value),
+            local_error: None,
+        }
     }
 
     pub fn notification() -> Self {
-        Self { value: None }
+        Self {
+            value: None,
+            local_error: None,
+        }
     }
 
     pub fn from_optional(value: Option<Value>) -> Self {
-        Self { value }
+        Self {
+            value,
+            local_error: None,
+        }
+    }
+
+    fn with_error(value: Value, error: A2aEdgeError) -> Self {
+        Self {
+            value: Some(value),
+            local_error: Some(std::sync::Arc::new(error)),
+        }
+    }
+
+    /// Typed local rejection cause. Never included in the wire response.
+    pub fn local_error(&self) -> Option<&A2aEdgeError> {
+        self.local_error.as_deref()
+    }
+
+    fn suppress_wire_response(mut self) -> Self {
+        self.value = None;
+        self
     }
 
     pub fn as_value(&self) -> Option<&Value> {

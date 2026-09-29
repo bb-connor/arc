@@ -70,7 +70,8 @@ submodules instead.
   unpadded, and (for `agent_id` and `taskId`) free of control characters
   before any skill resolution, kernel dispatch, or task-state mutation.
 - Original JSON-RPC bytes are bounded to 1 MiB and parsed with duplicate-key
-  detection before creating a JSON value. Parser causes remain typed locally.
+  detection before creating a JSON value. Parser causes remain typed locally. The response retains a local error sidecar
+  even when notification semantics suppress its wire payload.
 - The JSON-RPC boundary rejects a non-object `params` for a known method
   with `-32602`, an unknown method with `-32601`, and a malformed envelope
   (`jsonrpc != "2.0"`, missing `method`, or a non-string/number/null `id`)

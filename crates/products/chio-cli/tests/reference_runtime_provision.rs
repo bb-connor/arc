@@ -801,3 +801,34 @@ fn the_demo_provisioner_keeps_its_disabled_stage_report() {
     }
     assert!(report["artifacts"].get("migrationPromotions").is_none());
 }
+
+#[test]
+fn shadow_discovery_refuses_before_executing_the_target() {
+    let fixture = Fixture::new();
+    let marker = fixture.root.path().join("executed");
+    write_executable(&fixture.target, b"#!/bin/sh\nprintf launched > \"$1\"\n");
+    let output = fixture.output("shadow-discovery");
+    let rejected = Command::new(chio())
+        .args([
+            "security",
+            "provision-reference-runtime",
+            "--stage",
+            "shadow",
+            "--discover-tools",
+        ])
+        .arg("--output-dir")
+        .arg(&output)
+        .arg("--cage-init")
+        .arg(&fixture.helper)
+        .arg("--target")
+        .arg(&fixture.target)
+        .arg("--target-arg")
+        .arg(&marker)
+        .args(["--execution-uid", "10001", "--execution-gid", "10001"])
+        .output()
+        .expect("run shadow discovery");
+    assert!(!rejected.status.success());
+    assert!(stderr(&rejected).contains("live MCP discovery requires an enforced migration stage"));
+    assert!(!marker.exists());
+    assert!(!output.exists());
+}

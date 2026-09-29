@@ -1,5 +1,4 @@
-//! Tool discovery runs with the provisioned cage's authority. Explicit demo
-//! discovery is explicitly unconfined and is never available to root.
+//! Live tool discovery runs only with the provisioned cage's enforced authority.
 
 use super::{CliError, ProvisionInputs};
 
@@ -19,7 +18,7 @@ pub(super) fn discover_tool_surface(
         let (child, stdin, stdout, stderr) = launch::start(inputs, deadline)?;
         let outcome = transport::exchange_until(stdin, stdout, stderr, deadline);
         // The cage denies clone/fork and owns termination through a pidfd.
-        // Unconfined demo discovery owns its process group. I/O never waits for EOF.
+        // Bounded nonblocking I/O never waits for EOF.
         drop(child);
         let tools = outcome.map_err(|reason| {
             CliError::cli_other_error(format!("native MCP tool discovery failed: {reason}"))

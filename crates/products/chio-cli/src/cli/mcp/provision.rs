@@ -28,7 +28,7 @@ pub(crate) use reference_runtime::{
 
 /// Where the reviewed tool surface of a provisioned demo comes from.
 #[derive(Clone, Copy)]
-pub(crate) enum ToolSurfaceSource<'a> {
+enum ToolSurfaceSource<'a> {
     /// A reviewed `tools/list` fixture on disk.
     Fixture(&'a Path),
     /// The target itself, spawned once and asked for its `tools/list`.
@@ -319,7 +319,7 @@ impl Drop for StagingDirectory {
 pub(crate) fn cmd_provision_native_mcp_demo(
     output_dir: &Path,
     runtime_security_dir: Option<&Path>,
-    tool_surface: ToolSurfaceSource<'_>,
+    tools_fixture: &Path,
     target: &Path,
     target_args: &[String],
     working_directory: Option<&Path>,
@@ -334,7 +334,7 @@ pub(crate) fn cmd_provision_native_mcp_demo(
         ProvisionProfile::native_mcp_demo(),
         output_dir,
         runtime_security_dir,
-        tool_surface,
+        ToolSurfaceSource::Fixture(tools_fixture),
         target,
         target_args,
         working_directory,
@@ -384,6 +384,11 @@ fn resolve_inputs(
     server_name: &str,
     server_version: &str,
 ) -> Result<ProvisionInputs, CliError> {
+    if matches!(tool_surface, ToolSurfaceSource::Discovered) && !profile.containment_enforced() {
+        return Err(CliError::cli_other_error(
+            "live MCP discovery requires an enforced migration stage; supply --tools-fixture for inactive preparation",
+        ));
+    }
     validate_text_argument("server id", server_id, 256)?;
     validate_text_argument("server name", server_name, 512)?;
     validate_text_argument("server version", server_version, 128)?;

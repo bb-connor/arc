@@ -8,6 +8,7 @@ crate_name_markers = [
 ]
 
 explicit_roots = [
+  "crates/products/chio-cli/src/cli/mcp/provision/discovery",
   "crates/products/chio-api-protect/src",
   "crates/protocol/chio-cross-protocol/src",
   "crates/protocol/chio-openapi/src",

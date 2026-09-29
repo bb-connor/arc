@@ -36,6 +36,8 @@ upstream MCP server) and `chio-mcp-edge` (the MCP hosting runtime).
   kernel-mediated blocking send, deferred stream start, and raw JSON-RPC
   dispatch. `handle_jsonrpc` accepts original bytes (up to 1 MiB), rejects
   duplicate keys before dispatch, and returns `Result<A2aJsonRpcResponse, A2aEdgeError>`.
+  Responses expose `local_error()` for typed dispatch diagnostics; wire output
+  and notification suppression never serialize that cause.
 - `A2aEdgeConfig`, `A2aEdgeError`, `A2aKernelExecutionContext` - Agent Card
   config, error type, and per-call kernel execution context.
 - Wire types: `AgentCard`, `A2aSkillEntry`, `SendMessageRequest`,

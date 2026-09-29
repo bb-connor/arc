@@ -6,18 +6,23 @@ use crate::tests::{
 use chio_core::Keypair;
 use chio_security_types::clock::{Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis};
 use chio_test_support::prelude::*;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 struct TestClock {
     millis: AtomicU64,
     monotonic: AtomicU64,
+    samples: Mutex<VecDeque<ClockReading>>,
     fail: AtomicBool,
 }
 impl Clock for TestClock {
     fn read(&self) -> Result<ClockReading, ClockError> {
         if self.fail.load(Ordering::SeqCst) {
             return Err(ClockError::Unavailable);
+        }
+        if let Some(sample) = self.samples.lock().test_unwrap().pop_front() {
+            return Ok(sample);
         }
         Ok(ClockReading::new(
             UnixMillis::new(self.millis.load(Ordering::SeqCst)),
@@ -51,6 +56,7 @@ fn harness() -> (
     let clock = Arc::new(TestClock {
         millis: AtomicU64::new(unix_now() * 1000),
         monotonic: AtomicU64::new(0),
+        samples: Mutex::new(VecDeque::new()),
         fail: AtomicBool::new(false),
     });
     let mut kernel = ChioKernel::new_with_clock(config, clock.clone());
@@ -189,6 +195,68 @@ fn monotonic_expiry_denies_dispatch_when_wall_time_stops() {
         &execution,
     );
     assert_eq!(response["error"]["code"], -32602);
+    assert!(edge.tasks.is_empty());
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn public_dispatch_preserves_typed_causes_without_emitting_them() {
+    use std::error::Error;
+    let (mut edge, kernel, execution, clock, calls) = harness();
+    for id in [Some(1), None] {
+        let mut request = json!({"jsonrpc":"2.0", "method":"message/send", "params":{"metadata":{"chio":{"targetSkillId":"echo"}},"message":{"role":"user", "parts":"secret_marker"}}});
+        if let Some(id) = id {
+            request["id"] = json!(id);
+        }
+        let response = edge
+            .handle_jsonrpc(
+                &serde_json::to_vec(&request).test_unwrap(),
+                &kernel,
+                &execution,
+            )
+            .test_unwrap();
+        let error = response.local_error().test_expect("retain DTO failure");
+        assert!(
+            matches!(error, A2aEdgeError::UntrustedInput(_)),
+            "{error:?}"
+        );
+        assert!(error.source().and_then(Error::source).is_some());
+        assert_eq!(response.is_notification(), id.is_none());
+        assert!(!format!("{response:?}").contains("secret_marker"));
+    }
+    let response = edge.handle_jsonrpc(br#"{"jsonrpc":"2.0","id":2,"method":"message/send","params":{"metadata":{"chio":{"targetSkillId":"echo"}},"message":{"role":"user","parts":[{"type":"data","data":{"value":18446744073709551615}}]}}}"#, &kernel, &execution).test_unwrap();
+    assert!(matches!(
+        response.local_error(),
+        Some(A2aEdgeError::UntrustedInput(_))
+    ));
+    clock.fail.store(true, Ordering::SeqCst);
+    let response = edge.handle_jsonrpc(br#"{"jsonrpc":"2.0","id":3,"method":"message/stream","params":{"metadata":{"chio":{"targetSkillId":"echo"}},"message":{"role":"user","parts":[{"type":"text","text":"hello"}]}}}"#, &kernel, &execution).test_unwrap();
+    assert!(matches!(
+        response.local_error(),
+        Some(A2aEdgeError::Clock(ClockError::Unavailable))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn final_dispatch_expiry_removes_the_retained_task() {
+    let (mut edge, kernel, execution, clock, calls) = harness();
+    let accepted = edge
+        .handle_stream_message("echo", &text_message("hello"), &kernel, &execution)
+        .test_unwrap();
+    let deadline = clock.millis.load(Ordering::SeqCst) + DEFERRED_A2A_TASK_TTL_MILLIS;
+    clock.samples.lock().test_unwrap().extend([
+        ClockReading::new(
+            UnixMillis::new(deadline - 1),
+            MonotonicInstant::from_nanos(1),
+        ),
+        ClockReading::new(UnixMillis::new(deadline), MonotonicInstant::from_nanos(2)),
+    ]);
+    let response = edge.handle_jsonrpc(&serde_json::to_vec(&json!({"jsonrpc":"2.0", "id":4,"method":"task/get","params":{"taskId":accepted.id}})).test_unwrap(), &kernel, &execution).test_unwrap();
+    assert!(matches!(
+        response.local_error(),
+        Some(A2aEdgeError::Clock(ClockError::Expired))
+    ));
     assert!(edge.tasks.is_empty());
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }

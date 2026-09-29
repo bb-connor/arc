@@ -160,6 +160,14 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
             let report: serde_json::Value = serde_json::from_slice(&std::fs::read(&stdout)?)?;
             assert_eq!(report["containmentEnforced"], true);
             assert_eq!(report["reviewedToolCount"], 1);
+            assert_eq!(report["reviewedToolsSource"], "discovered");
+            let reviewed: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(output_dir.join("reviewed-tools.json"))?)?;
+            assert_eq!(reviewed["tools"][0]["name"], "confined_probe");
+            assert_eq!(
+                reviewed["tools"][0]["inputSchema"],
+                serde_json::json!({"type":"object"})
+            );
         } else {
             assert!(!result.success(), "hostile discovery reported success");
             assert!(

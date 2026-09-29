@@ -1,37 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
-use std::os::unix::process::CommandExt;
-use std::process::{Child, Command, Stdio};
 
 use super::{CliError, ProvisionInputs};
 
-pub(super) enum DiscoveryChild {
-    Enforced(Box<chio_cage::EnforcedChild>),
-    UnconfinedDemo(Child),
-}
+pub(super) struct DiscoveryChild(chio_cage::EnforcedChild);
 
 impl Drop for DiscoveryChild {
     fn drop(&mut self) {
-        match self {
-            Self::Enforced(child) => {
-                let _ = child.signal(chio_cage::TerminationSignal::Terminate);
-            }
-            Self::UnconfinedDemo(child) => {
-                if let Ok(pid) = i32::try_from(child.id()) {
-                    // SAFETY: the unreaped child owns a new process group with
-                    // this ID. No other process group can reuse it yet.
-                    unsafe { libc::kill(-pid, libc::SIGKILL) };
-                }
-                let _ = child.kill();
-                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-                while matches!(child.try_wait(), Ok(None)) {
-                    if std::time::Instant::now() >= deadline {
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                }
-            }
-        }
+        let _ = self.0.signal(chio_cage::TerminationSignal::Terminate);
     }
 }
 
@@ -39,34 +15,11 @@ pub(super) fn start(
     inputs: &ProvisionInputs,
     deadline: std::time::Instant,
 ) -> Result<(DiscoveryChild, File, File, File), CliError> {
-    if inputs.profile.containment_enforced() {
-        return start_cage(inputs, deadline);
-    }
-    // Disabled/Shadow demos are explicitly unconfined. Never let that opt-in
-    // turn privileged provisioning into an unconfined root execution path.
-    let privileged = rustix::process::getuid().is_root() || rustix::process::geteuid().is_root();
-    if privileged {
+    if !inputs.profile.containment_enforced() {
         return Err(CliError::cli_other_error(
-            "privileged discovery requires an Enforced cage; supply --tools-fixture for unconfined demo provisioning",
+            "live MCP discovery requires an enforced migration stage; supply --tools-fixture for inactive preparation",
         ));
     }
-    let child = Command::new(&inputs.target_path)
-        .args(inputs.target_argv.iter().skip(1))
-        .current_dir(&inputs.working_directory)
-        .env_clear()
-        .process_group(0)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(failure)?;
-    with_stdio(DiscoveryChild::UnconfinedDemo(child))
-}
-
-fn start_cage(
-    inputs: &ProvisionInputs,
-    deadline: std::time::Instant,
-) -> Result<(DiscoveryChild, File, File, File), CliError> {
     use chio_manifest::{
         NativeSyscallProfile, RequiredPermissions, RuntimeToolTopology, ToolAnnotations,
         ToolDefinition, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
@@ -149,34 +102,16 @@ fn start_cage(
     let remaining = deadline.saturating_duration_since(std::time::Instant::now());
     let options = chio_cage::CageLaunchOptions::new(remaining).map_err(failure)?;
     let child = chio_cage::launch(compiled, options).map_err(failure)?;
-    with_stdio(DiscoveryChild::Enforced(Box::new(child)))
+    with_stdio(DiscoveryChild(child))
 }
 
 fn with_stdio(mut child: DiscoveryChild) -> Result<(DiscoveryChild, File, File, File), CliError> {
     // Own cleanup before extracting pipes, including partial extraction errors.
-    let (stdin, stdout, stderr) = match &mut child {
-        DiscoveryChild::Enforced(child) => child
-            .take_stdio()
-            .ok_or_else(|| failure("missing cage stdio"))?
-            .into_parts(),
-        DiscoveryChild::UnconfinedDemo(child) => (
-            File::from(std::os::fd::OwnedFd::from(
-                child.stdin.take().ok_or_else(|| failure("missing stdin"))?,
-            )),
-            File::from(std::os::fd::OwnedFd::from(
-                child
-                    .stdout
-                    .take()
-                    .ok_or_else(|| failure("missing stdout"))?,
-            )),
-            File::from(std::os::fd::OwnedFd::from(
-                child
-                    .stderr
-                    .take()
-                    .ok_or_else(|| failure("missing stderr"))?,
-            )),
-        ),
-    };
+    let (stdin, stdout, stderr) = child
+        .0
+        .take_stdio()
+        .ok_or_else(|| failure("missing cage stdio"))?
+        .into_parts();
     Ok((child, stdin, stdout, stderr))
 }
 
