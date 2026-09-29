@@ -231,11 +231,11 @@ impl ChioKernel {
         })?
         .ok_or_else(|| error("approval reservation ownership disappeared"))?;
         validate_recovery_history(&operation, &history)?;
-        let index = history
-            .iter()
-            .position(|claim| &claim.reference == reference)
+        let claim = history
+            .iter_mut()
+            .find(|claim| &claim.reference == reference)
             .ok_or_else(|| error("approval reservation changed its exact reference"))?;
-        if history[index].disposition == Disposition::ReleasedBeforeDispatch {
+        if claim.disposition == Disposition::ReleasedBeforeDispatch {
             return Ok(());
         }
         let lease = self.claim_approval_recovery(&operation, now)?;
@@ -244,7 +244,7 @@ impl ChioKernel {
                 .store
                 .release_governed_approval(&operation, &lease, reference, now)
         })?;
-        history[index].disposition = Disposition::ReleasedBeforeDispatch;
+        claim.disposition = Disposition::ReleasedBeforeDispatch;
         if load_exact_history(runtime, &operation, now)? != history {
             return Err(error(
                 "approval reservation release changed its retained history",

@@ -132,7 +132,7 @@ impl BrokerDaemonMigrationConfig {
             || self.trusted_transition_signers.len() > 16
             || self
                 .trusted_transition_signers
-                .windows(2)
+                .array_windows::<2>()
                 .any(|pair| pair[0].to_hex() >= pair[1].to_hex())
             || !self
                 .credential_custody_stage
@@ -167,7 +167,7 @@ impl BrokerDaemonMigrationConfig {
         if self.minimum_heads.len() != expected.len()
             || self
                 .minimum_heads
-                .windows(2)
+                .array_windows::<2>()
                 .any(|pair| pair[0].key >= pair[1].key)
         {
             return Err(BrokerError::InvalidRequest(
@@ -240,12 +240,15 @@ impl BrokerDaemonConfig {
                 "daemon config is not a bounded regular file".to_string(),
             ));
         }
-        let mut bytes = Vec::with_capacity(metadata.len() as usize);
+        let expected_len = usize::try_from(metadata.len()).map_err(|_| {
+            BrokerError::Storage("daemon config length exceeds address space".to_owned())
+        })?;
+        let mut bytes = Vec::with_capacity(expected_len);
         file.by_ref()
             .take(MAX_CONFIG_BYTES + 1)
             .read_to_end(&mut bytes)
             .map_err(|error| BrokerError::Storage(format!("daemon config read failed: {error}")))?;
-        if bytes.len() as u64 != metadata.len() {
+        if bytes.len() != expected_len {
             return Err(BrokerError::Storage(
                 "daemon config changed while it was read".to_string(),
             ));
@@ -377,7 +380,11 @@ impl BrokerDaemonConfig {
             }
         }
         for (index, path) in database_paths.iter().enumerate() {
-            if database_paths[index + 1..].contains(path) {
+            if database_paths
+                .iter()
+                .skip(index + 1)
+                .any(|other| other == path)
+            {
                 return Err(BrokerError::InvalidRequest(
                     "daemon database paths must be distinct".to_string(),
                 ));
@@ -1128,7 +1135,7 @@ fn acquire_database_owner_locks(
         (left.0, left.1, left.2.as_os_str()).cmp(&(right.0, right.1, right.2.as_os_str()))
     });
     if ordered
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| (pair[0].0, pair[0].1) == (pair[1].0, pair[1].1))
     {
         return Err(BrokerError::Custody(

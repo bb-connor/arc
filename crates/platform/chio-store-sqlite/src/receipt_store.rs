@@ -1253,21 +1253,21 @@ impl WriterHandle {
 fn receipt_actor_flush_timeout_error(timeout: Duration) -> ReceiptStoreError {
     ReceiptStoreError::Timeout {
         operation: "sqlite receipt commit flush".to_string(),
-        timeout_ms: timeout.as_millis().min(u128::from(u64::MAX)) as u64,
+        timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
     }
 }
 
 fn receipt_actor_append_timeout_error(timeout: Duration) -> ReceiptStoreError {
     ReceiptStoreError::Timeout {
         operation: "sqlite receipt commit append".to_string(),
-        timeout_ms: timeout.as_millis().min(u128::from(u64::MAX)) as u64,
+        timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
     }
 }
 
 fn receipt_actor_write_timeout_error(timeout: Duration) -> ReceiptStoreError {
     ReceiptStoreError::Timeout {
         operation: "sqlite receipt commit write".to_string(),
-        timeout_ms: timeout.as_millis().min(u128::from(u64::MAX)) as u64,
+        timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
     }
 }
 
@@ -2929,13 +2929,15 @@ fn append_receipt_batch(
     // projection row. Deduplicating the new seqs keeps `inserted` equal to the
     // distinct row count so the cross-check below does not false-trigger the
     // projection-drift Conflict and roll back a valid idempotent batch.
-    let inserted = results
-        .iter()
-        .filter_map(|result| result.as_ref().ok())
-        .filter(|seq| **seq > baseline_max)
-        .copied()
-        .collect::<std::collections::BTreeSet<u64>>()
-        .len() as u64;
+    let inserted = crate::integer::count(
+        results
+            .iter()
+            .filter_map(|result| result.as_ref().ok())
+            .filter(|seq| **seq > baseline_max)
+            .copied()
+            .collect::<std::collections::BTreeSet<u64>>()
+            .len(),
+    );
     #[cfg(feature = "chaos-test-hooks")]
     chaos_test_hooks::pause_after_receipt_write_before_commit(database_mutated)?;
     // O(b) projection cross-check over the delta only: the claim-log
@@ -3384,7 +3386,7 @@ impl SqliteReceiptStore {
             [],
             |row| row.get(0),
         )?;
-        Ok(seq.max(0) as u64)
+        Ok(u64::try_from(seq.max(0)).unwrap_or_default())
     }
 
     /// Highest child-receipt replication seq, or 0 on an empty store.
@@ -3395,7 +3397,7 @@ impl SqliteReceiptStore {
             [],
             |row| row.get(0),
         )?;
-        Ok(seq.max(0) as u64)
+        Ok(u64::try_from(seq.max(0)).unwrap_or_default())
     }
 
     /// Read-only after open (staged-rollout flag).
@@ -3487,7 +3489,7 @@ impl SqliteReceiptStore {
         classify_writer_liveness(
             &self.receipt_commit_actor.writer_counters(),
             threshold,
-            RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+            crate::integer::count(RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY),
             self.receipt_commit_actor.backlog_started_unix_ms(),
             now,
         )
@@ -4551,6 +4553,10 @@ mod receipt_commit_actor_tests {
     }
 
     #[test]
+    #[allow(
+        clippy::expect_used,
+        reason = "The test fixture requires its injected clock sample to succeed."
+    )]
     fn note_accept_restamps_backlog_start_only_on_a_fresh_backlog() {
         let health = ReceiptCommitWriterHealth::default();
 
@@ -4949,6 +4955,10 @@ mod receipt_commit_actor_tests {
     }
 
     #[test]
+    #[allow(
+        clippy::expect_used,
+        reason = "The test fixture requires its injected clock sample to succeed."
+    )]
     fn disconnected_bounded_write_records_writer_death_for_liveness(
     ) -> Result<(), Box<dyn std::error::Error>> {
         // The commit actor accepts a bounded child-receipt write, then dies

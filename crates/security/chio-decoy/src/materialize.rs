@@ -1023,7 +1023,11 @@ mod unix {
             return Err(MaterializeError::OwnershipMismatch);
         }
         let mut tag = [0_u8; 32];
-        tag.copy_from_slice(&value[..initialized]);
+        tag.copy_from_slice(
+            value
+                .get(..initialized)
+                .ok_or(MaterializeError::OwnershipMismatch)?,
+        );
         Ok(tag)
     }
 
@@ -1052,7 +1056,12 @@ mod unix {
             if count == 0 {
                 break;
             }
-            Digest::update(&mut hasher, &buffer[..count]);
+            Digest::update(
+                &mut hasher,
+                buffer
+                    .get(..count)
+                    .ok_or(MaterializeError::OwnershipMismatch)?,
+            );
         }
         let output = hasher.finalize();
         let mut digest = [0_u8; 32];

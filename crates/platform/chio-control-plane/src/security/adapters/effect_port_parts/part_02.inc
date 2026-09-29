@@ -733,7 +733,7 @@ impl IssuanceFreezeBackend {
         ) {
             return Err(PortError::conflict());
         }
-        for effect in &response.plan.effects.as_slice()[effect_index.saturating_add(1)..] {
+        for effect in response.plan.effects.as_slice().iter().skip(effect_index.saturating_add(1)) {
             if !effect.kind.is_reversible() {
                 continue;
             }

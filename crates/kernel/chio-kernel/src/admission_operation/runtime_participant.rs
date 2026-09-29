@@ -136,9 +136,14 @@ impl RuntimeParticipantClaimEvidenceV1 {
         ))
         .map_err(|_| invalid())?;
         if sha256_hex(&bytes) != self.history.reference.claim_digest().as_str()
-            || self.claim["schema"] != "chio.runtime-participant-claim.v1"
-            || self.claim["operationId"] != self.history.reference.operation_id().as_str()
-            || self.claim["intent"] != intent
+            || self.claim.get("schema").and_then(serde_json::Value::as_str)
+                != Some("chio.runtime-participant-claim.v1")
+            || self
+                .claim
+                .get("operationId")
+                .and_then(serde_json::Value::as_str)
+                != Some(self.history.reference.operation_id().as_str())
+            || self.claim.get("intent") != Some(&intent)
             || operation.binding().operation_id() != self.history.reference.operation_id()
             || operation.binding().request_binding_hash()
                 != self.history.intent.request_binding_hash()
@@ -262,7 +267,7 @@ impl RuntimeParticipantClaimIntentV1 {
         if self.resources.len() > MAX_RUNTIME_PARTICIPANTS
             || self
                 .resources
-                .windows(2)
+                .array_windows::<2>()
                 .any(|pair| pair[0].kind >= pair[1].kind)
         {
             return Err(AdmissionOperationStoreError::Invariant(

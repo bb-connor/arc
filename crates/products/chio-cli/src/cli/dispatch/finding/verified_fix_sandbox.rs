@@ -225,7 +225,7 @@ fn write_current_pid(fd: std::os::fd::RawFd) -> Result<(), std::io::Error> {
     let mut digits = [0u8; 32];
     let mut cursor = digits.len() - 1;
     digits[cursor] = b'\n';
-    let mut pid = unsafe { libc::getpid() } as u32;
+    let mut pid = rustix::process::getpid().as_raw_pid();
     loop {
         cursor -= 1;
         digits[cursor] = b'0' + u8::try_from(pid % 10).unwrap_or(0);
@@ -237,6 +237,8 @@ fn write_current_pid(fd: std::os::fd::RawFd) -> Result<(), std::io::Error> {
     let mut written = 0usize;
     let bytes = &digits[cursor..];
     while written < bytes.len() {
+        // SAFETY: the slice remains live for this synchronous write, and its
+        // length bounds the readable buffer. An invalid fd returns an OS error.
         let result = unsafe {
             libc::write(
                 fd,

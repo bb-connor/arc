@@ -138,7 +138,7 @@ fn builders_produce_deterministic_ids_and_canonical_vectors() {
 fn signer_key_id_hashes_raw_public_key_bytes() {
     let public_key = key(3).public_key();
     let key_id = fiscal_signer_key_id(&public_key).test_unwrap();
-    assert_eq!(key_id, sha256_hex(public_key.as_bytes()));
+    assert_eq!(key_id, sha256_hex(public_key.ed25519_bytes().test_unwrap()));
     assert_ne!(key_id, sha256_hex(public_key.to_hex().as_bytes()));
 }
 

@@ -434,6 +434,10 @@ fn trusted_publication_anchor(
 }
 
 #[must_use]
+#[allow(
+    clippy::as_conversions,
+    reason = "These conversions only widen collection lengths on the supported 32-bit and 64-bit targets."
+)]
 pub fn build_evidence_transparency_claims(
     bundle: &EvidenceExportBundle,
     transparency: &CheckpointTransparencySummary,
@@ -499,7 +503,10 @@ pub fn build_evidence_transparency_claims(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use crate::checkpoint::{

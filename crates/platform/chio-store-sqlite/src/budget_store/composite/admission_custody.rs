@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Read physical custody by the operation's own hold identity.
 use super::*;
 use crate::admission_operation_store::AdmissionBudgetCustodySnapshot;

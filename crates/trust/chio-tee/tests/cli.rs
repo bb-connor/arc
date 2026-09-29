@@ -220,7 +220,7 @@ fn run_captures_signed_redacted_frames_end_to_end() {
         "secret token must be redacted out of the capture stream"
     );
 
-    let pubkey = *kp.public_key().as_bytes();
+    let pubkey = kp.public_key_bytes();
     let mut verdicts = Vec::new();
     for line in &lines {
         let frame: Frame = serde_json::from_str(line).expect("well-formed frame line");
@@ -274,7 +274,7 @@ fn run_capture_feeds_the_replay_bless_consumer_shape() {
 
     let capture = dir.path().join("captures").join("run-bless.ndjson");
     let body = std::fs::read_to_string(&capture).expect("capture exists");
-    let pubkey = *kp.public_key().as_bytes();
+    let pubkey = kp.public_key_bytes();
     let mut count = 0u32;
     for line in body.lines() {
         if line.trim().is_empty() {

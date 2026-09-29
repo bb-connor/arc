@@ -152,7 +152,8 @@ impl SqliteReceiptStore {
         let page_size: i64 = self
             .connection()?
             .query_row("PRAGMA page_size", [], |row| row.get(0))?;
-        Ok((page_count.max(0) as u64) * (page_size.max(0) as u64))
+        Ok(u64::try_from(page_count.max(0)).unwrap_or_default()
+            * u64::try_from(page_size.max(0)).unwrap_or_default())
     }
 
     /// Live logical size in bytes: `(page_count - freelist_count) * page_size`.
@@ -172,7 +173,7 @@ impl SqliteReceiptStore {
             [],
             |row| row.get::<_, Option<i64>>(0),
         )?;
-        Ok(ts.map(|t| t.max(0) as u64))
+        Ok(ts.map(|t| u64::try_from(t.max(0)).unwrap_or_default()))
     }
 
     /// Return the oldest live receipt timestamp for a tenant.
@@ -185,7 +186,7 @@ impl SqliteReceiptStore {
             params![tenant_id],
             |row| row.get::<_, Option<i64>>(0),
         )?;
-        Ok(ts.map(|t| t.max(0) as u64))
+        Ok(ts.map(|t| u64::try_from(t.max(0)).unwrap_or_default()))
     }
 
     /// Archive all receipts whose entire checkpointed prefix has aged past
@@ -263,8 +264,14 @@ impl SqliteReceiptStore {
         let tool_srv = query.tool_server.as_deref();
         let tool_nm = query.tool_name.as_deref();
         let outcome = query.outcome.as_deref();
-        let since = query.since.map(|v| v as i64);
-        let until = query.until.map(|v| v as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let min_cost = query.min_cost.map(|value| value.to_be_bytes().to_vec());
         let max_cost = query.max_cost.map(|value| value.to_be_bytes().to_vec());
         let agent_sub = query.agent_subject.as_deref();
@@ -311,7 +318,7 @@ impl SqliteReceiptStore {
                             ],
                             |row| row.get::<_, i64>(0),
                         )
-                        .map(|n| n.max(0) as u64)?;
+                        .map(|n| u64::try_from(n.max(0)).unwrap_or_default())?;
                     transaction.commit()?;
                     return Ok(ReceiptQueryResult {
                         receipts: Vec::new(),
@@ -336,7 +343,7 @@ impl SqliteReceiptStore {
                     max_cost,
                     agent_sub,
                     cursor_i64,
-                    limit as i64,
+                    crate::integer::checked::<_, i64>(limit)?,
                     tenant,
                     cost_currency,
                 ],
@@ -346,7 +353,7 @@ impl SqliteReceiptStore {
             let mut receipts = Vec::new();
             for row in rows {
                 let (seq, raw_json) = row?;
-                let seq = seq.max(0) as u64;
+                let seq = u64::try_from(seq.max(0)).unwrap_or_default();
                 let receipt =
                     decode_verified_chio_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
                 if tenant.is_some_and(|tenant| receipt.tenant_id.as_deref() != Some(tenant)) {
@@ -381,7 +388,7 @@ impl SqliteReceiptStore {
                 ],
                 |row| row.get::<_, i64>(0),
             )
-            .map(|n| n.max(0) as u64)?;
+            .map(|n| u64::try_from(n.max(0)).unwrap_or_default())?;
 
         // next_cursor is Some(last_seq) when the page is full (more results may exist).
         let next_cursor = if receipts.len() == limit {
@@ -544,7 +551,7 @@ fn resolve_rotation_cutoff(
     // whenever the store is over its limit, independent of the time trigger.
     let mut cutoff: Option<u64> = None;
     if let Some(oldest_ts) = oldest {
-        if (oldest_ts.max(0) as u64) < time_cutoff {
+        if u64::try_from(oldest_ts.max(0)).unwrap_or_default() < time_cutoff {
             cutoff = Some(time_cutoff);
         }
     }
@@ -594,7 +601,8 @@ fn live_db_size_bytes_on_connection(
         connection.query_row("PRAGMA freelist_count", [], |row| row.get(0))?;
     let page_size: i64 = connection.query_row("PRAGMA page_size", [], |row| row.get(0))?;
     let live_pages = (page_count - freelist_count).max(0);
-    Ok((live_pages as u64) * (page_size.max(0) as u64))
+    Ok(crate::integer::checked::<_, u64>(live_pages)?
+        * u64::try_from(page_size.max(0)).unwrap_or_default())
 }
 
 /// Materialize the sibling archive database file before a rotation `ATTACH`es
@@ -1896,7 +1904,7 @@ pub(super) fn retention_repair_on_writer(
     //    stays attached through the transaction so the tombstones can be stamped
     //    from the archived rows, and is detached only once the repair commits
     //    (DETACH cannot run inside an open transaction).
-    let removed = extras.len() as u64;
+    let removed = crate::integer::count(extras.len());
     let repair_result = (|| -> Result<(), ReceiptStoreError> {
         let now = chio_security_types::clock::Clock::unix_millis(
             &chio_security_types::clock::SystemClock,

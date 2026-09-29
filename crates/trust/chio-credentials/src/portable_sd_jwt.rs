@@ -24,12 +24,12 @@ pub struct PortableEd25519Jwk {
 }
 
 impl PortableEd25519Jwk {
-    pub fn from_public_key(public_key: &PublicKey) -> Self {
-        Self {
+    pub fn from_public_key(public_key: &PublicKey) -> Result<Self, CredentialError> {
+        Ok(Self {
             kty: "OKP".to_string(),
             crv: "Ed25519".to_string(),
-            x: URL_SAFE_NO_PAD.encode(public_key.as_bytes()),
-        }
+            x: URL_SAFE_NO_PAD.encode(public_key.ed25519_bytes()?),
+        })
     }
 
     pub fn to_public_key(&self) -> Result<PublicKey, CredentialError> {
@@ -103,7 +103,7 @@ pub fn build_portable_jwks(
     let identity = normalize_credential_issuer(identity)?;
     let mut keys = Vec::new();
     for public_key in public_keys {
-        let jwk = PortableEd25519Jwk::from_public_key(public_key);
+        let jwk = PortableEd25519Jwk::from_public_key(public_key)?;
         keys.push(PortableEd25519JwkSetEntry {
             kid: format!("{identity}#{}", jwk.thumbprint()?),
             jwk,
@@ -276,7 +276,7 @@ pub fn issue_chio_passport_sd_jwt_vc(
     let credential_issuer = normalize_credential_issuer(credential_issuer)?;
     let projection = build_chio_passport_portable_projection(passport, now)?;
     let subject_did = DidChio::from_str(&projection.subject_did).map_err(CredentialError::Did)?;
-    let holder_jwk = PortableEd25519Jwk::from_public_key(subject_did.public_key());
+    let holder_jwk = PortableEd25519Jwk::from_public_key(subject_did.public_key())?;
     let holder_thumbprint = holder_jwk.thumbprint()?;
     let header = json!({
         "alg": "EdDSA",
@@ -387,7 +387,7 @@ pub fn issue_chio_passport_sd_jwt_vc(
         passport_id: projection.passport_id,
         subject_did: projection.subject_did,
         issuer: credential_issuer,
-        issuer_jwk: PortableEd25519Jwk::from_public_key(&issuer_keypair.public_key()),
+        issuer_jwk: PortableEd25519Jwk::from_public_key(&issuer_keypair.public_key())?,
     })
 }
 
@@ -648,4 +648,22 @@ fn parse_sd_jwt_disclosure(disclosure: &str) -> Result<(String, String, Value), 
         ));
     }
     Ok((salt, key, array[2].clone()))
+}
+
+
+#[cfg(test)]
+mod key_algorithm_tests {
+    use super::*;
+
+    #[test]
+    fn portable_jwk_rejects_non_ed25519_without_panicking() -> Result<(), CredentialError> {
+        let key = PublicKey::from_hex(
+            "p256:046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+        )?;
+        assert!(matches!(PortableEd25519Jwk::from_public_key(&key),
+            Err(CredentialError::Core(chio_core::Error::InvalidPublicKey(_)))));
+        let ed25519 = Keypair::from_seed(&[7; 32]).public_key();
+        assert_eq!(PortableEd25519Jwk::from_public_key(&ed25519)?.to_public_key()?, ed25519);
+        Ok(())
+    }
 }

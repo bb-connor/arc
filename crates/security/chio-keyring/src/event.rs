@@ -429,7 +429,7 @@ impl<'de> Deserialize<'de> for KeyLogAuthorizations {
         let wire = KeyLogAuthorizationsWire::deserialize(deserializer)?;
         if wire
             .recovery
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].authorizer_id >= pair[1].authorizer_id)
         {
             return Err(serde::de::Error::custom(
@@ -686,7 +686,7 @@ impl SignedKeyLogEvent {
             || self
                 .authorizations
                 .recovery
-                .windows(2)
+                .array_windows::<2>()
                 .any(|pair| pair[0].authorizer_id >= pair[1].authorizer_id)
         {
             return Err(KeyringError::InvalidAuthorizationSet);

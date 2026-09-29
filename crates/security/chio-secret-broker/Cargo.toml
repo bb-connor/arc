@@ -28,6 +28,7 @@ native-mcp = ["kernel-admission", "dep:chio-mcp-adapter", "dep:chio-manifest", "
 real-linux-enforcement = ["native-mcp"]
 
 [dependencies]
+secrecy = { workspace = true }
 async-trait = { workspace = true, optional = true }
 chio-core-types = { workspace = true }
 chio-kernel = { workspace = true, optional = true }

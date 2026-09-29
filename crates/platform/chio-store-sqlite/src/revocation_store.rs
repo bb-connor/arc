@@ -279,12 +279,15 @@ impl SqliteRevocationStore {
                 LIMIT ?2
                 "#,
             )?;
-            let rows = statement.query_map(params![capability_id, limit as i64], |row| {
-                Ok(RevocationRecord {
-                    capability_id: row.get(0)?,
-                    revoked_at: row.get(1)?,
-                })
-            })?;
+            let rows = statement.query_map(
+                params![capability_id, crate::integer::checked::<_, i64>(limit)?],
+                |row| {
+                    Ok(RevocationRecord {
+                        capability_id: row.get(0)?,
+                        revoked_at: row.get(1)?,
+                    })
+                },
+            )?;
             rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
         })
     }
@@ -310,7 +313,11 @@ impl SqliteRevocationStore {
                 "#,
             )?;
             let rows = statement.query_map(
-                params![after_revoked_at, after_capability_id, limit as i64],
+                params![
+                    after_revoked_at,
+                    after_capability_id,
+                    crate::integer::checked::<_, i64>(limit)?
+                ],
                 |row| {
                     Ok(RevocationRecord {
                         capability_id: row.get(0)?,
@@ -353,13 +360,16 @@ impl SqliteRevocationStore {
                     LIMIT ?2
                     "#,
                 )?;
-                let rows = statement.query_map(params![after_seq, limit as i64], |row| {
-                    Ok((
-                        row.get::<_, i64>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, i64>(2)?,
-                    ))
-                })?;
+                let rows = statement.query_map(
+                    params![after_seq, crate::integer::checked::<_, i64>(limit)?],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, i64>(2)?,
+                        ))
+                    },
+                )?;
                 rows.map(|row| {
                     let (seq, capability_id, revoked_at) = row?;
                     Ok(StoredRevocation {
@@ -1296,13 +1306,21 @@ fn verify_revocation_foreign_keys(connection: &Connection) -> Result<(), Revocat
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod connection_recovery;
 #[cfg(test)]
 pub(crate) use connection_recovery::write_probe_revocation;
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 

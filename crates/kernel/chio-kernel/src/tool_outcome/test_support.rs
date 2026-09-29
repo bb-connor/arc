@@ -1,3 +1,8 @@
+#![allow(
+    clippy::panic,
+    reason = "This feature-gated test support deliberately rejects malformed fixture identifiers."
+)]
+
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::sha256_hex;

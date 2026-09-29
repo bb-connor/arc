@@ -226,7 +226,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], request_path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                request_path
+            );
             let request = if self.cluster_peer_auth.is_some() {
                 self.build_internal_get_request(&self.http, &url, auth_endpoint, term)?
             } else {
@@ -264,7 +272,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
             let request = if self.cluster_peer_auth.is_some() {
                 self.build_internal_post_request(&self.http, &url, path, term)?
             } else {
@@ -311,7 +327,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
             match request(&self.http, &url, &self.token) {
                 Ok(response) => {
                     self.mark_preferred(index);
@@ -351,7 +375,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
             match request(&self.http, &url) {
                 Ok(response) => {
                     self.mark_preferred(index);
@@ -394,7 +426,15 @@ impl TrustControlClient {
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
-            let url = format!("{}{}", self.endpoints[index], path);
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
             match request(&self.http, &url) {
                 Ok(response) => {
                     self.mark_preferred(index);

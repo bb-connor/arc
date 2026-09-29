@@ -20,7 +20,8 @@ fn oversized_identity_is_rejected_by_every_writer_before_any_state_change() {
     let oversized = "secret-identity-".repeat(300);
     assert!(oversized.len() > MAX_DPOP_REPLAY_IDENTITY_PART_BYTES);
     for bad_part in 0..3 {
-        let store = DpopNonceStore::new(8, Duration::ZERO);
+        let store =
+            DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
         let before = snapshot(&store);
         let nonce = if bad_part == 0 {
             oversized.as_str()
@@ -61,7 +62,8 @@ fn oversized_identity_is_rejected_by_every_writer_before_any_state_change() {
 
 #[test]
 fn limits_measure_utf8_bytes_and_keep_identity_text_exact() {
-    let store = DpopNonceStore::new(8, Duration::from_secs(60));
+    let store = DpopNonceStore::new(8, Duration::from_secs(60))
+        .expect("positive replay store test capacities");
     let boundary = "é".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES / 2);
     assert!(store
         .reserve_for_dispatch_through(&boundary, "cap", u64::MAX, "owner")
@@ -101,7 +103,8 @@ fn byte_pressure_never_evicts_a_live_or_reserved_marker() {
             8,
             capacity,
             Duration::from_secs(60),
-        );
+        )
+        .expect("positive replay store test capacities");
         if owned {
             assert!(store
                 .reserve_for_dispatch_through("nonce", "cap", u64::MAX, "owner")
@@ -140,7 +143,8 @@ fn byte_pressure_never_evicts_a_live_or_reserved_marker() {
 
 #[test]
 fn expired_reclamation_and_shared_capability_cleanup_return_the_exact_charge() {
-    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 100, Duration::ZERO);
+    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 100, Duration::ZERO)
+        .expect("positive replay store test capacities");
     store.check_and_insert("expired", "cap").unwrap();
     assert_eq!(store.identity_byte_utilization().unwrap().0, 13);
     store
@@ -168,12 +172,10 @@ fn expired_reclamation_and_shared_capability_cleanup_return_the_exact_charge() {
 
 #[test]
 fn concurrent_reservations_cannot_oversubscribe_the_byte_budget() {
-    let store = Arc::new(DpopNonceStore::new_with_identity_byte_capacity(
-        8,
-        8,
-        8,
-        Duration::from_secs(60),
-    ));
+    let store = Arc::new(
+        DpopNonceStore::new_with_identity_byte_capacity(8, 8, 8, Duration::from_secs(60))
+            .expect("positive replay store test capacities"),
+    );
     let barrier = Arc::new(Barrier::new(8));
     let writers = (0..8)
         .map(|index| {
@@ -197,7 +199,8 @@ fn concurrent_reservations_cannot_oversubscribe_the_byte_budget() {
 
 #[test]
 fn retirement_binds_byte_limits_and_detects_accounting_substitution() {
-    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 100, Duration::from_secs(60));
+    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 100, Duration::from_secs(60))
+        .expect("positive replay store test capacities");
     store
         .check_and_insert_through("nonce", "cap", u64::MAX)
         .unwrap();
@@ -216,7 +219,9 @@ fn retirement_binds_byte_limits_and_detects_accounting_substitution() {
 }
 
 #[test]
-#[should_panic(expected = "identity byte capacity must be greater than zero")]
 fn zero_identity_byte_capacity_is_rejected() {
-    let _ = DpopNonceStore::new_with_identity_byte_capacity(1, 1, 0, Duration::ZERO);
+    assert!(matches!(
+        DpopNonceStore::new_with_identity_byte_capacity(1, 1, 0, Duration::ZERO),
+        Err(DpopError::InvalidCapacity(_))
+    ));
 }

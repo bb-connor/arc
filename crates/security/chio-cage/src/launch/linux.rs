@@ -1,3 +1,7 @@
+#[path = "linux_parts/descriptor_transfer.rs"]
+mod descriptor_transfer;
+use descriptor_transfer::{receive_descriptors, send_descriptors};
+
 include!("linux_parts/part_01.rs");
 include!("linux_parts/part_02.rs");
 

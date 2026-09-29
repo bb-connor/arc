@@ -1,3 +1,4 @@
+use secrecy::{ExposeSecret, SecretBox};
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -9,7 +10,7 @@ use chio_core_types::{
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroize;
 
 use crate::protocol::CredentialRef;
 use crate::sqlite::DurableBrokerDatabaseFile;
@@ -298,7 +299,7 @@ impl CompletedAdminControl {
 }
 
 pub struct AdminAuthorization {
-    opaque_capability: Zeroizing<Vec<u8>>,
+    opaque_capability: SecretBox<Vec<u8>>,
 }
 
 impl AdminAuthorization {
@@ -310,13 +311,13 @@ impl AdminAuthorization {
             ));
         }
         Ok(Self {
-            opaque_capability: Zeroizing::new(opaque_capability),
+            opaque_capability: SecretBox::new(Box::new(opaque_capability)),
         })
     }
 
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        self.opaque_capability.as_slice()
+        self.opaque_capability.expose_secret()
     }
 }
 
@@ -411,7 +412,7 @@ impl GovernedAdminAuthorizationEnvelope {
         if self.schema != GOVERNED_ADMIN_AUTHORIZATION_SCHEMA
             || self.approvals.is_empty()
             || self.approvals.len() > MAX_GOVERNED_ADMIN_APPROVALS
-            || self.approvals.windows(2).any(|pair| {
+            || self.approvals.array_windows::<2>().any(|pair| {
                 let left = (pair[0].approver.to_hex(), pair[0].id.as_str());
                 let right = (pair[1].approver.to_hex(), pair[1].id.as_str());
                 left >= right

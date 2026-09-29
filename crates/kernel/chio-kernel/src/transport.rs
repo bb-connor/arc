@@ -57,9 +57,13 @@ impl<R: Read, W: Write> ChioTransport<R, W> {
     /// a complete frame is read.
     pub fn recv(&mut self) -> Result<AgentMessage, TransportError> {
         let bytes = read_frame(&mut self.reader)?;
-        let msg: AgentMessage =
-            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_MESSAGE_SIZE as usize)
-                .and_then(|input| input.decode_canonical())?;
+        let msg: AgentMessage = chio_core::canonical::UntrustedJsonText::from_wire(
+            &bytes,
+            usize::try_from(MAX_MESSAGE_SIZE).map_err(|_| {
+                TransportError::Serialize("message limit exceeds address space".into())
+            })?,
+        )
+        .and_then(|input| input.decode_canonical())?;
         Ok(msg)
     }
 
@@ -95,7 +99,13 @@ pub fn read_frame<R: Read>(reader: &mut R) -> Result<Vec<u8>, TransportError> {
         });
     }
 
-    let mut buf = vec![0u8; len as usize];
+    let mut buf = vec![
+        0u8;
+        usize::try_from(len).map_err(|_| TransportError::MessageTooLarge {
+            size: len,
+            max: MAX_MESSAGE_SIZE
+        })?
+    ];
     match reader.read_exact(&mut buf) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
@@ -124,7 +134,11 @@ pub fn write_frame<W: Write>(writer: &mut W, data: &[u8]) -> Result<(), Transpor
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_core::capability::{

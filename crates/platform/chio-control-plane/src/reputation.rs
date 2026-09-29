@@ -60,6 +60,10 @@ pub struct ReputationLocalCommand<'a> {
     pub authority_seed_file: Option<&'a Path>,
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), CliError> {
     let clock_now = unix_now()?;
     let ReputationLocalCommand {
@@ -200,6 +204,10 @@ pub struct ReputationCompareCommand<'a> {
     pub authority_seed_file: Option<&'a Path>,
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(), CliError> {
     let clock_now = unix_now()?;
     let ReputationCompareCommand {
@@ -559,6 +567,10 @@ fn compare_metric_values(portable: MetricValue, local: MetricValue) -> Reputatio
     }
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 fn print_local_reputation(inspection: &LocalReputationInspection) {
     println!("subject_key:             {}", inspection.subject_key);
     println!("window:                  {}", describe_window(inspection));
@@ -632,6 +644,10 @@ fn print_local_reputation(inspection: &LocalReputationInspection) {
     }
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 fn print_reputation_comparison(comparison: &PortableReputationComparison) {
     println!("subject_key:             {}", comparison.subject_key);
     println!("passport_subject:        {}", comparison.passport_subject);

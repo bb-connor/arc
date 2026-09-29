@@ -354,7 +354,10 @@ impl ChioKernel {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(super) fn build_capture_replay_deny_response(
         &self,
         request: &ToolCallRequest,
@@ -392,7 +395,10 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(super) fn build_definite_payment_denial_after_capture(
         &self,
         request: &ToolCallRequest,
@@ -826,7 +832,10 @@ impl ChioKernel {
     // state (request, grant, capability, budget mutation, admission metadata,
     // and the budget-lease gate) needed to reverse it; grouping them into
     // a params struct would only rename the same inputs.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(super) fn build_execution_nonce_preflight_allow_response_after_cleanup(
         &self,
         request: &ToolCallRequest,

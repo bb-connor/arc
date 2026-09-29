@@ -242,7 +242,7 @@ impl ChioKernel {
         )?;
         let admitted_metadata = merge_metadata_objects(
             merge_metadata_objects(request_metadata, extra_receipt_metadata),
-            receipt_attribution_metadata(&request.capability, Some(matched_grant_index)),
+            receipt_attribution_metadata(&request.capability, Some(matched_grant_index))?,
         );
         let context = DurableToolReturnContext {
             operation_id: admission.operation.binding().operation_id().clone(),

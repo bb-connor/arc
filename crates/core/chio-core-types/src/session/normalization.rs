@@ -231,11 +231,14 @@ pub(super) fn normalize_absolute_filesystem_path(path: &str) -> Option<String> {
 
 pub(super) fn split_windows_drive(path: &str) -> Option<(char, &str)> {
     let bytes = path.as_bytes();
-    if bytes.len() < 2 || !bytes[0].is_ascii_alphabetic() || bytes[1] != b':' {
+    let [drive, b':', ..] = bytes else {
+        return None;
+    };
+    if !drive.is_ascii_alphabetic() {
         return None;
     }
 
-    let drive = char::from(bytes[0]).to_ascii_uppercase();
+    let drive = char::from(*drive).to_ascii_uppercase();
     match bytes.get(2).copied() {
         None => Some((drive, "")),
         Some(b'/') => Some((drive, &path[3..])),

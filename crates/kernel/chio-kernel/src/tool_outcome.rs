@@ -462,7 +462,10 @@ impl std::fmt::Debug for PersistedRawInvocationOutcomeV1 {
 
 impl RawInvocationOutcomeV1 {
     #[allow(dead_code)]
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn from_committed_dispatch(
         operation: &AdmissionOperationV1,
         commit: &AdmissionDispatchCommitBindingV1,
@@ -498,7 +501,10 @@ impl RawInvocationOutcomeV1 {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn from_committed_dispatch_with_request(
         operation: &AdmissionOperationV1,
         commit: &AdmissionDispatchCommitBindingV1,
@@ -542,7 +548,10 @@ impl RawInvocationOutcomeV1 {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn from_committed_dispatch_parts(
         schema: &'static str,
         operation: &AdmissionOperationV1,
@@ -1420,7 +1429,9 @@ impl ToolOutcomeRecordV1 {
             return Err(ToolOutcomeError::Binding("outcome.dispatch_commit"));
         }
         positive("outcome.raw_output_size_bytes", self.raw_output_size_bytes)?;
-        if self.raw_output_size_bytes > MAX_RAW_INVOCATION_OUTCOME_BYTES as u64 {
+        if usize::try_from(self.raw_output_size_bytes)
+            .map_or(true, |size| size > MAX_RAW_INVOCATION_OUTCOME_BYTES)
+        {
             return Err(ToolOutcomeError::TooLarge {
                 field: "outcome.raw_output_size_bytes",
                 actual: usize::try_from(self.raw_output_size_bytes).unwrap_or(usize::MAX),
@@ -1691,7 +1702,10 @@ pub trait ToolOutcomeStore: Send + Sync {
     ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError>;
 
     /// Atomically commits the matching terminal evaluation and outcome.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn finalize_post_return(
         &self,
         operation_id: &AdmissionOperationId,
@@ -1711,7 +1725,10 @@ pub trait ToolOutcomeStore: Send + Sync {
     /// this default retains each step before atomically finalizing the pair.
     /// A failed default call can therefore leave a recoverable pure prefix.
     /// External stateful steps must use their existing recording boundary.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn finalize_post_return_with_pure_results(
         &self,
         operation_id: &AdmissionOperationId,
@@ -1771,7 +1788,10 @@ pub trait ToolOutcomeStore: Send + Sync {
     /// that fuses both writes makes them one durable write and rolls the
     /// claim back with a refused or conflicting record; this default persists
     /// and qualifies the claim through `admission` first.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn claim_and_record_tool_returned(
         &self,
         admission: &dyn QualifiedAdmissionOperationStore,

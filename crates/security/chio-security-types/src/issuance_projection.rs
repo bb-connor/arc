@@ -75,9 +75,13 @@ pub fn validate_issuance_freeze_snapshot(
     expected_key: &IssuanceFreezeKey,
 ) -> PortResult<()> {
     if &snapshot.key != expected_key
-        || snapshot.contributions.as_slice().windows(2).any(|pair| {
-            (&pair[0].action_id, &pair[0].effect_id) >= (&pair[1].action_id, &pair[1].effect_id)
-        })
+        || snapshot
+            .contributions
+            .as_slice()
+            .array_windows::<2>()
+            .any(|pair| {
+                (&pair[0].action_id, &pair[0].effect_id) >= (&pair[1].action_id, &pair[1].effect_id)
+            })
     {
         return Err(PortError::integrity_failure());
     }
@@ -218,9 +222,13 @@ pub fn validate_issuance_freeze_admission_decision(
         .validate_parent(query.parent_capability_id.as_ref())?;
     if &decision.query != query
         || decision.frozen == decision.active_matches.is_empty()
-        || decision.active_matches.as_slice().windows(2).any(|pair| {
-            (&pair[0].action_id, &pair[0].effect_id) >= (&pair[1].action_id, &pair[1].effect_id)
-        })
+        || decision
+            .active_matches
+            .as_slice()
+            .array_windows::<2>()
+            .any(|pair| {
+                (&pair[0].action_id, &pair[0].effect_id) >= (&pair[1].action_id, &pair[1].effect_id)
+            })
         || decision.active_matches.as_slice().iter().any(|entry| {
             entry.commit_index == 0
                 || entry.affected_set_hash == Digest32::new([0_u8; 32])

@@ -104,7 +104,7 @@ impl TableHasher {
     pub(crate) fn new(table: &str) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(b"chio.security-participant-source.table.v1\0");
-        hasher.update((table.len() as u64).to_be_bytes());
+        hasher.update(crate::integer::count(table.len()).to_be_bytes());
         hasher.update(table.as_bytes());
         Self {
             table: table.into(),

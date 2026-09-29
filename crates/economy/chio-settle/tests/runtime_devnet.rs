@@ -418,9 +418,7 @@ async fn runtime_devnet_keeps_escrow_identity_stable_under_interleaving_and_repl
     )?;
     let operator_ed_key_hash = format!(
         "0x{}",
-        hex::encode(
-            alloy_primitives::keccak256(operator_keypair.public_key().as_bytes()).as_slice()
-        )
+        hex::encode(alloy_primitives::keccak256(operator_keypair.public_key_bytes()).as_slice())
     );
     let _devnet = spawn_runtime_devnet(&deployment_path, &operator_ed_key_hash, 8548).await?;
 
@@ -556,9 +554,7 @@ async fn runtime_devnet_executes_merkle_refund_and_dual_sign_paths(
     )?;
     let operator_ed_key_hash = format!(
         "0x{}",
-        hex::encode(
-            alloy_primitives::keccak256(operator_keypair.public_key().as_bytes()).as_slice()
-        )
+        hex::encode(alloy_primitives::keccak256(operator_keypair.public_key_bytes()).as_slice())
     );
     let _devnet = spawn_runtime_devnet(&deployment_path, &operator_ed_key_hash, 8547).await?;
 

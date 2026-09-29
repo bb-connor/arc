@@ -19,8 +19,9 @@ pub(crate) use receipt_content::{
 #[cfg(test)]
 pub(crate) use receipt_metadata::governed_request_metadata;
 pub(crate) use receipt_metadata::{
-    merge_metadata_objects, receipt_attribution_metadata, request_receipt_metadata,
-    request_receipt_metadata_with_payee_binding, verify_governed_runtime_attestation_record,
+    checked_receipt_count, merge_metadata_objects, receipt_attribution_metadata,
+    request_receipt_metadata, request_receipt_metadata_with_payee_binding,
+    verify_governed_runtime_attestation_record,
 };
 pub(crate) use receipt_scopes::{
     current_post_invocation_guard_evidence, current_pre_invocation_guard_evidence,

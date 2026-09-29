@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 mod cognition_market;
 mod error;
 mod evidence_graph;

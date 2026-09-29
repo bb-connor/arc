@@ -142,7 +142,10 @@ impl SqliteKeyLogStore {
                     base_checkpoint_hash,
                     checkpoints: Vec::new(),
                     event_envelopes: Vec::new(),
-                    activation_commits: activation_commits[commit_start..commit_end].to_vec(),
+                    activation_commits: activation_commits
+                        .get(commit_start..commit_end)
+                        .ok_or(KeyringError::NumericRange)?
+                        .to_vec(),
                     consistency_proof: None,
                 };
                 if canonical_json_bytes(&response)?.len() <= crate::MAX_CANONICAL_RECORD_BYTES {

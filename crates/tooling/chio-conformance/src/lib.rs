@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Chio cross-language conformance tooling.
 //!
 //! Loads conformance scenarios and recorded results, drives the native and

@@ -257,12 +257,12 @@ fn validate_markers(markers: &[RuntimeReplayMarker]) -> Result<[u32; 3], ChioRun
             ));
         }
         previous = Some(identity);
-        let index = match marker.kind() {
-            RuntimeReplayMarkerKind::DestructiveLease => 0,
-            RuntimeReplayMarkerKind::TreatyContinuation => 1,
-            RuntimeReplayMarkerKind::SwarmContinuation => 2,
+        let count = match marker.kind() {
+            RuntimeReplayMarkerKind::DestructiveLease => &mut counts[0],
+            RuntimeReplayMarkerKind::TreatyContinuation => &mut counts[1],
+            RuntimeReplayMarkerKind::SwarmContinuation => &mut counts[2],
         };
-        counts[index] = counts[index].checked_add(1).ok_or_else(limit)?;
+        *count = count.checked_add(1).ok_or_else(limit)?;
     }
     Ok(counts)
 }

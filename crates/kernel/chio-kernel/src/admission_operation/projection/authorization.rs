@@ -30,7 +30,10 @@ impl VerifiedAuthorizationReceiptConsumption {
     /// Verify historical source and consumer receipts against the exact admitted
     /// request. The committing store must independently authenticate the kernel
     /// claimant and live recovery lease; this proof cannot authorize dispatch.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn from_signed_source(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,

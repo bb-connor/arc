@@ -127,7 +127,10 @@ struct CoordinatorRecordPreimage<'a> {
 }
 
 impl SqliteFrostStore {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn claim_coordinator_session(
         &self,
         request: &FrostCoordinatorSessionRequest<'_>,
@@ -681,7 +684,10 @@ impl SqliteFrostStore {
         Ok(public_lease(&stored))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn claim_and_reconcile_existing(
         &self,
         stored: StoredCoordinator,

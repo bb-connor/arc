@@ -1307,7 +1307,10 @@ fn validate_denied_receipt_reason_and_delivery_metadata(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn validate_denied_payment_terminal_record(
     payment: &UntrustedPaymentTerminalEvidenceV1,
     record: &VerifiedAdmissionTerminalProjectionRecordV1,

@@ -451,7 +451,7 @@ fn build_remote_auth_mode(
     let provider_profile = config
         .auth_jwt_provider_profile
         .unwrap_or(JwtProviderProfile::Generic);
-    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime();
+    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime()?;
 
     if config.auth_token.is_some()
         && (config.auth_jwt_public_key.is_some()
@@ -620,13 +620,13 @@ fn build_remote_auth_mode(
     })
 }
 
-fn build_sender_dpop_runtime() -> (Arc<DpopNonceStore>, DpopConfig) {
+fn build_sender_dpop_runtime() -> Result<(Arc<DpopNonceStore>, DpopConfig), CliError> {
     let config = DpopConfig::default();
     let store = Arc::new(DpopNonceStore::new(
         config.nonce_store_capacity,
         Duration::from_secs(config.proof_ttl_secs),
-    ));
-    (store, config)
+    ).map_err(|error| CliError::cli_other_error(error.to_string()))?);
+    Ok((store, config))
 }
 
 fn resolve_local_auth_issuer(
@@ -656,7 +656,7 @@ fn build_local_auth_server(
     })?;
     let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
     let default_audience = effective_resource_indicator(config, &base_url);
-    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime();
+    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime()?;
     Ok(Some(LocalAuthorizationServer {
         signing_key,
         issuer,

@@ -44,19 +44,21 @@ fn command(descriptor: &impl AsRawFd) -> Command {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let source = descriptor.as_raw_fd();
-    // SAFETY: after fork, only descriptor syscalls run before exec. The parent
-    // keeps source open through spawn; only the child's slot table changes.
-    #[allow(unsafe_code)]
-    unsafe {
-        command.pre_exec(move || {
-            if libc::dup2(source, PREPARED_BROKER_FD) < 0
-                || libc::fcntl(PREPARED_BROKER_FD, libc::F_SETFD, 0) < 0
-            {
-                return Err(std::io::Error::last_os_error());
-            }
-            Ok(())
-        });
-    }
+    let prepare = move || {
+        // SAFETY: the parent keeps source live until spawn; dup2 changes only the
+        // child's descriptor table and runs before exec without allocation.
+        if unsafe { libc::dup2(source, PREPARED_BROKER_FD) } < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        // SAFETY: dup2 installed the reserved descriptor. Clear CLOEXEC so the
+        // prepared broker stream survives exec; this is an async-signal-safe call.
+        if unsafe { libc::fcntl(PREPARED_BROKER_FD, libc::F_SETFD, 0) } < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(())
+    };
+    // SAFETY: the closure performs only descriptor syscalls between fork and exec.
+    unsafe { command.pre_exec(prepare) };
     command
 }
 

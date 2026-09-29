@@ -89,7 +89,10 @@ impl<'a> ScopedReader<'a> {
         let authority = self.authority;
         let bindings = authority
             .as_ref()
-            .map(|id| id as &dyn ToSql)
+            .map(|id| {
+                let parameter: &dyn ToSql = id;
+                parameter
+            })
             .into_iter()
             .chain(parameters.iter().copied());
         statement.query_row(params_from_iter(bindings), read)
@@ -121,7 +124,10 @@ impl<'a> ScopedReader<'a> {
         let authority = self.authority;
         let bindings = authority
             .as_ref()
-            .map(|id| id as &dyn ToSql)
+            .map(|id| {
+                let parameter: &dyn ToSql = id;
+                parameter
+            })
             .into_iter()
             .chain(parameters.iter().copied());
         let mut rows = statement
@@ -149,7 +155,10 @@ impl<'a> ScopedReader<'a> {
         let authority = self.authority;
         let bindings = authority
             .as_ref()
-            .map(|id| id as &dyn ToSql)
+            .map(|id| {
+                let parameter: &dyn ToSql = id;
+                parameter
+            })
             .into_iter()
             .chain(parameters.iter().copied());
         let result = statement
@@ -220,7 +229,10 @@ impl<'a> ScopedMutation<'a> {
         let authority = self.reader.authority;
         let bindings = authority
             .as_ref()
-            .map(|id| id as &dyn ToSql)
+            .map(|id| {
+                let parameter: &dyn ToSql = id;
+                parameter
+            })
             .into_iter()
             .chain(parameters.iter().copied());
         statement.execute(params_from_iter(bindings))

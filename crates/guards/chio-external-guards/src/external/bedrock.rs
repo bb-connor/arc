@@ -39,9 +39,9 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::{Client, StatusCode};
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
 use super::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
 
@@ -75,12 +75,36 @@ impl BedrockSource {
 
 /// Configuration for [`BedrockGuardrailGuard`].
 ///
-/// `api_key` is wrapped in [`Zeroizing`] so its bytes are scrubbed from
+/// `api_key` is wrapped in [`SecretString`] so its bytes are scrubbed from
 /// memory on drop.
+/// Guard credentials require deliberate access and cannot be serialized by
+/// an ordinary artifact writer.
+///
+/// ```
+/// use chio_external_guards::external::bedrock::BedrockGuardrailConfig;
+/// use secrecy::ExposeSecret;
+/// fn use_credential(config: &BedrockGuardrailConfig) -> &str {
+///     config.api_key.expose_secret()
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use chio_external_guards::external::bedrock::BedrockGuardrailConfig;
+/// fn export(config: &BedrockGuardrailConfig) {
+///     let _ = serde_json::to_string(&config.api_key);
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use chio_external_guards::external::bedrock::BedrockGuardrailConfig;
+/// fn log(config: &BedrockGuardrailConfig) {
+///     let _ = format!("{}", config.api_key);
+/// }
+/// ```
 #[derive(Clone)]
 pub struct BedrockGuardrailConfig {
     /// Bearer token for the Bedrock runtime endpoint.
-    pub api_key: Zeroizing<String>,
+    pub api_key: SecretString,
     /// Bedrock region (used to construct the default endpoint).
     pub region: String,
     /// Guardrail identifier (the `guardrailId` path parameter).
@@ -120,7 +144,7 @@ impl BedrockGuardrailConfig {
         guardrail_version: impl Into<String>,
     ) -> Self {
         Self {
-            api_key: Zeroizing::new(api_key.into()),
+            api_key: SecretString::from(api_key.into()),
             region: region.into(),
             guardrail_id: guardrail_id.into(),
             guardrail_version: guardrail_version.into(),
@@ -285,7 +309,7 @@ impl ExternalGuard for BedrockGuardrailGuard {
 
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        let auth_value = format!("Bearer {}", self.cfg.api_key.as_str());
+        let auth_value = format!("Bearer {}", self.cfg.api_key.expose_secret());
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(&auth_value)

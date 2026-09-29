@@ -116,7 +116,7 @@ impl TrustedExecutionContext {
         if self.source_receipt_ids.len() > 64
             || self
                 .source_receipt_ids
-                .windows(2)
+                .array_windows::<2>()
                 .any(|pair| pair[0].as_bytes() >= pair[1].as_bytes())
         {
             return Err(BrokerError::AuthorizationDenied(

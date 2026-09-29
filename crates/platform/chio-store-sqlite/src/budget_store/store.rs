@@ -1,4 +1,6 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
+mod invocations;
 use chio_kernel_core::budget_increment_admits;
 
 /// Budget-store schema revision. Bump on every schema-affecting change.
@@ -415,7 +417,7 @@ impl SqliteBudgetStore {
             [],
             |row| row.get(0),
         )?;
-        let watermark = watermark.max(0) as u64;
+        let watermark = u64::try_from(watermark.max(0)).unwrap_or_default();
         let watermark_sqlite = budget_u64_to_sqlite(watermark, "head_seq")?;
         // Advance the head over slots ABOVE the watermark only. A slot is FILLED if
         // a real mutation event occupies it OR it is a recorded abandoned/tombstoned
@@ -481,7 +483,7 @@ impl SqliteBudgetStore {
         } else {
             watermark_sqlite
         };
-        let head = head.max(0) as u64;
+        let head = u64::try_from(head.max(0)).unwrap_or_default();
         if head > watermark {
             let head_sqlite = budget_u64_to_sqlite(head, "head_seq")?;
             transaction.execute(
@@ -562,7 +564,7 @@ impl SqliteBudgetStore {
             transaction.prepare("SELECT seq FROM budget_abandoned_event_seqs ORDER BY seq ASC")?;
         let rows = statement.query_map([], |row| {
             let seq: i64 = row.get(0)?;
-            Ok(seq.max(0) as u64)
+            Ok(u64::try_from(seq.max(0)).unwrap_or_default())
         })?;
         let rows = rows.collect::<Result<Vec<_>, _>>()?;
         drop(statement);
@@ -604,7 +606,10 @@ impl SqliteBudgetStore {
         let rows = statement.query_map([], |row| {
             let start: i64 = row.get(0)?;
             let end: i64 = row.get(1)?;
-            Ok((start.max(0) as u64, end.max(0) as u64))
+            Ok((
+                u64::try_from(start.max(0)).unwrap_or_default(),
+                u64::try_from(end.max(0)).unwrap_or_default(),
+            ))
         })?;
         let rows = rows.collect::<Result<Vec<_>, _>>()?;
         drop(statement);
@@ -628,7 +633,7 @@ impl SqliteBudgetStore {
         )?;
         let rows = statement.query_map(rusqlite::params![after_seq], |row| {
             let seq: i64 = row.get(0)?;
-            Ok(seq.max(0) as u64)
+            Ok(u64::try_from(seq.max(0)).unwrap_or_default())
         })?;
         let rows = rows.collect::<Result<Vec<_>, _>>()?;
         drop(statement);
@@ -663,10 +668,14 @@ impl SqliteBudgetStore {
              WHERE seq > ?1 AND seq <= ?2 ORDER BY seq ASC LIMIT ?3",
         )?;
         let rows = statement.query_map(
-            rusqlite::params![after_seq, up_to_seq, limit as i64],
+            rusqlite::params![
+                after_seq,
+                up_to_seq,
+                crate::integer::checked::<_, i64>(limit)?
+            ],
             |row| {
                 let seq: i64 = row.get(0)?;
-                Ok(seq.max(0) as u64)
+                Ok(u64::try_from(seq.max(0)).unwrap_or_default())
             },
         )?;
         let rows = rows.collect::<Result<Vec<_>, _>>()?;
@@ -1063,7 +1072,10 @@ impl SqliteBudgetStore {
             LIMIT ?2
             "#,
         )?;
-        let rows = statement.query_map(params![after_seq, limit as i64], record_from_row)?;
+        let rows = statement.query_map(
+            params![after_seq, crate::integer::checked::<_, i64>(limit)?],
+            record_from_row,
+        )?;
         let rows = rows.collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         transaction.rollback()?;
@@ -1112,9 +1124,10 @@ impl SqliteBudgetStore {
             "#,
         )?;
         let event_ids = statement
-            .query_map(params![after_event_seq, limit as i64], |row| {
-                row.get::<_, String>(0)
-            })?
+            .query_map(
+                params![after_event_seq, crate::integer::checked::<_, i64>(limit)?],
+                |row| row.get::<_, String>(0),
+            )?
             .collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         let events = event_ids
@@ -1225,7 +1238,10 @@ impl SqliteBudgetStore {
                       AND invocation_captured = 1
                 )
                 "#,
-                params![capability_id, grant_index as i64],
+                params![
+                    capability_id,
+                    crate::integer::checked::<_, i64>(grant_index)?
+                ],
                 |row| row.get(0),
             )
             .map_err(Into::into)
@@ -1248,7 +1264,10 @@ impl SqliteBudgetStore {
                       AND disposition != 'reversed'
                 )
                 "#,
-                params![capability_id, grant_index as i64],
+                params![
+                    capability_id,
+                    crate::integer::checked::<_, i64>(grant_index)?
+                ],
                 |row| row.get(0),
             )
             .map_err(Into::into)
@@ -1328,7 +1347,7 @@ impl SqliteBudgetStore {
             params![
                 hold_id,
                 capability_id,
-                grant_index as i64,
+                crate::integer::checked::<_, i64>(grant_index)?,
                 budget_u64_to_sqlite(authorized_exposure_units, "authorized_exposure_units",)?,
                 budget_u64_to_sqlite(authorized_exposure_units, "remaining_exposure_units",)?,
                 HoldDisposition::Open.as_str(),
@@ -1387,7 +1406,10 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(super) fn upsert_hold(
         transaction: &rusqlite::Transaction<'_>,
         hold_id: &str,
@@ -1434,7 +1456,7 @@ impl SqliteBudgetStore {
             params![
                 hold_id,
                 capability_id,
-                grant_index as i64,
+                crate::integer::checked::<_, i64>(grant_index)?,
                 budget_u64_to_sqlite(authorized_exposure_units, "authorized_exposure_units",)?,
                 budget_u64_to_sqlite(remaining_exposure_units, "remaining_exposure_units",)?,
                 if invocation_captured { 1_i64 } else { 0_i64 },
@@ -1586,7 +1608,10 @@ impl SqliteBudgetStore {
         Ok(Some(existing_allowed.unwrap_or(0) > 0))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(super) fn existing_event_allowed(
         transaction: &rusqlite::Transaction<'_>,
         event_id: Option<&str>,
@@ -1681,7 +1706,10 @@ impl SqliteBudgetStore {
         Ok(Some(existing_allowed))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(super) fn append_mutation_event(
         &self,
         transaction: &rusqlite::Transaction<'_>,
@@ -1754,7 +1782,7 @@ impl SqliteBudgetStore {
                 event_id,
                 hold_id,
                 capability_id,
-                grant_index as i64,
+                crate::integer::checked::<_, i64>(grant_index)?,
                 kind.as_str(),
                 allowed.map(|value| if value { 1_i64 } else { 0_i64 }),
                 recorded_at,
@@ -1794,7 +1822,7 @@ impl SqliteBudgetStore {
                 "#,
                 params![
                     capability_id,
-                    grant_index as i64,
+                    crate::integer::checked::<_, i64>(grant_index)?,
                     recorded_at,
                     budget_u64_to_sqlite(event_seq, "event_seq")?,
                 ],
@@ -1810,7 +1838,7 @@ impl SqliteBudgetStore {
             hold_id: hold_id.map(ToOwned::to_owned),
             admission_binding: None,
             capability_id: capability_id.to_string(),
-            grant_index: grant_index as u32,
+            grant_index: crate::integer::checked::<_, u32>(grant_index)?,
             kind,
             allowed,
             authorization_outcome,
@@ -1836,133 +1864,6 @@ impl SqliteBudgetStore {
             total_cost_realized_spend_after,
             authority: authority.cloned(),
         })
-    }
-
-    pub fn try_increment_with_event_id(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        event_id: Option<&str>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.require_standalone_mutation("unbound invocation increment")?;
-        validate_budget_grant_index(grant_index)?;
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection)?;
-        Self::reject_legacy_admission_after_composite_history(
-            &transaction,
-            capability_id,
-            grant_index,
-        )?;
-
-        if let Some(allowed) = SqliteBudgetStore::existing_increment_allowed(
-            &transaction,
-            event_id,
-            capability_id,
-            grant_index,
-            max_invocations,
-        )? {
-            transaction.rollback()?;
-            return Ok(allowed);
-        }
-
-        let current: Option<(u32, u64, u64)> = transaction
-            .query_row(
-                r#"
-                SELECT invocation_count, total_cost_exposed, total_cost_realized_spend
-                FROM capability_grant_budgets
-                WHERE capability_id = ?1 AND grant_index = ?2
-                "#,
-                params![capability_id, grant_index as i64],
-                |row| {
-                    Ok((
-                        budget_u32_from_row(row, 0, "invocation_count")?,
-                        budget_u64_from_row(row, 1, "total_cost_exposed")?,
-                        budget_u64_from_row(row, 2, "total_cost_realized_spend")?,
-                    ))
-                },
-            )
-            .optional()?;
-        let (current, total_cost_exposed, total_cost_realized_spend) = current.unwrap_or((0, 0, 0));
-        let updated_at = self.unix_now()?;
-
-        let allowed = budget_increment_admits(current, max_invocations);
-        if !allowed {
-            let event_seq = allocate_budget_replication_seq(&transaction)?;
-            self.append_mutation_event(
-                &transaction,
-                event_id,
-                None,
-                None,
-                capability_id,
-                grant_index,
-                BudgetMutationKind::IncrementInvocation,
-                Some(false),
-                event_seq,
-                None,
-                0,
-                0,
-                max_invocations,
-                None,
-                None,
-                current,
-                total_cost_exposed,
-                total_cost_realized_spend,
-            )?;
-            transaction.commit()?;
-            return Ok(false);
-        }
-
-        let invocation_count_after = current.checked_add(1).ok_or_else(|| {
-            BudgetStoreError::Overflow("invocation count overflowed u32".to_string())
-        })?;
-        let seq = allocate_budget_replication_seq(&transaction)?;
-        transaction.execute(
-            r#"
-            INSERT INTO capability_grant_budgets (
-                capability_id,
-                grant_index,
-                invocation_count,
-                updated_at,
-                seq,
-                total_cost_exposed,
-                total_cost_realized_spend
-            ) VALUES (?1, ?2, ?3, ?4, ?5, 0, 0)
-            ON CONFLICT(capability_id, grant_index) DO UPDATE SET
-                invocation_count = excluded.invocation_count,
-                updated_at = excluded.updated_at,
-                seq = excluded.seq
-            "#,
-            params![
-                capability_id,
-                grant_index as i64,
-                i64::from(invocation_count_after),
-                updated_at,
-                budget_u64_to_sqlite(seq, "seq")?,
-            ],
-        )?;
-        self.append_mutation_event(
-            &transaction,
-            event_id,
-            None,
-            None,
-            capability_id,
-            grant_index,
-            BudgetMutationKind::IncrementInvocation,
-            Some(true),
-            seq,
-            Some(seq),
-            0,
-            0,
-            max_invocations,
-            None,
-            None,
-            invocation_count_after,
-            total_cost_exposed,
-            total_cost_realized_spend,
-        )?;
-        transaction.commit()?;
-        Ok(true)
     }
 }
 

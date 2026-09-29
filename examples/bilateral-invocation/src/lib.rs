@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,

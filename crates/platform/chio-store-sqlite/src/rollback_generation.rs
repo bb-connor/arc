@@ -277,6 +277,10 @@ impl RollbackGenerationAnchor {
         self.commit_prepared(&record)
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "Fixed slot layout bounds every constant offset; variable payload lengths are checked before slicing and record pairs require length two."
+    )]
     fn prepare_next(
         &self,
         current_record_generation: u64,
@@ -401,6 +405,10 @@ impl RollbackGenerationAnchor {
         }
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "Fixed slot layout bounds every constant offset; variable payload lengths are checked before slicing and record pairs require length two."
+    )]
     fn load_anchor_state(&self) -> Result<AnchorLoadState, String> {
         self.ensure_shape()?;
         let mut records = Vec::with_capacity(SLOT_COUNT);
@@ -476,6 +484,10 @@ impl RollbackGenerationAnchor {
         }))
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "Fixed slot layout bounds every constant offset; variable payload lengths are checked before slicing and record pairs require length two."
+    )]
     fn decode_slot(&self, slot: &[u8; SLOT_SIZE]) -> Result<GenerationRecord, String> {
         let payload_len = u32::from_be_bytes(
             slot[LENGTH_OFFSET..CHECKSUM_OFFSET]
@@ -639,6 +651,10 @@ fn metadata_inode(_metadata: &fs::Metadata) -> Result<u64, String> {
 }
 
 #[cfg(unix)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The OS read or write count cannot exceed the supplied buffer length."
+)]
 fn read_exact_at(file: &File, mut bytes: &mut [u8], mut offset: usize) -> std::io::Result<()> {
     use std::os::unix::fs::FileExt as _;
 
@@ -662,6 +678,10 @@ fn read_exact_at(_file: &File, _bytes: &mut [u8], _offset: usize) -> std::io::Re
 }
 
 #[cfg(unix)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The OS read or write count cannot exceed the supplied buffer length."
+)]
 fn write_all_at(file: &File, mut bytes: &[u8], mut offset: usize) -> std::io::Result<()> {
     use std::os::unix::fs::FileExt as _;
 

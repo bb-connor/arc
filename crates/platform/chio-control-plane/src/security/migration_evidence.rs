@@ -212,7 +212,7 @@ impl EnterpriseMigrationEvidenceBinding {
         }
         if self
             .durable_migration_states
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].sort_key() >= pair[1].sort_key())
         {
             return Err(EnterpriseMigrationEvidenceError::Invalid(
@@ -694,7 +694,10 @@ fn validate_wire_size(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
+#[allow(
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_core_types::{Ed25519Backend, Keypair};

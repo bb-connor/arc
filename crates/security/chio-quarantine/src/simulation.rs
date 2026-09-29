@@ -63,7 +63,8 @@ pub fn evaluate_response_simulation(
                 .iter()
                 .filter(|scope| scope.effect_id == effect.effect_id)
                 .collect();
-            if matching.len() != 1 || matching[0].result != spec.acquisition.approved_result {
+            if !matches!(matching.as_slice(), [scope] if scope.result == spec.acquisition.approved_result)
+            {
                 return Err(refused("simulation.stale_scope", PortErrorKind::Conflict));
             }
         }
@@ -82,13 +83,16 @@ pub fn evaluate_response_simulation(
             (ResponseSimulationOutcome::WouldDeliverAlert, None)
         } else {
             let index = state_index(&states, plan, effect)?;
-            if states[index].version_hash()? != effect.observed_base_version_hash {
+            let state = states
+                .get_mut(index)
+                .ok_or_else(|| refused("simulation.state_index", PortErrorKind::InvalidData))?;
+            if state.version_hash()? != effect.observed_base_version_hash {
                 return Err(refused("simulation.stale_state", PortErrorKind::Conflict));
             }
-            states[index] = apply_effect(&states[index], plan, effect)?;
+            *state = apply_effect(state, plan, effect)?;
             (
                 ResponseSimulationOutcome::WouldApply,
-                Some(states[index].version_hash()?),
+                Some(state.version_hash()?),
             )
         };
         apply.push(ResponseSimulationStep {
@@ -154,7 +158,9 @@ pub fn rollback_response_simulation(
             (ResponseSimulationOutcome::AlertNotReversible, None)
         } else {
             let index = state_index(&candidate, plan, effect)?;
-            let state = &candidate[index];
+            let state = candidate
+                .get_mut(index)
+                .ok_or_else(|| refused("simulation.state_index", PortErrorKind::InvalidData))?;
             if !contributions(state).iter().any(|(action, id, hash, _)| {
                 id == &effect.effect_id
                     && *hash == effect.contribution_hash
@@ -168,10 +174,10 @@ pub fn rollback_response_simulation(
             // Reusing apply's exact existing-contribution comparison also
             // rejects a changed payload whose hash column was left untouched.
             apply_effect(state, plan, effect)?;
-            candidate[index] = remove(state, Some(&plan.action_id), &effect.effect_id)?;
+            *state = remove(state, Some(&plan.action_id), &effect.effect_id)?;
             (
                 ResponseSimulationOutcome::WouldRemove,
-                Some(candidate[index].version_hash()?),
+                Some(state.version_hash()?),
             )
         };
         steps.push(ResponseSimulationStep {

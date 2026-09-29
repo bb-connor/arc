@@ -4,7 +4,7 @@ description = "Shared Chio substrate types for capability, receipt, manifest, an
 version.workspace = true
 edition.workspace = true
 # Kani 0.67 uses Rust 1.93; this formal-proof crate remains compatible.
-rust-version = "1.93"
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
@@ -95,8 +95,11 @@ regress = "0.10.5"
 chio-spec-codegen = { workspace = true }
 
 [lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 
 [lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }

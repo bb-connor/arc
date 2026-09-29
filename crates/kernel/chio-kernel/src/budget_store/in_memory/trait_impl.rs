@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 impl BudgetStore for InMemoryBudgetStore {
@@ -158,7 +159,10 @@ impl BudgetStore for InMemoryBudgetStore {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn try_charge_cost_with_ids(
         &self,
         capability_id: &str,
@@ -182,7 +186,10 @@ impl BudgetStore for InMemoryBudgetStore {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn try_charge_cost_with_ids_and_authority(
         &self,
         capability_id: &str,
@@ -336,7 +343,10 @@ impl BudgetStore for InMemoryBudgetStore {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn settle_charge_cost_with_ids_and_authority(
         &self,
         capability_id: &str,

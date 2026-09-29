@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Firecracker-isolated execution for hosted cognition-market jobs.
 //!
 //! The worker stages immutable, digest-pinned guest assets into a unique jail,

@@ -255,14 +255,19 @@ pub(crate) fn validate_cluster_peer_auth(
             "cluster peer is not in the configured allowlist",
         ));
     }
-    let now = clock_now as i64;
+    let now = i64::try_from(clock_now).map_err(|_| {
+        plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "clock exceeds signed timestamp field",
+        )
+    })?;
     let expected =
         cluster_peer_auth_signature(&config.service_token, &node_id, endpoint, issued_at, term)
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             })?;
     if !bool::from(signature.as_bytes().ct_eq(expected.as_bytes())) {
-        if cluster_peer_auth_is_rate_limited(&unverified_failure_key, now as u64) {
+        if cluster_peer_auth_is_rate_limited(&unverified_failure_key, clock_now) {
             let mut response = plain_http_error(
                 StatusCode::TOO_MANY_REQUESTS,
                 "cluster peer authentication temporarily rate limited after repeated invalid signatures",
@@ -276,7 +281,7 @@ pub(crate) fn validate_cluster_peer_auth(
         record_cluster_peer_auth_failure(&unverified_failure_key);
         return Err(cluster_peer_auth_error());
     }
-    if cluster_peer_auth_is_rate_limited(&node_id, now as u64) {
+    if cluster_peer_auth_is_rate_limited(&node_id, clock_now) {
         let mut response = plain_http_error(
             StatusCode::TOO_MANY_REQUESTS,
             "cluster peer authentication temporarily rate limited after repeated verified failures",

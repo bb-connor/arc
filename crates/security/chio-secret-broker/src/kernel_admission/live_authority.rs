@@ -122,7 +122,9 @@ impl CapabilityLiveness for BrokerKernelAuthorityHandler {
             .map(|link| link.capability_id.clone())
             .collect::<Vec<_>>();
         ancestors.sort_unstable_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
-        if ancestors.windows(2).any(|pair| pair[0] == pair[1])
+        if ancestors
+            .array_windows::<2>()
+            .any(|pair| pair[0] == pair[1])
             || ancestors.iter().any(|id| id == &parent.id)
         {
             return Err(rejected());

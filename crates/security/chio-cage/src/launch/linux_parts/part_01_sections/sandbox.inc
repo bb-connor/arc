@@ -17,6 +17,7 @@ fn duplicate_helper_exec_fd(source: RawFd) -> Result<OwnedFd, CageLaunchError> {
     Ok(unsafe { OwnedFd::from_raw_fd(duplicate) })
 }
 
+#[allow(clippy::as_conversions, reason = "The fixed PLAN_FD, STATUS_FD and TARGET_FD constants are positive and fit u32.")]
 fn validate_envelope(envelope: &LaunchEnvelope, peer: libc::ucred) -> Result<(), BootstrapFault> {
     if envelope.schema != LAUNCH_ENVELOPE_SCHEMA
         || envelope.parent_process_id == 0
@@ -102,11 +103,11 @@ fn validate_fd_table_shape(plan: &CageInitPlan) -> Result<(), BootstrapFault> {
     let mut target_stderr = 0_u8;
     let mut broker = 0_u8;
     for (position, entry) in plan.fd_table.iter().enumerate() {
-        if !slots.insert(entry.slot)
-            || position > 0 && plan.fd_table[position - 1].slot >= entry.slot
+        if RawFd::try_from(entry.slot).is_err() || !slots.insert(entry.slot)
+            || position.checked_sub(1).and_then(|index| plan.fd_table.get(index)).is_some_and(|previous| previous.slot >= entry.slot)
             || entry.slot <= plan.status_fd_slot
             || entry.purpose != FdPurpose::TargetExecutable
-                && entry.slot >= plan.resource_limits.nofile_hard as u32
+                && u64::from(entry.slot) >= plan.resource_limits.nofile_hard
         {
             return Err(BootstrapFault::new(
                 CageEnforcementFailureCode::InvalidPlan,
@@ -266,7 +267,7 @@ fn transfer_descriptors(compiled: &CompiledCage) -> Result<Vec<RawFd>, CageLaunc
             FdPurpose::RuntimeFile { index } => compiled
                 .runtime()
                 .runtime_files()
-                .get(index as usize)
+                .get(usize::try_from(index).map_err(|_| CageLaunchError::bootstrap_failed(CageEnforcementFailureCode::DescriptorCountMismatch, "descriptor_index"))?)
                 .map(|artifact| artifact.resource().file().as_raw_fd())
                 .ok_or_else(|| {
                     CageLaunchError::bootstrap_failed(
@@ -277,7 +278,7 @@ fn transfer_descriptors(compiled: &CompiledCage) -> Result<Vec<RawFd>, CageLaunc
             FdPurpose::ReadGrant { index } => compiled
                 .admitted()
                 .read_resources()
-                .get(index as usize)
+                .get(usize::try_from(index).map_err(|_| CageLaunchError::bootstrap_failed(CageEnforcementFailureCode::DescriptorCountMismatch, "descriptor_index"))?)
                 .map(|resource| resource.file().as_raw_fd())
                 .ok_or_else(|| {
                     CageLaunchError::bootstrap_failed(
@@ -288,7 +289,7 @@ fn transfer_descriptors(compiled: &CompiledCage) -> Result<Vec<RawFd>, CageLaunc
             FdPurpose::WriteGrant { index } => compiled
                 .admitted()
                 .write_resources()
-                .get(index as usize)
+                .get(usize::try_from(index).map_err(|_| CageLaunchError::bootstrap_failed(CageEnforcementFailureCode::DescriptorCountMismatch, "descriptor_index"))?)
                 .map(|resource| resource.file().as_raw_fd())
                 .ok_or_else(|| {
                     CageLaunchError::bootstrap_failed(
@@ -407,6 +408,7 @@ fn verify_descriptor_table(
     Ok(())
 }
 
+#[allow(clippy::indexing_slicing, reason = "The mutation target index comes from position on this exact fd_table and the vector is not resized while applying the conformance mutation.")]
 pub(super) fn validate_cage_target_fd_binding_production_paths(
     template: &CageInitPlan,
     target: &File,
@@ -644,7 +646,7 @@ fn remap_descriptors(
     mappings.push((control.as_raw_fd(), STATUS_FD, true));
     mappings.push((plan_memfd.as_raw_fd(), PLAN_FD, true));
     for (entry, file) in plan.fd_table.iter().zip(&resources) {
-        mappings.push((file.as_raw_fd(), entry.slot as RawFd, entry.close_on_exec));
+        mappings.push((file.as_raw_fd(), checked_slot_fd(entry.slot)?, entry.close_on_exec));
     }
     let mut temporary = Vec::with_capacity(mappings.len());
     for (source, target, close_on_exec) in mappings {
@@ -690,7 +692,7 @@ fn remap_target_stdio(plan: &CageInitPlan) -> Result<(), BootstrapFault> {
             .fd_table
             .iter()
             .find(|entry| entry.purpose == purpose)
-            .map(|entry| entry.slot as RawFd)
+            .map(|entry| checked_slot_fd(entry.slot)).transpose()?
             .ok_or_else(|| {
                 BootstrapFault::new(
                     CageEnforcementFailureCode::DescriptorCountMismatch,
@@ -738,6 +740,7 @@ fn reset_signal_state() -> Result<(), BootstrapFault> {
     let mut set = unsafe { std::mem::zeroed::<libc::sigset_t>() };
     // SAFETY: set is a live output object and the old mask is not requested.
     if unsafe { libc::sigemptyset(&mut set) } != 0
+        // SAFETY: set was initialized above and remains borrowed for this call.
         || unsafe { libc::sigprocmask(libc::SIG_SETMASK, &set, std::ptr::null_mut()) } != 0
     {
         return Err(BootstrapFault::new(
@@ -781,6 +784,7 @@ fn observe_execution_identity() -> Result<ExecutionIdentity, BootstrapFault> {
     let mut saved_gid = 0;
     // SAFETY: all pointers name live uid_t or gid_t outputs.
     if unsafe { libc::getresuid(&mut real_uid, &mut effective_uid, &mut saved_uid) } != 0
+        // SAFETY: all three gid_t output pointers refer to distinct live locals.
         || unsafe { libc::getresgid(&mut real_gid, &mut effective_gid, &mut saved_gid) } != 0
     {
         return Err(BootstrapFault::new(
@@ -872,6 +876,7 @@ fn apply_execution_identity(
 
     // SAFETY: both prctl operations only clear privilege-retention state.
     if unsafe { libc::prctl(libc::PR_SET_KEEPCAPS, 0, 0, 0, 0) } != 0
+        // SAFETY: this prctl clears ambient capabilities and receives no pointer arguments.
         || unsafe {
             libc::prctl(
                 libc::PR_CAP_AMBIENT,
@@ -1000,7 +1005,7 @@ fn apply_landlock(plan: &CageInitPlan) -> Result<LandlockEnforcement, BootstrapF
         // SAFETY: each slot is populated from the authenticated descriptor
         // table and remains open until target exec. BorrowedFd cannot outlive
         // this capability set or the child bootstrap frame.
-        let descriptor = unsafe { BorrowedFd::borrow_raw(grant.fd_slot as RawFd) };
+        let descriptor = unsafe { BorrowedFd::borrow_raw(checked_slot_fd(grant.fd_slot)?) };
         capabilities.add_path_fd(descriptor, access, is_directory);
     }
 
@@ -1177,4 +1182,9 @@ fn install_seccomp(filter: &seccompiler::BpfProgram) -> Result<(), BootstrapFaul
             "seccomp_install",
         )
     })
+}
+
+fn checked_slot_fd(slot: u32) -> Result<RawFd, BootstrapFault> {
+    RawFd::try_from(slot).map_err(|_| BootstrapFault::new(
+        CageEnforcementFailureCode::InvalidPlan, "descriptor_slot_range"))
 }

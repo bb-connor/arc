@@ -133,18 +133,20 @@ mod unix {
                 // process library's child-error pipe or another live descriptor.
                 command.arg(argument).arg(file.as_raw_fd().to_string());
             }
-            // SAFETY: files are owned by this command and remain open through
-            // fork. The child callback uses only async-signal-safe fcntl calls;
-            // no descriptor number is replaced and the parent's flags stay set.
-            unsafe {
-                command.pre_exec(move || {
-                    for (_, file) in &self.0 {
-                        if libc::fcntl(file.as_raw_fd(), libc::F_SETFD, 0) == -1 {
-                            return Err(io::Error::last_os_error());
-                        }
+            let inherit_credentials = move || {
+                for (_, file) in &self.0 {
+                    // SAFETY: the captured file owns this live descriptor.
+                    // F_SETFD clears CLOEXEC only in the forked child.
+                    if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_SETFD, 0) } == -1 {
+                        return Err(io::Error::last_os_error());
                     }
-                    Ok(())
-                });
+                }
+                Ok(())
+            };
+            // SAFETY: the callback uses only async-signal-safe fcntl calls and
+            // nonallocating errno conversion, with all files owned before fork.
+            unsafe {
+                command.pre_exec(inherit_credentials);
             }
             Ok(())
         }

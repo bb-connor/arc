@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Lambda deployment-shape verdict-matrix driver.
 //!
 //! The driver loads the canonical scenario corpus from

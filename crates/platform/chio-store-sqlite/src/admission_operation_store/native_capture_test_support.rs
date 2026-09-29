@@ -1,3 +1,9 @@
+#![allow(
+    clippy::as_conversions,
+    clippy::panic,
+    clippy::print_stderr,
+    reason = "Feature-gated fault injection encodes fixed discriminants and deliberately exercises failure paths."
+)]
 //! Default-off process and reply faults, never replacement writes.
 use super::*;
 use chio_kernel::budget_store::{BudgetGuaranteeLevel, BudgetInvocationCaptureDecision};

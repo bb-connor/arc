@@ -85,7 +85,8 @@ impl BrokerService {
 
     fn attempt_operation_guard_for_digest(&self, digest: &str) -> Result<MutexGuard<'_, ()>> {
         let gate_index = attempt_operation_gate_index(digest)?;
-        self.attempt_operation_gates[gate_index]
+        self.attempt_operation_gates.get(gate_index).ok_or_else(||
+            BrokerError::Invariant("broker attempt gate index is invalid".to_owned()))?
             .lock()
             .map_err(|_| {
                 BrokerError::Invariant("broker attempt operation gate is poisoned".to_string())

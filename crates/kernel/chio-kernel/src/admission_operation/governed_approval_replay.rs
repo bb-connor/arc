@@ -270,7 +270,7 @@ impl GovernedApprovalReplaySourceInventory {
         }
         if self
             .markers
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].key() >= pair[1].key())
         {
             return Err(invalid("markers are unordered or duplicate"));

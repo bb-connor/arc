@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Physical hold checks for operation-owned nonce transitions.
 
 use super::*;

@@ -1,4 +1,7 @@
-#![allow(clippy::result_large_err)]
+#![allow(
+    clippy::result_large_err,
+    reason = "Preserve the typed rejection and its source without allocating a box on the failure path."
+)]
 
 #[path = "trust_control/finding_hosted_profile.rs"]
 pub mod finding_hosted_profile;

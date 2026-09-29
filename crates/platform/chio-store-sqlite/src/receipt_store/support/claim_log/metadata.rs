@@ -50,14 +50,14 @@ pub(crate) fn metered_billing_evidence_record_from_columns(
         usage_evidence: chio_core::receipt::governance::MeteredUsageEvidenceReceiptMetadata {
             evidence_kind: adapter_kind,
             evidence_id,
-            observed_units: observed_units.max(0) as u64,
+            observed_units: u64::try_from(observed_units.max(0)).unwrap_or_default(),
             evidence_sha256,
         },
         billed_cost: chio_core::capability::scope::MonetaryAmount {
-            units: billed_cost_units.max(0) as u64,
+            units: u64::try_from(billed_cost_units.max(0)).unwrap_or_default(),
             currency: billed_cost_currency,
         },
-        recorded_at: recorded_at.max(0) as u64,
+        recorded_at: u64::try_from(recorded_at.max(0)).unwrap_or_default(),
     })
 }
 

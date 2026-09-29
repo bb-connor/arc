@@ -251,7 +251,7 @@ fn build_behavioral_feed_report(
         filters: normalized_query,
         privacy: BehavioralFeedPrivacyBoundary {
             matching_receipts: selection.matching_receipts,
-            returned_receipts: selection.receipts.len() as u64,
+            returned_receipts: crate::integer::count(selection.receipts.len()),
             direct_evidence_export_supported: compliance.direct_evidence_export_supported,
             child_receipt_scope: compliance.child_receipt_scope,
             proofs_complete: compliance.proofs_complete,
@@ -457,9 +457,9 @@ pub(crate) fn build_exposure_ledger_report_with_context(
         support_boundary: ExposureLedgerSupportBoundary::default(),
         summary: ExposureLedgerSummary {
             matching_receipts: selection.matching_receipts,
-            returned_receipts: receipts.len() as u64,
+            returned_receipts: crate::integer::count(receipts.len()),
             matching_decisions: decision_report.summary.matching_decisions,
-            returned_decisions: decisions.len() as u64,
+            returned_decisions: crate::integer::count(decisions.len()),
             active_decisions: decision_report.summary.active_decisions,
             superseded_decisions: decision_report.summary.superseded_decisions,
             actionable_receipts,
@@ -467,9 +467,9 @@ pub(crate) fn build_exposure_ledger_report_with_context(
             failed_settlement_receipts,
             currencies: currencies.clone(),
             mixed_currency_book: currencies.len() > 1,
-            truncated_receipts: selection.matching_receipts > receipts.len() as u64,
+            truncated_receipts: selection.matching_receipts > crate::integer::count(receipts.len()),
             truncated_decisions: decision_report.summary.matching_decisions
-                > decisions.len() as u64,
+                > crate::integer::count(decisions.len()),
         },
         positions: positions_by_currency.into_values().collect(),
         receipts,
@@ -588,7 +588,10 @@ pub(crate) fn issue_signed_capital_allocation_decision_detailed(
         .map_err(|error| TrustHttpError::internal(error.to_string()))
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the ordered report projection in one function; its stages share the same validated input."
+)]
 fn build_capital_allocation_decision_artifact_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,

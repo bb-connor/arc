@@ -86,20 +86,23 @@ pub(super) fn spawn_with_stdin(
 pub(super) fn inherit_seed_descriptors_in_child(command: &mut Command, descriptors: [i32; 2]) {
     assert!(descriptors.iter().all(|descriptor| *descriptor >= 3));
     assert_ne!(descriptors[0], descriptors[1]);
-    // SAFETY: pre_exec runs after fork in the broker child. The closure invokes
-    // only async-signal-safe fcntl calls on live descriptors retained by the
-    // controller, clearing CLOEXEC in that child immediately before exec.
+    let prepare = move || {
+        for descriptor in descriptors {
+            // SAFETY: the controller keeps this descriptor alive through spawn;
+            // fcntl only clears CLOEXEC in the child and is async-signal-safe.
+            #[allow(unsafe_code)]
+            if unsafe { libc::fcntl(descriptor, libc::F_SETFD, 0) } < 0 {
+                return Err(io::Error::last_os_error());
+            }
+        }
+        Ok(())
+    };
+    // SAFETY: the closure performs only async-signal-safe descriptor operations
+    // between fork and exec, with no allocation or locks.
     #[allow(unsafe_code)]
     unsafe {
-        command.pre_exec(move || {
-            for descriptor in descriptors {
-                if libc::fcntl(descriptor, libc::F_SETFD, 0) < 0 {
-                    return Err(io::Error::last_os_error());
-                }
-            }
-            Ok(())
-        });
-    }
+        command.pre_exec(prepare)
+    };
 }
 
 pub(super) fn report_from_output<T: for<'de> Deserialize<'de>>(output: &[u8], prefix: &str) -> T {

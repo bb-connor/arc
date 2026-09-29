@@ -117,7 +117,7 @@ pub(in crate::admission_operation_store) fn verify(
     let original = retained_request::load_retained_request_tx(connection, operation)?
         .ok_or_else(|| invariant("nonce preflight lost its retained original request"))?;
     if original
-        .retained_matching_grant(ownership.grant_index as usize)
+        .retained_matching_grant(crate::integer::checked::<_, usize>(ownership.grant_index)?)
         .is_none()
     {
         return Err(invariant(

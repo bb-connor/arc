@@ -2823,7 +2823,10 @@ fn settle_purchase(
 
 /// The same settlement against a caller-chosen allocation, so a test can
 /// sell from the backing a listing carried before it was rebacked.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn settle_purchase_with(
     deployment: &Deployment,
     allocation_id: &str,
@@ -3265,7 +3268,10 @@ fn sample_case(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn sample_case_at(
     signer: &Keypair,
     listing: &SignedGenericListing,
@@ -3474,7 +3480,10 @@ fn admitted_terms_digest() -> Result<String, AnyError> {
 /// seal, so a payout only closes on a later call past that deadline. Both
 /// calls carry identical arguments; the second is the one the caller's
 /// assertion is about, and it carries whatever the sealing path decided.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn uphold_across_claim_window(
     coordinator: &FindingChallengeCoordinator,
     terms: &SignedFindingMarketTerms,
@@ -6605,44 +6614,8 @@ fn finding_challenge_pending_appeal_branch_holds_the_bond() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn finding_challenge_successful_appeal_reverses_before_impairment() -> TestResult {
-    let case = upheld_liability()?;
-    let identity = liability_identity(&case.finding_id, &case.deployment.allocation_id);
-    let resolution = case.coordinator.resolve_appeal(
-        &case.upheld.liability_key,
-        &case.outcome,
-        &identity,
-        Some(&case.upheld.sealed),
-        &case.governance.context(),
-        &AppealDisposition::Successful {
-            appeal_case: &case.governance.appeal_case,
-            appeal_case_id: &case.governance.appeal_case.body.case_id,
-        },
-        &case.upheld.sanction_case_id,
-        &case.upheld.hold,
-        &hex64('7'),
-        fixture_commit_time(NOW + 20),
-    )?;
-    let AppealResolution::ReversedBeforeImpairment { reversal } = resolution else {
-        return Err("a timely successful appeal reverses the hold".into());
-    };
-    assert_eq!(
-        reversal.evaluation.effective_state,
-        OpenMarketPenaltyEffectiveState::Reversed
-    );
-    let liability = case
-        .deployment
-        .challenges
-        .get_liability(&case.upheld.liability_key)?
-        .ok_or("liability head is durable")?;
-    assert_eq!(
-        liability.state,
-        FindingLiabilityState::ReversedBeforeImpairment
-    );
-    assert!(!liability.publication_pending);
-    Ok(())
-}
+#[path = "finding_challenge_enforcement_e2e_tests/appeals.rs"]
+mod appeals;
 
 #[test]
 fn finding_challenge_appeal_accepts_a_retained_activation_across_governance_rotation() -> TestResult

@@ -550,7 +550,7 @@ impl AdmissionOperationAttachmentsV1 {
         // introduced custody slots and reject an otherwise valid operation.
         if self
             .0
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].slot() >= pair[1].slot())
         {
             return Err(AdmissionOperationError::DuplicateAttachment {
@@ -1188,7 +1188,10 @@ pub struct AdmissionOperationCommand {
 }
 
 impl AdmissionOperationCommand {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new(
         operation_id: AdmissionOperationId,
         expected_version: u64,
@@ -1209,8 +1212,9 @@ impl AdmissionOperationCommand {
             return Err(AdmissionOperationError::TerminalProjectionRequired);
         }
         for (index, attachment) in attachments.iter().enumerate() {
-            if attachments[..index]
+            if attachments
                 .iter()
+                .take(index)
                 .any(|prior| prior.field_name() == attachment.field_name())
             {
                 return Err(AdmissionOperationError::DuplicateAttachment {

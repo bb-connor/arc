@@ -664,7 +664,7 @@ fn keyid_is_sha256_of_raw_ed25519_public_key_bytes() {
     let kp = Keypair::generate();
     let pk = kp.public_key();
     let keyid = Keyid::from_public_key(&pk);
-    let want = sha256_hex(pk.as_bytes());
+    let want = sha256_hex(&kp.public_key_bytes());
     assert_eq!(keyid.0, want);
     // hashing the hex form must NOT match.
     let hex_form = sha256_hex(pk.to_hex().as_bytes());

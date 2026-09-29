@@ -158,7 +158,7 @@ impl CapabilitySnapshot {
             .last()
             .map(|link| link.capability_id.as_str());
         if self.parent_capability_id.as_deref() != expected_parent
-            || self.delegation_depth != token.delegation_chain.len() as u64
+            || u64::try_from(token.delegation_chain.len()) != Ok(self.delegation_depth)
         {
             return Err(self.conflict("does not match its signed delegation lineage"));
         }

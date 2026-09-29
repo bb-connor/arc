@@ -19,9 +19,9 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Client;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
 use crate::external::bedrock::classify_status_error;
 use crate::external::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
@@ -60,7 +60,7 @@ impl SnykSeverity {
 #[derive(Clone)]
 pub struct SnykConfig {
     /// `Authorization: token <api_token>` credential.
-    pub api_token: Zeroizing<String>,
+    pub api_token: SecretString,
     /// Snyk organization id.
     pub org_id: String,
     /// Override the base URL (test hook).
@@ -91,7 +91,7 @@ impl SnykConfig {
     /// Build a config with defaults.
     pub fn new(api_token: impl Into<String>, org_id: impl Into<String>) -> Self {
         Self {
-            api_token: Zeroizing::new(api_token.into()),
+            api_token: SecretString::from(api_token.into()),
             org_id: org_id.into(),
             base_url: None,
             severity_threshold: SnykSeverity::High,
@@ -251,7 +251,7 @@ impl ExternalGuard for SnykGuard {
 
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        let auth_value = format!("token {}", self.cfg.api_token.as_str());
+        let auth_value = format!("token {}", self.cfg.api_token.expose_secret());
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(&auth_value)

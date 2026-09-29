@@ -754,21 +754,23 @@ fn run_repository_staging_command(
     {
         use std::os::unix::process::CommandExt as _;
         command.process_group(0);
-        // SAFETY: setrlimit is async-signal-safe and touches only the child
-        // between fork and exec. It bounds any one file in addition to the
-        // aggregate staging-root accounting below.
+        let bound_staged_files = move || {
+            let limit = libc::rlimit {
+                rlim_cur: maximum_bytes,
+                rlim_max: maximum_bytes,
+            };
+            // SAFETY: limit is initialized and live for the synchronous call.
+            // RLIMIT_FSIZE changes only the child process's file-size bound.
+            if unsafe { libc::setrlimit(libc::RLIMIT_FSIZE, &limit) } == 0 {
+                Ok(())
+            } else {
+                Err(std::io::Error::last_os_error())
+            }
+        };
+        // SAFETY: the callback uses only async-signal-safe setrlimit and
+        // nonallocating errno conversion between fork and exec.
         unsafe {
-            command.pre_exec(move || {
-                let limit = libc::rlimit {
-                    rlim_cur: maximum_bytes,
-                    rlim_max: maximum_bytes,
-                };
-                if libc::setrlimit(libc::RLIMIT_FSIZE, &limit) == 0 {
-                    Ok(())
-                } else {
-                    Err(std::io::Error::last_os_error())
-                }
-            });
+            command.pre_exec(bound_staged_files);
         }
     }
     let started = Instant::now();

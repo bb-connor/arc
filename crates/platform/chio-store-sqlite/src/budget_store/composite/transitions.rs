@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 use rusqlite::{params, OptionalExtension, Transaction};
 
@@ -254,7 +255,10 @@ pub(super) fn load_event_admission(
     Ok(admission)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn write_transition_projection(
     transaction: &Transaction<'_>,
     event_id: &str,
@@ -349,7 +353,11 @@ fn write_transition_projection(
                 event_id, member_index, capability_id
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![event_id, index as i64, capability_id],
+            params![
+                event_id,
+                crate::integer::checked::<_, i64>(index)?,
+                capability_id
+            ],
         )?;
     }
     for (index, digest) in admission.authorization_artifact_digests.iter().enumerate() {
@@ -359,7 +367,7 @@ fn write_transition_projection(
                 event_id, artifact_index, artifact_digest
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![event_id, index as i64, digest],
+            params![event_id, crate::integer::checked::<_, i64>(index)?, digest],
         )?;
     }
     write_event_revocation_commit(
@@ -619,7 +627,10 @@ fn validate_transition_identity(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn replay_transition(
     store: &SqliteBudgetStore,
     transaction: &Transaction<'_>,

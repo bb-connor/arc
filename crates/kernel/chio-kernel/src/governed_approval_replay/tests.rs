@@ -4,14 +4,17 @@ use chio_security_types::clock::ClockError;
 use super::*;
 
 #[test]
-#[should_panic(expected = "governed approval replay capacity must be greater than zero")]
 fn zero_capacity_is_rejected() {
-    let _store = InMemoryGovernedApprovalReplayStore::new(0);
+    assert!(matches!(
+        InMemoryGovernedApprovalReplayStore::new(0),
+        Err(ApprovalReplayError::InvalidCapacity)
+    ));
 }
 
 #[test]
 fn commit_retains_marker_and_disables_owner_rollback() {
-    let store = InMemoryGovernedApprovalReplayStore::with_clock(2, Arc::new(TestClock::new(100)));
+    let store = InMemoryGovernedApprovalReplayStore::with_clock(2, Arc::new(TestClock::new(100)))
+        .expect("positive replay store test capacities");
     let expires_at = 160;
     assert!(store
         .reserve_for_dispatch("subject", "request", "intent", expires_at, "owner")
@@ -29,7 +32,8 @@ fn commit_retains_marker_and_disables_owner_rollback() {
 
 #[test]
 fn rollback_is_owner_qualified() {
-    let store = InMemoryGovernedApprovalReplayStore::with_clock(2, Arc::new(TestClock::new(100)));
+    let store = InMemoryGovernedApprovalReplayStore::with_clock(2, Arc::new(TestClock::new(100)))
+        .expect("positive replay store test capacities");
     let expires_at = 160;
     assert!(store
         .reserve_for_dispatch("subject", "request", "intent", expires_at, "owner")
@@ -45,7 +49,8 @@ fn rollback_is_owner_qualified() {
 #[test]
 fn live_capacity_is_not_evicted() {
     let clock = Arc::new(TestClock::new(100));
-    let store = InMemoryGovernedApprovalReplayStore::with_clock(1, clock);
+    let store = InMemoryGovernedApprovalReplayStore::with_clock(1, clock)
+        .expect("positive replay store test capacities");
     let expires_at = 160;
     assert!(store
         .reserve("subject", "request-a", "intent-a", expires_at, "owner-a")
@@ -61,7 +66,8 @@ fn live_capacity_is_not_evicted() {
 
 #[test]
 fn identical_request_and_intent_are_scoped_by_subject() {
-    let store = InMemoryGovernedApprovalReplayStore::with_clock(2, Arc::new(TestClock::new(100)));
+    let store = InMemoryGovernedApprovalReplayStore::with_clock(2, Arc::new(TestClock::new(100)))
+        .expect("positive replay store test capacities");
     let expires_at = 160;
     assert!(store
         .reserve_for_dispatch("subject-a", "request", "intent", expires_at, "owner-a")
@@ -74,7 +80,8 @@ fn identical_request_and_intent_are_scoped_by_subject() {
 #[test]
 fn clock_faults_and_commit_preserve_marker_custody() {
     let clock = Arc::new(TestClock::new(100));
-    let store = InMemoryGovernedApprovalReplayStore::with_clock(2, clock.clone());
+    let store = InMemoryGovernedApprovalReplayStore::with_clock(2, clock.clone())
+        .expect("positive replay store test capacities");
     assert!(store
         .reserve_for_dispatch("s", "r", "i", 110, "owner")
         .unwrap());

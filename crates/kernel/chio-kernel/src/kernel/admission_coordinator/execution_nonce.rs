@@ -275,7 +275,7 @@ impl ChioKernel {
                 )
             })?;
         if snapshot.capability_id != operation.binding().capability_id().as_str()
-            || snapshot.grant_index != identity.grant_index() as usize
+            || usize::try_from(identity.grant_index()) != Ok(snapshot.grant_index)
         {
             return Err(KernelError::DurableAdmission(
                 "nonce preflight hold belongs to another grant".to_owned(),

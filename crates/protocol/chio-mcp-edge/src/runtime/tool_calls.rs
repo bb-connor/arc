@@ -569,11 +569,11 @@ impl ChioMcpEdge {
         outcome
     }
 
-    pub(super) fn evaluate_tool_call_operation_with_transport_channel<W: Write>(
+    pub(super) fn evaluate_tool_call_operation_with_transport_channel<W: Write + Send>(
         &mut self,
         request: ToolCallRequestContext<'_>,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> ToolCallEdgeOutcome {
         let ToolCallRequestContext {
@@ -704,12 +704,12 @@ impl ChioMcpEdge {
         )
     }
 
-    pub(super) fn handle_tools_call_with_transport_channel<W: Write>(
+    pub(super) fn handle_tools_call_with_transport_channel<W: Write + Send>(
         &mut self,
         id: Value,
         params: Value,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Value {
         let (session_id, context, operation) = match self.prepare_tool_call_request(&id, &params) {

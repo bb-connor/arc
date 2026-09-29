@@ -4,7 +4,10 @@
 use super::*;
 
 impl ChioKernel {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn run_pre_budget_admission(
         &self,
         request: &ToolCallRequest,

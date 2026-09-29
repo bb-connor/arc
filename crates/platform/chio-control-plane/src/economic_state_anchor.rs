@@ -96,7 +96,7 @@ impl RemoteEconomicStateAnchorConfig {
         crate::anchor_egress::strict_https_contract(
             &endpoint,
             "control-plane.economic-state-anchor",
-            ECONOMIC_STATE_RESPONSE_LIMIT as u64,
+            crate::integer::count(ECONOMIC_STATE_RESPONSE_LIMIT),
         )
         .map_err(EconomicStateAnchorConfigError::InvalidEgressContract)?;
         self.pins.validate()?;
@@ -134,7 +134,7 @@ impl HttpsEconomicStateAnchorTransport {
         let egress_contract = crate::anchor_egress::strict_https_contract(
             &endpoint,
             "control-plane.economic-state-anchor",
-            ECONOMIC_STATE_RESPONSE_LIMIT as u64,
+            crate::integer::count(ECONOMIC_STATE_RESPONSE_LIMIT),
         )
         .map_err(EconomicStateAnchorConfigError::InvalidEgressContract)?;
         // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
@@ -189,11 +189,11 @@ impl EconomicStateAnchorTransport for HttpsEconomicStateAnchorTransport {
         }
         let mut body = Vec::new();
         response
-            .take(ECONOMIC_STATE_RESPONSE_LIMIT as u64 + 1)
+            .take(crate::integer::count(ECONOMIC_STATE_RESPONSE_LIMIT) + 1)
             .read_to_end(&mut body)
             .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
         self.egress_contract
-            .enforce_response_bytes(body.len() as u64)
+            .enforce_response_bytes(crate::integer::count(body.len()))
             .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
         ensure_bounded_response(&body)?;
         Ok(body)
@@ -206,11 +206,12 @@ fn valid_bearer_token(value: &str) -> bool {
         .iter()
         .position(|byte| *byte == b'=')
         .unwrap_or(bytes.len());
+    let (token, padding) = bytes.split_at(unpadded_len);
     unpadded_len > 0
-        && bytes[..unpadded_len].iter().all(|byte| {
+        && token.iter().all(|byte| {
             byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'+' | b'/')
         })
-        && bytes[unpadded_len..].iter().all(|byte| *byte == b'=')
+        && padding.iter().all(|byte| *byte == b'=')
 }
 
 pub struct RemoteEconomicStateAnchor {

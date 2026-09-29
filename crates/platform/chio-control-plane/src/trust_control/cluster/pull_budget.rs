@@ -303,7 +303,7 @@ pub(crate) fn require_forward_progress(
     }
     // Strict monotonicity: a duplicate seq is a malformed page (a PK seq column
     // cannot legitimately repeat a value within a page).
-    for pair in sorted.windows(2) {
+    for pair in sorted.array_windows::<2>() {
         if pair[0] == pair[1] {
             return Err(PeerProtocolError::NonContiguousPage {
                 expected_seq: pair[0].saturating_add(1),
@@ -433,9 +433,9 @@ pub(crate) fn ensure_legacy_revocation_page_ascending(
             return Err(PeerProtocolError::NonAdvancingPage {
                 after_seq: previous
                     .as_ref()
-                    .map(|value| value.revoked_at.max(0) as u64)
+                    .map(|value| u64::try_from(value.revoked_at).unwrap_or_default())
                     .unwrap_or(0),
-                page_max_seq: current.revoked_at.max(0) as u64,
+                page_max_seq: u64::try_from(current.revoked_at).unwrap_or_default(),
             });
         }
         previous = Some(current.clone());
@@ -443,7 +443,7 @@ pub(crate) fn ensure_legacy_revocation_page_ascending(
     }
     head.ok_or(PeerProtocolError::NonAdvancingPage {
         after_seq: cursor
-            .map(|value| value.revoked_at.max(0) as u64)
+            .map(|value| u64::try_from(value.revoked_at).unwrap_or_default())
             .unwrap_or(0),
         page_max_seq: 0,
     })

@@ -230,7 +230,11 @@ fn validate_trusted_time(value: u64) -> Result<(), EconomicAdmissionCancellation
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex, MutexGuard};

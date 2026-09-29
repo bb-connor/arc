@@ -14,8 +14,14 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
         let row_limit = query.authorization_limit_or_default();
 
@@ -96,14 +102,14 @@ impl SqliteReceiptStore {
             ],
             |row| {
                 Ok((
-                    row.get::<_, i64>(0)?.max(0) as u64,
-                    row.get::<_, i64>(1)?.max(0) as u64,
-                    row.get::<_, i64>(2)?.max(0) as u64,
-                    row.get::<_, i64>(3)?.max(0) as u64,
-                    row.get::<_, i64>(4)?.max(0) as u64,
-                    row.get::<_, i64>(5)?.max(0) as u64,
-                    row.get::<_, i64>(6)?.max(0) as u64,
-                    row.get::<_, i64>(7)?.max(0) as u64,
+                    u64::try_from(row.get::<_, i64>(0)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(1)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(2)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(3)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(4)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(5)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(6)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(7)?.max(0)).unwrap_or_default(),
                 ))
             },
         )?;
@@ -188,7 +194,7 @@ impl SqliteReceiptStore {
             let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )?;
             let governed = extract_governed_transaction_metadata(&receipt).ok_or_else(|| {
                 ReceiptStoreError::Canonical(format!(
@@ -216,9 +222,12 @@ impl SqliteReceiptStore {
                     receipt_issuer_key: receipt_issuer_key.as_deref(),
                     lineage_subject_key: lineage_subject_key.as_deref(),
                     lineage_issuer_key: lineage_issuer_key.as_deref(),
-                    grant_index: attribution
-                        .grant_index
-                        .or_else(|| persisted_grant_index.map(|value| value.max(0) as u32)),
+                    grant_index: match attribution.grant_index {
+                        Some(index) => Some(index),
+                        None => persisted_grant_index
+                            .map(crate::integer::checked::<_, u32>)
+                            .transpose()?,
+                    },
                     grants_json: grants_json.as_deref(),
                 },
                 &transaction_context,
@@ -288,7 +297,7 @@ impl SqliteReceiptStore {
             profile: ChioOAuthAuthorizationProfile::default(),
             summary: AuthorizationContextSummary {
                 matching_receipts,
-                returned_receipts: receipts.len() as u64,
+                returned_receipts: crate::integer::count(receipts.len()),
                 approval_receipts,
                 approved_receipts,
                 commerce_receipts,
@@ -306,7 +315,7 @@ impl SqliteReceiptStore {
                 session_anchor_receipts,
                 request_lineage_receipts,
                 receipt_lineage_statement_receipts,
-                truncated: matching_receipts > receipts.len() as u64,
+                truncated: matching_receipts > crate::integer::count(receipts.len()),
             },
             receipts,
         })
@@ -392,7 +401,7 @@ impl SqliteReceiptStore {
             let signed_receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )?;
             let governed_transaction = extract_governed_transaction_metadata(&signed_receipt)
                 .ok_or_else(|| {
@@ -432,7 +441,7 @@ impl SqliteReceiptStore {
             metadata,
             summary: ChioOAuthAuthorizationReviewPackSummary {
                 matching_receipts: authorization_context.summary.matching_receipts,
-                returned_receipts: records.len() as u64,
+                returned_receipts: crate::integer::count(records.len()),
                 dpop_required_receipts: authorization_context.summary.dpop_bound_receipts,
                 runtime_assurance_receipts: authorization_context
                     .summary

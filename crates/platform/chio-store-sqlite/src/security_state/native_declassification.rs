@@ -245,7 +245,11 @@ impl NativeDeclassificationOutcome {
                 Ok(NativeRowChange {
                     table: table.into(),
                     before: if index == 0 {
-                        pending[0].after.clone()
+                        pending
+                            .first()
+                            .ok_or_else(PortError::integrity_failure)?
+                            .after
+                            .clone()
                     } else {
                         None
                     },

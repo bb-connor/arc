@@ -533,6 +533,10 @@ pub fn publish_certification_across_network(
     })
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_discover(
     tool_server_id: &str,
     discovery_path: Option<&Path>,
@@ -580,6 +584,10 @@ pub fn cmd_certify_registry_discover(
     Ok(())
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_publish_network(
     input: &Path,
     discovery_path: Option<&Path>,

@@ -153,7 +153,8 @@ fn installed_dpop_and_default_approval_follow_the_kernel_clock() -> TestResult {
     let clock = Arc::new(TestClock::new(100));
     let mut kernel = ChioKernel::new_with_clock(make_config(), clock.clone());
     kernel.set_dpop_store(
-        DpopNonceStore::new(2, Duration::from_secs(60)),
+        DpopNonceStore::new(2, Duration::from_secs(60))
+            .expect("positive replay store test capacities"),
         DpopConfig::default(),
     )?;
     let dpop = kernel.dpop_nonce_store.as_ref().ok_or("DPoP store")?;

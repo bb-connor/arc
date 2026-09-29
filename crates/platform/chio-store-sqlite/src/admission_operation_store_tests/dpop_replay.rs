@@ -51,7 +51,10 @@ struct Source {
 
 impl Source {
     fn new(fixture: &Fixture, empty: bool) -> AnchoredTestResult<Self> {
-        let raw = Arc::new(DpopNonceStore::new(8, Duration::from_secs(3600)));
+        let raw = Arc::new(
+            DpopNonceStore::new(8, Duration::from_secs(3600))
+                .expect("positive replay store test capacities"),
+        );
         if !empty {
             assert!(raw.check_and_insert("local", "capability")?);
             assert!(raw.check_and_insert_through(

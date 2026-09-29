@@ -5,7 +5,11 @@
 //! identity before they write, and every mutation is one RAII transaction. So
 //! there is no phase between a commit and an anchor write for either.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 
 use std::path::PathBuf;
 

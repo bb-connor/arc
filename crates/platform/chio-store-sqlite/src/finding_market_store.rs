@@ -665,7 +665,10 @@ impl SqliteFindingMarketStore {
     /// observes a current non-retraction proof under the governance-pinned
     /// status-operator authorization. A concurrent status update therefore
     /// wins before an unsellable listing can open another fee intent.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn begin_live_participation_fee_intent(
         &self,
         intent: &FindingFeeIntent<'_>,
@@ -996,7 +999,10 @@ impl SqliteFindingMarketStore {
     /// envelope and matched to its durable intent in the same transaction.
     /// Another admission cannot prepare for the same finding or listing
     /// while this attempt is pending.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn prepare_listing_activation(
         &self,
         admission_envelope_json: &str,
@@ -2273,5 +2279,9 @@ mod fee_recovery;
 mod status_read;
 #[cfg(test)]
 #[path = "finding_market_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

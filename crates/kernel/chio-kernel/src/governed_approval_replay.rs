@@ -13,6 +13,8 @@ use crate::KernelError;
 /// Refusal rules of the process-local approval custody store.
 #[derive(Debug, thiserror::Error)]
 pub enum ApprovalReplayError {
+    #[error("approval replay store capacity must be positive")]
+    InvalidCapacity,
     #[error("approval replay store unavailable; marker retained")]
     Unavailable,
     #[error("approval replay store capacity exhausted")]
@@ -25,6 +27,7 @@ pub enum ApprovalReplayError {
 impl ApprovalReplayError {
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::InvalidCapacity => "urn:chio:error:kernel:approval-replay-invalid-capacity",
             Self::Unavailable => "urn:chio:error:kernel:approval-replay-unavailable",
             Self::Capacity => "urn:chio:error:kernel:approval-replay-capacity",
             Self::Identity => "urn:chio:error:kernel:approval-replay-identity",
@@ -96,18 +99,24 @@ struct ApprovalReplayEntry {
 }
 
 impl InMemoryGovernedApprovalReplayStore {
-    /// # Panics
-    ///
-    /// Panics when `capacity` is zero.
-    #[must_use]
-    pub fn new(capacity: usize) -> Self {
+    /// Reject a zero marker capacity without constructing a replay store.
+    pub fn new(capacity: usize) -> Result<Self, ApprovalReplayError> {
         Self::with_clock(capacity, Arc::new(SystemClock))
     }
-    pub fn with_clock(capacity: usize, clock: Arc<dyn Clock>) -> Self {
-        let capacity = match NonZeroUsize::new(capacity) {
-            Some(capacity) => capacity,
-            None => panic!("governed approval replay capacity must be greater than zero"),
-        };
+
+    pub fn with_clock(capacity: usize, clock: Arc<dyn Clock>) -> Result<Self, ApprovalReplayError> {
+        let capacity = NonZeroUsize::new(capacity).ok_or(ApprovalReplayError::InvalidCapacity)?;
+        Ok(Self::from_capacity(capacity, clock))
+    }
+
+    pub(crate) fn with_default_capacity(clock: Arc<dyn Clock>) -> Self {
+        // Construct the shipped positive constant without a runtime assertion.
+        const CAPACITY: NonZeroUsize =
+            NonZeroUsize::MIN.saturating_add(DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY - 1);
+        Self::from_capacity(CAPACITY, clock)
+    }
+
+    fn from_capacity(capacity: NonZeroUsize, clock: Arc<dyn Clock>) -> Self {
         Self {
             inner: Mutex::new(ApprovalReplayState {
                 cache: LruCache::new(capacity),
@@ -188,7 +197,7 @@ impl InMemoryGovernedApprovalReplayStore {
 
 impl Default for InMemoryGovernedApprovalReplayStore {
     fn default() -> Self {
-        Self::new(DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY)
+        Self::with_default_capacity(Arc::new(SystemClock))
     }
 }
 
@@ -271,5 +280,9 @@ fn validate_key_part(_name: &str, value: &str) -> Result<(), KernelError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

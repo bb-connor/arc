@@ -216,7 +216,7 @@ impl CaptureExecutionHoldRequest {
         if self.revocation_ids.is_empty()
             || self
                 .revocation_ids
-                .windows(2)
+                .array_windows::<2>()
                 .any(|pair| pair[0].as_bytes() >= pair[1].as_bytes())
         {
             return Err(BrokerError::InvalidRequest(

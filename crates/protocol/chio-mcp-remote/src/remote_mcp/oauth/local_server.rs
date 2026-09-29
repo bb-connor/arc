@@ -529,7 +529,7 @@ impl LocalAuthorizationServer {
                 "alg": "EdDSA",
                 "use": "sig",
                 "kid": jwk_key_id(&self.signing_key.public_key()),
-                "x": URL_SAFE_NO_PAD.encode(self.signing_key.public_key().as_bytes()),
+                "x": URL_SAFE_NO_PAD.encode(self.signing_key.public_key_bytes()),
             }]
         })
     }

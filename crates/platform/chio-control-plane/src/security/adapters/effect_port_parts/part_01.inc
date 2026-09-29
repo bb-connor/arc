@@ -131,15 +131,13 @@ impl ActiveResponseEffectPort {
         alert_outbox: Arc<SqliteSiemOutbox>,
         blast_radius: Arc<dyn BlastRadiusPort>,
     ) -> PortResult<Self> {
-        let alert_store = Arc::clone(&alert_outbox) as Arc<dyn EscalateAlertStore>;
-        let throttle_store = Arc::clone(&security_store) as Arc<dyn SessionThrottleStore>;
-        let egress_store = Arc::clone(&security_store) as Arc<dyn EgressRestrictionStore>;
-        let session_suspension_store =
-            Arc::clone(&security_store) as Arc<dyn ContainmentOverlayStore>;
-        let capability_suspension_store =
-            Arc::clone(&security_store) as Arc<dyn CapabilitySetSuspensionStore>;
-        let issuance_freeze_store = Arc::clone(&security_store) as Arc<dyn IssuanceFreezeStore>;
-        let scheduler_store = Arc::clone(&security_store) as Arc<dyn ResponseSchedulerStore>;
+        let alert_store: Arc<dyn EscalateAlertStore> = alert_outbox.clone();
+        let throttle_store: Arc<dyn SessionThrottleStore> = security_store.clone();
+        let egress_store: Arc<dyn EgressRestrictionStore> = security_store.clone();
+        let session_suspension_store: Arc<dyn ContainmentOverlayStore> = security_store.clone();
+        let capability_suspension_store: Arc<dyn CapabilitySetSuspensionStore> = security_store.clone();
+        let issuance_freeze_store: Arc<dyn IssuanceFreezeStore> = security_store.clone();
+        let scheduler_store: Arc<dyn ResponseSchedulerStore> = security_store.clone();
         let backends: Vec<Arc<dyn ResponseEffectBackend>> = vec![
             Arc::new(EscalateAlertBackend::new(alert_store)),
             Arc::new(SessionThrottleBackend::new(throttle_store)),

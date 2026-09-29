@@ -232,7 +232,7 @@ impl ActiveDefenseDeploymentConfig {
             validate_absolute_path(path, false, "broker database")?;
         }
         paths.sort();
-        if paths.windows(2).any(|pair| pair[0] == pair[1]) {
+        if paths.array_windows::<2>().any(|pair| pair[0] == pair[1]) {
             return Err(AuthorityError::InvalidConfig(
                 "deployment paths must not alias across privileged roles".to_string(),
             ));

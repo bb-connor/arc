@@ -22,7 +22,8 @@ pub fn is_systemd_credential(file: &File, service_uid: u32) -> io::Result<bool> 
     }
     let filesystem = rustix::fs::fstatfs(file)?;
     // RAMFS_MAGIC from Linux's uapi/linux/magic.h is not exported by libc.
-    if filesystem.f_type != libc::TMPFS_MAGIC && filesystem.f_type as u64 != 0x8584_58f6 {
+    if filesystem.f_type != libc::TMPFS_MAGIC && u64::try_from(filesystem.f_type) != Ok(0x8584_58f6)
+    {
         return Ok(false);
     }
     if !rustix::fs::fstatvfs(file)?
@@ -48,6 +49,10 @@ pub fn is_systemd_credential(_file: &File, _service_uid: u32) -> io::Result<bool
 }
 
 #[cfg(target_os = "linux")]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The fixed 44-byte ACL has a 4-byte header and five exact 8-byte chunks, split into 2/2/4-byte fields."
+)]
 fn credential_acl(service_uid: u32) -> [u8; 44] {
     let mut acl = [0_u8; 44];
     acl[..4].copy_from_slice(&2_u32.to_le_bytes());

@@ -11,9 +11,9 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
 use crate::external::bedrock::classify_status_error;
 use crate::external::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
@@ -37,7 +37,7 @@ pub const DEFAULT_CLIENT_VERSION: &str = "0.1.0";
 #[derive(Clone)]
 pub struct SafeBrowsingConfig {
     /// API key (query parameter `key`).
-    pub api_key: Zeroizing<String>,
+    pub api_key: SecretString,
     /// Client identifier submitted in the request body.
     pub client_id: String,
     /// Client version submitted in the request body.
@@ -67,7 +67,7 @@ impl SafeBrowsingConfig {
     /// Construct a config with defaults.
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
-            api_key: Zeroizing::new(api_key.into()),
+            api_key: SecretString::from(api_key.into()),
             client_id: DEFAULT_CLIENT_ID.to_string(),
             client_version: DEFAULT_CLIENT_VERSION.to_string(),
             base_url: None,
@@ -229,7 +229,7 @@ impl ExternalGuard for SafeBrowsingGuard {
         let endpoint = format!(
             "{}/threatMatches:find?key={}",
             self.base_url,
-            self.cfg.api_key.as_str()
+            self.cfg.api_key.expose_secret()
         );
 
         let body = FindRequest {

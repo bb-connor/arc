@@ -28,21 +28,18 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let mut history = load_exact_history(runtime, operation, now)?;
         validate_recovery_history(operation, &history)?;
-        let Some(index) = history
-            .iter()
-            .position(|claim| claim.disposition == Disposition::ReservedBeforeDispatch)
+        let Some(claim) = history
+            .iter_mut()
+            .find(|claim| claim.disposition == Disposition::ReservedBeforeDispatch)
         else {
             return Ok(());
         };
         store_call("release", || {
-            runtime.store.release_governed_approval(
-                operation,
-                lease,
-                &history[index].reference,
-                now,
-            )
+            runtime
+                .store
+                .release_governed_approval(operation, lease, &claim.reference, now)
         })?;
-        history[index].disposition = Disposition::ReleasedBeforeDispatch;
+        claim.disposition = Disposition::ReleasedBeforeDispatch;
         if load_exact_history(runtime, operation, now)? != history {
             return Err(custody_error(
                 "approval release did not preserve its exact ownership history",

@@ -114,7 +114,7 @@ pub(super) fn insert_event(
     observed: u64,
     fence: &StoreMutationFence,
 ) -> Result<(), AdmissionOperationStoreError> {
-    if sequence != record.events.len() as u64 + 1 || !(1..=3).contains(&sequence) {
+    if sequence != crate::integer::count(record.events.len()) + 1 || !(1..=3).contains(&sequence) {
         return Err(integrity_error("invalid migration event transition"));
     }
     if record
@@ -233,8 +233,12 @@ fn validate_storage_bounds(connection: &Connection) -> IntegrityResult<bool> {
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|error| error.to_string())?;
-    if !(0..=MAX_MIGRATIONS as i64).contains(&expectations)
-        || !(0..=MAX_TOTAL_SOURCE_BYTES as i64).contains(&bytes)
+    if !(0..=crate::integer::checked::<_, i64>(MAX_MIGRATIONS)
+        .map_err(|error| error.to_string())?)
+        .contains(&expectations)
+        || !(0..=crate::integer::checked::<_, i64>(MAX_TOTAL_SOURCE_BYTES)
+            .map_err(|error| error.to_string())?)
+            .contains(&bytes)
     {
         return Err("migration expectation aggregate limit exceeded".into());
     }
@@ -260,7 +264,7 @@ fn validate_storage_bounds(connection: &Connection) -> IntegrityResult<bool> {
         let rows: i64 = connection.query_row(
             &format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0),
         ).map_err(|error| error.to_string())?;
-        if !(0..=maximum_rows as i64).contains(&rows) {
+        if !(0..=crate::integer::checked::<_, i64>(maximum_rows).map_err(|error| error.to_string())?).contains(&rows) {
             return Err(format!("{table} row limit exceeded"));
         }
         let predicate = columns.into_iter()
@@ -408,9 +412,10 @@ fn load_bounded_record(
     let mut previous = GENESIS_CHAIN_DIGEST;
     let mut observed = 0;
     for (index, event) in events.iter().enumerate() {
-        if event.sequence != index as u64 + 1
+        if event.sequence != crate::integer::count(index) + 1
             || event.mutation_kind
-                != migration_mutation(index as u64 + 1).map_err(|error| error.to_string())?
+                != migration_mutation(crate::integer::count(index) + 1)
+                    .map_err(|error| error.to_string())?
             || event.expectation_digest != record.expectation_digest
             || event.inventory_sha256 != record.snapshot.inventory_sha256()
             || event.fence.store_uuid != record.snapshot.destination_authority_id()

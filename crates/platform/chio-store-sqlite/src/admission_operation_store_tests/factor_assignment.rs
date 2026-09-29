@@ -771,7 +771,10 @@ fn persist_receivable(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn signed_receipt(
     suffix: &str,
     operation: &AdmissionOperationV1,

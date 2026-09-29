@@ -254,56 +254,54 @@ fn fresh_live_dispatch_rejects_simulation_authority() {
     let simulated = DispatchRejection::ExecutionMode {
         observed: ResponseExecutionMode::DryRun,
     };
-    for (execution, expected) in [(
+    let (execution, expected) = (
         ResponseExecutionBinding::new(ResponseExecutionMode::DryRun),
         simulated,
-    )] {
-        let response_plan = plan_with_execution(ResponseApprovalRequirement::Automatic, execution);
-        let observed = match chio_security_types::FreshLiveAdmission::new(response_plan) {
-            Err(rejection) => rejection,
-            Ok(_) => panic!("fresh authority accepted {execution:?}"),
-        };
-        assert_eq!(observed, expected, "fresh authority for {execution:?}");
-    }
+    );
+    let response_plan = plan_with_execution(ResponseApprovalRequirement::Automatic, execution);
+    let observed = match chio_security_types::FreshLiveAdmission::new(response_plan) {
+        Err(rejection) => rejection,
+        Ok(_) => panic!("fresh authority accepted {execution:?}"),
+    };
+    assert_eq!(observed, expected, "fresh authority for {execution:?}");
 }
 
 #[test]
 fn direct_state_transition_cannot_activate_a_simulated_plan() {
-    for (execution, expected) in [(
+    let (execution, expected) = (
         ResponseExecutionBinding::new(ResponseExecutionMode::DryRun),
         DispatchRejection::ExecutionMode {
             observed: ResponseExecutionMode::DryRun,
         },
-    )] {
-        let store = Arc::new(TestResponseStore::default());
-        let snapshot = chio_quarantine::state_machine::projection::initial_response_snapshot(
-            plan_with_execution(ResponseApprovalRequirement::Automatic, execution),
-        )
-        .unwrap_or_else(|error| panic!("retained snapshot: {error}"));
-        let current = response_record(&snapshot);
+    );
+    let store = Arc::new(TestResponseStore::default());
+    let snapshot = chio_quarantine::state_machine::projection::initial_response_snapshot(
+        plan_with_execution(ResponseApprovalRequirement::Automatic, execution),
+    )
+    .unwrap_or_else(|error| panic!("retained snapshot: {error}"));
+    let current = response_record(&snapshot);
+    store
+        .create(&current)
+        .unwrap_or_else(|error| panic!("seed retained record: {error}"));
+    let machine = ResponseStateMachine::new(Arc::clone(&store));
+    assert!(
+        matches!(machine.transition(&current, &ResponseTransitionRequest {
+        expected_generation: 0,
+        target_state: ResponseState::Applying,
+        occurred_at_unix_ms: 41_000,
+        applying_lease_expires_at_unix_ms: Some(42_000),
+        error_code: None,
+    }), Err(StateMachineError::InvalidDispatch(observed)) if observed == expected)
+    );
+    assert_eq!(
         store
-            .create(&current)
-            .unwrap_or_else(|error| panic!("seed retained record: {error}"));
-        let machine = ResponseStateMachine::new(Arc::clone(&store));
-        assert!(
-            matches!(machine.transition(&current, &ResponseTransitionRequest {
-            expected_generation: 0,
-            target_state: ResponseState::Applying,
-            occurred_at_unix_ms: 41_000,
-            applying_lease_expires_at_unix_ms: Some(42_000),
-            error_code: None,
-        }), Err(StateMachineError::InvalidDispatch(observed)) if observed == expected)
-        );
-        assert_eq!(
-            store
-                .load_plan(&chio_security_types::ports::ResponsePlanKey {
-                    tenant_id: current.tenant_id.clone(),
-                    action_id: current.action_id.clone(),
-                })
-                .unwrap_or_else(|error| panic!("load retained plan: {error}")),
-            Some(current)
-        );
-    }
+            .load_plan(&chio_security_types::ports::ResponsePlanKey {
+                tenant_id: current.tenant_id.clone(),
+                action_id: current.action_id.clone(),
+            })
+            .unwrap_or_else(|error| panic!("load retained plan: {error}")),
+        Some(current)
+    );
 }
 
 #[test]

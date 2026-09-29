@@ -34,8 +34,8 @@ use chio_governance::lease::{
     CapabilityLeaseActionClass, CapabilityLeaseArtifact, SignedCapabilityLease,
     CAPABILITY_LEASE_SCHEMA_V1,
 };
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
-use zeroize::Zeroizing;
 
 mod frost_ceremony;
 mod frost_coordinator;
@@ -120,20 +120,41 @@ pub struct AuthorityProfileDocument {
     pub revocation_authority: ChioRevocationAuthority,
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NamedSeedHex {
     pub id: String,
-    pub seed_hex: Zeroizing<String>,
+    pub seed_hex: SecretString,
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Private signing-key custody. Public artifact serializers cannot accept it.
+///
+/// ```
+/// use chio_federation_authority::LocalAuthoritySigningKeysDocument;
+/// use secrecy::ExposeSecret;
+/// fn explicit_access(keys: &LocalAuthoritySigningKeysDocument) -> &str {
+///     keys.revocation_authority_seed_hex.expose_secret()
+/// }
+/// ```
+///
+/// ```compile_fail
+/// fn export(keys: &chio_federation_authority::LocalAuthoritySigningKeysDocument) {
+///     let _ = serde_json::to_vec(keys);
+/// }
+/// ```
+///
+/// ```compile_fail
+/// fn duplicate(keys: chio_federation_authority::LocalAuthoritySigningKeysDocument) {
+///     let _ = keys.clone();
+/// }
+/// ```
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LocalAuthoritySigningKeysDocument {
     pub schema: String,
     pub lease_authority_seeds: Vec<NamedSeedHex>,
     pub governance_authority_seeds: Vec<NamedSeedHex>,
-    pub revocation_authority_seed_hex: Zeroizing<String>,
+    pub revocation_authority_seed_hex: SecretString,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -237,7 +258,7 @@ impl LocalAuthoritySigningKeysDocument {
         }
         validate_seed_entries(&self.lease_authority_seeds, "leaseAuthoritySeeds")?;
         validate_seed_entries(&self.governance_authority_seeds, "governanceAuthoritySeeds")?;
-        keypair_from_seed_hex(&self.revocation_authority_seed_hex)
+        keypair_from_seed_hex(self.revocation_authority_seed_hex.expose_secret())
             .map_err(ChioAuthorityError::SigningKeys)?;
         Ok(())
     }
@@ -662,8 +683,9 @@ pub fn publish_revocation_checkpoint(
         "revocation checkpoint",
         &request.checkpoint_id,
     )?;
-    let revocation_key = keypair_from_seed_hex(&signing_keys.revocation_authority_seed_hex)
-        .map_err(ChioAuthorityError::SigningKeys)?;
+    let revocation_key =
+        keypair_from_seed_hex(signing_keys.revocation_authority_seed_hex.expose_secret())
+            .map_err(ChioAuthorityError::SigningKeys)?;
     ensure_key_matches_authority(
         &revocation_key,
         &profile.revocation_authority.public_key,
@@ -797,7 +819,8 @@ fn validate_seed_entries(entries: &[NamedSeedHex], label: &str) -> Result<(), Ch
     let mut ids = BTreeSet::new();
     for entry in entries {
         validate_non_empty(&entry.id, label).map_err(ChioAuthorityError::SigningKeys)?;
-        keypair_from_seed_hex(&entry.seed_hex).map_err(ChioAuthorityError::SigningKeys)?;
+        keypair_from_seed_hex(entry.seed_hex.expose_secret())
+            .map_err(ChioAuthorityError::SigningKeys)?;
         if !ids.insert(&entry.id) {
             return Err(ChioAuthorityError::SigningKeys(format!(
                 "duplicate signing seed id {}",
@@ -830,7 +853,7 @@ fn keypair_for_named_seed(
     let entry = entries.iter().find(|entry| entry.id == id).ok_or_else(|| {
         ChioAuthorityError::SigningKeys(format!("{label} {id} has no local signing seed"))
     })?;
-    keypair_from_seed_hex(&entry.seed_hex).map_err(ChioAuthorityError::SigningKeys)
+    keypair_from_seed_hex(entry.seed_hex.expose_secret()).map_err(ChioAuthorityError::SigningKeys)
 }
 
 fn keypair_from_seed_hex(seed_hex: &str) -> Result<Keypair, String> {

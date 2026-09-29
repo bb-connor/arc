@@ -38,7 +38,10 @@ fn stream_receipt_content(
         let bytes = canonical_json_bytes(&chunk.data).map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to hash stream chunk: {e}"))
         })?;
-        total_bytes = crate::runtime::checked_stream_byte_total(total_bytes, bytes.len() as u64)?;
+        total_bytes = crate::runtime::checked_stream_byte_total(
+            total_bytes,
+            crate::runtime::stream_size(bytes.len())?,
+        )?;
         let chunk_hash = sha256_hex(&bytes);
         combined.extend_from_slice(chunk_hash.as_bytes());
         chunk_hashes.push(chunk_hash);
@@ -113,14 +116,16 @@ where
 
     for chunk in chunks {
         // Chunk-count bound first: retaining another chunk would exceed the cap.
-        if max_stream_chunks > 0 && accepted.len() as u64 >= max_stream_chunks {
+        if max_stream_chunks > 0
+            && crate::runtime::stream_size(accepted.len())? >= max_stream_chunks
+        {
             cause = Some(StreamTruncationCause::ChunkLimit);
             break;
         }
         let bytes = canonical_json_bytes(&chunk.data).map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to size stream chunk: {e}"))
         })?;
-        let chunk_bytes = bytes.len() as u64;
+        let chunk_bytes = crate::runtime::stream_size(bytes.len())?;
         let next = crate::runtime::checked_stream_byte_total(total_bytes, chunk_bytes)?;
         if max_stream_total_bytes > 0 && next > max_stream_total_bytes {
             cause = Some(StreamTruncationCause::ByteLimit);

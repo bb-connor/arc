@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 impl BudgetStore for SqliteBudgetStore {
@@ -76,7 +77,10 @@ impl BudgetStore for SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![&request.capability_id, request.grant_index as i64],
+                params![
+                    &request.capability_id,
+                    crate::integer::checked::<_, i64>(request.grant_index)?
+                ],
                 |row| {
                     Ok((
                         budget_u64_from_row(row, 0, "seq")?,
@@ -297,7 +301,7 @@ impl BudgetStore for SqliteBudgetStore {
             let matches = existing.kind == BudgetMutationKind::CancelCapturedBeforeDispatch
                 && existing.hold_id.as_deref() == Some(request.hold_id.as_str())
                 && existing.capability_id == request.capability_id
-                && existing.grant_index == request.grant_index as u32
+                && existing.grant_index == crate::integer::checked::<_, u32>(request.grant_index)?
                 && existing.allowed == Some(true)
                 && existing.realized_spend_units == 0
                 && existing.max_invocations.is_none()
@@ -365,7 +369,7 @@ impl BudgetStore for SqliteBudgetStore {
         let capture =
             SqliteBudgetStore::load_current_capture_event(&transaction, &request.hold_id)?;
         if capture.capability_id != request.capability_id
-            || capture.grant_index != request.grant_index as u32
+            || capture.grant_index != crate::integer::checked::<_, u32>(request.grant_index)?
             || capture.allowed != Some(true)
         {
             transaction.rollback()?;
@@ -382,7 +386,10 @@ impl BudgetStore for SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![&request.capability_id, request.grant_index as i64],
+                params![
+                    &request.capability_id,
+                    crate::integer::checked::<_, i64>(request.grant_index)?
+                ],
                 |row| {
                     Ok((
                         budget_u32_from_row(row, 0, "invocation_count")?,
@@ -422,7 +429,7 @@ impl BudgetStore for SqliteBudgetStore {
             "#,
             params![
                 &request.capability_id,
-                request.grant_index as i64,
+                crate::integer::checked::<_, i64>(request.grant_index)?,
                 InvocationCount::new(current.0)
                     .try_sub(InvocationCount::new(1))?
                     .get(),
@@ -806,7 +813,10 @@ impl BudgetStore for SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![capability_id, grant_index as i64],
+                params![
+                    capability_id,
+                    crate::integer::checked::<_, i64>(grant_index)?
+                ],
                 |row| {
                     Ok((
                         budget_u32_from_row(row, 0, "invocation_count")?,
@@ -856,7 +866,7 @@ impl BudgetStore for SqliteBudgetStore {
             "#,
             params![
                 capability_id,
-                grant_index as i64,
+                crate::integer::checked::<_, i64>(grant_index)?,
                 InvocationCount::new(invocation_count)
                     .try_sub(InvocationCount::new(1))?
                     .get(),
@@ -1027,7 +1037,10 @@ impl BudgetStore for SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![capability_id, grant_index as i64],
+                params![
+                    capability_id,
+                    crate::integer::checked::<_, i64>(grant_index)?
+                ],
                 |row| {
                     Ok((
                         budget_u32_from_row(row, 0, "invocation_count")?,
@@ -1070,7 +1083,7 @@ impl BudgetStore for SqliteBudgetStore {
             "#,
             params![
                 capability_id,
-                grant_index as i64,
+                crate::integer::checked::<_, i64>(grant_index)?,
                 self.unix_now()?,
                 budget_u64_to_sqlite(seq, "seq")?,
                 budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?,
@@ -1265,7 +1278,10 @@ impl BudgetStore for SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![capability_id, grant_index as i64],
+                params![
+                    capability_id,
+                    crate::integer::checked::<_, i64>(grant_index)?
+                ],
                 |row| {
                     Ok((
                         budget_u32_from_row(row, 0, "invocation_count")?,
@@ -1320,7 +1336,7 @@ impl BudgetStore for SqliteBudgetStore {
             "#,
             params![
                 capability_id,
-                grant_index as i64,
+                crate::integer::checked::<_, i64>(grant_index)?,
                 self.unix_now()?,
                 budget_u64_to_sqlite(seq, "seq")?,
                 budget_u64_to_sqlite(new_total_cost_exposed, "total_cost_exposed")?,
@@ -1404,7 +1420,10 @@ impl BudgetStore for SqliteBudgetStore {
             LIMIT ?2
             "#,
         )?;
-        let rows = statement.query_map(params![capability_id, limit as i64], record_from_row)?;
+        let rows = statement.query_map(
+            params![capability_id, crate::integer::checked::<_, i64>(limit)?],
+            record_from_row,
+        )?;
         let rows = rows.collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         transaction.rollback()?;
@@ -1433,7 +1452,10 @@ impl BudgetStore for SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![capability_id, grant_index as i64],
+                params![
+                    capability_id,
+                    crate::integer::checked::<_, i64>(grant_index)?
+                ],
                 record_from_row,
             )
             .optional()?;
@@ -1544,8 +1566,10 @@ impl BudgetStore for SqliteBudgetStore {
             .query_map(
                 params![
                     capability_id,
-                    grant_index.map(|value| value as i64),
-                    limit as i64
+                    grant_index
+                        .map(crate::integer::checked::<_, i64>)
+                        .transpose()?,
+                    crate::integer::checked::<_, i64>(limit)?
                 ],
                 |row| row.get::<_, String>(0),
             )?

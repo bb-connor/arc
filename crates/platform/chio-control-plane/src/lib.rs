@@ -1,4 +1,22 @@
-#![allow(clippy::result_large_err, clippy::too_many_arguments)]
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![allow(
+    clippy::result_large_err,
+    clippy::too_many_arguments,
+    reason = "Preserve the typed rejection and its source without allocating a box on the failure path. Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub use chio_agent_web_interop as agent_web;
 use chio_core::capability::threshold_approval::ThresholdApprovalRequirement;
 use chio_core::crypto::Keypair;
@@ -14,6 +32,7 @@ pub mod attestation;
 pub mod certify;
 mod durable_admission;
 mod error;
+mod integer;
 mod json_input;
 mod signed_input;
 pub use chio_enterprise_export as enterprise_export;
@@ -559,7 +578,11 @@ fn write_authority_seed_file(path: &Path, keypair: &Keypair) -> Result<(), CliEr
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 

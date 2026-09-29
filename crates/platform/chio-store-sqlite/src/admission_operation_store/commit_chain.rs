@@ -80,7 +80,10 @@ pub(super) fn append_operation_commit(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(crate) fn append_operation_commit_with_participant(
     transaction: &Transaction<'_>,
     operation: &AdmissionOperationV1,

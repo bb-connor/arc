@@ -15,8 +15,14 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
 
         let count_sql = r#"
@@ -46,7 +52,7 @@ impl SqliteReceiptStore {
                 ],
                 |row| row.get::<_, i64>(0),
             )
-            .map(|value| value.max(0) as u64)?;
+            .map(|value| u64::try_from(value.max(0)).unwrap_or_default())?;
 
         let data_sql = r#"
             SELECT r.seq, r.raw_json
@@ -76,7 +82,7 @@ impl SqliteReceiptStore {
                 ],
                 |row| {
                     Ok((
-                        row.get::<_, i64>(0)?.max(0) as u64,
+                        u64::try_from(row.get::<_, i64>(0)?.max(0)).unwrap_or_default(),
                         row.get::<_, String>(1)?,
                     ))
                 },
@@ -144,7 +150,7 @@ impl SqliteReceiptStore {
                 attempted_cost,
                 "cost attribution attempted-cost total",
             )?;
-            max_delegation_depth = max_delegation_depth.max(financial.delegation_depth as u64);
+            max_delegation_depth = max_delegation_depth.max(u64::from(financial.delegation_depth));
 
             if let Some(root_key) = root_subject_key.clone() {
                 distinct_roots.insert(root_key.clone());
@@ -162,7 +168,7 @@ impl SqliteReceiptStore {
                 )?;
                 root_entry.max_delegation_depth = root_entry
                     .max_delegation_depth
-                    .max(financial.delegation_depth as u64);
+                    .max(u64::from(financial.delegation_depth));
 
                 if let Some(leaf_key) = leaf_subject_key.clone() {
                     root_entry.leaf_subjects.insert(leaf_key.clone());
@@ -180,7 +186,7 @@ impl SqliteReceiptStore {
                     )?;
                     leaf_entry.max_delegation_depth = leaf_entry
                         .max_delegation_depth
-                        .max(financial.delegation_depth as u64);
+                        .max(u64::from(financial.delegation_depth));
                 }
             }
 
@@ -200,7 +206,7 @@ impl SqliteReceiptStore {
                     root_subject_key,
                     leaf_subject_key,
                     grant_index: Some(financial.grant_index),
-                    delegation_depth: financial.delegation_depth as u64,
+                    delegation_depth: u64::from(financial.delegation_depth),
                     cost_charged: financial.cost_charged,
                     attempted_cost: financial.attempted_cost,
                     currency: financial.currency.clone(),
@@ -222,7 +228,7 @@ impl SqliteReceiptStore {
                 receipt_count: aggregate.receipt_count,
                 total_cost_charged: aggregate.total_cost_charged,
                 total_attempted_cost: aggregate.total_attempted_cost,
-                distinct_leaf_subjects: aggregate.leaf_subjects.len() as u64,
+                distinct_leaf_subjects: crate::integer::count(aggregate.leaf_subjects.len()),
                 max_delegation_depth: aggregate.max_delegation_depth,
             })
             .collect::<Vec<_>>();
@@ -259,14 +265,14 @@ impl SqliteReceiptStore {
         Ok(CostAttributionReport {
             summary: CostAttributionSummary {
                 matching_receipts,
-                returned_receipts: receipts.len() as u64,
+                returned_receipts: crate::integer::count(receipts.len()),
                 total_cost_charged,
                 total_attempted_cost,
                 max_delegation_depth,
-                distinct_root_subjects: distinct_roots.len() as u64,
-                distinct_leaf_subjects: distinct_leaves.len() as u64,
+                distinct_root_subjects: crate::integer::count(distinct_roots.len()),
+                distinct_leaf_subjects: crate::integer::count(distinct_leaves.len()),
                 lineage_gap_count,
-                truncated: matching_receipts > receipts.len() as u64,
+                truncated: matching_receipts > crate::integer::count(receipts.len()),
             },
             by_root,
             by_leaf,

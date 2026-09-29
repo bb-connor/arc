@@ -44,8 +44,7 @@ pub(super) fn start(
     }
     // Disabled/Shadow demos are explicitly unconfined. Never let that opt-in
     // turn privileged provisioning into an unconfined root execution path.
-    // SAFETY: these credential queries have no pointer arguments or side effects.
-    let privileged = unsafe { libc::getuid() == 0 || libc::geteuid() == 0 };
+    let privileged = rustix::process::getuid().is_root() || rustix::process::geteuid().is_root();
     if privileged {
         return Err(CliError::cli_other_error(
             "privileged discovery requires an Enforced cage; supply --tools-fixture for unconfined demo provisioning",

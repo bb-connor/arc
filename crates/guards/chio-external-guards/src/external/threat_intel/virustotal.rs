@@ -17,9 +17,9 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::Client;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
 use crate::external::bedrock::classify_status_error;
 use crate::external::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
@@ -40,7 +40,7 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 #[derive(Clone)]
 pub struct VirusTotalConfig {
     /// `x-apikey` header.
-    pub api_key: Zeroizing<String>,
+    pub api_key: SecretString,
     /// Override the base URL (test hook).
     pub base_url: Option<String>,
     /// Detection threshold. Calls are denied when
@@ -65,7 +65,7 @@ impl VirusTotalConfig {
     /// Construct a config with defaults.
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
-            api_key: Zeroizing::new(api_key.into()),
+            api_key: SecretString::from(api_key.into()),
             base_url: None,
             min_detections: DEFAULT_MIN_DETECTIONS,
             timeout: DEFAULT_TIMEOUT,
@@ -251,7 +251,7 @@ impl ExternalGuard for VirusTotalGuard {
         let mut headers = HeaderMap::new();
         headers.insert(
             "x-apikey",
-            HeaderValue::from_str(self.cfg.api_key.as_str())
+            HeaderValue::from_str(self.cfg.api_key.expose_secret())
                 .map_err(|e| ExternalGuardError::Permanent(format!("invalid api key: {e}")))?,
         );
 

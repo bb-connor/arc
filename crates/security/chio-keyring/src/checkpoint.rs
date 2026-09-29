@@ -86,7 +86,7 @@ impl<'de> Deserialize<'de> for SignedKeyLogCheckpoint {
         let wire = SignedKeyLogCheckpointWire::deserialize(deserializer)?;
         if wire
             .witness_signatures
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].witness_id >= pair[1].witness_id)
         {
             return Err(serde::de::Error::custom(

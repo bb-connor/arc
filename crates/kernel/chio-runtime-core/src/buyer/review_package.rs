@@ -100,7 +100,7 @@ fn verify_buyer_attestation_review_package_internal(
         }
         let observed = sha256_hex(&source.bytes);
         if observed != artifact_ref.artifact_sha256
-            || source.bytes.len() as u64 != artifact_ref.byte_count
+            || u64::try_from(source.bytes.len()) != Ok(artifact_ref.byte_count)
         {
             checks.push(buyer_review_check(
                 "chio_buyer_review.artifact_hash_bound",
@@ -143,7 +143,7 @@ fn verify_buyer_attestation_review_package_internal(
                 checks,
             ));
         };
-        if bytes.len() as u64 != artifact_ref.byte_count {
+        if u64::try_from(bytes.len()) != Ok(artifact_ref.byte_count) {
             checks.push(buyer_review_check(
                 "chio_buyer_review.artifact_hash_bound",
                 false,

@@ -1430,7 +1430,7 @@ pub(crate) async fn handle_federated_issue(
                             .map(|link| link.capability_id.clone());
                         let mut child_snapshot = match build_capability_snapshot(
                             &capability,
-                            capability.delegation_chain.len() as u64,
+                            crate::integer::count(capability.delegation_chain.len()),
                             signed_parent_capability_id,
                         ) {
                             Ok(snapshot) => snapshot,

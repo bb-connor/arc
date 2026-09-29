@@ -59,7 +59,8 @@ fn prune_checks_the_entire_release_before_deleting_any_marker() -> TestResult {
 
 #[test]
 fn owned_rollback_preserves_marker_on_byte_underflow_and_latches_refusal() -> TestResult {
-    let store = DpopNonceStore::new(8, Duration::from_secs(60));
+    let store = DpopNonceStore::new(8, Duration::from_secs(60))
+        .expect("positive replay store test capacities");
     assert!(store.reserve_for_dispatch_until("nonce", "cap", u64::MAX, "owner")?);
     store
         .inner
@@ -158,7 +159,8 @@ fn proof_deadline_overflow_is_rejected_before_nonce_reservation() -> TestResult 
         proof_ttl_secs: u64::MAX,
         ..Default::default()
     };
-    let store = DpopNonceStore::new(8, Duration::from_secs(60));
+    let store = DpopNonceStore::new(8, Duration::from_secs(60))
+        .expect("positive replay store test capacities");
     for result in [
         verify_dpop_proof_stateless(
             &proof,

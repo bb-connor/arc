@@ -555,8 +555,9 @@ fn signing_key_custody_is_canonical_zeroizing_and_redacted() {
     let keys = signing_keys();
     let encoded = crate::signing_keys_json(&keys).expect("canonical custody");
     assert_eq!(
-        crate::signing_keys_from_json(&encoded).expect("decode"),
-        keys
+        crate::signing_keys_json(&crate::signing_keys_from_json(&encoded).expect("decode"))
+            .expect("export decoded custody"),
+        encoded
     );
     let debug = format!("{keys:?} {:?}", keys.lease_authority_seeds);
     for seed in [11, 12, 13] {

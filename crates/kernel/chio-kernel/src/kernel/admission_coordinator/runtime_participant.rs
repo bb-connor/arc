@@ -45,9 +45,9 @@ impl ChioKernel {
             ));
         }
         let runtime = self.durable_runtime()?;
-        let history = load_exact_history(runtime, operation, trusted_now_unix_ms)?;
+        let mut history = load_exact_history(runtime, operation, trusted_now_unix_ms)?;
         validate_recovery_history(operation, &history)?;
-        let Some(live_index) = history.iter().position(|claim| {
+        let Some(claim) = history.iter_mut().find(|claim| {
             claim.disposition == RuntimeParticipantDisposition::ReservedBeforeDispatch
         }) else {
             return Ok(());
@@ -56,7 +56,7 @@ impl ChioKernel {
             runtime.store.release_runtime_participants(
                 operation,
                 lease,
-                &history[live_index].reference,
+                &claim.reference,
                 trusted_now_unix_ms,
             )
         })?;
@@ -64,8 +64,8 @@ impl ChioKernel {
         // Do not treat an acknowledgement alone as proof of physical release.
         // Readback must preserve every reference and intent, including released
         // predecessors, and change only this episode's disposition.
-        let mut expected = history;
-        expected[live_index].disposition = RuntimeParticipantDisposition::ReleasedBeforeDispatch;
+        claim.disposition = RuntimeParticipantDisposition::ReleasedBeforeDispatch;
+        let expected = history;
         if load_exact_history(runtime, operation, trusted_now_unix_ms)? != expected {
             return Err(custody_error(
                 "runtime replay release did not retain the exact released history",

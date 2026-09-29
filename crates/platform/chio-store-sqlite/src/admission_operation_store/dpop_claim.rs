@@ -307,7 +307,7 @@ fn require_intent(
         ));
     }
     if retained
-        .retained_matching_grant(intent.grant_index() as usize)
+        .retained_matching_grant(crate::integer::checked::<_, usize>(intent.grant_index())?)
         .is_none()
     {
         return Err(invariant(

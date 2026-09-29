@@ -359,7 +359,10 @@ impl SqliteFiscalStore {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn admit_proposal(
         &self,
         proposal: &VerifiedFiscalProposal,
@@ -1047,7 +1050,10 @@ impl SqliteFiscalStore {
         Ok(record)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn persist_immutable_artifact(
         &self,
         table: &str,
@@ -1186,7 +1192,10 @@ impl SqliteFiscalStore {
         self.stage_advance_inner(advance, next_authority, None, None, fence)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn stage_activation_advance(
         &self,
         advance: &VerifiedFiscalContinuityAdvance,
@@ -1207,7 +1216,10 @@ impl SqliteFiscalStore {
         self.stage_advance_inner(advance, next_authority, Some(&mutation), None, fence)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn stage_charter_rotation_advance(
         &self,
         advance: &VerifiedFiscalContinuityAdvance,
@@ -1764,7 +1776,10 @@ fn prepare_activation_mutation(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn prepare_rotation_mutation(
     advance: &VerifiedFiscalContinuityAdvance,
     activation: &VerifiedFiscalActivation,
@@ -1849,7 +1864,7 @@ fn prepare_rotation_mutation(
         });
     }
     if schedules
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].domain >= pair[1].domain)
     {
         return Err(FiscalStoreError::Conflict);
@@ -2722,7 +2737,10 @@ fn ensure_legacy_envelope_digest_column(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn verify_exact_genesis(
     transaction: &Transaction<'_>,
     policy_json: &[u8],

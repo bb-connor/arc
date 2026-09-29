@@ -1,3 +1,18 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![forbid(unsafe_code)]
 mod error;
 pub mod finding_pool;
 mod types;

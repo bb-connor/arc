@@ -37,7 +37,7 @@ fn verify(proof: &DpopProof, store: &DpopNonceStore, config: &DpopConfig) -> Res
 fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new(8, Duration::ZERO);
+    let store = DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
     let proof = proof(
         &key,
         "sender-proof".to_owned(),
@@ -48,7 +48,7 @@ fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
     assert_eq!(store.utilization().unwrap().0, 1);
     // Characterize the former local-TTL path: the same cache configuration
     // immediately forgets local-only markers, although this proof is valid.
-    let legacy = DpopNonceStore::new(8, Duration::ZERO);
+    let legacy = DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
     assert!(legacy
         .check_and_insert(&proof.body.nonce, "sender-binding")
         .unwrap());
@@ -61,7 +61,7 @@ fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
 fn sender_dpop_rejects_oversized_keys_before_signature_verification_or_storage() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new(8, Duration::ZERO);
+    let store = DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
     let mut proof = proof(&key, "nonce".to_owned(), unix_now());
     proof.body.nonce = "private-marker".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES);
     let error = verify(&proof, &store, &config).unwrap_err();
@@ -75,7 +75,7 @@ fn sender_dpop_rejects_oversized_keys_before_signature_verification_or_storage()
 fn sender_dpop_byte_pressure_preserves_the_consumed_proof() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 40, Duration::ZERO);
+    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 40, Duration::ZERO).expect("positive replay store test capacities");
     let first = proof(&key, "first".to_owned(), unix_now());
     verify(&first, &store, &config).unwrap();
     let second = proof(&key, "second".to_owned(), unix_now());
@@ -94,7 +94,7 @@ fn sender_legacy_profile_rejects_a_durable_domain_even_when_resigned_as_v1() {
     use chio_kernel::dpop::authority::{DpopReplayAuthorityInputV1, DpopReplayAuthorityV1, DPOP_AUTHORITY_SCHEMA};
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new(8, Duration::from_secs(300));
+    let store = DpopNonceStore::new(8, Duration::from_secs(300)).expect("positive replay store test capacities");
     let mut body = proof(&key, "authority-proof".into(), unix_now()).body;
     body.replay_authority = Some(DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
         destination_store_uuid: AdmissionIdentifier::try_new("destination", "018f9878-7047-7abc-8c98-120dc65700ea").unwrap(),

@@ -649,16 +649,20 @@ fn validate_pre_dispatch_source(
     bundle: &MonetaryReleaseEvidenceV1,
     source: &PreDispatchReleaseSourceV1,
 ) -> Result<(), ToolOutcomeError> {
-    let manifest: PreDispatchParticipantManifestV1 =
-        parse_artifact_value(&bundle.source_artifacts[0])?;
-    let _: VerifierPolicyArtifactV1 = parse_artifact_value(&bundle.source_artifacts[1])?;
+    let checked_artifacts: &[_; 2] = bundle
+        .source_artifacts
+        .as_slice()
+        .try_into()
+        .map_err(|_| ToolOutcomeError::Binding("release_evidence.artifact_count"))?;
+    let manifest: PreDispatchParticipantManifestV1 = parse_artifact_value(&checked_artifacts[0])?;
+    let _: VerifierPolicyArtifactV1 = parse_artifact_value(&checked_artifacts[1])?;
     positive("release_evidence.verified_at", source.verified_at_unix_ms)?;
     validate_store_fence(&source.verification_store_fence)?;
     if source.operation_id != bundle.operation_id
         || source.operation_version != bundle.operation_version
         || source.verifier_policy_digest != bundle.verifier_policy_digest
-        || source.complete_participant_query_root != bundle.source_artifacts[0].digest
-        || source.verifier_policy_digest != bundle.source_artifacts[1].digest
+        || source.complete_participant_query_root != checked_artifacts[0].digest
+        || source.verifier_policy_digest != checked_artifacts[1].digest
         || source.participant_manifest != manifest
         || source.request_binding_hash != manifest.request_binding_hash
         || source.coordinator_lease_id != manifest.coordinator_lease_id
@@ -677,6 +681,11 @@ fn validate_transport_source(
     bundle: &MonetaryReleaseEvidenceV1,
     source: &TransportReleaseSourceV1,
 ) -> Result<(), ToolOutcomeError> {
+    let checked_artifacts: &[_; 3] = bundle
+        .source_artifacts
+        .as_slice()
+        .try_into()
+        .map_err(|_| ToolOutcomeError::Binding("release_evidence.artifact_count"))?;
     let evidence =
         transport::validate_artifacts(&bundle.source_artifacts, source.verified_at_unix_ms)?;
     let signed = &evidence.signed;
@@ -687,7 +696,7 @@ fn validate_transport_source(
     if source.operation_id != bundle.operation_id
         || source.operation_version != bundle.operation_version
         || source.verifier_policy_digest != bundle.verifier_policy_digest
-        || source.verifier_policy_digest != bundle.source_artifacts[2].digest
+        || source.verifier_policy_digest != checked_artifacts[2].digest
         || signed.verifier_identity != source.verifier_identity
         || signed.qualification_digest != source.qualification_digest
         || evidence.cancellation_digest != source.signed_status_digest
@@ -710,10 +719,15 @@ fn validate_zero_charge_source(
     bundle: &MonetaryReleaseEvidenceV1,
     source: &ZeroChargeReleaseSourceV1,
 ) -> Result<(), ToolOutcomeError> {
+    let checked_artifacts: &[_; 3] = bundle
+        .source_artifacts
+        .as_slice()
+        .try_into()
+        .map_err(|_| ToolOutcomeError::Binding("release_evidence.artifact_count"))?;
     if source.operation_id != bundle.operation_id
         || source.operation_version != bundle.operation_version
         || source.verifier_policy_digest != bundle.verifier_policy_digest
-        || source.verifier_policy_digest != bundle.source_artifacts[2].digest
+        || source.verifier_policy_digest != checked_artifacts[2].digest
     {
         return Err(ToolOutcomeError::Binding(
             "release_evidence.zero_charge_source",
@@ -727,10 +741,14 @@ fn validate_zero_charge_records(
     artifacts: &[ImmutableReleaseArtifactV1],
     operation: Option<&AdmissionOperationV1>,
 ) -> Result<(), ToolOutcomeError> {
-    let outcome = ToolOutcomeRecordV1::from_persisted(parse_artifact_value(&artifacts[0])?)?;
+    let checked_artifacts: &[_; 3] = artifacts
+        .try_into()
+        .map_err(|_| ToolOutcomeError::Binding("release_evidence.artifact_count"))?;
+    let outcome =
+        ToolOutcomeRecordV1::from_persisted(parse_artifact_value(&checked_artifacts[0])?)?;
     let evaluation =
-        PostReturnEvaluationRecordV1::from_persisted(parse_artifact_value(&artifacts[1])?)?;
-    let _: VerifierPolicyArtifactV1 = parse_artifact_value(&artifacts[2])?;
+        PostReturnEvaluationRecordV1::from_persisted(parse_artifact_value(&checked_artifacts[1])?)?;
+    let _: VerifierPolicyArtifactV1 = parse_artifact_value(&checked_artifacts[2])?;
     if let Some(operation) = operation {
         outcome.validate_against(operation)?;
         evaluation.validate_against(operation, &outcome)?;

@@ -33,7 +33,7 @@ impl ChioKernel {
                 extra_metadata,
             ),
             merge_metadata_objects(
-                receipt_attribution_metadata(&request.capability, Some(matched_grant_index)),
+                receipt_attribution_metadata(&request.capability, Some(matched_grant_index))?,
                 Some(serde_json::json!({
                     "threshold_approval": {
                         "proposal_id": proposal.body.proposal_id,

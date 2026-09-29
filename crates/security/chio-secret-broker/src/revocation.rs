@@ -117,7 +117,7 @@ impl CanonicalBrokerRevocationSet {
             validate_identifier(id, "revocation id", 512)?;
         }
         ids.sort_unstable_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
-        if ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        if ids.array_windows::<2>().any(|pair| pair[0] == pair[1]) {
             return Err(BrokerError::InvalidRequest(
                 "revocation set contains duplicate identities".to_string(),
             ));
@@ -147,7 +147,7 @@ pub(crate) fn digest_canonical_revocation_ids(ids: &[String]) -> Result<String> 
         validate_identifier(id, "revocation id", 512)?;
     }
     if ids
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].as_bytes() >= pair[1].as_bytes())
     {
         return Err(BrokerError::InvalidRequest(
@@ -178,7 +178,7 @@ pub fn validate_parent_liveness(
     }
     if parent
         .delegation_ancestor_ids
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].as_bytes() >= pair[1].as_bytes())
     {
         return Err(BrokerError::AuthorizationDenied(

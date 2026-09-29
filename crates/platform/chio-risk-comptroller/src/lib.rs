@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core_types::{PublicKey, Signature};
@@ -1321,36 +1322,6 @@ fn validate_risk_claim_appeal(appeal: &RiskClaimAppeal) -> Result<(), Transactio
     Ok(())
 }
 
-fn require_non_empty(value: &str, field: &'static str) -> Result<(), TransactionPassportError> {
-    if value.is_empty() {
-        Err(claim_failed(format!("{field} must not be empty")))
-    } else {
-        Ok(())
-    }
-}
-
-fn optional_non_empty<'a>(
-    value: Option<&'a String>,
-    field: &'static str,
-) -> Result<Option<&'a str>, TransactionPassportError> {
-    match value {
-        Some(value) => {
-            require_non_empty(value, field)?;
-            Ok(Some(value.as_str()))
-        }
-        None => Ok(None),
-    }
-}
-
-fn parse_rfc3339_utc(
-    value: &str,
-    field: &'static str,
-) -> Result<DateTime<Utc>, TransactionPassportError> {
-    DateTime::parse_from_rfc3339(value)
-        .map(|timestamp| timestamp.with_timezone(&Utc))
-        .map_err(|_| claim_failed(format!("invalid risk timestamp: {field}")))
-}
-
-fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
-    TransactionPassportError::RiskComptrollerClaimFailed(message.into())
-}
+#[path = "validation_helpers.rs"]
+mod validation_helpers;
+use validation_helpers::{claim_failed, optional_non_empty, parse_rfc3339_utc, require_non_empty};

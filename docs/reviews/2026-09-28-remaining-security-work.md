@@ -38,8 +38,11 @@ Use the execution record for the exact terminal checks and residual boundaries.
 
 The four-owner part of item 2 is implemented and locally qualified in the
 [authority-boundary record](2026-09-28-authority-boundary-closure.md). Item 2
-continues with the remaining product/protocol owners; item 3 is the next distinct
-compiler and secret-ownership package. This continuation does not erase the other queues.
+continues with the remaining product/protocol owners. The compiler and
+secret-ownership implementation in item 3 is recorded in the
+[September 29 execution record](2026-09-29-compiler-secret-hardening-execution.md).
+The next distinct implementation package is item 4. This continuation does not
+erase the other queues.
 
 ### 2. Remaining authority boundaries and rejection semantics
 
@@ -58,16 +61,19 @@ counts in the reviews are historical; do not quote them as today's unresolved
 defect count. The twelve registered sealed proof types are bounded delivered work,
 not a workspace-wide proof-result audit.
 
-### 3. Compiler enforcement and secret ownership
+### 3. Compiler enforcement and secret ownership (implemented)
 
-Finish hardening H1/H3/H4: unsafe-operation and safety-comment lints, `forbid`
-where unsafe is unnecessary, the scoped TCB deny set, reasoned exceptions, and
-the scoped arithmetic compiler lint. The current workspace lint table still
-contains only `unwrap_used` and `expect_used`; a lint-parity gate cannot enforce
-rules that have not been enabled. Complete broader H7 secret-wrapper and access
-ownership beyond the delivered FROST/private-key boundaries.
+The [compiler and secret-ownership record](2026-09-29-compiler-secret-hardening-execution.md)
+contains the H1/H3/H4/H7 implementation and its exact qualification state:
+workspace unsafe-operation, documentation and single-operation lints across all
+177 manifests; eligible-root forbids across 165 libraries with 12 named unsafe
+boundaries; the production deny set on 25 TCB libraries; checked accounting
+arithmetic and conversions; and explicit secret owners for guards, authority,
+broker and settlement inputs. Compiler/source calibration and CI wiring prevent
+silent removal of the policy. Existing FROST custody protections remain intact.
 
-Miri configuration, the additive nextest job, lint-parity gate, schema snapshot
+Remaining assurance is separate from this implementation. Miri configuration,
+the additive nextest job, lint-parity gate, schema snapshot
 gate and ASan/TSan workflows already exist. Preserve them. Remaining qualification
 includes unsafe reach, meaningful test coverage and sanitizer expansion to
 store/broker owners; the sanitizer crate list currently contains security types,

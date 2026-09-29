@@ -687,7 +687,7 @@ async fn non_strict_dpop_only_payment_requests_reach_the_external_rail(
     }));
     kernel
         .set_dpop_store(
-            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
+            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)).expect("positive replay store test capacities"),
             dpop::DpopConfig::default(),
         )
         .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));

@@ -4590,21 +4590,6 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/products/
 first_seen = "1b9620751d"
 
 [[schema]]
-value = "chio.retained-tool-admission-request.v1"
-files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"]
-first_seen = "bd94b09a7b"
-
-[[schema]]
-value = "chio.retained-tool-admission-request.v2"
-files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"]
-first_seen = "7e54c14a60"
-
-[[schema]]
-value = "chio.retained-tool-admission-request.v3"
-files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"]
-first_seen = "7e54c14a60"
-
-[[schema]]
 value = "chio.retained-tool-admission-request.v4"
 files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"]
 first_seen = "7e54c14a60"

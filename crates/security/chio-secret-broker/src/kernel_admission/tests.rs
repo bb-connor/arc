@@ -271,15 +271,7 @@ fn broker_admission_uses_installed_trust_and_live_clock() -> TestResult {
             chio_security_types::clock::ClockReading,
             chio_security_types::clock::ClockError,
         > {
-            let value: Result<u64> = (|| {
-                Err(crate::BrokerError::AuthorityUnavailable(
-                    "test clock unavailable".into(),
-                ))
-            })();
-            let value = value.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
-            chio_security_types::clock::Clock::read(&chio_security_types::clock::FixedClock::new(
-                value,
-            ))
+            Err(chio_security_types::clock::ClockError::Unavailable)
         }
     }
     let failed = BrokerQuotaVerifier::new(verifier.config, Arc::new(FailedClock))?;
@@ -288,11 +280,7 @@ fn broker_admission_uses_installed_trust_and_live_clock() -> TestResult {
             .verify(&bytes, &context)
             .err()
             .map(|error| error.to_string()),
-        Some(
-            chio_security_types::clock::ClockError::Unavailable
-                .code()
-                .to_owned()
-        )
+        Some("clock_unavailable".to_owned())
     );
     Ok(())
 }

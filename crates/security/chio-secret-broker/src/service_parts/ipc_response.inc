@@ -62,17 +62,17 @@ fn validate_broker_ipc_response_envelope(
 #[cfg(unix)]
 fn is_well_formed_broker_ipc_error_code(code: &str) -> bool {
     let bytes = code.as_bytes();
-    if bytes.is_empty()
-        || bytes.len() > MAX_BROKER_IPC_ERROR_CODE_BYTES
-        || !bytes[0].is_ascii_lowercase()
-        || !(bytes[bytes.len() - 1].is_ascii_lowercase() || bytes[bytes.len() - 1].is_ascii_digit())
+    let (Some(first), Some(last)) = (bytes.first(), bytes.last()) else { return false; };
+    if bytes.len() > MAX_BROKER_IPC_ERROR_CODE_BYTES
+        || !first.is_ascii_lowercase()
+        || !(last.is_ascii_lowercase() || last.is_ascii_digit())
     {
         return false;
     }
     bytes
         .iter()
         .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_')
-        && !bytes.windows(2).any(|pair| pair == b"__")
+        && !bytes.array_windows::<2>().any(|pair| pair == b"__")
 }
 
 #[cfg(unix)]

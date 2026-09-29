@@ -165,7 +165,7 @@
             vec!["action-order-a", "action-order-m", "action-order-z"]
         );
         assert!(claimed
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[0].fencing_token < pair[1].fencing_token));
         for work in &claimed {
             store

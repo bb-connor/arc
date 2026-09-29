@@ -22,6 +22,10 @@ use super::types::{
 };
 use super::verify::certification_artifact_id;
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
     let artifact = load_signed_certification_check(input)?;
     let artifact_id = certification_artifact_id(&artifact)?;
@@ -48,6 +52,10 @@ pub fn cmd_certify_verify(input: &Path, json_output: bool) -> Result<(), CliErro
     Ok(())
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_check(
     scenarios_dir: &Path,
     results_dir: &Path,
@@ -122,6 +130,10 @@ pub fn cmd_certify_registry_publish_local(
     emit_registry_entry("published certification artifact", &entry, json_output)
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_list_local(
     registry_path: &Path,
     json_output: bool,
@@ -163,6 +175,10 @@ pub fn cmd_certify_registry_get_local(
     emit_registry_entry("certification artifact", &entry, json_output)
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_resolve_local(
     tool_server_id: &str,
     registry_path: &Path,
@@ -232,6 +248,10 @@ fn parse_dispute_state(state: &str) -> Result<CertificationDisputeState, CliErro
     }
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_search(
     discovery_path: Option<&Path>,
     tool_server_id: Option<&str>,
@@ -286,6 +306,10 @@ pub fn cmd_certify_registry_search(
     Ok(())
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_transparency(
     discovery_path: Option<&Path>,
     tool_server_id: Option<&str>,
@@ -328,6 +352,10 @@ pub fn cmd_certify_registry_transparency(
     Ok(())
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_certify_registry_consume(
     discovery_path: Option<&Path>,
     tool_server_id: &str,
@@ -404,6 +432,10 @@ pub fn cmd_certify_registry_dispute(
     emit_registry_entry("updated certification dispute state", &entry, json_output)
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 fn emit_registry_entry(
     headline: &str,
     entry: &CertificationRegistryEntry,

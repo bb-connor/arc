@@ -36,8 +36,12 @@ pub(super) fn validate_storage_bounds(connection: &Connection) -> Result<bool, S
         "SELECT COUNT(*), COALESCE(SUM(length(CAST(canonical_source AS BLOB))), 0) FROM dpop_replay_migration_expectations",
         [], |row| Ok((row.get(0)?,row.get(1)?)),
     ).map_err(|error| error.to_string())?;
-    if !(0..=MAX_MIGRATIONS as i64).contains(&expectations)
-        || !(0..=MAX_TOTAL_SOURCE_BYTES as i64).contains(&bytes)
+    if !(0..=crate::integer::checked::<_, i64>(MAX_MIGRATIONS)
+        .map_err(|error| error.to_string())?)
+        .contains(&expectations)
+        || !(0..=crate::integer::checked::<_, i64>(MAX_TOTAL_SOURCE_BYTES)
+            .map_err(|error| error.to_string())?)
+            .contains(&bytes)
     {
         return Err("DPoP expectation aggregate limit exceeded".into());
     }
@@ -58,7 +62,7 @@ pub(super) fn validate_storage_bounds(connection: &Connection) -> Result<bool, S
     ] {
         let rows: i64 = connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
             .map_err(|error| error.to_string())?;
-        if !(0..=limit as i64).contains(&rows) { return Err(format!("{table} row limit exceeded")); }
+        if !(0..=crate::integer::checked::<_, i64>(limit).map_err(|error| error.to_string())?).contains(&rows) { return Err(format!("{table} row limit exceeded")); }
         let predicate = text_columns.into_iter().map(|(column, min, max)| format!(
             "typeof({column}) <> 'text' OR length(CAST({column} AS BLOB)) NOT BETWEEN {min} AND {max}"
         )).chain([extra.to_owned()]).collect::<Vec<_>>().join(" OR ");
@@ -70,7 +74,10 @@ pub(super) fn validate_storage_bounds(connection: &Connection) -> Result<bool, S
         "SELECT COALESCE(SUM(length(CAST(canonical_marker AS BLOB))), 0) FROM dpop_replay_legacy_tombstones",
         [], |row| row.get(0),
     ).map_err(|error| error.to_string())?;
-    if !(0..=MAX_TOTAL_SOURCE_BYTES as i64).contains(&marker_bytes) {
+    if !(0..=crate::integer::checked::<_, i64>(MAX_TOTAL_SOURCE_BYTES)
+        .map_err(|error| error.to_string())?)
+        .contains(&marker_bytes)
+    {
         return Err("DPoP tombstone byte limit exceeded".into());
     }
     super::activation::validate_storage_bounds(connection)?;

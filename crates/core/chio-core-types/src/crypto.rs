@@ -172,6 +172,12 @@ impl Keypair {
         Ok(Self::from_seed(&wire::seed_from_hex(hex_str)?))
     }
 
+    /// Fixed-width public bytes of this Ed25519-only signing identity.
+    #[must_use]
+    pub fn public_key_bytes(&self) -> [u8; 32] {
+        self.signing_key.verifying_key().to_bytes()
+    }
+
     #[must_use]
     pub fn public_key(&self) -> PublicKey {
         PublicKey {
@@ -345,7 +351,7 @@ impl PublicKey {
                 bytes.len()
             )));
         }
-        if bytes[0] != 0x04 {
+        if bytes.first() != Some(&0x04) {
             return Err(Error::InvalidPublicKey(
                 "P-256 SEC1 point must start with 0x04 (uncompressed)".to_string(),
             ));
@@ -366,7 +372,7 @@ impl PublicKey {
                 bytes.len()
             )));
         }
-        if bytes[0] != 0x04 {
+        if bytes.first() != Some(&0x04) {
             return Err(Error::InvalidPublicKey(
                 "P-384 SEC1 point must start with 0x04 (uncompressed)".to_string(),
             ));
@@ -572,27 +578,16 @@ impl PublicKey {
         }
     }
 
-    /// Raw 32-byte Ed25519 representation.
-    ///
-    /// This accessor is intentionally Ed25519-only. Non-Ed25519 callers must
-    /// use [`Self::to_hex`] or another algorithm-aware representation instead
-    /// of coercing P-256 / P-384 material into a lossy 32-byte placeholder.
-    ///
-    /// # Panics
-    ///
-    /// Panics when called on a non-Ed25519 key so Ed25519-only consumers fail
-    /// closed instead of silently collapsing distinct keys onto the same bytes.
-    #[must_use]
-    pub fn as_bytes(&self) -> &[u8; 32] {
+    /// Borrow the Ed25519 representation, refusing every other algorithm.
+    /// Algorithm-polymorphic consumers must use an algorithm-tagged encoding.
+    pub fn ed25519_bytes(&self) -> Result<&[u8; 32]> {
         match &self.material {
-            PublicKeyMaterial::Ed25519 { verifying_key } => verifying_key.as_bytes(),
+            PublicKeyMaterial::Ed25519 { verifying_key } => Ok(verifying_key.as_bytes()),
             PublicKeyMaterial::P256 { .. }
             | PublicKeyMaterial::P384 { .. }
-            | PublicKeyMaterial::Hybrid { .. } => {
-                panic!(
-                    "PublicKey::as_bytes is only valid for Ed25519 keys; use to_hex() for algorithm-aware encoding"
-                )
-            }
+            | PublicKeyMaterial::Hybrid { .. } => Err(Error::InvalidPublicKey(
+                "Ed25519 public key required".into(),
+            )),
         }
     }
 }
@@ -1183,7 +1178,6 @@ fn verify_ecdsa_p256(public_sec1: &[u8], message: &[u8], signature_der: &[u8]) -
 }
 
 #[cfg(not(feature = "fips"))]
-#[allow(clippy::ptr_arg)]
 fn verify_ecdsa_p256(_public_sec1: &[u8], _message: &[u8], _signature_der: &[u8]) -> bool {
     // Without the `fips` feature we cannot verify ECDSA signatures. Fail-closed.
     false
@@ -1197,7 +1191,6 @@ fn verify_ecdsa_p384(public_sec1: &[u8], message: &[u8], signature_der: &[u8]) -
 }
 
 #[cfg(not(feature = "fips"))]
-#[allow(clippy::ptr_arg)]
 fn verify_ecdsa_p384(_public_sec1: &[u8], _message: &[u8], _signature_der: &[u8]) -> bool {
     false
 }
@@ -1287,7 +1280,11 @@ pub fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
 
@@ -1549,16 +1546,16 @@ mod tests {
     }
 
     #[test]
-    fn non_ed25519_as_bytes_fails_closed() {
+    fn non_ed25519_byte_access_fails_closed() {
         let p256_generator = PublicKey::from_hex(
             "p256:046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
         )
         .unwrap();
 
-        let panic = std::panic::catch_unwind(|| {
-            let _ = p256_generator.as_bytes();
-        });
-        assert!(panic.is_err());
+        assert!(matches!(
+            p256_generator.ed25519_bytes(),
+            Err(Error::InvalidPublicKey(_))
+        ));
     }
 
     #[cfg(feature = "fips")]

@@ -536,6 +536,10 @@ fn record_extends(current: &AnchorRecord, prior: &AnchorRecord) -> bool {
 /// slot must decode, and a slot that does not is reported as corrupt
 /// alongside the surviving record. Two decoded slots must be consecutive
 /// generations of one history.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Fixed slot layout bounds every constant offset; variable payload lengths are checked before slicing and record pairs require length two."
+)]
 fn decode_slots(
     slots: &[[u8; SLOT_SIZE]; SLOT_COUNT],
 ) -> Result<Option<LoadedAnchor>, SqliteServingOwnerError> {
@@ -582,6 +586,10 @@ fn decode_slots(
 
 /// A committed slot: marker, payload length, payload checksum, payload and
 /// zero padding, the exact bytes `decode_slot` accepts.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Fixed slot layout bounds every constant offset; variable payload lengths are checked before slicing and record pairs require length two."
+)]
 fn encode_slot(payload: &[u8]) -> Result<[u8; SLOT_SIZE], SqliteServingOwnerError> {
     if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
         return Err(invalid("serving rollback anchor exceeds its fixed slot"));
@@ -638,6 +646,10 @@ pub(crate) fn exercise_slot_image(data: &[u8]) {
 /// A committed slot decodes only when its marker, length, checksum and
 /// canonical payload agree; `encode_slot` of the decoded record reproduces
 /// the slot exactly.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Fixed slot layout bounds every constant offset; variable payload lengths are checked before slicing and record pairs require length two."
+)]
 fn decode_slot(slot: &[u8; SLOT_SIZE]) -> Result<AnchorRecord, SqliteServingOwnerError> {
     if slot[..COMMIT_MARKER.len()] != COMMIT_MARKER[..] {
         return Err(invalid("serving rollback anchor commit marker is corrupt"));
@@ -781,6 +793,10 @@ fn metadata_inode(_metadata: &fs::Metadata) -> Result<u64, SqliteServingOwnerErr
 }
 
 #[cfg(unix)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The OS read or write count cannot exceed the supplied buffer length."
+)]
 fn read_exact_at(file: &File, mut bytes: &mut [u8], mut offset: usize) -> std::io::Result<()> {
     use std::os::unix::fs::FileExt;
 
@@ -804,6 +820,10 @@ fn read_exact_at(_file: &File, _bytes: &mut [u8], _offset: usize) -> std::io::Re
 }
 
 #[cfg(unix)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The OS read or write count cannot exceed the supplied buffer length."
+)]
 fn write_all_at(file: &File, mut bytes: &[u8], mut offset: usize) -> std::io::Result<()> {
     use std::os::unix::fs::FileExt;
 
@@ -840,7 +860,11 @@ fn io_offset(offset: usize) -> std::io::Result<u64> {
 }
 
 #[cfg(all(test, unix))]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use std::fs::{self, File, OpenOptions};
     use std::io::{Seek, SeekFrom, Write};

@@ -1,7 +1,10 @@
 use super::*;
 
 impl ChioKernel {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn build_cancelled_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -41,7 +44,7 @@ impl ChioKernel {
                     merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
-                receipt_attribution_metadata(cap, matched_grant_index),
+                receipt_attribution_metadata(cap, matched_grant_index)?,
             ),
             timestamp,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
@@ -63,7 +66,10 @@ impl ChioKernel {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn build_incomplete_response_with_output_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -104,7 +110,7 @@ impl ChioKernel {
                     merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
-                receipt_attribution_metadata(cap, matched_grant_index),
+                receipt_attribution_metadata(cap, matched_grant_index)?,
             ),
             timestamp,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),

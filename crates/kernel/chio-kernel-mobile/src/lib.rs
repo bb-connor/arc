@@ -1,3 +1,17 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 //! Mobile FFI for the Chio kernel core.
 //!
 //! This adapter wraps the portable [`chio_kernel_core`](chio_kernel_core)
@@ -55,7 +69,10 @@
 // clippy in the strict workspace configuration flag that as
 // `empty-line-after-doc-comments`; since we don't author the
 // generated file, we allow it crate-wide here.
-#![allow(clippy::empty_line_after_doc_comments)]
+#![allow(
+    clippy::empty_line_after_doc_comments,
+    reason = "The platform crate separates generated binding documentation from its implementation."
+)]
 
 mod clock;
 mod errors;
@@ -285,11 +302,7 @@ fn chio_hash(bytes: &[u8]) -> [u8; 32] {
 }
 
 fn fixed_clock_from_secs(now_secs: i64) -> Option<FixedClock> {
-    if now_secs < 0 {
-        None
-    } else {
-        Some(FixedClock::new(now_secs as u64))
-    }
+    u64::try_from(now_secs).ok().map(FixedClock::new)
 }
 
 fn seed_budget_registry(
@@ -376,7 +389,7 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
     // honour it (useful for deterministic testing harnesses on the
     // Swift/Kotlin side); otherwise fall back to `MobileClock`.
     let fixed_clock: Option<FixedClock> = match parsed.now_secs {
-        Some(secs) if secs > 0 => Some(FixedClock::new(secs as u64)),
+        Some(secs) if secs > 0 => fixed_clock_from_secs(secs),
         _ => None,
     };
     let mobile_clock = MobileClock::new();
@@ -724,7 +737,7 @@ pub fn verify_passport(
         })?;
 
     let fixed_clock: Option<FixedClock> = if now_secs > 0 {
-        Some(FixedClock::new(now_secs as u64))
+        fixed_clock_from_secs(now_secs)
     } else {
         None
     };

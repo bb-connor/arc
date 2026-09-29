@@ -1238,7 +1238,7 @@ impl SqliteFindingStatusStore {
             .map_err(sqlite_error)?;
         let rows = statement
             .query_map(
-                params![feed_id, sqlite_i64(limit as u64, "limit")?],
+                params![feed_id, sqlite_i64(crate::integer::count(limit), "limit")?],
                 raw_intent_from_row,
             )
             .map_err(sqlite_error)?
@@ -1296,7 +1296,7 @@ impl SqliteFindingStatusStore {
             .map_err(sqlite_error)?;
         let rows = statement
             .query_map(
-                params![feed_id, sqlite_i64(limit as u64, "limit")?,],
+                params![feed_id, sqlite_i64(crate::integer::count(limit), "limit")?,],
                 raw_intent_from_row,
             )
             .map_err(sqlite_error)?
@@ -1389,7 +1389,7 @@ impl SqliteFindingStatusStore {
                     operator_authorization_sha256,
                     sqlite_i64(trusted_now, "trusted_now")?,
                     sqlite_i64(max_epoch_age_secs, "max_epoch_age_secs")?,
-                    sqlite_i64(limit as u64, "limit")?,
+                    sqlite_i64(crate::integer::count(limit), "limit")?,
                 ],
                 raw_proof_from_row,
             )
@@ -1457,7 +1457,7 @@ impl SqliteFindingStatusStore {
                 params![
                     feed_id,
                     sqlite_i64(trusted_now, "trusted_now")?,
-                    sqlite_i64(limit as u64, "limit")?,
+                    sqlite_i64(crate::integer::count(limit), "limit")?,
                 ],
                 |row| row.get(0),
             )
@@ -1820,7 +1820,11 @@ include!("finding_status_store/persistence.rs");
 
 #[cfg(test)]
 #[path = "finding_status_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
 
 mod trusted_time;

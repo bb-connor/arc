@@ -207,7 +207,7 @@ pub(super) fn remove_for_relocation(
     validate_inode_identity(&metadata, &file.metadata()?, None)?;
     let mut bytes = Vec::new();
     file.take(MAX_MARKER_BYTES + 1).read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_MARKER_BYTES {
+    if crate::integer::count(bytes.len()) > MAX_MARKER_BYTES {
         return Err(invalid("oversized relocation marker"));
     }
     let record: PathIdentityRecord =

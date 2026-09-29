@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Historical operation-lease evidence shared by native journal families.
 //! Verification reconstructs the original claim; it grants no current lease.
 use super::*;

@@ -1207,7 +1207,10 @@ pub(super) fn signed_credit_facility_fixture(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn signed_underwriting_decision_fixture(
     subject_key: &str,
     decision_id: &str,
@@ -1273,7 +1276,10 @@ pub(super) fn signed_underwriting_decision_fixture(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn signed_credit_bond_fixture(
     subject_key: &str,
     facility_id: &str,
@@ -1334,7 +1340,10 @@ pub(super) fn signed_credit_bond_fixture(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn signed_credit_loss_lifecycle_fixture(
     subject_key: &str,
     facility_id: &str,

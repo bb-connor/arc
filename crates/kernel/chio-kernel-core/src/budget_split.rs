@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Sibling-sum budget enforcement for delegated capability tokens.
 //!
 //! `CapabilityToken::validate_schema` already enforces the per-token cap

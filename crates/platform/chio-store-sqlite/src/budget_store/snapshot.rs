@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{PublicKey, Signature};
@@ -605,7 +606,10 @@ impl SqliteBudgetStore {
                 ],
             )?;
         }
-        raise_budget_replication_seq_floor(transaction, covered_head as u64)?;
+        raise_budget_replication_seq_floor(
+            transaction,
+            crate::integer::checked::<_, u64>(covered_head)?,
+        )?;
         Ok(())
     }
 

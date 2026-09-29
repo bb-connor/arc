@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Read a complete delegated caller-share view from retained operations.
 
 use super::*;

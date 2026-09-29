@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Fenced caller-share views for sibling-budget admission.
 
 use super::*;

@@ -406,6 +406,10 @@ fn significant_digits(token: &str) -> String {
 /// Returns:
 /// - `digits`: significant digits with no leading/trailing zeros (except "0").
 /// - `sci_exp`: exponent such that the value is `digits[0].digits[1..] * 10^sci_exp`.
+#[allow(
+    clippy::as_conversions,
+    reason = "Input is the shortest finite f64 rendering from ryu; its digit count and exponent fit i32."
+)]
 fn parse_to_scientific_parts(s: &str) -> Result<(String, i32)> {
     let s = s.trim();
     if s.is_empty() {
@@ -467,6 +471,10 @@ fn parse_to_scientific_parts(s: &str) -> Result<(String, i32)> {
 }
 
 /// Render significant digits with a decimal point at the correct position.
+#[allow(
+    clippy::as_conversions,
+    reason = "The ryu digit count and decimal exponent are bounded by f64; each usize conversion occurs only in its nonnegative branch."
+)]
 fn render_decimal(digits: &str, sci_exp: i32) -> String {
     let digits_len = digits.len() as i32;
     let shift = sci_exp - (digits_len - 1);
@@ -515,6 +523,11 @@ fn trim_decimal(mut s: String) -> String {
 /// Quotes and reverse solidus use their mandatory JSON escapes. Control
 /// characters in the C0 range use the standard short forms when available and
 /// lowercase `\uXXXX` otherwise. DEL and C1 controls pass through as UTF-8.
+#[allow(
+    clippy::indexing_slicing,
+    clippy::as_conversions,
+    reason = "Only ASCII control characters reach this escape branch; their codepoints fit usize and masked nibbles index the 16-entry table."
+)]
 fn write_escaped_json_string(s: &str, result: &mut String) {
     for c in s.chars() {
         match c {
@@ -591,6 +604,10 @@ impl StrictJson {
     /// the conservative closure: it admits only fractional literals that survive
     /// the strict path unchanged. The caller invokes it after [`Self::from_str`]
     /// succeeds, so the input here is guaranteed to be well-formed JSON.
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "Every indexed scanner byte is guarded by idx < len, including the separately checked numeric lookahead."
+    )]
     fn reject_over_precise_numbers(input: &str) -> Result<()> {
         let bytes = input.as_bytes();
         let len = bytes.len();
@@ -726,7 +743,9 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
             )));
         }
         // Safe: v <= 2^53 - 1 < i64::MAX.
-        Ok(StrictJson::Int(v as i64))
+        i64::try_from(v)
+            .map(StrictJson::Int)
+            .map_err(de::Error::custom)
     }
 
     fn visit_f64<E>(self, v: f64) -> core::result::Result<StrictJson, E>
@@ -814,7 +833,11 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
 

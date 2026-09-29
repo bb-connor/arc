@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use chio_core::capability::scope::MonetaryAmount;
 pub use chio_kernel_core::accounting::{
     AccountingError, ExposureBalance, ExposureUnits, InvocationCount,
@@ -154,7 +155,7 @@ impl BudgetAuthorizeHoldRequest {
         }
         if self
             .invocation_quotas
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].key >= pair[1].key)
         {
             return Err(BudgetStoreError::Invariant(
@@ -677,7 +678,10 @@ pub trait BudgetStore: Send + Sync {
         max_total_cost_units: Option<u64>,
     ) -> Result<bool, BudgetStoreError>;
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn try_charge_cost_with_ids(
         &self,
         capability_id: &str,
@@ -708,7 +712,10 @@ pub trait BudgetStore: Send + Sync {
     /// authority fence. Implementations must preserve all three values or
     /// return an explicit unsupported error. This method is required so a
     /// backend upgrade cannot compile successfully and fail only on live calls.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn try_charge_cost_with_ids_and_authority(
         &self,
         capability_id: &str,
@@ -833,7 +840,10 @@ pub trait BudgetStore: Send + Sync {
 
     /// Reconcile exposure and spend under the exact durable identity and
     /// authority fence.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn settle_charge_cost_with_ids_and_authority(
         &self,
         capability_id: &str,

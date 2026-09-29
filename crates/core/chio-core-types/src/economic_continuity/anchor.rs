@@ -306,7 +306,7 @@ impl EconomicStateAnchorViewV1 {
         self.heads
             .binary_search_by(|head| head.resource_key.cmp(key))
             .ok()
-            .map(|index| &self.heads[index])
+            .and_then(|index| self.heads.get(index))
     }
 
     pub fn proves_resource_absent(&self, key: &EconomicResourceKeyV1) -> bool {
@@ -317,7 +317,7 @@ impl EconomicStateAnchorViewV1 {
         self.request_replays
             .binary_search_by(|replay| replay.request.key().cmp(key))
             .ok()
-            .map(|index| &self.request_replays[index])
+            .and_then(|index| self.request_replays.get(index))
     }
 
     pub fn proves_request_absent(&self, key: &EconomicRequestKeyV1) -> bool {
@@ -346,7 +346,7 @@ impl EconomicStateAnchorViewV1 {
         }
         if !self
             .heads
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[0].resource_key < pair[1].resource_key)
         {
             return Err(EconomicStateAnchorError::InvalidView(
@@ -355,7 +355,7 @@ impl EconomicStateAnchorViewV1 {
         }
         if !self
             .absent_resource_keys
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[0] < pair[1])
         {
             return Err(EconomicStateAnchorError::InvalidView(
@@ -385,7 +385,7 @@ impl EconomicStateAnchorViewV1 {
         }
         if !self
             .request_replays
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[0].request.key() < pair[1].request.key())
         {
             return Err(EconomicStateAnchorError::InvalidView(
@@ -394,7 +394,7 @@ impl EconomicStateAnchorViewV1 {
         }
         if !self
             .absent_request_keys
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[0] < pair[1])
         {
             return Err(EconomicStateAnchorError::InvalidView(
@@ -585,13 +585,19 @@ pub fn qualify_economic_effect_unknown_advance(
     if advance.batch.transitions.len() != 1
         || !advance.batch.effect_slots.is_empty()
         || !advance.batch.request_replays.is_empty()
-        || advance.batch.transitions[0].prepared_effect.is_some()
+        || advance
+            .batch
+            .transitions
+            .first()
+            .is_some_and(|transition| transition.prepared_effect.is_some())
     {
         return Err(EconomicStateAnchorError::EffectDispatchRejected(
             "unknown recovery must advance exactly one retained effect slot",
         ));
     }
-    let transition = &advance.batch.transitions[0];
+    let transition = advance.batch.transitions.first().ok_or(
+        EconomicStateAnchorError::EffectDispatchRejected("missing retained effect transition"),
+    )?;
     if transition.resource_key.resource_family != "effect_slot" {
         return Err(EconomicStateAnchorError::EffectDispatchRejected(
             "unknown recovery transition is not an effect slot",
@@ -861,13 +867,19 @@ pub fn verify_economic_effect_dispatch_advance(
     if advance.batch.transitions.len() != 1
         || !advance.batch.effect_slots.is_empty()
         || !advance.batch.request_replays.is_empty()
-        || advance.batch.transitions[0].prepared_effect.is_some()
+        || advance
+            .batch
+            .transitions
+            .first()
+            .is_some_and(|transition| transition.prepared_effect.is_some())
     {
         return Err(EconomicStateAnchorError::EffectDispatchRejected(
             "dispatch must advance exactly one retained effect slot",
         ));
     }
-    let transition = &advance.batch.transitions[0];
+    let transition = advance.batch.transitions.first().ok_or(
+        EconomicStateAnchorError::EffectDispatchRejected("missing retained effect transition"),
+    )?;
     if transition.resource_key.resource_family != "effect_slot" {
         return Err(EconomicStateAnchorError::EffectDispatchRejected(
             "transition is not an effect slot",
@@ -1017,7 +1029,9 @@ impl EconomicEffectDispatchCommitV1 {
         signer_key_epoch: u64,
         keypair: &Keypair,
     ) -> Result<Self, EconomicStateAnchorError> {
-        let transition = &advance.batch().transitions[0];
+        let transition = advance.batch().transitions.first().ok_or(
+            EconomicStateAnchorError::EffectDispatchRejected("missing retained effect transition"),
+        )?;
         let mut commit = Self {
             schema: CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA.to_string(),
             commit_id: String::new(),
@@ -1154,7 +1168,9 @@ pub fn verify_economic_effect_dispatch_commit(
 ) -> Result<VerifiedEconomicEffectDispatch, EconomicStateAnchorError> {
     committed.view.verify(pins)?;
     commit.verify(pins)?;
-    let transition = &advance.batch().transitions[0];
+    let transition = advance.batch().transitions.first().ok_or(
+        EconomicStateAnchorError::EffectDispatchRejected("missing retained effect transition"),
+    )?;
     let expected_head_digest = transition.next_head.digest()?;
     let target_head_digest = committed
         .view
@@ -1392,7 +1408,7 @@ pub fn assess_economic_state_readiness(
     }
     if !expectation
         .heads
-        .windows(2)
+        .array_windows::<2>()
         .all(|pair| pair[0].resource_key < pair[1].resource_key)
     {
         return Err(EconomicStateAnchorError::InvalidView(

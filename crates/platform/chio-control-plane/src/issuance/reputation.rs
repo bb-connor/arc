@@ -97,8 +97,8 @@ pub(crate) fn inspect_local_reputation_with_read_context(
     let now = clock_now;
     let scorecard = compute_local_scorecard(subject_key, now, &corpus, &scoring);
     let probationary_status = ProbationaryStatus {
-        below_receipt_target: scorecard.history_depth.receipt_count
-            < probationary_receipt_count as usize,
+        below_receipt_target: crate::integer::count(scorecard.history_depth.receipt_count)
+            < probationary_receipt_count,
         below_day_target: scorecard.history_depth.span_days < probationary_min_days,
     };
     let probationary =

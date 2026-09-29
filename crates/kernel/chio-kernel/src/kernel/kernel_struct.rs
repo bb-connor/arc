@@ -524,7 +524,7 @@ fn linux_page_size() -> u64 {
         // preconditions; it returns the configured page size, or -1 on failure.
         let raw = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
         if raw > 0 {
-            raw as u64
+            u64::try_from(raw).unwrap_or(4096)
         } else {
             4096
         }

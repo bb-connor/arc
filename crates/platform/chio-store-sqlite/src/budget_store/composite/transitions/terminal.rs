@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 impl SqliteBudgetStore {
@@ -665,7 +666,10 @@ impl SqliteBudgetStore {
         ))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn settle_composite_hold(
         &self,
         capability_id: &str,
@@ -701,7 +705,10 @@ impl SqliteBudgetStore {
         Ok(decision)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn settle_composite_hold_in_transaction(
         &self,
         transaction: &rusqlite::Transaction<'_>,

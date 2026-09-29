@@ -1,5 +1,6 @@
 //! Bounded public artifact readers and canonical private-key custody.
 use super::*;
+use zeroize::Zeroizing;
 
 pub fn authority_profile_from_json(
     json: &str,
@@ -27,7 +28,7 @@ pub fn signing_keys_from_json(
 ) -> Result<LocalAuthoritySigningKeysDocument, ChioAuthorityError> {
     let document: LocalAuthoritySigningKeysDocument =
         chio_core_types::canonical::UntrustedJsonText::from_wire(json.as_bytes(), 16 * 1024 * 1024)
-            .and_then(|text| text.decode_canonical())
+            .and_then(|text| text.decode_canonical_with(signing_keys_custody_bytes))
             .map_err(ChioAuthorityError::UntrustedInput)?;
     document.validate()?;
     Ok(document)
@@ -69,7 +70,7 @@ pub fn issuance_request_json(request: &ChioIssuanceRequest) -> Result<String, Ch
 pub fn signing_keys_json(
     keys: &LocalAuthoritySigningKeysDocument,
 ) -> Result<Zeroizing<String>, ChioAuthorityError> {
-    let mut bytes = chio_core_types::canonical::canonical_json_bytes_zeroizing(keys)
+    let mut bytes = signing_keys_custody_bytes(keys)
         .map_err(|error| ChioAuthorityError::Canonical(error.to_string()))?;
     String::from_utf8(core::mem::take(&mut *bytes))
         .map(Zeroizing::new)
@@ -98,4 +99,40 @@ pub fn signed_revocation_checkpoint_json(
 ) -> Result<String, ChioAuthorityError> {
     serde_json::to_string_pretty(checkpoint)
         .map_err(|error| ChioAuthorityError::Json(error.to_string()))
+}
+
+/// Borrow plaintext only for the explicit private-key custody export. These
+/// projections never escape this function or give the owning key types serde.
+fn signing_keys_custody_bytes(
+    keys: &LocalAuthoritySigningKeysDocument,
+) -> chio_core_types::Result<Zeroizing<Vec<u8>>> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Seed<'a> {
+        id: &'a str,
+        seed_hex: &'a str,
+    }
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Custody<'a> {
+        schema: &'a str,
+        lease_authority_seeds: Vec<Seed<'a>>,
+        governance_authority_seeds: Vec<Seed<'a>>,
+        revocation_authority_seed_hex: &'a str,
+    }
+    fn project(entries: &[NamedSeedHex]) -> Vec<Seed<'_>> {
+        entries
+            .iter()
+            .map(|entry| Seed {
+                id: entry.id.as_str(),
+                seed_hex: entry.seed_hex.expose_secret(),
+            })
+            .collect()
+    }
+    chio_core_types::canonical::canonical_json_bytes_zeroizing(&Custody {
+        schema: &keys.schema,
+        lease_authority_seeds: project(&keys.lease_authority_seeds),
+        governance_authority_seeds: project(&keys.governance_authority_seeds),
+        revocation_authority_seed_hex: keys.revocation_authority_seed_hex.expose_secret(),
+    })
 }

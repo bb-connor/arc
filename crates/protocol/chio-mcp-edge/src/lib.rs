@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Shared MCP edge runtime and transport contracts for Chio.
 
 use chio_core::session::RequestId;

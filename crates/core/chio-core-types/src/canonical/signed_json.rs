@@ -95,6 +95,10 @@ impl<'de> Visitor<'de> for StoredValueVisitor {
 
 // Input is already proven syntactically valid above. Inspect original number
 // tokens because an f64 visitor cannot recover discarded fractional digits.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Each cursor access is guarded by cursor < bytes.len(); token endpoints only advance through ASCII numeric bytes."
+)]
 fn validate_number_tokens(input: &str) -> Result<(), String> {
     let bytes = input.as_bytes();
     let mut cursor = 0;

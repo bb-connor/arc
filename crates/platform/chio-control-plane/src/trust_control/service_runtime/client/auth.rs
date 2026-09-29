@@ -15,7 +15,9 @@ impl TrustControlClient {
                 .get(url)
                 .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
         };
-        let issued_at = clock_now as i64;
+        let issued_at = i64::try_from(clock_now).map_err(|_| {
+            CliError::cli_other_error("clock exceeds signed timestamp field".to_owned())
+        })?;
         let signature = cluster_peer_auth_signature(
             &self.token,
             cluster_peer_auth.node_id.as_ref(),
@@ -47,7 +49,9 @@ impl TrustControlClient {
                 .post(url)
                 .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
         };
-        let issued_at = clock_now as i64;
+        let issued_at = i64::try_from(clock_now).map_err(|_| {
+            CliError::cli_other_error("clock exceeds signed timestamp field".to_owned())
+        })?;
         let signature = cluster_peer_auth_signature(
             &self.token,
             cluster_peer_auth.node_id.as_ref(),

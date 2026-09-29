@@ -835,7 +835,7 @@ pub fn respond_to_oid4vp_request(
         ));
     }
     let holder_thumbprint =
-        PortableEd25519Jwk::from_public_key(&holder_keypair.public_key()).thumbprint()?;
+        PortableEd25519Jwk::from_public_key(&holder_keypair.public_key())?.thumbprint()?;
     if holder_thumbprint != inspected.subject_thumbprint {
         return Err(CredentialError::InvalidOid4vpResponse(
             "holder key does not match the portable credential cnf.jwk thumbprint".to_string(),

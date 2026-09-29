@@ -14,8 +14,14 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
         let row_limit = query.settlement_limit_or_default();
 
@@ -76,11 +82,11 @@ impl SqliteReceiptStore {
             ],
             |row| {
                 Ok((
-                    row.get::<_, i64>(0)?.max(0) as u64,
-                    row.get::<_, i64>(1)?.max(0) as u64,
-                    row.get::<_, i64>(2)?.max(0) as u64,
-                    row.get::<_, i64>(3)?.max(0) as u64,
-                    row.get::<_, i64>(4)?.max(0) as u64,
+                    u64::try_from(row.get::<_, i64>(0)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(1)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(2)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(3)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(4)?.max(0)).unwrap_or_default(),
                 ))
             },
         )?;
@@ -126,7 +132,7 @@ impl SqliteReceiptStore {
                 since,
                 until,
                 agent_subject,
-                row_limit as i64
+                crate::integer::checked::<_, i64>(row_limit)?
             ],
             |row| {
                 Ok((
@@ -171,7 +177,7 @@ impl SqliteReceiptStore {
             let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )?;
             let settlement_status = parse_settlement_status(&settlement_status_text)?;
             let reconciliation_state =
@@ -182,32 +188,33 @@ impl SqliteReceiptStore {
             );
             receipts.push(SettlementReconciliationRow {
                 receipt_id,
-                timestamp: timestamp.max(0) as u64,
+                timestamp: u64::try_from(timestamp.max(0)).unwrap_or_default(),
                 capability_id,
                 subject_key,
                 tool_server,
                 tool_name,
                 payment_reference,
                 settlement_status,
-                cost_charged: cost_charged.map(|value| value.max(0) as u64),
+                cost_charged: cost_charged
+                    .map(|value| u64::try_from(value.max(0)).unwrap_or_default()),
                 currency,
                 budget_authority: receipt.financial_budget_authority_metadata(),
                 reconciliation_state,
                 action_required,
                 note,
-                updated_at: updated_at.map(|value| value.max(0) as u64),
+                updated_at: updated_at.map(|value| u64::try_from(value.max(0)).unwrap_or_default()),
             });
         }
 
         Ok(SettlementReconciliationReport {
             summary: SettlementReconciliationSummary {
                 matching_receipts,
-                returned_receipts: receipts.len() as u64,
+                returned_receipts: crate::integer::count(receipts.len()),
                 pending_receipts,
                 failed_receipts,
                 actionable_receipts,
                 reconciled_receipts,
-                truncated: matching_receipts > receipts.len() as u64,
+                truncated: matching_receipts > crate::integer::count(receipts.len()),
             },
             receipts,
         })

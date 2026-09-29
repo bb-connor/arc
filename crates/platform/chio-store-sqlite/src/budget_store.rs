@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use chio_security_types::clock::{Clock, ClockError, ClockFence, SystemClock};
 use std::fs;
 use std::path::Path;
@@ -67,12 +68,20 @@ pub use snapshot::{
 pub(crate) use store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod connection_recovery;
 
 #[cfg(test)]
 #[path = "budget_store/tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
 
 #[cfg(test)]

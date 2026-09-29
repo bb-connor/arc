@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 impl SqliteBudgetStore {
@@ -74,7 +75,7 @@ impl SqliteBudgetStore {
             ) && Self::has_captured_hold(
                 transaction,
                 &record.capability_id,
-                record.grant_index as usize,
+                crate::integer::checked::<_, usize>(record.grant_index)?,
             )? {
                 return Err(BudgetStoreError::Invariant(format!(
                     "captured budget hold blocks generic `{}` mutation",
@@ -103,7 +104,7 @@ impl SqliteBudgetStore {
                         transaction,
                         hold_id,
                         &record.capability_id,
-                        record.grant_index as usize,
+                        crate::integer::checked::<_, usize>(record.grant_index)?,
                         record.exposure_units,
                         record.exposure_units,
                         false,
@@ -122,7 +123,7 @@ impl SqliteBudgetStore {
                     ))
                 })?;
                 if hold.capability_id != record.capability_id
-                    || hold.grant_index != record.grant_index as usize
+                    || hold.grant_index != crate::integer::checked::<_, usize>(record.grant_index)?
                 {
                     return Err(BudgetStoreError::Invariant(format!(
                         "budget hold `{hold_id}` does not match capability/grant"
@@ -150,7 +151,7 @@ impl SqliteBudgetStore {
                     transaction,
                     hold_id,
                     &record.capability_id,
-                    record.grant_index as usize,
+                    crate::integer::checked::<_, usize>(record.grant_index)?,
                     hold.authorized_exposure_units,
                     remaining,
                     hold.invocation_captured,
@@ -170,7 +171,7 @@ impl SqliteBudgetStore {
                     transaction,
                     hold_id,
                     &record.capability_id,
-                    record.grant_index as usize,
+                    crate::integer::checked::<_, usize>(record.grant_index)?,
                 )?;
                 if !hold.invocation_captured {
                     return Err(BudgetStoreError::Invariant(format!(
@@ -188,7 +189,7 @@ impl SqliteBudgetStore {
                     transaction,
                     hold_id,
                     &record.capability_id,
-                    record.grant_index as usize,
+                    crate::integer::checked::<_, usize>(record.grant_index)?,
                     hold.authorized_exposure_units,
                     0,
                     false,
@@ -208,7 +209,7 @@ impl SqliteBudgetStore {
                     transaction,
                     hold_id,
                     &record.capability_id,
-                    record.grant_index as usize,
+                    crate::integer::checked::<_, usize>(record.grant_index)?,
                 )?;
                 if !hold.invocation_count_debited {
                     return Err(BudgetStoreError::Invariant(format!(
@@ -229,7 +230,7 @@ impl SqliteBudgetStore {
                     transaction,
                     hold_id,
                     &record.capability_id,
-                    record.grant_index as usize,
+                    crate::integer::checked::<_, usize>(record.grant_index)?,
                     hold.authorized_exposure_units,
                     hold.remaining_exposure_units,
                     true,
@@ -258,7 +259,7 @@ impl SqliteBudgetStore {
                     transaction,
                     hold_id,
                     &record.capability_id,
-                    record.grant_index as usize,
+                    crate::integer::checked::<_, usize>(record.grant_index)?,
                     existing.authorized_exposure_units,
                     0,
                     false,
@@ -289,7 +290,7 @@ impl SqliteBudgetStore {
                     transaction,
                     hold_id,
                     &record.capability_id,
-                    record.grant_index as usize,
+                    crate::integer::checked::<_, usize>(record.grant_index)?,
                     existing.authorized_exposure_units,
                     0,
                     true,
@@ -354,7 +355,7 @@ impl SqliteBudgetStore {
             )));
         };
         if hold.capability_id != record.capability_id
-            || hold.grant_index != record.grant_index as usize
+            || hold.grant_index != crate::integer::checked::<_, usize>(record.grant_index)?
         {
             return Err(BudgetStoreError::Invariant(format!(
                 "budget hold `{}` does not match imported capability/grant",

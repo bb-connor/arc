@@ -299,7 +299,7 @@ pub fn durable_admission_sidecar_path(session_database: &Path) -> Result<PathBuf
 
 pub fn validate_distinct_database_paths(paths: &[(&str, &Path)]) -> Result<(), CliError> {
     for (index, (left_label, left_path)) in paths.iter().enumerate() {
-        for (right_label, right_path) in &paths[index + 1..] {
+        for (right_label, right_path) in paths.iter().skip(index + 1) {
             if database_paths_alias(left_path, right_path)? {
                 return Err(CliError::cli_other_error(format!(
                     "{left_label} must not alias {right_label}"
@@ -963,6 +963,10 @@ fn sync_private_directory_unix(directory: &File) -> Result<(), std::io::Error> {
 }
 
 #[cfg(unix)]
+#[allow(
+    clippy::useless_conversion,
+    reason = "mode_t is u16 on macOS and u32 on Linux; checked conversion covers both."
+)]
 fn write_new_private_file_unix(
     root: &File,
     relative: &Path,
@@ -986,7 +990,7 @@ fn write_new_private_file_unix(
         *file_name,
         OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
         // Permission bits fit both macOS's u16 and Linux's u32 mode_t.
-        Mode::from_bits_truncate((mode & 0o7777) as _),
+        Mode::from_bits_truncate((mode & 0o7777).try_into().map_err(std::io::Error::other)?),
     )?;
     let mut file = File::from(descriptor);
     let operation = file
@@ -1175,7 +1179,7 @@ fn resolve_database_path_inner(path: &Path, symlink_depth: usize) -> Result<Path
                         } else {
                             resolved.join(target)
                         };
-                        for remaining in &components[index + 1..] {
+                        for remaining in components.iter().skip(index + 1) {
                             redirected.push(remaining.as_os_str());
                         }
                         return resolve_database_path_inner(&redirected, symlink_depth + 1);
@@ -1183,7 +1187,7 @@ fn resolve_database_path_inner(path: &Path, symlink_depth: usize) -> Result<Path
                     Ok(_) => resolved.push(component.as_os_str()),
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                         resolved.push(component.as_os_str());
-                        for remaining in &components[index + 1..] {
+                        for remaining in components.iter().skip(index + 1) {
                             resolved.push(remaining.as_os_str());
                         }
                         return Ok(normalize_path(&resolved));

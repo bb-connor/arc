@@ -77,7 +77,10 @@ struct ChannelReservationParticipantCommitment<'a> {
     ready_effect_head_digest: &'a str,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn channel_reservation_participant_digest(
     prepared: &ChannelPreparedAdmissionRecordV1,
     reservation_digest: &str,
@@ -108,7 +111,10 @@ pub(super) fn channel_reservation_participant_digest(
         .map_err(|error| invalid(error.to_string()))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn insert_pending_reservation_tx(
     transaction: &Transaction<'_>,
     prepared: &ChannelPreparedAdmissionRecordV1,

@@ -155,7 +155,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 artifact.claim_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 artifact
                     .bound_coverage
                     .body
@@ -191,7 +191,7 @@ impl SqliteReceiptStore {
                     .risk_package
                     .body
                     .subject_key,
-                artifact.claim_event_at as i64,
+                crate::integer::checked::<_, i64>(artifact.claim_event_at)?,
                 serde_json::to_string(claim)?,
                 claim.signer_key.to_hex(),
                 claim.signature.to_hex(),
@@ -274,7 +274,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                     params![
                         artifact.claim_response_id,
-                        artifact.issued_at as i64,
+                        crate::integer::checked::<_, i64>(artifact.issued_at)?,
                         artifact.claim.body.claim_id,
                         artifact
                             .claim
@@ -370,7 +370,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 artifact.dispute_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 artifact.provider_response.body.claim.body.claim_id,
                 artifact.provider_response.body.claim_response_id,
                 artifact
@@ -470,7 +470,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                     params![
                         artifact.adjudication_id,
-                        artifact.issued_at as i64,
+                        crate::integer::checked::<_, i64>(artifact.issued_at)?,
                         artifact
                             .dispute
                             .body
@@ -576,10 +576,10 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 artifact.payout_instruction_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 claim_id,
                 artifact.adjudication.body.adjudication_id,
-                artifact.payout_amount.units as i64,
+                crate::integer::checked::<_, i64>(artifact.payout_amount.units)?,
                 artifact.payout_amount.currency,
                 serde_json::to_string(payout_instruction)?,
                 payout_instruction.signer_key.to_hex(),
@@ -677,7 +677,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 artifact.payout_receipt_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 claim_id,
                 artifact.payout_instruction.body.payout_instruction_id,
                 serde_json::to_string(&artifact.reconciliation_state)?,
@@ -781,7 +781,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 artifact.settlement_instruction_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 claim_id,
                 artifact.payout_receipt.body.payout_receipt_id,
                 serde_json::to_string(&artifact.settlement_kind)?,
@@ -789,7 +789,7 @@ impl SqliteReceiptStore {
                 artifact.topology.payer.party_id,
                 serde_json::to_string(&artifact.topology.payee.role)?,
                 artifact.topology.payee.party_id,
-                artifact.settlement_amount.units as i64,
+                crate::integer::checked::<_, i64>(artifact.settlement_amount.units)?,
                 artifact.settlement_amount.currency,
                 serde_json::to_string(settlement_instruction)?,
                 settlement_instruction.signer_key.to_hex(),
@@ -899,7 +899,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 artifact.settlement_receipt_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 claim_id,
                 artifact
                     .settlement_instruction
@@ -1155,7 +1155,7 @@ impl SqliteReceiptStore {
             query: normalized,
             summary: LiabilityClaimWorkflowSummary {
                 matching_claims,
-                returned_claims: claims.len() as u64,
+                returned_claims: crate::integer::count(claims.len()),
                 provider_responses,
                 accepted_responses,
                 denied_responses,

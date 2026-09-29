@@ -403,7 +403,10 @@ impl ChioKernel {
             .validate_request_material(context.request)
             .map_err(durable_store_error)?;
         if retained
-            .retained_matching_grant(grant_index as usize)
+            .retained_matching_grant(
+                usize::try_from(grant_index)
+                    .map_err(|_| acquisition_error("grant index exceeds address space"))?,
+            )
             .is_none()
         {
             return Err(acquisition_error(

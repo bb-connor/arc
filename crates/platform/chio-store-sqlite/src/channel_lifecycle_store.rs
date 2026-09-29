@@ -316,7 +316,10 @@ impl SqliteChannelLifecycleStore {
         Ok(record)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn stage_channel_reservation(
         &self,
         advance: &VerifiedEconomicStateBatchAdvance,
@@ -535,7 +538,10 @@ impl SqliteChannelLifecycleStore {
         Ok(record)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn record_channel_anchor_advanced(
         &self,
         operation_id: &AdmissionOperationId,

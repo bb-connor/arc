@@ -15,7 +15,7 @@ pub(super) fn verify_manifest_file_hashes(
         let relative = safe_relative_path(&file.path)?;
         let bytes = fs::read(input_dir.join(relative))?;
         let actual_hash = sha256_hex(&bytes);
-        let actual_bytes = bytes.len() as u64;
+        let actual_bytes = crate::integer::count(bytes.len());
         if actual_hash != file.sha256 {
             return Err(CliError::attest_error(format!(
                 "evidence package file hash mismatch for {}",
@@ -385,9 +385,11 @@ pub(super) fn verify_inclusion_proofs(
         }
     }
 
-    let derived_uncheckpointed = tool_receipts_by_seq
-        .len()
-        .saturating_sub(proved_receipt_seqs.len()) as u64;
+    let derived_uncheckpointed = crate::integer::count(
+        tool_receipts_by_seq
+            .len()
+            .saturating_sub(proved_receipt_seqs.len()),
+    );
     if derived_uncheckpointed != expected_uncheckpointed_receipts {
         return Err(CliError::attest_error(format!(
             "uncheckpointed receipt count mismatch: manifest says {}, derived {}",
@@ -440,11 +442,11 @@ pub(super) fn verify_manifest_counts(
     inclusion_proofs: &[ReceiptInclusionProof],
 ) -> Result<(), CliError> {
     let counts = &manifest.counts;
-    if counts.tool_receipts != tool_receipts.len() as u64
-        || counts.child_receipts != child_receipts.len() as u64
-        || counts.checkpoints != checkpoints.len() as u64
-        || counts.capability_lineage != capability_lineage.len() as u64
-        || counts.inclusion_proofs != inclusion_proofs.len() as u64
+    if counts.tool_receipts != crate::integer::count(tool_receipts.len())
+        || counts.child_receipts != crate::integer::count(child_receipts.len())
+        || counts.checkpoints != crate::integer::count(checkpoints.len())
+        || counts.capability_lineage != crate::integer::count(capability_lineage.len())
+        || counts.inclusion_proofs != crate::integer::count(inclusion_proofs.len())
     {
         return Err(CliError::attest_error(
             "evidence package manifest counts do not match exported data".to_string(),

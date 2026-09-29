@@ -17,14 +17,14 @@ impl Store {
         if now < process.capability.issued_at
             || expires_at <= now
             || expires_at > process.capability.expires_at
-            || expires_at > i64::MAX as u64
+            || i64::try_from(expires_at).is_err()
         {
             return Err(ProcessError::Invalid(
                 "credential validity must fit its live capability",
             ));
         }
         tx.execute("INSERT INTO worker_credentials(credential_hash, process_id, expires_at) VALUES (?1, ?2, ?3)",
-            params![hash, process_id, expires_at as i64])?;
+            params![hash, process_id, i64::try_from(expires_at).map_err(|_| ProcessError::Invalid("credential expiry exceeds SQLite range"))?])?;
         tx.commit()?;
         Ok(())
     }

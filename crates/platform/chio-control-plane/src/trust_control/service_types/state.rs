@@ -379,7 +379,7 @@ impl FederationAdmissionRateLimiter {
         entry
             .timestamps
             .retain(|timestamp| *timestamp > lower_bound);
-        if entry.timestamps.len() >= limit.max_requests as usize {
+        if crate::integer::count(entry.timestamps.len()) >= u64::from(limit.max_requests) {
             let retry_after_seconds = entry
                 .timestamps
                 .first()
@@ -409,10 +409,8 @@ impl FederationAdmissionRateLimiter {
             limit: limit.max_requests,
             window_seconds: limit.window_seconds,
             remaining: limit.max_requests.saturating_sub(
-                self.attempts
-                    .get(&key)
-                    .map(|v| v.timestamps.len())
-                    .unwrap_or(0) as u32,
+                u32::try_from(self.attempts.get(&key).map_or(0, |v| v.timestamps.len()))
+                    .unwrap_or(u32::MAX),
             ),
             retry_after_seconds: None,
         }
@@ -491,7 +489,11 @@ impl PeerHealth {
 
 #[cfg(test)]
 mod admission_bound_tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )]
     use super::*;
 
     fn limit() -> FederationAdmissionRateLimit {

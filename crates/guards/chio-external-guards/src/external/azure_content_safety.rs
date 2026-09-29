@@ -21,9 +21,9 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
 use super::bedrock::classify_status_error;
 use super::http_egress;
@@ -73,7 +73,7 @@ impl AzureCategory {
 #[derive(Clone)]
 pub struct AzureContentSafetyConfig {
     /// Content Safety API key (`Ocp-Apim-Subscription-Key` header).
-    pub api_key: Zeroizing<String>,
+    pub api_key: SecretString,
     /// Content Safety endpoint (e.g.
     /// `https://<region>.api.cognitive.microsoft.com`).
     pub endpoint: String,
@@ -107,7 +107,7 @@ impl AzureContentSafetyConfig {
     /// Construct a minimal config with defaults.
     pub fn new(api_key: impl Into<String>, endpoint: impl Into<String>) -> Self {
         Self {
-            api_key: Zeroizing::new(api_key.into()),
+            api_key: SecretString::from(api_key.into()),
             endpoint: endpoint.into(),
             api_version: DEFAULT_API_VERSION.to_string(),
             timeout: DEFAULT_TIMEOUT,
@@ -272,7 +272,7 @@ impl ExternalGuard for AzureContentSafetyGuard {
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers.insert(
             "Ocp-Apim-Subscription-Key",
-            HeaderValue::from_str(self.cfg.api_key.as_str())
+            HeaderValue::from_str(self.cfg.api_key.expose_secret())
                 .map_err(|e| ExternalGuardError::Permanent(format!("invalid api key: {e}")))?,
         );
 

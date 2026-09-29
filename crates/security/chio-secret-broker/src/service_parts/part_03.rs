@@ -666,6 +666,8 @@ impl ZeroizingCanonicalJsonWriter {
         Ok(())
     }
 
+    #[allow(clippy::as_conversions, clippy::indexing_slicing,
+        reason = "Only checked ASCII chars are narrowed; masked nibbles index a fixed 16-byte alphabet.")]
     pub(crate) fn write_string(&mut self, value: &str) -> Result<()> {
         self.push(b'"')?;
         for character in value.chars() {

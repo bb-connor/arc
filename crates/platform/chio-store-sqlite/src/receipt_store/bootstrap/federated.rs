@@ -311,8 +311,8 @@ impl SqliteReceiptStore {
                 partner: import.partner.clone(),
                 signer_public_key: import.signer_public_key.clone(),
                 require_proofs: import.require_proofs,
-                tool_receipts: import.tool_receipts.len() as u64,
-                capability_lineage: import.capability_lineage.len() as u64,
+                tool_receipts: crate::integer::count(import.tool_receipts.len()),
+                capability_lineage: crate::integer::count(import.capability_lineage.len()),
             })
         })
     }

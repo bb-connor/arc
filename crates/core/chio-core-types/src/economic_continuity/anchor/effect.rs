@@ -89,13 +89,19 @@ pub fn verify_economic_effect_cancellation_advance(
     if advance.batch.transitions.len() != 1
         || !advance.batch.effect_slots.is_empty()
         || !advance.batch.request_replays.is_empty()
-        || advance.batch.transitions[0].prepared_effect.is_some()
+        || advance
+            .batch
+            .transitions
+            .first()
+            .is_some_and(|transition| transition.prepared_effect.is_some())
     {
         return Err(EconomicStateAnchorError::EffectCancellationRejected(
             "cancellation must advance exactly one retained effect slot",
         ));
     }
-    let transition = &advance.batch.transitions[0];
+    let transition = advance.batch.transitions.first().ok_or(
+        EconomicStateAnchorError::EffectDispatchRejected("missing retained effect transition"),
+    )?;
     if transition.resource_key.resource_family != "effect_slot" {
         return Err(EconomicStateAnchorError::EffectCancellationRejected(
             "transition is not an effect slot",

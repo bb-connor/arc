@@ -4,7 +4,7 @@ description = "Chio runtime kernel: capability validation, guard evaluation, rec
 version.workspace = true
 edition.workspace = true
 # Kani 0.67 uses Rust 1.93; this formal-proof dependency remains compatible.
-rust-version = "1.93"
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 readme = "README.md"
@@ -105,7 +105,7 @@ opentelemetry-semantic-conventions = { workspace = true, optional = true }
 rusqlite = { workspace = true }
 chio-underwriting = { workspace = true }
 chio-swarm-authority = { workspace = true, optional = true }
-uuid = { workspace = true, features = ["v7"] }
+uuid = { workspace = true, features = ["v4", "v7"] }
 ureq = { version = "2.10", features = ["json"] }
 url = { workspace = true }
 rand = { workspace = true }
@@ -241,8 +241,11 @@ path = "tests/canonical_bytes_hybrid.rs"
 required-features = ["pq"]
 
 [lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 
 [lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(dhat)", "cfg(loom)", "cfg(chio_kernel_loom)"] }

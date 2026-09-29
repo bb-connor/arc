@@ -68,13 +68,12 @@ impl Keyid {
     /// to be rejected.
     #[must_use]
     pub fn from_public_key(public_key: &PublicKey) -> Self {
-        use chio_core_types::crypto::SigningAlgorithm;
         let mut hasher = Sha256::new();
-        match public_key.algorithm() {
-            SigningAlgorithm::Ed25519 => {
-                hasher.update(public_key.as_bytes());
+        match public_key.ed25519_bytes() {
+            Ok(bytes) => {
+                hasher.update(bytes);
             }
-            _ => {
+            Err(_) => {
                 hasher.update(public_key.to_hex().as_bytes());
             }
         }

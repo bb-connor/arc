@@ -1,5 +1,6 @@
 use std::fmt;
 
+use secrecy::{ExposeSecret, SecretBox};
 use zeroize::Zeroizing;
 
 use crate::backend::SecretMaterial;
@@ -14,7 +15,7 @@ pub enum CredentialPlacement {
 
 pub(crate) struct SecretHeader {
     name: String,
-    value: Zeroizing<Vec<u8>>,
+    value: SecretBox<Vec<u8>>,
 }
 
 impl SecretHeader {
@@ -22,8 +23,8 @@ impl SecretHeader {
         &self.name
     }
 
-    pub(crate) fn value(&self) -> &[u8] {
-        self.value.as_slice()
+    pub(crate) fn expose_secret(&self) -> &[u8] {
+        self.value.expose_secret()
     }
 }
 
@@ -138,9 +139,9 @@ impl ProviderAdapter for GenericCredentialProvider {
         if self.placement == CredentialPlacement::BearerAuthorization {
             value.extend_from_slice(b"Bearer ");
         }
-        value.extend_from_slice(credential.as_bytes());
+        value.extend_from_slice(credential.expose_secret());
         if credential
-            .as_bytes()
+            .expose_secret()
             .iter()
             .any(|byte| !matches!(*byte, b'!'..=b'~'))
         {
@@ -152,7 +153,7 @@ impl ProviderAdapter for GenericCredentialProvider {
             caller: request.clone(),
             secret_headers: vec![SecretHeader {
                 name: owned.to_string(),
-                value,
+                value: SecretBox::new(Box::new(std::mem::take(&mut *value))),
             }],
         })
     }

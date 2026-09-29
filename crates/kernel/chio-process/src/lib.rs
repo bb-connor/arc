@@ -1,3 +1,17 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 //! Durable agent process trees over Chio's existing admission coordinator.
 //!
 //! The core API is for trusted hosts. The optional `worker-server` feature
@@ -430,13 +444,22 @@ impl ProcessRuntime {
                     "attempt": attempt}
             });
             if known_outcome_only {
-                attribution["chio_process"]["recovery_policy"] = json!("known_outcome_only");
+                attribution
+                    .get_mut("chio_process")
+                    .and_then(Value::as_object_mut)
+                    .ok_or(ProcessError::Invalid(
+                        "process attribution must be an object",
+                    ))?
+                    .insert("recovery_policy".into(), json!("known_outcome_only"));
             }
+            let attribution_fields = attribution.as_object_mut().ok_or(ProcessError::Invalid(
+                "process attribution must be an object",
+            ))?;
             if let Some(route) = route {
-                attribution["route"] = serde_json::to_value(route)?;
+                attribution_fields.insert("route".into(), serde_json::to_value(route)?);
             }
             if let Some(receipt) = self.launch_receipts.get(&request.server_id) {
-                attribution["native_launch"] = serde_json::to_value(receipt)?;
+                attribution_fields.insert("native_launch".into(), serde_json::to_value(receipt)?);
             }
             // Keep the kernel evaluation frame out of every enclosing worker
             // future. Durable nonce verification adds a deep synchronous path;

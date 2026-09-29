@@ -222,19 +222,23 @@ fn pattern_suffixes_overlap(
     } else if right_index == right.len() {
         pattern_suffix_can_match_empty(left, left_index)
     } else {
-        match (left[left_index], right[right_index]) {
-            (b'*', _) => {
+        match (
+            left.get(left_index).copied(),
+            right.get(right_index).copied(),
+        ) {
+            (Some(b'*'), Some(_)) => {
                 pattern_suffixes_overlap(left, left_index + 1, right, right_index, memo)
                     || pattern_suffixes_overlap(left, left_index, right, right_index + 1, memo)
             }
-            (_, b'*') => {
+            (Some(_), Some(b'*')) => {
                 pattern_suffixes_overlap(left, left_index, right, right_index + 1, memo)
                     || pattern_suffixes_overlap(left, left_index + 1, right, right_index, memo)
             }
-            (left_byte, right_byte) => {
+            (Some(left_byte), Some(right_byte)) => {
                 pattern_bytes_compatible(left_byte, right_byte)
                     && pattern_suffixes_overlap(left, left_index + 1, right, right_index + 1, memo)
             }
+            _ => false,
         }
     };
     memo.insert((left_index, right_index), result);
@@ -242,7 +246,9 @@ fn pattern_suffixes_overlap(
 }
 
 fn pattern_suffix_can_match_empty(pattern: &[u8], index: usize) -> bool {
-    pattern[index..].iter().all(|byte| *byte == b'*')
+    pattern
+        .get(index..)
+        .is_some_and(|suffix| suffix.iter().all(|byte| *byte == b'*'))
 }
 
 fn pattern_bytes_compatible(left: u8, right: u8) -> bool {

@@ -65,24 +65,7 @@ def allow(expires: str, rationale: str) -> UnreachedDebt:
 
 # Manifests with no `[lints]` table. Each retires when its manifest adopts
 # `[lints] workspace = true`; entries are removed, never renewed in place.
-UNREACHED: dict[str, UnreachedDebt] = {
-    "examples/hello-a2a/Cargo.toml": allow(
-        "2026-12-31",
-        "example binary with no lints table; retires when it inherits the workspace policy",
-    ),
-    "examples/hello-acp/Cargo.toml": allow(
-        "2026-12-31",
-        "example binary with no lints table; retires when it inherits the workspace policy",
-    ),
-    "examples/hello-mcp/Cargo.toml": allow(
-        "2026-12-31",
-        "example binary with no lints table; retires when it inherits the workspace policy",
-    ),
-    "examples/hello-tool/Cargo.toml": allow(
-        "2026-12-31",
-        "example binary with no lints table; retires when it inherits the workspace policy",
-    ),
-}
+UNREACHED: dict[str, UnreachedDebt] = {}
 
 
 @dataclass(frozen=True)

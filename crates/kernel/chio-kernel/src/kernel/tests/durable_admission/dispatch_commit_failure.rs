@@ -144,7 +144,7 @@ fn payment_dispatch_failure(
     }
     if present_approval {
         kernel.set_governed_approval_replay_store(Box::new(
-            InMemoryGovernedApprovalReplayStore::new(8),
+            InMemoryGovernedApprovalReplayStore::new(8).expect("positive replay store test capacities"),
         ));
         let intent = make_governed_intent(
             "payment-dispatch-commit-failure-intent",

@@ -1,3 +1,17 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 #![deny(unsafe_code)]
 
 //! Shared custody primitives for Linux Unix-domain IPC services.
@@ -490,7 +504,7 @@ pub fn harden_process_custody() -> Result<()> {
 }
 
 pub fn read_bounded_frame(reader: &mut impl Read, maximum_bytes: usize) -> Result<Vec<u8>> {
-    if maximum_bytes == 0 || maximum_bytes > u32::MAX as usize {
+    if maximum_bytes == 0 || u32::try_from(maximum_bytes).is_err() {
         return Err(SecureIpcError::InvalidConfig(
             "frame limit is invalid".to_string(),
         ));

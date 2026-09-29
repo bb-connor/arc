@@ -1,3 +1,17 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 //! Authority key transparency with immutable events and transactional replay.
 
 mod checkpoint;
@@ -615,6 +629,8 @@ pub fn validate_sqlite_main_database_live_path_binding(
     connection: &rusqlite::Connection,
 ) -> Result<()> {
     let mut has_moved = 0_i32;
+    // SAFETY: the borrowed connection remains live throughout the synchronous control call.
+    let handle = unsafe { connection.handle() };
     // SAFETY: `connection` remains borrowed for the complete synchronous call,
     // so its SQLite handle is live. The schema name is a static NUL-terminated
     // string and `has_moved` is writable storage of the exact integer type
@@ -622,7 +638,7 @@ pub fn validate_sqlite_main_database_live_path_binding(
     // pointer after returning.
     let result = unsafe {
         rusqlite::ffi::sqlite3_file_control(
-            connection.handle(),
+            handle,
             c"main".as_ptr(),
             rusqlite::ffi::SQLITE_FCNTL_HAS_MOVED,
             (&raw mut has_moved).cast(),

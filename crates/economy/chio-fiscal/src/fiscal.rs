@@ -74,7 +74,10 @@ impl FiscalSigner {
 
 pub fn fiscal_signer_key_id(public_key: &PublicKey) -> Result<String, FiscalError> {
     let raw = match public_key.algorithm() {
-        SigningAlgorithm::Ed25519 => public_key.as_bytes().to_vec(),
+        SigningAlgorithm::Ed25519 => public_key
+            .ed25519_bytes()
+            .map_err(|_| FiscalError::UnsupportedSignerAlgorithm)?
+            .to_vec(),
         SigningAlgorithm::P256 => decode_prefixed_key(public_key, "p256:")?,
         SigningAlgorithm::P384 => decode_prefixed_key(public_key, "p384:")?,
         SigningAlgorithm::Hybrid => return Err(FiscalError::UnsupportedSignerAlgorithm),

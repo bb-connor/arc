@@ -222,7 +222,7 @@ impl Store {
     ) -> Result<Checkpoint, ProcessError> {
         let next = expected_revision
             .checked_add(1)
-            .filter(|v| *v <= i64::MAX as u64)
+            .filter(|v| i64::try_from(*v).is_ok())
             .ok_or(ProcessError::CheckpointConflict)?;
         let tx = self
             .connection
@@ -234,9 +234,9 @@ impl Store {
             "UPDATE processes SET checkpoint = ?1, revision = ?2 WHERE id = ?3 AND revision = ?4",
             params![
                 serde_json::to_string(&value)?,
-                next as i64,
+                i64::try_from(next).map_err(|_| ProcessError::CheckpointConflict)?,
                 id,
-                expected_revision as i64
+                i64::try_from(expected_revision).map_err(|_| ProcessError::CheckpointConflict)?
             ],
         )?;
         if changed != 1 {

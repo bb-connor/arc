@@ -123,12 +123,15 @@ pub(crate) fn resolve_sender_constraint_grant(
     .map_err(ReceiptStoreError::from)?;
 
     if let Some(index) = grant_index {
-        let grant = scope.grants.get(index as usize).ok_or_else(|| {
-            invalid_chio_oauth_authorization_profile(
-                receipt_id,
-                format!("matched grant_index `{index}` is outside the capability scope"),
-            )
-        })?;
+        let grant = scope
+            .grants
+            .get(crate::integer::checked::<_, usize>(index)?)
+            .ok_or_else(|| {
+                invalid_chio_oauth_authorization_profile(
+                    receipt_id,
+                    format!("matched grant_index `{index}` is outside the capability scope"),
+                )
+            })?;
         if grant.server_id != tool_server || grant.tool_name != tool_name {
             return Err(invalid_chio_oauth_authorization_profile(
                 receipt_id,
@@ -160,7 +163,10 @@ pub(crate) fn resolve_sender_constraint_grant(
             ),
         ));
     }
-    Ok((index as u32, grant.dpop_required == Some(true)))
+    Ok((
+        crate::integer::checked::<_, u32>(index)?,
+        grant.dpop_required == Some(true),
+    ))
 }
 
 pub(crate) struct AuthorizationSenderConstraintArgs<'a> {
@@ -570,7 +576,7 @@ pub(crate) fn chain_is_complete(
     {
         return false;
     }
-    if chain.windows(2).any(|window| {
+    if chain.array_windows::<2>().any(|window| {
         window[1].parent_capability_id.as_deref() != Some(window[0].capability_id.as_str())
     }) {
         return false;
@@ -578,12 +584,16 @@ pub(crate) fn chain_is_complete(
     if leaf.parent_capability_id.is_some() && chain.len() == 1 {
         return false;
     }
-    if leaf.delegation_depth as usize != chain.len().saturating_sub(1) {
+    if usize::try_from(leaf.delegation_depth) != Ok(chain.len().saturating_sub(1)) {
         return false;
     }
     true
 }
 
+#[allow(
+    clippy::as_conversions,
+    reason = "Observational ratios intentionally approximate integer counters as floating point."
+)]
 pub(crate) fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
     if denominator == 0 {
         None

@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Differential testing: executable Chio reference spec vs the production
 //! capability structs and the normalized proof-facing AST in `chio-kernel-core`.
 //!

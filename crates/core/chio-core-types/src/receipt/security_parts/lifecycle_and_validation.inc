@@ -5,6 +5,7 @@
 /// verify the exact prior-receipt chain. `allow_normalized_dispatch` is only
 /// for the pre-commit Applying snapshot whose authorization hash is attached
 /// by the subsequent dispatch commit.
+#[allow(clippy::indexing_slicing, reason = "The mutation list is nonempty, each effect index is resolved against the plan, parallel arrays have plan length, and replay prefixes come from enumerate on this same list.")]
 pub fn validate_response_snapshot_lifecycle(
     snapshot: &ResponseSnapshot,
     allow_normalized_dispatch: bool,
@@ -791,6 +792,7 @@ fn response_domain_hash<T: Serialize>(domain: &[u8], value: &T) -> Result<Digest
     Ok(Digest32::new(*sha256(&preimage).as_bytes()))
 }
 
+#[allow(clippy::indexing_slicing, reason = "The table has exactly 16 entries and both indices are masked four-bit nibbles.")]
 fn response_hex_bytes(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(bytes.len() * 2);
@@ -1217,10 +1219,10 @@ fn validate_correlated_finding(
         return Err(ActiveDefenseReceiptValidationError::MismatchedFindingEvidence);
     }
     for (index, event_id) in event_ids.iter().enumerate() {
-        if event_ids[..index].contains(event_id) {
+        if event_ids.iter().take(index).any(|earlier| earlier == event_id) {
             return Err(ActiveDefenseReceiptValidationError::DuplicateFindingEvent);
         }
-        require_nonzero_digest(&evidence_digests[index], "ordered_evidence_digest")?;
+        require_nonzero_digest(evidence_digests.get(index).ok_or(ActiveDefenseReceiptValidationError::MismatchedFindingEvidence)?, "ordered_evidence_digest")?;
     }
     let mut expected_priors = source_receipt_ids.to_vec();
     expected_priors.sort();
@@ -1604,8 +1606,7 @@ fn validate_effect_outcome_commitments(
         {
             return Err(ActiveDefenseReceiptValidationError::InvalidEffectOrdinal);
         }
-        if effects[..index]
-            .iter()
+        if effects.iter().take(index)
             .any(|earlier| earlier.effect.effect_id == effect.effect.effect_id)
         {
             return Err(ActiveDefenseReceiptValidationError::DuplicateEffectId);
@@ -1625,8 +1626,7 @@ fn validate_effect_order(
     if matches!(order, EffectOrder::ContiguousFromZero) && usize::from(effect.ordinal) != index {
         return Err(ActiveDefenseReceiptValidationError::InvalidEffectOrdinal);
     }
-    if effects[..index]
-        .iter()
+    if effects.iter().take(index)
         .any(|earlier| earlier.effect_id == effect.effect_id)
     {
         return Err(ActiveDefenseReceiptValidationError::DuplicateEffectId);

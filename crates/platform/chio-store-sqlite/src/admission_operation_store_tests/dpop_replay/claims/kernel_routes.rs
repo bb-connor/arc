@@ -94,7 +94,8 @@ impl Route {
         // afterwards. Neither its config nor its availability can downgrade v2.
         kernel
             .set_dpop_store(
-                DpopNonceStore::new(8, Duration::from_secs(60)),
+                DpopNonceStore::new(8, Duration::from_secs(60))
+                    .expect("positive replay store test capacities"),
                 chio_kernel::dpop::DpopConfig::default(),
             )
             .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));

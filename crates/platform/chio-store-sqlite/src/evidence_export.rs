@@ -203,8 +203,14 @@ impl SqliteReceiptStore {
             return Ok(Vec::new());
         }
 
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
@@ -221,7 +227,7 @@ impl SqliteReceiptStore {
 
         rows.map(|row| {
             let (seq, raw_json) = row?;
-            let seq = seq.max(0) as u64;
+            let seq = u64::try_from(seq.max(0)).unwrap_or_default();
             Ok(EvidenceChildReceiptRecord {
                 seq,
                 receipt: crate::receipt_store::decode_verified_child_receipt(
@@ -266,13 +272,17 @@ impl SqliteReceiptStore {
             ORDER BY checkpoint_seq ASC
             "#,
         )?;
-        let rows = statement.query_map(params![min_seq as i64, max_seq as i64], |row| {
-            row.get::<_, i64>(0)
-        })?;
+        let rows = statement.query_map(
+            params![
+                crate::integer::checked::<_, i64>(min_seq)?,
+                crate::integer::checked::<_, i64>(max_seq)?
+            ],
+            |row| row.get::<_, i64>(0),
+        )?;
 
         let mut checkpoints = Vec::new();
         for row in rows {
-            let checkpoint_seq = row?.max(0) as u64;
+            let checkpoint_seq = u64::try_from(row?.max(0)).unwrap_or_default();
             if let Some(checkpoint) = self.load_checkpoint_by_seq(checkpoint_seq)? {
                 checkpoints.push(checkpoint);
             }
@@ -410,11 +420,12 @@ fn load_checkpoint_publication_core(
                 Ok(PersistedCheckpointPublicationCore {
                     publication_schema: row.get::<_, String>(0)?,
                     merkle_root: row.get::<_, String>(1)?,
-                    published_at: row.get::<_, i64>(2)?.max(0) as u64,
+                    published_at: u64::try_from(row.get::<_, i64>(2)?.max(0)).unwrap_or_default(),
                     kernel_key: row.get::<_, String>(3)?,
-                    log_tree_size: row.get::<_, i64>(4)?.max(0) as u64,
-                    entry_start_seq: row.get::<_, i64>(5)?.max(0) as u64,
-                    entry_end_seq: row.get::<_, i64>(6)?.max(0) as u64,
+                    log_tree_size: u64::try_from(row.get::<_, i64>(4)?.max(0)).unwrap_or_default(),
+                    entry_start_seq: u64::try_from(row.get::<_, i64>(5)?.max(0))
+                        .unwrap_or_default(),
+                    entry_end_seq: u64::try_from(row.get::<_, i64>(6)?.max(0)).unwrap_or_default(),
                     previous_checkpoint_sha256: row.get::<_, Option<String>>(7)?,
                 })
             },
@@ -467,7 +478,11 @@ fn publication_core_matches(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 

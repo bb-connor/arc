@@ -1,3 +1,17 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 //! SQLite-backed persistence, query, and report layer for the Chio protocol.
 //!
 //! This crate is the concrete persistent backend for the kernel's receipt log
@@ -61,6 +75,7 @@ pub mod frost_store;
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
 mod governed_approval_replay_store;
+mod integer;
 pub mod iou_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
@@ -184,6 +199,10 @@ pub fn is_in_memory_sqlite_path(path: &str) -> bool {
     })
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The loop bounds index by the byte length and checks the complete percent-encoded triplet before reading its suffix."
+)]
 fn percent_decode_sqlite_uri(value: &str) -> String {
     let bytes = value.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());
@@ -204,6 +223,10 @@ fn percent_decode_sqlite_uri(value: &str) -> String {
     String::from_utf8_lossy(&decoded).into_owned()
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The loop bounds index by the byte length and checks the complete percent-encoded triplet before reading its suffix."
+)]
 fn percent_decode_sqlite_uri_component(value: &str) -> Option<String> {
     let bytes = value.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());

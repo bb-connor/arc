@@ -884,7 +884,7 @@ fn dimension_plans(
     connection: &SqliteStoreConnection,
     query: &ReceiptAnalyticsQuery,
 ) -> Vec<(&'static str, Vec<String>)> {
-    let scope = AnalyticsScope::from_query(query);
+    let scope = AnalyticsScope::from_query(query).test_expect("bounded analytics query");
     let group_limit = MAX_ANALYTICS_GROUP_LIMIT as i64;
     let bucket_width = DAY_SECS as i64;
     let summary = summary_query(&scope);
@@ -975,4 +975,29 @@ fn analytics_report_refuses_more_receipts_than_the_scan_ceiling() {
         .test_expect("a bounded report is accepted");
     assert!(bounded.summary.total_receipts > 0);
     assert!(bounded.summary.total_receipts <= ceiling as u64);
+}
+
+#[test]
+fn analytics_rejects_unrepresentable_timestamp_filters_before_querying() {
+    let fixture = populate("analytics-timestamp-range", Vec::new());
+    for (since, until) in [(Some(u64::MAX), None), (None, Some(u64::MAX))] {
+        let query = ReceiptAnalyticsQuery {
+            since,
+            until,
+            ..admin_query()
+        };
+        assert!(matches!(
+            fixture.store.query_receipt_analytics(&query),
+            Err(ReceiptStoreError::Sqlite(
+                rusqlite::Error::ToSqlConversionFailure(_)
+            ))
+        ));
+    }
+    fixture
+        .store
+        .query_receipt_analytics(&ReceiptAnalyticsQuery {
+            since: Some(i64::MAX.unsigned_abs()),
+            ..admin_query()
+        })
+        .test_expect("largest representable timestamp remains valid");
 }

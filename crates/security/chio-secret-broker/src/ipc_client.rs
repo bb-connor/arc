@@ -549,7 +549,7 @@ fn is_well_formed_ipc_error_code(code: &str) -> bool {
         && bytes
             .iter()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_')
-        && !bytes.windows(2).any(|pair| pair == b"__")
+        && !bytes.array_windows::<2>().any(|pair| pair == b"__")
 }
 
 fn decode_execute_outcome(

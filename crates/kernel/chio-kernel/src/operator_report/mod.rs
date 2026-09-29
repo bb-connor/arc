@@ -99,7 +99,10 @@ pub use settlement_report::{
 };
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_core::capability::governance::{

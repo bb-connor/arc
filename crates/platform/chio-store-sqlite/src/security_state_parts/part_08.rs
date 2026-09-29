@@ -1436,7 +1436,7 @@ fn load_egress_restriction_snapshot(
         });
     }
     if contributions
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].effect_id >= pair[1].effect_id)
         || generation
             < u64::try_from(contributions.len()).map_err(|_| PortError::integrity_failure())?

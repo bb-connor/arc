@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Combine live evaluation leases with operation-owned caller shares.
 
 use super::*;

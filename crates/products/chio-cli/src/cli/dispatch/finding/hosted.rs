@@ -369,7 +369,7 @@ fn same_file(before: &Metadata, after: &Metadata) -> bool {
 #[cfg(unix)]
 fn require_private_file(path: &Path, metadata: &Metadata) -> Result<(), CliError> {
     use std::os::unix::fs::MetadataExt as _;
-    if metadata.mode() & 0o077 != 0 || metadata.uid() != unsafe { libc::geteuid() } {
+    if metadata.mode() & 0o077 != 0 || metadata.uid() != rustix::process::geteuid().as_raw() {
         return Err(CliError::cli_other_error(format!(
             "{} must be owned by the current user with mode 0600 or stricter",
             path.display()

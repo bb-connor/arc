@@ -767,7 +767,11 @@ impl KernelError {
             ),
             Self::CredentialReservationCleanup { cause, .. } => {
                 let mut report = cause.report();
-                report.context["cleanup_failed"] = serde_json::json!(true);
+                if let Some(context) = report.context.as_object_mut() {
+                    context.insert("cleanup_failed".into(), serde_json::json!(true));
+                } else {
+                    report.context = serde_json::json!({ "cause": report.context, "cleanup_failed": true });
+                }
                 report.message = self.to_string();
                 report
             }
@@ -875,7 +879,11 @@ impl From<crate::security_admission_operation::AdmissionOperationError> for Kern
 
 #[cfg(test)]
 mod overload_tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )]
     use super::*;
 
     #[test]

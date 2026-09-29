@@ -1035,7 +1035,7 @@ impl CompiledCage {
         if self
             .plan
             .fd_table
-            .windows(2)
+            .array_windows::<2>()
             .any(|entries| entries[0].slot == entries[1].slot)
         {
             return Err(CageError::DuplicateFdSlot);
@@ -1673,7 +1673,7 @@ fn build_fd_table(
     }
     entries.sort_by_key(|entry| entry.slot);
     if entries
-        .windows(2)
+        .array_windows::<2>()
         .any(|window| window[0].slot == window[1].slot)
     {
         return Err(CageError::DuplicateFdSlot);

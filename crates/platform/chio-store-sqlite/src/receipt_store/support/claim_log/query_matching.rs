@@ -48,8 +48,8 @@ pub(crate) fn query_underwriting_appeal(
                 reason,
                 status: parse_underwriting_appeal_status(&status)?,
                 note,
-                created_at: created_at.max(0) as u64,
-                updated_at: updated_at.max(0) as u64,
+                created_at: u64::try_from(created_at.max(0)).unwrap_or_default(),
+                updated_at: u64::try_from(updated_at.max(0)).unwrap_or_default(),
                 resolved_by,
                 replacement_decision_id,
             })
@@ -109,8 +109,8 @@ pub(crate) fn load_underwriting_appeal_rows(
             reason,
             status: parse_underwriting_appeal_status(&status)?,
             note,
-            created_at: created_at.max(0) as u64,
-            updated_at: updated_at.max(0) as u64,
+            created_at: u64::try_from(created_at.max(0)).unwrap_or_default(),
+            updated_at: u64::try_from(updated_at.max(0)).unwrap_or_default(),
             resolved_by,
             replacement_decision_id,
         })

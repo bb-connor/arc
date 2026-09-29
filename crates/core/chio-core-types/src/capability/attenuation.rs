@@ -237,8 +237,7 @@ pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32
             });
         }
 
-        if i > 0 {
-            let prev = &chain[i - 1];
+        if let Some(prev) = i.checked_sub(1).and_then(|index| chain.get(index)) {
             if prev.delegatee != link.delegator {
                 return Err(Error::DelegationChainBroken {
                     reason: format!("link {i} delegator does not match link {} delegatee", i - 1),
@@ -469,7 +468,7 @@ fn validate_attenuation_step(
                 server_id,
                 tool_name,
                 |_grant| true,
-                || unreachable!("a covering grant always satisfies the trivial predicate"),
+                || "covering grant predicate rejected".to_string(),
             )
         }
         Attenuation::RemoveOperation {
@@ -779,10 +778,11 @@ pub fn compute_attenuation_witness(
     let mut restricted_predicates = Vec::new();
 
     for (child_index, child_grant) in child.grants.iter().enumerate() {
-        let Some(parent_index) = parent
+        let Some((parent_index, parent_grant)) = parent
             .grants
             .iter()
-            .position(|parent_grant| child_grant.is_subset_of(parent_grant))
+            .enumerate()
+            .find(|(_, parent_grant)| child_grant.is_subset_of(parent_grant))
         else {
             return Err(Error::AttenuationViolation {
                 reason: format!("tool grant {child_index} has no parent subset witness"),
@@ -794,7 +794,6 @@ pub fn compute_attenuation_witness(
             parent_index: u32::try_from(parent_index).unwrap_or(u32::MAX),
             subset: true,
         });
-        let parent_grant = &parent.grants[parent_index];
         for constraint in &child_grant.constraints {
             if !parent_grant.constraints.contains(constraint) {
                 restricted_predicates.push(format!(
@@ -814,10 +813,11 @@ pub fn compute_attenuation_witness(
     }
 
     for (child_index, child_grant) in child.resource_grants.iter().enumerate() {
-        let Some(parent_index) = parent
+        let Some((parent_index, _parent_grant)) = parent
             .resource_grants
             .iter()
-            .position(|parent_grant| child_grant.is_subset_of(parent_grant))
+            .enumerate()
+            .find(|(_, parent_grant)| child_grant.is_subset_of(parent_grant))
         else {
             return Err(Error::AttenuationViolation {
                 reason: format!("resource grant {child_index} has no parent subset witness"),
@@ -832,10 +832,11 @@ pub fn compute_attenuation_witness(
     }
 
     for (child_index, child_grant) in child.prompt_grants.iter().enumerate() {
-        let Some(parent_index) = parent
+        let Some((parent_index, _parent_grant)) = parent
             .prompt_grants
             .iter()
-            .position(|parent_grant| child_grant.is_subset_of(parent_grant))
+            .enumerate()
+            .find(|(_, parent_grant)| child_grant.is_subset_of(parent_grant))
         else {
             return Err(Error::AttenuationViolation {
                 reason: format!("prompt grant {child_index} has no parent subset witness"),

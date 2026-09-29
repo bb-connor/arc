@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Fenced observation of an admission's original composite hold.
 use super::*;
 use chio_kernel::admission_operation::RetainedToolAdmissionRequestV1;

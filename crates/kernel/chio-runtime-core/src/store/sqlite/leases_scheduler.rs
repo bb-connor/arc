@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
 use super::{sqlite_error, sqlite_i64, sqlite_u64, SqliteRuntimeOrchestrationStore};
@@ -24,7 +25,7 @@ fn lease_expiry(now: u64, ttl: u64) -> Result<u64, ChioRuntimeError> {
         ));
     }
     now.checked_add(ttl)
-        .filter(|expiry| *expiry <= i64::MAX as u64)
+        .filter(|expiry| i64::try_from(*expiry).is_ok())
         .ok_or_else(|| {
             rejected(
                 "runtime_run_lease_expiry_overflow",
@@ -42,7 +43,7 @@ fn next_fencing_token(previous: i64) -> Result<u64, ChioRuntimeError> {
     }
     previous
         .checked_add(1)
-        .map(|next| next as u64)
+        .and_then(|next| u64::try_from(next).ok())
         .ok_or_else(|| {
             rejected(
                 "runtime_run_lease_fencing_exhausted",

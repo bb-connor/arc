@@ -725,11 +725,11 @@ fn peer_credentials(fd: RawFd) -> Result<libc::ucred, BootstrapFault> {
             fd,
             libc::SOL_SOCKET,
             libc::SO_PEERCRED,
-            (&mut credentials as *mut libc::ucred).cast(),
+            (&raw mut credentials).cast(),
             &mut length,
         )
     } != 0
-        || length as usize != std::mem::size_of::<libc::ucred>()
+        || usize::try_from(length) != Ok(std::mem::size_of::<libc::ucred>())
     {
         return Err(BootstrapFault::new(
             CageEnforcementFailureCode::StatusProtocolViolation,
@@ -838,177 +838,7 @@ fn memfd_seal_mask(fd: RawFd) -> Result<u32, CageLaunchError> {
     })
 }
 
-fn send_descriptors(socket: RawFd, descriptors: &[RawFd]) -> Result<(), CageLaunchError> {
-    if descriptors.is_empty() || descriptors.len() > MAX_TRANSFER_FDS {
-        return Err(CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::DescriptorCountMismatch,
-            "descriptor_send_count",
-        ));
-    }
-    let count = u32::try_from(descriptors.len()).map_err(|_| {
-        CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::DescriptorCountMismatch,
-            "descriptor_send_count",
-        )
-    })?;
-    let mut payload = count.to_le_bytes();
-    let mut io_vector = libc::iovec {
-        iov_base: payload.as_mut_ptr().cast(),
-        iov_len: payload.len(),
-    };
-    let descriptor_bytes = descriptors
-        .len()
-        .checked_mul(std::mem::size_of::<RawFd>())
-        .ok_or_else(|| {
-            CageLaunchError::bootstrap_failed(
-                CageEnforcementFailureCode::DescriptorCountMismatch,
-                "descriptor_send_size",
-            )
-        })?;
-    // SAFETY: CMSG_SPACE computes the required ancillary buffer size.
-    let control_size = unsafe { libc::CMSG_SPACE(descriptor_bytes as libc::c_uint) } as usize;
-    let control_entries = control_size.div_ceil(std::mem::size_of::<libc::cmsghdr>());
-    let mut control = Vec::<std::mem::MaybeUninit<libc::cmsghdr>>::with_capacity(control_entries);
-    control.resize_with(control_entries, std::mem::MaybeUninit::zeroed);
-    // SAFETY: msghdr is a plain C input structure whose zero value denotes no
-    // peer address or optional flags.
-    let mut message = unsafe { std::mem::zeroed::<libc::msghdr>() };
-    message.msg_iov = &mut io_vector;
-    message.msg_iovlen = 1;
-    message.msg_control = control.as_mut_ptr().cast();
-    // msg_controllen is size_t on glibc and socklen_t on musl.
-    message.msg_controllen = control_size as _;
-    // SAFETY: message owns a correctly sized control buffer.
-    let header = unsafe { libc::CMSG_FIRSTHDR(&message) };
-    if header.is_null() {
-        return Err(CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::StatusProtocolViolation,
-            "descriptor_send_header",
-        ));
-    }
-    // SAFETY: header points inside control and CMSG_DATA has descriptor_bytes
-    // writable bytes after the header.
-    unsafe {
-        (*header).cmsg_level = libc::SOL_SOCKET;
-        (*header).cmsg_type = libc::SCM_RIGHTS;
-        (*header).cmsg_len = libc::CMSG_LEN(descriptor_bytes as libc::c_uint)
-            .try_into()
-            .map_err(|_| {
-                CageLaunchError::bootstrap_failed(
-                    CageEnforcementFailureCode::DescriptorCountMismatch,
-                    "descriptor_send_size",
-                )
-            })?;
-        std::ptr::copy_nonoverlapping(
-            descriptors.as_ptr().cast::<u8>(),
-            libc::CMSG_DATA(header),
-            descriptor_bytes,
-        );
-    }
-    // SAFETY: all message buffers and descriptor values remain live for the
-    // single atomic sequenced-packet send.
-    let sent = unsafe { libc::sendmsg(socket, &message, libc::MSG_NOSIGNAL) };
-    if sent != payload.len() as isize {
-        return Err(CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::StatusProtocolViolation,
-            "descriptor_send",
-        ));
-    }
-    Ok(())
-}
-
-fn receive_descriptors(socket: RawFd) -> Result<(File, Vec<OwnedFd>), BootstrapFault> {
-    let mut payload = [0_u8; 4];
-    let mut io_vector = libc::iovec {
-        iov_base: payload.as_mut_ptr().cast(),
-        iov_len: payload.len(),
-    };
-    let descriptor_bytes = MAX_TRANSFER_FDS * std::mem::size_of::<RawFd>();
-    // SAFETY: CMSG_SPACE computes the maximum ancillary buffer size.
-    let control_size = unsafe { libc::CMSG_SPACE(descriptor_bytes as libc::c_uint) } as usize;
-    let control_entries = control_size.div_ceil(std::mem::size_of::<libc::cmsghdr>());
-    let mut control = Vec::<std::mem::MaybeUninit<libc::cmsghdr>>::with_capacity(control_entries);
-    control.resize_with(control_entries, std::mem::MaybeUninit::zeroed);
-    // SAFETY: msghdr is a plain C output structure initialized to no address.
-    let mut message = unsafe { std::mem::zeroed::<libc::msghdr>() };
-    message.msg_iov = &mut io_vector;
-    message.msg_iovlen = 1;
-    message.msg_control = control.as_mut_ptr().cast();
-    // msg_controllen is size_t on glibc and socklen_t on musl.
-    message.msg_controllen = control_size as _;
-    // SAFETY: all output buffers are writable for the duration of recvmsg.
-    let received = unsafe { libc::recvmsg(socket, &mut message, libc::MSG_CMSG_CLOEXEC) };
-    if received < 0 {
-        return Err(BootstrapFault::new(
-            CageEnforcementFailureCode::StatusProtocolViolation,
-            "descriptor_receive",
-        ));
-    }
-    let mut owned = Vec::new();
-    let mut control_headers = 0_usize;
-    let mut control_valid = true;
-    // SAFETY: message contains the ancillary bytes initialized by recvmsg.
-    let mut header = unsafe { libc::CMSG_FIRSTHDR(&message) };
-    while !header.is_null() {
-        // SAFETY: header is within the received ancillary buffer.
-        let valid = unsafe {
-            (*header).cmsg_level == libc::SOL_SOCKET && (*header).cmsg_type == libc::SCM_RIGHTS
-        };
-        if !valid {
-            control_valid = false;
-            // SAFETY: CMSG_NXTHDR advances within the same received message.
-            header = unsafe { libc::CMSG_NXTHDR(&message, header) };
-            continue;
-        }
-        control_headers = control_headers.saturating_add(1);
-        // SAFETY: cmsg_len was validated by the kernel to lie in the buffer.
-        // cmsg_len is size_t on glibc and socklen_t on musl.
-        let length = unsafe { (*header).cmsg_len } as usize;
-        let header_length = unsafe { libc::CMSG_LEN(0) } as usize;
-        if length < header_length
-            || !(length - header_length).is_multiple_of(std::mem::size_of::<RawFd>())
-        {
-            return Err(BootstrapFault::new(
-                CageEnforcementFailureCode::StatusProtocolViolation,
-                "descriptor_control_length",
-            ));
-        }
-        let count = (length - header_length) / std::mem::size_of::<RawFd>();
-        // SAFETY: CMSG_DATA points to count initialized RawFd values.
-        let values =
-            unsafe { std::slice::from_raw_parts(libc::CMSG_DATA(header).cast::<RawFd>(), count) };
-        for raw in values {
-            if *raw < 0 {
-                control_valid = false;
-                continue;
-            }
-            // SAFETY: SCM_RIGHTS returned a new uniquely owned descriptor.
-            owned.push(unsafe { OwnedFd::from_raw_fd(*raw) });
-        }
-        // SAFETY: CMSG_NXTHDR advances within the same received message.
-        header = unsafe { libc::CMSG_NXTHDR(&message, header) };
-    }
-    if received != payload.len() as isize
-        || message.msg_flags & (libc::MSG_TRUNC | libc::MSG_CTRUNC) != 0
-        || control_headers != 1
-        || !control_valid
-    {
-        return Err(BootstrapFault::new(
-            CageEnforcementFailureCode::StatusProtocolViolation,
-            "descriptor_receive",
-        ));
-    }
-    let expected = u32::from_le_bytes(payload) as usize;
-    if expected == 0 || expected > MAX_TRANSFER_FDS || owned.len() != expected {
-        return Err(BootstrapFault::new(
-            CageEnforcementFailureCode::DescriptorCountMismatch,
-            "descriptor_receive_count",
-        ));
-    }
-    let plan = owned.remove(0);
-    Ok((File::from(plan), owned))
-}
-
+#[allow(clippy::indexing_slicing, reason = "The packet read count was converted from nonnegative ssize_t and is bounded by the supplied buffer.")]
 fn read_status(fd: RawFd) -> Result<StatusRead, CageLaunchError> {
     let mut buffer = vec![0_u8; MAX_STATUS_BYTES];
     let mut io_vector = libc::iovec {
@@ -1080,7 +910,7 @@ fn write_packet(fd: RawFd, bytes: &[u8]) -> io::Result<()> {
     // SAFETY: bytes is a live input buffer and the status descriptor is a
     // connected sequenced-packet socket.
     let written = unsafe { libc::write(fd, bytes.as_ptr().cast(), bytes.len()) };
-    if written == bytes.len() as isize {
+    if usize::try_from(written) == Ok(bytes.len()) {
         Ok(())
     } else if written < 0 {
         Err(io::Error::last_os_error())
@@ -1119,13 +949,14 @@ fn is_status_socket(fd: RawFd) -> bool {
             fd,
             libc::SOL_SOCKET,
             libc::SO_TYPE,
-            (&mut socket_type as *mut i32).cast(),
+            (&raw mut socket_type).cast(),
             &mut length,
         ) == 0
             && socket_type == libc::SOCK_SEQPACKET
     }
 }
 
+#[allow(clippy::indexing_slicing, reason = "offset starts at zero, the loop checks it against the allocated size, and each FileExt read is bounded by the remaining slice.")]
 fn read_bounded_file(file: &File, max_bytes: usize) -> Result<Vec<u8>, BootstrapFault> {
     let size = usize::try_from(
         file.metadata()
@@ -1145,7 +976,7 @@ fn read_bounded_file(file: &File, max_bytes: usize) -> Result<Vec<u8>, Bootstrap
     let mut offset = 0_usize;
     while offset < size {
         let read = file
-            .read_at(&mut bytes[offset..], offset as u64)
+            .read_at(&mut bytes[offset..], u64::try_from(offset).map_err(|_| BootstrapFault::new(CageEnforcementFailureCode::InvalidPlan, "plan_offset"))?)
             .map_err(|_| {
                 BootstrapFault::new(CageEnforcementFailureCode::InvalidPlan, "plan_read")
             })?;
@@ -1196,8 +1027,8 @@ fn hash_file(file: &File) -> Result<String, BootstrapFault> {
                 "artifact_short_read",
             ));
         }
-        bytes.extend_from_slice(&buffer[..read]);
-        offset = offset.saturating_add(read as u64);
+        bytes.extend_from_slice(buffer.get(..read).ok_or(BootstrapFault::new(CageEnforcementFailureCode::DescriptorIdentityMismatch, "artifact_read_count"))?);
+        offset = offset.checked_add(u64::try_from(read).map_err(|_| BootstrapFault::new(CageEnforcementFailureCode::DescriptorIdentityMismatch, "artifact_read_count"))?).ok_or(BootstrapFault::new(CageEnforcementFailureCode::DescriptorIdentityMismatch, "artifact_read_offset"))?;
     }
     let after = file.metadata().map_err(|_| {
         BootstrapFault::new(
@@ -1224,7 +1055,7 @@ fn random_digest() -> Result<String, CageLaunchError> {
     // SAFETY: bytes is writable for its full length and flags zero requests a
     // blocking kernel random read.
     let read = unsafe { libc::getrandom(bytes.as_mut_ptr().cast(), bytes.len(), 0) };
-    if read != bytes.len() as isize {
+    if usize::try_from(read) != Ok(bytes.len()) {
         return Err(CageLaunchError::bootstrap_failed(
             CageEnforcementFailureCode::UnsupportedKernel,
             "trace_random",

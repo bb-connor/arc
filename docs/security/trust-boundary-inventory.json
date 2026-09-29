@@ -1689,7 +1689,7 @@
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::from_str",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::validate_number_tokens::from_str",
-    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_canonical::from_str",
+    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_canonical_with::from_str",
     "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_signed::from_value",
     "crates/core/chio-core-types/src/capability/caveat.rs::security_binding::from_slice",
     "crates/core/chio-core-types/src/capability/governance.rs::explicit_continuation_token::from_value",
@@ -3951,7 +3951,7 @@
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse.",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::from_str": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse.",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::validate_number_tokens::from_str": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse.",
-    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_canonical::from_str": "Constrained reader implementation. Signed mode delegates original-token validation; canonical mode compares exact original bytes with canonical typed serialization.",
+    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_canonical_with::from_str": "Constrained reader implementation. Signed mode delegates original-token validation; canonical mode compares exact original bytes with canonical typed serialization.",
     "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_signed::from_value": "Constrained reader implementation. Signed mode delegates original-token validation; canonical mode compares exact original bytes with canonical typed serialization.",
     "crates/core/chio-core-types/src/capability/caveat.rs::security_binding::from_slice": "Security binding verifies strict I-JSON canonical bytes equal original predicate before typed reparse and binding validation.",
     "crates/core/chio-core-types/src/capability/governance.rs::explicit_continuation_token::from_value": "Typed Value conversions and validating custom deserializers for governance DTOs. Signed outer readers and authority verification remain mandatory.",
@@ -4667,7 +4667,7 @@
       "validate_number_tokens::from_str"
     ],
     "crates/core/chio-core-types/src/canonical/untrusted.rs": [
-      "decode_canonical::from_str",
+      "decode_canonical_with::from_str",
       "decode_signed::from_value"
     ],
     "crates/core/chio-core-types/src/canonical.rs": [
@@ -10574,7 +10574,7 @@
       "contract": "Constrained reader implementation. Signed mode delegates original-token validation; canonical mode compares exact original bytes with canonical typed serialization.",
       "migrations": [],
       "retained_typed_conversions": [
-        "decode_canonical::from_str",
+        "decode_canonical_with::from_str",
         "decode_signed::from_value"
       ]
     },

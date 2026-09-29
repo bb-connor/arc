@@ -200,7 +200,7 @@ where
                 "key-log service request exceeds 1048576 bytes".to_string(),
             ));
         }
-        line.extend_from_slice(&available[..take]);
+        line.extend_from_slice(available.get(..take).ok_or(KeyringError::NumericRange)?);
         reader.consume(take);
         if line.last() == Some(&b'\n') {
             break;

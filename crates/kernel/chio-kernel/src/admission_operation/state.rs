@@ -80,7 +80,7 @@ pub(super) fn validate_artifact_digests(
     digests: &[AdmissionDigest],
 ) -> Result<(), AdmissionOperationError> {
     if digests.len() > MAX_AUTHORIZATION_ARTIFACT_DIGESTS
-        || digests.windows(2).any(|pair| pair[0] >= pair[1])
+        || digests.array_windows::<2>().any(|pair| pair[0] >= pair[1])
     {
         return Err(AdmissionOperationError::InvalidAuthorizationArtifactDigests);
     }

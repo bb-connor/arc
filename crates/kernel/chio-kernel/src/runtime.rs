@@ -226,9 +226,19 @@ pub struct ToolCallStream {
 }
 
 impl ToolCallStream {
+    #[allow(
+        clippy::as_conversions,
+        reason = "The supported 32-bit and 64-bit targets widen collection lengths into u64 without loss."
+    )]
     pub fn chunk_count(&self) -> u64 {
         self.chunks.len() as u64
     }
+}
+
+pub(crate) fn stream_size(size: usize) -> Result<u64, KernelError> {
+    u64::try_from(size).map_err(|_| KernelError::Overloaded {
+        resource: crate::OverloadResource::StreamBytes,
+    })
 }
 
 /// Sum the canonical byte size of a materialized stream and deny with
@@ -246,7 +256,7 @@ pub fn enforce_stream_byte_limit(
     for chunk in &stream.chunks {
         let bytes = crate::canonical_json_bytes(&chunk.data)
             .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?;
-        total = checked_stream_byte_total(total, bytes.len() as u64)?;
+        total = checked_stream_byte_total(total, stream_size(bytes.len())?)?;
         if total > max_total_bytes {
             return Err(KernelError::Overloaded {
                 resource: crate::OverloadResource::StreamBytes,
@@ -276,14 +286,16 @@ pub fn push_chunk_bounded(
     // Chunk-count bound: shed before retaining another chunk when the retained
     // count is already at the cap, so a flood of tiny chunks under the byte cap
     // still cannot grow `acc` (or the per-chunk signing preimage) without bound.
-    if max_chunks > 0 && acc.len() as u64 >= max_chunks {
+    if max_chunks > 0 && stream_size(acc.len())? >= max_chunks {
         return Err(KernelError::Overloaded {
             resource: crate::OverloadResource::StreamChunks,
         });
     }
-    let chunk_bytes = crate::canonical_json_bytes(&chunk.data)
-        .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?
-        .len() as u64;
+    let chunk_bytes = stream_size(
+        crate::canonical_json_bytes(&chunk.data)
+            .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?
+            .len(),
+    )?;
     let next = checked_stream_byte_total(*running_bytes, chunk_bytes)?;
     if max_total_bytes > 0 && next > max_total_bytes {
         return Err(KernelError::Overloaded {

@@ -69,7 +69,7 @@ pub(in crate::runtime) fn cancellation_reason(message: &Value) -> String {
 }
 
 pub(in crate::runtime) fn next_client_message(
-    client_rx: &mpsc::Receiver<ClientInbound>,
+    client_rx: &mut mpsc::Receiver<ClientInbound>,
 ) -> Result<Value, AdapterError> {
     match client_rx.recv() {
         Ok(ClientInbound::Message(message)) => Ok(message),

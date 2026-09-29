@@ -39,7 +39,7 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
             .len()
             .checked_add(1)
             .is_some_and(|expected| candidate_mutations.len() == expected)
-            && &candidate_mutations[..current_mutations.len()] == current_mutations;
+            && candidate_mutations.get(..current_mutations.len()) == Some(current_mutations);
         let (scheduler_owner, scheduler_token) = response_mutation_scheduler_fence(appended)?;
         if request.current.tenant_id != request.work.tenant_id
             || request.current.action_id != request.work.action_id
@@ -83,7 +83,7 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
                 decode_response_snapshot(&durable).map_err(|_| PortError::integrity_failure())?;
             let durable_mutations = durable_snapshot.mutations.as_slice();
             let candidate_is_durable_prefix = candidate_mutations.len() <= durable_mutations.len()
-                && &durable_mutations[..candidate_mutations.len()] == candidate_mutations;
+                && durable_mutations.get(..candidate_mutations.len()) == Some(candidate_mutations);
             if !candidate_is_durable_prefix
                 || durable.tenant_id != request.candidate.tenant_id
                 || durable.action_id != request.candidate.action_id

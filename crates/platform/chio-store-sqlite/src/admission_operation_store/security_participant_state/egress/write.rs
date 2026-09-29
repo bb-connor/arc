@@ -3,7 +3,10 @@
 use super::*;
 
 impl SqliteAdmissionOperationStore {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn acquire_security_participant_egress(
         &self,
         operation: &AdmissionOperationV1,
@@ -30,7 +33,10 @@ impl SqliteAdmissionOperationStore {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn commit_security_participant_egress(
         &self,
         operation: &AdmissionOperationV1,
@@ -97,7 +103,10 @@ impl SqliteAdmissionOperationStore {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn mutate_security_participant_egress(
         &self,
         operation: &AdmissionOperationV1,

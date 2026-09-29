@@ -231,7 +231,7 @@ impl AdmissionRequestBindingInput {
             validate_digest(digest, "approval_token_digest")?;
         }
         if approval_token_digests
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0] >= pair[1])
         {
             return Err(AdmissionOperationError::Invalid(

@@ -471,7 +471,7 @@ fn run_guards_owned(
 }
 
 fn budget_ms_saturating(budget: std::time::Duration) -> u64 {
-    budget.as_millis().min(u128::from(u64::MAX)) as u64
+    u64::try_from(budget.as_millis()).unwrap_or(u64::MAX)
 }
 
 /// The fail-closed error returned when a tool-server call outruns its dispatch
@@ -685,7 +685,10 @@ impl ChioKernel {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn revalidate_immediately_before_dispatch(
         &self,
         request: &ToolCallRequest,

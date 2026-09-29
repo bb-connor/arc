@@ -437,28 +437,40 @@ pub(crate) fn build_public_generic_listing_report(
         .collect::<Vec<_>>();
 
     let summary = GenericListingSummary {
-        matching_listings: filtered.len() as u64,
-        returned_listings: filtered.len().min(normalized_query.limit_or_default()) as u64,
-        active_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Active)
-            .count() as u64,
-        suspended_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Suspended)
-            .count() as u64,
-        superseded_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Superseded)
-            .count() as u64,
-        revoked_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Revoked)
-            .count() as u64,
-        retired_listings: filtered
-            .iter()
-            .filter(|listing| listing.body.status == GenericListingStatus::Retired)
-            .count() as u64,
+        matching_listings: crate::integer::count(filtered.len()),
+        returned_listings: crate::integer::count(
+            filtered.len().min(normalized_query.limit_or_default()),
+        ),
+        active_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Active)
+                .count(),
+        ),
+        suspended_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Suspended)
+                .count(),
+        ),
+        superseded_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Superseded)
+                .count(),
+        ),
+        revoked_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Revoked)
+                .count(),
+        ),
+        retired_listings: crate::integer::count(
+            filtered
+                .iter()
+                .filter(|listing| listing.body.status == GenericListingStatus::Retired)
+                .count(),
+        ),
     };
 
     Ok(GenericListingReport {

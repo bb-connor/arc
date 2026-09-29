@@ -80,25 +80,17 @@ impl MerkleTree {
         }
 
         let mut levels: Vec<Vec<Hash>> = Vec::new();
-        let mut current: Vec<Hash> = Vec::with_capacity(leaves.len());
-        let mut li = 0;
-        while li < leaves.len() {
-            current.push(leaf_hash(leaves[li].as_ref()));
-            li += 1;
-        }
+        let mut current: Vec<Hash> = leaves.iter().map(|leaf| leaf_hash(leaf.as_ref())).collect();
         levels.push(current.clone());
 
         while current.len() > 1 {
             let mut next: Vec<Hash> = Vec::with_capacity(current.len().div_ceil(2));
-            let mut i = 0;
-            while i < current.len() {
-                if i + 1 < current.len() {
-                    next.push(node_hash(&current[i], &current[i + 1]));
-                } else {
-                    // Carry last node upward unchanged.
-                    next.push(current[i]);
+            for chunk in current.chunks(2) {
+                match chunk {
+                    [left, right] => next.push(node_hash(left, right)),
+                    [last] => next.push(*last),
+                    _ => {}
                 }
-                i += 2;
             }
             levels.push(next.clone());
             current = next;
@@ -119,14 +111,12 @@ impl MerkleTree {
 
         while current.len() > 1 {
             let mut next: Vec<Hash> = Vec::with_capacity(current.len().div_ceil(2));
-            let mut i = 0;
-            while i < current.len() {
-                if i + 1 < current.len() {
-                    next.push(node_hash(&current[i], &current[i + 1]));
-                } else {
-                    next.push(current[i]);
+            for chunk in current.chunks(2) {
+                match chunk {
+                    [left, right] => next.push(node_hash(left, right)),
+                    [last] => next.push(*last),
+                    _ => {}
                 }
-                i += 2;
             }
             levels.push(next.clone());
             current = next;
@@ -138,26 +128,17 @@ impl MerkleTree {
     /// Get the number of leaves.
     #[must_use]
     pub fn leaf_count(&self) -> usize {
-        if self.levels.is_empty() {
-            0
-        } else {
-            self.levels[0].len()
-        }
+        self.levels.first().map_or(0, Vec::len)
     }
 
     /// Get the root hash.
     #[must_use]
     pub fn root(&self) -> Hash {
-        if self.levels.is_empty() {
-            Hash::zero()
-        } else {
-            let last = &self.levels[self.levels.len() - 1];
-            if last.is_empty() {
-                Hash::zero()
-            } else {
-                last[0]
-            }
-        }
+        self.levels
+            .last()
+            .and_then(|level| level.first())
+            .copied()
+            .unwrap_or_else(Hash::zero)
     }
 
     /// Generate an RFC 6962 consistency proof (RFC 9162 section 2.1.4.1)
@@ -245,7 +226,8 @@ impl MerkleTree {
         }
         let size = hi - lo;
         if size.is_power_of_two() && lo.is_multiple_of(size) {
-            let level = size.trailing_zeros() as usize;
+            let level =
+                usize::try_from(size.trailing_zeros()).map_err(|_| Error::MerkleProofFailed)?;
             return self
                 .levels
                 .get(level)
@@ -435,7 +417,7 @@ where
         where
             A: SeqAccess<'de>,
         {
-            let maximum = usize::BITS as usize + 1;
+            let maximum = (core::mem::size_of::<usize>() * 8) + 1;
             if sequence.size_hint().is_some_and(|size| size > maximum) {
                 return Err(serde::de::Error::custom(
                     "consistency path exceeds platform tree depth",
@@ -460,7 +442,7 @@ where
 impl MerkleConsistencyProof {
     /// Verify the bounded audit path against both advertised roots.
     pub fn verify(&self, old_root: &Hash, new_root: &Hash) -> Result<()> {
-        if self.audit_path.len() > usize::BITS as usize + 1
+        if self.audit_path.len() > (core::mem::size_of::<usize>() * 8) + 1
             || !verify_consistency_proof(
                 self.old_size,
                 self.new_size,
@@ -549,7 +531,11 @@ impl MerkleProof {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
 
@@ -847,14 +833,14 @@ mod tests {
         let overlong = MerkleConsistencyProof {
             old_size: 3,
             new_size: 7,
-            audit_path: vec![Hash::zero(); usize::BITS as usize + 2],
+            audit_path: vec![Hash::zero(); (core::mem::size_of::<usize>() * 8) + 2],
         };
         assert!(overlong.verify(&old_tree.root(), &new_tree.root()).is_err());
     }
 
     #[test]
     fn consistency_deserialization_rejects_overlong_paths_before_growth() {
-        let hashes = vec![Hash::zero(); usize::BITS as usize + 2];
+        let hashes = vec![Hash::zero(); (core::mem::size_of::<usize>() * 8) + 2];
         let json = serde_json::json!({
             "old_size": 1,
             "new_size": 2,

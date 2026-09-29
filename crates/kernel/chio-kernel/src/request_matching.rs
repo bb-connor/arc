@@ -513,7 +513,11 @@ fn constraint_matches(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_core::capability::{
@@ -1244,6 +1248,10 @@ fn normalize_domain(value: &str) -> String {
     value.trim().trim_matches('.').to_ascii_lowercase()
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Each character access is guarded by the corresponding vector length; saved star positions originate in those guarded accesses."
+)]
 fn wildcard_matches(pattern: &str, candidate: &str) -> bool {
     let pattern_chars: Vec<char> = pattern.chars().collect();
     let candidate_chars: Vec<char> = candidate.chars().collect();

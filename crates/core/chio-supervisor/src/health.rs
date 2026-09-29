@@ -23,6 +23,14 @@ pub enum HealthLevel {
 }
 
 impl HealthLevel {
+    const fn as_byte(self) -> u8 {
+        match self {
+            Self::Healthy => 0,
+            Self::Degraded => 1,
+            Self::Failed => 2,
+        }
+    }
+
     fn from_u8(value: u8) -> Self {
         match value {
             0 => HealthLevel::Healthy,
@@ -55,7 +63,7 @@ impl HealthFlag {
     #[must_use]
     pub fn new(tcb_critical: bool) -> Self {
         Self(Arc::new(HealthState {
-            level: AtomicU8::new(HealthLevel::Healthy as u8),
+            level: AtomicU8::new(HealthLevel::Healthy.as_byte()),
             tcb_critical,
             consecutive_failures: AtomicU32::new(0),
             restart_total: AtomicU64::new(0),
@@ -117,7 +125,7 @@ impl HealthFlag {
         self.0.consecutive_failures.store(0, Ordering::SeqCst);
         self.0
             .level
-            .store(HealthLevel::Healthy as u8, Ordering::SeqCst);
+            .store(HealthLevel::Healthy.as_byte(), Ordering::SeqCst);
         self.0
             .last_transition_unix_ms
             .store(now_ms, Ordering::SeqCst);
@@ -141,7 +149,7 @@ impl HealthFlag {
     /// Monotonically raise the level. A compare-and-swap loop guarantees a concurrent
     /// escalation can never be lost behind a lower-severity raise.
     fn raise_to(&self, level: HealthLevel, now_ms: u64) {
-        let target = level as u8;
+        let target = level.as_byte();
         let mut current = self.0.level.load(Ordering::SeqCst);
         while target > current {
             match self

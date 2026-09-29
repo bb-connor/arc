@@ -36,8 +36,8 @@ pub(super) struct QueuedEdgeNestedFlowClient<'a, W> {
     pub(super) logging_enabled: bool,
     pub(super) minimum_log_level: LogLevel,
     pub(super) related_task_id: Option<&'a str>,
-    pub(super) client_rx: &'a mpsc::Receiver<ClientInbound>,
-    pub(super) cancel_rx: &'a mpsc::Receiver<Value>,
+    pub(super) client_rx: &'a mut mpsc::Receiver<ClientInbound>,
+    pub(super) cancel_rx: &'a mut mpsc::Receiver<Value>,
     pub(super) writer: &'a mut W,
 }
 
@@ -47,7 +47,7 @@ pub(super) struct AcceptedUrlElicitation {
     pub(super) related_task_id: Option<String>,
 }
 
-impl<R: BufRead, W: Write> EdgeNestedFlowClient<'_, R, W> {
+impl<R: BufRead, W: Write + Send> EdgeNestedFlowClient<'_, R, W> {
     fn emit_log(&mut self, level: LogLevel, logger: &str, data: Value) {
         if !self.logging_enabled || level < self.minimum_log_level {
             return;
@@ -157,7 +157,7 @@ impl<R: BufRead, W: Write> EdgeNestedFlowClient<'_, R, W> {
     }
 }
 
-impl<W: Write> QueuedEdgeNestedFlowClient<'_, W> {
+impl<W: Write + Send> QueuedEdgeNestedFlowClient<'_, W> {
     fn emit_log(&mut self, level: LogLevel, logger: &str, data: Value) {
         if !self.logging_enabled || level < self.minimum_log_level {
             return;
@@ -497,13 +497,7 @@ impl<R: BufRead + Send, W: Write + Send> NestedFlowClient for EdgeNestedFlowClie
     }
 }
 
-// SAFETY: the channel-backed edge client is constructed as a stack-local
-// adapter and consumed synchronously by the kernel. The `Send` bound on
-// `NestedFlowClient` is a trait compatibility requirement; this adapter is not
-// transferred to another thread while the borrowed receivers remain live.
-unsafe impl<W: Write> Send for QueuedEdgeNestedFlowClient<'_, W> {}
-
-impl<W: Write> NestedFlowClient for QueuedEdgeNestedFlowClient<'_, W> {
+impl<W: Write + Send> NestedFlowClient for QueuedEdgeNestedFlowClient<'_, W> {
     fn poll_parent_cancellation(
         &mut self,
         _parent_context: &OperationContext,

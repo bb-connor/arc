@@ -170,6 +170,10 @@ pub(crate) fn build_credit_scorecard_report(
     )
 }
 
+#[allow(
+    clippy::as_conversions,
+    reason = "Exposure is converted only for the statistical anomaly detector; monetary authority uses integer units."
+)]
 pub(crate) fn build_credit_scorecard_report_with_context(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
@@ -269,7 +273,7 @@ pub(crate) fn build_credit_scorecard_report_with_context(
             confidence,
             band,
             overall_score: round_credit_score_value(overall_score),
-            anomaly_count: anomalies.len() as u64,
+            anomaly_count: crate::integer::count(anomalies.len()),
             probationary: probation.probationary,
         },
         reputation: CreditScorecardReputationContext {
@@ -1223,28 +1227,18 @@ pub(crate) fn build_credit_facility_terms(
         [position] => position,
         _ => return None,
     };
-    let base_units = position.governed_max_exposure_units.max(
-        position
-            .settled_units
-            .saturating_add(position.pending_units),
-    );
+    let base_units = position
+        .governed_max_exposure_units
+        .max(position.settled_units.checked_add(position.pending_units)?);
     if base_units == 0 {
         return None;
     }
 
-    let band_factor = match scorecard.summary.band {
-        CreditScorecardBand::Prime => 1.0,
-        CreditScorecardBand::Standard => 0.85,
-        CreditScorecardBand::Guarded => 0.65,
-        CreditScorecardBand::Probationary => 0.40,
-        CreditScorecardBand::Restricted => 0.0,
-    };
-    let confidence_factor = match scorecard.summary.confidence {
-        CreditScorecardConfidence::High => 1.0,
-        CreditScorecardConfidence::Medium => 0.9,
-        CreditScorecardConfidence::Low => 0.75,
-    };
-    let credit_limit_units = ((base_units as f64) * band_factor * confidence_factor).floor() as u64;
+    let credit_limit_units = credit_limit_units(
+        base_units,
+        scorecard.summary.band,
+        scorecard.summary.confidence,
+    )?;
     if credit_limit_units == 0 {
         return None;
     }
@@ -1268,6 +1262,30 @@ pub(crate) fn build_credit_facility_terms(
         ttl_seconds,
         capital_source: CreditFacilityCapitalSource::OperatorInternal,
     })
+}
+
+fn credit_limit_units(
+    base_units: u64,
+    band: CreditScorecardBand,
+    confidence: CreditScorecardConfidence,
+) -> Option<u64> {
+    let band_percent = match band {
+        CreditScorecardBand::Prime => 100_u32,
+        CreditScorecardBand::Standard => 85,
+        CreditScorecardBand::Guarded => 65,
+        CreditScorecardBand::Probationary => 40,
+        CreditScorecardBand::Restricted => 0,
+    };
+    let confidence_percent = match confidence {
+        CreditScorecardConfidence::High => 100_u32,
+        CreditScorecardConfidence::Medium => 90,
+        CreditScorecardConfidence::Low => 75,
+    };
+    // Multiply before dividing to round down exactly once, including above 2^53.
+    let scaled = u128::from(base_units)
+        .checked_mul(u128::from(band_percent))?
+        .checked_mul(u128::from(confidence_percent))?;
+    u64::try_from(scaled / 10_000).ok()
 }
 
 fn build_credit_facility_findings(
@@ -1494,5 +1512,58 @@ pub(crate) fn credit_backtest_utilization_bps(
         .saturating_add(position.failed_units)
         .saturating_add(position.provisional_loss_units)
         .saturating_sub(position.recovered_units);
-    Some(((utilized_units as u128) * 10_000 / (denominator as u128)).min(u32::MAX as u128) as u32)
+    Some(
+        u32::try_from(u128::from(utilized_units) * 10_000 / u128::from(denominator))
+            .unwrap_or(u32::MAX),
+    )
+}
+
+#[cfg(test)]
+mod credit_limit_tests {
+    use super::*;
+
+    #[test]
+    fn credit_limits_preserve_large_integer_units_and_round_down_once() {
+        let cases = [
+            (
+                u64::MAX,
+                CreditScorecardBand::Prime,
+                CreditScorecardConfidence::High,
+                u64::MAX,
+            ),
+            (
+                (1_u64 << 53) + 1,
+                CreditScorecardBand::Prime,
+                CreditScorecardConfidence::High,
+                (1_u64 << 53) + 1,
+            ),
+            (
+                101,
+                CreditScorecardBand::Standard,
+                CreditScorecardConfidence::Medium,
+                77,
+            ),
+            (
+                101,
+                CreditScorecardBand::Guarded,
+                CreditScorecardConfidence::Low,
+                49,
+            ),
+            (
+                u64::MAX,
+                CreditScorecardBand::Restricted,
+                CreditScorecardConfidence::High,
+                0,
+            ),
+            (
+                0,
+                CreditScorecardBand::Prime,
+                CreditScorecardConfidence::High,
+                0,
+            ),
+        ];
+        for (base, band, confidence, expected) in cases {
+            assert_eq!(credit_limit_units(base, band, confidence), Some(expected));
+        }
+    }
 }

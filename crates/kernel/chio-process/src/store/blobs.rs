@@ -12,6 +12,8 @@ impl Store {
         if bytes.len() > MAX_STATE_BLOB_BYTES {
             return Err(ProcessError::Invalid("state blob is too large"));
         }
+        let byte_count = u32::try_from(bytes.len())
+            .map_err(|_| ProcessError::Invalid("state blob length exceeds reference range"))?;
         let sha256 = sha256_hex(bytes);
         let tx = self
             .connection
@@ -25,7 +27,10 @@ impl Store {
             }
         } else {
             let storage = usage(&tx, &process)?;
-            if storage.tree_bytes + bytes.len() as u64 > u64::from(storage.limits.max_bytes)
+            if storage
+                .tree_bytes
+                .checked_add(u64::from(byte_count))
+                .is_none_or(|total| total > u64::from(storage.limits.max_bytes))
                 || storage.tree_blobs >= u64::from(storage.limits.max_blobs)
             {
                 return Err(ProcessError::Limit("immutable process state"));
@@ -38,7 +43,7 @@ impl Store {
         tx.commit()?;
         Ok(StateBlobRef {
             sha256,
-            bytes: bytes.len() as u32,
+            bytes: byte_count,
         })
     }
 
@@ -67,7 +72,12 @@ fn read_bytes(
         .query_row(
             "SELECT CASE WHEN typeof(data)='blob' AND length(data)<=?3 THEN data ELSE NULL END
          FROM process_state_blobs WHERE process_id=?1 AND sha256=?2",
-            params![id, sha256, MAX_STATE_BLOB_BYTES as i64],
+            params![
+                id,
+                sha256,
+                i64::try_from(MAX_STATE_BLOB_BYTES)
+                    .map_err(|_| ProcessError::Invalid("state blob limit exceeds SQLite range"))?
+            ],
             |row| row.get(0),
         )
         .optional()?;
@@ -91,7 +101,8 @@ fn usage(
     let [process_bytes, process_blobs, tree_bytes, tree_blobs] = counts;
     Ok(ProcessStorage {
         protocol: STATE_BLOB_PROTOCOL.to_owned(),
-        max_blob_bytes: MAX_STATE_BLOB_BYTES as u32,
+        max_blob_bytes: u32::try_from(MAX_STATE_BLOB_BYTES)
+            .map_err(|_| ProcessError::Invalid("state blob limit exceeds reference range"))?,
         limits: process.limits.state,
         process_bytes: checked(process_bytes)?,
         process_blobs: checked(process_blobs)?,

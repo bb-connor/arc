@@ -517,7 +517,10 @@ struct PreDispatchParticipantDispositionsV1 {
 
 impl PreDispatchParticipantDispositionsV1 {
     #[cfg(test)]
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn from_verified_parts(
         broker: VerifiedParticipantNoEffectV1,
         budget: VerifiedParticipantNoEffectV1,
@@ -961,6 +964,12 @@ impl VerifiedPreDispatchNoEffect {
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
     ) -> Result<(), ToolOutcomeError> {
+        let checked_artifacts: &[_; 2] = self
+            .snapshot
+            .artifacts
+            .as_slice()
+            .try_into()
+            .map_err(|_| ToolOutcomeError::Binding("release_evidence.artifact_count"))?;
         validate_pre_dispatch_context(operation, context)?;
         self.snapshot.participant_manifest.validate_for(operation)?;
         validate_successor_fence(
@@ -986,17 +995,16 @@ impl VerifiedPreDispatchNoEffect {
             || self.snapshot.participant_manifest.verified_at_unix_ms
                 != self.snapshot.verified_at_unix_ms
             || self.snapshot.artifacts.len() != 2
-            || self.snapshot.artifacts[0].kind
-                != ReleaseEvidenceArtifactKindV1::ParticipantQuerySnapshot
-            || self.snapshot.artifacts[1].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
-            || self.snapshot.complete_participant_query_root != self.snapshot.artifacts[0].digest
-            || self.snapshot.verifier_policy_digest != self.snapshot.artifacts[1].digest
+            || checked_artifacts[0].kind != ReleaseEvidenceArtifactKindV1::ParticipantQuerySnapshot
+            || checked_artifacts[1].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
+            || self.snapshot.complete_participant_query_root != checked_artifacts[0].digest
+            || self.snapshot.verifier_policy_digest != checked_artifacts[1].digest
         {
             return Err(ToolOutcomeError::Binding("predispatch.projection_context"));
         }
         let artifact_manifest: PreDispatchParticipantManifestV1 =
-            parse_artifact_value(&self.snapshot.artifacts[0])?;
-        let _: VerifierPolicyArtifactV1 = parse_artifact_value(&self.snapshot.artifacts[1])?;
+            parse_artifact_value(&checked_artifacts[0])?;
+        let _: VerifierPolicyArtifactV1 = parse_artifact_value(&checked_artifacts[1])?;
         if self.snapshot.participant_manifest != artifact_manifest {
             return Err(ToolOutcomeError::Binding(
                 "predispatch.participant_artifact",
@@ -1335,7 +1343,10 @@ impl VerifiedTransportNotAccepted {
     }
 
     #[allow(dead_code)]
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn from_verified_provider(
         status: &VerifiedProviderNotAccepted,
         qualification: &QualifiedDispatchStatusProvider,
@@ -1517,10 +1528,16 @@ impl VerifiedTransportNotAccepted {
         &self,
         operation: &AdmissionOperationV1,
     ) -> Result<(), ToolOutcomeError> {
+        let checked_artifacts: &[_; 3] = self
+            .artifacts
+            .as_slice()
+            .try_into()
+            .map_err(|_| ToolOutcomeError::Binding("release_evidence.artifact_count"))?;
         if self.artifacts.len() != 3
-            || self.artifacts[1].kind != ReleaseEvidenceArtifactKindV1::MonotonicAttemptCheckpoint
-            || self.artifacts[2].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
-            || self.verifier_policy_digest != self.artifacts[2].digest
+            || checked_artifacts[1].kind
+                != ReleaseEvidenceArtifactKindV1::MonotonicAttemptCheckpoint
+            || checked_artifacts[2].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
+            || self.verifier_policy_digest != checked_artifacts[2].digest
         {
             return Err(ToolOutcomeError::Binding(
                 "transport_not_accepted.provider_artifact_shape",
@@ -1556,17 +1573,22 @@ impl VerifiedTransportNotAccepted {
         &self,
         operation: &AdmissionOperationV1,
     ) -> Result<(), ToolOutcomeError> {
+        let checked_artifacts: &[_; 2] = self
+            .artifacts
+            .as_slice()
+            .try_into()
+            .map_err(|_| ToolOutcomeError::Binding("release_evidence.artifact_count"))?;
         if self.artifacts.len() != 2
-            || self.artifacts[1].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
-            || self.verifier_policy_digest != self.artifacts[1].digest
+            || checked_artifacts[1].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
+            || self.verifier_policy_digest != checked_artifacts[1].digest
         {
             return Err(ToolOutcomeError::Binding(
                 "transport_not_accepted.economic_artifact_shape",
             ));
         }
         let artifact: EconomicEffectCancellationArtifactV1 =
-            parse_artifact_value(&self.artifacts[0])?;
-        let _: VerifierPolicyArtifactV1 = parse_artifact_value(&self.artifacts[1])?;
+            parse_artifact_value(&checked_artifacts[0])?;
+        let _: VerifierPolicyArtifactV1 = parse_artifact_value(&checked_artifacts[1])?;
         artifact
             .slot
             .validate()
@@ -1722,6 +1744,11 @@ impl VerifiedContractualZeroCharge {
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
     ) -> Result<(), ToolOutcomeError> {
+        let checked_artifacts: &[_; 3] = self
+            .artifacts
+            .as_slice()
+            .try_into()
+            .map_err(|_| ToolOutcomeError::Binding("release_evidence.artifact_count"))?;
         validate_projection_context(operation, context)?;
         validate_successor_fence(&self.projection_store_fence, &context.store_fence)?;
         if self.operation_id != *operation.binding().operation_id()
@@ -1737,18 +1764,19 @@ impl VerifiedContractualZeroCharge {
             || (self.projection_store_fence == context.store_fence
                 && self.projection_coordinator_lease_id != context.coordinator_lease_id)
             || self.artifacts.len() != 3
-            || self.artifacts[0].kind != ReleaseEvidenceArtifactKindV1::TerminalToolOutcome
-            || self.artifacts[1].kind != ReleaseEvidenceArtifactKindV1::TerminalPostReturnEvaluation
-            || self.artifacts[2].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
-            || self.verifier_policy_digest != self.artifacts[2].digest
+            || checked_artifacts[0].kind != ReleaseEvidenceArtifactKindV1::TerminalToolOutcome
+            || checked_artifacts[1].kind
+                != ReleaseEvidenceArtifactKindV1::TerminalPostReturnEvaluation
+            || checked_artifacts[2].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
+            || self.verifier_policy_digest != checked_artifacts[2].digest
         {
             return Err(ToolOutcomeError::Binding("zero_charge.projection_context"));
         }
         let outcome_persisted: PersistedToolOutcomeRecordV1 =
-            parse_artifact_value(&self.artifacts[0])?;
+            parse_artifact_value(&checked_artifacts[0])?;
         let evaluation_persisted: PersistedPostReturnEvaluationRecordV1 =
-            parse_artifact_value(&self.artifacts[1])?;
-        let _: VerifierPolicyArtifactV1 = parse_artifact_value(&self.artifacts[2])?;
+            parse_artifact_value(&checked_artifacts[1])?;
+        let _: VerifierPolicyArtifactV1 = parse_artifact_value(&checked_artifacts[2])?;
         let outcome = ToolOutcomeRecordV1::from_persisted(outcome_persisted)?;
         let evaluation = PostReturnEvaluationRecordV1::from_persisted(evaluation_persisted)?;
         outcome.validate_against(operation)?;

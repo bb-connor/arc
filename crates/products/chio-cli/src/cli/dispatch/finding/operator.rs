@@ -1900,7 +1900,7 @@ fn require_secret_file(path: &Path) -> Result<(), CliError> {
                 "operator profile must not grant group or other permissions".to_owned(),
             ));
         }
-        if metadata.uid() != unsafe { libc::geteuid() } {
+        if metadata.uid() != rustix::process::geteuid().as_raw() {
             return Err(CliError::cli_other_error(
                 "operator profile is not owned by the current user".to_owned(),
             ));
@@ -1911,6 +1911,8 @@ fn require_secret_file(path: &Path) -> Result<(), CliError> {
 
 fn set_operator_umask() {
     #[cfg(unix)]
+    // SAFETY: umask accepts permission bits and no pointers. This startup
+    // restriction applies before the operator creates any secret files.
     unsafe {
         libc::umask(0o077);
     }

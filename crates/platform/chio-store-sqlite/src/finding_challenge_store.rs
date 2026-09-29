@@ -732,5 +732,9 @@ include!("finding_challenge_store_root_refresh.rs");
 mod connection_recovery;
 #[cfg(test)]
 #[path = "finding_challenge_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

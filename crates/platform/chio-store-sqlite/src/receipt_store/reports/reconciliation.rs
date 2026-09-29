@@ -74,7 +74,7 @@ impl SqliteReceiptStore {
         let receipt = decode_verified_chio_receipt(
             &raw_json,
             "persisted tool receipt",
-            Some(seq.max(0) as u64),
+            Some(u64::try_from(seq.max(0)).unwrap_or_default()),
         )?;
         let governed = extract_governed_transaction_metadata(&receipt).ok_or_else(|| {
             ReceiptStoreError::Conflict(format!(
@@ -150,11 +150,11 @@ impl SqliteReceiptStore {
                     receipt_id_owned,
                     &evidence.usage_evidence.evidence_kind,
                     &evidence.usage_evidence.evidence_id,
-                    evidence.usage_evidence.observed_units as i64,
-                    evidence.billed_cost.units as i64,
+                    crate::integer::checked::<_, i64>(evidence.usage_evidence.observed_units)?,
+                    crate::integer::checked::<_, i64>(evidence.billed_cost.units)?,
                     &evidence.billed_cost.currency,
                     evidence.usage_evidence.evidence_sha256.as_deref(),
-                    evidence.recorded_at as i64,
+                    crate::integer::checked::<_, i64>(evidence.recorded_at)?,
                     metered_billing_reconciliation_state_text(reconciliation_state),
                     note_owned,
                     updated_at
@@ -177,8 +177,14 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
         let row_limit = query.metered_limit_or_default();
 
@@ -223,7 +229,7 @@ impl SqliteReceiptStore {
                 since,
                 until,
                 agent_subject,
-                row_limit as i64
+                crate::integer::checked::<_, i64>(row_limit)?
             ],
             |row| {
                 Ok((
@@ -264,7 +270,7 @@ impl SqliteReceiptStore {
             let receipt = decode_verified_chio_receipt(
                 &raw_json,
                 "persisted tool receipt",
-                Some(seq.max(0) as u64),
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
             )?;
             let governed = extract_governed_transaction_metadata(&receipt).ok_or_else(|| {
                 ReceiptStoreError::Canonical(format!(
@@ -324,14 +330,14 @@ impl SqliteReceiptStore {
                 exceeds_quoted_cost: analysis.exceeds_quoted_cost,
                 financial_mismatch: analysis.financial_mismatch,
                 note,
-                updated_at: updated_at.map(|value| value.max(0) as u64),
+                updated_at: updated_at.map(|value| u64::try_from(value.max(0)).unwrap_or_default()),
             });
         }
 
         Ok(MeteredBillingReconciliationReport {
             summary: MeteredBillingReconciliationSummary {
                 matching_receipts: summary.metered_receipts,
-                returned_receipts: receipts.len() as u64,
+                returned_receipts: crate::integer::count(receipts.len()),
                 evidence_attached_receipts: summary.evidence_attached_receipts,
                 missing_evidence_receipts: summary.missing_evidence_receipts,
                 over_quoted_units_receipts: summary.over_quoted_units_receipts,
@@ -340,7 +346,7 @@ impl SqliteReceiptStore {
                 financial_mismatch_receipts: summary.financial_mismatch_receipts,
                 actionable_receipts: summary.actionable_receipts,
                 reconciled_receipts: summary.reconciled_receipts,
-                truncated: summary.metered_receipts > receipts.len() as u64,
+                truncated: summary.metered_receipts > crate::integer::count(receipts.len()),
             },
             receipts,
         })

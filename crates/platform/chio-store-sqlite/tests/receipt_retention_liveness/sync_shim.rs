@@ -204,8 +204,12 @@ fn register_default_vfs() -> Result<(), String> {
     }
     // SAFETY: `parent` was returned by SQLite and stays registered for the
     // life of the process; only public fields are read.
-    let (parent_version, parent_file_size, parent_path_max) =
-        unsafe { ((*parent).iVersion, (*parent).szOsFile, (*parent).mxPathname) };
+    let parent_fields = unsafe { &*parent };
+    let (parent_version, parent_file_size, parent_path_max) = (
+        parent_fields.iVersion,
+        parent_fields.szOsFile,
+        parent_fields.mxPathname,
+    );
     if parent_version < 3 {
         return Err(format!(
             "the default VFS is version {parent_version}; the shim forwards version 3"
@@ -545,9 +549,8 @@ fn shim() -> &'static SyncShim {
     install()
 }
 
-/// # Safety
-/// `file` must be a shim file object that `shim_open` initialized.
-unsafe fn header(file: *mut ffi::sqlite3_file) -> *mut ShimFile {
+// Casting a pointer does not access it; dereferencing the result remains unsafe.
+fn header(file: *mut ffi::sqlite3_file) -> *mut ShimFile {
     file.cast::<ShimFile>()
 }
 
@@ -557,25 +560,27 @@ unsafe fn header(file: *mut ffi::sqlite3_file) -> *mut ShimFile {
 unsafe fn real_parts(
     file: *mut ffi::sqlite3_file,
 ) -> (*mut ffi::sqlite3_file, ffi::sqlite3_io_methods) {
-    // SAFETY: the caller guarantees an initialized header whose wrapped
-    // object carries a method table.
-    unsafe {
-        let real = (*header(file)).real;
-        (real, *(*real).pMethods)
-    }
+    // SAFETY: the caller guarantees an initialized ShimFile header.
+    let real = unsafe { (*header(file)).real };
+    // SAFETY: the wrapped object is initialized and has a method table.
+    let table = unsafe { (*real).pMethods };
+    // SAFETY: SQLite's method table remains valid for the open file's lifetime.
+    let methods = unsafe { *table };
+    (real, methods)
 }
 
 /// # Safety
 /// `file` must be a shim file object that `shim_open` initialized.
 unsafe fn file_path(file: *mut ffi::sqlite3_file) -> String {
-    // SAFETY: SQLite keeps the open-time filename valid until xClose.
-    unsafe {
-        let path = (*header(file)).path;
-        if path.is_null() {
-            String::from("<unnamed>")
-        } else {
-            CStr::from_ptr(path).to_string_lossy().into_owned()
-        }
+    // SAFETY: the caller guarantees an initialized ShimFile header.
+    let path = unsafe { (*header(file)).path };
+    if path.is_null() {
+        String::from("<unnamed>")
+    } else {
+        // SAFETY: SQLite keeps the NUL-terminated open filename valid until xClose.
+        unsafe { CStr::from_ptr(path) }
+            .to_string_lossy()
+            .into_owned()
     }
 }
 
@@ -593,31 +598,40 @@ unsafe extern "C" fn shim_open(
     flags: c_int,
     out_flags: *mut c_int,
 ) -> c_int {
-    // SAFETY: SQLite hands us `szOsFile` bytes at `file`; the header fits at
-    // the front and the wrapped object fits after it by construction.
+    // SAFETY: SQLite dispatches this callback through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    let shim_file = header(file);
+    // SAFETY: szOsFile reserves the aligned header followed by the parent's object.
+    let real = unsafe { file.cast::<u8>().add(size_of::<ShimFile>()) }.cast::<ffi::sqlite3_file>();
+    // SAFETY: the leading allocation fits ShimFile. Write the entire header before
+    // reading any field, including its Rust enum discriminant.
     unsafe {
-        let parent = parent_of(vfs);
-        let shim_file = header(file);
-        let real = file
-            .cast::<u8>()
-            .add(size_of::<ShimFile>())
-            .cast::<ffi::sqlite3_file>();
-        (*shim_file).base.pMethods = ptr::null();
-        (*shim_file).real = real;
-        (*shim_file).path = name;
-        (*shim_file).kind = FileKind::classify(flags);
-        (*real).pMethods = ptr::null();
-        let Some(open) = (*parent).xOpen else {
-            return ffi::SQLITE_CANTOPEN;
-        };
-        let rc = open(parent, name, real, flags, out_flags);
-        // SQLite also calls xClose after a failed open when the parent left
-        // a method table installed. Preserve that cleanup obligation.
-        if !(*real).pMethods.is_null() {
-            (*shim_file).base.pMethods = &SHIM_METHODS;
-        }
-        rc
+        shim_file.write(ShimFile {
+            base: ffi::sqlite3_file {
+                pMethods: ptr::null(),
+            },
+            real,
+            path: name,
+            kind: FileKind::classify(flags),
+        })
+    };
+    // SAFETY: the trailing allocation fits the parent's sqlite3_file prefix.
+    unsafe { (*real).pMethods = ptr::null() };
+    // SAFETY: the registered parent VFS remains alive during the callback.
+    let open = unsafe { (*parent).xOpen };
+    let Some(open) = open else {
+        return ffi::SQLITE_CANTOPEN;
+    };
+    // SAFETY: forward SQLite's arguments with the parent's correctly sized object.
+    let rc = unsafe { open(parent, name, real, flags, out_flags) };
+    // SAFETY: the parent initialized pMethods, or left our null sentinel intact.
+    let needs_close = unsafe { !(*real).pMethods.is_null() };
+    // SQLite also closes failed opens when the parent installed a method table.
+    if needs_close {
+        // SAFETY: only the header's method pointer is changed, after initialization.
+        unsafe { (*shim_file).base.pMethods = &SHIM_METHODS };
     }
+    rc
 }
 
 unsafe extern "C" fn shim_delete(
@@ -625,13 +639,16 @@ unsafe extern "C" fn shim_delete(
     name: *const c_char,
     sync_dir: c_int,
 ) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xDelete {
-            Some(delete) => delete(parent, name, sync_dir),
-            None => ffi::SQLITE_IOERR_DELETE,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xDelete };
+    match method {
+        Some(delete) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { delete(parent, name, sync_dir) }
         }
+        None => ffi::SQLITE_IOERR_DELETE,
     }
 }
 
@@ -641,13 +658,16 @@ unsafe extern "C" fn shim_access(
     flags: c_int,
     result: *mut c_int,
 ) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xAccess {
-            Some(access) => access(parent, name, flags, result),
-            None => ffi::SQLITE_IOERR_ACCESS,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xAccess };
+    match method {
+        Some(access) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { access(parent, name, flags, result) }
         }
+        None => ffi::SQLITE_IOERR_ACCESS,
     }
 }
 
@@ -657,34 +677,41 @@ unsafe extern "C" fn shim_full_pathname(
     out_len: c_int,
     out: *mut c_char,
 ) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xFullPathname {
-            Some(full_pathname) => full_pathname(parent, name, out_len, out),
-            None => ffi::SQLITE_ERROR,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xFullPathname };
+    match method {
+        Some(full_pathname) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { full_pathname(parent, name, out_len, out) }
         }
+        None => ffi::SQLITE_ERROR,
     }
 }
 
 unsafe extern "C" fn shim_dl_open(vfs: *mut ffi::sqlite3_vfs, name: *const c_char) -> *mut c_void {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xDlOpen {
-            Some(dl_open) => dl_open(parent, name),
-            None => ptr::null_mut(),
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xDlOpen };
+    match method {
+        Some(dl_open) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { dl_open(parent, name) }
         }
+        None => ptr::null_mut(),
     }
 }
 
 unsafe extern "C" fn shim_dl_error(vfs: *mut ffi::sqlite3_vfs, len: c_int, message: *mut c_char) {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        if let Some(dl_error) = (*parent).xDlError {
-            dl_error(parent, len, message);
-        }
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xDlError };
+    if let Some(dl_error) = method {
+        // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+        unsafe { dl_error(parent, len, message) };
     }
 }
 
@@ -693,23 +720,27 @@ unsafe extern "C" fn shim_dl_sym(
     handle: *mut c_void,
     symbol: *const c_char,
 ) -> Option<unsafe extern "C" fn(*mut ffi::sqlite3_vfs, *mut c_void, *const c_char)> {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xDlSym {
-            Some(dl_sym) => dl_sym(parent, handle, symbol),
-            None => None,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xDlSym };
+    match method {
+        Some(dl_sym) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { dl_sym(parent, handle, symbol) }
         }
+        None => None,
     }
 }
 
 unsafe extern "C" fn shim_dl_close(vfs: *mut ffi::sqlite3_vfs, handle: *mut c_void) {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        if let Some(dl_close) = (*parent).xDlClose {
-            dl_close(parent, handle);
-        }
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xDlClose };
+    if let Some(dl_close) = method {
+        // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+        unsafe { dl_close(parent, handle) };
     }
 }
 
@@ -718,35 +749,44 @@ unsafe extern "C" fn shim_randomness(
     len: c_int,
     out: *mut c_char,
 ) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xRandomness {
-            Some(randomness) => randomness(parent, len, out),
-            None => 0,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xRandomness };
+    match method {
+        Some(randomness) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { randomness(parent, len, out) }
         }
+        None => 0,
     }
 }
 
 unsafe extern "C" fn shim_sleep(vfs: *mut ffi::sqlite3_vfs, microseconds: c_int) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xSleep {
-            Some(sleep) => sleep(parent, microseconds),
-            None => 0,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xSleep };
+    match method {
+        Some(sleep) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { sleep(parent, microseconds) }
         }
+        None => 0,
     }
 }
 
 unsafe extern "C" fn shim_current_time(vfs: *mut ffi::sqlite3_vfs, out: *mut f64) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xCurrentTime {
-            Some(current_time) => current_time(parent, out),
-            None => ffi::SQLITE_ERROR,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xCurrentTime };
+    match method {
+        Some(current_time) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { current_time(parent, out) }
         }
+        None => ffi::SQLITE_ERROR,
     }
 }
 
@@ -755,13 +795,16 @@ unsafe extern "C" fn shim_get_last_error(
     len: c_int,
     out: *mut c_char,
 ) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xGetLastError {
-            Some(get_last_error) => get_last_error(parent, len, out),
-            None => 0,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xGetLastError };
+    match method {
+        Some(get_last_error) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { get_last_error(parent, len, out) }
         }
+        None => 0,
     }
 }
 
@@ -769,13 +812,16 @@ unsafe extern "C" fn shim_current_time_int64(
     vfs: *mut ffi::sqlite3_vfs,
     out: *mut ffi::sqlite3_int64,
 ) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xCurrentTimeInt64 {
-            Some(current_time) => current_time(parent, out),
-            None => ffi::SQLITE_ERROR,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xCurrentTimeInt64 };
+    match method {
+        Some(current_time) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { current_time(parent, out) }
         }
+        None => ffi::SQLITE_ERROR,
     }
 }
 
@@ -784,13 +830,16 @@ unsafe extern "C" fn shim_set_system_call(
     name: *const c_char,
     call: ffi::sqlite3_syscall_ptr,
 ) -> c_int {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xSetSystemCall {
-            Some(set_system_call) => set_system_call(parent, name, call),
-            None => ffi::SQLITE_NOTFOUND,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xSetSystemCall };
+    match method {
+        Some(set_system_call) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { set_system_call(parent, name, call) }
         }
+        None => ffi::SQLITE_NOTFOUND,
     }
 }
 
@@ -798,13 +847,16 @@ unsafe extern "C" fn shim_get_system_call(
     vfs: *mut ffi::sqlite3_vfs,
     name: *const c_char,
 ) -> ffi::sqlite3_syscall_ptr {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xGetSystemCall {
-            Some(get_system_call) => get_system_call(parent, name),
-            None => None,
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xGetSystemCall };
+    match method {
+        Some(get_system_call) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { get_system_call(parent, name) }
         }
+        None => None,
     }
 }
 
@@ -812,13 +864,16 @@ unsafe extern "C" fn shim_next_system_call(
     vfs: *mut ffi::sqlite3_vfs,
     name: *const c_char,
 ) -> *const c_char {
-    // SAFETY: forwards to the wrapped VFS with SQLite's own arguments.
-    unsafe {
-        let parent = parent_of(vfs);
-        match (*parent).xNextSystemCall {
-            Some(next_system_call) => next_system_call(parent, name),
-            None => ptr::null(),
+    // SAFETY: SQLite called through our registered VFS.
+    let parent = unsafe { parent_of(vfs) };
+    // SAFETY: the registered parent VFS remains alive during this callback.
+    let method = unsafe { (*parent).xNextSystemCall };
+    match method {
+        Some(next_system_call) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { next_system_call(parent, name) }
         }
+        None => ptr::null(),
     }
 }
 
@@ -845,17 +900,17 @@ static SHIM_METHODS: ffi::sqlite3_io_methods = ffi::sqlite3_io_methods {
 };
 
 unsafe extern "C" fn shim_close(file: *mut ffi::sqlite3_file) -> c_int {
-    // SAFETY: SQLite closes files with an installed method table, including
-    // failed opens for which the parent requires cleanup.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        let rc = match methods.xClose {
-            Some(close) => close(real),
-            None => ffi::SQLITE_IOERR_CLOSE,
-        };
-        shim().forget_handle(file as usize);
-        rc
-    }
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    let rc = match methods.xClose {
+        Some(close) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { close(real) }
+        }
+        None => ffi::SQLITE_IOERR_CLOSE,
+    };
+    shim().forget_handle(file as usize);
+    rc
 }
 
 unsafe extern "C" fn shim_read(
@@ -864,13 +919,14 @@ unsafe extern "C" fn shim_read(
     amount: c_int,
     offset: ffi::sqlite3_int64,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xRead {
-            Some(read) => read(real, buffer, amount, offset),
-            None => ffi::SQLITE_IOERR_READ,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xRead {
+        Some(read) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { read(real, buffer, amount, offset) }
         }
+        None => ffi::SQLITE_IOERR_READ,
     }
 }
 
@@ -880,13 +936,14 @@ unsafe extern "C" fn shim_write(
     amount: c_int,
     offset: ffi::sqlite3_int64,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xWrite {
-            Some(write) => write(real, buffer, amount, offset),
-            None => ffi::SQLITE_IOERR_WRITE,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xWrite {
+        Some(write) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { write(real, buffer, amount, offset) }
         }
+        None => ffi::SQLITE_IOERR_WRITE,
     }
 }
 
@@ -894,36 +951,39 @@ unsafe extern "C" fn shim_truncate(
     file: *mut ffi::sqlite3_file,
     size: ffi::sqlite3_int64,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xTruncate {
-            Some(truncate) => truncate(real, size),
-            None => ffi::SQLITE_IOERR_TRUNCATE,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xTruncate {
+        Some(truncate) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { truncate(real, size) }
         }
+        None => ffi::SQLITE_IOERR_TRUNCATE,
     }
 }
 
 unsafe extern "C" fn shim_sync(file: *mut ffi::sqlite3_file, flags: c_int) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file after the
-    // hook; the hook touches only the shim's own state.
-    unsafe {
-        let record = SyncRecord {
-            thread: ThreadTag::current(),
-            path: file_path(file),
-            kind: (*header(file)).kind,
-            flags,
-            started: Instant::now(),
-            wal_write_lock: false,
-            wal_checkpoint_lock: false,
-            backtrace: None,
-        };
-        shim().before_sync(record);
-        let (real, methods) = real_parts(file);
-        match methods.xSync {
-            Some(sync) => sync(real, flags),
-            None => ffi::SQLITE_IOERR_FSYNC,
+    let record = SyncRecord {
+        thread: ThreadTag::current(),
+        // SAFETY: SQLite keeps the filename live until xClose.
+        path: unsafe { file_path(file) },
+        // SAFETY: shim_open initialized this header before installing the method table.
+        kind: unsafe { (*header(file)).kind },
+        flags,
+        started: Instant::now(),
+        wal_write_lock: false,
+        wal_checkpoint_lock: false,
+        backtrace: None,
+    };
+    shim().before_sync(record);
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xSync {
+        Some(sync) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { sync(real, flags) }
         }
+        None => ffi::SQLITE_IOERR_FSYNC,
     }
 }
 
@@ -931,57 +991,65 @@ unsafe extern "C" fn shim_file_size(
     file: *mut ffi::sqlite3_file,
     size: *mut ffi::sqlite3_int64,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xFileSize {
-            Some(file_size) => file_size(real, size),
-            None => ffi::SQLITE_IOERR_FSTAT,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xFileSize {
+        Some(file_size) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { file_size(real, size) }
         }
+        None => ffi::SQLITE_IOERR_FSTAT,
     }
 }
 
 unsafe extern "C" fn shim_lock(file: *mut ffi::sqlite3_file, level: c_int) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        let rc = match methods.xLock {
-            Some(lock) => lock(real, level),
-            None => ffi::SQLITE_IOERR_LOCK,
-        };
-        if rc == ffi::SQLITE_OK {
-            shim().record_lock(file as usize, &file_path(file), level);
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    let rc = match methods.xLock {
+        Some(lock) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { lock(real, level) }
         }
-        rc
+        None => ffi::SQLITE_IOERR_LOCK,
+    };
+    if rc == ffi::SQLITE_OK {
+        // SAFETY: this initialized file is still open.
+        let path = unsafe { file_path(file) };
+        shim().record_lock(file as usize, &path, level);
     }
+    rc
 }
 
 unsafe extern "C" fn shim_unlock(file: *mut ffi::sqlite3_file, level: c_int) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        let rc = match methods.xUnlock {
-            Some(unlock) => unlock(real, level),
-            None => ffi::SQLITE_IOERR_UNLOCK,
-        };
-        if rc == ffi::SQLITE_OK {
-            shim().record_lock(file as usize, &file_path(file), level);
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    let rc = match methods.xUnlock {
+        Some(unlock) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { unlock(real, level) }
         }
-        rc
+        None => ffi::SQLITE_IOERR_UNLOCK,
+    };
+    if rc == ffi::SQLITE_OK {
+        // SAFETY: this initialized file is still open.
+        let path = unsafe { file_path(file) };
+        shim().record_lock(file as usize, &path, level);
     }
+    rc
 }
 
 unsafe extern "C" fn shim_check_reserved_lock(
     file: *mut ffi::sqlite3_file,
     result: *mut c_int,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xCheckReservedLock {
-            Some(check) => check(real, result),
-            None => ffi::SQLITE_IOERR_CHECKRESERVEDLOCK,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xCheckReservedLock {
+        Some(check) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { check(real, result) }
         }
+        None => ffi::SQLITE_IOERR_CHECKRESERVEDLOCK,
     }
 }
 
@@ -990,35 +1058,38 @@ unsafe extern "C" fn shim_file_control(
     op: c_int,
     arg: *mut c_void,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xFileControl {
-            Some(file_control) => file_control(real, op, arg),
-            None => ffi::SQLITE_NOTFOUND,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xFileControl {
+        Some(file_control) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { file_control(real, op, arg) }
         }
+        None => ffi::SQLITE_NOTFOUND,
     }
 }
 
 unsafe extern "C" fn shim_sector_size(file: *mut ffi::sqlite3_file) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xSectorSize {
-            Some(sector_size) => sector_size(real),
-            None => 4096,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xSectorSize {
+        Some(sector_size) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { sector_size(real) }
         }
+        None => 4096,
     }
 }
 
 unsafe extern "C" fn shim_device_characteristics(file: *mut ffi::sqlite3_file) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xDeviceCharacteristics {
-            Some(characteristics) => characteristics(real),
-            None => 0,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xDeviceCharacteristics {
+        Some(characteristics) => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { characteristics(real) }
         }
+        None => 0,
     }
 }
 
@@ -1029,13 +1100,14 @@ unsafe extern "C" fn shim_shm_map(
     extend: c_int,
     out: *mut *mut c_void,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xShmMap {
-            Some(shm_map) if methods.iVersion >= 2 => shm_map(real, page, page_size, extend, out),
-            _ => ffi::SQLITE_IOERR_SHMMAP,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xShmMap {
+        Some(shm_map) if methods.iVersion >= 2 => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { shm_map(real, page, page_size, extend, out) }
         }
+        _ => ffi::SQLITE_IOERR_SHMMAP,
     }
 }
 
@@ -1045,40 +1117,43 @@ unsafe extern "C" fn shim_shm_lock(
     n: c_int,
     flags: c_int,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        let rc = match methods.xShmLock {
-            Some(shm_lock) if methods.iVersion >= 2 => shm_lock(real, offset, n, flags),
-            _ => ffi::SQLITE_IOERR_SHMLOCK,
-        };
-        if rc == ffi::SQLITE_OK {
-            shim().record_shm_lock(file as usize, &file_path(file), offset, n, flags);
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    let rc = match methods.xShmLock {
+        Some(shm_lock) if methods.iVersion >= 2 => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { shm_lock(real, offset, n, flags) }
         }
-        rc
+        _ => ffi::SQLITE_IOERR_SHMLOCK,
+    };
+    if rc == ffi::SQLITE_OK {
+        // SAFETY: this initialized file is still open.
+        let path = unsafe { file_path(file) };
+        shim().record_shm_lock(file as usize, &path, offset, n, flags);
     }
+    rc
 }
 
 unsafe extern "C" fn shim_shm_barrier(file: *mut ffi::sqlite3_file) {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        if let Some(barrier) = methods.xShmBarrier {
-            if methods.iVersion >= 2 {
-                barrier(real);
-            }
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    if let Some(barrier) = methods.xShmBarrier {
+        if methods.iVersion >= 2 {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { barrier(real) };
         }
     }
 }
 
 unsafe extern "C" fn shim_shm_unmap(file: *mut ffi::sqlite3_file, delete: c_int) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xShmUnmap {
-            Some(shm_unmap) if methods.iVersion >= 2 => shm_unmap(real, delete),
-            _ => ffi::SQLITE_OK,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xShmUnmap {
+        Some(shm_unmap) if methods.iVersion >= 2 => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { shm_unmap(real, delete) }
         }
+        _ => ffi::SQLITE_OK,
     }
 }
 
@@ -1088,16 +1163,17 @@ unsafe extern "C" fn shim_fetch(
     amount: c_int,
     out: *mut *mut c_void,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file; a null
-    // result tells SQLite to fall back to xRead.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xFetch {
-            Some(fetch) if methods.iVersion >= 3 => fetch(real, offset, amount, out),
-            _ => {
-                *out = ptr::null_mut();
-                ffi::SQLITE_OK
-            }
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xFetch {
+        Some(fetch) if methods.iVersion >= 3 => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { fetch(real, offset, amount, out) }
+        }
+        _ => {
+            // SAFETY: SQLite supplies a writable output pointer for xFetch.
+            unsafe { *out = ptr::null_mut() };
+            ffi::SQLITE_OK
         }
     }
 }
@@ -1107,13 +1183,14 @@ unsafe extern "C" fn shim_unfetch(
     offset: ffi::sqlite3_int64,
     page: *mut c_void,
 ) -> c_int {
-    // SAFETY: forwards SQLite's own arguments to the wrapped file.
-    unsafe {
-        let (real, methods) = real_parts(file);
-        match methods.xUnfetch {
-            Some(unfetch) if methods.iVersion >= 3 => unfetch(real, offset, page),
-            _ => ffi::SQLITE_OK,
+    // SAFETY: SQLite invokes I/O methods only after a method table is installed.
+    let (real, methods) = unsafe { real_parts(file) };
+    match methods.xUnfetch {
+        Some(unfetch) if methods.iVersion >= 3 => {
+            // SAFETY: forwards the original SQLite arguments to the wrapped callback.
+            unsafe { unfetch(real, offset, page) }
         }
+        _ => ffi::SQLITE_OK,
     }
 }
 

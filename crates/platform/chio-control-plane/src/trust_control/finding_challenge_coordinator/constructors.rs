@@ -2,7 +2,7 @@
 
 impl FindingChallengeCoordinator {
     /// Build over the durable stores while checking all configured role pins.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn new(
         challenges: SqliteFindingChallengeStore,
         purchases: SqliteFindingPurchaseStore,
@@ -33,7 +33,7 @@ impl FindingChallengeCoordinator {
     }
 
     /// Build with local signing keys and an injected clock.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn new_with_status_commit_clock(
         challenges: SqliteFindingChallengeStore,
         purchases: SqliteFindingPurchaseStore,
@@ -65,7 +65,7 @@ impl FindingChallengeCoordinator {
     }
 
     /// Build with custody-backed signers and the production commit clock.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn new_with_signing_backends(
         challenges: SqliteFindingChallengeStore,
         purchases: SqliteFindingPurchaseStore,

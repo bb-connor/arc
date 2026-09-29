@@ -147,7 +147,10 @@ struct RecordDigestPreimage<'a> {
 }
 
 impl SqliteFrostStore {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn begin_ceremony<R: CryptoRng + RngCore>(
         &self,
         config: &FrostCeremonyConfig,
@@ -286,7 +289,10 @@ impl SqliteFrostStore {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn advance_ceremony(
         &self,
         config: &FrostCeremonyConfig,
@@ -926,6 +932,10 @@ fn decrypt_secret(
     decrypt_secrets(stored, custody).map(|(secret, _)| secret)
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The plaintext length is checked to exceed the fixed 32-byte seed prefix before either split."
+)]
 fn decrypt_secrets(
     stored: &StoredCeremonyRow,
     custody: &FrostCustodyKey,

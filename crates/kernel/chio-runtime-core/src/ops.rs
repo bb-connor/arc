@@ -502,7 +502,7 @@ fn runtime_provider_model_card_failure_code(
                 return Ok(Some("runtime_provider_model_card_missing"));
             };
             let card_expires_at_ms = model_card.expires_at.timestamp_millis();
-            if card_expires_at_ms < 0 || now_unix_ms >= card_expires_at_ms as u64 {
+            if u64::try_from(card_expires_at_ms).map_or(true, |expiry| now_unix_ms >= expiry) {
                 return Ok(Some("runtime_provider_model_card_stale"));
             }
             if canonical_sha256(model_card)? != model_card_digest {

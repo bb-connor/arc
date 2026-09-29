@@ -1,3 +1,7 @@
+#![allow(
+    clippy::as_conversions,
+    reason = "Feature-gated fault injection encodes fixed discriminants and deliberately exercises failure paths."
+)]
 //! Default-off local test controls. No persistent row or authority is fabricated.
 use super::*;
 

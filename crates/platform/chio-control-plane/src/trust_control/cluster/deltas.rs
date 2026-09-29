@@ -12,6 +12,10 @@ fn internal_cluster_http_error(context: &'static str, error: &dyn std::fmt::Disp
 /// propagation delay. This is emitted from the capability revoke paths (local
 /// revoke and cluster-delta upserts) so the capability-revocation SLO reflects
 /// real capability revocations rather than passport lifecycle events.
+#[allow(
+    clippy::as_conversions,
+    reason = "Prometheus lag is an approximate observation and never authorizes an operation."
+)]
 pub(crate) fn observe_capability_revocation_lag(revoked_at: i64) {
     use chio_security_types::clock::{Clock, SystemClock};
     let Ok(now) = SystemClock.unix_millis() else {
@@ -730,7 +734,10 @@ fn sync_current_peer_revocations(
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
         // a large well-ordered backlog resumes next sync round.
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         // Version 4 pages advance through a dense append-only revocation log
@@ -788,7 +795,10 @@ fn sync_legacy_peer_revocations(
             clear_peer_revocation_cursor(state, peer_url);
             break;
         }
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         let page_head =
@@ -845,7 +855,10 @@ fn sync_peer_tool_receipts(
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
         // a large well-ordered backlog resumes next sync round.
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         // Tool receipts are a NON-DENSE append-only seq stream: `seq` is an
@@ -900,7 +913,10 @@ fn sync_peer_child_receipts(
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
         // a large well-ordered backlog resumes next sync round.
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         // Child receipts are a NON-DENSE append-only seq stream (AUTOINCREMENT +
@@ -1129,7 +1145,10 @@ pub(crate) fn import_budget_delta_response(
     }
     // Local per-round pull cap: stop the round WITHOUT demoting; the next sync
     // round resumes from the unchanged cursor.
-    if round.charge_page(record_count as u64).is_err() {
+    if round
+        .charge_page(crate::integer::count(record_count))
+        .is_err()
+    {
         return Ok(BudgetDeltaImportOutcome {
             applied_count: 0,
             next_cursor: current_cursor,
@@ -1255,7 +1274,7 @@ pub(crate) fn import_budget_delta_response(
             page_max_seq,
         }));
     }
-    let applied_count = mutation_records.len() as u64;
+    let applied_count = crate::integer::count(mutation_records.len());
 
     Ok(BudgetDeltaImportOutcome {
         applied_count,
@@ -1289,7 +1308,10 @@ fn sync_peer_lineage(
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
         // a large well-ordered backlog resumes next sync round.
-        if round.charge_page(response.records.len() as u64).is_err() {
+        if round
+            .charge_page(crate::integer::count(response.records.len()))
+            .is_err()
+        {
             break;
         }
         // Lineage snapshots paginate on the capability_lineage rowid, which is
@@ -1551,7 +1573,9 @@ fn budget_write_quorum_commit_timeout(sync_interval: Duration, peer_count: usize
         .saturating_add(PEER_ROUND_WALL_CLOCK_BUDGET);
     // One worst-case cycle over all peers preceding the quorum peer, plus one extra
     // cycle for a mid-cycle write arrival.
-    let cycles = (peer_count as u32).saturating_add(1);
+    let cycles = u32::try_from(peer_count)
+        .unwrap_or(u32::MAX)
+        .saturating_add(1);
     let peer_bound = per_peer_sync
         .checked_mul(cycles)
         .unwrap_or(MAX_QUORUM_COMMIT_TIMEOUT)

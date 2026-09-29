@@ -172,7 +172,7 @@ impl fmt::Display for PortError {
 
 impl core::error::Error for PortError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        self.source.as_deref().map(|source| source as &dyn core::error::Error)
+        self.source.as_deref().map(|source| -> &(dyn core::error::Error + 'static) { source })
     }
 }
 
@@ -620,7 +620,7 @@ pub struct RecordIdSet(BoundedVec<RecordId, 4_096>);
 
 impl RecordIdSet {
     pub fn new(values: Vec<RecordId>) -> Result<Self, RecordIdSetError> {
-        if values.windows(2).any(|pair| pair[0] >= pair[1]) {
+        if values.array_windows::<2>().any(|pair| pair[0] >= pair[1]) {
             return Err(RecordIdSetError::NotStrictlySorted);
         }
         BoundedVec::new(values)
@@ -695,7 +695,7 @@ fn validate_canonical_set<T: Ord>(
     if values.len() > maximum {
         return Err(CanonicalSetError::TooManyItems);
     }
-    if values.windows(2).any(|pair| pair[0] >= pair[1]) {
+    if values.array_windows::<2>().any(|pair| pair[0] >= pair[1]) {
         return Err(CanonicalSetError::NotStrictlySorted);
     }
     Ok(())
@@ -1290,7 +1290,9 @@ fn declassification_hex(bytes: &[u8; 32]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(64);
     for byte in bytes {
+        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
         encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
         encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     encoded
@@ -1804,7 +1806,9 @@ fn attested_finding_derived_id(
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut suffix = String::with_capacity(digest.len().saturating_mul(2));
     for byte in digest {
+        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
         suffix.push(char::from(HEX[usize::from(byte >> 4)]));
+        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
         suffix.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     Ok(format!("{prefix}-{suffix}"))

@@ -51,9 +51,17 @@ const RETENTION_GRACE_SECS: i64 = 60;
 
 /// Maximum unexplained wall-clock skew accepted before nonce reservation
 /// fails with a typed clock anomaly and leaves durable replay state unchanged.
+#[allow(
+    clippy::as_conversions,
+    reason = "The constant u32 clock skew widens into u64 without loss."
+)]
 pub const MAX_EXECUTION_NONCE_CLOCK_SKEW_SECS: u64 =
     chio_security_types::clock::MAX_REPLAY_WALL_SKEW_SECS as u64;
 
+#[allow(
+    clippy::as_conversions,
+    reason = "The constant u32 clock skew widens into i64 without loss."
+)]
 const MAX_EXECUTION_NONCE_CLOCK_SKEW_I64: i64 =
     chio_security_types::clock::MAX_REPLAY_WALL_SKEW_SECS as i64;
 
@@ -808,14 +816,21 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 fn now_secs() -> i64 {
     use chio_security_types::clock::Clock;
     i64::try_from(SystemClock.unix_millis().unwrap().as_secs()).unwrap()
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};

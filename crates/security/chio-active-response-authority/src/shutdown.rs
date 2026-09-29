@@ -17,24 +17,28 @@ extern "C" fn request_stop(_signal: libc::c_int) {
 /// `AuthorityDaemonRuntime::serve_until_stopped` instead. Installation never
 /// clears a stop that was already requested.
 #[allow(unsafe_code)]
+#[allow(
+    clippy::as_conversions,
+    reason = "POSIX sigaction stores a C function address in sighandler_t."
+)]
 pub fn install_daemon_stop_handlers() -> Result<&'static AtomicBool> {
-    // SAFETY: sigaction is initialized before use. The C ABI handler only
-    // stores a lock-free AtomicBool; it never allocates, locks, or performs I/O.
-    unsafe {
-        let mut action: libc::sigaction = std::mem::zeroed();
-        action.sa_sigaction = request_stop as *const () as usize;
-        action.sa_flags = libc::SA_RESTART;
-        if libc::sigemptyset(&mut action.sa_mask) != 0 {
+    // SAFETY: an all-zero sigaction is valid before its handler and mask are set.
+    let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
+    action.sa_sigaction = request_stop as *const () as libc::sighandler_t;
+    action.sa_flags = libc::SA_RESTART;
+    // SAFETY: sa_mask is a valid, writable sigset_t owned by this stack frame.
+    if unsafe { libc::sigemptyset(&mut action.sa_mask) } != 0 {
+        return Err(AuthorityError::Runtime(
+            "stop signal mask failed".to_owned(),
+        ));
+    }
+    for signal in [libc::SIGINT, libc::SIGTERM] {
+        // SAFETY: the C-ABI handler only writes a lock-free atomic; the initialized
+        // action is installed only when this daemon owns the signal dispositions.
+        if unsafe { libc::sigaction(signal, &action, std::ptr::null_mut()) } != 0 {
             return Err(AuthorityError::Runtime(
-                "stop signal mask failed".to_owned(),
+                "stop signal handler failed".to_owned(),
             ));
-        }
-        for signal in [libc::SIGINT, libc::SIGTERM] {
-            if libc::sigaction(signal, &action, std::ptr::null_mut()) != 0 {
-                return Err(AuthorityError::Runtime(
-                    "stop signal handler failed".to_owned(),
-                ));
-            }
         }
     }
     Ok(&STOP_REQUESTED)

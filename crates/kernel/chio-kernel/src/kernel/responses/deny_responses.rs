@@ -29,7 +29,10 @@ impl ChioKernel {
                 .as_ref()
                 .map(|m| m.units)
                 .unwrap_or(0);
-            let delegation_depth = cap.delegation_chain.len() as u32;
+            let delegation_depth = crate::receipt_support::checked_receipt_count(
+                cap.delegation_chain.len(),
+                "delegation depth",
+            )?;
             let root_budget_holder = cap.issuer.to_hex();
             let (payment_reference, settlement_status) =
                 ReceiptSettlement::not_applicable().into_receipt_parts();
@@ -41,7 +44,10 @@ impl ChioKernel {
                 .unwrap_or(0);
             let budget_remaining = financial_budget_remaining(budget_total, committed)?;
             let financial_meta = FinancialReceiptMetadata {
-                grant_index: mg.index as u32,
+                grant_index: crate::receipt_support::checked_receipt_count(
+                    mg.index,
+                    "grant index",
+                )?,
                 cost_charged: 0,
                 currency,
                 budget_remaining,
@@ -66,7 +72,7 @@ impl ChioKernel {
 
             let metadata = merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_attribution_metadata(cap, Some(mg.index)),
+                    receipt_attribution_metadata(cap, Some(mg.index))?,
                     deny_extra_metadata,
                 ),
                 request_metadata,
@@ -113,7 +119,10 @@ impl ChioKernel {
         self.build_deny_response_with_metadata(request, reason, timestamp, None, extra_metadata)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -138,7 +147,10 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn build_pre_execution_monetary_deny_response_with_recording(
         &self,
         request: &ToolCallRequest,
@@ -151,7 +163,10 @@ impl ChioKernel {
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<ToolCallResponse, KernelError> {
-        let delegation_depth = cap.delegation_chain.len() as u32;
+        let delegation_depth = crate::receipt_support::checked_receipt_count(
+            cap.delegation_chain.len(),
+            "delegation depth",
+        )?;
         let root_budget_holder = cap.issuer.to_hex();
         let (payment_reference, settlement_status) =
             ReceiptSettlement::not_applicable().into_receipt_parts();
@@ -159,7 +174,10 @@ impl ChioKernel {
             financial_budget_remaining(charge.budget_total, committed_cost_after_release)?;
 
         let financial_meta = FinancialReceiptMetadata {
-            grant_index: charge.grant_index as u32,
+            grant_index: crate::receipt_support::checked_receipt_count(
+                charge.grant_index,
+                "grant index",
+            )?,
             cost_charged: 0,
             currency: charge.currency.clone(),
             budget_remaining,
@@ -202,7 +220,7 @@ impl ChioKernel {
             canonical_content: receipt_content.canonical_content,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_attribution_metadata(cap, Some(charge.grant_index)),
+                    receipt_attribution_metadata(cap, Some(charge.grant_index))?,
                     deny_extra_metadata,
                 ),
                 request_metadata,
@@ -281,7 +299,7 @@ impl ChioKernel {
                     merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
-                receipt_attribution_metadata(cap, matched_grant_index),
+                receipt_attribution_metadata(cap, matched_grant_index)?,
             ),
             timestamp,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
@@ -428,7 +446,10 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn build_deny_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -468,7 +489,10 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn build_deny_response_with_recording(
         &self,
         request: &ToolCallRequest,
@@ -510,7 +534,7 @@ impl ChioKernel {
                     merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
-                receipt_attribution_metadata(cap, matched_grant_index),
+                receipt_attribution_metadata(cap, matched_grant_index)?,
             ),
             timestamp,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),

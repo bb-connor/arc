@@ -851,7 +851,10 @@ impl<'de> Deserialize<'de> for GovernedResponsePlanIntentBody {
 
 impl GovernedResponsePlanIntentBody {
     /// Construct and validate a complete governed response-plan projection.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new(
         plan_schema: impl Into<String>,
         plan_id: impl Into<String>,
@@ -988,7 +991,12 @@ impl GovernedResponsePlanIntentBody {
             ));
         }
         for (index, effect) in self.ordered_effects.iter().enumerate() {
-            if self.ordered_effects[..index].contains(effect) {
+            if self
+                .ordered_effects
+                .iter()
+                .take(index)
+                .any(|earlier| earlier == effect)
+            {
                 return Err(Error::CanonicalJson(
                     "governed response plan effects must be unique".into(),
                 ));
@@ -1732,7 +1740,9 @@ impl ApprovalSetBody {
         token_digests.sort();
         if token_digests.is_empty()
             || token_digests.iter().any(|digest| !is_sha256_hex(digest))
-            || token_digests.windows(2).any(|pair| pair[0] == pair[1])
+            || token_digests
+                .array_windows::<2>()
+                .any(|pair| pair[0] == pair[1])
         {
             return Err(Error::CanonicalJson(
                 "verified approval token digests must be distinct SHA-256 values".into(),

@@ -41,9 +41,15 @@ pub(super) fn durable_execution_proof_snapshot(
         snapshot.applying_lease_expires_at_unix_ms = None;
         snapshot.due_at_unix_ms = Some(snapshot.plan.expires_at_unix_ms);
         snapshot.operator_page_required = false;
-        snapshot.mutations =
-            ResponseMutationLog::new(current.mutations.as_slice()[..=activation_index].to_vec())
-                .map_err(ExecutorError::ActiveEvidenceMutationBound)?;
+        snapshot.mutations = ResponseMutationLog::new(
+            current
+                .mutations
+                .as_slice()
+                .get(..=activation_index)
+                .ok_or(ExecutorError::InvalidActiveEvidence)?
+                .to_vec(),
+        )
+        .map_err(ExecutorError::ActiveEvidenceMutationBound)?;
         let record = encode_response_record(&snapshot)?;
         return Ok((snapshot, record, DurableActiveResponseOutcome::Activated));
     }
@@ -162,9 +168,15 @@ fn applying_response_record(
     snapshot.applying_lease_expires_at_unix_ms = Some(applying_lease_expires_at_unix_ms);
     snapshot.due_at_unix_ms = Some(applying_lease_expires_at_unix_ms);
     snapshot.operator_page_required = false;
-    snapshot.mutations =
-        ResponseMutationLog::new(current.mutations.as_slice()[..=applying_index].to_vec())
-            .map_err(ExecutorError::ActiveEvidenceMutationBound)?;
+    snapshot.mutations = ResponseMutationLog::new(
+        current
+            .mutations
+            .as_slice()
+            .get(..=applying_index)
+            .ok_or(ExecutorError::InvalidActiveEvidence)?
+            .to_vec(),
+    )
+    .map_err(ExecutorError::ActiveEvidenceMutationBound)?;
     crate::state_machine::encode_normalized_dispatch_response_record(&snapshot)
         .map_err(ExecutorError::StateMachine)
 }

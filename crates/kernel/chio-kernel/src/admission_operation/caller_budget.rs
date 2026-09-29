@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Sibling-share accounting projected from operation-owned caller holds.
 
 use super::*;

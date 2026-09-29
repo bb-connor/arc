@@ -19,7 +19,7 @@ mod coordinator;
 
 pub use coordinator::*;
 
-const MAX_ANCHOR_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
+const MAX_ANCHOR_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Clone)]
 pub struct RemoteFrostAnchorConfig {
@@ -105,7 +105,7 @@ impl RemoteFrostAnchorClient {
         let egress_contract = crate::anchor_egress::strict_https_contract(
             &base_url,
             "control-plane.frost-anchor",
-            MAX_ANCHOR_RESPONSE_BYTES,
+            crate::integer::count(MAX_ANCHOR_RESPONSE_BYTES),
         )
         .map_err(RemoteFrostAnchorConfigError::InvalidEgressContract)?;
         // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
@@ -301,13 +301,13 @@ fn decode_response<T: DeserializeOwned>(
     let mut bytes = Vec::new();
     response
         .by_ref()
-        .take(MAX_ANCHOR_RESPONSE_BYTES + 1)
+        .take(crate::integer::count(MAX_ANCHOR_RESPONSE_BYTES) + 1)
         .read_to_end(&mut bytes)
         .map_err(unavailable)?;
     egress_contract
-        .enforce_response_bytes(bytes.len() as u64)
+        .enforce_response_bytes(crate::integer::count(bytes.len()))
         .map_err(|error| FrostAnchorError::InvalidResponse(error.to_string()))?;
-    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_ANCHOR_RESPONSE_BYTES as usize)
+    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_ANCHOR_RESPONSE_BYTES)
         .and_then(|input| input.decode_signed())
         .map_err(|error| FrostAnchorError::UntrustedInput(error.into()))
 }

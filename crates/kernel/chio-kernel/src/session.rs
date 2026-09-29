@@ -1,8 +1,8 @@
 #[cfg(loom)]
-use loom::sync::atomic::{AtomicU64, Ordering};
+use loom::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::{HashMap, HashSet, VecDeque};
 #[cfg(not(loom))]
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -154,7 +154,7 @@ impl InflightRequest {
 pub struct InflightRegistry {
     requests: RwLock<HashMap<RequestId, InflightRequest>>,
     dispatching: RwLock<HashSet<RequestId>>,
-    active_count: AtomicU64,
+    active_count: AtomicUsize,
 }
 
 impl Clone for InflightRegistry {
@@ -163,7 +163,7 @@ impl Clone for InflightRegistry {
         let requests = requests_guard.clone();
         let dispatching = read_lock(&self.dispatching).clone();
         Self {
-            active_count: AtomicU64::new(requests.len() as u64),
+            active_count: AtomicUsize::new(requests.len()),
             requests: RwLock::new(requests),
             dispatching: RwLock::new(dispatching),
         }
@@ -175,7 +175,7 @@ impl Default for InflightRegistry {
         Self {
             requests: RwLock::new(HashMap::new()),
             dispatching: RwLock::new(HashSet::new()),
-            active_count: AtomicU64::new(0),
+            active_count: AtomicUsize::new(0),
         }
     }
 }
@@ -273,8 +273,7 @@ impl InflightRegistry {
             })
             .is_err()
         {
-            self.active_count
-                .store(requests.len() as u64, Ordering::Release);
+            self.active_count.store(requests.len(), Ordering::Release);
         }
         Ok(completed)
     }
@@ -369,7 +368,7 @@ impl InflightRegistry {
     }
 
     pub fn len(&self) -> usize {
-        self.active_count.load(Ordering::Acquire) as usize
+        self.active_count.load(Ordering::Acquire)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -400,14 +399,14 @@ enum SubscriptionSubject {
 #[derive(Debug)]
 pub struct SubscriptionRegistry {
     subscriptions: RwLock<HashSet<SubscriptionSubject>>,
-    subscription_count: AtomicU64,
+    subscription_count: AtomicUsize,
 }
 
 impl Clone for SubscriptionRegistry {
     fn clone(&self) -> Self {
         let subscriptions = read_lock(&self.subscriptions).clone();
         Self {
-            subscription_count: AtomicU64::new(subscriptions.len() as u64),
+            subscription_count: AtomicUsize::new(subscriptions.len()),
             subscriptions: RwLock::new(subscriptions),
         }
     }
@@ -417,7 +416,7 @@ impl Default for SubscriptionRegistry {
     fn default() -> Self {
         Self {
             subscriptions: RwLock::new(HashSet::new()),
-            subscription_count: AtomicU64::new(0),
+            subscription_count: AtomicUsize::new(0),
         }
     }
 }
@@ -446,14 +445,14 @@ impl SubscriptionRegistry {
         let mut subscriptions = write_lock(&self.subscriptions);
         subscriptions.insert(SubscriptionSubject::Resource(uri.into()));
         self.subscription_count
-            .store(subscriptions.len() as u64, Ordering::Release);
+            .store(subscriptions.len(), Ordering::Release);
     }
 
     pub fn unsubscribe_resource(&self, uri: &str) {
         let mut subscriptions = write_lock(&self.subscriptions);
         subscriptions.remove(&SubscriptionSubject::Resource(uri.to_string()));
         self.subscription_count
-            .store(subscriptions.len() as u64, Ordering::Release);
+            .store(subscriptions.len(), Ordering::Release);
     }
 
     pub fn contains_resource(&self, uri: &str) -> bool {
@@ -461,7 +460,7 @@ impl SubscriptionRegistry {
     }
 
     pub fn len(&self) -> usize {
-        self.subscription_count.load(Ordering::Acquire) as usize
+        self.subscription_count.load(Ordering::Acquire)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -1268,6 +1267,10 @@ impl Session {
             .map_err(in_memory_session_error)
     }
 
+    #[allow(
+        clippy::as_conversions,
+        reason = "The active-request count is usize and only widens into the diagnostic u64 field on supported targets."
+    )]
     pub fn close_persisted<E>(
         &self,
         persist: impl FnOnce(&SessionAnchorSnapshot, Option<&str>) -> Result<(), E>,
@@ -1620,7 +1623,11 @@ pub enum SessionOperationResponse {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
 
 #[cfg(all(test, not(loom)))]

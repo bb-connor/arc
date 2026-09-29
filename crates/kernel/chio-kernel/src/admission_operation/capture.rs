@@ -632,7 +632,7 @@ fn validate_quota_usages(
 ) -> Result<(), AdmissionOperationError> {
     if usages.len() > MAX_INVOCATION_QUOTAS_PER_ADMISSION
         || usages
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].quota.key >= pair[1].quota.key)
     {
         return Err(AdmissionOperationError::CaptureQuotaMismatch);

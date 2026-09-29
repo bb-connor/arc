@@ -15,7 +15,10 @@ pub(crate) struct PostInvocationHandling {
 }
 
 impl ChioKernel {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn finalize_tool_output_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -153,7 +156,10 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn apply_durable_post_invocation_pipeline(
         &self,
         request: &ToolCallRequest,

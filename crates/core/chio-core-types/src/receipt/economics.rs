@@ -6,7 +6,11 @@ use crate::capability::scope::MonetaryAmount;
 use crate::oracle::OracleConversionEvidence;
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
 
 pub const CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA: &str = "chio.channel.receipt-metadata.v1";

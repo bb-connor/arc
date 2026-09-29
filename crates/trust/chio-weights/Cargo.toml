@@ -43,10 +43,13 @@ smoke = []
 kani = []
 
 [lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 
 [lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
 # `cfg(kani)` is set automatically by the Kani toolchain (see
 # `crates/trust/chio-weights/src/kani_public_harnesses.rs`). Register the
 # cfg with check-cfg so default `cargo build` / `cargo clippy` passes

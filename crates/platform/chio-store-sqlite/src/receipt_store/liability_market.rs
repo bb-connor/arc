@@ -88,7 +88,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8)",
                 params![
                     artifact.provider_record_id,
-                    artifact.issued_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
                     artifact.report.provider_id,
                     liability_provider_lifecycle_state_label(artifact.lifecycle_state),
                     artifact.supersedes_provider_record_id.as_deref(),
@@ -182,7 +182,7 @@ impl SqliteReceiptStore {
             query: normalized,
             summary: LiabilityProviderListSummary {
                 matching_providers,
-                returned_providers: providers.len() as u64,
+                returned_providers: crate::integer::count(providers.len()),
                 active_providers,
                 suspended_providers,
                 superseded_providers,
@@ -361,7 +361,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 artifact.quote_request_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 artifact.provider_policy.provider_id,
                 artifact.provider_policy.jurisdiction,
                 serde_json::to_string(&artifact.provider_policy.coverage_class)?,
@@ -489,7 +489,7 @@ impl SqliteReceiptStore {
         let expires_at = artifact
             .quoted_terms
             .as_ref()
-            .map(|terms| terms.expires_at as i64);
+            .map(|terms| crate::integer::checked::<_, i64>(terms.expires_at)).transpose()?;
         tx.execute(
             "INSERT INTO liability_quote_responses (
                 quote_response_id, issued_at, quote_request_id, provider_id, disposition,
@@ -498,7 +498,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8, ?9, ?10)",
             params![
                 artifact.quote_response_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 artifact.quote_request.body.quote_request_id,
                 artifact.quote_request.body.provider_policy.provider_id,
                 liability_quote_disposition_label(&artifact.disposition),
@@ -662,7 +662,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 params![
                     artifact.placement_id,
-                    artifact.issued_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
                     artifact
                         .quote_response
                         .body
@@ -771,12 +771,12 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 artifact.authority_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 artifact.quote_request.body.quote_request_id,
                 artifact.provider_policy.provider_id,
                 artifact.facility.body.facility_id,
                 artifact.underwriting_decision.body.decision_id,
-                artifact.expires_at as i64,
+                crate::integer::checked::<_, i64>(artifact.expires_at)?,
                 serde_json::to_string(authority)?,
                 authority.signer_key.to_hex(),
                 authority.signature.to_hex(),
@@ -871,7 +871,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 artifact.bound_coverage_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 artifact
                     .placement
                     .body
@@ -1056,7 +1056,7 @@ impl SqliteReceiptStore {
                  ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 params![
                     placement_artifact.placement_id,
-                    placement_artifact.issued_at as i64,
+                    crate::integer::checked::<_, i64>(placement_artifact.issued_at)?,
                     placement_artifact
                         .quote_response
                         .body
@@ -1117,7 +1117,7 @@ impl SqliteReceiptStore {
                  ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 params![
                     bound_artifact.bound_coverage_id,
-                    bound_artifact.issued_at as i64,
+                    crate::integer::checked::<_, i64>(bound_artifact.issued_at)?,
                     bound_artifact
                         .placement
                         .body
@@ -1156,7 +1156,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 artifact.decision_id,
-                artifact.issued_at as i64,
+                crate::integer::checked::<_, i64>(artifact.issued_at)?,
                 artifact
                     .quote_response
                     .body
@@ -1356,7 +1356,7 @@ impl SqliteReceiptStore {
             query: normalized,
             summary: LiabilityMarketWorkflowSummary {
                 matching_requests,
-                returned_requests: workflows.len() as u64,
+                returned_requests: crate::integer::count(workflows.len()),
                 quote_responses,
                 quoted_responses,
                 declined_responses,

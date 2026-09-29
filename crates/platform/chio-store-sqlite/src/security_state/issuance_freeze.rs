@@ -1431,7 +1431,11 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
                 entry.action_id == request.action_id && entry.effect_id == request.effect_id
             })
             .ok_or_else(PortError::conflict)?;
-        let current_contribution = &current.contributions.as_slice()[position];
+        let current_contribution = current
+            .contributions
+            .as_slice()
+            .get(position)
+            .ok_or_else(PortError::conflict)?;
         if current_contribution.external_fence == *maintained {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(current);
@@ -1440,8 +1444,11 @@ impl IssuanceFreezeStore for SqliteSecurityStateStore {
             return Err(PortError::conflict());
         }
         let mut contributions = current.contributions.clone().into_vec();
-        contributions[position].external_fence = maintained.clone();
-        validate_issuance_freeze_contribution(&request.key, &contributions[position])?;
+        let contribution = contributions
+            .get_mut(position)
+            .ok_or_else(PortError::conflict)?;
+        contribution.external_fence = maintained.clone();
+        validate_issuance_freeze_contribution(&request.key, contribution)?;
         let next = IssuanceFreezeSnapshot {
             key: current.key.clone(),
             generation: current

@@ -10,6 +10,7 @@ fn binding(destination: &str) -> DpopReplaySourceBinding {
 
 fn store() -> DpopNonceStore {
     DpopNonceStore::new_with_per_capability_capacity(16, 8, Duration::from_secs(60))
+        .expect("positive replay store test capacities")
 }
 
 fn preview(store: &DpopNonceStore) -> DpopReplaySourceSnapshot {
@@ -211,7 +212,8 @@ fn rollback_and_retirement_cannot_omit_an_outstanding_reservation() {
 
 #[test]
 fn previews_do_not_prune_and_real_pruning_is_retained_in_inventory() {
-    let store = DpopNonceStore::new(4, Duration::ZERO);
+    let store =
+        DpopNonceStore::new(4, Duration::ZERO).expect("positive replay store test capacities");
     store.check_and_insert("elapsed", "cap").unwrap();
     let old = preview(&store);
     assert_eq!(old.markers().len(), 1);

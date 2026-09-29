@@ -400,7 +400,10 @@ impl WitnessedActivationSet {
         for (index, checkpoint) in checkpoints.iter().enumerate() {
             let sequence = u64::try_from(index).map_err(|_| KeyringError::NumericRange)?;
             let tree_size = sequence.checked_add(1).ok_or(KeyringError::NumericRange)?;
-            let root = chio_core_types::MerkleTree::from_leaves(&leaves[..=index])?.root();
+            let root = chio_core_types::MerkleTree::from_leaves(
+                leaves.get(..=index).ok_or(KeyringError::NumericRange)?,
+            )?
+            .root();
             checkpoint.validate(crate::KeyLogCheckpointExpectation {
                 log_id: &policy.log_id,
                 sequence,
@@ -410,7 +413,13 @@ impl WitnessedActivationSet {
                 last_issued_at: previous_checkpoint_time,
             })?;
             checkpoint.verify_operator(&policy.operator_key)?;
-            if checkpoint.body.issued_at < events[index].body.issued_at {
+            if checkpoint.body.issued_at
+                < events
+                    .get(index)
+                    .ok_or(KeyringError::NumericRange)?
+                    .body
+                    .issued_at
+            {
                 return Err(KeyringError::InvalidTimeOrdering);
             }
             let hash = checkpoint.checkpoint_hash()?;
@@ -442,7 +451,9 @@ impl WitnessedActivationSet {
             if previous_activation_index.is_some_and(|previous| checkpoint_index <= previous) {
                 return Err(KeyringError::InvalidWitnessActivation);
             }
-            let event = &events[checkpoint_index];
+            let event = events
+                .get(checkpoint_index)
+                .ok_or(KeyringError::NumericRange)?;
             if commit.body.event_id != event.body.event_id
                 || !matches!(
                     event.body.operation,
@@ -451,7 +462,9 @@ impl WitnessedActivationSet {
             {
                 return Err(KeyringError::InvalidWitnessActivation);
             }
-            let checkpoint = &checkpoints[checkpoint_index];
+            let checkpoint = checkpoints
+                .get(checkpoint_index)
+                .ok_or(KeyringError::NumericRange)?;
             let mut witnessed_checkpoint = checkpoint.clone();
             witnessed_checkpoint.witness_signatures = commit.body.witness_signatures.clone();
             witnessed_checkpoint.verify_witnesses(&policy.witness_keys)?;

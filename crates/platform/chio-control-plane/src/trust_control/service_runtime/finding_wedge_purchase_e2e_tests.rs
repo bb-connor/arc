@@ -2027,7 +2027,7 @@ fn build_reveal_kernel(inputs: &RevealKernelInputs<'_>) -> Result<ChioKernel, An
             DpopNonceStore::new(
                 dpop_config.nonce_store_capacity,
                 std::time::Duration::from_secs(dpop_config.proof_ttl_secs),
-            ),
+            )?,
             dpop_config,
         )
         .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
@@ -2192,7 +2192,10 @@ fn handshake(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn handshake_at(
     web: &MarketWeb,
     witness: &VerifiedFindingAdmission,

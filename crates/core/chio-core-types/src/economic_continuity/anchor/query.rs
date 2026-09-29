@@ -16,8 +16,14 @@ impl EconomicStateReadQuery {
                 "read query exceeds the bound",
             ));
         }
-        if !self.resource_keys.windows(2).all(|pair| pair[0] < pair[1])
-            || !self.request_keys.windows(2).all(|pair| pair[0] < pair[1])
+        if !self
+            .resource_keys
+            .array_windows::<2>()
+            .all(|pair| pair[0] < pair[1])
+            || !self
+                .request_keys
+                .array_windows::<2>()
+                .all(|pair| pair[0] < pair[1])
         {
             return Err(EconomicStateAnchorError::InvalidView(
                 "read query keys must be sorted and unique",

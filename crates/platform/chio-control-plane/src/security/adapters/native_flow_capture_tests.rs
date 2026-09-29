@@ -44,7 +44,7 @@ impl Fixture {
         };
         use chio_kernel::dpop::replay_source::{DpopReplaySourceBinding, DpopReplaySourcePort};
         use chio_kernel::dpop::{DpopNonceStore, DpopProof, DpopProofBody};
-        let source = DpopNonceStore::new(16, std::time::Duration::from_secs(600));
+        let source = DpopNonceStore::new(16, std::time::Duration::from_secs(600))?;
         let store = self.authority.admission_operation_store();
         let fence = self.authority.mutation_fence();
         let authority_id = AdmissionIdentifier::try_new("authority", "native-capture-dpop")?;

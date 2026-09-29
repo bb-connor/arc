@@ -62,7 +62,7 @@ impl GovernedApprovalReplayMigrationRecordV1 {
     }
 
     pub fn event_sequence(&self) -> u64 {
-        self.events.len() as u64
+        crate::integer::count(self.events.len())
     }
 }
 

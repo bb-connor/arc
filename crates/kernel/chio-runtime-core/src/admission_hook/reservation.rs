@@ -161,20 +161,29 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
         };
         if report.accepted {
             let mut metadata = report.receipt_metadata;
-            let runtime_metadata_key = "chio_runtime";
+            let runtime_fields = metadata
+                .get_mut("chio_runtime")
+                .and_then(serde_json::Value::as_object_mut)
+                .ok_or_else(|| {
+                    KernelError::Internal("runtime receipt metadata must contain an object".into())
+                })?;
             if let Some(continuation_id) = treaty_continuation_id_to_consume.as_deref() {
-                metadata[runtime_metadata_key]["reserved_treaty_continuation_id"] =
-                    serde_json::json!(continuation_id);
+                runtime_fields.insert(
+                    "reserved_treaty_continuation_id".into(),
+                    serde_json::json!(continuation_id),
+                );
             }
             if let Some(continuation_id) = swarm_continuation_id_to_consume.as_deref() {
-                metadata[runtime_metadata_key]["reserved_swarm_continuation_id"] =
-                    serde_json::json!(continuation_id);
+                runtime_fields.insert(
+                    "reserved_swarm_continuation_id".into(),
+                    serde_json::json!(continuation_id),
+                );
             }
             if let Some(route_metadata) = verified_swarm_route_metadata {
-                metadata[runtime_metadata_key]["verified_swarm_route_metadata"] = route_metadata;
+                runtime_fields.insert("verified_swarm_route_metadata".into(), route_metadata);
             }
             if let Some(binding) = verified_swarm_request_binding {
-                metadata[runtime_metadata_key]["verified_swarm_request_binding"] = binding;
+                runtime_fields.insert("verified_swarm_request_binding".into(), binding);
             }
             if let Some(material) = federation_treaty_material {
                 return Ok(

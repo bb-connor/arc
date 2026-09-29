@@ -231,10 +231,10 @@ impl DpopNonceStore {
     /// remember. `ttl` is fallback retention for calls to
     /// [`Self::check_and_insert`] that do not supply a signed horizon.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics when `capacity` is zero.
-    pub fn new(capacity: usize, ttl: Duration) -> Self {
+    /// Returns an error when `capacity` is zero.
+    pub fn new(capacity: usize, ttl: Duration) -> Result<Self, DpopError> {
         Self::new_with_per_capability_capacity(capacity, capacity, ttl)
     }
 
@@ -244,15 +244,15 @@ impl DpopNonceStore {
     /// the store-wide capacity. [`Self::new`] lets one capability use the full
     /// configured store capacity.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics when either capacity is zero or when the per-capability capacity
+    /// Returns an error when either capacity is zero or when the per-capability capacity
     /// exceeds the store-wide capacity.
     pub fn new_with_per_capability_capacity(
         capacity: usize,
         per_capability_capacity: usize,
         ttl: Duration,
-    ) -> Self {
+    ) -> Result<Self, DpopError> {
         Self::new_with_identity_byte_capacity(
             capacity,
             per_capability_capacity,
@@ -266,15 +266,15 @@ impl DpopNonceStore {
     /// capability-key copies. Container overhead is bounded separately by the
     /// marker limit. Exhaustion denies new entries without evicting live ones.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics on zero capacities or a per-capability limit above total capacity.
+    /// Returns an error on zero capacities or a per-capability limit above total capacity.
     pub fn new_with_identity_byte_capacity(
         capacity: usize,
         per_capability_capacity: usize,
         identity_byte_capacity: usize,
         ttl: Duration,
-    ) -> Self {
+    ) -> Result<Self, DpopError> {
         Self::with_clock(
             capacity,
             per_capability_capacity,
@@ -291,20 +291,21 @@ impl DpopNonceStore {
         identity_byte_capacity: usize,
         ttl: Duration,
         clock: Arc<dyn Clock>,
-    ) -> Self {
-        let nz = match NonZeroUsize::new(capacity) {
-            Some(capacity) => capacity,
-            None => panic!("DPoP nonce store capacity must be greater than zero"),
-        };
+    ) -> Result<Self, DpopError> {
+        let nz = NonZeroUsize::new(capacity).ok_or(DpopError::InvalidCapacity(
+            "total capacity must be positive",
+        ))?;
         if per_capability_capacity == 0 || per_capability_capacity > capacity {
-            panic!(
-                "DPoP nonce store per-capability capacity must be between one and the store capacity"
-            );
+            return Err(DpopError::InvalidCapacity(
+                "per-capability capacity must be positive and at most total capacity",
+            ));
         }
         if identity_byte_capacity == 0 {
-            panic!("DPoP nonce store identity byte capacity must be greater than zero");
+            return Err(DpopError::InvalidCapacity(
+                "identity byte capacity must be positive",
+            ));
         }
-        Self {
+        Ok(Self {
             inner: Mutex::new(DpopNonceState {
                 source: replay_source::SourceState::new(),
                 cache: LruCache::new(nz),
@@ -317,7 +318,7 @@ impl DpopNonceStore {
             }),
             ttl,
             clock,
-        }
+        })
     }
 
     pub(crate) fn bind_clock(&mut self, clock: Arc<dyn Clock>) -> Result<(), KernelError> {
@@ -746,15 +747,32 @@ pub fn verify_dpop_proof(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod backend_tests {
     use super::*;
     use chio_core::crypto::Ed25519Backend;
 
     #[test]
-    #[should_panic(expected = "DPoP nonce store capacity must be greater than zero")]
     fn zero_capacity_is_rejected() {
-        let _store = DpopNonceStore::new(0, Duration::from_secs(1));
+        assert!(matches!(
+            DpopNonceStore::new(0, Duration::from_secs(1)),
+            Err(DpopError::InvalidCapacity(_))
+        ));
+    }
+
+    #[test]
+    fn invalid_per_capability_limits_are_rejected() {
+        for per_capability in [0, 3] {
+            assert!(matches!(
+                DpopNonceStore::new_with_per_capability_capacity(2, per_capability, Duration::ZERO),
+                Err(DpopError::InvalidCapacity(_))
+            ));
+        }
+        assert!(DpopNonceStore::new_with_per_capability_capacity(2, 2, Duration::ZERO).is_ok());
     }
 
     #[test]
@@ -784,7 +802,8 @@ mod backend_tests {
 
     #[test]
     fn dispatch_reservation_rolls_back_only_for_its_owner() {
-        let store = DpopNonceStore::new(4, Duration::from_secs(60));
+        let store = DpopNonceStore::new(4, Duration::from_secs(60))
+            .expect("positive replay store test capacities");
         assert!(store
             .reserve_for_dispatch_until("nonce", "capability", u64::MAX, "owner-a")
             .unwrap());
@@ -801,7 +820,8 @@ mod backend_tests {
     #[test]
     fn shared_dpop_and_approval_store_capacity_pressure_does_not_evict_live_reservation(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let store = DpopNonceStore::new(2, Duration::from_secs(60));
+        let store = DpopNonceStore::new(2, Duration::from_secs(60))
+            .expect("positive replay store test capacities");
         assert!(store.reserve_for_dispatch_until(
             "nonce-a",
             "capability-a",
@@ -832,12 +852,14 @@ mod backend_tests {
     #[test]
     fn shared_dpop_and_approval_store_capacity_pressure_retains_consumed_key_until_expiry(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let store = DpopNonceStore::new(1, Duration::from_secs(60));
+        let store = DpopNonceStore::new(1, Duration::from_secs(60))
+            .expect("positive replay store test capacities");
         assert!(store.check_and_insert("nonce-a", "capability")?);
         assert!(store.check_and_insert("nonce-b", "capability").is_err());
         assert!(!store.check_and_insert("nonce-a", "capability")?);
 
-        let expired_store = DpopNonceStore::new(1, Duration::ZERO);
+        let expired_store =
+            DpopNonceStore::new(1, Duration::ZERO).expect("positive replay store test capacities");
         assert!(expired_store.check_and_insert("nonce-a", "capability")?);
         assert!(expired_store.check_and_insert("nonce-b", "capability")?);
         Ok(())
@@ -847,7 +869,8 @@ mod backend_tests {
     fn per_capability_quota_preserves_capacity_for_other_capabilities(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let store =
-            DpopNonceStore::new_with_per_capability_capacity(512, 64, Duration::from_secs(60));
+            DpopNonceStore::new_with_per_capability_capacity(512, 64, Duration::from_secs(60))
+                .expect("positive replay store test capacities");
         let per_capability_capacity = store.inner.lock().unwrap().per_capability_capacity;
         assert_eq!(per_capability_capacity, 64);
 
@@ -864,7 +887,8 @@ mod backend_tests {
 
     #[test]
     fn small_store_capability_quota_reserves_a_fair_share() -> Result<(), KernelError> {
-        let store = DpopNonceStore::new_with_per_capability_capacity(8, 1, Duration::from_secs(60));
+        let store = DpopNonceStore::new_with_per_capability_capacity(8, 1, Duration::from_secs(60))
+            .expect("positive replay store test capacities");
         assert_eq!(store.inner.lock().unwrap().per_capability_capacity, 1);
         assert!(store.check_and_insert("capability-a-first", "capability-a")?);
         assert!(store
@@ -876,7 +900,8 @@ mod backend_tests {
 
     #[test]
     fn default_store_allows_one_capability_to_use_configured_capacity() -> Result<(), KernelError> {
-        let store = DpopNonceStore::new(8, Duration::from_secs(60));
+        let store = DpopNonceStore::new(8, Duration::from_secs(60))
+            .expect("positive replay store test capacities");
         assert_eq!(store.inner.lock().unwrap().per_capability_capacity, 8);
         for index in 0..8 {
             assert!(store.check_and_insert(&format!("nonce-{index}"), "capability")?);
@@ -891,14 +916,16 @@ mod backend_tests {
     fn signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let store = DpopNonceStore::new(1, Duration::ZERO);
+        let store =
+            DpopNonceStore::new(1, Duration::ZERO).expect("positive replay store test capacities");
         assert!(store.check_and_insert_until("approval-a", "intent", now + 60)?);
         assert!(!store.check_and_insert_until("approval-a", "intent", now + 60)?);
         assert!(store
             .check_and_insert_until("approval-b", "intent", now + 60)
             .is_err());
 
-        let expired_store = DpopNonceStore::new(1, Duration::from_secs(60));
+        let expired_store = DpopNonceStore::new(1, Duration::from_secs(60))
+            .expect("positive replay store test capacities");
         assert!(matches!(
             expired_store.check_and_insert_until("approval-a", "intent", 0),
             Err(KernelError::Dpop(DpopError::Expired))
@@ -914,6 +941,10 @@ mod backend_tests {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 #[path = "dpop/clock_tests.rs"]
 mod clock_tests;

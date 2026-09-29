@@ -268,7 +268,9 @@ impl Body {
             || quota == 0
             || quota > capacity
             || inventory.markers.len() > MAX_DPOP_REPLAY_SOURCE_MARKERS
-            || inventory.markers.len() as u128 > capacity
+            || u128::try_from(inventory.markers.len())
+                .map_err(|_| invalid("marker count overflow"))?
+                > capacity
         {
             return Err(invalid("invalid source capacity or marker count"));
         }
@@ -283,7 +285,9 @@ impl Body {
                 marker.dispatch_reservation_id.as_deref(),
             )?;
             actual_bytes = actual_bytes
-                .checked_add(bytes as u128)
+                .checked_add(
+                    u128::try_from(bytes).map_err(|_| invalid("identity byte count overflow"))?,
+                )
                 .ok_or_else(|| invalid("retained identity byte count overflow"))?;
             if previous.is_some_and(|key| key >= marker.key()) {
                 return Err(invalid("source markers are not unique and sorted"));
@@ -334,5 +338,9 @@ fn signed(text: &str) -> Result<i128, KernelError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

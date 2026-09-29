@@ -166,7 +166,10 @@ pub(super) fn validate_storage_bounds(connection: &Connection) -> Result<(), Str
             |row| row.get(0),
         )
         .map_err(|error| error.to_string())?;
-    if !(0..=MAX_MIGRATIONS as i64).contains(&count) {
+    if !(0..=crate::integer::checked::<_, i64>(MAX_MIGRATIONS)
+        .map_err(|error| error.to_string())?)
+        .contains(&count)
+    {
         return Err("DPoP activation count exceeds bound".into());
     }
     if super::bounds::invalid_row_exists(connection, TABLE,

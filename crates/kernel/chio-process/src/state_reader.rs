@@ -100,7 +100,13 @@ impl ProcessStateReader {
             .query_row(
                 "SELECT CASE WHEN typeof(data)='blob' AND length(data)<=?3 THEN data ELSE NULL END
              FROM process_state_blobs WHERE process_id=?1 AND sha256=?2",
-                params![process, sha256, MAX_STATE_BLOB_BYTES as i64],
+                params![
+                    process,
+                    sha256,
+                    i64::try_from(MAX_STATE_BLOB_BYTES).map_err(|_| ProcessError::Invalid(
+                        "state blob limit exceeds SQLite range"
+                    ))?
+                ],
                 |row| row.get(0),
             )
             .optional()?;

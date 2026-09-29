@@ -1333,7 +1333,7 @@ fn scan_verified_partition(
             evidence_hash: decode_digest(evidence)?,
         });
     }
-    let truncated = events.len() > scan.max_results as usize;
+    let truncated = events.len() > crate::integer::checked::<_, usize>(scan.max_results)?;
     if truncated {
         events.pop();
     }

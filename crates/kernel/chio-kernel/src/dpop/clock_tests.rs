@@ -12,6 +12,7 @@ pub(super) fn store(clock: Arc<TestClock>, capacity: usize) -> DpopNonceStore {
         Duration::from_secs(10),
         clock,
     )
+    .expect("positive replay store test capacities")
 }
 #[test]
 fn injected_time_preserves_inclusive_horizon_and_retry_window() {

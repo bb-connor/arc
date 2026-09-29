@@ -315,7 +315,7 @@ pub(crate) fn execute_runtime_loopback_step(
         &step.request.tool_name,
         now_unix_ms,
     )?;
-    let mut kernel = ChioKernel::new(chio_kernel::KernelConfig {
+    let config = chio_kernel::KernelConfig {
         keypair: vendor_key.clone(),
         ca_public_keys: vec![vendor_key.public_key()],
         max_delegation_depth: 5,
@@ -334,7 +334,14 @@ pub(crate) fn execute_runtime_loopback_step(
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
         allow_ephemeral_receipt_log: false,
         allow_ephemeral_revocation_store: false,
-    });
+    };
+    // The loopback's admission, federation and evidence use the same instant.
+    let mut kernel = ChioKernel::new_with_clock(
+        config,
+        std::sync::Arc::new(chio_security_types::clock::FixedClock::from_millis(
+            now_unix_ms,
+        )),
+    );
     kernel.set_federation_local_kernel_id(step.request.host_kernel_id.clone());
     let fence = authority.mutation_fence();
     let admission_store = std::sync::Arc::new(authority.admission_operation_store());

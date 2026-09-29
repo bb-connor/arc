@@ -67,13 +67,13 @@ impl ChioMcpEdge {
         }
     }
 
-    pub(super) fn handle_request_with_transport_channel<W: Write>(
+    pub(super) fn handle_request_with_transport_channel<W: Write + Send>(
         &mut self,
         id: Value,
         method: &str,
         params: Value,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Value {
         match method {

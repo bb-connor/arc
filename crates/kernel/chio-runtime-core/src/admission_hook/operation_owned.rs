@@ -45,19 +45,28 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
             ));
         }
         let mut metadata = report.receipt_metadata;
-        metadata["chio_runtime"]["operation_owned_replay"] = serde_json::json!({
-            "reference": reference,
-            "plan_sha256": plan_digest,
-            "bundle_sha256": bundle_digest,
-            "resources_sha256": resources_digest,
-            "treaty_evidence_sha256": self.treaty_evidence_digest,
-            "swarm_evidence_sha256": self.swarm_evidence_digest,
-        });
+        let runtime_fields = metadata
+            .get_mut("chio_runtime")
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or_else(|| {
+                KernelError::Internal("runtime receipt metadata must contain an object".into())
+            })?;
+        runtime_fields.insert(
+            "operation_owned_replay".into(),
+            serde_json::json!({
+                "reference": reference,
+                "plan_sha256": plan_digest,
+                "bundle_sha256": bundle_digest,
+                "resources_sha256": resources_digest,
+                "treaty_evidence_sha256": self.treaty_evidence_digest,
+                "swarm_evidence_sha256": self.swarm_evidence_digest,
+            }),
+        );
         if let Some(route) = self.verified_swarm_route_metadata {
-            metadata["chio_runtime"]["verified_swarm_route_metadata"] = route;
+            runtime_fields.insert("verified_swarm_route_metadata".into(), route);
         }
         if let Some(binding) = self.verified_swarm_request_binding {
-            metadata["chio_runtime"]["verified_swarm_request_binding"] = binding;
+            runtime_fields.insert("verified_swarm_request_binding".into(), binding);
         }
         Ok(match self.federation_treaty_material {
             Some(material) => KernelRuntimeAdmissionDecision::allow_with_verified_treaty_material(
@@ -112,19 +121,28 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
             .resume_operation_owned(&self.hook.store)
             .map_err(runtime_error)?;
         let mut metadata = report.receipt_metadata;
-        metadata["chio_runtime"]["operation_owned_replay"] = serde_json::json!({
-            "reference": claim.reference,
-            "plan_sha256": claim.intent.plan_digest().as_str(),
-            "bundle_sha256": bundle_digest,
-            "resources_sha256": resources_digest,
-            "treaty_evidence_sha256": self.treaty_evidence_digest,
-            "swarm_evidence_sha256": self.swarm_evidence_digest,
-        });
+        let runtime_fields = metadata
+            .get_mut("chio_runtime")
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or_else(|| {
+                KernelError::Internal("runtime receipt metadata must contain an object".into())
+            })?;
+        runtime_fields.insert(
+            "operation_owned_replay".into(),
+            serde_json::json!({
+                "reference": claim.reference,
+                "plan_sha256": claim.intent.plan_digest().as_str(),
+                "bundle_sha256": bundle_digest,
+                "resources_sha256": resources_digest,
+                "treaty_evidence_sha256": self.treaty_evidence_digest,
+                "swarm_evidence_sha256": self.swarm_evidence_digest,
+            }),
+        );
         if let Some(route) = self.verified_swarm_route_metadata {
-            metadata["chio_runtime"]["verified_swarm_route_metadata"] = route;
+            runtime_fields.insert("verified_swarm_route_metadata".into(), route);
         }
         if let Some(binding) = self.verified_swarm_request_binding {
-            metadata["chio_runtime"]["verified_swarm_request_binding"] = binding;
+            runtime_fields.insert("verified_swarm_request_binding".into(), binding);
         }
         Ok(match self.federation_treaty_material {
             Some(material) => KernelRuntimeAdmissionDecision::allow_with_verified_treaty_material(

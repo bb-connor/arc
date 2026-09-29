@@ -46,7 +46,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn reverse_charge_cost_with_expected_state(
         &mut self,
         capability_id: &str,
@@ -81,7 +81,7 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn reverse_charge_cost_with_mutation(
         &mut self,
         capability_id: &str,
@@ -797,7 +797,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn settle_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
@@ -829,7 +829,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn settle_charge_cost_with_mutation(
         &mut self,
         capability_id: &str,

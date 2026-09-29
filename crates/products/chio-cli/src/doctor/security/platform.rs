@@ -290,9 +290,10 @@ mod host {
     }
 
     fn pidfd_open() -> bool {
+        let pid = rustix::process::getpid().as_raw_pid();
         // SAFETY: opening a pid file descriptor for our own process has no
         // side effect beyond the descriptor, which is closed at once.
-        let descriptor = unsafe { libc::syscall(libc::SYS_pidfd_open, libc::getpid(), 0u32) };
+        let descriptor = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0u32) };
         if descriptor < 0 {
             return false;
         }

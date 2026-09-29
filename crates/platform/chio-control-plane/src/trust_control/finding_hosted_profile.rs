@@ -994,7 +994,7 @@ impl FindingHostedProfile {
         validate_digest(&self.worker.rootfs_sha256, "worker rootfs digest")?;
         let mut uids = BTreeSet::new();
         let mut gids = BTreeSet::new();
-        if self.worker.identities.len() != self.worker.max_instances as usize
+        if u32::try_from(self.worker.identities.len()).ok() != Some(self.worker.max_instances)
             || self.worker.identities.iter().any(|identity| {
                 identity.uid == 0
                     || identity.gid == 0

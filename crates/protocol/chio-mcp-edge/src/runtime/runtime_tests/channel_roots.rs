@@ -26,7 +26,7 @@ fn refresh_roots_with_channel_defers_unrelated_requests() {
         _ => panic!("expected ready state"),
     };
 
-    let (client_tx, client_rx) = mpsc::channel();
+    let (client_tx, mut client_rx) = mpsc::channel();
     client_tx
         .send(ClientInbound::Message(json!({
             "jsonrpc": "2.0",
@@ -55,7 +55,7 @@ fn refresh_roots_with_channel_defers_unrelated_requests() {
     drop(client_tx);
 
     let mut output = Vec::new();
-    edge.refresh_roots_from_client_with_channel(&session_id, &client_rx, &mut output)
+    edge.refresh_roots_from_client_with_channel(&session_id, &mut client_rx, &mut output)
         .unwrap();
 
     let lines = String::from_utf8(output).unwrap();

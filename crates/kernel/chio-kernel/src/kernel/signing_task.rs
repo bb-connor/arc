@@ -136,6 +136,10 @@ pub(crate) const DEFAULT_MAX_SIGNING_QUEUED_BYTES: usize =
 /// so the semaphore can always vend at least one permit. A request whose
 /// preimage exceeds the budget is NOT queued at all (it inline-signs), so only
 /// preimages that fit the budget ever acquire permits.
+#[allow(
+    clippy::as_conversions,
+    reason = "Const conversion clamps to the smaller source and destination maximum before narrowing."
+)]
 const fn clamp_aggregate_permits(budget: usize) -> u32 {
     let ceiling = u32::MAX as usize;
     let clamped = if budget > ceiling { ceiling } else { budget };
@@ -152,6 +156,10 @@ const fn clamp_aggregate_permits(budget: usize) -> u32 {
 /// generic conversion saturates at `usize::MAX` so an operator-configured budget
 /// larger than the address space clamps to a representable, still-bounded value.
 #[allow(dead_code)]
+#[allow(
+    clippy::as_conversions,
+    reason = "Const conversion compares with usize::MAX and saturates before narrowing."
+)]
 const fn clamp_u64_to_usize(value: u64) -> usize {
     if value > usize::MAX as u64 {
         usize::MAX
@@ -427,7 +435,9 @@ impl SigningTaskHandle {
             backend,
             capacity,
             max_content_bytes,
-            aggregate_byte_budget: Arc::new(Semaphore::new(aggregate_budget_permits as usize)),
+            aggregate_byte_budget: Arc::new(Semaphore::new(
+                usize::try_from(aggregate_budget_permits).unwrap_or(usize::MAX),
+            )),
             aggregate_budget_permits,
             spawn_gate: Mutex::new(()),
             closed: AtomicBool::new(false),
@@ -441,7 +451,7 @@ impl SigningTaskHandle {
             backend,
             self.capacity,
             self.max_content_bytes,
-            self.aggregate_budget_permits as usize,
+            usize::try_from(self.aggregate_budget_permits).unwrap_or(usize::MAX),
         );
         next.closed
             .store(self.closed.load(Ordering::Acquire), Ordering::Release);
@@ -481,20 +491,19 @@ impl SigningTaskHandle {
         self.max_content_bytes != PER_REQUEST_BUDGET_UNLIMITED && len > self.max_content_bytes
     }
 
-    /// Number of aggregate-budget permits a preimage of `len` bytes must hold
-    /// while queued. Only ever called for a preimage that *fits* the budget
-    /// (`len <= aggregate_budget_permits`, guaranteed by
-    /// [`Self::exceeds_aggregate_budget`] being checked first), so this is a
-    /// direct `len as u32` with no clamp: a request whose byte count cannot fit
-    /// the queue under the advertised aggregate bound is NEVER enqueued (it
-    /// inline-signs instead, see [`Self::sign`]), so we never clamp-and-enqueue
-    /// an oversized buffer that would hold more bytes than the budget admits.
-    fn permits_for(&self, len: usize) -> u32 {
-        debug_assert!(
-            len <= self.aggregate_budget_permits as usize,
-            "permits_for must only run for a preimage that fits the aggregate budget",
-        );
-        len as u32
+    /// Checked aggregate-budget permits for a queued preimage. Callers route
+    /// oversized content to inline signing before enqueueing; this check also
+    /// refuses a count outside the semaphore range or the configured budget.
+    fn permits_for(&self, len: usize) -> Result<u32, KernelError> {
+        let permits = u32::try_from(len).map_err(|_| {
+            KernelError::ReceiptSigningFailed("signing preimage exceeds permit range".into())
+        })?;
+        if permits > self.aggregate_budget_permits {
+            return Err(KernelError::ReceiptSigningFailed(
+                "signing preimage exceeds aggregate budget".into(),
+            ));
+        }
+        Ok(permits)
     }
 
     /// Whether a `len`-byte preimage is too large to be queued under the
@@ -503,7 +512,7 @@ impl SigningTaskHandle {
     /// after clamping the permit count) would retain a buffer larger than the
     /// queue memory bound. It must inline-sign instead.
     fn exceeds_aggregate_budget(&self, len: usize) -> bool {
-        len > self.aggregate_budget_permits as usize
+        len > usize::try_from(self.aggregate_budget_permits).unwrap_or(usize::MAX)
     }
 
     /// Lazily spawn the signing task and return a reference to the
@@ -599,7 +608,9 @@ impl SigningTaskHandle {
         // Hole 2: non-blocking permit acquisition. If the aggregate budget is
         // exhausted we do NOT park holding the preimage; we report backpressure
         // and the caller inline-signs.
-        let permits = self.permits_for(canonical_content.len());
+        let Ok(permits) = self.permits_for(canonical_content.len()) else {
+            return EnqueueOutcome::Backpressure(body, canonical_content);
+        };
         let permit = match Arc::clone(&self.aggregate_byte_budget).try_acquire_many_owned(permits) {
             Ok(permit) => permit,
             Err(_) => {
@@ -762,7 +773,11 @@ impl SigningTaskHandle {
     /// back without re-allocating; boxing would force a heap allocation on
     /// every successful send. The lint is silenced because the size is a
     /// deliberate trade-off.
-    #[allow(dead_code, clippy::result_large_err)]
+    #[allow(
+        dead_code,
+        clippy::result_large_err,
+        reason = "Preserve the typed rejection and its source without allocating a box on the failure path."
+    )]
     pub(crate) fn try_sign(
         &self,
         body: ChioReceiptBody,
@@ -793,7 +808,9 @@ impl SigningTaskHandle {
         // exhausted the request is returned unsent (same "not enqueued"
         // contract as a full channel) rather than `.await`-ing, since this is
         // the non-blocking entrypoint.
-        let permits = self.permits_for(canonical_content.len());
+        let Ok(permits) = self.permits_for(canonical_content.len()) else {
+            return Err((body, canonical_content));
+        };
         let permit = match Arc::clone(&self.aggregate_byte_budget).try_acquire_many_owned(permits) {
             Ok(permit) => permit,
             Err(_) => return Err((body, canonical_content)),

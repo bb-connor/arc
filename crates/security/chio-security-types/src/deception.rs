@@ -7,6 +7,11 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 pub const MAX_ENCRYPTED_DECOY_ENVELOPE_BYTES: usize = 1_048_576;
 pub const MAX_DECOY_EXPORT_PAGE: u16 = 256;
+#[allow(
+    clippy::as_conversions,
+    reason = "The u16 bound 256 fits usize on every supported target; From is not const."
+)]
+const MAX_DECOY_EXPORT_PAGE_ITEMS: usize = MAX_DECOY_EXPORT_PAGE as usize;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -373,7 +378,7 @@ impl core::error::Error for DecoyScanError {}
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SealedDecoyPage {
-    pub records: BoundedVec<SealedDecoyRecord, { MAX_DECOY_EXPORT_PAGE as usize }>,
+    pub records: BoundedVec<SealedDecoyRecord, MAX_DECOY_EXPORT_PAGE_ITEMS>,
     pub next_artifact_token: Option<Digest32>,
 }
 

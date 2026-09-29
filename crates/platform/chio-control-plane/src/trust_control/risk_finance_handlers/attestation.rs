@@ -55,11 +55,14 @@ pub(crate) async fn handle_runtime_attestation_appraisal_import(
         return response;
     }
 
+    let now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    };
     Json::<RuntimeAttestationAppraisalImportReport>(
-        build_runtime_attestation_appraisal_import_report(
-            &request,
-            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
-        ),
+        build_runtime_attestation_appraisal_import_report(&request, now),
     )
     .into_response()
 }

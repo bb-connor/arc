@@ -335,7 +335,10 @@ pub struct BrokerDaemonHandler {
 }
 
 impl BrokerDaemonHandler {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new(
         tenant_scope: String,
         audience: String,

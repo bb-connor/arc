@@ -344,7 +344,7 @@ impl ApprovalSetReservationInput {
         proposal_deadline: u64,
     ) -> Result<Self, ApprovalStoreError> {
         validate_reservation_digest(&approval_set_hash, "approval_set_hash")?;
-        if proposal_deadline == 0 || proposal_deadline > i64::MAX as u64 {
+        if proposal_deadline == 0 || i64::try_from(proposal_deadline).is_err() {
             return Err(ApprovalStoreError::Invalid(
                 "proposal_deadline is outside the durable timestamp range".to_string(),
             ));
@@ -494,7 +494,7 @@ fn normalize_approval_reservation_members(
             .then_with(|| left.token_id.cmp(&right.token_id))
     });
     if members
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].token_digest == pair[1].token_digest)
     {
         return Err(ApprovalStoreError::Invalid(
@@ -506,7 +506,10 @@ fn normalize_approval_reservation_members(
         .map(|member| member.token_id.as_str())
         .collect::<Vec<_>>();
     token_ids.sort_unstable();
-    if token_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+    if token_ids
+        .array_windows::<2>()
+        .any(|pair| pair[0] == pair[1])
+    {
         return Err(ApprovalStoreError::Invalid(
             "approval token IDs contain a duplicate".to_string(),
         ));

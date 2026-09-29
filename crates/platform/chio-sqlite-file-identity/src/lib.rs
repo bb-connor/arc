@@ -41,23 +41,24 @@ pub fn main_database_file_identity(
 ) -> Result<SqliteFileIdentity, String> {
     let mut file = std::ptr::null_mut::<ffi::sqlite3_file>();
     let mut vfs = std::ptr::null_mut::<ffi::sqlite3_vfs>();
-    // SAFETY: `connection` keeps its sqlite3 handle alive for this call. Both
-    // opcodes are public SQLite APIs and receive correctly typed out-pointers.
-    let (file_result, vfs_result) = unsafe {
-        let handle = connection.handle();
-        (
-            ffi::sqlite3_file_control(
-                handle,
-                c"main".as_ptr(),
-                ffi::SQLITE_FCNTL_FILE_POINTER,
-                std::ptr::addr_of_mut!(file).cast(),
-            ),
-            ffi::sqlite3_file_control(
-                handle,
-                c"main".as_ptr(),
-                ffi::SQLITE_FCNTL_VFS_POINTER,
-                std::ptr::addr_of_mut!(vfs).cast(),
-            ),
+    // SAFETY: the borrowed connection keeps the handle alive throughout both calls.
+    let handle = unsafe { connection.handle() };
+    // SAFETY: FILE_POINTER receives a live handle and a correctly typed out-pointer.
+    let file_result = unsafe {
+        ffi::sqlite3_file_control(
+            handle,
+            c"main".as_ptr(),
+            ffi::SQLITE_FCNTL_FILE_POINTER,
+            std::ptr::addr_of_mut!(file).cast(),
+        )
+    };
+    // SAFETY: VFS_POINTER receives the same live handle and its typed out-pointer.
+    let vfs_result = unsafe {
+        ffi::sqlite3_file_control(
+            handle,
+            c"main".as_ptr(),
+            ffi::SQLITE_FCNTL_VFS_POINTER,
+            std::ptr::addr_of_mut!(vfs).cast(),
         )
     };
     if file_result != ffi::SQLITE_OK || file.is_null() {
@@ -73,17 +74,18 @@ pub fn main_database_file_identity(
 
     // SAFETY: SQLite returned `vfs` from the live connection. Its public
     // sqlite3_vfs fields remain valid while the connection is borrowed.
-    let (vfs_name, vfs_file_size) = unsafe {
-        let vfs = &*vfs;
-        let name = if vfs.zName.is_null() {
+    let vfs_header = unsafe { &*vfs };
+    let (vfs_name, vfs_file_size) = {
+        let name = if vfs_header.zName.is_null() {
             return Err("SQLite main VFS has no name".to_owned());
         } else {
-            CStr::from_ptr(vfs.zName)
+            // SAFETY: SQLite's live VFS supplies a non-null NUL-terminated name.
+            unsafe { CStr::from_ptr(vfs_header.zName) }
                 .to_str()
                 .map_err(|_| "SQLite main VFS name is not UTF-8".to_owned())?
                 .to_owned()
         };
-        (name, vfs.szOsFile)
+        (name, vfs_header.szOsFile)
     };
     if !vfs_name.starts_with("unix") {
         return Err(format!(

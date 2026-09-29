@@ -652,18 +652,23 @@ pub(crate) fn request_receipt_metadata_with_payee_binding(
     ))
 }
 
+pub(crate) fn checked_receipt_count(value: usize, field: &'static str) -> Result<u32, KernelError> {
+    u32::try_from(value)
+        .map_err(|_| KernelError::ReceiptSigningFailed(format!("{field} exceeds receipt range")))
+}
+
 pub(crate) fn receipt_attribution_metadata(
     capability: &CapabilityToken,
     matched_grant_index: Option<usize>,
-) -> Option<serde_json::Value> {
-    Some(serde_json::json!({
+) -> Result<Option<serde_json::Value>, KernelError> {
+    Ok(Some(serde_json::json!({
         "attribution": ReceiptAttributionMetadata {
             subject_key: capability.subject.to_hex(),
             issuer_key: capability.issuer.to_hex(),
-            delegation_depth: capability.delegation_chain.len() as u32,
-            grant_index: matched_grant_index.map(|index| index as u32),
+            delegation_depth: checked_receipt_count(capability.delegation_chain.len(), "delegation depth")?,
+            grant_index: matched_grant_index.map(u32::try_from).transpose().map_err(|_| KernelError::ReceiptSigningFailed("grant index exceeds receipt range".into()))?,
         }
-    }))
+    })))
 }
 
 pub(crate) fn request_model_metadata_receipt_metadata(

@@ -891,7 +891,10 @@ pub trait ReceiptStore: Send + Sync {
     }
 
     /// Persist a serialized `RequestLineageRecord` (JSON form).
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn record_request_lineage(
         &self,
         _session_id: &str,
@@ -906,7 +909,10 @@ pub trait ReceiptStore: Send + Sync {
     }
 
     /// Persist a serialized `ReceiptLineageStatement` (JSON form).
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn record_receipt_lineage_statement(
         &self,
         _child_receipt_id: &str,
@@ -1150,7 +1156,7 @@ impl ThresholdApprovalReplayReservationV1 {
         }
         tokens_with_digests.sort_by(|left, right| left.0.cmp(&right.0));
         if tokens_with_digests
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].0 == pair[1].0)
             || tokens_with_digests
                 .iter()
@@ -1223,7 +1229,10 @@ pub trait QualifiedAdmissionProjectionStore:
         begin: AdmissionPaymentSettlementBegin<'_>,
     ) -> Result<AdmissionPaymentSettlement, AdmissionPaymentJournalError>;
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn authorize_budget_and_commit_admission(
         &self,
         operation: &crate::admission_operation::AdmissionOperationV1,
@@ -1305,7 +1314,10 @@ pub trait QualifiedAdmissionProjectionStore:
     /// fuses both writes makes them one durable write and rolls the claim
     /// back with a refused or fenced authorization; this default persists
     /// and qualifies the claim first.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn claim_and_authorize_budget_and_commit_admission(
         &self,
         claim: crate::admission_operation::RecoveryClaimRequest<'_>,

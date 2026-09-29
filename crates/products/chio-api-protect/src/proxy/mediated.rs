@@ -183,7 +183,8 @@ pub(crate) fn build_mediation_kernel(
             DpopNonceStore::new(
                 DpopConfig::default().nonce_store_capacity,
                 std::time::Duration::from_secs(DpopConfig::default().proof_ttl_secs),
-            ),
+            )
+            .map_err(|error| ProtectError::Config(error.to_string()))?,
             DpopConfig::default(),
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;

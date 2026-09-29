@@ -1,3 +1,17 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 //! Chio Runtime Kernel.
 //!
 //! The kernel is the trusted computing base (TCB) of the Chio protocol.
@@ -19,7 +33,14 @@
 //! through an anonymous pipe or Unix domain socket and never learns the kernel's
 //! PID, address, or signing key.
 
-#![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )
+)]
 // Under `--cfg loom` only the `session` module below is compiled; every other
 // item is gated to `cfg(not(loom))`. The interleaving model in
 // tests/loom_concurrency.rs drives the real `Session` terminal-admission state

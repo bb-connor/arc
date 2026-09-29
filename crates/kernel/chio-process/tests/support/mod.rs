@@ -106,7 +106,7 @@ pub fn kernel_with_artifacts(
     )?;
     kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
     kernel.set_governed_approval_replay_store(Box::new(
-        chio_kernel::InMemoryGovernedApprovalReplayStore::new(64),
+        chio_kernel::InMemoryGovernedApprovalReplayStore::new(64)?,
     ));
     if nonce {
         let config = chio_kernel::execution_nonce::ExecutionNonceConfig {

@@ -200,7 +200,7 @@ pub(super) fn build_request_head(request: &PinnedHttpsRequest) -> Result<Zeroizi
         append_header(&mut head, &header.name, &header.value)?;
     }
     for header in &request.secret_headers {
-        append_header(&mut head, header.name(), header.value())?;
+        append_header(&mut head, header.name(), header.expose_secret())?;
     }
     head.extend_from_slice(b"\r\n");
     if head.len() > MAX_WIRE_BYTES {
@@ -314,10 +314,13 @@ fn parse_http_response(
         let separator = line.iter().position(|byte| *byte == b':').ok_or_else(|| {
             BrokerError::ResponseRejected("upstream response header is malformed".to_string())
         })?;
-        let name = std::str::from_utf8(&line[..separator]).map_err(|_| {
+        let (name, suffix) = line.split_at(separator);
+        let name = std::str::from_utf8(name).map_err(|_| {
             BrokerError::ResponseRejected("upstream response header name is invalid".to_string())
         })?;
-        let value = trim_optional_whitespace(&line[separator + 1..]);
+        let value = trim_optional_whitespace(suffix.strip_prefix(b":").ok_or_else(|| {
+            BrokerError::ResponseRejected("upstream response header is malformed".to_owned())
+        })?);
         let field = HeaderField::normalized(name, value).map_err(|_| {
             BrokerError::ResponseRejected("upstream response header is invalid".to_string())
         })?;
@@ -367,23 +370,24 @@ fn parse_http_response(
 }
 
 fn parse_status_line(line: &[u8]) -> Result<u16> {
-    if line.len() < 12
-        || &line[..9] != b"HTTP/1.1 "
-        || !line[9..12].iter().all(u8::is_ascii_digit)
-        || (line.len() > 12 && line[12] != b' ')
-        || line.get(13..).is_some_and(|reason| {
-            !reason
-                .iter()
-                .all(|byte| matches!(*byte, b'\t' | b' '..=b'~'))
-        })
+    let invalid =
+        || BrokerError::ResponseRejected("upstream HTTP status line is invalid".to_owned());
+    let rest = line.strip_prefix(b"HTTP/1.1 ").ok_or_else(invalid)?;
+    let [hundreds, tens, ones, suffix @ ..] = rest else {
+        return Err(invalid());
+    };
+    if ![hundreds, tens, ones]
+        .iter()
+        .all(|byte| byte.is_ascii_digit())
+        || (!suffix.is_empty() && !suffix.starts_with(b" "))
+        || !suffix
+            .iter()
+            .all(|byte| matches!(*byte, b'\t' | b' '..=b'~'))
     {
-        return Err(BrokerError::ResponseRejected(
-            "upstream HTTP status line is invalid".to_string(),
-        ));
+        return Err(invalid());
     }
-    let status = u16::from(line[9] - b'0') * 100
-        + u16::from(line[10] - b'0') * 10
-        + u16::from(line[11] - b'0');
+    let status =
+        u16::from(hundreds - b'0') * 100 + u16::from(tens - b'0') * 10 + u16::from(ones - b'0');
     if !(200..=599).contains(&status) {
         return Err(BrokerError::ResponseRejected(
             "informational or invalid HTTP status is unsupported".to_string(),
@@ -500,7 +504,8 @@ fn read_chunked_body(reader: &mut impl Read, body_limit: usize) -> Result<Vec<u8
         }
         let previous = body.len();
         body.resize(new_length, 0);
-        read_exact_response(reader, &mut body[previous..])?;
+        let (_, chunk) = body.split_at_mut(previous);
+        read_exact_response(reader, chunk)?;
         let mut terminator = [0_u8; 2];
         read_exact_response(reader, &mut terminator)?;
         if terminator != *b"\r\n" {
@@ -546,18 +551,13 @@ fn read_exact_response(reader: &mut impl Read, buffer: &mut [u8]) -> Result<()> 
         .map_err(|_| BrokerError::Upstream("upstream response read failed".to_string()))
 }
 
-fn trim_optional_whitespace(mut value: &[u8]) -> &[u8] {
-    while value
-        .first()
-        .is_some_and(|byte| matches!(*byte, b' ' | b'\t'))
-    {
-        value = &value[1..];
+fn trim_optional_whitespace(value: &[u8]) -> &[u8] {
+    let mut value = value;
+    while let Some((b' ' | b'\t', rest)) = value.split_first() {
+        value = rest;
     }
-    while value
-        .last()
-        .is_some_and(|byte| matches!(*byte, b' ' | b'\t'))
-    {
-        value = &value[..value.len() - 1];
+    while let Some((b' ' | b'\t', rest)) = value.split_last() {
+        value = rest;
     }
     value
 }
@@ -582,6 +582,35 @@ mod tests {
         BrokerDestination, BrokerRequest, CallerOptions, RedirectPolicy, RequestConstraints,
     };
     use crate::provider::{CredentialPlacement, GenericCredentialProvider};
+
+    #[test]
+    fn status_parser_rejects_truncation_and_non_http_whitespace() {
+        let line = b"HTTP/1.1 200 OK";
+        for prefix in 0..12 {
+            assert!(matches!(
+                parse_status_line(&line[..prefix]),
+                Err(BrokerError::ResponseRejected(_))
+            ));
+        }
+        for line in [
+            b"HTTP/1.1 200\tOK".as_slice(),
+            b"HTTP/1.1 20x OK",
+            b"HTTP/1.0 200 OK",
+            b"HTTP/1.1 200 O\x0bK",
+            b"HTTP/1.1 600 NO",
+        ] {
+            assert!(matches!(
+                parse_status_line(line),
+                Err(BrokerError::ResponseRejected(_))
+            ));
+        }
+        assert_eq!(
+            parse_status_line(b"HTTP/1.1 200").test_expect("valid status"),
+            200
+        );
+        assert_eq!(trim_optional_whitespace(b" \tvalue\t "), b"value");
+        assert_eq!(trim_optional_whitespace(b"\rvalue\n"), b"\rvalue\n");
+    }
 
     #[test]
     fn strict_parser_accepts_only_fixed_or_plain_chunked_bodies() {

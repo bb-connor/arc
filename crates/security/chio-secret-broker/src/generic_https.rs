@@ -70,7 +70,7 @@ impl PinnedHttpsRequest {
     pub(crate) fn secret_headers(&self) -> impl Iterator<Item = (&str, &[u8])> {
         self.secret_headers
             .iter()
-            .map(|header| (header.name(), header.value()))
+            .map(|header| (header.name(), header.expose_secret()))
     }
 
     #[cfg(test)]
@@ -378,7 +378,7 @@ impl GenericHttpsExecutor {
                     return Err(error);
                 }
             };
-            if contains_secret(&body, credential.as_bytes()) {
+            if contains_secret(&body, credential.expose_secret()) {
                 body.zeroize();
                 zeroize_headers(&mut headers);
                 return Err(BrokerError::ResponseRejected(
@@ -559,9 +559,9 @@ fn sanitize_response_headers(
     }
     if headers.iter().any(|header| {
         let normalized_name = Zeroizing::new(header.name.to_ascii_lowercase());
-        contains_secret(&header.value, credential.as_bytes())
-            || contains_secret(header.name.as_bytes(), credential.as_bytes())
-            || contains_secret(normalized_name.as_bytes(), credential.as_bytes())
+        contains_secret(&header.value, credential.expose_secret())
+            || contains_secret(header.name.as_bytes(), credential.expose_secret())
+            || contains_secret(normalized_name.as_bytes(), credential.expose_secret())
     }) {
         zeroize_headers(&mut headers);
         return Err(BrokerError::ResponseRejected(

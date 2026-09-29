@@ -635,7 +635,10 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
 }
 
 impl SqliteToolOutcomeStore {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn stage_post_return_evaluation_tx(
         &self,
         transaction: &Transaction<'_>,
@@ -685,7 +688,10 @@ impl SqliteToolOutcomeStore {
         Ok(next.clone())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn finalize_post_return_tx(
         &self,
         transaction: &Transaction<'_>,
@@ -1163,7 +1169,10 @@ fn insert_outcome_tx(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn update_outcome_tx(
     transaction: &Transaction<'_>,
     operation_id: &AdmissionOperationId,
@@ -1248,7 +1257,10 @@ fn insert_evaluation_tx(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn update_evaluation_tx(
     transaction: &Transaction<'_>,
     operation_id: &AdmissionOperationId,
@@ -1615,5 +1627,9 @@ fn invariant(detail: impl Into<String>) -> ToolOutcomeStoreError {
 
 #[cfg(test)]
 #[path = "tool_outcome_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

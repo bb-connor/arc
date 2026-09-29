@@ -39,7 +39,10 @@ pub fn commit_fiscal_state_advance(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub fn commit_fiscal_activation(
     store: &SqliteFiscalStore,
     anchor: &dyn FiscalStateAnchor,
@@ -74,7 +77,10 @@ pub fn commit_fiscal_activation(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub fn commit_fiscal_charter_rotation(
     store: &SqliteFiscalStore,
     anchor: &dyn FiscalStateAnchor,
@@ -113,7 +119,10 @@ pub fn commit_fiscal_charter_rotation(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn finish_fiscal_state_advance(
     store: &SqliteFiscalStore,
     anchor: &dyn FiscalStateAnchor,

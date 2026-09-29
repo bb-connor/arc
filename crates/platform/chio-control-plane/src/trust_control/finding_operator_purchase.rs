@@ -169,7 +169,10 @@ pub struct FindingOperatorPurchaseExecutor {
 }
 
 impl FindingOperatorPurchaseExecutor {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new(
         storage: FindingOperatorPurchaseStorage,
         market: FindingMarketConfig,
@@ -512,7 +515,8 @@ impl FindingOperatorPurchaseExecutor {
                 DpopNonceStore::new(
                     dpop.nonce_store_capacity,
                     std::time::Duration::from_secs(dpop.proof_ttl_secs),
-                ),
+                )
+                .map_err(execution_internal)?,
                 dpop,
             )
             .map_err(execution_internal)?;
@@ -779,7 +783,10 @@ impl FindingOperatorPurchaseExecutor {
         Ok(Some(job))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn prepare_purchase_job(
         &self,
         buyer: &AuthenticatedFindingBuyer,
@@ -1039,7 +1046,7 @@ impl FindingOperatorPurchaseExecutor {
         authenticated: &AuthenticatedFindingBuyer,
         request: &FindingPurchaseRequest,
     ) -> Result<FindingPurchaseResult, FindingPurchaseExecutionError> {
-        if request.max_price.units > i64::MAX as u64 {
+        if i64::try_from(request.max_price.units).is_err() {
             return Err(FindingPurchaseExecutionError::Rejected(
                 "maximum price exceeds the durable payment range".to_owned(),
             ));

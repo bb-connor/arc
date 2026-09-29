@@ -754,7 +754,7 @@ impl SqliteTemporalCorrelationPort {
         rules.sort_by(|left, right| {
             (left.policy_version(), left.rule_id()).cmp(&(right.policy_version(), right.rule_id()))
         });
-        if rules.windows(2).any(|pair| {
+        if rules.array_windows::<2>().any(|pair| {
             pair[0].policy_version() == pair[1].policy_version()
                 && pair[0].rule_id() == pair[1].rule_id()
         }) {

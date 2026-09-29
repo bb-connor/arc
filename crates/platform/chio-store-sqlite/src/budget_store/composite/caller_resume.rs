@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Resume an approved caller reservation without replaying its superseded
 //! pre-approval authorization event or acquiring another hold.
 use super::*;

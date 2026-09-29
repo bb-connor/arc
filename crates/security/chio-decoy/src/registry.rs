@@ -210,7 +210,7 @@ impl RegistryKeyRing {
             {
                 return Err(RegistryError::IntegrityFailure);
             }
-            if legacy[..index].iter().any(|existing| {
+            if legacy.iter().take(index).any(|existing| {
                 existing.version() == candidate.version()
                     || same_registry_key(existing.key.key(), candidate.key.key())
             }) {

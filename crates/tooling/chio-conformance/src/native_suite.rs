@@ -1089,7 +1089,8 @@ fn evaluate_artifact_assertion(
         }
         NativeAssertionKind::DpopProofValid => {
             let dpop = fixture.dpop_case()?;
-            let nonce_store = DpopNonceStore::new(32, Duration::from_secs(60));
+            let nonce_store = DpopNonceStore::new(32, Duration::from_secs(60))
+                .map_err(chio_kernel::KernelError::from)?;
             let actual = verify_dpop_proof(
                 dpop.proof,
                 dpop.capability,

@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Zed editor extension for Chio.
 //!
 //! Spawns the `chio-lsp` binary via Zed's LSP adapter API and wires

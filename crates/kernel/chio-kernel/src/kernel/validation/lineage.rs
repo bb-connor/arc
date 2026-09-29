@@ -41,7 +41,9 @@ impl ChioKernel {
         if cap.delegation_chain.len() <= 1 || !cap.requires_chain_binding() {
             return Ok(Vec::new());
         }
-        if cap.delegation_chain.len() > self.config.max_delegation_depth as usize {
+        if usize::try_from(self.config.max_delegation_depth)
+            .is_ok_and(|limit| cap.delegation_chain.len() > limit)
+        {
             return Err("delegation chain exceeds configured maximum depth".to_string());
         }
         cap.delegation_chain

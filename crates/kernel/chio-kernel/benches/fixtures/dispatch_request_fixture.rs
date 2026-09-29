@@ -20,6 +20,7 @@ use chio_kernel::{
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
+use chio_test_support::prelude::*;
 use tokio::runtime::{Builder, Runtime};
 
 const SERVER_ID: &str = "bench-dispatch-srv";
@@ -100,7 +101,8 @@ impl DispatchAllowFixture {
                 SessionId::new(session_id.clone()),
                 guard_agent_id.clone(),
                 vec![capability.clone()],
-            )?,
+            )
+            .test_expect("valid dispatch benchmark session"),
         );
 
         let fixture = Self {

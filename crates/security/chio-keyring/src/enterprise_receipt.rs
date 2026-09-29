@@ -95,11 +95,14 @@ impl KeyEnterpriseReceiptBody {
                     .ok_or(KeyringError::NumericRange)?
             || self.checkpoint_sequence != self.event_sequence
             || self.event_signers.is_empty()
-            || self.event_signers.windows(2).any(|pair| pair[0] >= pair[1])
+            || self
+                .event_signers
+                .array_windows::<2>()
+                .any(|pair| pair[0] >= pair[1])
             || self.witness_signatures.len() > MAX_WITNESS_SIGNATURES
             || self
                 .witness_signatures
-                .windows(2)
+                .array_windows::<2>()
                 .any(|pair| pair[0].witness_id >= pair[1].witness_id)
         {
             return Err(KeyringError::StateInvariant(
@@ -436,7 +439,7 @@ fn validate_receipt_identifier(value: &str, kind: &'static str) -> Result<()> {
 fn validate_source_receipt_ids(ids: &[String]) -> Result<()> {
     if ids.len() > MAX_SOURCE_RECEIPT_IDS
         || ids
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].as_bytes() >= pair[1].as_bytes())
     {
         return Err(KeyringError::StateInvariant(

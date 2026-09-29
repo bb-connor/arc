@@ -35,7 +35,10 @@ pub(crate) enum PreflightNonceSource {
 }
 
 impl ChioKernel {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn build_allow_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -95,7 +98,7 @@ impl ChioKernel {
                     merge_metadata_objects(receipt_content.metadata, request_metadata),
                     extra_metadata,
                 ),
-                receipt_attribution_metadata(cap, matched_grant_index),
+                receipt_attribution_metadata(cap, matched_grant_index)?,
             ),
             memory_read_metadata,
         );
@@ -160,7 +163,10 @@ impl ChioKernel {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn build_execution_nonce_preflight_allow_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -184,7 +190,7 @@ impl ChioKernel {
                 merge_metadata_objects(receipt_content.metadata, request_metadata),
                 extra_metadata,
             ),
-            receipt_attribution_metadata(cap, matched_grant_index),
+            receipt_attribution_metadata(cap, matched_grant_index)?,
         );
 
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
@@ -227,7 +233,10 @@ impl ChioKernel {
                 } => {
                     let envelope = crate::budget_store::ReservedHoldEnvelope {
                         budget_total: charge.budget_total,
-                        delegation_depth: cap.delegation_chain.len() as u32,
+                        delegation_depth: crate::receipt_support::checked_receipt_count(
+                            cap.delegation_chain.len(),
+                            "delegation depth",
+                        )?,
                         root_budget_holder: cap.issuer.to_hex(),
                     };
                     if let Err(error) = self.with_budget_store(|store| {
@@ -252,7 +261,10 @@ impl ChioKernel {
                 } => {
                     let envelope = crate::budget_store::ReservedHoldEnvelope {
                         budget_total: None,
-                        delegation_depth: cap.delegation_chain.len() as u32,
+                        delegation_depth: crate::receipt_support::checked_receipt_count(
+                            cap.delegation_chain.len(),
+                            "delegation depth",
+                        )?,
                         root_budget_holder: cap.issuer.to_hex(),
                     };
                     if let Err(error) = self.with_budget_store(|store| {

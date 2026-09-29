@@ -7,12 +7,15 @@ fn source(
     bytes: usize,
     legacy: bool,
 ) -> AnchoredTestResult<Source> {
-    let raw = Arc::new(DpopNonceStore::new_with_identity_byte_capacity(
-        count,
-        per_capability,
-        bytes,
-        Duration::from_secs(3600),
-    ));
+    let raw = Arc::new(
+        DpopNonceStore::new_with_identity_byte_capacity(
+            count,
+            per_capability,
+            bytes,
+            Duration::from_secs(3600),
+        )
+        .expect("positive replay store test capacities"),
+    );
     if legacy {
         assert!(raw.check_and_insert("legacy-nonce", "original-capability")?);
     }

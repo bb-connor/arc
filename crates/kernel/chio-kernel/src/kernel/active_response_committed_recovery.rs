@@ -1147,7 +1147,9 @@ fn validate_approval_cleanup_actions(
         .collect::<Vec<_>>();
     if require_completed {
         if terminal_actions.len() != 1
-            || terminal_actions[0].state() != AdmissionCleanupActionState::Completed
+            || terminal_actions
+                .first()
+                .is_none_or(|action| action.state() != AdmissionCleanupActionState::Completed)
         {
             return Err(never_committed_internal(
                 "terminal governed response lacks one completed signed receipt outbox",
@@ -1417,6 +1419,10 @@ fn record_id_is_zero_sentinel(value: &RecordId) -> bool {
     !value.as_str().is_empty() && value.as_str().bytes().all(|byte| byte == b'0')
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Both masked nibbles are at most 15 and the alphabet contains exactly 16 entries."
+)]
 fn digest_hex(digest: &Digest32) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(64);

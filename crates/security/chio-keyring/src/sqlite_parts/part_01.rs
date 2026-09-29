@@ -1335,16 +1335,16 @@ fn build_sync_response_page(
     let commit_end = activation_commits
         .partition_point(|commit| commit.body.checkpoint_sequence <= candidate_checkpoint_sequence);
     let consistency_proof = if event_start > 0 && event_start < page_end {
-        let leaves = canonical_event_leaves(&events[..page_end])?;
+        let leaves = canonical_event_leaves(events.get(..page_end).ok_or(KeyringError::NumericRange)?)?;
         Some(MerkleTree::from_leaves(&leaves)?.consistency_proof_record(event_start)?)
     } else {
         None
     };
     Ok(KeyLogSyncResponse {
         base_checkpoint_hash,
-        checkpoints: checkpoints[checkpoint_start..checkpoint_end].to_vec(),
-        event_envelopes: events[event_start..page_end].to_vec(),
-        activation_commits: activation_commits[commit_start..commit_end].to_vec(),
+        checkpoints: checkpoints.get(checkpoint_start..checkpoint_end).ok_or(KeyringError::NumericRange)?.to_vec(),
+        event_envelopes: events.get(event_start..page_end).ok_or(KeyringError::NumericRange)?.to_vec(),
+        activation_commits: activation_commits.get(commit_start..commit_end).ok_or(KeyringError::NumericRange)?.to_vec(),
         consistency_proof,
     })
 }

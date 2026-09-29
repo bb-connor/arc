@@ -4,7 +4,8 @@ use crate::dpop::{replay_source::DpopReplaySourcePort, DpopNonceStore};
 use std::time::Duration;
 
 fn snapshot() -> DpopReplaySourceSnapshot {
-    let store = DpopNonceStore::new_with_per_capability_capacity(8, 4, Duration::from_secs(60));
+    let store = DpopNonceStore::new_with_per_capability_capacity(8, 4, Duration::from_secs(60))
+        .expect("positive replay store test capacities");
     store
         .check_and_insert_through("a-private-nonce", "cap", u64::MAX)
         .unwrap();
@@ -139,7 +140,8 @@ fn even_valid_reencoded_data_is_not_a_live_seal() {
         AdmissionIdentifier::try_new("destination", "substituted").unwrap();
     let substituted = DpopReplaySourceSnapshot::new(body).unwrap();
     assert_ne!(first.inventory_sha256(), substituted.inventory_sha256());
-    let fresh = DpopNonceStore::new(8, Duration::from_secs(60));
+    let fresh = DpopNonceStore::new(8, Duration::from_secs(60))
+        .expect("positive replay store test capacities");
     assert!(fresh.seal_exact(&substituted).is_err());
     assert!(fresh.verify_exact(&substituted).is_err());
 }

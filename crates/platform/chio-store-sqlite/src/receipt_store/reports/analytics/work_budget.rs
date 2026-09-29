@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Limit SQLite work even when a filter returns few or no matching receipts.
 
 use super::*;
@@ -19,12 +20,13 @@ impl<'connection> SqlWorkBudget<'connection> {
         let exhausted = Arc::new(AtomicBool::new(false));
         let signal = Arc::clone(&exhausted);
         let mut remaining = steps;
+        let interval = crate::integer::checked::<_, u64>(PROGRESS_INTERVAL)?;
         connection.progress_handler(
             PROGRESS_INTERVAL,
             Some(move || {
                 // Exhaustion, including a partial final interval, must become
                 // zero so this callback interrupts the query immediately.
-                remaining = remaining.saturating_sub(PROGRESS_INTERVAL as u64);
+                remaining = remaining.saturating_sub(interval);
                 let stop = remaining == 0;
                 if stop {
                     signal.store(true, Ordering::Relaxed);

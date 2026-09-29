@@ -310,7 +310,10 @@ impl ResponsePlan {
             effect_ids.push(effect.effect_id.as_str());
         }
         effect_ids.sort_unstable();
-        if effect_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        if effect_ids
+            .array_windows::<2>()
+            .any(|pair| pair[0] == pair[1])
+        {
             return Err(ResponseShapeError::DuplicateEffectId);
         }
         if lineage_scoped
@@ -1465,11 +1468,13 @@ fn record_id_is_zero_sentinel(record_id: &RecordId) -> bool {
     let value = record_id.as_str();
     value.char_indices().any(|(index, character)| {
         if character != '0'
-            || (index > 0 && !matches!(value.as_bytes()[index - 1], b'_' | b'-' | b':'))
+            || (index > 0 && !matches!(value.as_bytes().get(index - 1), Some(b'_' | b'-' | b':')))
         {
             return false;
         }
-        let candidate = &value[index..];
+        let Some(candidate) = value.get(index..) else {
+            return false;
+        };
         candidate.bytes().filter(|byte| *byte == b'0').count() >= 32
             && candidate
                 .bytes()

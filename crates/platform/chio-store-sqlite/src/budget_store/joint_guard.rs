@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 impl SqliteBudgetStore {
@@ -128,7 +129,10 @@ impl SqliteBudgetStore {
                   AND projection_kind = 'composite_v1'
             )
             "#,
-            rusqlite::params![capability_id, grant_index as i64],
+            rusqlite::params![
+                capability_id,
+                crate::integer::checked::<_, i64>(grant_index)?
+            ],
             |row| row.get::<_, bool>(0),
         )?;
         if exists {

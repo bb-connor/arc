@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use std::error::Error;
 use std::io::{self, BufRead, Write};
 

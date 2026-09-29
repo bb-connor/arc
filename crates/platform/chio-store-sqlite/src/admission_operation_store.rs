@@ -628,7 +628,10 @@ impl SqliteAdmissionOperationStore {
             .map_err(map_budget_capture_error)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn authorize_budget_and_commit_admission(
         &self,
         operation: &AdmissionOperationV1,
@@ -651,7 +654,10 @@ impl SqliteAdmissionOperationStore {
     }
 
     /// Claim recovery and authorize the budget hold in one durable write.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn claim_and_authorize_budget_and_commit_admission(
         &self,
         claim: RecoveryClaimRequest<'_>,
@@ -677,7 +683,10 @@ impl SqliteAdmissionOperationStore {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn authorize_budget_and_commit_admission_under(
         &self,
         recovery: RecoveryAuthority<'_, '_>,
@@ -1608,7 +1617,11 @@ impl From<AdmissionOperationStoreError> for SqliteServingOwnerError {
 
 #[cfg(test)]
 #[path = "admission_operation_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
 
 #[cfg(all(test, unix))]

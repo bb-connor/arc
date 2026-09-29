@@ -178,7 +178,10 @@ impl VerifiedAdmissionReceipt {
     /// attachment: the actual output remains in privileged durable outcome
     /// evidence while the public receipt carries only the deterministic
     /// redaction binding, mirroring the other non-`Completed` terminals.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn from_kernel_verified_denied_after_delivery(
         receipt: ChioReceipt,
         expected_kernel_public_key: &PublicKey,
@@ -206,7 +209,10 @@ impl VerifiedAdmissionReceipt {
     }
 
     #[cfg(any(test, feature = "admission-test-support"))]
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn from_kernel_verified_for_test(
         receipt: ChioReceipt,
         expected_kernel_public_key: &PublicKey,
@@ -237,7 +243,10 @@ impl VerifiedAdmissionReceipt {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn qualify(
         receipt: ChioReceipt,
         expected_kernel_public_key: &PublicKey,
@@ -444,7 +453,7 @@ impl AdmissionProjectionManifestV1 {
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
         if self.records.is_empty()
-            || self.records.windows(2).any(|pair| {
+            || self.records.array_windows::<2>().any(|pair| {
                 let left = (pair[0].kind.as_str(), pair[0].record_id.as_str());
                 let right = (pair[1].kind.as_str(), pair[1].record_id.as_str());
                 left >= right
@@ -746,7 +755,11 @@ pub struct GovernedEconomicMutationResultBinding {
 
 impl GovernedEconomicMutationResultBinding {
     #[cfg(test)]
-    #[allow(clippy::too_many_arguments, dead_code)]
+    #[allow(
+        clippy::too_many_arguments,
+        dead_code,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn from_verified(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Verification boundary for supplemental invocation quotas.
 //!
 //! The kernel treats supplemental authorization artifacts as opaque bytes. A
@@ -783,7 +784,7 @@ impl CanonicalRevocationSet {
             return Err(SupplementalQuotaError::EmptyRevocationId);
         }
         ids.sort_unstable_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
-        if let Some(duplicate) = ids.windows(2).find(|pair| pair[0] == pair[1]) {
+        if let Some(duplicate) = ids.array_windows::<2>().find(|pair| pair[0] == pair[1]) {
             return Err(SupplementalQuotaError::DuplicateRevocationId(
                 duplicate[0].clone(),
             ));
@@ -869,7 +870,7 @@ fn validate_canonical_revocation_ids(ids: &[String]) -> Result<(), SupplementalQ
     if ids.iter().any(String::is_empty) {
         return Err(SupplementalQuotaError::EmptyRevocationId);
     }
-    for pair in ids.windows(2) {
+    for pair in ids.array_windows::<2>() {
         if pair[0] == pair[1] {
             return Err(SupplementalQuotaError::DuplicateRevocationId(
                 pair[0].clone(),

@@ -136,7 +136,7 @@ pub(super) fn insert_event(
     observed: u64,
     fence: &StoreMutationFence,
 ) -> Result<(), AdmissionOperationStoreError> {
-    if sequence != record.events.len() as u64 + 1 || !(1..=3).contains(&sequence) {
+    if sequence != crate::integer::count(record.events.len()) + 1 || !(1..=3).contains(&sequence) {
         return Err(integrity_error("invalid migration event transition"));
     }
     if record
@@ -358,9 +358,10 @@ fn load_bounded_record(
                 .validate_transition_time(event.observed_at_unix_ms)
                 .map_err(|error| error.to_string())?;
         }
-        if event.sequence != index as u64 + 1
+        if event.sequence != crate::integer::count(index) + 1
             || event.mutation_kind
-                != migration_mutation(index as u64 + 1).map_err(|error| error.to_string())?
+                != migration_mutation(crate::integer::count(index) + 1)
+                    .map_err(|error| error.to_string())?
             || event.expectation_digest != record.expectation_digest
             || event.inventory_sha256 != record.snapshot.inventory_sha256()
             || event.fence.store_uuid != record.snapshot.destination_authority_id()

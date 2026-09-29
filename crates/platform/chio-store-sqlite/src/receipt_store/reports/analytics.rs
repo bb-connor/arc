@@ -216,15 +216,21 @@ impl<'bind> AnalyticsScan<'bind> {
 }
 
 impl AnalyticsScope {
-    fn from_query(query: &ReceiptAnalyticsQuery) -> Self {
-        Self {
+    fn from_query(query: &ReceiptAnalyticsQuery) -> Result<Self, ReceiptStoreError> {
+        Ok(Self {
             capability_id: query.capability_id.clone(),
             tool_server: query.tool_server.clone(),
             tool_name: query.tool_name.clone(),
-            since: query.since.map(|value| value as i64),
-            until: query.until.map(|value| value as i64),
+            since: query
+                .since
+                .map(crate::integer::checked::<_, i64>)
+                .transpose()?,
+            until: query
+                .until
+                .map(crate::integer::checked::<_, i64>)
+                .transpose()?,
             agent_subject: query.agent_subject.clone(),
-        }
+        })
     }
 
     /// Build the scan for one dimension.
@@ -416,13 +422,15 @@ impl SqliteReceiptStore {
             query.read_context.as_ref(),
             "receipt analytics report",
         )?;
-        let group_limit = query
-            .group_limit
-            .unwrap_or(50)
-            .clamp(1, MAX_ANALYTICS_GROUP_LIMIT) as i64;
+        let group_limit = crate::integer::checked::<_, i64>(
+            query
+                .group_limit
+                .unwrap_or(50)
+                .clamp(1, MAX_ANALYTICS_GROUP_LIMIT),
+        )?;
         let time_bucket = query.time_bucket.unwrap_or(AnalyticsTimeBucket::Day);
-        let bucket_width = time_bucket.width_secs() as i64;
-        let scope = AnalyticsScope::from_query(query);
+        let bucket_width = crate::integer::checked::<_, i64>(time_bucket.width_secs())?;
+        let scope = AnalyticsScope::from_query(query)?;
 
         let connection = self.connection()?;
         register_cost_aggregates(&connection)?;
@@ -474,11 +482,12 @@ impl SqliteReceiptStore {
             let by_time = snapshot
                 .prepare(&time_sql)?
                 .query_map(time_scan.params(), |row| {
-                    let bucket_start = row.get::<_, i64>(0)?.max(0) as u64;
+                    let bucket_start =
+                        u64::try_from(row.get::<_, i64>(0)?.max(0)).unwrap_or_default();
                     Ok(TimeAnalyticsRow {
                         bucket_start,
                         bucket_end: bucket_start
-                            .saturating_add(bucket_width.max(1) as u64)
+                            .saturating_add(u64::try_from(bucket_width.max(1)).unwrap_or_default())
                             .saturating_sub(1),
                         metrics: metrics_from_row(row, 1)?,
                     })

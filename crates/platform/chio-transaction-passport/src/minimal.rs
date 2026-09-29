@@ -3,7 +3,7 @@ use std::path::{Component, Path};
 
 use chio_core_types::{
     canonical::{canonical_json_bytes, canonical_json_bytes_from_str},
-    crypto::{Keypair, Signature, SigningAlgorithm},
+    crypto::{Keypair, Signature},
     hashing::Hash,
     merkle::{leaf_hash, MerkleProof},
     PublicKey,
@@ -1255,11 +1255,9 @@ fn transparency_anchor_state(
 /// and over the hex encoding for every other algorithm, prefixed with
 /// `local-log-`.
 fn checkpoint_log_id(kernel_key: &PublicKey) -> String {
-    let log_key_bytes: Vec<u8> = match kernel_key.algorithm() {
-        SigningAlgorithm::Ed25519 => kernel_key.as_bytes().to_vec(),
-        SigningAlgorithm::P256 | SigningAlgorithm::P384 | SigningAlgorithm::Hybrid => {
-            kernel_key.to_hex().into_bytes()
-        }
+    let log_key_bytes: Vec<u8> = match kernel_key.ed25519_bytes() {
+        Ok(bytes) => bytes.to_vec(),
+        Err(_) => kernel_key.to_hex().into_bytes(),
     };
     format!("local-log-{}", super::sha256_hex(&log_key_bytes))
 }

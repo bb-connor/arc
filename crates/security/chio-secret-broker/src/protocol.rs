@@ -38,7 +38,7 @@ pub(crate) fn is_well_formed_broker_execute_diagnostic_code(code: &str) -> bool 
         && bytes
             .iter()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_')
-        && !bytes.windows(2).any(|pair| pair == b"__")
+        && !bytes.array_windows::<2>().any(|pair| pair == b"__")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -282,9 +282,15 @@ pub struct RequestConstraints {
 
 impl RequestConstraints {
     pub fn validate(&self) -> Result<()> {
-        if self.maximum_body_bytes > MAX_BODY_BYTES as u64
+        if self.maximum_body_bytes
+            > u64::try_from(MAX_BODY_BYTES).map_err(|_| {
+                BrokerError::Invariant("configured byte limit exceeds u64".to_owned())
+            })?
             || self.maximum_response_bytes == 0
-            || self.maximum_response_bytes > MAX_RESPONSE_BYTES as u64
+            || self.maximum_response_bytes
+                > u64::try_from(MAX_RESPONSE_BYTES).map_err(|_| {
+                    BrokerError::Invariant("configured byte limit exceeds u64".to_owned())
+                })?
             || self.maximum_timeout_ms == 0
             || self.maximum_timeout_ms > MAX_TIMEOUT_MS
         {
@@ -427,7 +433,10 @@ impl CallerOptions {
         if self.timeout_ms == 0
             || self.timeout_ms > MAX_TIMEOUT_MS
             || self.response_limit_bytes == 0
-            || self.response_limit_bytes > MAX_RESPONSE_BYTES as u64
+            || self.response_limit_bytes
+                > u64::try_from(MAX_RESPONSE_BYTES).map_err(|_| {
+                    BrokerError::Invariant("configured byte limit exceeds u64".to_owned())
+                })?
         {
             return Err(BrokerError::InvalidRequest(
                 "caller options exceed broker limits".to_string(),
@@ -594,7 +603,7 @@ pub fn normalize_headers(
         .collect::<Result<Vec<_>>>()?;
     normalized.sort_unstable_by(|left, right| left.name.cmp(&right.name));
     if normalized
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].name == pair[1].name)
     {
         return Err(BrokerError::InvalidRequest(
@@ -630,7 +639,7 @@ fn validate_normalized_header_names(names: &[String]) -> Result<()> {
             ));
         }
     }
-    if names.windows(2).any(|pair| pair[0] >= pair[1]) {
+    if names.array_windows::<2>().any(|pair| pair[0] >= pair[1]) {
         return Err(BrokerError::InvalidRequest(
             "header names must be strictly sorted".to_string(),
         ));

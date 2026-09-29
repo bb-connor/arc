@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Example-facing fixture command library for the Chio three-vendor corpus.
 
 mod commands;

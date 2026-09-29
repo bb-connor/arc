@@ -491,7 +491,7 @@ fn registered_composite_execution(
             .filter(|attempt| attempt.invocation_id == "request-1")
             .collect();
         assert_eq!(original.len(), if strict_nonce { 2 } else { 1 });
-        assert!(original.windows(2).all(|pair| pair[0] == pair[1]));
+        assert!(original.array_windows::<2>().all(|pair| pair[0] == pair[1]));
         assert_eq!(original[0].quotas.len(), 3);
     }
     Ok(())

@@ -2555,7 +2555,7 @@ fn transparency_checkpoint_keypair() -> Keypair {
 fn transparency_checkpoint_log_id() -> String {
     format!(
         "local-log-{}",
-        sha256_hex(transparency_checkpoint_keypair().public_key().as_bytes())
+        sha256_hex(&transparency_checkpoint_keypair().public_key_bytes())
     )
 }
 

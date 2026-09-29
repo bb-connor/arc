@@ -242,11 +242,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "web3 test module with public-settlement review regressions; capped until split",
         max_lines=2_697,
     ),
-    "crates/kernel/chio-runtime-proof-parity/src/lib.rs": allow(
-        "2026-10-31",
-        "runtime proof parity surface; capped to current size until split",
-        max_lines=1_058,
-    ),
     "crates/kernel/chio-swarm-authority/src/verifier.rs": allow(
         "2026-10-31",
         "swarm authority verifier surface; capped to current size until split",

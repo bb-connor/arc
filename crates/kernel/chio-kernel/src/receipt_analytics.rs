@@ -162,6 +162,10 @@ pub struct ReceiptAnalyticsResponse {
     pub by_time: Vec<TimeAnalyticsRow>,
 }
 
+#[allow(
+    clippy::as_conversions,
+    reason = "This observational ratio intentionally approximates u64 counters as floating point."
+)]
 fn ratio_option(numerator: u128, denominator: u128) -> Option<f64> {
     if denominator == 0 {
         None

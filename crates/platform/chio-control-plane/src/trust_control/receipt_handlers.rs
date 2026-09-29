@@ -610,7 +610,15 @@ pub(crate) async fn handle_record_settlement_reconciliation(
             receipt_id: request.receipt_id,
             reconciliation_state: request.reconciliation_state,
             note: request.note,
-            updated_at: updated_at as u64,
+            updated_at: match u64::try_from(updated_at) {
+                Ok(value) => value,
+                Err(_) => {
+                    return plain_http_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "persisted reconciliation timestamp is negative",
+                    )
+                }
+            },
         })
         .into_response(),
         Err(ReceiptStoreError::NotFound(message)) => {
@@ -804,7 +812,15 @@ pub(crate) async fn handle_record_metered_billing_reconciliation(
             evidence,
             reconciliation_state: request.reconciliation_state,
             note: request.note,
-            updated_at: updated_at as u64,
+            updated_at: match u64::try_from(updated_at) {
+                Ok(value) => value,
+                Err(_) => {
+                    return plain_http_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "persisted reconciliation timestamp is negative",
+                    )
+                }
+            },
         })
         .into_response(),
         Err(ReceiptStoreError::NotFound(message)) => {

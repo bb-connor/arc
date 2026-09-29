@@ -1,6 +1,6 @@
 use std::fmt;
 
-use zeroize::Zeroizing;
+use secrecy::{ExposeSecret, SecretBox};
 
 use crate::protocol::CredentialRef;
 use crate::Result;
@@ -10,18 +10,18 @@ pub(crate) trait SecretBackend: Send + Sync {
 }
 
 pub(crate) struct SecretMaterial {
-    bytes: Zeroizing<Vec<u8>>,
+    bytes: SecretBox<Vec<u8>>,
 }
 
 impl SecretMaterial {
     pub(crate) fn new(bytes: Vec<u8>) -> Self {
         Self {
-            bytes: Zeroizing::new(bytes),
+            bytes: SecretBox::new(Box::new(bytes)),
         }
     }
 
-    pub(crate) fn as_bytes(&self) -> &[u8] {
-        self.bytes.as_slice()
+    pub(crate) fn expose_secret(&self) -> &[u8] {
+        self.bytes.expose_secret()
     }
 }
 
@@ -57,6 +57,16 @@ mod tests {
 
     impl<T> SerializeAmbiguity<()> for TraitProbe<T> {}
     impl<T: serde::Serialize> SerializeAmbiguity<u8> for TraitProbe<T> {}
+
+    #[test]
+    fn secret_material_keeps_the_original_allocation() {
+        let mut bytes = Vec::with_capacity(1024);
+        bytes.extend_from_slice(b"credential-with-spare-capacity");
+        let allocation = bytes.as_ptr();
+        let secret = SecretMaterial::new(bytes);
+        assert_eq!(secret.expose_secret().as_ptr(), allocation);
+        assert_eq!(secret.expose_secret(), b"credential-with-spare-capacity");
+    }
 
     #[test]
     fn display_never_exposes_secret_bytes() {

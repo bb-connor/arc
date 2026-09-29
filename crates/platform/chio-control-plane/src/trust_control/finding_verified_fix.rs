@@ -792,7 +792,7 @@ fn recipe_dependencies(
         "shell": "sh",
     }))
     .map_err(string_error)?;
-    let blobs = vec![
+    let blobs = [
         baseline,
         candidate,
         parameters,
@@ -800,10 +800,7 @@ fn recipe_dependencies(
         runner_manifest,
         runtime_fingerprint,
     ];
-    let digests = blobs
-        .iter()
-        .map(|blob| sha256_hex(blob))
-        .collect::<Vec<_>>();
+    let digests = blobs.each_ref().map(|blob| sha256_hex(blob));
     Ok(RecipeDependencies {
         baseline_input_sha256: digests[0].clone(),
         candidate_input_sha256: digests[1].clone(),
@@ -909,7 +906,8 @@ fn build_profile(
             },
         ],
         checkpoint_logs: vec![FindingCheckpointLogPolicy {
-            log_id: chio_finding::finding_checkpoint_log_id(&checkpoint_key.public_key()),
+            log_id: chio_finding::finding_checkpoint_log_id(&checkpoint_key.public_key())
+                .map_err(string_error)?,
             signer: local_policy(
                 "verified-fix-checkpoint",
                 checkpoint_key,
@@ -951,7 +949,10 @@ fn build_profile(
     SignedExportEnvelope::sign(body, &keys.governance_root).map_err(string_error)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn build_finding(
     seller: &FindingOperatorSellerProfile,
     context_sha256: &str,
@@ -1027,7 +1028,12 @@ fn build_fee_schedule(
                 slashable: true,
             },
         ],
-        issued_by: profile.market.fee_schedule_operator_keys[0].clone(),
+        issued_by: profile
+            .market
+            .fee_schedule_operator_keys
+            .first()
+            .ok_or_else(|| "fee schedule requires an operator signing key".to_owned())?
+            .clone(),
         issued_at: Some(issued_at),
         expires_at: None,
         note: Some("single-operator cognition-market pilot".to_owned()),
@@ -1037,7 +1043,10 @@ fn build_fee_schedule(
     SignedOpenMarketFeeSchedule::sign(artifact, signer).map_err(string_error)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn build_terms(
     seller: &FindingOperatorSellerProfile,
     finding: &Finding,
@@ -1080,7 +1089,10 @@ fn build_terms(
     SignedExportEnvelope::sign(terms, &seller_key).map_err(string_error)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn build_seller_authorization(
     seller: &FindingOperatorSellerProfile,
     finding: &Finding,
@@ -1113,7 +1125,10 @@ fn build_seller_authorization(
     SignedExportEnvelope::sign(authorization, &seller_key).map_err(string_error)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn build_backing(
     seller: &FindingOperatorSellerProfile,
     collateral: &Keypair,
@@ -1164,7 +1179,10 @@ fn build_backing(
     SignedExportEnvelope::sign(backing, collateral).map_err(string_error)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn build_listing(
     profile: &FindingOperatorProfile,
     signer: &Keypair,
@@ -1425,7 +1443,10 @@ fn signer_status_trust(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn verifier_trust(
     market: &super::FindingMarketConfig,
     verifier_profile: &SignedFindingChallengeVerifierProfile,

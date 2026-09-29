@@ -61,7 +61,7 @@ pub fn validate_egress_restriction_snapshot(
     }
     let contributions = snapshot.contributions.as_slice();
     if contributions
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].effect_id >= pair[1].effect_id)
         || (snapshot.highest_fencing_token == 0 && !contributions.is_empty())
         || snapshot.generation

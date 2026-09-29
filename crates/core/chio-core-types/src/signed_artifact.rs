@@ -1215,6 +1215,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA, None),
 ];
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Both fixed arrays have SIGNED_ARTIFACT_SCHEMA_SPECS.len() elements and the loop checks the index against that length."
+)]
 const fn known_signed_artifact_schemas() -> [&'static str; SIGNED_ARTIFACT_SCHEMA_SPECS.len()] {
     let mut schemas = [""; SIGNED_ARTIFACT_SCHEMA_SPECS.len()];
     let mut index = 0;

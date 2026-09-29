@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 use std::collections::HashMap;
@@ -67,7 +68,7 @@ impl SqliteBudgetStore {
                     if !captured {
                         self.capture_invocation_reservations(BudgetCaptureInvocationRequest {
                             capability_id: capability_id.clone(),
-                            grant_index: grant_index as usize,
+                            grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                             hold_id: hold_id.clone(),
                             event_id: format!("{hold_id}:reap-capture-invocation"),
                             trusted_time: None,
@@ -77,7 +78,7 @@ impl SqliteBudgetStore {
                     if exposure > 0 {
                         self.reconcile_budget_hold(BudgetReconcileHoldRequest {
                             capability_id: capability_id.clone(),
-                            grant_index: grant_index as usize,
+                            grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                             exposed_cost_units: exposure,
                             realized_spend_units: realized.min(exposure),
                             hold_id: Some(hold_id.clone()),
@@ -91,7 +92,7 @@ impl SqliteBudgetStore {
                     if exposure > 0 {
                         self.reconcile_budget_hold(BudgetReconcileHoldRequest {
                             capability_id: capability_id.clone(),
-                            grant_index: grant_index as usize,
+                            grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                             exposed_cost_units: exposure,
                             realized_spend_units: exposure,
                             hold_id: Some(hold_id.clone()),
@@ -104,7 +105,7 @@ impl SqliteBudgetStore {
                 None => {
                     self.reverse_budget_hold(BudgetReverseHoldRequest {
                         capability_id: capability_id.clone(),
-                        grant_index: grant_index as usize,
+                        grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                         reversed_exposure_units: exposure,
                         hold_id: Some(hold_id.clone()),
                         event_id: Some(format!("{hold_id}:reap-reverse")),
@@ -164,7 +165,7 @@ impl SqliteBudgetStore {
             if !captured {
                 self.capture_invocation_reservations(BudgetCaptureInvocationRequest {
                     capability_id: capability_id.clone(),
-                    grant_index: grant_index as usize,
+                    grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                     hold_id: hold_id.clone(),
                     event_id: format!("{hold_id}:ttl-reap-capture-invocation"),
                     trusted_time: None,
@@ -174,7 +175,7 @@ impl SqliteBudgetStore {
             if remaining > 0 {
                 self.reconcile_budget_hold(BudgetReconcileHoldRequest {
                     capability_id,
-                    grant_index: grant_index as usize,
+                    grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                     exposed_cost_units: remaining,
                     realized_spend_units: remaining,
                     hold_id: Some(hold_id.clone()),
@@ -211,8 +212,8 @@ impl SqliteBudgetStore {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)? as u32,
-                row.get::<_, i64>(3)? as u64,
+                crate::integer::checked::<_, u32>(row.get::<_, i64>(2)?)?,
+                crate::integer::checked::<_, u64>(row.get::<_, i64>(3)?)?,
                 row.get::<_, i64>(4)? > 0,
                 authority,
             ))
@@ -251,8 +252,11 @@ impl SqliteBudgetStore {
                 reserved_until_unix_secs,
                 currency,
                 payment_reference,
-                envelope.budget_total.map(|value| value as i64),
-                envelope.delegation_depth as i64,
+                envelope
+                    .budget_total
+                    .map(crate::integer::checked::<_, i64>)
+                    .transpose()?,
+                crate::integer::checked::<_, i64>(envelope.delegation_depth)?,
                 envelope.root_budget_holder,
             ],
         )?;
@@ -295,10 +299,13 @@ impl SqliteBudgetStore {
             params![
                 hold_id,
                 capability_id,
-                grant_index as i64,
+                crate::integer::checked::<_, i64>(grant_index)?,
                 reserved_until_unix_secs,
-                envelope.budget_total.map(|value| value as i64),
-                envelope.delegation_depth as i64,
+                envelope
+                    .budget_total
+                    .map(crate::integer::checked::<_, i64>)
+                    .transpose()?,
+                crate::integer::checked::<_, i64>(envelope.delegation_depth)?,
                 envelope.root_budget_holder,
                 self.unix_now()?,
             ],
@@ -353,19 +360,25 @@ impl SqliteBudgetStore {
                     Ok(BudgetHoldSnapshot {
                         hold_id: row.get::<_, String>(0)?,
                         capability_id: row.get::<_, String>(1)?,
-                        grant_index: row.get::<_, i64>(2)? as usize,
-                        authorized_exposure_units: row.get::<_, i64>(3)? as u64,
-                        remaining_exposure_units: row.get::<_, i64>(4)? as u64,
+                        grant_index: crate::integer::checked::<_, usize>(row.get::<_, i64>(2)?)?,
+                        authorized_exposure_units: crate::integer::checked::<_, u64>(
+                            row.get::<_, i64>(3)?,
+                        )?,
+                        remaining_exposure_units: crate::integer::checked::<_, u64>(
+                            row.get::<_, i64>(4)?,
+                        )?,
                         disposition,
                         reserved_until: row.get::<_, Option<i64>>(6)?,
                         reserved_currency: row.get::<_, Option<String>>(10)?,
                         reserved_payment_reference: row.get::<_, Option<String>>(11)?,
                         reserved_budget_total: row
                             .get::<_, Option<i64>>(12)?
-                            .map(|value| value as u64),
+                            .map(crate::integer::checked::<_, u64>)
+                            .transpose()?,
                         reserved_delegation_depth: row
                             .get::<_, Option<i64>>(13)?
-                            .map(|value| value as u32),
+                            .map(crate::integer::checked::<_, u32>)
+                            .transpose()?,
                         reserved_root_budget_holder: row.get::<_, Option<String>>(14)?,
                         authority,
                     })
@@ -453,8 +466,8 @@ impl SqliteBudgetStore {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)? as u32,
-                row.get::<_, i64>(3)? as u64,
+                crate::integer::checked::<_, u32>(row.get::<_, i64>(2)?)?,
+                crate::integer::checked::<_, u64>(row.get::<_, i64>(3)?)?,
                 row.get::<_, i64>(4)? != 0,
                 authority,
             ))
@@ -468,7 +481,11 @@ impl SqliteBudgetStore {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_kernel::budget_store::{

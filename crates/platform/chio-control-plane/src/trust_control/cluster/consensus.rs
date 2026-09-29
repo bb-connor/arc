@@ -187,7 +187,12 @@ pub(crate) fn build_cluster_state(
         last_leader_url: persisted_leader_url,
         term_started_at: None,
         lease_expires_at: None,
-        lease_ttl_ms: authority_lease_ttl(config.cluster_sync_interval).as_millis() as u64,
+        lease_ttl_ms: u64::try_from(authority_lease_ttl(config.cluster_sync_interval).as_millis())
+            .map_err(|_| {
+                CliError::cli_other_error(
+                    "authority lease duration exceeds milliseconds field".to_owned(),
+                )
+            })?,
     }))))
 }
 

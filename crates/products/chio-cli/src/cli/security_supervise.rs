@@ -168,13 +168,11 @@ fn readiness(
 /// records the same outcome it would have seen from the service itself.
 #[cfg(unix)]
 fn end_by_signal(number: i32) -> ! {
-    // SAFETY: signal(2) and raise(2) are called with a valid signal number
-    // after the runtime and every handler it installed have been dropped;
-    // restoring the default disposition and raising ends the process.
-    unsafe {
-        libc::signal(number, libc::SIG_DFL);
-        libc::raise(number);
-    }
+    // SAFETY: the runtime and its handlers have been dropped. SIG_DFL is a
+    // valid disposition for the signal reported by the supervised child.
+    unsafe { libc::signal(number, libc::SIG_DFL) };
+    // SAFETY: the same valid signal now has its default disposition installed.
+    unsafe { libc::raise(number) };
     std::process::exit(128 + number)
 }
 

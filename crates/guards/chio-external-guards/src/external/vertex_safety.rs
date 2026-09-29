@@ -12,7 +12,7 @@
 //!
 //! Authentication uses a bearer token (typically an OAuth access token
 //! minted from a service account). Like the Bedrock adapter, we accept
-//! the token as a [`Zeroizing<String>`] so tokens don't linger in memory.
+//! the token as a [`SecretString`] so tokens don't linger in memory.
 
 use std::time::Duration;
 
@@ -21,9 +21,9 @@ use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Client;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 
 use super::bedrock::classify_status_error;
 use super::http_egress;
@@ -65,7 +65,7 @@ impl VertexProbability {
 #[derive(Clone)]
 pub struct VertexSafetyConfig {
     /// Bearer token (OAuth access token).
-    pub api_key: Zeroizing<String>,
+    pub api_key: SecretString,
     /// GCP project ID.
     pub project: String,
     /// Region, e.g. `us-central1`.
@@ -104,7 +104,7 @@ impl VertexSafetyConfig {
         model: impl Into<String>,
     ) -> Self {
         Self {
-            api_key: Zeroizing::new(api_key.into()),
+            api_key: SecretString::from(api_key.into()),
             project: project.into(),
             location: location.into(),
             model: model.into(),
@@ -313,7 +313,7 @@ impl ExternalGuard for VertexSafetyGuard {
 
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        let auth = format!("Bearer {}", self.cfg.api_key.as_str());
+        let auth = format!("Bearer {}", self.cfg.api_key.expose_secret());
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(&auth)

@@ -116,7 +116,7 @@ impl ThresholdApprovalRequirement {
             );
         }
         if eligible_approvers
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].identifier == pair[1].identifier)
         {
             return Err("threshold approval identifiers must be unique".to_string());
@@ -131,7 +131,10 @@ impl ThresholdApprovalRequirement {
             .map(|approver| approver.public_key.to_hex())
             .collect::<Vec<_>>();
         key_fingerprints.sort();
-        if key_fingerprints.windows(2).any(|pair| pair[0] == pair[1]) {
+        if key_fingerprints
+            .array_windows::<2>()
+            .any(|pair| pair[0] == pair[1])
+        {
             return Err("threshold approval public keys must be unique".to_string());
         }
         let approver_count = u32::try_from(eligible_approvers.len())
@@ -199,7 +202,11 @@ fn is_sha256_digest(value: &str) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use crate::crypto::Keypair;

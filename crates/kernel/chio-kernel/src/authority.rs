@@ -159,7 +159,10 @@ pub fn validate_issued_capability_response_at(
 }
 
 /// Deterministically validate a security-bound issuance response.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub fn validate_issued_capability_response_with_binding_at(
     capability: &CapabilityToken,
     requested_subject: &PublicKey,
@@ -183,7 +186,10 @@ pub fn validate_issued_capability_response_with_binding_at(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn validate_issued_response_at(
     capability: &CapabilityToken,
     requested_subject: &PublicKey,

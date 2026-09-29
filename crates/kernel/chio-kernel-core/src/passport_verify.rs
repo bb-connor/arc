@@ -255,11 +255,15 @@ mod payload_bytes_hex {
         decode_hex(&hex_str).map_err(serde::de::Error::custom)
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "Each masked nibble is in 0..16 and NIBBLES has 16 entries."
+    )]
     fn encode_hex(bytes: &[u8]) -> String {
         let mut out = String::with_capacity(bytes.len() * 2);
         for byte in bytes {
-            let hi = NIBBLES[(byte >> 4) as usize];
-            let lo = NIBBLES[(byte & 0x0f) as usize];
+            let hi = NIBBLES[usize::from(byte >> 4)];
+            let lo = NIBBLES[usize::from(byte & 0x0f)];
             out.push(hi);
             out.push(lo);
         }
@@ -272,12 +276,8 @@ mod payload_bytes_hex {
         }
         let bytes_in = hex_str.as_bytes();
         let mut out = Vec::with_capacity(bytes_in.len() / 2);
-        let mut idx = 0;
-        while idx < bytes_in.len() {
-            let hi = from_hex_nibble(bytes_in[idx])?;
-            let lo = from_hex_nibble(bytes_in[idx + 1])?;
-            out.push((hi << 4) | lo);
-            idx += 2;
+        for [hi, lo] in bytes_in.as_chunks::<2>().0 {
+            out.push((from_hex_nibble(*hi)? << 4) | from_hex_nibble(*lo)?);
         }
         Ok(out)
     }

@@ -1170,7 +1170,7 @@ fn insert_operation(
     Ok(())
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, reason = "The tuple preserves the complete typed database row at this existing storage boundary.")]
 fn load_operation(
     connection: &Connection,
     operation_id: &str,

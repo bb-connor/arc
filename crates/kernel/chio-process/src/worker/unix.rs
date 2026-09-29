@@ -102,6 +102,10 @@ async fn handle_connection(mut stream: UnixStream, service: WorkerService) {
     let _ = tokio::time::timeout(FRAME_TIMEOUT, stream.write_all(&response)).await;
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The read count is bounded by the provided buffer; newline position is within that initialized prefix."
+)]
 async fn read_frame(stream: &mut UnixStream) -> io::Result<Vec<u8>> {
     let mut frame = Vec::new();
     let mut buffer = [0_u8; 8192];

@@ -60,9 +60,9 @@ impl RetainedEgressFence {
         fn invalid<T>(_: T) -> PortError {
             PortError::integrity_failure()
         }
-        if values.len() != 12 {
-            return Err(PortError::integrity_failure());
-        }
+        let values: &[ValueRef<'_>; 12] = values
+            .try_into()
+            .map_err(|_| PortError::integrity_failure())?;
         let fence_id = RecordId::new(text(values, 0)?).map_err(invalid)?;
         let key = FlowStateKey {
             tenant_id: TenantId::new(text(values, 1)?).map_err(invalid)?,
@@ -125,7 +125,9 @@ impl RetainedEgressFence {
 }
 
 fn text<'row>(values: &[ValueRef<'row>], column: usize) -> PortResult<&'row str> {
-    let value = values[column]
+    let value = values
+        .get(column)
+        .ok_or_else(PortError::integrity_failure)?
         .as_str()
         .map_err(|_| PortError::integrity_failure())?;
     // All fence identifiers use the existing 256-byte domain bound. Check the

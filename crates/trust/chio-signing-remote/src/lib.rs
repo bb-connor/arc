@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Remote signing implementations for hosted Chio deployments.
 //!
 //! Both backends pin an explicit public key and key version. A successful
@@ -695,7 +696,7 @@ mod tests {
                     "9": {
                         "creation_time": "2026-08-28T00:00:00Z",
                         "name": "ed25519",
-                        "public_key": BASE64_STANDARD.encode(returned.public_key().as_bytes())
+                        "public_key": BASE64_STANDARD.encode(returned.public_key_bytes())
                     }
                 },
                 "latest_version": 9,

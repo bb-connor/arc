@@ -237,7 +237,7 @@ pub fn derive_liability_key(
         identity.vault_contract,
         identity.vault_id,
     ] {
-        preimage.extend_from_slice(&(component.len() as u64).to_be_bytes());
+        preimage.extend_from_slice(&(crate::integer::count(component.len())).to_be_bytes());
         preimage.extend_from_slice(component.as_bytes());
     }
     sha256_hex(&preimage)
@@ -961,7 +961,10 @@ impl FindingChallengeCoordinator {
     }
 
     /// Build with custody-backed signers and an injected commit clock.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new_with_signing_backends_and_status_commit_clock(
         challenges: SqliteFindingChallengeStore,
         purchases: SqliteFindingPurchaseStore,

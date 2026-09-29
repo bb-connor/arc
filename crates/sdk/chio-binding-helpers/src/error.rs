@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
+    UntrustedInput,
     InvalidPublicKey,
     InvalidHex,
     InvalidSignature,
@@ -89,6 +90,7 @@ impl Error {
 
 fn core_error_code(error: &chio_core::Error) -> ErrorCode {
     match error {
+        chio_core::Error::UntrustedInput(_) => ErrorCode::UntrustedInput,
         chio_core::Error::InvalidPublicKey(_) => ErrorCode::InvalidPublicKey,
         chio_core::Error::InvalidHex(_) => ErrorCode::InvalidHex,
         chio_core::Error::InvalidSignature(_) => ErrorCode::InvalidSignature,

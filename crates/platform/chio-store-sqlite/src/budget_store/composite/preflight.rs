@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Preflight uses the ordinary accounting engine but cannot acquire execution authority.
 
 use super::*;
@@ -72,7 +73,7 @@ pub(crate) fn verify_preflight_hold(
     })?;
     if hold.admission.operation_id != identity.budget_operation_id().as_str()
         || hold.capability_id != operation.binding().capability_id().as_str()
-        || hold.grant_index != identity.grant_index() as usize
+        || hold.grant_index != crate::integer::checked::<_, usize>(identity.grant_index())?
     {
         return Err(BudgetStoreError::Invariant(
             "nonce preflight physical ownership changed".into(),

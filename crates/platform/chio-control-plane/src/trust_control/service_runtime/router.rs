@@ -809,7 +809,11 @@ mod finding_wedge_purchase_e2e_tests;
 
 #[cfg(all(test, unix))]
 #[path = "finding_challenge_enforcement_e2e_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod finding_challenge_enforcement_e2e_tests;
 
 /// The bounded single-operator cognition-market qualification composes the

@@ -1168,7 +1168,7 @@ fn snapshot_export_is_consistent_while_another_connection_commits() {
         assert_eq!(snapshot.covered_head, last_event.event_seq);
         assert!(snapshot
             .mutation_events
-            .windows(2)
+            .array_windows::<2>()
             .all(|pair| pair[1].event_seq == pair[0].event_seq + 1));
         let usage = snapshot
             .usages

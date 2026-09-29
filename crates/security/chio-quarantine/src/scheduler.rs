@@ -724,6 +724,10 @@ fn executor_error_code(error: &ExecutorError) -> Result<ErrorCode, SchedulerErro
     error_code(error.code())
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The table has exactly 16 entries and each masked nibble is in 0..16."
+)]
 fn hex_bytes(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(bytes.len() * 2);

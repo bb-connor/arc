@@ -271,7 +271,7 @@ pub(crate) fn non_negative_u64_from_column(
     if value < 0 {
         return Err(negative_lineage_integer_error(column, field_name, value));
     }
-    Ok(value as u64)
+    Ok(crate::integer::checked::<_, u64>(value)?)
 }
 
 fn negative_lineage_integer_error(
@@ -340,7 +340,7 @@ impl SqliteReceiptStore {
             issued_at,
             expires_at,
             grants_json: grants_json.clone(),
-            delegation_depth: token.delegation_chain.len() as u64,
+            delegation_depth: crate::integer::count(token.delegation_chain.len()),
             parent_capability_id: token
                 .delegation_chain
                 .last()
@@ -682,6 +682,10 @@ impl SqliteReceiptStore {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 #[path = "capability_lineage_tests.rs"]
 mod tests;

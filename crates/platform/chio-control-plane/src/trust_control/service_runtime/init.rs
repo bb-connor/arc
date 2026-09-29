@@ -221,7 +221,7 @@ async fn serve_async_inner(
     let router = apply_server_hygiene(router::build_router(state), &hygiene);
 
     info!(listen_addr = %local_addr, "serving Chio trust control service");
-    eprintln!("Chio trust control service listening on http://{local_addr}");
+    tracing::info!(%local_addr, "Chio trust control service listening");
 
     let listener = MaxConnListener::new(listener, hygiene.max_connections.unwrap_or(usize::MAX));
     let server = axum::serve(listener, router).with_graceful_shutdown(controller.signalled());

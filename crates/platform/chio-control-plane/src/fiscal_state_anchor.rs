@@ -79,7 +79,7 @@ impl RemoteFiscalStateAnchorConfig {
         crate::anchor_egress::strict_https_contract(
             &endpoint,
             "control-plane.fiscal-state-anchor",
-            FISCAL_STATE_TRANSPORT_LIMIT as u64,
+            crate::integer::count(FISCAL_STATE_TRANSPORT_LIMIT),
         )
         .map_err(FiscalStateAnchorConfigError::InvalidEgressContract)?;
         let genesis = self
@@ -113,7 +113,7 @@ impl HttpsFiscalStateAnchorTransport {
         let egress_contract = crate::anchor_egress::strict_https_contract(
             &endpoint,
             "control-plane.fiscal-state-anchor",
-            FISCAL_STATE_TRANSPORT_LIMIT as u64,
+            crate::integer::count(FISCAL_STATE_TRANSPORT_LIMIT),
         )
         .map_err(FiscalStateAnchorConfigError::InvalidEgressContract)?;
         // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
@@ -163,11 +163,11 @@ impl FiscalStateAnchorTransport for HttpsFiscalStateAnchorTransport {
         }
         let mut body = Vec::new();
         response
-            .take(FISCAL_STATE_TRANSPORT_LIMIT as u64 + 1)
+            .take(crate::integer::count(FISCAL_STATE_TRANSPORT_LIMIT) + 1)
             .read_to_end(&mut body)
             .map_err(|_| FiscalStateAnchorError::Unavailable)?;
         self.egress_contract
-            .enforce_response_bytes(body.len() as u64)
+            .enforce_response_bytes(crate::integer::count(body.len()))
             .map_err(|_| FiscalStateAnchorError::Unavailable)?;
         Ok(body)
     }
@@ -310,11 +310,12 @@ fn valid_bearer_token(value: &str) -> bool {
         .iter()
         .position(|byte| *byte == b'=')
         .unwrap_or(bytes.len());
+    let (token, padding) = bytes.split_at(unpadded_len);
     unpadded_len > 0
-        && bytes[..unpadded_len].iter().all(|byte| {
+        && token.iter().all(|byte| {
             byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'+' | b'/')
         })
-        && bytes[unpadded_len..].iter().all(|byte| *byte == b'=')
+        && padding.iter().all(|byte| *byte == b'=')
 }
 
 #[cfg(test)]

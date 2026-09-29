@@ -91,7 +91,10 @@ pub(crate) struct PostAdmissionDropGuard<'a> {
 }
 
 impl<'a> PostAdmissionDropGuard<'a> {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn new(
         kernel: &'a ChioKernel,
         request: &'a ToolCallRequest,
@@ -143,8 +146,8 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// this returns `Ok`; the caller disarms only on success, so the disarmed
     /// drop then flushes an empty buffer and never double-records.
     pub(crate) fn record_buffered_child_receipts(&mut self) -> Result<(), KernelError> {
-        while !self.child_receipts.is_empty() {
-            self.kernel.record_child_receipt(&self.child_receipts[0])?;
+        while let Some(receipt) = self.child_receipts.first() {
+            self.kernel.record_child_receipt(receipt)?;
             self.child_receipts.remove(0);
         }
         Ok(())

@@ -53,14 +53,22 @@ pub(super) fn verify_signed_lineage(
         verify_capability_base(parent, trusted, clock, floor, aggregate, cumulative)?;
         verify_delegation_chain_shape(parent)?;
         let child = ancestors.get(index + 1).unwrap_or(token);
-        let link = &token.delegation_chain[index];
+        let link = token
+            .delegation_chain
+            .get(index)
+            .ok_or_else(|| invalid("missing signed delegation link"))?;
         if parent.issuer != token.issuer
             || parent.id != link.capability_id
             || parent.subject != link.delegator
             || child.subject != link.delegatee
             || canonical_json_bytes(&parent.delegation_chain).map_err(map_optional_feature_error)?
-                != canonical_json_bytes(&&token.delegation_chain[..index])
-                    .map_err(map_optional_feature_error)?
+                != canonical_json_bytes(
+                    &token
+                        .delegation_chain
+                        .get(..index)
+                        .ok_or_else(|| invalid("invalid delegation prefix"))?,
+                )
+                .map_err(map_optional_feature_error)?
         {
             return Err(invalid(
                 "signed ancestor does not match the exact delegation prefix",

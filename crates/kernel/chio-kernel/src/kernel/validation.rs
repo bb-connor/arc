@@ -812,7 +812,9 @@ impl ChioKernel {
                         link.capability_id, index
                     ))
                 })?;
-            let expected_depth = index as u64;
+            let expected_depth = u64::try_from(index).map_err(|_| {
+                KernelError::DelegationInvalid("delegation depth exceeds lineage range".into())
+            })?;
             if snapshot.delegation_depth != expected_depth {
                 return Err(KernelError::DelegationInvalid(format!(
                     "delegation ancestor {} at link index {} has stored depth {}, expected {}",
@@ -822,7 +824,8 @@ impl ChioKernel {
 
             let expected_parent_capability_id = index
                 .checked_sub(1)
-                .map(|parent_index| cap.delegation_chain[parent_index].capability_id.as_str());
+                .and_then(|parent_index| cap.delegation_chain.get(parent_index))
+                .map(|parent| parent.capability_id.as_str());
             if snapshot.parent_capability_id.as_deref() != expected_parent_capability_id {
                 let observed_parent = snapshot.parent_capability_id.as_deref().unwrap_or("<root>");
                 let expected_parent = expected_parent_capability_id.unwrap_or("<root>");
@@ -835,8 +838,12 @@ impl ChioKernel {
             ancestor_snapshots.push(snapshot);
         }
 
-        for (index, link) in cap.delegation_chain.iter().enumerate() {
-            let parent_snapshot = &ancestor_snapshots[index];
+        for (index, (link, parent_snapshot)) in cap
+            .delegation_chain
+            .iter()
+            .zip(&ancestor_snapshots)
+            .enumerate()
+        {
             let parent_scope = scope_from_capability_snapshot(parent_snapshot)?;
 
             if parent_snapshot.subject_key != link.delegator.to_hex() {
@@ -1739,7 +1746,10 @@ impl ChioKernel {
             .is_none_or(|server| server.measures_realized_cost())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn finalize_unmeasured_cost_provisional_allow(
         &self,
         request: &ToolCallRequest,
@@ -1757,7 +1767,10 @@ impl ChioKernel {
             self.reverse_budget_charge(&cap.id, &charge)?
         };
         let financial = FinancialReceiptMetadata {
-            grant_index: charge.grant_index as u32,
+            grant_index: crate::receipt_support::checked_receipt_count(
+                charge.grant_index,
+                "grant index",
+            )?,
             cost_charged: 0,
             currency: charge.currency.clone(),
             budget_remaining: financial_budget_remaining(
@@ -1765,7 +1778,10 @@ impl ChioKernel {
                 reverse.committed_cost_units_after,
             )?,
             budget_total: charge.budget_total,
-            delegation_depth: cap.delegation_chain.len() as u32,
+            delegation_depth: crate::receipt_support::checked_receipt_count(
+                cap.delegation_chain.len(),
+                "delegation depth",
+            )?,
             root_budget_holder: cap.issuer.to_hex(),
             payment_reference: None,
             settlement_status: SettlementStatus::Pending,
@@ -1813,7 +1829,10 @@ impl ChioKernel {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub(crate) fn finalize_budgeted_tool_output_with_cost_and_metadata(
         &self,
         request: &ToolCallRequest,
@@ -1886,12 +1905,18 @@ impl ChioKernel {
                 }
                 let (payment_reference, settlement_status) = settlement.into_receipt_parts();
                 let financial = FinancialReceiptMetadata {
-                    grant_index: matched_grant_index as u32,
+                    grant_index: crate::receipt_support::checked_receipt_count(
+                        matched_grant_index,
+                        "grant index",
+                    )?,
                     cost_charged: quoted_units,
                     currency: quoted_currency,
                     budget_remaining: None,
                     budget_total: None,
-                    delegation_depth: cap.delegation_chain.len() as u32,
+                    delegation_depth: crate::receipt_support::checked_receipt_count(
+                        cap.delegation_chain.len(),
+                        "delegation depth",
+                    )?,
                     root_budget_holder: cap.issuer.to_hex(),
                     payment_reference,
                     settlement_status,
@@ -2085,7 +2110,10 @@ impl ChioKernel {
 
         let budget_remaining =
             financial_budget_remaining(charge.budget_total, running_committed_cost_units)?;
-        let delegation_depth = cap.delegation_chain.len() as u32;
+        let delegation_depth = crate::receipt_support::checked_receipt_count(
+            cap.delegation_chain.len(),
+            "delegation depth",
+        )?;
         let root_budget_holder = cap.issuer.to_hex();
         let (payment_reference, settlement_status) = settlement.into_receipt_parts();
         let payment_breakdown = payment_authorization.as_ref().map(|authorization| {
@@ -2100,7 +2128,10 @@ impl ChioKernel {
         });
 
         let financial_meta = FinancialReceiptMetadata {
-            grant_index: charge.grant_index as u32,
+            grant_index: crate::receipt_support::checked_receipt_count(
+                charge.grant_index,
+                "grant index",
+            )?,
             cost_charged: recorded_cost,
             currency: charge.currency.clone(),
             budget_remaining,

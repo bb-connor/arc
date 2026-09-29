@@ -248,7 +248,7 @@ impl ShadowRunner {
     /// Tenant public key bytes, for downstream `tenant_sig` verification.
     #[must_use]
     pub fn tenant_public_key(&self) -> [u8; 32] {
-        *self.keypair.public_key().as_bytes()
+        self.keypair.public_key_bytes()
     }
 
     /// Drain an NDJSON stream of [`Observation`] envelopes, driving each one

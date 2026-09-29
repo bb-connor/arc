@@ -392,7 +392,7 @@ fn write_bytes_file(
     file_hashes.push(EvidenceExportFileHash {
         path: relative_path.to_string(),
         sha256: sha256_hex(bytes),
-        bytes: bytes.len() as u64,
+        bytes: crate::integer::count(bytes.len()),
     });
     Ok(())
 }
@@ -993,7 +993,11 @@ fn write_evidence_package(
         let source_bytes = fs::read(policy_file)?;
         let source_path = policy_source_relative_path(policy_file);
         write_bytes_file(output, &source_path, &source_bytes, &mut file_hashes)?;
-        let metadata = policy_metadata(policy_file, &source_path, source_bytes.len() as u64)?;
+        let metadata = policy_metadata(
+            policy_file,
+            &source_path,
+            crate::integer::count(source_bytes.len()),
+        )?;
         write_json_file(output, "policy/metadata.json", &metadata, &mut file_hashes)?;
         Some(metadata)
     } else {
@@ -1013,12 +1017,12 @@ fn write_evidence_package(
     };
 
     let counts = EvidenceExportCounts {
-        tool_receipts: bundle.tool_receipts.len() as u64,
-        child_receipts: bundle.child_receipts.len() as u64,
-        checkpoints: bundle.checkpoints.len() as u64,
-        capability_lineage: bundle.capability_lineage.len() as u64,
-        inclusion_proofs: bundle.inclusion_proofs.len() as u64,
-        uncheckpointed_receipts: bundle.uncheckpointed_receipts.len() as u64,
+        tool_receipts: crate::integer::count(bundle.tool_receipts.len()),
+        child_receipts: crate::integer::count(bundle.child_receipts.len()),
+        checkpoints: crate::integer::count(bundle.checkpoints.len()),
+        capability_lineage: crate::integer::count(bundle.capability_lineage.len()),
+        inclusion_proofs: crate::integer::count(bundle.inclusion_proofs.len()),
+        uncheckpointed_receipts: crate::integer::count(bundle.uncheckpointed_receipts.len()),
     };
     let proof_coverage = EvidenceProofCoverage {
         checkpointed_receipts: counts
@@ -1063,6 +1067,10 @@ pub struct EvidenceFederationPolicyCreateArgs<'a> {
     pub json_output: bool,
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_evidence_federation_policy_create(
     args: EvidenceFederationPolicyCreateArgs<'_>,
 ) -> Result<(), CliError> {
@@ -1221,6 +1229,10 @@ pub fn cmd_evidence_export(
     )
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_evidence_import(
     input: &Path,
     receipt_db: Option<&Path>,
@@ -1273,6 +1285,10 @@ pub fn cmd_evidence_import(
     Ok(())
 }
 
+#[allow(
+    clippy::print_stdout,
+    reason = "This CLI command emits its requested report to standard output."
+)]
 pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
     let clock_now = unix_now()?;
     let package = load_verified_evidence_package(input)?;
@@ -1297,15 +1313,15 @@ pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliErr
         tool_receipts: manifest.counts.tool_receipts,
         child_receipts: manifest.counts.child_receipts,
         checkpoints: manifest.counts.checkpoints,
-        checkpoint_publications: transparency.publications.len() as u64,
-        checkpoint_witnesses: transparency.witnesses.len() as u64,
-        checkpoint_consistency_proofs: transparency.consistency_proofs.len() as u64,
-        checkpoint_equivocations: transparency.equivocations.len() as u64,
+        checkpoint_publications: crate::integer::count(transparency.publications.len()),
+        checkpoint_witnesses: crate::integer::count(transparency.witnesses.len()),
+        checkpoint_consistency_proofs: crate::integer::count(transparency.consistency_proofs.len()),
+        checkpoint_equivocations: crate::integer::count(transparency.equivocations.len()),
         capability_lineage: manifest.counts.capability_lineage,
         inclusion_proofs: manifest.counts.inclusion_proofs,
         uncheckpointed_receipts: manifest.counts.uncheckpointed_receipts,
         receipt_semantics: manifest.receipt_semantics,
-        verified_files: manifest.files.len() as u64,
+        verified_files: crate::integer::count(manifest.files.len()),
         child_receipt_scope: manifest.child_receipt_scope,
         claim_boundary,
         disclosure_notice: manifest.disclosure_notice,

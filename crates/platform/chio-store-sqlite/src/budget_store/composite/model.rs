@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 use rusqlite::{params, OptionalExtension, Transaction};
 
@@ -204,7 +205,10 @@ pub(super) fn load_usage_or_default(
             FROM capability_grant_budgets
             WHERE capability_id = ?1 AND grant_index = ?2
             "#,
-            params![capability_id, grant_index as i64],
+            params![
+                capability_id,
+                crate::integer::checked::<_, i64>(grant_index)?
+            ],
             |row| {
                 Ok((
                     budget_u32_from_row(row, 0, "invocation_count")?,
@@ -350,7 +354,10 @@ pub(super) fn legacy_grant_quota_limit(
         WHERE capability_id = ?1 AND grant_index = ?2
           AND projection_kind = 'legacy' AND max_invocations IS NOT NULL
         "#,
-        params![capability_id, grant_index as i64],
+        params![
+            capability_id,
+            crate::integer::checked::<_, i64>(grant_index)?
+        ],
         |row| {
             Ok((
                 row.get::<_, Option<i64>>(0)?,
@@ -686,7 +693,11 @@ pub(super) fn write_hold_admission_members(
                 hold_id, member_index, capability_id
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![hold_id, index as i64, capability_id],
+            params![
+                hold_id,
+                crate::integer::checked::<_, i64>(index)?,
+                capability_id
+            ],
         )?;
     }
     for (index, digest) in admission.authorization_artifact_digests.iter().enumerate() {
@@ -696,7 +707,7 @@ pub(super) fn write_hold_admission_members(
                 hold_id, artifact_index, artifact_digest
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![hold_id, index as i64, digest],
+            params![hold_id, crate::integer::checked::<_, i64>(index)?, digest],
         )?;
     }
     write_hold_revocation_commit(
@@ -847,7 +858,10 @@ pub(super) fn load_event_revocation_commit(
     Ok(commit)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn write_authorization_event_projection(
     transaction: &Transaction<'_>,
     event_id: &str,
@@ -933,7 +947,11 @@ pub(super) fn write_authorization_event_projection(
                 event_id, member_index, capability_id
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![event_id, index as i64, capability_id],
+            params![
+                event_id,
+                crate::integer::checked::<_, i64>(index)?,
+                capability_id
+            ],
         )?;
     }
     for (index, digest) in admission.authorization_artifact_digests.iter().enumerate() {
@@ -943,7 +961,7 @@ pub(super) fn write_authorization_event_projection(
                 event_id, artifact_index, artifact_digest
             ) VALUES (?1, ?2, ?3)
             "#,
-            params![event_id, index as i64, digest],
+            params![event_id, crate::integer::checked::<_, i64>(index)?, digest],
         )?;
     }
     write_event_revocation_commit(
@@ -1531,7 +1549,10 @@ pub(super) fn cumulative_usage(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub(super) fn authorization_decision(
     store: &SqliteBudgetStore,
     request: BudgetAuthorizeHoldRequest,

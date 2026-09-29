@@ -105,7 +105,7 @@ impl FindingChallengeCoordinator {
     /// durable head rather than from the call, so the signed authorization
     /// can only ever point at the allocation and vault the liability was
     /// opened against.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn finalize_enforcement(
         &self,
         record: &FindingLiabilityRecord,
@@ -451,7 +451,7 @@ impl FindingChallengeCoordinator {
     /// historical admission, and this coordinator's own penalty key. A
     /// key that appears only in an unadmitted artifact never joins that
     /// set, so a self-signed governance case cannot authorize a slash.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn mint_penalty(
         &self,
         branch: FindingPenaltyBranch,

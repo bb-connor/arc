@@ -4,7 +4,11 @@
 //! the phases that exist are before commit, a refused rollback, and after
 //! commit before the caller's acknowledgement.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 
 use chio_kernel::{AdmissionOperationError, AdmissionOperationStore};
 use rusqlite::Connection;

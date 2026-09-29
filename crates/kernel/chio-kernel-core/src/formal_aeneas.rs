@@ -81,7 +81,10 @@ pub(crate) fn ledger_is_terminal(state: ReservationLedger) -> bool {
     )
 )]
 // Explicit matches keep checked-add semantics transparent to Aeneas.
-#[allow(clippy::manual_map)]
+#[allow(
+    clippy::manual_map,
+    reason = "The explicit match is the form consumed by the formal extraction tool."
+)]
 pub fn ledger_apply(state: ReservationLedger, op: u8, amount: u64) -> (ReservationLedger, bool) {
     let Some(total) = state.reserved.checked_add(state.committed) else {
         return (state, false);
@@ -156,7 +159,11 @@ pub struct InclusionStep {
     pub next_size: u64,
 }
 
-#[allow(clippy::manual_is_multiple_of, clippy::needless_bool)] // Aeneas scalar subset.
+#[allow(
+    clippy::manual_is_multiple_of,
+    clippy::needless_bool,
+    reason = "Keep arithmetic in the explicit form consumed by the existing formal model. The explicit boolean is the form consumed by the formal extraction tool."
+)] // Aeneas scalar subset.
 pub fn inclusion_step(index: u64, size: u64) -> InclusionStep {
     let sibling_on_left = index % 2 != 0;
     let right_sibling_exists = match index.checked_add(1) {

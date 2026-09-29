@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! WASM Guard Runtime for Chio.
 //!
 //! This crate allows operators to author guards in any language that compiles

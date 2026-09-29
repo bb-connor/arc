@@ -1098,5 +1098,9 @@ fn decode_control(value: &str) -> PortResult<EnterpriseMigrationControl> {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod connection_recovery;

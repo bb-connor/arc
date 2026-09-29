@@ -509,5 +509,9 @@ fn sqlite_error(error: rusqlite::Error) -> FindingRecoveryStoreError {
 
 #[cfg(test)]
 #[path = "finding_recovery_store_tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

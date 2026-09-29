@@ -162,7 +162,11 @@ pub fn serve_prepared_broker_mcp(
 fn read_message(input: &mut impl BufRead) -> Result<Message> {
     let mut frame = Vec::new();
     input
-        .take((MAX_WIRE_BYTES + 1) as u64)
+        .take(
+            u64::try_from(MAX_WIRE_BYTES + 1).map_err(|_| {
+                BrokerError::Invariant("configured byte limit exceeds u64".to_owned())
+            })?,
+        )
         .read_until(b'\n', &mut frame)
         .map_err(|_| refused())?;
     if frame.is_empty() || frame.len() > MAX_WIRE_BYTES || frame.last() != Some(&b'\n') {

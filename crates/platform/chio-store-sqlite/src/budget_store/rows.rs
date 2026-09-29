@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 pub(super) fn budget_authorization_outcome_text(value: BudgetAuthorizationOutcome) -> &'static str {
@@ -597,7 +598,9 @@ pub(super) fn budget_u64_from_row(
     index: usize,
     field_name: &'static str,
 ) -> rusqlite::Result<u64> {
-    Ok(budget_i64_from_row(row, index, field_name)? as u64)
+    Ok(crate::integer::checked::<_, u64>(budget_i64_from_row(
+        row, index, field_name,
+    )?)?)
 }
 
 pub(super) fn budget_u32_from_row(
@@ -637,7 +640,9 @@ pub(super) fn optional_budget_u64_from_row(
     index: usize,
     field_name: &'static str,
 ) -> rusqlite::Result<Option<u64>> {
-    Ok(optional_budget_i64_from_row(row, index, field_name)?.map(|value| value as u64))
+    Ok(optional_budget_i64_from_row(row, index, field_name)?
+        .map(crate::integer::checked::<_, u64>)
+        .transpose()?)
 }
 
 pub(super) fn optional_budget_u32_from_row(
@@ -693,7 +698,7 @@ pub(super) fn sqlite_budget_event_authority(
             Ok(Some(BudgetEventAuthority {
                 authority_id,
                 lease_id,
-                lease_epoch: lease_epoch as u64,
+                lease_epoch: crate::integer::checked::<_, u64>(lease_epoch)?,
             }))
         }
         _ => Err(rusqlite::Error::FromSqlConversionFailure(

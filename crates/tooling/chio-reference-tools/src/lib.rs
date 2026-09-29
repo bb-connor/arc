@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! A minimal MCP server over standard input and output for tools that run
 //! inside the cage.
 //!

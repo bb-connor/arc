@@ -220,6 +220,10 @@ impl Guard for SessionThrottleGuard {
     }
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Masked nibbles are at most 15 and HEX has exactly 16 entries."
+)]
 fn encode_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));

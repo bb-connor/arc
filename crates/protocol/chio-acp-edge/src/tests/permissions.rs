@@ -196,7 +196,7 @@ fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
     kernel.register_tool_server(Box::new(test_server()));
     kernel
         .set_dpop_store(
-            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
+            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)).test_unwrap(),
             dpop::DpopConfig::default(),
         )
         .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
@@ -252,7 +252,7 @@ fn jsonrpc_permission_preview_uses_kernel_dpop_config() {
     let mut kernel = ChioKernel::new(config);
     kernel
         .set_dpop_store(
-            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
+            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)).test_unwrap(),
             dpop::DpopConfig {
                 proof_ttl_secs: 5,
                 max_clock_skew_secs: 0,

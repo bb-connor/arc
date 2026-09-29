@@ -135,7 +135,9 @@ fn read_sealed_32(
     }
     let metadata = fstat(&*file)
         .map_err(|error| BrokerError::Custody(format!("{label} FD metadata failed: {error}")))?;
-    if metadata.st_uid != expected_owner || metadata.st_size != KEY_BYTES as i64 {
+    if metadata.st_uid != expected_owner
+        || usize::try_from(metadata.st_size).ok() != Some(KEY_BYTES)
+    {
         return Err(BrokerError::Custody(format!(
             "{label} descriptor owner or length is invalid"
         )));
@@ -463,7 +465,7 @@ mod tests {
         let material = backend
             .materialize(&credential(1))
             .test_expect("materialize");
-        assert_eq!(material.as_bytes(), b"unique-secret-canary");
+        assert_eq!(material.expose_secret(), b"unique-secret-canary");
     }
 
     #[test]
@@ -522,7 +524,7 @@ mod tests {
             tenant_a
                 .materialize(&credential(1))
                 .test_expect("version one material")
-                .as_bytes(),
+                .expose_secret(),
             b"version-one"
         );
         tenant_a.disable(&credential(1)).test_expect("disable one");
@@ -531,7 +533,7 @@ mod tests {
             tenant_a
                 .materialize(&credential(2))
                 .test_expect("version two material")
-                .as_bytes(),
+                .expose_secret(),
             b"version-two"
         );
 

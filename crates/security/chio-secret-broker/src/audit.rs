@@ -1,3 +1,4 @@
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
 use std::fmt;
 
 use chio_core_types::{
@@ -52,7 +53,7 @@ pub const BROKER_AUDIT_REFERENCE_COMMITMENT_SALT_BYTES: usize = 32;
 /// from manufacturing this typed expectation by copying a digest out of a
 /// broker-signed response.
 pub struct BrokerAuditReferencePrecommitment {
-    commitment_salt: Zeroizing<String>,
+    commitment_salt: SecretString,
     commitment_sha256: String,
 }
 
@@ -70,9 +71,9 @@ impl BrokerAuditReferencePrecommitment {
                 "broker audit runner precommitment randomness is invalid".to_string(),
             ));
         }
-        let commitment_salt = Zeroizing::new(hex::encode(salt.as_slice()));
+        let commitment_salt = SecretString::from(hex::encode(salt.as_slice()));
         let commitment_sha256 = broker_audit_reference_commitment_sha256(
-            commitment_salt.as_str(),
+            commitment_salt.expose_secret(),
             request_head,
             request_body,
         )?;
@@ -84,7 +85,7 @@ impl BrokerAuditReferencePrecommitment {
 
     #[must_use]
     pub fn commitment_salt(&self) -> &str {
-        self.commitment_salt.as_str()
+        self.commitment_salt.expose_secret()
     }
 
     #[must_use]
@@ -107,9 +108,9 @@ impl fmt::Debug for BrokerAuditReferencePrecommitment {
 /// migration audit path. The buffers are zeroized on every return path and
 /// cannot be cloned, serialized, or inspected through `Debug`.
 pub struct BrokerAuditReferenceRequest {
-    commitment_salt: Zeroizing<String>,
-    request_head: Zeroizing<Vec<u8>>,
-    request_body: Zeroizing<Vec<u8>>,
+    commitment_salt: SecretString,
+    request_head: SecretBox<Vec<u8>>,
+    request_body: SecretBox<Vec<u8>>,
 }
 
 impl BrokerAuditReferenceRequest {
@@ -145,9 +146,9 @@ impl BrokerAuditReferenceRequest {
             ));
         }
         let reference = Self {
-            commitment_salt: Zeroizing::new(commitment_salt),
-            request_head: Zeroizing::new(request_head),
-            request_body: Zeroizing::new(request_body),
+            commitment_salt: SecretString::from(commitment_salt),
+            request_head: SecretBox::new(Box::new(request_head)),
+            request_body: SecretBox::new(Box::new(request_body)),
         };
         reference.validate()?;
         Ok(reference)
@@ -155,10 +156,10 @@ impl BrokerAuditReferenceRequest {
 
     pub(crate) fn validate(&self) -> Result<()> {
         validate_reference_request_parts(
-            self.request_head.as_slice(),
-            self.request_body.as_slice(),
+            self.request_head.expose_secret(),
+            self.request_body.expose_secret(),
         )?;
-        validate_reference_commitment_salt(self.commitment_salt.as_str())
+        validate_reference_commitment_salt(self.commitment_salt.expose_secret())
     }
 }
 
@@ -728,9 +729,9 @@ pub fn broker_audit_reference_commitment_sha256(
 
 fn reference_request_digest(reference: &BrokerAuditReferenceRequest) -> Result<String> {
     broker_audit_reference_commitment_sha256(
-        reference.commitment_salt.as_str(),
-        reference.request_head.as_slice(),
-        reference.request_body.as_slice(),
+        reference.commitment_salt.expose_secret(),
+        reference.request_head.expose_secret(),
+        reference.request_body.expose_secret(),
     )
 }
 
@@ -1153,17 +1154,19 @@ pub(crate) struct BrokerAuditWireComparison {
     pub(crate) projections_equal: bool,
 }
 
-pub(crate) struct BrokerAuditComparisonSalt(Zeroizing<[u8; 32]>);
+pub(crate) struct BrokerAuditComparisonSalt(SecretBox<[u8; 32]>);
 
 impl BrokerAuditComparisonSalt {
     pub(crate) fn generate() -> Result<Self> {
-        let mut salt = Zeroizing::new([0_u8; 32]);
-        OsRng.try_fill_bytes(&mut salt[..]).map_err(|_| {
-            BrokerError::AuthorityUnavailable(
-                "broker audit comparison randomness is unavailable".to_string(),
-            )
-        })?;
-        if salt.iter().all(|byte| *byte == 0) {
+        let mut salt = SecretBox::new(Box::new([0_u8; 32]));
+        OsRng
+            .try_fill_bytes(salt.expose_secret_mut())
+            .map_err(|_| {
+                BrokerError::AuthorityUnavailable(
+                    "broker audit comparison randomness is unavailable".to_string(),
+                )
+            })?;
+        if salt.expose_secret().iter().all(|byte| *byte == 0) {
             return Err(BrokerError::AuthorityUnavailable(
                 "broker audit comparison randomness is invalid".to_string(),
             ));
@@ -1171,8 +1174,8 @@ impl BrokerAuditComparisonSalt {
         Ok(Self(salt))
     }
 
-    fn as_bytes(&self) -> &[u8] {
-        &self.0[..]
+    fn expose_secret(&self) -> &[u8] {
+        self.0.expose_secret()
     }
 }
 
@@ -1193,18 +1196,18 @@ pub(crate) fn compare_audit_wire_requests(
         ));
     }
     let broker_tag = audit_projection_commitment(
-        comparison_salt.as_bytes(),
+        comparison_salt.expose_secret(),
         broker_request_head,
         broker_request_body,
     )?;
     let reference_tag = audit_projection_commitment(
-        comparison_salt.as_bytes(),
-        &reference.request_head,
-        &reference.request_body,
+        comparison_salt.expose_secret(),
+        reference.request_head.expose_secret(),
+        reference.request_body.expose_secret(),
     )?;
     let projections_equal = bool::from(
-        broker_request_head.ct_eq(reference.request_head.as_slice())
-            & broker_request_body.ct_eq(reference.request_body.as_slice()),
+        broker_request_head.ct_eq(reference.request_head.expose_secret())
+            & broker_request_body.ct_eq(reference.request_body.expose_secret()),
     );
     Ok(BrokerAuditWireComparison {
         broker_projection_commitment_sha256: hex::encode(broker_tag),

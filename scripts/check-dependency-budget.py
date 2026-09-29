@@ -148,14 +148,11 @@ BUDGETS: dict[str, Budget] = {
     "chio-secret-broker": Budget(
         manifest="crates/security/chio-secret-broker/Cargo.toml",
         binary="chio-secret-brokerd",
-        # 478 -> 479: kernel-owned response dispatch preparation now depends on
-        # chio-quarantine's shared transition projections. The measured musl
-        # graph adds only that in-tree crate, with no new external package or
-        # normal dependency cycle. Keeping recovery preparation in the kernel
-        # preserves its private authority constructors. See the execution
-        # boundary review in docs/reviews/2026-09-26-execution-boundaries.md.
-        ceiling=479,
-        measured="2026-09-26",
+        # 479 -> 480: explicit broker secret ownership adds only secrecy 0.10.3.
+        # Its existing zeroize/serde dependencies add no other package. Source
+        # audit: docs/security/supply-chain/secrecy-0.10.3.md.
+        ceiling=480,
+        measured="2026-09-28",
         features=(),
         deny=COMMON_DENY,
         pending={},

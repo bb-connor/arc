@@ -374,7 +374,10 @@ impl ChioKernel {
         let grant_budget_total = hold.reserved_budget_total;
         let committed_after = reconcile.committed_cost_units_after;
         let financial = FinancialReceiptMetadata {
-            grant_index: hold.grant_index as u32,
+            grant_index: crate::receipt_support::checked_receipt_count(
+                hold.grant_index,
+                "grant index",
+            )?,
             cost_charged: realized,
             currency: receipt_currency,
             budget_remaining: financial_budget_remaining(grant_budget_total, committed_after)?,

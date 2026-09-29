@@ -292,8 +292,8 @@ impl SqliteSecurityStateStore {
             durable_leases.push(row.map_err(sqlite_error)?);
         }
         drop(statement);
-        let terminal_remaining = durable_leases.len() > max_leases as usize;
-        durable_leases.truncate(max_leases as usize);
+        let terminal_remaining = durable_leases.len() > crate::integer::checked::<_, usize>(max_leases)?;
+        durable_leases.truncate(crate::integer::checked::<_, usize>(max_leases)?);
         let mut cleaned = 0_u32;
         for action_id in durable_leases {
             let work = load_valid_scheduler_lease(
@@ -517,7 +517,7 @@ impl ResponseStore for SqliteSecurityStateStore {
             .len()
             .checked_add(1)
             .is_some_and(|expected| candidate_mutations.len() == expected)
-            && &candidate_mutations[..current_mutations.len()] == current_mutations;
+            && candidate_mutations.get(..current_mutations.len()) == Some(current_mutations);
         if !exact_prefix
             || candidate_snapshot.schema_version != current_snapshot.schema_version
             || candidate_snapshot.plan != current_snapshot.plan
@@ -1105,7 +1105,7 @@ impl ResponseStore for SqliteSecurityStateStore {
                     request_hash.as_slice(),
                     request.lease_owner_id.as_str(),
                     to_i64(request.lease_expires_at_unix_ms)?,
-                    to_i64(claimed.len() as u64)?,
+                    to_i64(crate::integer::count(claimed.len()))?,
                     trusted_now_sql
                 ],
             )

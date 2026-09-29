@@ -109,6 +109,8 @@ pub fn get_config(key: &str) -> Option<String> {
         let mut buf = vec![0u8; BUF_SIZE];
 
         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        // SAFETY: these buffers remain live for the synchronous host call;
+        // the host receives their actual lengths and must honor those bounds.
         let result = unsafe {
             chio_get_config_raw(
                 key.as_ptr() as i32,
@@ -165,6 +167,8 @@ pub fn fetch_blob(handle: u32, offset: u64, len: u32) -> Result<Vec<u8>, String>
         let mut buf = vec![0_u8; len as usize];
 
         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        // SAFETY: these buffers remain live for the synchronous host call;
+        // the host receives their actual lengths and must honor those bounds.
         let result = unsafe {
             chio_fetch_blob_raw(
                 handle as i32,

@@ -254,7 +254,7 @@ fn anchored_receipt_sink_binding(file_sink_binding: &str, anchor_instance_id: &s
 }
 
 fn append_receipt_sink_binding_part(material: &mut Vec<u8>, part: &[u8]) {
-    material.extend_from_slice(&(part.len() as u64).to_be_bytes());
+    material.extend_from_slice(&crate::integer::count(part.len()).to_be_bytes());
     material.extend_from_slice(part);
 }
 

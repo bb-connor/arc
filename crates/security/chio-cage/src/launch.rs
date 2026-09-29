@@ -891,7 +891,9 @@ fn supervise_child_custodies(receiver: std::sync::mpsc::Receiver<ChildCustody>) 
 
         let mut index = 0;
         while index < custodies.len() {
-            let custody = &mut custodies[index];
+            let Some(custody) = custodies.get_mut(index) else {
+                break;
+            };
             if child_custody_is_reaped(custody) {
                 drop(custodies.swap_remove(index));
                 continue;

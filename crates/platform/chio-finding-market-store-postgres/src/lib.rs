@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! PostgreSQL durability for the hosted cognition-market control loop.
 //!
 //! Every tenant-scoped operation sets `chio.tenant_id` transaction-locally

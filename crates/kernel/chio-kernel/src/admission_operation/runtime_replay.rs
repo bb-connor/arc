@@ -131,12 +131,12 @@ impl RuntimeReplaySourceSnapshotV1 {
                 return Err(invalid("source markers are not sorted and unique"));
             }
             previous = Some(identity);
-            let index = match marker.kind() {
-                RuntimeReplayParticipantKind::DestructiveLease => 0,
-                RuntimeReplayParticipantKind::TreatyContinuation => 1,
-                RuntimeReplayParticipantKind::SwarmContinuation => 2,
+            let count = match marker.kind() {
+                RuntimeReplayParticipantKind::DestructiveLease => &mut counts[0],
+                RuntimeReplayParticipantKind::TreatyContinuation => &mut counts[1],
+                RuntimeReplayParticipantKind::SwarmContinuation => &mut counts[2],
             };
-            counts[index] = counts[index]
+            *count = count
                 .checked_add(1)
                 .ok_or_else(|| invalid("source marker count overflow"))?;
         }

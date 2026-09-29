@@ -180,8 +180,11 @@ pub(in crate::admission_operation_store) fn verify_operation(
         "SELECT COALESCE(SUM(mutation_kind = 'governed_approval_claim'), 0), COALESCE(SUM(mutation_kind = 'governed_approval_release'), 0)
          FROM admission_operation_commits WHERE operation_id = ?1", [operation.binding().operation_id().as_str()], |row| Ok((row.get(0)?, row.get(1)?)),
     ).map_err(sqlite_error)?;
-    if claims != episodes.len() as i64
-        || releases != episodes.iter().filter(|episode| episode.released).count() as i64
+    if claims != crate::integer::checked::<_, i64>(episodes.len())?
+        || releases
+            != crate::integer::checked::<_, i64>(
+                episodes.iter().filter(|episode| episode.released).count(),
+            )?
     {
         return Err(invariant(
             "approval claim journal and physical records have different counts",
@@ -201,7 +204,9 @@ pub(super) fn load(
             |row| row.get(0),
         )
         .map_err(sqlite_error)?;
-    if !(0..=MAX_GOVERNED_APPROVAL_CLAIM_EPISODES as i64).contains(&count) {
+    if !(0..=crate::integer::checked::<_, i64>(MAX_GOVERNED_APPROVAL_CLAIM_EPISODES)?)
+        .contains(&count)
+    {
         return Err(invariant("approval claim episode count exceeds its bound"));
     }
     let mut statement = connection.prepare(
@@ -212,7 +217,7 @@ pub(super) fn load(
     let mut rows = statement
         .query([operation.binding().operation_id().as_str()])
         .map_err(sqlite_error)?;
-    let mut claims = Vec::with_capacity(count as usize);
+    let mut claims = Vec::with_capacity(crate::integer::checked::<_, usize>(count)?);
     while let Some(row) = rows.next().map_err(sqlite_error)? {
         let bytes = bounded_bytes(row, 0)?;
         let snapshot = bounded_bytes(row, 1)?;

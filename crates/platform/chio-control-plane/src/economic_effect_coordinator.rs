@@ -43,16 +43,19 @@ impl SequencedEconomicEffectCoordinator {
     ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
         let _mutation_guard = self.lock()?;
         let batch = advance.batch();
-        if batch.transitions.len() != 1
-            || !batch.effect_slots.is_empty()
+        let [transition] = batch.transitions.as_slice() else {
+            return Err(EconomicStateAnchorError::EffectDispatchRejected(
+                "unknown recovery must advance exactly one retained effect slot",
+            ));
+        };
+        if !batch.effect_slots.is_empty()
             || !batch.request_replays.is_empty()
-            || batch.transitions[0].prepared_effect.is_some()
+            || transition.prepared_effect.is_some()
         {
             return Err(EconomicStateAnchorError::EffectDispatchRejected(
                 "unknown recovery must advance exactly one retained effect slot",
             ));
         }
-        let transition = &batch.transitions[0];
         let current_head = advance
             .current()
             .view()
@@ -90,7 +93,11 @@ impl SequencedEconomicEffectCoordinator {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 

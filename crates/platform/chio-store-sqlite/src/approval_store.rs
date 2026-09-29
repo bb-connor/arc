@@ -441,8 +441,8 @@ impl ApprovalStore for SqliteApprovalStore {
                     request.tool_server,
                     request.tool_name,
                     request.parameter_hash,
-                    request.expires_at as i64,
-                    request.created_at as i64,
+                    crate::integer::checked::<_, i64>(request.expires_at)?,
+                    crate::integer::checked::<_, i64>(request.created_at)?,
                     payload,
                 ],
                 |row| row.get::<_, String>(0),
@@ -518,10 +518,16 @@ impl ApprovalStore for SqliteApprovalStore {
             params_vec.push((":tool_name", Box::new(s.clone())));
         }
         if let Some(t) = &filter.not_expired_at {
-            params_vec.push((":not_expired_at", Box::new(*t as i64)));
+            params_vec.push((
+                ":not_expired_at",
+                Box::new(crate::integer::checked::<_, i64>(*t)?),
+            ));
         }
         if let Some(limit) = &filter.limit {
-            params_vec.push((":limit", Box::new(*limit as i64)));
+            params_vec.push((
+                ":limit",
+                Box::new(crate::integer::checked::<_, i64>(*limit)?),
+            ));
         }
 
         let refs: Vec<(&str, &dyn rusqlite::ToSql)> = params_vec
@@ -604,7 +610,7 @@ impl ApprovalStore for SqliteApprovalStore {
             params![
                 id,
                 outcome,
-                decision.received_at as i64,
+                crate::integer::checked::<_, i64>(decision.received_at)?,
                 decision.approver.to_hex(),
                 decision.token.id,
             ],
@@ -613,7 +619,7 @@ impl ApprovalStore for SqliteApprovalStore {
 
         tx.execute(
             "INSERT INTO chio_hitl_consumed_tokens (token_id, parameter_hash, consumed_at) VALUES (?1, ?2, ?3)",
-            params![decision.token.id, parameter_hash, decision.received_at as i64],
+            params![decision.token.id, parameter_hash, crate::integer::checked::<_, i64>(decision.received_at)?],
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("insert consumed: {e}")))?;
 
@@ -643,7 +649,7 @@ impl ApprovalStore for SqliteApprovalStore {
                 |row| row.get(0),
             )
             .map_err(|e| ApprovalStoreError::Backend(format!("count: {e}")))?;
-        Ok(count.max(0) as u64)
+        Ok(u64::try_from(count.max(0)).unwrap_or_default())
     }
 
     fn record_consumed(
@@ -658,7 +664,7 @@ impl ApprovalStore for SqliteApprovalStore {
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
         let rows = conn.execute(
             "INSERT OR IGNORE INTO chio_hitl_consumed_tokens (token_id, parameter_hash, consumed_at) VALUES (?1, ?2, ?3)",
-            params![token_id, parameter_hash, now as i64],
+            params![token_id, parameter_hash, crate::integer::checked::<_, i64>(now)?],
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("insert consumed: {e}")))?;
         if rows == 0 {
@@ -725,7 +731,7 @@ impl ApprovalStore for SqliteApprovalStore {
                 Ok(Some(ResolvedApproval {
                     approval_id,
                     outcome,
-                    resolved_at: resolved_at.max(0) as u64,
+                    resolved_at: u64::try_from(resolved_at.max(0)).unwrap_or_default(),
                     approver_hex,
                     token_id,
                 }))
@@ -896,6 +902,10 @@ fn serialize_reservation_members(
     Ok(serialized)
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Short-circuit length equality proves every enumerated stored row has a corresponding approval member."
+)]
 fn load_approval_reservation(
     connection: &Connection,
     operation_id: &str,
@@ -1036,7 +1046,11 @@ fn transition_approval_reservation(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_core::capability::governance::{

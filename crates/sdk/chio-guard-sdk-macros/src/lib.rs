@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Proc-macro crate for the Chio WASM guard SDK.
 //!
 //! Provides the `#[chio_guard]` attribute macro that transforms a plain
@@ -191,6 +192,8 @@ pub fn chio_guard(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[no_mangle]
         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
         pub extern "C" fn evaluate(ptr: i32, len: i32) -> i32 {
+            // SAFETY: the host ABI supplies a live guest-memory request region
+            // for this synchronous entry point; read_request rejects signed bounds.
             let request = match unsafe { chio_guard_sdk::read_request(ptr, len) } {
                 Ok(r) => r,
                 Err(_) => return chio_guard_sdk::VERDICT_DENY,

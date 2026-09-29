@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 /// Quorum-witness identity of a stored budget mutation event: its `event_seq`,
@@ -451,7 +452,7 @@ impl SqliteBudgetStore {
                 "#,
                 rusqlite::params![start, end],
             )?;
-            previous_end = end as u64;
+            previous_end = crate::integer::checked::<_, u64>(end)?;
         }
         Ok(())
     }

@@ -55,7 +55,11 @@ impl SqliteFindingMarketStore {
             .read_companions
             .lease()
             .map_err(|error| FindingMarketStoreError::Unavailable(error.to_string()))?;
-        let transaction = self.begin_companion_read(companion.connection())?;
+        let transaction = self.begin_companion_read(
+            companion
+                .connection()
+                .map_err(|error| FindingMarketStoreError::Unavailable(error.to_string()))?,
+        )?;
         require_verified_live_status_tx(
             &transaction,
             feed_id,

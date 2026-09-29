@@ -4443,7 +4443,7 @@ fn restore_ready_session_requests_roots_and_updates_session() {
     )
     .unwrap();
 
-    let (client_tx, client_rx) = mpsc::channel();
+    let (client_tx, mut client_rx) = mpsc::channel();
     client_tx
         .send(ClientInbound::Message(json!({
             "jsonrpc": "2.0",
@@ -4459,7 +4459,7 @@ fn restore_ready_session_requests_roots_and_updates_session() {
     drop(client_tx);
 
     let mut output = Vec::new();
-    edge.process_pending_actions_with_channel(&client_rx, &mut output)
+    edge.process_pending_actions_with_channel(&mut client_rx, &mut output)
         .unwrap();
 
     let lines = String::from_utf8(output).unwrap();

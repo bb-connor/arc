@@ -127,12 +127,14 @@ pub(crate) fn build_underwriting_compliance_evidence(
             report.export_query.agent_subject
         ));
     }
-    let observed_capabilities = selection
-        .receipts
-        .iter()
-        .map(|receipt| receipt.capability_id.clone())
-        .collect::<std::collections::BTreeSet<_>>()
-        .len() as u64;
+    let observed_capabilities = crate::integer::count(
+        selection
+            .receipts
+            .iter()
+            .map(|receipt| receipt.capability_id.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+    );
     let latest_receipt_timestamp = selection
         .receipts
         .iter()
@@ -143,7 +145,7 @@ pub(crate) fn build_underwriting_compliance_evidence(
         activity.summary.deny_count,
         observed_capabilities,
         0,
-        activity.by_time.len() as u64,
+        crate::integer::count(activity.by_time.len()),
         0,
         latest_receipt_timestamp.map(|timestamp| generated_at.saturating_sub(timestamp)),
     );
@@ -213,26 +215,30 @@ fn build_underwriting_receipt_evidence(
     shared_evidence: &SharedEvidenceReferenceReport,
     selection: &chio_kernel::BehavioralFeedReceiptSelection,
 ) -> UnderwritingReceiptEvidence {
-    let runtime_assurance_receipts = selection
-        .receipts
-        .iter()
-        .filter(|receipt| {
-            receipt
-                .governed
-                .as_ref()
-                .and_then(|governed| governed.runtime_assurance.as_ref())
-                .is_some()
-        })
-        .count() as u64;
-    let call_chain_receipts = selection
-        .receipts
-        .iter()
-        .filter(|receipt| underwriting_receipt_call_chain(receipt).is_some())
-        .count() as u64;
+    let runtime_assurance_receipts = crate::integer::count(
+        selection
+            .receipts
+            .iter()
+            .filter(|receipt| {
+                receipt
+                    .governed
+                    .as_ref()
+                    .and_then(|governed| governed.runtime_assurance.as_ref())
+                    .is_some()
+            })
+            .count(),
+    );
+    let call_chain_receipts = crate::integer::count(
+        selection
+            .receipts
+            .iter()
+            .filter(|receipt| underwriting_receipt_call_chain(receipt).is_some())
+            .count(),
+    );
 
     UnderwritingReceiptEvidence {
         matching_receipts: selection.matching_receipts,
-        returned_receipts: selection.receipts.len() as u64,
+        returned_receipts: crate::integer::count(selection.receipts.len()),
         allow_count: activity.summary.allow_count,
         deny_count: activity.summary.deny_count,
         cancelled_count: activity.summary.cancelled_count,
@@ -766,7 +772,7 @@ pub(crate) fn build_budget_utilization_report(
         })?;
         let invocation_utilization_rate = resolved
             .max_invocations
-            .and_then(|max| ratio_option(usage.invocation_count as u64, max as u64));
+            .and_then(|max| ratio_option(u64::from(usage.invocation_count), u64::from(max)));
         let cost_utilization_rate = resolved
             .max_total_cost_units
             .and_then(|max| ratio_option(committed_cost_units, max));
@@ -787,7 +793,7 @@ pub(crate) fn build_budget_utilization_report(
             || cost_utilization_rate.is_some_and(|rate| rate >= 0.8);
 
         matching_grants = matching_grants.saturating_add(1);
-        total_invocations = total_invocations.saturating_add(usage.invocation_count as u64);
+        total_invocations = total_invocations.saturating_add(u64::from(usage.invocation_count));
         total_committed_cost_units =
             total_committed_cost_units.saturating_add(committed_cost_units);
         distinct_capabilities.insert(usage.capability_id.clone());
@@ -833,9 +839,9 @@ pub(crate) fn build_budget_utilization_report(
                         let near_limit = exhausted
                             || invocation_utilization_rate.is_some_and(|rate| rate >= 0.8);
                         BudgetDimensionUsage {
-                            used: usage.invocation_count as u64,
-                            limit: max as u64,
-                            remaining: remaining_invocations.unwrap_or(0) as u64,
+                            used: u64::from(usage.invocation_count),
+                            limit: u64::from(max),
+                            remaining: u64::from(remaining_invocations.unwrap_or(0)),
                             utilization_rate: invocation_utilization_rate,
                             near_limit,
                             exhausted,
@@ -862,16 +868,16 @@ pub(crate) fn build_budget_utilization_report(
     Ok(BudgetUtilizationReport {
         summary: BudgetUtilizationSummary {
             matching_grants,
-            returned_grants: rows.len() as u64,
-            distinct_capabilities: distinct_capabilities.len() as u64,
-            distinct_subjects: distinct_subjects.len() as u64,
+            returned_grants: crate::integer::count(rows.len()),
+            distinct_capabilities: crate::integer::count(distinct_capabilities.len()),
+            distinct_subjects: crate::integer::count(distinct_subjects.len()),
             total_invocations,
             total_cost_charged: total_committed_cost_units,
             near_limit_count,
             exhausted_count,
             rows_missing_scope,
             rows_missing_lineage,
-            truncated: matching_grants > rows.len() as u64,
+            truncated: matching_grants > crate::integer::count(rows.len()),
         },
         rows,
     })
@@ -896,7 +902,10 @@ fn resolve_budget_grant(snapshot: &CapabilitySnapshot, grant_index: u32) -> Reso
         }
     };
 
-    let Some(grant) = scope.grants.get(grant_index as usize) else {
+    let Some(grant) = usize::try_from(grant_index)
+        .ok()
+        .and_then(|index| scope.grants.get(index))
+    else {
         return ResolvedBudgetGrant {
             scope_resolution_error: Some(format!(
                 "grant_index {} is out of bounds for capability {}",
@@ -926,6 +935,10 @@ fn resolve_budget_grant(snapshot: &CapabilitySnapshot, grant_index: u32) -> Reso
     }
 }
 
+#[allow(
+    clippy::as_conversions,
+    reason = "Report ratios approximate counters as floating point and do not grant authority."
+)]
 fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
     if denominator == 0 {
         None

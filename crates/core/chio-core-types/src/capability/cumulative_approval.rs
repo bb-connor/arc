@@ -232,7 +232,7 @@ impl CumulativeApprovalDelegationMarker {
         }
         if self
             .bindings
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair.first() >= pair.get(1))
         {
             return Err(violation(
@@ -353,7 +353,13 @@ fn bind_family_roots_with(
             signer_key_epoch,
         )?;
         let binding = sign(binding_body)?;
-        body.scope.grants[grant_index].constraints[constraint_index]
+        body.scope
+            .grants
+            .get_mut(grant_index)
+            .and_then(|grant| grant.constraints.get_mut(constraint_index))
+            .ok_or_else(|| Error::AttenuationViolation {
+                reason: "cumulative approval target disappeared".into(),
+            })?
             .set_cumulative_approval_root_binding(Some(binding))?;
     }
     Ok(())
@@ -762,7 +768,10 @@ fn root_commitment_hash_from_body(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn root_commitment_hash_parts(
     id: &str,
     issuer: &PublicKey,

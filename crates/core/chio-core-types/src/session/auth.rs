@@ -14,7 +14,10 @@ use super::ownership::SessionTransport;
 /// This is intentionally separate from Chio capability authorization. A session
 /// may be transport-authenticated and still be denied by capability or guard
 /// checks later during operation evaluation.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "The authentication state retains its owned credential without an additional heap allocation."
+)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionAuthMethod {

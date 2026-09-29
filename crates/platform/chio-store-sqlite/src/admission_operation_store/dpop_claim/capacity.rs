@@ -39,10 +39,10 @@ pub(super) fn require_available(
         .map_err(|error| invariant(error.to_string()))?;
     // Logical live key/count-index and owner charge, not a whole-database bound.
     // Canonical history has separate per-record and per-operation limits.
-    let charge = credential.capability_id().len() as u64 * 2
-        + credential.nonce().len() as u64
-        + operation.binding().operation_id().as_str().len() as u64
-        + intent.episode_id().as_str().len() as u64;
+    let charge = crate::integer::count(credential.capability_id().len()) * 2
+        + crate::integer::count(credential.nonce().len())
+        + crate::integer::count(operation.binding().operation_id().as_str().len())
+        + crate::integer::count(intent.episode_id().as_str().len());
     if stored_u64(live, "dpop_live_count")? >= limits.markers
         || stored_u64(per_capability, "dpop_capability_count")? >= limits.per_capability
         || stored_u64(bytes, "dpop_identity_bytes")?

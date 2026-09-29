@@ -13,7 +13,7 @@ pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
     let mut bytes = Vec::new();
     std::fs::File::open(path)?
-        .take((MAX_SIGNED_FILE_BYTES + 1) as u64)
+        .take(crate::integer::count(MAX_SIGNED_FILE_BYTES + 1))
         .read_to_end(&mut bytes)?;
     Ok(bytes)
 }

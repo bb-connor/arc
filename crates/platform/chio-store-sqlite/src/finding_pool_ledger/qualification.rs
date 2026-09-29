@@ -540,13 +540,13 @@ fn derive_ledger_store_binding(
 
     let mut binding = Sha256::new();
     binding.update(b"chio.finding-pool.store-binding.v1");
-    binding.update((ledger_domain.len() as u64).to_be_bytes());
+    binding.update(crate::integer::count(ledger_domain.len()).to_be_bytes());
     binding.update(ledger_domain.as_bytes());
-    binding.update((identity_material.len() as u64).to_be_bytes());
+    binding.update(crate::integer::count(identity_material.len()).to_be_bytes());
     binding.update(&identity_material);
-    binding.update((public_key_bytes.len() as u64).to_be_bytes());
+    binding.update(crate::integer::count(public_key_bytes.len()).to_be_bytes());
     binding.update(public_key_bytes);
-    binding.update((anchor_instance_id.len() as u64).to_be_bytes());
+    binding.update(crate::integer::count(anchor_instance_id.len()).to_be_bytes());
     binding.update(anchor_instance_id.as_bytes());
     Ok(hex::encode(binding.finalize()))
 }
@@ -572,7 +572,7 @@ fn database_identity_material(
 }
 
 fn append_binding_part(target: &mut Vec<u8>, value: &[u8]) {
-    target.extend_from_slice(&(value.len() as u64).to_be_bytes());
+    target.extend_from_slice(&crate::integer::count(value.len()).to_be_bytes());
     target.extend_from_slice(value);
 }
 

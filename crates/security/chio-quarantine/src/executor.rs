@@ -1306,7 +1306,10 @@ impl<
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn record_rollback_failure(
         &self,
         current: ResponsePlanRecord,
@@ -1677,6 +1680,10 @@ fn freeze_issuance_became_applied(before: &ResponseSnapshot, after: &ResponseSna
     })
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The table has exactly 16 entries and each masked nibble is in 0..16."
+)]
 fn hex_bytes(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(bytes.len() * 2);

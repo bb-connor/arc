@@ -12,8 +12,14 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
         let issuer = query.issuer.as_deref();
         let partner = query.partner.as_deref();
@@ -46,7 +52,7 @@ impl SqliteReceiptStore {
                 |row| {
                     Ok((
                         row.get::<_, String>(0)?,
-                        row.get::<_, i64>(1)?.max(0) as u64,
+                        u64::try_from(row.get::<_, i64>(1)?.max(0)).unwrap_or_default(),
                         row.get::<_, String>(2)?,
                         row.get::<_, String>(3)?,
                     ))
@@ -196,7 +202,7 @@ impl SqliteReceiptStore {
             distinct_remote_subjects.insert(reference.subject_key.clone());
         }
 
-        let matching_references = returned_references.len() as u64;
+        let matching_references = crate::integer::count(returned_references.len());
         let truncated = returned_references.len() > limit;
         if truncated {
             returned_references.truncate(limit);
@@ -204,9 +210,9 @@ impl SqliteReceiptStore {
 
         Ok(SharedEvidenceReferenceReport {
             summary: SharedEvidenceReferenceSummary {
-                matching_shares: distinct_shares.len() as u64,
+                matching_shares: crate::integer::count(distinct_shares.len()),
                 matching_references,
-                matching_local_receipts: matched_local_receipts.len() as u64,
+                matching_local_receipts: crate::integer::count(matched_local_receipts.len()),
                 remote_tool_receipts: distinct_shares
                     .values()
                     .map(|share| share.tool_receipts)
@@ -215,11 +221,13 @@ impl SqliteReceiptStore {
                     .values()
                     .map(|share| share.capability_lineage)
                     .sum(),
-                distinct_remote_subjects: distinct_remote_subjects.len() as u64,
-                proof_required_shares: distinct_shares
-                    .values()
-                    .filter(|share| share.require_proofs)
-                    .count() as u64,
+                distinct_remote_subjects: crate::integer::count(distinct_remote_subjects.len()),
+                proof_required_shares: crate::integer::count(
+                    distinct_shares
+                        .values()
+                        .filter(|share| share.require_proofs)
+                        .count(),
+                ),
                 truncated,
             },
             references: returned_references,

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Recovery of the budget store's connection after a panic inside a critical
 //! section, in both of its shapes: sharing the authority connection under a
 //! serving owner, and standing alone on a path of its own. The durable phases are induced through

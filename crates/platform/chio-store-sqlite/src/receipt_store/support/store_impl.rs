@@ -153,7 +153,11 @@ fn load_chio_receipt_row(
         )
         .optional()?
         .map(|(seq, raw_json)| {
-            decode_verified_chio_receipt(&raw_json, context, Some(seq.max(0) as u64))
+            decode_verified_chio_receipt(
+                &raw_json,
+                context,
+                Some(u64::try_from(seq.max(0)).unwrap_or_default()),
+            )
         })
         .transpose()
 }
@@ -308,7 +312,10 @@ impl SqliteReceiptStore {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn record_request_lineage_record(
         &self,
         session_id: &str,
@@ -344,7 +351,10 @@ impl SqliteReceiptStore {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn record_receipt_lineage_statement_record(
         &self,
         child_receipt_id: &str,
@@ -659,7 +669,7 @@ impl ReceiptStore for SqliteReceiptStore {
                 decode_verified_chio_receipt(
                     &raw_json,
                     "persisted tool receipt",
-                    Some(seq.max(0) as u64),
+                    Some(u64::try_from(seq.max(0)).unwrap_or_default()),
                 )
             })
             .transpose()
@@ -722,7 +732,7 @@ impl ReceiptStore for SqliteReceiptStore {
                 decode_verified_child_receipt(
                     &raw_json,
                     "persisted child receipt",
-                    Some(seq.max(0) as u64),
+                    Some(u64::try_from(seq.max(0)).unwrap_or_default()),
                 )
             })
             .transpose()
@@ -948,7 +958,7 @@ impl ReceiptStore for SqliteReceiptStore {
                 root.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
                     && root.parent_capability_id.is_none()
                     && root.delegation_depth == 0
-            }) && chain.windows(2).all(|pair| {
+            }) && chain.array_windows::<2>().all(|pair| {
                 let parent = &pair[0];
                 let child = &pair[1];
                 child.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken

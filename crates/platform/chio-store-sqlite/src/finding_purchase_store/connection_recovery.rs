@@ -3,7 +3,11 @@
 //! the drivers in `crate::serving_owner`, since fifteen stores share that one
 //! connection; this module asserts the outcome this store presents for each.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 
 use chio_kernel::RevocationStore;
 

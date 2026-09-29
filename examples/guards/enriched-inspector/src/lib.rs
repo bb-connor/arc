@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Example guard: enriched field inspection + host functions.
 //!
 //! Reads the enriched `action_type` and `extracted_path` fields and calls the

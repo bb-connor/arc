@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core::crypto::{Keypair, PublicKey, Signature};
 use chio_core::hashing::sha256_hex;
 use chio_core::hashing::Hash;
 use chio_core::merkle::{leaf_hash, verify_consistency_proof, MerkleProof, MerkleTree};
@@ -331,11 +331,9 @@ pub struct CheckpointTransparencySummary {
 
 #[must_use]
 pub fn checkpoint_log_id(checkpoint: &KernelCheckpoint) -> String {
-    let log_key_bytes: Vec<u8> = match checkpoint.body.kernel_key.algorithm() {
-        SigningAlgorithm::Ed25519 => checkpoint.body.kernel_key.as_bytes().to_vec(),
-        SigningAlgorithm::P256 | SigningAlgorithm::P384 | SigningAlgorithm::Hybrid => {
-            checkpoint.body.kernel_key.to_hex().into_bytes()
-        }
+    let log_key_bytes: Vec<u8> = match checkpoint.body.kernel_key.ed25519_bytes() {
+        Ok(bytes) => bytes.to_vec(),
+        Err(_) => checkpoint.body.kernel_key.to_hex().into_bytes(),
     };
     format!("local-log-{}", sha256_hex(&log_key_bytes))
 }
@@ -449,9 +447,8 @@ impl CheckpointChainFrontier {
     pub fn append(&mut self, chain_leaf_hash: Hash) {
         self.last_leaf = Some(chain_leaf_hash);
         self.subtrees.push((chain_leaf_hash, 1));
-        while self.subtrees.len() >= 2 {
-            let (right, right_span) = self.subtrees[self.subtrees.len() - 1];
-            let (left, left_span) = self.subtrees[self.subtrees.len() - 2];
+        while let [.., (left, left_span), (right, right_span)] = self.subtrees.as_slice() {
+            let (left, left_span, right, right_span) = (*left, *left_span, *right, *right_span);
             if left_span != right_span {
                 break;
             }
@@ -475,15 +472,10 @@ impl CheckpointChainFrontier {
     /// definition produces for a tree whose right edge is incomplete.
     #[must_use]
     pub fn root(&self) -> Option<Hash> {
-        let (last, _) = *self.subtrees.last()?;
-        Some(
-            self.subtrees[..self.subtrees.len() - 1]
-                .iter()
-                .rev()
-                .fold(last, |acc, (subtree, _)| {
-                    chio_core::merkle::node_hash(subtree, &acc)
-                }),
-        )
+        let (&(last, _), prefix) = self.subtrees.split_last()?;
+        Some(prefix.iter().rev().fold(last, |acc, (subtree, _)| {
+            chio_core::merkle::node_hash(subtree, &acc)
+        }))
     }
 }
 
@@ -612,6 +604,10 @@ fn chain_tree_size(checkpoint: &KernelCheckpoint) -> Result<usize, CheckpointErr
 
 /// Ensure the two pair endpoints appear at their own positions in the
 /// supplied chain leaves, then hand back the parsed sizes.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Both nonzero tree sizes are checked against the supplied leaf count before indexing."
+)]
 fn validate_chain_leaves_for_pair(
     previous: &KernelCheckpoint,
     current: &KernelCheckpoint,
@@ -947,7 +943,10 @@ pub fn verify_checkpoint_consistency_proof_with_anchor(
     ))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn ordered_equivocation(
     kind: CheckpointEquivocationKind,
     log_id: Option<String>,
@@ -1213,6 +1212,10 @@ struct DerivedCheckpointTransparency<'a> {
     checkpoints: Vec<ValidatedCheckpoint<'a>>,
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "All positions are created by enumerating this immutable checkpoint slice in this function."
+)]
 fn derive_checkpoint_transparency(
     checkpoints: &[KernelCheckpoint],
 ) -> Result<DerivedCheckpointTransparency<'_>, CheckpointError> {
@@ -1419,6 +1422,10 @@ pub fn build_checkpoint_transparency(
 /// A caller that wants to trust a later boundary without the full prefix must
 /// use a separate API that accepts an explicitly pinned boundary. This
 /// verifier has no such input, so an unresolved predecessor fails closed.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The digest index stores positions from enumerating the same unchanged checkpoint vector."
+)]
 pub fn validate_checkpoint_transparency(
     checkpoints: &[KernelCheckpoint],
 ) -> Result<CheckpointTransparencySummary, CheckpointError> {
@@ -1646,7 +1653,10 @@ pub fn build_checkpoint_with_previous(
 /// it, so issuing a checkpoint costs O(log n) hashes instead of rehashing the
 /// whole chain. The predecessor's signed `chain_root` is still checked, at the
 /// same O(log n) cost, so the integrity guarantee is unchanged.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 pub fn build_checkpoint_with_chain_frontier(
     checkpoint_seq: u64,
     batch_start_seq: u64,

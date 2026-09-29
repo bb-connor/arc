@@ -241,36 +241,42 @@ pub(super) fn spawn_command(
     let ceilings = resources
         .map(|resources| resources.ceilings())
         .unwrap_or_default();
+    let confine_child = move || {
+        // SAFETY: PR_SET_PDEATHSIG takes a valid signal and no pointers, and
+        // changes only the forked child's parent-death behavior.
+        if unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: getppid is an async-signal-safe query with no arguments.
+        if unsafe { libc::getppid() } != parent {
+            return Err(io::Error::from_raw_os_error(libc::ECHILD));
+        }
+        for (ceiling, value) in &ceilings {
+            let resource = match ceiling {
+                Ceiling::CpuSeconds => libc::RLIMIT_CPU,
+                Ceiling::OpenFiles => libc::RLIMIT_NOFILE,
+                Ceiling::FileBytes => libc::RLIMIT_FSIZE,
+                Ceiling::AddressSpaceBytes => libc::RLIMIT_AS,
+            };
+            let limit = libc::rlimit {
+                rlim_cur: *value,
+                rlim_max: *value,
+            };
+            // SAFETY: limit is initialized and live; resource is one of the
+            // supported process ceilings. Only this child's limits change.
+            if unsafe { libc::setrlimit(resource, &limit) } != 0 {
+                return Err(io::Error::last_os_error());
+            }
+        }
+        Ok(())
+    };
     // SAFETY: after fork, only prctl/getppid/setrlimit and nonallocating errno
     // conversion run over a vector allocated before the fork. No locks, heap
     // operations, environment reads or Rust destructors. Spawn is called by the
     // runner thread or one of its fixed runtime threads, which live until the
     // runner has cancelled supervision and reconciled container ownership.
     unsafe {
-        command.pre_exec(move || {
-            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) != 0 {
-                return Err(io::Error::last_os_error());
-            }
-            if libc::getppid() != parent {
-                return Err(io::Error::from_raw_os_error(libc::ECHILD));
-            }
-            for (ceiling, value) in &ceilings {
-                let resource = match ceiling {
-                    Ceiling::CpuSeconds => libc::RLIMIT_CPU,
-                    Ceiling::OpenFiles => libc::RLIMIT_NOFILE,
-                    Ceiling::FileBytes => libc::RLIMIT_FSIZE,
-                    Ceiling::AddressSpaceBytes => libc::RLIMIT_AS,
-                };
-                let limit = libc::rlimit {
-                    rlim_cur: *value,
-                    rlim_max: *value,
-                };
-                if libc::setrlimit(resource, &limit) != 0 {
-                    return Err(io::Error::last_os_error());
-                }
-            }
-            Ok(())
-        });
+        command.pre_exec(confine_child);
     }
     let mut child = command
         .spawn()

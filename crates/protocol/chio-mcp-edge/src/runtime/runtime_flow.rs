@@ -85,9 +85,9 @@ impl ChioMcpEdge {
         result
     }
 
-    pub(super) fn process_pending_actions_with_channel<W: Write>(
+    pub(super) fn process_pending_actions_with_channel<W: Write + Send>(
         &mut self,
-        client_rx: &mpsc::Receiver<ClientInbound>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
         writer: &mut W,
     ) -> Result<(), AdapterError> {
         while let Some(action) = self.pending_actions.pop() {
@@ -130,10 +130,10 @@ impl ChioMcpEdge {
             .push(EdgeAction::RefreshRoots { session_id, reason });
     }
 
-    pub(super) fn refresh_roots_from_client_with_channel<W: Write>(
+    pub(super) fn refresh_roots_from_client_with_channel<W: Write + Send>(
         &mut self,
         session_id: &SessionId,
-        client_rx: &mpsc::Receiver<ClientInbound>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
         writer: &mut W,
     ) -> Result<(), AdapterError> {
         let result =
@@ -220,9 +220,9 @@ impl ChioMcpEdge {
         }
     }
 
-    pub(super) fn send_client_request_with_channel<W: Write>(
+    pub(super) fn send_client_request_with_channel<W: Write + Send>(
         &mut self,
-        client_rx: &mpsc::Receiver<ClientInbound>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
         writer: &mut W,
         method: &str,
         params: Value,
@@ -489,7 +489,7 @@ impl ChioMcpEdge {
         std::mem::take(&mut self.pending_notifications)
     }
 
-    pub(super) fn flush_pending_notifications<W: Write>(
+    pub(super) fn flush_pending_notifications<W: Write + Send>(
         &mut self,
         writer: &mut W,
     ) -> Result<(), AdapterError> {

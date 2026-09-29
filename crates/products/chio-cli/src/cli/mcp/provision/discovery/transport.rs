@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::{Read, Write};
-use std::os::fd::AsRawFd;
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
@@ -15,17 +14,9 @@ pub(super) fn exchange_until(
     deadline: Instant,
 ) -> Result<Value, String> {
     for pipe in [&stdin, &stdout, &stderr] {
-        // SAFETY: each borrowed FD remains open and owned by this function.
-        let flags = unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_GETFL) };
-        // SAFETY: F_SETFL changes flags on our own live pipe descriptor.
-        if flags < 0
-            || unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0
-        {
-            return Err(format!(
-                "could not make discovery I/O nonblocking: {}",
-                std::io::Error::last_os_error()
-            ));
-        }
+        rustix::fs::fcntl_getfl(pipe)
+            .and_then(|flags| rustix::fs::fcntl_setfl(pipe, flags | rustix::fs::OFlags::NONBLOCK))
+            .map_err(|error| format!("could not make discovery I/O nonblocking: {error}"))?;
     }
     let requests = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params": {

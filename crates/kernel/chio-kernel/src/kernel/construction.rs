@@ -352,8 +352,7 @@ impl ChioKernel {
             execution_nonce_store: None,
             governed_approval_authority: None,
             approval_replay_store: Some(Box::new(
-                crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::with_clock(
-                    crate::governed_approval_replay::DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY,
+                crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::with_default_capacity(
                     clock.clone(),
                 ),
             )),
@@ -1794,7 +1793,7 @@ impl ChioKernel {
     ) -> Result<&dyn dpop::replay_source::DpopReplaySourcePort, KernelError> {
         self.dpop_nonce_store
             .as_ref()
-            .map(|store| store as &dyn dpop::replay_source::DpopReplaySourcePort)
+            .map(|store| -> &dyn dpop::replay_source::DpopReplaySourcePort { store })
             .ok_or_else(|| KernelError::Dpop(crate::dpop::DpopError::MissingStore))
     }
 

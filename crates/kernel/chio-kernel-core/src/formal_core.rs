@@ -384,6 +384,10 @@ pub struct CompositeQuotaResult {
 
 /// Authorize one invocation against every applicable quota or none.
 #[must_use]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "All four arrays have length three and the loop is 0..3; retain this loop shape for formal extraction."
+)]
 pub fn composite_quota_authorize(
     captured: [u8; 3],
     maximum: [u8; 3],
@@ -444,6 +448,10 @@ pub const fn family_binding_preserved(
 
 /// Count distinct eligible signer IDs in a bounded three-token approval set.
 #[must_use]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The parallel arrays have length three; signer is checked against that length before indexing the eligibility and seen arrays."
+)]
 pub fn threshold_distinct_eligible_signers(
     signer_ids: [u8; 3],
     present: [bool; 3],

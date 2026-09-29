@@ -476,7 +476,9 @@ pub fn containment_target(
     let mut target_hex = String::with_capacity(digest.len().saturating_mul(2));
     const HEX: &[u8; 16] = b"0123456789abcdef";
     for byte in digest {
+        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
         target_hex.push(char::from(HEX[usize::from(byte >> 4)]));
+        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
         target_hex.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     Ok(TenantScopedId {
@@ -507,7 +509,7 @@ pub fn validate_containment_overlay_snapshot(
     }
     let contributions = snapshot.active_contributions.as_slice();
     if contributions
-        .windows(2)
+        .array_windows::<2>()
         .any(|pair| pair[0].effect_id >= pair[1].effect_id)
     {
         return Err(PortError::integrity_failure());
@@ -823,7 +825,7 @@ pub fn validate_session_throttle_snapshot(
         || snapshot
             .contributions
             .as_slice()
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].effect_id >= pair[1].effect_id)
     {
         return Err(PortError::integrity_failure());
@@ -1025,7 +1027,9 @@ fn session_throttle_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(bytes.len().saturating_mul(2));
     for byte in bytes {
+        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
         encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        #[allow(clippy::indexing_slicing, reason = "The masked nibble is in 0..16 and HEX has exactly 16 entries.")]
         encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     encoded
@@ -1187,7 +1191,7 @@ pub fn validate_capability_set_suspension_snapshot(
         return Err(PortError::integrity_failure());
     }
     let contributions = snapshot.contributions.as_slice();
-    if contributions.windows(2).any(|pair| {
+    if contributions.array_windows::<2>().any(|pair| {
         (&pair[0].action_id, &pair[0].effect_id) >= (&pair[1].action_id, &pair[1].effect_id)
     }) {
         return Err(PortError::integrity_failure());
@@ -1334,7 +1338,7 @@ pub fn validate_capability_suspension_decision(
     if decision.tenant_id != query.tenant_id
         || decision.capability_id != query.capability_id
         || decision.denied == decision.active_matches.is_empty()
-        || decision.active_matches.as_slice().windows(2).any(|pair| {
+        || decision.active_matches.as_slice().array_windows::<2>().any(|pair| {
             (
                 pair[0].action_id.as_str(),
                 pair[0].effect_id.as_str(),

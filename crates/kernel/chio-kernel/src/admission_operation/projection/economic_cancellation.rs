@@ -53,14 +53,15 @@ pub fn verify_economic_cancellation_terminal_advance(
     projection: &VerifiedAdmissionTerminalProjectionV1,
 ) -> Result<EconomicEffectSlotV1, AdmissionOperationError> {
     let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
-    if batch.transitions.len() != 1
-        || !batch.effect_slots.is_empty()
+    let [transition] = batch.transitions.as_slice() else {
+        return Err(mismatch());
+    };
+    if !batch.effect_slots.is_empty()
         || !batch.request_replays.is_empty()
-        || batch.transitions[0].prepared_effect.is_some()
+        || transition.prepared_effect.is_some()
     {
         return Err(mismatch());
     }
-    let transition = &batch.transitions[0];
     if transition.resource_key.resource_family != "effect_slot" {
         return Err(mismatch());
     }

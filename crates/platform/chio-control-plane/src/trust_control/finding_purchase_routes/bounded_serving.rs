@@ -167,9 +167,8 @@ fn leased_json_body(bytes: Bytes, permit: OwnedSemaphorePermit) -> Body {
     });
     let (sender, receiver) = tokio::sync::mpsc::channel(1);
     tokio::spawn(async move {
-        for start in (0..bytes.len()).step_by(FINDING_RESPONSE_CHUNK_BYTES) {
-            let end = (start + FINDING_RESPONSE_CHUNK_BYTES).min(bytes.len());
-            let send = sender.send(Ok(Bytes::copy_from_slice(&bytes[start..end])));
+        for chunk in bytes.chunks(FINDING_RESPONSE_CHUNK_BYTES) {
+            let send = sender.send(Ok(Bytes::copy_from_slice(chunk)));
             match tokio::time::timeout_at(deadline, send).await {
                 Ok(Ok(())) => {}
                 Ok(Err(_)) | Err(_) => return,

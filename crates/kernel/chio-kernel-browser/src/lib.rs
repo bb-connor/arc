@@ -1,3 +1,18 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![forbid(unsafe_code)]
 //! Browser (wasm-bindgen) bindings over the portable Chio kernel core.
 //!
 //! This crate exposes portable entry points to browser JavaScript /
@@ -35,8 +50,14 @@
 //! error message describing which step failed.
 
 #![no_std]
-#![deny(unsafe_code)]
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )
+)]
 
 extern crate alloc;
 

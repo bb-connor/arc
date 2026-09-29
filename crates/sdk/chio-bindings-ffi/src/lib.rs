@@ -48,6 +48,7 @@ pub const CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA: i32 = 25;
 pub const CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD: i32 = 26;
 pub const CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION: i32 = 27;
 pub const CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION: i32 = 28;
+pub const CHIO_FFI_ERROR_UNTRUSTED_INPUT: i32 = 29;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -122,6 +123,7 @@ fn helper_error_code(error: &Error) -> i32 {
 
 fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
     match code {
+        ErrorCode::UntrustedInput => CHIO_FFI_ERROR_UNTRUSTED_INPUT,
         ErrorCode::InvalidPublicKey => CHIO_FFI_ERROR_INVALID_PUBLIC_KEY,
         ErrorCode::InvalidHex => CHIO_FFI_ERROR_INVALID_HEX,
         ErrorCode::InvalidSignature => CHIO_FFI_ERROR_INVALID_SIGNATURE,

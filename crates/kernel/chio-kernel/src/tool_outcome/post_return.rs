@@ -965,6 +965,10 @@ impl PostReturnEvaluationRecordV1 {
         Ok(next)
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "The recorded-result branch checks index against this unchanged vector length."
+    )]
     pub fn replay_action(
         &self,
         step_index: u32,
@@ -1123,12 +1127,8 @@ fn validate_results(
             maximum: steps.len(),
         });
     }
+    let mut dependency = exact_inputs_digest;
     for (index, result) in results.iter().enumerate() {
-        let dependency = index
-            .checked_sub(1)
-            .map_or(exact_inputs_digest, |previous| {
-                &results[previous].result_digest
-            });
         result.validate_for(
             index,
             steps
@@ -1137,6 +1137,7 @@ fn validate_results(
             dependency,
             evaluation_trusted_time_unix_ms,
         )?;
+        dependency = &result.result_digest;
     }
     Ok(())
 }

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
 impl SqliteBudgetStore {
@@ -117,7 +118,10 @@ impl SqliteBudgetStore {
                 FROM capability_grant_budgets
                 WHERE capability_id = ?1 AND grant_index = ?2
                 "#,
-                params![&request.capability_id, request.grant_index as i64],
+                params![
+                    &request.capability_id,
+                    crate::integer::checked::<_, i64>(request.grant_index)?
+                ],
                 |row| {
                     Ok((
                         budget_u64_from_row(row, 0, "seq")?,
@@ -173,7 +177,7 @@ impl SqliteBudgetStore {
                 "#,
                     params![
                         &request.capability_id,
-                        request.grant_index as i64,
+                        crate::integer::checked::<_, i64>(request.grant_index)?,
                         i64::from(invocation_count_after),
                         self.unix_now()?,
                         budget_u64_to_sqlite(event_seq, "seq")?,
@@ -275,7 +279,7 @@ impl SqliteBudgetStore {
         };
         if original.kind != BudgetMutationKind::AuthorizeExposure
             || original.capability_id != request.capability_id
-            || original.grant_index != request.grant_index as u32
+            || original.grant_index != crate::integer::checked::<_, u32>(request.grant_index)?
             || original.exposure_units != request.requested_exposure_units
             || original.max_invocations != request.max_invocations
             || original.max_cost_per_invocation != request.max_cost_per_invocation

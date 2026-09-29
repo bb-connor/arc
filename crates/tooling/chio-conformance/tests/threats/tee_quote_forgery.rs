@@ -122,7 +122,7 @@ fn unsigned_frame() -> Frame {
 
 fn signed_frame() -> (Frame, [u8; 32]) {
     let keypair = Keypair::from_seed(&[0x42u8; 32]);
-    let public_key = *keypair.public_key().as_bytes();
+    let public_key = keypair.public_key_bytes();
     let mut frame = unsigned_frame();
     let payload = match signing_payload(&frame) {
         Ok(payload) => payload,
@@ -145,7 +145,7 @@ fn threat_tee_quote_forgery_wrong_tenant_key_rejected() {
     // different tenant's public key (e.g. tenant_id swap). The
     // production validate_signed MUST reject.
     let (frame, _genuine_pk) = signed_frame();
-    let attacker_pk = *Keypair::from_seed(&[0xAAu8; 32]).public_key().as_bytes();
+    let attacker_pk = Keypair::from_seed(&[0xAAu8; 32]).public_key_bytes();
     assert_ne!(_genuine_pk, attacker_pk);
 
     let err = match validate_signed(&frame, &attacker_pk) {

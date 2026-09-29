@@ -848,7 +848,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
         if state.rule_version_hash != rule.version_hash() {
             return CapacityReservation::Health(DetectorHealthKind::CorruptState);
         }
-        if state.groups.len() > rule.max_groups() as usize {
+        if u32::try_from(state.groups.len()).map_or(true, |count| count > rule.max_groups()) {
             return CapacityReservation::Health(DetectorHealthKind::CorruptState);
         }
         let next_watermark = state.watermark_unix_ms.max(event.event_time_unix_ms);
@@ -867,7 +867,7 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
             }
             entry.expires_at_unix_ms = entry.expires_at_unix_ms.max(expires_at);
         } else {
-            if state.groups.len() >= rule.max_groups() as usize {
+            if u32::try_from(state.groups.len()).map_or(true, |count| count >= rule.max_groups()) {
                 return CapacityReservation::Overflow;
             }
             state.groups.push(CapacityEntry {
@@ -1180,7 +1180,8 @@ fn process_events(
     next_watermark: u64,
     bounded_lateness_ms: u64,
 ) -> Result<ProcessResult, ()> {
-    if state.candidates.len() > rule.max_partial_matches_per_group() as usize
+    if u32::try_from(state.candidates.len())
+        .map_or(true, |count| count > rule.max_partial_matches_per_group())
         || state
             .candidates
             .iter()
@@ -1239,7 +1240,7 @@ fn process_events(
             };
             let candidates = if stage_index == 0 {
                 let mut stages = vec![None; rule.stages().len()];
-                stages[0] = Some(contribution);
+                *stages.first_mut().ok_or(())? = Some(contribution);
                 vec![PartialCandidate {
                     stages,
                     lineage_seed: body.subject.lineage_seed.clone(),
@@ -1278,7 +1279,7 @@ fn process_events(
                         continue;
                     }
                     let mut candidate = source;
-                    candidate.stages[stage_index] = Some(contribution.clone());
+                    *candidate.stages.get_mut(stage_index).ok_or(())? = Some(contribution.clone());
                     extended.push(candidate);
                 }
                 extended
@@ -1293,11 +1294,15 @@ fn process_events(
             }
             working.sort();
             working.dedup();
-            if findings.len() > rule.max_partial_matches_per_group() as usize {
+            if u32::try_from(findings.len())
+                .map_or(true, |count| count > rule.max_partial_matches_per_group())
+            {
                 return Ok(suppress_for_overflow(rule, state, bounded_lateness_ms));
             }
         }
-        if working.len() > rule.max_partial_matches_per_group() as usize {
+        if u32::try_from(working.len())
+            .map_or(true, |count| count > rule.max_partial_matches_per_group())
+        {
             return Ok(suppress_for_overflow(rule, state, bounded_lateness_ms));
         }
         state.candidates = working;
@@ -1338,11 +1343,11 @@ fn candidate_deadline(rule: &TemporalRule, candidate: &PartialCandidate) -> Resu
     }
     let mut deadline = u64::MAX;
     for (stage_index, stage) in rule.stages().iter().enumerate().skip(1) {
-        if candidate.stages[stage_index].is_some() {
+        if candidate.stages.get(stage_index).ok_or(())?.is_some() {
             continue;
         }
         let predecessor = stage.predecessor_index().ok_or(())?;
-        let Some(predecessor_event) = candidate.stages[predecessor].as_ref() else {
+        let Some(predecessor_event) = candidate.stages.get(predecessor).ok_or(())?.as_ref() else {
             continue;
         };
         let within = stage.within_ms().ok_or(())?;
@@ -1605,7 +1610,7 @@ fn load_capacity_state(partial: &CorrelationPartial) -> Result<CapacityState, ()
         || state.watermark_unix_ms != partial.watermark_unix_ms
         || state
             .groups
-            .windows(2)
+            .array_windows::<2>()
             .any(|pair| pair[0].group_hash >= pair[1].group_hash)
     {
         return Err(());
@@ -1645,6 +1650,10 @@ fn port_health_kind(error: &PortError) -> DetectorHealthKind {
     }
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The table has exactly 16 entries and each masked nibble is in 0..16."
+)]
 fn hex_bytes(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(bytes.len() * 2);

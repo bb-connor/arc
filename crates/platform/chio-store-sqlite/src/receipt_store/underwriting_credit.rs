@@ -64,7 +64,8 @@ impl SqliteReceiptStore {
                 .premium
                 .quoted_amount
                 .as_ref()
-                .map(|amount| amount.units as i64);
+                .map(|amount| crate::integer::checked::<_, i64>(amount.units))
+                .transpose()?;
             tx.execute(
                 "INSERT INTO underwriting_decisions (
                 decision_id, issued_at, capability_id, subject_key, tool_server, tool_name,
@@ -73,7 +74,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, ?12, ?13, ?14, ?15)",
                 params![
                     artifact.decision_id,
-                    artifact.issued_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
                     artifact.evaluation.input.filters.capability_id.as_deref(),
                     artifact.evaluation.input.filters.agent_subject.as_deref(),
                     artifact.evaluation.input.filters.tool_server.as_deref(),
@@ -188,8 +189,8 @@ impl SqliteReceiptStore {
                     record.reason,
                     underwriting_appeal_status_label(record.status),
                     record.note.as_deref(),
-                    record.created_at as i64,
-                    record.updated_at as i64,
+                    crate::integer::checked::<_, i64>(record.created_at)?,
+                    crate::integer::checked::<_, i64>(record.updated_at)?,
                 ],
             )?;
             tx.commit()?;
@@ -262,7 +263,7 @@ impl SqliteReceiptStore {
             params![
                 underwriting_appeal_status_label(record.status),
                 record.note.as_deref(),
-                record.updated_at as i64,
+                crate::integer::checked::<_, i64>(record.updated_at)?,
                 record.resolved_by.as_deref(),
                 record.replacement_decision_id.as_deref(),
                 record.appeal_id,
@@ -351,10 +352,12 @@ impl SqliteReceiptStore {
             }
 
             if decisions.len() < normalized.limit_or_default() {
-                let open_appeal_count = decision_appeals
-                    .iter()
-                    .filter(|appeal| appeal.status == UnderwritingAppealStatus::Open)
-                    .count() as u64;
+                let open_appeal_count = crate::integer::count(
+                    decision_appeals
+                        .iter()
+                        .filter(|appeal| appeal.status == UnderwritingAppealStatus::Open)
+                        .count(),
+                );
                 decisions.push(UnderwritingDecisionRow {
                     decision,
                     lifecycle_state,
@@ -381,7 +384,7 @@ impl SqliteReceiptStore {
             filters: normalized,
             summary: UnderwritingDecisionSummary {
                 matching_decisions,
-                returned_decisions: decisions.len() as u64,
+                returned_decisions: crate::integer::count(decisions.len()),
                 active_decisions,
                 superseded_decisions,
                 open_appeals,
@@ -451,7 +454,7 @@ impl SqliteReceiptStore {
                 if state.0
                     != credit_facility_lifecycle_state_label(CreditFacilityLifecycleState::Active)
                     || state.1.is_some()
-                    || state.2.max(0) as u64 <= unix_now()?
+                    || u64::try_from(state.2.max(0)).unwrap_or_default() <= unix_now()?
                 {
                     return Err(ReceiptStoreError::Conflict(format!(
                         "credit facility `{supersedes_facility_id}` is not active"
@@ -467,8 +470,8 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, ?11, ?12, ?13)",
                 params![
                     artifact.facility_id,
-                    artifact.issued_at as i64,
-                    artifact.expires_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
+                    crate::integer::checked::<_, i64>(artifact.expires_at)?,
                     artifact.report.filters.capability_id.as_deref(),
                     artifact.report.filters.agent_subject.as_deref(),
                     artifact.report.filters.tool_server.as_deref(),
@@ -574,7 +577,7 @@ impl SqliteReceiptStore {
             query: normalized,
             summary: CreditFacilityListSummary {
                 matching_facilities,
-                returned_facilities: facilities.len() as u64,
+                returned_facilities: crate::integer::count(facilities.len()),
                 active_facilities,
                 superseded_facilities,
                 denied_facilities,
@@ -638,7 +641,7 @@ impl SqliteReceiptStore {
                     })?;
                 if state.0 != credit_bond_lifecycle_state_label(CreditBondLifecycleState::Active)
                     || state.1.is_some()
-                    || state.2.max(0) as u64 <= unix_now()?
+                    || u64::try_from(state.2.max(0)).unwrap_or_default() <= unix_now()?
                 {
                     return Err(ReceiptStoreError::Conflict(format!(
                         "credit bond `{supersedes_bond_id}` is not active"
@@ -654,8 +657,8 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, ?12, ?13, ?14)",
                 params![
                     artifact.bond_id,
-                    artifact.issued_at as i64,
-                    artifact.expires_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
+                    crate::integer::checked::<_, i64>(artifact.expires_at)?,
                     artifact.report.latest_facility_id.as_deref(),
                     artifact.report.filters.capability_id.as_deref(),
                     artifact.report.filters.agent_subject.as_deref(),
@@ -762,7 +765,7 @@ impl SqliteReceiptStore {
             query: normalized,
             summary: CreditBondListSummary {
                 matching_bonds,
-                returned_bonds: bonds.len() as u64,
+                returned_bonds: crate::integer::count(bonds.len()),
                 active_bonds,
                 superseded_bonds,
                 released_bonds,
@@ -829,7 +832,7 @@ impl SqliteReceiptStore {
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                 params![
                     artifact.event_id,
-                    artifact.issued_at as i64,
+                    crate::integer::checked::<_, i64>(artifact.issued_at)?,
                     artifact.bond_id,
                     artifact.report.summary.facility_id.as_deref(),
                     artifact.report.summary.capability_id.as_deref(),
@@ -973,7 +976,7 @@ impl SqliteReceiptStore {
             query: normalized,
             summary: CreditLossLifecycleListSummary {
                 matching_events,
-                returned_events: events.len() as u64,
+                returned_events: crate::integer::count(events.len()),
                 delinquency_events,
                 recovery_events,
                 reserve_release_events,

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use chio_credit::obligation::{
     CreditExposureReservationRecordV1, CreditExposureReservationStateV1,
 };
@@ -1033,7 +1034,7 @@ pub(super) fn verify_credit_exposure_account_invariants(
             }
         }
         event_versions.sort_unstable();
-        if event_versions.windows(2).any(|pair| {
+        if event_versions.array_windows::<2>().any(|pair| {
             pair[0]
                 .checked_add(1)
                 .is_none_or(|expected| expected != pair[1])

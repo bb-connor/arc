@@ -66,13 +66,15 @@ impl NativeBrokerMcpTool {
             .authorize_cage_manifest(server_id)
             .map_err(|_| refused())?;
         let manifest = &authorization.signed_manifest().manifest;
-        if manifest.tools.len() != 1
-            || manifest
-                .required_permissions
-                .as_ref()
-                .is_none_or(|permissions| {
-                    permissions.native_syscall_profile != NativeSyscallProfile::BrokeredNativeV1
-                })
+        let [tool] = manifest.tools.as_slice() else {
+            return Err(refused());
+        };
+        if manifest
+            .required_permissions
+            .as_ref()
+            .is_none_or(|permissions| {
+                permissions.native_syscall_profile != NativeSyscallProfile::BrokeredNativeV1
+            })
         {
             return Err(refused());
         }
@@ -82,7 +84,7 @@ impl NativeBrokerMcpTool {
             server_version: manifest.version.clone(),
             public_key: manifest.public_key.clone(),
         };
-        let tool_name = manifest.tools[0].name.clone();
+        let tool_name = tool.name.clone();
         Ok(Self {
             command,
             args,

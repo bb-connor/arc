@@ -1,3 +1,18 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+#![forbid(unsafe_code)]
 //! Portable Chio kernel core.
 //!
 //! This crate contains the pure-compute subset of Chio evaluation as a
@@ -53,8 +68,14 @@
 //! qualification on top of this core.
 
 #![no_std]
-#![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
-#![deny(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+    )
+)]
 
 extern crate alloc;
 

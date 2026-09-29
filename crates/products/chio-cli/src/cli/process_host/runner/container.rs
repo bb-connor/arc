@@ -210,8 +210,8 @@ pub(super) async fn create(
         .ok_or_else(|| error("container socket path must be UTF-8"))?;
     let metadata = socket.symlink_metadata()?;
     // The runner prepared and owns this socket's private ancestry.
-    // SAFETY: getuid/getgid are read-only process queries.
-    let (uid, gid) = unsafe { (libc::getuid(), libc::getgid()) };
+    let uid = rustix::process::getuid().as_raw();
+    let gid = rustix::process::getgid().as_raw();
     if socket_text.contains([',', '\n', '\r', '\0'])
         || !socket.is_absolute()
         || !metadata.file_type().is_socket()

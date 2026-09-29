@@ -370,7 +370,7 @@ pub(crate) fn build_capability_snapshot(
         .delegation_chain
         .last()
         .map(|link| link.capability_id.as_str());
-    if delegation_depth != token.delegation_chain.len() as u64
+    if delegation_depth != crate::integer::count(token.delegation_chain.len())
         || parent_capability_id.as_deref() != signed_parent
     {
         return Err(CliError::cli_other_error(

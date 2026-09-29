@@ -85,7 +85,10 @@ pub struct ProductionActiveDefenseHostConfig {
 }
 
 impl ProductionActiveDefenseHostConfig {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new(
         durability: super::durability::SecurityDurability,
         security_state_authority: ProductionSecurityStateAuthority,
@@ -969,3 +972,7 @@ include!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/security/orchestration_teardown.inc"
 ));
+
+#[cfg(test)]
+#[path = "orchestration_retained_teardown_tests.rs"]
+mod retained_teardown_supervisor_tests;

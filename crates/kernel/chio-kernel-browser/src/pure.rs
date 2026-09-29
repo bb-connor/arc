@@ -436,22 +436,20 @@ pub fn decode_seed_hex(hex_str: &str) -> Result<[u8; 32], BindingError> {
     }
     let mut out = [0u8; 32];
     let bytes = stripped.as_bytes();
-    let mut idx = 0;
-    while idx < bytes.len() {
-        let hi = from_hex_nibble(bytes[idx]).map_err(|reason| {
+    for (output, [hi, lo]) in out.iter_mut().zip(bytes.as_chunks::<2>().0) {
+        let hi = from_hex_nibble(*hi).map_err(|reason| {
             BindingError::new(
                 "invalid_seed_hex",
                 format!("seed has non-hex character: {reason}"),
             )
         })?;
-        let lo = from_hex_nibble(bytes[idx + 1]).map_err(|reason| {
+        let lo = from_hex_nibble(*lo).map_err(|reason| {
             BindingError::new(
                 "invalid_seed_hex",
                 format!("seed has non-hex character: {reason}"),
             )
         })?;
-        out[idx / 2] = (hi << 4) | lo;
-        idx += 2;
+        *output = (hi << 4) | lo;
     }
     Ok(out)
 }
@@ -467,14 +465,18 @@ fn from_hex_nibble(byte: u8) -> Result<u8, &'static str> {
 
 /// Lowercase-hex encoder shared by the wasm seed-minting entry and the
 /// native unit tests.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The table has 16 entries and each index is a masked four-bit nibble."
+)]
 pub fn hex_encode_lower(bytes: &[u8]) -> String {
     const NIBBLES: [char; 16] = [
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
     ];
     let mut out = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
-        out.push(NIBBLES[(byte >> 4) as usize]);
-        out.push(NIBBLES[(byte & 0x0f) as usize]);
+        out.push(NIBBLES[usize::from(byte >> 4)]);
+        out.push(NIBBLES[usize::from(byte & 0x0f)]);
     }
     out
 }

@@ -11,8 +11,14 @@ impl SqliteReceiptStore {
         let capability_id = query.capability_id.as_deref();
         let tool_server = query.tool_server.as_deref();
         let tool_name = query.tool_name.as_deref();
-        let since = query.since.map(|value| value as i64);
-        let until = query.until.map(|value| value as i64);
+        let since = query
+            .since
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
+        let until = query
+            .until
+            .map(crate::integer::checked::<_, i64>)
+            .transpose()?;
         let agent_subject = query.agent_subject.as_deref();
 
         let summary_sql = r#"
@@ -69,11 +75,11 @@ impl SqliteReceiptStore {
             ],
             |row| {
                 Ok((
-                    row.get::<_, i64>(0)?.max(0) as u64,
-                    row.get::<_, i64>(1)?.max(0) as u64,
-                    row.get::<_, i64>(2)?.max(0) as u64,
-                    row.get::<_, i64>(3)?.max(0) as u64,
-                    row.get::<_, i64>(4)?.max(0) as u64,
+                    u64::try_from(row.get::<_, i64>(0)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(1)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(2)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(3)?.max(0)).unwrap_or_default(),
+                    u64::try_from(row.get::<_, i64>(4)?.max(0)).unwrap_or_default(),
                 ))
             },
         )?;

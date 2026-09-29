@@ -1523,7 +1523,10 @@ impl SqliteFindingOperatorBundleStore {
         Ok(true)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn reserve_seller_artifact_capacity_with_limits(
         &self,
         request_id: &str,
@@ -1968,6 +1971,10 @@ fn now_secs() -> Result<i64, FindingOperatorBundleStoreError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 #[path = "finding_operator_bundle_store_tests.rs"]
 mod tests;

@@ -1085,12 +1085,26 @@ fn now_secs() -> Result<i64, BlobStoreError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 #[path = "encrypted_blob/tests/tenant_isolation.rs"]
 mod tenant_isolation;
 
+impl From<chio_security_types::clock::ClockError> for BlobStoreError {
+    fn from(error: chio_security_types::clock::ClockError) -> Self {
+        Self::Clock(error)
+    }
+}
+
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
 
@@ -1375,11 +1389,5 @@ mod tests {
                 .unwrap(),
             BlobReferenceMutationOutcome::Replayed
         );
-    }
-}
-
-impl From<chio_security_types::clock::ClockError> for BlobStoreError {
-    fn from(error: chio_security_types::clock::ClockError) -> Self {
-        Self::Clock(error)
     }
 }

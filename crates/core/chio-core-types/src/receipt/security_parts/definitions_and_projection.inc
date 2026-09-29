@@ -227,7 +227,7 @@ impl ActiveDefensePriorReceiptIds {
     pub fn new(
         prior_receipt_ids: Vec<OpaqueReceiptRef>,
     ) -> core::result::Result<Self, ActiveDefenseReceiptValidationError> {
-        if prior_receipt_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
+        if prior_receipt_ids.array_windows::<2>().any(|pair| pair[0] >= pair[1]) {
             return Err(ActiveDefenseReceiptValidationError::PriorReceiptsNotStrictlySorted);
         }
         BoundedVec::new(prior_receipt_ids)
@@ -246,7 +246,7 @@ impl ActiveDefensePriorReceiptIds {
     }
 
     fn validate(&self) -> core::result::Result<(), ActiveDefenseReceiptValidationError> {
-        if self.0.as_slice().windows(2).any(|pair| pair[0] >= pair[1]) {
+        if self.0.as_slice().array_windows::<2>().any(|pair| pair[0] >= pair[1]) {
             return Err(ActiveDefenseReceiptValidationError::PriorReceiptsNotStrictlySorted);
         }
         Ok(())
@@ -1259,7 +1259,7 @@ fn response_snapshot_effect_outcomes(
             .iter()
             .position(|effect| &effect.effect_id == effect_id)
             .ok_or_else(|| response_snapshot_error("response outcome references unknown effect"))?;
-        outcomes[position].outcome = outcome;
+        outcomes.get_mut(position).ok_or_else(|| response_snapshot_error("response outcome index is invalid"))?.outcome = outcome;
     }
     if lift {
         for outcome in &mut outcomes {

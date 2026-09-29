@@ -1876,7 +1876,7 @@ fn expected_transition(
         AdmissionOperationState::Completed,
     ]);
     let mut edges = path
-        .windows(2)
+        .array_windows::<2>()
         .map(|edge| (edge[0], edge[1]))
         .collect::<Vec<_>>();
     if requirements.budget_capture && requirements.approval {

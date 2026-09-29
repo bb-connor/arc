@@ -801,7 +801,7 @@ fn write_oidc_discovery_fixture(
                 "crv": "Ed25519",
                 "alg": "EdDSA",
                 "use": "sig",
-                "x": URL_SAFE_NO_PAD.encode(signing_key.public_key().as_bytes()),
+            "x": URL_SAFE_NO_PAD.encode(signing_key.public_key_bytes()),
             }]
         }),
     )

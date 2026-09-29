@@ -29,8 +29,8 @@ pub(super) fn decode_lower_hex_digest(value: &str) -> Option<Digest32> {
         return None;
     }
     let mut decoded = [0_u8; 32];
-    for (index, pair) in bytes.chunks_exact(2).enumerate() {
-        decoded[index] = hex_nibble(pair[0])?.checked_mul(16)? + hex_nibble(pair[1])?;
+    for (target, [high, low]) in decoded.iter_mut().zip(bytes.as_chunks::<2>().0) {
+        *target = hex_nibble(*high)?.checked_mul(16)? + hex_nibble(*low)?;
     }
     Some(Digest32::new(decoded))
 }

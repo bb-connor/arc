@@ -369,11 +369,11 @@ impl ChioMcpEdge {
         }
     }
 
-    fn handle_jsonrpc_with_transport_channel<W: Write>(
+    fn handle_jsonrpc_with_transport_channel<W: Write + Send>(
         &mut self,
         message: Value,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Option<Value> {
         let JsonRpcEnvelope { id, method, params } = match parse_jsonrpc_envelope(&message) {
@@ -393,34 +393,34 @@ impl ChioMcpEdge {
         }
     }
 
-    pub fn serve_stdio<R: BufRead + Send + 'static, W: Write>(
+    pub fn serve_stdio<R: BufRead + Send + 'static, W: Write + Send>(
         &mut self,
         reader: R,
         mut writer: W,
     ) -> Result<(), AdapterError> {
-        let (client_tx, client_rx) = mpsc::channel();
-        let (cancel_tx, cancel_rx) = mpsc::channel();
+        let (client_tx, mut client_rx) = mpsc::channel();
+        let (cancel_tx, mut cancel_rx) = mpsc::channel();
         std::thread::spawn(move || pump_client_messages(reader, client_tx, cancel_tx));
 
-        self.serve_inbound_loop(&client_rx, &cancel_rx, &mut writer)
+        self.serve_inbound_loop(&mut client_rx, &mut cancel_rx, &mut writer)
     }
 
-    pub fn serve_message_channels<W: Write>(
+    pub fn serve_message_channels<W: Write + Send>(
         &mut self,
         client_rx: mpsc::Receiver<Value>,
         mut writer: W,
     ) -> Result<(), AdapterError> {
-        let (inbound_tx, inbound_rx) = mpsc::channel();
-        let (cancel_tx, cancel_rx) = mpsc::channel();
+        let (inbound_tx, mut inbound_rx) = mpsc::channel();
+        let (cancel_tx, mut cancel_rx) = mpsc::channel();
         std::thread::spawn(move || pump_channel_messages(client_rx, inbound_tx, cancel_tx));
 
-        self.serve_inbound_loop(&inbound_rx, &cancel_rx, &mut writer)
+        self.serve_inbound_loop(&mut inbound_rx, &mut cancel_rx, &mut writer)
     }
 
-    fn serve_inbound_loop<W: Write>(
+    fn serve_inbound_loop<W: Write + Send>(
         &mut self,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Result<(), AdapterError> {
         loop {

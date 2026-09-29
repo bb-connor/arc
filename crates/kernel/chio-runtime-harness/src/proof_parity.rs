@@ -424,12 +424,14 @@ fn compare_bilateral_dsse_predicate_semantics(
 
     let mut normalized_runtime_value = runtime_value.clone();
     let step_index = expected_buyer_closure.step_index;
-    if buyer_closure_predicate_delta_matches(
-        &static_value[step_index],
-        &runtime_value[step_index],
-        expected_buyer_closure,
+    if let (Some(static_step), Some(runtime_step)) = (
+        static_value.get(step_index),
+        normalized_runtime_value.get_mut(step_index),
     ) {
-        normalized_runtime_value[step_index] = static_value[step_index].clone();
+        if buyer_closure_predicate_delta_matches(static_step, runtime_step, expected_buyer_closure)
+        {
+            *runtime_step = static_step.clone();
+        }
     }
     compare_runtime_proof_field(field, &static_value, &normalized_runtime_value, mismatches)
 }

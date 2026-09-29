@@ -456,7 +456,7 @@ fn validate_revocation_snapshot(
     records: &[RevocationRecordView],
     replication: &ClusterReplicationHeadsView,
 ) -> Result<Option<RevocationCursor>, CliError> {
-    for pair in records.windows(2) {
+    for pair in records.array_windows::<2>() {
         let previous = (&pair[0].revoked_at, pair[0].capability_id.as_str());
         let current = (&pair[1].revoked_at, pair[1].capability_id.as_str());
         if current <= previous {

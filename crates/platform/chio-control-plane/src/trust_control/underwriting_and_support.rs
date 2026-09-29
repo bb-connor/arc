@@ -81,8 +81,8 @@ pub(crate) fn build_credit_bond_terms(
     let coverage_ratio_bps = if reserve_requirement_units == 0 {
         10_000
     } else {
-        (((collateral_units as u128) * 10_000) / (reserve_requirement_units as u128))
-            .min(u16::MAX as u128) as u16
+        u16::try_from(u128::from(collateral_units) * 10_000 / u128::from(reserve_requirement_units))
+            .unwrap_or(u16::MAX)
     };
 
     CreditBondTerms {
@@ -431,7 +431,8 @@ pub(crate) fn credit_bond_reserve_units(units: u64, ratio_bps: u16) -> u64 {
     if units == 0 || ratio_bps == 0 {
         0
     } else {
-        (((units as u128) * (ratio_bps as u128)).div_ceil(10_000_u128)).min(u64::MAX as u128) as u64
+        u64::try_from((u128::from(units) * u128::from(ratio_bps)).div_ceil(10_000))
+            .unwrap_or(u64::MAX)
     }
 }
 
@@ -471,19 +472,25 @@ pub(crate) fn build_credit_recent_loss_history(
     entries.truncate(limit);
     let summary = CreditRecentLossSummary {
         matching_loss_events,
-        returned_loss_events: entries.len() as u64,
-        failed_settlement_events: entries
-            .iter()
-            .filter(|entry| entry.settlement_status == SettlementStatus::Failed)
-            .count() as u64,
-        provisional_loss_events: entries
-            .iter()
-            .filter(|entry| entry.provisional_loss_amount.is_some())
-            .count() as u64,
-        recovered_events: entries
-            .iter()
-            .filter(|entry| entry.recovered_amount.is_some())
-            .count() as u64,
+        returned_loss_events: crate::integer::count(entries.len()),
+        failed_settlement_events: crate::integer::count(
+            entries
+                .iter()
+                .filter(|entry| entry.settlement_status == SettlementStatus::Failed)
+                .count(),
+        ),
+        provisional_loss_events: crate::integer::count(
+            entries
+                .iter()
+                .filter(|entry| entry.provisional_loss_amount.is_some())
+                .count(),
+        ),
+        recovered_events: crate::integer::count(
+            entries
+                .iter()
+                .filter(|entry| entry.recovered_amount.is_some())
+                .count(),
+        ),
     };
     Ok(CreditRecentLossHistory { summary, entries })
 }
@@ -615,6 +622,10 @@ pub(crate) fn capital_book_receipt_evidence(
     evidence_refs
 }
 
+#[allow(
+    clippy::as_conversions,
+    reason = "Statistical score dimensions approximate integer totals; monetary amounts remain exact integer units."
+)]
 pub(crate) fn build_credit_scorecard_dimensions(
     subject_key: &str,
     exposure: &ExposureLedgerReport,
@@ -623,7 +634,10 @@ pub(crate) fn build_credit_scorecard_dimensions(
 ) -> Vec<CreditScorecardDimension> {
     let settlement_penalty = credit_scorecard_penalty_ratio(
         credit_scorecard_total_units(&exposure.positions, |position| {
-            position.failed_units.saturating_mul(2) + position.pending_units
+            position
+                .failed_units
+                .saturating_mul(2)
+                .saturating_add(position.pending_units)
         }) as f64
             / 2.0,
         exposure_units,
@@ -716,7 +730,7 @@ pub(crate) fn build_credit_scorecard_probation(
     CreditScorecardProbationStatus {
         probationary: inspection.probationary || confidence == CreditScorecardConfidence::Low,
         reasons,
-        receipt_count: inspection.scorecard.history_depth.receipt_count as u64,
+        receipt_count: crate::integer::count(inspection.scorecard.history_depth.receipt_count),
         span_days: inspection.scorecard.history_depth.span_days,
         target_receipt_count: inspection.probationary_receipt_count,
         target_span_days: inspection.probationary_min_days,
@@ -855,7 +869,7 @@ pub(crate) fn build_credit_scorecard_anomalies(
 pub(crate) fn resolve_credit_scorecard_confidence(
     inspection: &issuance::LocalReputationInspection,
 ) -> CreditScorecardConfidence {
-    let receipt_count = inspection.scorecard.history_depth.receipt_count as u64;
+    let receipt_count = crate::integer::count(inspection.scorecard.history_depth.receipt_count);
     let span_days = inspection.scorecard.history_depth.span_days;
     let mut confidence = if receipt_count >= 100 && span_days >= 30 {
         CreditScorecardConfidence::High

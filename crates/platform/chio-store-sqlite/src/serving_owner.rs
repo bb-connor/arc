@@ -1699,12 +1699,20 @@ fn verify_authority_store_invariants(
 
 #[cfg(all(test, unix))]
 #[path = "serving_owner/tests.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;
 
 #[cfg(all(test, unix))]
 #[path = "serving_owner/connection_recovery.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod connection_recovery;
 #[cfg(all(test, unix))]
 pub(crate) use connection_recovery::{

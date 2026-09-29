@@ -314,8 +314,10 @@ fn resolve_snapshot(
     {
         return Err(BlastRadiusIncompleteReason::MissingCompletenessWatermark);
     }
-    if snapshot.nodes.len() > request.query_bounds.max_nodes as usize
-        || snapshot.edges.len() > request.query_bounds.max_edges as usize
+    if u32::try_from(snapshot.nodes.len())
+        .map_or(true, |count| count > request.query_bounds.max_nodes)
+        || u32::try_from(snapshot.edges.len())
+            .map_or(true, |count| count > request.query_bounds.max_edges)
     {
         return Err(BlastRadiusIncompleteReason::UnreportedTruncation);
     }

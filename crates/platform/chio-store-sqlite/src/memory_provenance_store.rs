@@ -186,7 +186,7 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<MemoryProvenanceEntry> {
         key: row.get("entry_key")?,
         capability_id: row.get("capability_id")?,
         receipt_id: row.get("receipt_id")?,
-        written_at: row.get::<_, i64>("written_at")? as u64,
+        written_at: crate::integer::checked::<_, u64>(row.get::<_, i64>("written_at")?)?,
         prev_hash: row.get("prev_hash")?,
         hash: row.get("hash")?,
     })

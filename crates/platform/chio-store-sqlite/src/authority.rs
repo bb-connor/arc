@@ -645,7 +645,10 @@ impl SqliteCapabilityAuthority {
         };
         Ok((
             public_key,
-            authority_generation(authority_unsigned(generation, "generation")?)? as u64,
+            authority_unsigned(
+                authority_generation(authority_unsigned(generation, "generation")?)?,
+                "generation",
+            )?,
             authority_unsigned(rotated_at, "rotation time")?,
         ))
     }
@@ -762,10 +765,13 @@ impl SqliteCapabilityAuthority {
             let (key, generation, at) = row?;
             Ok(AuthorityTrustedKeySnapshot {
                 public_key_hex: PublicKey::from_hex(key.trim())?.to_hex(),
-                generation: authority_generation(authority_unsigned(
-                    generation,
+                generation: authority_unsigned(
+                    authority_generation(authority_unsigned(
+                        generation,
+                        "trusted-key generation",
+                    )?)?,
                     "trusted-key generation",
-                )?)? as u64,
+                )?,
                 activated_at: authority_unsigned(at, "trusted-key activation time")?,
             })
         })
@@ -880,7 +886,11 @@ fn unix_now() -> Result<u64, chio_security_types::clock::ClockError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};

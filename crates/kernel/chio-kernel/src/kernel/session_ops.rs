@@ -288,7 +288,7 @@ impl ChioKernel {
                         "uri": &operation.uri,
                     }
                 })),
-                receipt_attribution_metadata(&operation.capability, None),
+                receipt_attribution_metadata(&operation.capability, None)?,
             ),
             timestamp: read_unix_timestamp()?,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),

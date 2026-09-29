@@ -1107,6 +1107,12 @@ criteria = "safe-to-deploy"
 version = "1.2.0"
 notes = "RAII scope guard helper; trivial defer macro, no IO."
 
+[[audits.secrecy]]
+who = "Chio compiler and secret-ownership source review"
+criteria = "safe-to-deploy"
+version = "0.10.3"
+notes = "Reviewed all executable source and both manifests from registry archive SHA-256 e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a; all eight members match the cached source. no_std, forbid(unsafe_code), no build script or ambient I/O. Verified drop zeroization, redacted Debug, explicit exposure, cloning and serde opt-in boundaries against the workspace consumers. Broker buffers preserve Vec allocation ownership. Allocation/copy limits and custody exports are documented in docs/security/supply-chain/secrecy-0.10.3.md."
+
 [[audits.semver]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"

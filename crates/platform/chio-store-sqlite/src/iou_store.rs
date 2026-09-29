@@ -146,7 +146,10 @@ fn verify_envelope(envelope: &IouEnvelope) -> Result<(), IouEnvelopeStoreError> 
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
 fn insert_envelope_on_connection(
     connection: &rusqlite::Connection,
     receipt_id: &str,
@@ -339,7 +342,11 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use chio_core::crypto::{sha256_hex, Ed25519Backend, Keypair};

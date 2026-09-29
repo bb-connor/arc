@@ -168,7 +168,7 @@ mod tests {
         let store = Arc::new(DpopNonceStore::new(
             config.nonce_store_capacity,
             Duration::from_secs(config.proof_ttl_secs),
-        ));
+        ).expect("positive replay store test capacities"));
         (store, config)
     }
 

@@ -260,7 +260,7 @@ impl FindingChallengeCoordinator {
     /// confirmed for this liability and this penalty, and the anchored
     /// evidence leaf is fenced under its own key so one proof can
     /// authorize one impairment and no more.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     pub fn finalize(
         &self,
         liability_key: &str,

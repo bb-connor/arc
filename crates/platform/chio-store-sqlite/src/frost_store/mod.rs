@@ -580,5 +580,9 @@ pub(super) fn secret_kind_name(secret: &FrostCeremonySecret) -> &'static str {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod connection_recovery;

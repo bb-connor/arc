@@ -96,7 +96,8 @@ fn exact_authority_signature_yields_only_non_consuming_bounded_evidence() {
 #[test]
 fn legacy_consuming_and_preview_ports_refuse_v2_without_burning_a_nonce() {
     let (_, cap, proof) = fixture();
-    let store = DpopNonceStore::new(8, Duration::from_secs(300));
+    let store = DpopNonceStore::new(8, Duration::from_secs(300))
+        .expect("positive replay store test capacities");
     assert!(matches!(
         crate::dpop::verify_dpop_proof_stateless(
             &proof,
@@ -332,7 +333,8 @@ fn invalid_system_clock_is_not_reinterpreted_as_epoch_zero() {
         4096,
         Duration::from_secs(60),
         std::sync::Arc::new(BeforeEpoch),
-    );
+    )
+    .expect("positive replay store test capacities");
     assert!(matches!(
         store.check_and_insert("nonce", "cap"),
         Err(KernelError::Clock(ClockError::BeforeEpoch))

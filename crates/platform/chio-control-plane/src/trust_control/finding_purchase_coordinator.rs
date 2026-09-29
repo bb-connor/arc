@@ -243,7 +243,10 @@ impl FindingPurchaseCoordinator {
     /// each signing key equals its configured public pin and that the
     /// venue authority policy is valid and names the admissions this
     /// coordinator accepts.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new(
         store: SqliteFindingPurchaseStore,
         admissions: SqliteFindingMarketStore,
@@ -283,7 +286,10 @@ impl FindingPurchaseCoordinator {
     }
 
     /// Build with custody-backed purchase and failed-delivery signers.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn new_with_signing_backends(
         store: SqliteFindingPurchaseStore,
         admissions: SqliteFindingMarketStore,
@@ -648,7 +654,10 @@ impl FindingPurchaseCoordinator {
     /// must name the ask's minter; the allocation cap check and both
     /// reservations commit in one durable transaction. Replaying the same
     /// ask and payer returns the same signed receipt.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn reserve(
         &self,
         bid: &SignedBidRequest,
@@ -676,7 +685,10 @@ impl FindingPurchaseCoordinator {
     /// Reserve for a public request and atomically retain its complete buyer
     /// policy beside the reservation. Exact replays verify the same immutable
     /// binding without requiring the admission to remain current.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn reserve_for_public_request(
         &self,
         bid: &SignedBidRequest,
@@ -702,7 +714,10 @@ impl FindingPurchaseCoordinator {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn reserve_inner(
         &self,
         bid: &SignedBidRequest,
@@ -1578,7 +1593,10 @@ impl FindingPurchaseCoordinator {
     /// checkpoint must be signed by the same kernel and prove inclusion of
     /// the exact deny receipt; ids, digests, and the release terminal are
     /// derived only after those checks pass.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     pub fn finalize_denial(
         &self,
         reservation_id: &str,

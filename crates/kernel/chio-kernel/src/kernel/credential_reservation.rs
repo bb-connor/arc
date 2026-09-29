@@ -388,7 +388,10 @@ impl ChioKernel {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     #[cfg(test)]
     fn reserve_credentials(
         &self,

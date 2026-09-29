@@ -45,6 +45,7 @@ const MAX_ARTIFACT_BYTES: u64 = 256 * 1024 * 1024;
 const REQUIRED_MEMFD_SEALS: i32 =
     libc::F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL;
 const PTRACE_EVENT_EXEC: i32 = 4;
+#[allow(clippy::as_conversions, reason = "The nonnegative Linux ptrace option bits fit c_ulong on both supported architectures; From is not const.")]
 const PTRACE_OPTIONS: libc::c_ulong =
     (libc::PTRACE_O_TRACEEXEC | libc::PTRACE_O_EXITKILL) as libc::c_ulong;
 const AT_EMPTY_PATH: libc::c_int = 0x1000;
@@ -894,7 +895,7 @@ fn child_main(control: File) -> Result<(), BootstrapFault> {
     apply_resource_limits(&envelope.plan)?;
     // SAFETY: the working-directory slot is an authenticated retained
     // directory descriptor.
-    if unsafe { libc::fchdir(envelope.plan.working_directory_fd_slot as RawFd) } != 0 {
+    if unsafe { libc::fchdir(checked_slot_fd(envelope.plan.working_directory_fd_slot)?) } != 0 {
         return Err(BootstrapFault::new(
             CageEnforcementFailureCode::DescriptorIdentityMismatch,
             "working_directory",
@@ -1078,6 +1079,7 @@ fn exact_required_enforcement(requirements: &RequiredEnforcement) -> bool {
         }
 }
 
+#[allow(clippy::as_conversions, reason = "Only fixed nonnegative descriptor and seal constants are converted here; their values fit u32.")]
 fn validate_prepared_launch_contract(
     compiled: &CompiledCage,
     envelope: &LaunchEnvelope,
@@ -1164,6 +1166,7 @@ fn validate_prepared_launch_contract(
     Ok(seals)
 }
 
+#[allow(clippy::as_conversions, reason = "Only fixed nonnegative descriptor and seal constants are converted here; their values fit u32.")]
 fn validate_compiled_plan(validation: CompiledPlanValidation<'_>) -> Result<(), CageLaunchError> {
     let plan = validation.plan;
     if plan.schema != CAGE_INIT_PLAN_SCHEMA

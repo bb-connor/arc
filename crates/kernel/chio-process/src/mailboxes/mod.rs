@@ -58,11 +58,13 @@ impl MailboxServer {
             return Err(ProcessError::Invalid("expected 1-32 mailboxes"));
         }
         config.sort_by(|a, b| a.id.cmp(&b.id));
-        for (index, channel) in config.iter().enumerate() {
+        let mut previous = None;
+        for channel in &config {
             channel.validate()?;
-            if index > 0 && config[index - 1].id == channel.id {
+            if previous == Some(&channel.id) {
                 return Err(ProcessError::Invalid("duplicate mailbox id"));
             }
+            previous = Some(&channel.id);
         }
         let public_key = kernel.public_key().to_hex();
         let store = store::MailboxStore::open(path.as_ref(), authority, &public_key, &config)?;
@@ -167,7 +169,7 @@ impl MailboxServer {
                     serde_json::from_value(arguments)?,
                     sender.as_deref(),
                 )?;
-                if result["status"] == "sent" {
+                if result.get("status").and_then(Value::as_str) == Some("sent") {
                     if let Some(arrivals) = self.arrivals.get(id) {
                         arrivals.notify_waiters();
                     }
@@ -215,8 +217,11 @@ impl MailboxServer {
             tokio::pin!(arrived);
             arrived.as_mut().enable();
             let result = self.dispatch(tool, arguments.clone(), context)?;
-            let empty = result["status"] == "received"
-                && result["messages"].as_array().is_some_and(Vec::is_empty);
+            let empty = result.get("status").and_then(Value::as_str) == Some("received")
+                && result
+                    .get("messages")
+                    .and_then(Value::as_array)
+                    .is_some_and(Vec::is_empty);
             let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
             if !empty || remaining.is_zero() {
                 return Ok(result);

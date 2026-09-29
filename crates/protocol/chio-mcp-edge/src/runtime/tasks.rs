@@ -474,12 +474,12 @@ impl ChioMcpEdge {
         task_outcome_to_jsonrpc(task, &id, &task_id)
     }
 
-    pub(super) fn handle_tasks_result_with_transport_channel<W: Write>(
+    pub(super) fn handle_tasks_result_with_transport_channel<W: Write + Send>(
         &mut self,
         id: Value,
         params: Value,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Value {
         self.prune_expired_tasks();
@@ -552,10 +552,10 @@ impl ChioMcpEdge {
             .retain(|pending| pending != task_id);
     }
 
-    pub(super) fn process_background_tasks_with_channel<W: Write>(
+    pub(super) fn process_background_tasks_with_channel<W: Write + Send>(
         &mut self,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Result<bool, AdapterError> {
         let mut processed_any = false;
@@ -652,10 +652,10 @@ impl ChioMcpEdge {
         Ok(processed_any)
     }
 
-    pub(super) fn service_background_runtime_with_channel<W: Write>(
+    pub(super) fn service_background_runtime_with_channel<W: Write + Send>(
         &mut self,
-        client_rx: &mpsc::Receiver<ClientInbound>,
-        cancel_rx: &mpsc::Receiver<Value>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Result<(), AdapterError> {
         let _ = self.process_background_tasks_with_channel(client_rx, cancel_rx, writer)?;

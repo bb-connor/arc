@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use rusqlite::Connection;
 
 use super::{read_u64, SqliteServingOwnerError};

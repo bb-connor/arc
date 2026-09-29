@@ -771,7 +771,7 @@ fn validate_request(request: &PaymentAuthorizeRequest) -> Result<(), String> {
     validate_text(&request.reference, "reference")?;
     validate_text(&request.payer, "payer")?;
     validate_text(&request.payee, "payee")?;
-    if request.amount_units == 0 || request.amount_units > i64::MAX as u64 {
+    if request.amount_units == 0 || request.amount_units > i64::MAX.unsigned_abs() {
         return Err("payment amount is outside the supported range".to_owned());
     }
     if request.currency.len() != 3
@@ -795,7 +795,7 @@ fn validate_reconciliation_binding(
     currency: &str,
 ) -> Result<(), String> {
     validate_text(payer, "payer")?;
-    if amount_units == 0 || amount_units > i64::MAX as u64 {
+    if amount_units == 0 || amount_units > i64::MAX.unsigned_abs() {
         return Err("payment amount is outside the supported range".to_owned());
     }
     if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
@@ -869,7 +869,11 @@ fn now_secs() -> Result<i64, String> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
 

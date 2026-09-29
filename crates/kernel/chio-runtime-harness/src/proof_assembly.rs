@@ -145,19 +145,15 @@ pub(crate) fn assemble_runtime_loopback_outputs(
             ));
         }
         proof_checks.push("runtime_live_receipts.bound_to_proof_package".to_string());
-        let buyer_closure_index = steps
-            .iter()
-            .enumerate()
-            .find(|(index, step)| {
-                step.admission_bundle.destructive
-                    && step.admission_bundle.governance_receipt_id.is_some()
-                    && live_treaty_contexts
-                        .get(*index)
-                        .and_then(Option::as_ref)
-                        .is_some()
-            })
-            .map(|(index, _)| index);
-        let (mut package, buyer_closure) = if let Some(index) = buyer_closure_index {
+        let buyer_closure_step = steps.iter().enumerate().find(|(index, step)| {
+            step.admission_bundle.destructive
+                && step.admission_bundle.governance_receipt_id.is_some()
+                && live_treaty_contexts
+                    .get(*index)
+                    .and_then(Option::as_ref)
+                    .is_some()
+        });
+        let (mut package, buyer_closure) = if let Some((index, step)) = buyer_closure_step {
             let treaty_context = live_treaty_contexts
                 .get(index)
                 .and_then(Option::as_ref)
@@ -168,7 +164,7 @@ pub(crate) fn assemble_runtime_loopback_outputs(
                 })?;
             let (package, closure) = build_runtime_loopback_buyer_closure(
                 index,
-                &steps[index],
+                step,
                 treaty_context,
                 &baseline_package,
                 now_unix_ms,

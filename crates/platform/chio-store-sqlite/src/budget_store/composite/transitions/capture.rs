@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 use chio_kernel::admission_operation::{AdmissionOperationStoreError, AdmissionOperationV1};
 

@@ -57,9 +57,18 @@ impl<'a> UntrustedJsonText<'a> {
     pub fn decode_canonical<T: DeserializeOwned + Serialize>(
         &self,
     ) -> Result<T, UntrustedJsonError> {
+        self.decode_canonical_with(super::canonical_json_bytes_zeroizing)
+    }
+
+    /// Decode private custody without granting the value a general `Serialize`
+    /// implementation. The owner supplies its explicit canonical custody export;
+    /// original-byte equality still rejects duplicate fields and alternate encodings.
+    pub fn decode_canonical_with<T: DeserializeOwned>(
+        &self,
+        export: impl FnOnce(&T) -> super::Result<zeroize::Zeroizing<Vec<u8>>>,
+    ) -> Result<T, UntrustedJsonError> {
         let value: T = serde_json::from_str(self.text).map_err(UntrustedJsonError::Decode)?;
-        let canonical = super::canonical_json_bytes_zeroizing(&value)
-            .map_err(UntrustedJsonError::Canonicalization)?;
+        let canonical = export(&value).map_err(UntrustedJsonError::Canonicalization)?;
         if canonical.as_slice() != self.text.as_bytes() {
             return Err(UntrustedJsonError::NonCanonical);
         }

@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 //! Preflight every participant before publishing an in-memory reservation change.
 use super::*;
 

@@ -903,7 +903,7 @@ fn read_payment_json<T: DeserializeOwned>(response: ureq::Response) -> Result<T,
     reader.read_to_end(&mut body).map_err(|_| {
         PaymentError::RailError("payment rail response could not be read".to_owned())
     })?;
-    if body.len() as u64 > MAX_PAYMENT_RESPONSE_BYTES {
+    if u64::try_from(body.len()).map_or(true, |size| size > MAX_PAYMENT_RESPONSE_BYTES) {
         return Err(PaymentError::RailError(
             "payment rail response is too large".to_owned(),
         ));

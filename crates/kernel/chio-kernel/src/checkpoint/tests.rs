@@ -538,7 +538,7 @@ fn checkpoint_log_id_preserves_historical_ed25519_hashing() {
 
     assert_eq!(
         checkpoint_log_id(&checkpoint),
-        format!("local-log-{}", sha256_hex(kp.public_key().as_bytes()))
+        format!("local-log-{}", sha256_hex(&kp.public_key_bytes()))
     );
 }
 

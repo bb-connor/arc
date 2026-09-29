@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::{ExposureBalance, ExposureUnits, InvocationCount};
 use chio_security_types::clock::{Clock, ClockError, ClockFence, SystemClock};
 use std::collections::HashMap;

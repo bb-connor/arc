@@ -312,10 +312,15 @@ rust_registry_public_crates = []
 # narrow, reviewed exception annotate the specific call site with
 # `#[allow(clippy::unwrap_used)]` instead of opting the whole crate out.
 #
-# No `[workspace.lints.rust]` floor is defined yet. Adding one is a policy
-# change like any other: the mirrors must carry it, and the parity gate
-# compares the Rust table as well as the Clippy table.
+# Rust and Clippy floors are mirrored by opt-out manifests; the parity gate
+# checks both tables whenever this policy changes.
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
 [workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+
 unwrap_used = "deny"
 expect_used = "deny"
 
@@ -358,6 +363,7 @@ debug = 0
 split-debuginfo = "off"
 
 [workspace.dependencies]
+secrecy = { version = "=0.10.3", features = ["serde"] }
 async-trait = "0.1"
 aws-sdk-bedrockruntime = { version = "1.130.0", default-features = false, features = [
     "default-https-client",

@@ -383,7 +383,7 @@ pub(crate) fn parse_checkpoint_signed_columns(
             row.checkpoint_seq, row.batch_end_seq, checkpoint.body.batch_end_seq
         )));
     }
-    if checkpoint.body.tree_size as u64 != row.tree_size {
+    if crate::integer::checked::<_, u64>(checkpoint.body.tree_size)? != row.tree_size {
         return Err(ReceiptStoreError::Conflict(format!(
             "checkpoint {} tree_size column {} does not match signed body {}",
             row.checkpoint_seq, row.tree_size, checkpoint.body.tree_size
@@ -457,7 +457,7 @@ pub(crate) fn ensure_checkpoint_columns_match_body(
             row.checkpoint_seq, row.batch_end_seq, body.batch_end_seq
         )));
     }
-    if body.tree_size as u64 != row.tree_size {
+    if crate::integer::checked::<_, u64>(body.tree_size)? != row.tree_size {
         return Err(ReceiptStoreError::Conflict(format!(
             "checkpoint {} tree_size column {} does not match signed body {}; run `chio receipt audit`",
             row.checkpoint_seq, row.tree_size, body.tree_size
@@ -677,7 +677,7 @@ pub(crate) fn load_checkpoint_chain_leaf_hashes(
     for row in rows {
         let checkpoint = parse_persisted_checkpoint_row(row)?;
         let checkpoint_seq = checkpoint.body.checkpoint_seq;
-        let expected_seq = chain_leaf_hashes.len() as u64 + 1;
+        let expected_seq = crate::integer::count(chain_leaf_hashes.len()) + 1;
         if checkpoint_seq != expected_seq {
             return Err(ReceiptStoreError::Conflict(format!(
                 "checkpoint chain has a gap: expected seq {expected_seq}, found {checkpoint_seq}"
@@ -982,7 +982,9 @@ pub(crate) fn advance_verified_checkpoint_chain_frontier(
                     "persisted checkpoint chain ends before verified head {predecessor_seq}"
                 )));
             }
-            CheckpointChainFrontier::from_leaves(&chain_leaf_hashes[..prefix_len])
+            CheckpointChainFrontier::from_leaves(chain_leaf_hashes.get(..prefix_len).ok_or_else(
+                || ReceiptStoreError::Conflict("checkpoint prefix exceeds retained leaves".into()),
+            )?)
         }
     };
     if let Some(chain_root) = predecessor.and_then(|item| item.body.chain_root) {
@@ -1162,7 +1164,7 @@ pub(crate) fn store_kernel_checkpoint_validated_tx(
     // an existing sequence are byte-compared by `store_kernel_checkpoint_tx`.
     if let Some(chain_root) = checkpoint.body.chain_root {
         let chain_leaf_hashes = load_checkpoint_chain_leaf_hashes(tx)?;
-        if checkpoint.body.checkpoint_seq == chain_leaf_hashes.len() as u64 + 1 {
+        if checkpoint.body.checkpoint_seq == crate::integer::count(chain_leaf_hashes.len()) + 1 {
             let mut chain_frontier =
                 chio_kernel::checkpoint::CheckpointChainFrontier::from_leaves(&chain_leaf_hashes);
             chain_frontier.append(
@@ -1366,7 +1368,7 @@ pub(crate) fn insert_checkpoint_incremental_tx(
             sqlite_i64(checkpoint.body.checkpoint_seq, "checkpoint_seq")?,
             sqlite_i64(checkpoint.body.batch_start_seq, "batch_start_seq")?,
             sqlite_i64(checkpoint.body.batch_end_seq, "batch_end_seq")?,
-            sqlite_i64(checkpoint.body.tree_size as u64, "tree_size")?,
+            sqlite_i64(crate::integer::checked::<_, u64>(checkpoint.body.tree_size)?, "tree_size")?,
             checkpoint.body.merkle_root.to_hex(),
             sqlite_i64(checkpoint.body.issued_at, "issued_at")?,
             statement_json,

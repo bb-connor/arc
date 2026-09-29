@@ -145,7 +145,12 @@ fn active_response_initial_applying_body_hash(
     applying.due_at_unix_ms = transition.applying_lease_expires_at_unix_ms;
     applying.operator_page_required = false;
     applying.mutations = chio_security_types::ResponseMutationLog::new(
-        snapshot.mutations.as_slice()[..=index].to_vec(),
+        snapshot
+            .mutations
+            .as_slice()
+            .get(..=index)
+            .ok_or_else(|| active_response_internal("applying transition prefix missing"))?
+            .to_vec(),
     )
     .map_err(|error| {
         active_response_internal(format!(

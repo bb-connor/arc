@@ -1086,5 +1086,9 @@ fn secure_temp_directory(path: &std::path::Path) -> std::io::Result<()> {
 }
 
 #[path = "channel_release_publisher_store_tests/connection_recovery.rs"]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod connection_recovery;

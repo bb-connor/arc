@@ -702,7 +702,7 @@ impl KeyLogVerificationMigrationConfig {
             || self.trusted_transition_signers.len() > 16
             || self
                 .trusted_transition_signers
-                .windows(2)
+                .array_windows::<2>()
                 .any(|pair| pair[0].to_hex() >= pair[1].to_hex())
         {
             return Err(CliError::cli_other_error(
@@ -716,10 +716,9 @@ impl KeyLogVerificationMigrationConfig {
             scope_id: self.deployment_id.clone(),
             control: EnterpriseMigrationControl::KeyLogVerification,
         };
-        if self.minimum_heads.len() != 1
-            || self.minimum_heads[0].key != key
-            || !self.minimum_heads[0].is_valid()
-            || self.minimum_heads[0].minimum_generation != self.stage.generation()
+        if !matches!(self.minimum_heads.as_slice(), [head]
+            if head.key == key && head.is_valid()
+                && head.minimum_generation == self.stage.generation())
         {
             return Err(CliError::cli_other_error(
                 "key-log migration requires one exact externally anchored deployment head"

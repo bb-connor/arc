@@ -871,5 +871,9 @@ fn domain_digest<T: Serialize>(
 
 #[cfg(test)]
 #[path = "provider_attempt_tests.rs"]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests;

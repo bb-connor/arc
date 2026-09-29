@@ -1,6 +1,8 @@
 //! Input-independent DPoP refusal rules for signed evidence.
 #[derive(Debug, thiserror::Error)]
 pub enum DpopError {
+    #[error("invalid DPoP nonce store capacity: {0}")]
+    InvalidCapacity(&'static str),
     #[error("DPoP reservation ownership unconfirmed at commit; marker retained")]
     ReservationOwnership,
     #[error("unsupported DPoP schema or replay domain")]
@@ -53,6 +55,7 @@ pub enum DpopError {
 impl DpopError {
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::InvalidCapacity(..) => "urn:chio:error:kernel:dpop-invalid-capacity",
             Self::ReservationOwnership => "urn:chio:error:kernel:dpop-reservation-ownership",
             Self::Schema => "urn:chio:error:kernel:dpop-schema",
             Self::Sender => "urn:chio:error:kernel:dpop-sender",

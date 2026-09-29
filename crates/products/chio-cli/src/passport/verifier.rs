@@ -968,7 +968,7 @@ pub(crate) fn cmd_passport_status_resolve(
     } else {
         let path = require_passport_status_registry_path(passport_statuses_file)?;
         let registry = load_passport_status_registry_for_admin(path)?;
-        let mut resolution = registry.resolve(passport_id);
+        let mut resolution = registry.resolve(passport_id)?;
         resolution.source = Some(format!("registry:{}", path.display()));
         resolution
     };

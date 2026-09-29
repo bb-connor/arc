@@ -17,13 +17,45 @@ use crate::{
     RuntimeArtifactRole,
 };
 
+#[allow(
+    clippy::as_conversions,
+    reason = "Linux open flags are nonnegative constants fitting u64; From is not const."
+)]
 const O_WRONLY: u64 = libc::O_WRONLY as u64;
+#[allow(
+    clippy::as_conversions,
+    reason = "Linux open flags are nonnegative constants fitting u64; From is not const."
+)]
 const O_RDONLY: u64 = libc::O_RDONLY as u64;
+#[allow(
+    clippy::as_conversions,
+    reason = "Linux open flags are nonnegative constants fitting u64; From is not const."
+)]
 const O_CREAT: u64 = libc::O_CREAT as u64;
+#[allow(
+    clippy::as_conversions,
+    reason = "Linux open flags are nonnegative constants fitting u64; From is not const."
+)]
 const O_EXCL: u64 = libc::O_EXCL as u64;
+#[allow(
+    clippy::as_conversions,
+    reason = "Linux open flags are nonnegative constants fitting u64; From is not const."
+)]
 const O_CLOEXEC: u64 = libc::O_CLOEXEC as u64;
+#[allow(
+    clippy::as_conversions,
+    reason = "Linux open flags are nonnegative constants fitting u64; From is not const."
+)]
 const O_DIRECTORY: u64 = libc::O_DIRECTORY as u64;
+#[allow(
+    clippy::as_conversions,
+    reason = "Linux open flags are nonnegative constants fitting u64; From is not const."
+)]
 const O_NOFOLLOW: u64 = libc::O_NOFOLLOW as u64;
+#[allow(
+    clippy::as_conversions,
+    reason = "Linux open flags are nonnegative constants fitting u64; From is not const."
+)]
 const O_PATH: u64 = libc::O_PATH as u64;
 const RESOLVE_NO_MAGICLINKS: u64 = 0x02;
 const RESOLVE_NO_SYMLINKS: u64 = 0x04;
@@ -95,7 +127,7 @@ pub(crate) fn broker_peer_identity(file: &File) -> Result<crate::BrokerPeerIdent
             file.as_raw_fd(),
             SOL_SOCKET,
             SO_PEERCRED,
-            (&mut credentials as *mut UCred).cast(),
+            (&raw mut credentials).cast(),
             &mut length,
         )
     } != 0
@@ -231,14 +263,20 @@ fn directory_entry_names(
                     "directory record length is invalid",
                 ));
             }
-            let name_field = &record[LINUX_DIRENT64_NAME_OFFSET..record_length];
+            let name_field = record
+                .get(LINUX_DIRENT64_NAME_OFFSET..record_length)
+                .ok_or_else(|| {
+                    invalid_directory_record(path, "directory record bounds are invalid")
+                })?;
             let terminator = name_field
                 .iter()
                 .position(|byte| *byte == 0)
                 .ok_or_else(|| {
                     invalid_directory_record(path, "directory entry name is not terminated")
                 })?;
-            let name = &name_field[..terminator];
+            let name = name_field.get(..terminator).ok_or_else(|| {
+                invalid_directory_record(path, "directory name bounds are invalid")
+            })?;
             if name != b"." && name != b".." {
                 if name.is_empty() || name.contains(&b'/') {
                     return Err(invalid_directory_record(
@@ -254,7 +292,7 @@ fn directory_entry_names(
         }
     }
     names.sort();
-    if names.windows(2).any(|pair| pair[0] == pair[1]) {
+    if names.array_windows::<2>().any(|pair| pair[0] == pair[1]) {
         return Err(invalid_directory_record(
             path,
             "directory enumeration returned a duplicate entry",
@@ -332,7 +370,9 @@ pub(crate) fn retain_write_grants(
 
 fn open_root() -> Result<File, CageError> {
     let mut options = std::fs::OpenOptions::new();
-    options.read(true).custom_flags((O_PATH | O_CLOEXEC) as i32);
+    options
+        .read(true)
+        .custom_flags(libc::O_PATH | libc::O_CLOEXEC);
     options.open("/").map_err(|source| CageError::RetainPath {
         path: PathBuf::from("/"),
         source,
@@ -533,10 +573,10 @@ fn validate_native_executable(
     const EXTENDED_PROGRAM_HEADER_COUNT: u16 = u16::MAX;
 
     if content.len() < ELF_HEADER_BYTES
-        || &content[..4] != b"\x7fELF"
-        || content[4] != ELF_CLASS_64
-        || content[5] != ELF_DATA_LITTLE_ENDIAN
-        || content[6] != 1
+        || !content.starts_with(b"\x7fELF")
+        || content.get(4) != Some(&ELF_CLASS_64)
+        || content.get(5) != Some(&ELF_DATA_LITTLE_ENDIAN)
+        || content.get(6) != Some(&1)
     {
         return Err(CageError::InvalidExecutable(path.to_path_buf()));
     }
@@ -732,7 +772,7 @@ fn validate_dynamic_segment(
     let segment = checked_elf_range(content, offset, size)
         .ok_or_else(|| CageError::InvalidExecutable(path.to_path_buf()))?;
     let mut terminated = false;
-    for entry in segment.chunks_exact(ELF_DYNAMIC_ENTRY_SIZE as usize) {
+    for entry in segment.chunks_exact(core::mem::size_of::<[u64; 2]>()) {
         let tag = read_elf_u64(entry, 0)
             .ok_or_else(|| CageError::InvalidExecutable(path.to_path_buf()))?;
         if tag == DT_NULL {
@@ -947,6 +987,10 @@ fn mount_id(file: &File, path: &Path) -> Result<u64, CageError> {
         .ok_or_else(|| CageError::MissingMountIdentity(path.to_path_buf()))
 }
 
+#[allow(
+    clippy::indexing_slicing,
+    reason = "File::read reports at most the supplied buffer length; the slice contains exactly the initialized bytes."
+)]
 fn read_stable_content(
     file: &File,
     path: &Path,
@@ -1037,7 +1081,7 @@ fn openat2(
             SYS_OPENAT2,
             c_long::from(directory_fd),
             path.as_ptr(),
-            &how as *const OpenHow,
+            &raw const how,
             std::mem::size_of::<OpenHow>(),
         )
     };

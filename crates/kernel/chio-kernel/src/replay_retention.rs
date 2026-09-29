@@ -5,6 +5,10 @@ use chio_security_types::clock::{
 };
 use std::time::Duration;
 
+#[allow(
+    clippy::as_conversions,
+    reason = "The clock skew constant is a positive fixed number of seconds."
+)]
 const MAX_REPLAY_CLOCK_SKEW: Duration = Duration::from_secs(MAX_REPLAY_WALL_SKEW_SECS as u64);
 const REBASELINE_CONFIRMATION: Duration = Duration::from_secs(1);
 
@@ -84,6 +88,10 @@ impl ReplayClock {
         Ok(now)
     }
 }
+#[allow(
+    clippy::as_conversions,
+    reason = "UnixMillis is u64 milliseconds, so its seconds quotient always fits in i64."
+)]
 fn jump(store: &'static str, now: ClockReading, previous: ClockReading) -> KernelError {
     KernelError::ReplayClockAnomaly {
         store,
@@ -171,5 +179,9 @@ impl ReplayRetention {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 pub(crate) mod tests;

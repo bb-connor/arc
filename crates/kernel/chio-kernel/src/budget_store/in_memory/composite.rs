@@ -2,7 +2,7 @@ impl InMemoryBudgetStoreInner {
     fn has_composite_history(&self, capability_id: &str, grant_index: usize) -> bool {
         self.events.iter().any(|event| {
             event.capability_id == capability_id
-                && event.grant_index as usize == grant_index
+                && usize::try_from(event.grant_index) == Ok(grant_index)
                 && event.admission_binding.is_some()
         })
     }

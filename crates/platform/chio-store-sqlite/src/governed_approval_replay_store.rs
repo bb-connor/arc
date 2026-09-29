@@ -24,9 +24,17 @@ pub use replay_source::{
 use chio_kernel::admission_operation::governed_approval_replay::LEGACY_UNSCOPED_GOVERNED_APPROVAL_SUBJECT as LEGACY_UNSCOPED_SUBJECT_ID;
 
 /// Maximum unexplained wall-clock skew accepted by the durable approval store.
+#[allow(
+    clippy::as_conversions,
+    reason = "The constant u32 clock skew widens into u64 without loss."
+)]
 pub const MAX_GOVERNED_APPROVAL_CLOCK_SKEW_SECS: u64 =
     chio_security_types::clock::MAX_REPLAY_WALL_SKEW_SECS as u64;
 
+#[allow(
+    clippy::as_conversions,
+    reason = "The constant u32 clock skew widens into i64 without loss."
+)]
 const MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64: i64 =
     chio_security_types::clock::MAX_REPLAY_WALL_SKEW_SECS as i64;
 
@@ -839,14 +847,21 @@ fn kernel_store_error(error: SqliteGovernedApprovalReplayStoreError) -> KernelEr
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 fn now_secs() -> i64 {
     use chio_security_types::clock::Clock;
     i64::try_from(SystemClock.unix_millis().unwrap().as_secs()).unwrap()
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
