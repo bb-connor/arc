@@ -177,11 +177,12 @@ fn matrix(name: &str, cut: Cut, combined_disclosure: bool) -> TestResult {
     }
     let root = tempfile::tempdir()?;
     let output = std::fs::File::create(root.path().join("child.log"))?;
+    let module = module_path!().split_once("::").ok_or("test module lacks crate prefix")?.1;
     let mut child = std::process::Command::new(std::env::current_exe()?)
         .args([
             "--exact",
             &format!(
-                "security::adapters::tests::native_flow::support::process_recovery::caller::{name}"
+                "{module}::{name}"
             ),
             "--nocapture",
             "--test-threads=1",

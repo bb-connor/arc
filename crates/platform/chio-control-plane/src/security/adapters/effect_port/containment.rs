@@ -1,4 +1,36 @@
-use super::*;
+use super::Arc;
+use super::containment_installed_version_hash;
+use super::containment_overlay_version_hash;
+use super::containment_session_target;
+use super::predict_containment_overlay_apply;
+use super::predict_containment_overlay_remove;
+use super::validate_containment_overlay_snapshot;
+use super::CanonicalBody;
+use super::ContainmentOverlayCommand;
+use super::ContainmentOverlayStore;
+use super::Digest32;
+use super::EffectExecutionStatus;
+use super::EffectOperation;
+use super::EffectRequest;
+use super::EffectResult;
+use super::EffectResultQuery;
+use super::OverlayApplyRequest;
+use super::OverlayContribution;
+use super::OverlayRemoveRequest;
+use super::OverlaySnapshot;
+use super::PortError;
+use super::PortResult;
+use super::SessionId;
+use super::TenantId;
+use super::TenantScopedId;
+use super::ResponseEffectKind;
+use super::ResponseTarget;
+use super::SessionSuspensionContribution;
+use super::ResponseEffectBackend;
+use super::validate_request_binding;
+use super::effect_query_from_request;
+use super::verify_contribution_hash;
+
 
 
 /// Exact `SuspendSession` backend backed by the durable containment overlay.

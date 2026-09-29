@@ -1,7 +1,48 @@
 //! Native input and post-join policy use only kernel-owned mutation/custody.
 //! No legacy flow, declassification or receipt store is installed by this resolver.
 
-use super::*;
+use super::flow_dispatch;
+use super::flow_policy;
+use super::BTreeMap;
+use super::Arc;
+use super::ActiveDefensePolicyBinding;
+
+use super::prepare_pre_invocation;
+use super::FlowAdmission;
+use super::FlowDenial;
+use super::InformationFlowLattice;
+use super::AdmittedToolSecurity;
+use super::BridgeSecurityMetadata;
+use super::VerifiedManifestRegistry;
+use super::Clock;
+
+use super::FlowPreInvocationInput;
+use super::ClassificationPort;
+use super::ClassificationRequest;
+use super::ClassificationResult;
+use super::DeclassificationConsume;
+use super::DeclassificationConsumeRequest;
+use super::DeclassificationConsumptionEvidenceCommit;
+use super::DeclassificationOutcomeRequest;
+use super::DeclassificationTransitionBinding;
+use super::DeclassificationUseStore;
+use super::DestinationId;
+use super::Digest32;
+use super::FlowJoinRequest;
+use super::FlowStateSnapshot;
+
+use super::PortError;
+use super::PortResult;
+use super::RecordId;
+use super::RequestId;
+use super::InformationLabel;
+
+use super::canonical_body;
+use super::digest;
+use super::declassification_grant_hash;
+use super::active_defense_receipt_request;
+use super::declassification_consumption_body;
+use super::FlowResolverConfig;
 use chio_kernel::admission_operation::{
     AdmissionOperationId, NativeSecurityAuthorityBindingV1, NativeSecurityEgressHistoryV1,
     NativeSecurityFlowObservationV1,

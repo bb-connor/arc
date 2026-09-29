@@ -1,3 +1,4 @@
+use chio_security_types::ports::OpaqueReceiptRef;
 use super::*;
 
 #[test]

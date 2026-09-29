@@ -1,4 +1,47 @@
-use super::*;
+use super::canonical_json_bytes;
+use super::ActionId;
+use super::ErrorCode;
+use super::LeaseOwnerId;
+use super::PortError;
+use super::PortResult;
+use super::RecordId;
+use super::ResponseDispatchKey;
+use super::ResponsePlanRecord;
+use super::ResponseScheduledMutationCasRequest;
+use super::ResponseSchedulerStore;
+use super::ScheduledWork;
+use super::SchedulerClaimRequest;
+use super::SchedulerHealthAckRequest;
+use super::SchedulerLeaseReleaseRequest;
+use super::SchedulerLeaseRenewRequest;
+use super::SchedulerRetryRequest;
+use super::SchedulerRetryState;
+use super::SchedulerWorkKey;
+use super::TenantId;
+use super::ResponseMutationRecord;
+use super::ResponseState;
+use super::ResponseTransitionCause;
+use super::params;
+use super::Connection;
+use super::OptionalExtension;
+use super::Transaction;
+use super::TransactionBehavior;
+use super::Serialize;
+use super::SqliteSecurityStateStore;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::sqlite_error;
+use super::to_i64;
+use super::from_i64;
+use super::body_hash;
+use super::validate_canonical_json_body;
+use super::canonical_request_hash;
+use super::load_response_dispatch;
+use super::decode_response_snapshot;
+use super::response_mutation_scheduler_fence;
+use super::load_response_plan;
+use super::transition_status;
+use super::record_transition;
 
 pub(super) const MAX_SCHEDULER_CLAIMS: u32 = 1_024;
 pub(super) const MAX_CLOCK_SKEW_MS: u64 = 5_000;
@@ -1111,7 +1154,7 @@ pub(super) fn load_scheduler_lease(
         .transpose()
 }
 
-pub(super) fn validate_scheduler_work(
+fn validate_scheduler_work(
     connection: &Connection,
     work: &ScheduledWork,
     trusted_now_unix_ms: u64,
@@ -1130,7 +1173,7 @@ pub(super) fn validate_scheduler_work(
     Ok(())
 }
 
-pub(super) fn delete_scheduler_lease(connection: &Connection, work: &ScheduledWork) -> PortResult<()> {
+fn delete_scheduler_lease(connection: &Connection, work: &ScheduledWork) -> PortResult<()> {
     let deleted = connection
         .execute(
             r#"

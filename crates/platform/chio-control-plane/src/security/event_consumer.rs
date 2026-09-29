@@ -70,74 +70,90 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 
 mod verification;
-pub use verification::*;
-use verification::EVENT_EVIDENCE_HASH_DOMAIN;
-use verification::RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN;
-use verification::domain_hash;
+pub use verification::SECURITY_EVENT_RECEIPT_PROJECTION_VERSION;
+pub use verification::TrustedSecurityEventProducer;
+pub use verification::TrustedSecurityEventReceiptProducer;
+pub use verification::SecurityEventReceiptProjection;
+pub use verification::SecurityEventVerifierConfigError;
+
+
+
 
 mod finding_publication;
-pub use finding_publication::*;
+pub use finding_publication::AttestedFindingBatchPlanner;
 use finding_publication::build_attested_finding_batch_publication;
 use finding_publication::build_reserved_response_plan;
 use finding_publication::validate_authoritative_finding_binding;
 use finding_publication::build_attested_finding_response_plan_publication;
 
 mod ingress;
-pub use ingress::*;
+pub use ingress::VerifiedSecurityEventIngress;
 pub(crate) use ingress::DurableCorrelationIngress;
 use ingress::CorrelationEventVerifier;
 
 mod correlation;
-pub use correlation::*;
+pub use correlation::CorrelationRuleReport;
+pub use correlation::CorrelationConsumerReport;
+pub use correlation::ProductionCorrelationConsumer;
+#[cfg(test)]
 use correlation::CorrelationPort;
+#[cfg(test)]
 use correlation::CorrelationAttestor;
+#[cfg(test)]
 use correlation::RuleCorrelationOutcome;
-use correlation::correlation_delivery_error;
+
+#[cfg(test)]
 use correlation::SqliteTemporalCorrelationPort;
 
 mod admission;
-pub use admission::*;
-use admission::ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA;
-use admission::ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_DIGEST_DOMAIN;
-use admission::CanonicalAttestedFindingAdmissionArtifactBundle;
+pub use admission::AttestedFindingResponsePolicySelection;
+pub use admission::AttestedFindingAdmissionArtifacts;
+
+
+
+#[cfg(test)]
 use admission::AttestedFindingAdmissionArtifactPayload;
-use admission::KernelAttestedFindingAdmissionArtifactPayload;
+
 use admission::governed_approval_request_from_native;
-use admission::canonical_admission_artifact_bundle_digest;
+
+#[cfg(test)]
 use admission::digest_from_canonical_hex;
-use admission::domain_separated_artifact_digest;
+
 
 mod reservation;
-pub use reservation::*;
+pub use reservation::ReservedAttestedFindingResponseBatch;
+pub use reservation::AttestedFindingResponsePolicyPlanner;
 
 mod coordinator;
-pub use coordinator::*;
-pub(crate) use coordinator::PreparedAttestedFindingResponse;
-pub(crate) use coordinator::KernelPreparedAttestedFindingResponse;
+pub use coordinator::KernelAttestedFindingResponseCoordinator;
+#[cfg(test)]
+pub (crate) use coordinator::PreparedAttestedFindingResponse;
+
 pub(crate) use coordinator::AttestedFindingResponseCompletionProof;
 pub(crate) use coordinator::AttestedFindingDispatchCommittedResume;
 pub(crate) use coordinator::AttestedFindingPreDispatchReconstruction;
 pub(crate) use coordinator::AttestedFindingResponseCoordinator;
+
+
 #[cfg(test)]
-use coordinator::synthetic_prepared_dispatch_binding;
-use coordinator::KernelActiveResponseApprovalVerifierScope;
 use coordinator::KernelActiveResponseApprovalVerifier;
-use coordinator::validated_active_response_completion_proof;
+
 use coordinator::map_approval_coordinator_error;
 
 mod recovery;
-pub use recovery::*;
-pub(crate) use recovery::AttestedFindingResponseRecoveryReport;
-use recovery::MAX_ATTESTED_FINDING_STARTUP_RECOVERY_RECORDS;
-use recovery::MAX_ATTESTED_FINDING_STARTUP_RECOVERY_WALL_CLOCK_MS;
-use recovery::ATTESTED_FINDING_STARTUP_RECOVERY_POLL_MS;
-use recovery::error_code;
-use recovery::terminal_admission_error;
-use recovery::published_response_terminal_result;
-use recovery::is_definitively_never_committed;
+pub use recovery::DurableAttestedFindingBatchPlanner;
+
+
+
+
+
+
+
+
+#[cfg(test)]
 use recovery::response_recovery_backlog;
-use recovery::response_completion_matches;
-use recovery::map_finding_authority_error;
+
+
 
 #[cfg(test)]
 mod tests;

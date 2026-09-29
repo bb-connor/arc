@@ -1,5 +1,6 @@
 //! Test-only native writes are always rolled back. No production native writer
 //! or activation capability is constructed by these SQL-semantic tests.
+use std::collections::BTreeSet;
 
 use super::*;
 use crate::admission_operation_store::with_flow_sql_fixture;

@@ -8,8 +8,7 @@ use std::os::unix::net::UnixDatagram;
 use std::process::{Child, Command, Stdio};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-const CHILD: &str =
-    "security::event_consumer::tests::response_process_recovery::response_process_child";
+
 
 struct OwnedChild(Child);
 impl Drop for OwnedChild {
@@ -152,9 +151,11 @@ fn response_process_child() -> TestResult {
 }
 
 fn spawn(root: &Path, phase: &str) -> TestResult<OwnedChild> {
+    let module = module_path!().split_once("::").ok_or("test module lacks crate prefix")?.1;
+    let child_test = format!("{module}::response_process_child");
     Ok(OwnedChild(
         Command::new(std::env::current_exe()?)
-            .args(["--exact", CHILD, "--ignored", "--nocapture"])
+            .args(["--exact", &child_test, "--ignored", "--nocapture"])
             .env("CHIO_RESPONSE_RECOVERY_ROOT", root)
             .env("CHIO_RESPONSE_RECOVERY_PHASE", phase)
             .stdin(Stdio::null())

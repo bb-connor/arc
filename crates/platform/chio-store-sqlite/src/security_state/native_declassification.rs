@@ -1,7 +1,30 @@
 //! Exact one-shot row images for declassification inside an owned egress commit.
 //! These are historical data checks, not permission to enable a SQLite writer.
 
-use super::*;
+use super::NativeRowChange;
+use super::encode_retained_security_values;
+use super::ActiveDefenseReceiptBody;
+use super::declassification_retain_until_unix_ms;
+use super::derive_declassification_event_id;
+use super::derive_declassification_transition_id;
+use super::CanonicalBody;
+use super::CommittedEgressFence;
+use super::DeclassificationConsumptionEvidenceCommit;
+use super::DeclassificationOutcomeEvidenceCommit;
+use super::DeclassificationTransitionBinding;
+use super::DeclassificationUseState;
+use super::PortError;
+use super::PortResult;
+use super::ReceiptAppendRequest;
+use super::RecordId;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::to_i64;
+use super::declassification_state_name;
+use super::encode_declassification_binding;
+use super::decode_declassification_receipt;
+use super::validate_declassification_consumption_evidence;
+use super::validate_declassification_outcome_evidence;
 use chio_security_types::ports::DeclassificationOutcomeRequest;
 use rusqlite::types::{Value, ValueRef};
 use serde::{Deserialize, Serialize};

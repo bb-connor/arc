@@ -1,4 +1,48 @@
-use super::*;
+use super::canonical_json_bytes;
+use super::containment_installed_version_hash;
+use super::containment_overlay_version_hash;
+use super::containment_session_target;
+use super::predict_containment_overlay_apply;
+use super::predict_containment_overlay_remove;
+use super::validate_containment_overlay_snapshot;
+use super::ContainmentOverlayCommand;
+use super::ContainmentOverlayStore;
+use super::Digest32;
+use super::EffectExecutionStatus;
+use super::EffectId;
+use super::EffectOperation;
+use super::EffectRequest;
+use super::EffectResult;
+use super::EffectResultQuery;
+use super::OverlayApplyRequest;
+use super::OverlayContribution;
+use super::OverlayContributions;
+use super::OverlayRemoveRequest;
+use super::OverlaySnapshot;
+use super::PortError;
+use super::PortResult;
+use super::RecordId;
+use super::TenantScopedId;
+use super::ResponseEffectKind;
+use super::ResponseTarget;
+use super::params;
+use super::Connection;
+use super::OptionalExtension;
+use super::Transaction;
+use super::TransactionBehavior;
+use super::Deserialize;
+use super::Serialize;
+use super::SqliteSecurityStateStore;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::sqlite_error;
+use super::to_i64;
+use super::from_i64;
+use super::body_hash;
+use super::validate_canonical_json_body;
+use super::decode_digest;
+use super::effect_request_matches_query;
+use super::validate_scheduler_fence;
 
 
 impl ContainmentOverlayStore for SqliteSecurityStateStore {
@@ -389,13 +433,13 @@ pub(super) struct ContainmentCommandContributionBody {
     posture_rank: u32,
 }
 
-pub(super) fn validate_stored_containment_overlay_command(
+fn validate_stored_containment_overlay_command(
     command: &ContainmentOverlayCommand,
 ) -> PortResult<()> {
     validate_containment_command_common(command).map_err(|_| PortError::integrity_failure())
 }
 
-pub(super) fn validate_containment_apply_command(request: &OverlayApplyRequest) -> PortResult<()> {
+fn validate_containment_apply_command(request: &OverlayApplyRequest) -> PortResult<()> {
     validate_containment_command_common(&request.command)?;
     let command = &request.command.request;
     let canonical_target = containment_command_target(command)?;
@@ -414,7 +458,7 @@ pub(super) fn validate_containment_apply_command(request: &OverlayApplyRequest) 
     Ok(())
 }
 
-pub(super) fn validate_containment_remove_command(request: &OverlayRemoveRequest) -> PortResult<()> {
+fn validate_containment_remove_command(request: &OverlayRemoveRequest) -> PortResult<()> {
     validate_containment_command_common(&request.command)?;
     let command = &request.command.request;
     let canonical_target = containment_command_target(command)?;
@@ -429,7 +473,7 @@ pub(super) fn validate_containment_remove_command(request: &OverlayRemoveRequest
     Ok(())
 }
 
-pub(super) fn validate_containment_command_common(command: &ContainmentOverlayCommand) -> PortResult<()> {
+fn validate_containment_command_common(command: &ContainmentOverlayCommand) -> PortResult<()> {
     let request = &command.request;
     if request.effect_kind != ResponseEffectKind::SuspendSession
         || !matches!(&request.target, ResponseTarget::Session { .. })
@@ -490,14 +534,14 @@ pub(super) fn validate_containment_command_common(command: &ContainmentOverlayCo
     Ok(())
 }
 
-pub(super) fn containment_command_target(request: &EffectRequest) -> PortResult<TenantScopedId> {
+fn containment_command_target(request: &EffectRequest) -> PortResult<TenantScopedId> {
     let ResponseTarget::Session { session_id } = &request.target else {
         return Err(PortError::invalid_data());
     };
     containment_session_target(&request.tenant_id, session_id)
 }
 
-pub(super) fn decode_containment_command_contribution(
+fn decode_containment_command_contribution(
     request: &EffectRequest,
 ) -> PortResult<ContainmentCommandContributionBody> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
@@ -515,7 +559,7 @@ pub(super) fn decode_containment_command_contribution(
 
 pub(super) type StoredEffectCommandProjection = (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 
-pub(super) fn load_containment_overlay_command(
+fn load_containment_overlay_command(
     connection: &Connection,
     tenant_id: &str,
     idempotency_key: &str,
@@ -599,7 +643,7 @@ pub(super) fn load_containment_overlay_command(
         .transpose()
 }
 
-pub(super) fn persist_containment_overlay_command(
+fn persist_containment_overlay_command(
     transaction: &Transaction<'_>,
     command: &ContainmentOverlayCommand,
 ) -> PortResult<()> {
@@ -647,7 +691,7 @@ pub(super) fn persist_containment_overlay_command(
     Ok(())
 }
 
-pub(super) fn load_contribution_binding(
+fn load_contribution_binding(
     connection: &Connection,
     tenant_id: &str,
     effect_id: &str,
@@ -746,7 +790,7 @@ pub(super) fn load_overlay_snapshot(
     Ok(snapshot)
 }
 
-pub(super) fn persist_overlay_state(
+fn persist_overlay_state(
     transaction: &Transaction<'_>,
     target: &TenantScopedId,
     generation: u64,

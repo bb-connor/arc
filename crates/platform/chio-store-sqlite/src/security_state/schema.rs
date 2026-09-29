@@ -1,9 +1,24 @@
-use super::*;
+use super::PortResult;
+use super::Connection;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::sqlite_error;
+use super::schema_version_error;
+use super::ensure_attested_finding_batch_tenant_keys;
+use super::validate_correlation_durable_schema;
+use super::upgrade_correlation_ingress_pending_index;
+use super::prepare_declassification_schema_migration;
+use super::ensure_lineage_fence_binding_columns;
+use super::ensure_response_effect_generation_column;
+use super::ensure_scheduler_lease_body_hash_column;
+use super::ensure_scheduler_retry_health_columns;
+use super::ensure_response_dispatch_commit_mode_column;
+use super::ensure_attested_finding_response_outbox_schema;
 
 
-pub(super) const SECURITY_STATE_STORE_SCHEMA_KEY: &str = "security_state";
+const SECURITY_STATE_STORE_SCHEMA_KEY: &str = "security_state";
 pub(super) const SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
-pub(super) const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
+const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
     "security_transitions",
     "security_flow_contexts",
     "security_response_effects",

@@ -1,6 +1,23 @@
-use super::*;
+// tenant-read-contract: security_attested_finding_batch_items; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_outcomes; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_correlation_ingress; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_attested_finding_batches; class=tenant-predicate; principal=security-runtime
+use super::AttestedFindingBatchKey;
 
-pub(super) const ATTESTED_FINDING_BATCH_CANONICAL_DDL: &str = r#"
+use super::PortError;
+use super::PortResult;
+use super::RecordId;
+use super::TenantId;
+use super::params;
+use super::Connection;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::sqlite_error;
+use super::table_definition_is_exact;
+use super::schema_object_definition_is_exact;
+use super::load_attested_finding_batch_record;
+
+const ATTESTED_FINDING_BATCH_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_attested_finding_batches (
     batch_id TEXT NOT NULL,
     tenant_id TEXT NOT NULL,
@@ -11,7 +28,7 @@ CREATE TABLE security_attested_finding_batches (
 )
 "#;
 
-pub(super) const CORRELATION_INGRESS_CANONICAL_DDL: &str = r#"
+const CORRELATION_INGRESS_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_correlation_ingress (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id TEXT NOT NULL,
@@ -29,15 +46,15 @@ CREATE TABLE security_correlation_ingress (
         REFERENCES security_verified_events (tenant_id, event_id)
 )
 "#;
-pub(super) const CORRELATION_INGRESS_PENDING_INDEX_DDL: &str = r#"
+const CORRELATION_INGRESS_PENDING_INDEX_DDL: &str = r#"
 CREATE INDEX security_correlation_ingress_pending
 ON security_correlation_ingress (acknowledged, event_time, sequence)
 "#;
-pub(super) const CORRELATION_INGRESS_LEGACY_PENDING_INDEX_DDL: &str = r#"
+const CORRELATION_INGRESS_LEGACY_PENDING_INDEX_DDL: &str = r#"
 CREATE INDEX security_correlation_ingress_pending
 ON security_correlation_ingress (acknowledged, sequence)
 "#;
-pub(super) const CORRELATION_INGRESS_IMMUTABLE_TRIGGER_DDL: &str = r#"
+const CORRELATION_INGRESS_IMMUTABLE_TRIGGER_DDL: &str = r#"
 CREATE TRIGGER security_correlation_ingress_immutable
 BEFORE UPDATE ON security_correlation_ingress
 WHEN OLD.sequence != NEW.sequence
@@ -56,14 +73,14 @@ BEGIN
     SELECT RAISE(ABORT, 'correlation ingress mutation is rejected');
 END
 "#;
-pub(super) const CORRELATION_INGRESS_DELETE_TRIGGER_DDL: &str = r#"
+const CORRELATION_INGRESS_DELETE_TRIGGER_DDL: &str = r#"
 CREATE TRIGGER security_correlation_ingress_delete_rejected
 BEFORE DELETE ON security_correlation_ingress
 BEGIN
     SELECT RAISE(ABORT, 'correlation ingress deletion is rejected');
 END
 "#;
-pub(super) const CORRELATION_OUTCOMES_CANONICAL_DDL: &str = r#"
+const CORRELATION_OUTCOMES_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_correlation_outcomes (
     tenant_id TEXT NOT NULL,
     rule_id TEXT NOT NULL,
@@ -84,21 +101,21 @@ CREATE TABLE security_correlation_outcomes (
         REFERENCES security_verified_events (tenant_id, event_id)
 )
 "#;
-pub(super) const CORRELATION_OUTCOMES_IMMUTABLE_TRIGGER_DDL: &str = r#"
+const CORRELATION_OUTCOMES_IMMUTABLE_TRIGGER_DDL: &str = r#"
 CREATE TRIGGER security_correlation_outcomes_immutable
 BEFORE UPDATE ON security_correlation_outcomes
 BEGIN
     SELECT RAISE(ABORT, 'correlation outcome mutation is rejected');
 END
 "#;
-pub(super) const CORRELATION_OUTCOMES_DELETE_TRIGGER_DDL: &str = r#"
+const CORRELATION_OUTCOMES_DELETE_TRIGGER_DDL: &str = r#"
 CREATE TRIGGER security_correlation_outcomes_delete_rejected
 BEFORE DELETE ON security_correlation_outcomes
 BEGIN
     SELECT RAISE(ABORT, 'correlation outcome deletion is rejected');
 END
 "#;
-pub(super) const ATTESTED_FINDING_BATCH_ITEM_CANONICAL_DDL: &str = r#"
+const ATTESTED_FINDING_BATCH_ITEM_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_attested_finding_batch_items (
     batch_id TEXT NOT NULL,
     ordinal INTEGER NOT NULL CHECK (ordinal >= 0 AND ordinal < 4096),
@@ -119,7 +136,7 @@ CREATE TABLE security_attested_finding_batch_items (
         REFERENCES security_attested_finding_batches (tenant_id, batch_id)
 )
 "#;
-pub(super) const ATTESTED_FINDING_BATCH_LEGACY_DDL: &str = r#"
+const ATTESTED_FINDING_BATCH_LEGACY_DDL: &str = r#"
 CREATE TABLE security_attested_finding_batches (
     batch_id TEXT NOT NULL,
     tenant_id TEXT NOT NULL,
@@ -129,7 +146,7 @@ CREATE TABLE security_attested_finding_batches (
     PRIMARY KEY (batch_id)
 )
 "#;
-pub(super) const ATTESTED_FINDING_BATCH_ITEM_LEGACY_DDL: &str = r#"
+const ATTESTED_FINDING_BATCH_ITEM_LEGACY_DDL: &str = r#"
 CREATE TABLE security_attested_finding_batch_items (
     batch_id TEXT NOT NULL,
     ordinal INTEGER NOT NULL CHECK (ordinal >= 0 AND ordinal < 4096),
@@ -149,7 +166,7 @@ CREATE TABLE security_attested_finding_batch_items (
 )
 "#;
 
-pub(super) fn validate_no_attested_finding_batch_schema_extensions(connection: &Connection) -> PortResult<()> {
+fn validate_no_attested_finding_batch_schema_extensions(connection: &Connection) -> PortResult<()> {
     let extension_count: i64 = connection
         .query_row(
             r#"
@@ -181,7 +198,7 @@ pub(super) fn validate_no_attested_finding_batch_schema_extensions(connection: &
     Ok(())
 }
 
-pub(super) fn validate_attested_finding_batch_records(connection: &Connection) -> PortResult<()> {
+fn validate_attested_finding_batch_records(connection: &Connection) -> PortResult<()> {
     let quick_check: String = connection
         .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
         .map_err(sqlite_error)?;
@@ -263,7 +280,7 @@ pub(super) fn validate_attested_finding_batch_tenant_keys(connection: &Connectio
     validate_attested_finding_batch_records(connection)
 }
 
-pub(super) fn attested_finding_batch_legacy_schema_is_exact(connection: &Connection) -> PortResult<bool> {
+fn attested_finding_batch_legacy_schema_is_exact(connection: &Connection) -> PortResult<bool> {
     Ok(table_definition_is_exact(
         connection,
         "security_attested_finding_batches",
@@ -473,7 +490,7 @@ pub(super) fn upgrade_correlation_ingress_pending_index(connection: &Connection)
         .map_err(sqlite_error)
 }
 
-pub(super) fn correlation_schema_has_extensions(connection: &Connection) -> PortResult<bool> {
+fn correlation_schema_has_extensions(connection: &Connection) -> PortResult<bool> {
     let count: i64 = connection
         .query_row(
             r#"

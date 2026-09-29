@@ -1,4 +1,10 @@
-use super::*;
+use super::String;
+use super::fmt;
+use super::de;
+use super::Visitor;
+use super::Deserialize;
+use super::Deserializer;
+use super::Serialize;
 
 
 pub(super) const MAX_ID_BYTES: usize = 256;
@@ -220,4 +226,6 @@ id_type!(OpaqueReceiptRef);
 
 #[path = "error.rs"]
 mod error;
-pub use error::*;
+pub use error::PortErrorKind;
+pub use error::PortError;
+pub use error::PortResult;

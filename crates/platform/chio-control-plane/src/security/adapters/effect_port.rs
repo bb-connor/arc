@@ -53,66 +53,72 @@ use chio_security_types::response_simulation::SessionSuspensionSpec as SessionSu
 use chio_security_types::response_simulation::EgressRestrictionSpec as RestrictEgressContribution;
 
 mod dispatch;
-pub use dispatch::*;
-use dispatch::REQUIRED_EFFECT_KINDS;
+pub use dispatch::ResponseEffectBackend;
+pub use dispatch::LineageFenceMaintenanceResult;
+pub use dispatch::ActiveResponseEffectPortConfigError;
+pub use dispatch::ActiveResponseEffectPort;
+
 use dispatch::validate_request_binding;
 
 mod alert;
-pub use alert::*;
-use alert::ESCALATE_ALERT_SCHEMA_VERSION;
-use alert::ESCALATE_ALERT_TYPE;
-use alert::ESCALATE_ALERT_EVENT_DOMAIN;
-use alert::ESCALATE_ALERT_COMMAND_DOMAIN;
-use alert::ESCALATE_ALERT_FINDING_DOMAIN;
-use alert::ESCALATE_ALERT_ACTION_DOMAIN;
-use alert::ESCALATE_ALERT_EVIDENCE_DOMAIN;
-use alert::ESCALATE_ALERT_RESULT_DOMAIN;
-use alert::EscalateAlertCommitment;
-use alert::validate_escalate_alert_request;
-use alert::validate_escalate_alert_query;
-use alert::verify_canonical_json_contribution;
-use alert::build_escalate_alert;
-use alert::validate_escalate_alert;
-use alert::validate_alert_delivery_status;
-use alert::escalate_alert_result;
-use alert::escalate_alert_record_id;
+pub use alert::EscalateAlertStore;
+pub use alert::EscalateAlertBackend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 mod throttle;
-pub use throttle::*;
-use throttle::decode_session_throttle_limits;
-use throttle::valid_throttle_effect_result;
+pub use throttle::SessionThrottleBackend;
+
+
 
 mod suspension;
-pub use suspension::*;
-use suspension::decode_capability_set_suspension_spec;
-use suspension::valid_capability_set_suspension_result;
+pub use suspension::CapabilitySetSuspensionBackend;
+
+
 
 mod issuance;
-pub use issuance::*;
-use issuance::decode_issuance_freeze_spec;
+pub use issuance::IssuanceFreezeBackend;
+
 
 mod containment;
-pub use containment::*;
-use containment::valid_containment_effect_result;
-use containment::empty_overlay_snapshot;
-use containment::decode_session_suspension;
-use containment::validate_overlay_snapshot;
-use containment::overlay_version_hash;
-use containment::installed_result;
-use containment::installed_version_hash;
+pub use containment::SessionSuspensionOverlayBackend;
+pub use containment::session_containment_target;
+pub use containment::session_overlay_version_hash;
+
+
+
+
+
+
+
 
 mod egress;
-pub use egress::*;
-use egress::valid_egress_effect_result;
-use egress::decode_egress_restriction;
-use egress::InstalledEgressContributionCommitment;
-use egress::egress_installed_result;
-use egress::egress_installed_version_hash;
-use egress::egress_installed_contribution_hash;
-use egress::INSTALLED_EGRESS_CONTRIBUTION_DOMAIN;
+pub use egress::RestrictEgressOverlayBackend;
+pub use egress::egress_restriction_version_hash;
+
+
+
+
+
+
+
 
 mod evidence;
-use evidence::*;
 use evidence::EFFECT_COMMAND_ID_PREFIX;
 use evidence::effect_query_from_request;
 use evidence::verify_contribution_hash;

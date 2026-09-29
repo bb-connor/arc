@@ -1,4 +1,53 @@
-use super::*;
+use super::canonical_json_bytes;
+
+
+
+use super::Digest;
+use super::Sha256;
+
+use super::ExecutionHoldState;
+use super::QueryExecutionHoldRequest;
+
+
+use super::capability_digest;
+use super::BrokerExecuteFailure;
+use super::BrokerExecuteRequest;
+use super::failure_receipt_digest;
+use super::sign_failure_receipt;
+use super::verify_failure_receipt;
+use super::BrokerDispatchKnowledge;
+use super::BrokerFailureOutcome;
+use super::BrokerFailureReceiptBody;
+use super::BrokerFailureStage;
+
+use super::BROKER_FAILURE_RECEIPT_SCHEMA;
+use super::broker_execute_request_registration_digest;
+use super::derive_attempt_ids;
+use super::AttemptRecord;
+use super::AttemptState;
+
+use super::AttemptTransitionEvidence;
+use super::validate_digest;
+use super::validate_identifier;
+use super::BrokerError;
+use super::Result;
+use super::BrokerService;
+
+
+use super::broker_request_digest;
+use super::FAILURE_RECEIPT_REQUEST_DOMAIN;
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -460,7 +509,7 @@ impl BrokerService {
         self.persist_terminal_failure(request, now_unix_seconds, error, projection)
     }
 
-    pub(super) fn attempt_for_request(&self, request: &BrokerExecuteRequest) -> Result<Option<AttemptRecord>> {
+    fn attempt_for_request(&self, request: &BrokerExecuteRequest) -> Result<Option<AttemptRecord>> {
         let request_digest = failure_bound_request_digest(request)?;
         let ids = derive_attempt_ids(
             &request.capability.body.capability_id,
@@ -471,7 +520,7 @@ impl BrokerService {
         self.attempts.load_attempt(&ids.attempt_id)
     }
 
-    pub(super) fn authoritative_pre_dispatch_terminal(
+    fn authoritative_pre_dispatch_terminal(
         &self,
         attempt: &AttemptRecord,
         _error: &BrokerError,
@@ -511,7 +560,7 @@ impl BrokerService {
         }
     }
 
-    pub(super) fn reconcile_captured_failure_boundary(
+    fn reconcile_captured_failure_boundary(
         &self,
         attempt: &AttemptRecord,
         commit: crate::budget::CombinedCaptureCommit,
@@ -571,7 +620,7 @@ impl BrokerService {
         }
     }
 
-    pub(super) fn execution_failure_projection(
+    fn execution_failure_projection(
         &self,
         attempt: &AttemptRecord,
         error: &BrokerError,
@@ -606,7 +655,7 @@ impl BrokerService {
         }
     }
 
-    pub(super) fn persist_terminal_failure(
+    fn persist_terminal_failure(
         &self,
         request: &BrokerExecuteRequest,
         now_unix_seconds: u64,
@@ -740,7 +789,7 @@ impl BrokerService {
         })
     }
 
-    pub(super) fn terminalize_failure_attempt(
+    fn terminalize_failure_attempt(
         &self,
         attempt: &AttemptRecord,
         receipt: &BrokerFailureReceiptBody,

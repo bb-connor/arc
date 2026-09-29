@@ -1,4 +1,67 @@
-use super::*;
+use super::Clock;
+use super::SystemClock;
+use super::Arc;
+use super::decode_response_record;
+use super::empty_issuance_freeze_snapshot;
+use super::issuance_freeze_installed_version_hash;
+use super::issuance_freeze_version_hash;
+use super::predict_issuance_freeze_apply;
+use super::predict_issuance_freeze_remove;
+use super::validate_issuance_freeze_contribution;
+use super::validate_issuance_freeze_snapshot;
+use super::BlastRadiusPort;
+use super::BlastRadiusResult;
+
+
+use super::Digest32;
+use super::EffectExecutionStatus;
+use super::EffectId;
+use super::EffectOperation;
+
+use super::EffectRequest;
+use super::EffectResult;
+use super::EffectResultQuery;
+
+use super::IssuanceFreezeApplyRequest;
+use super::IssuanceFreezeCommand;
+use super::IssuanceFreezeContribution;
+use super::IssuanceFreezeFenceMaintenanceRequest;
+use super::IssuanceFreezeKey;
+use super::IssuanceFreezeOperationStatus;
+use super::IssuanceFreezePendingRelease;
+use super::IssuanceFreezeRemoveRequest;
+use super::IssuanceFreezeSnapshot;
+use super::IssuanceFreezeSpec;
+use super::IssuanceFreezeStore;
+use super::LineageFence;
+use super::LineageFenceMaintenanceRequest;
+use super::LineageFenceRelease;
+use super::LineageFenceRenewal;
+use super::LineageFenceRequest;
+use super::LineageFenceTakeover;
+use super::PortError;
+use super::PortResult;
+use super::RecordId;
+use super::ResponsePlanKey;
+use super::ResponseSchedulerStore;
+use super::ScheduledWork;
+
+
+use super::TenantId;
+use super::LINEAGE_FENCE_MAX_LEASE_MS;
+use super::ResponseEffectKind;
+use super::ResponseEffectProgress;
+use super::ResponseSnapshot;
+use super::ResponseState;
+use super::ResponseTarget;
+
+use super::ResponseEffectBackend;
+use super::LineageFenceMaintenanceResult;
+use super::validate_request_binding;
+
+use super::effect_query_from_request;
+use super::verify_contribution_hash;
+
 
 
 /// Exact `FreezeIssuance` backend over a commit-indexed causal fence.

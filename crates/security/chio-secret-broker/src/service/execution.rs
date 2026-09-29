@@ -1,4 +1,66 @@
-use super::*;
+
+
+
+
+
+use super::CaptureExecutionHoldRequest;
+use super::ExecutionHoldState;
+
+
+use super::capability_digest;
+use super::response_digest;
+use super::HttpsDispatchFailure;
+use super::BrokerExecuteRequest;
+use super::BrokerExecuteResponse;
+use super::BrokerExecutionEvidence;
+use super::BROKER_EVIDENCE_SCHEMA;
+use super::credential_reference_hash;
+use super::receipt_digest;
+use super::sign_execution_receipt;
+use super::verify_execution_receipt;
+use super::BrokerDispatchKnowledge;
+use super::BrokerExecutionOutcome;
+use super::BrokerFailureOutcome;
+use super::BrokerFailureStage;
+use super::BrokerReceiptBody;
+
+use super::BROKER_RECEIPT_SCHEMA;
+use super::prepared_dispatch_id;
+use super::validate_revocation_snapshot;
+use super::BrokerRevocationRequest;
+
+use super::derive_attempt_ids;
+use super::derive_attempt_ids_for_operation;
+use super::AttemptState;
+
+use super::AttemptTransitionEvidence;
+use super::validate_identifier;
+use super::BrokerError;
+use super::Result;
+use super::TrustedExecutionContext;
+use super::BrokerService;
+use super::BrokerExecuteOutcome;
+
+
+
+use super::broker_request_digest;
+use super::FailureOrigin;
+use super::FailureProjection;
+use super::ExecutionFailure;
+use super::ExecutionResult;
+use super::execution_failure_after_capture_release;
+
+
+
+
+
+
+
+
+
+
+
+
 
 impl BrokerService {
 
@@ -133,7 +195,7 @@ impl BrokerService {
         }
     }
 
-    pub(super) fn targets_completed_attempt(&self, request: &BrokerExecuteRequest) -> Result<bool> {
+    fn targets_completed_attempt(&self, request: &BrokerExecuteRequest) -> Result<bool> {
         let request_digest = broker_request_digest(request)?;
         let ids = derive_attempt_ids(
             &request.capability.body.capability_id,
@@ -770,7 +832,7 @@ impl BrokerService {
         Ok(response)
     }
 
-    pub(super) fn validate_completed_replay(
+    fn validate_completed_replay(
         &self,
         request: &BrokerExecuteRequest,
         trusted: &TrustedExecutionContext,

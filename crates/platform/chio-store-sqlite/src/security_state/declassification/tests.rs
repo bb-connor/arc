@@ -1,4 +1,6 @@
 //! Native SQL semantics only: every native mutation is test-only and rolled back.
+use chio_security_types::ports::DeclassificationTransitionBinding;
+use chio_security_types::ports::ReceiptAppendRequest;
 
 use super::*;
 use crate::admission_operation_store::with_flow_sql_fixture;

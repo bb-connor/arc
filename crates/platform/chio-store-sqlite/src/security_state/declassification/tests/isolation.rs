@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use super::*;
 
 fn assert_exact_tenant_reads(

@@ -1,4 +1,47 @@
-use super::*;
+use super::BTreeSet;
+use super::canonical_json_bytes;
+use super::ActionId;
+use super::DestinationId;
+use super::EffectExecutionStatus;
+use super::EffectId;
+use super::EffectOperation;
+use super::EffectRequest;
+use super::EffectResult;
+use super::EffectResultQuery;
+use super::EgressDeniedDestinations;
+use super::EgressDestinationQuery;
+use super::EgressDestinationSet;
+use super::EgressRestrictionApplyRequest;
+use super::EgressRestrictionCommand;
+use super::EgressRestrictionContribution;
+use super::EgressRestrictionContributions;
+use super::EgressRestrictionDecision;
+use super::EgressRestrictionEffectIds;
+use super::EgressRestrictionRemoveRequest;
+use super::EgressRestrictionSessionKey;
+use super::EgressRestrictionSnapshot;
+use super::EgressRestrictionStore;
+use super::PortError;
+use super::PortResult;
+use super::ResponseEffectKind;
+use super::ResponseTarget;
+use super::params;
+use super::Connection;
+use super::OptionalExtension;
+use super::Transaction;
+use super::TransactionBehavior;
+use super::Deserialize;
+use super::Serialize;
+use super::SqliteSecurityStateStore;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::sqlite_error;
+use super::to_i64;
+use super::from_i64;
+use super::body_hash;
+use super::validate_canonical_json_body;
+use super::decode_digest;
+use super::validate_scheduler_fence;
 
 
 impl EgressRestrictionStore for SqliteSecurityStateStore {
@@ -430,14 +473,14 @@ pub(super) struct EgressCommandContributionBody {
     destinations: EgressDestinationSet,
 }
 
-pub(super) fn validate_stored_egress_restriction_command(
+fn validate_stored_egress_restriction_command(
     command: &EgressRestrictionCommand,
 ) -> PortResult<()> {
     validate_egress_command_common(command).map_err(|_| PortError::integrity_failure())?;
     Ok(())
 }
 
-pub(super) fn validate_egress_apply_command(request: &EgressRestrictionApplyRequest) -> PortResult<()> {
+fn validate_egress_apply_command(request: &EgressRestrictionApplyRequest) -> PortResult<()> {
     validate_egress_command_common(&request.command)?;
     let command = &request.command.request;
     let ResponseTarget::Session { session_id } = &command.target else {
@@ -459,7 +502,7 @@ pub(super) fn validate_egress_apply_command(request: &EgressRestrictionApplyRequ
     Ok(())
 }
 
-pub(super) fn validate_egress_remove_command(request: &EgressRestrictionRemoveRequest) -> PortResult<()> {
+fn validate_egress_remove_command(request: &EgressRestrictionRemoveRequest) -> PortResult<()> {
     validate_egress_command_common(&request.command)?;
     let command = &request.command.request;
     let ResponseTarget::Session { session_id } = &command.target else {
@@ -477,7 +520,7 @@ pub(super) fn validate_egress_remove_command(request: &EgressRestrictionRemoveRe
     Ok(())
 }
 
-pub(super) fn validate_egress_command_common(command: &EgressRestrictionCommand) -> PortResult<()> {
+fn validate_egress_command_common(command: &EgressRestrictionCommand) -> PortResult<()> {
     let request = &command.request;
     if request.effect_kind != ResponseEffectKind::RestrictEgress
         || !matches!(&request.target, ResponseTarget::Session { .. })
@@ -496,7 +539,7 @@ pub(super) fn validate_egress_command_common(command: &EgressRestrictionCommand)
     Ok(())
 }
 
-pub(super) fn decode_egress_command_contribution(
+fn decode_egress_command_contribution(
     request: &EffectRequest,
 ) -> PortResult<EgressCommandContributionBody> {
     validate_canonical_json_body(&request.canonical_contribution, &request.contribution_hash)?;
@@ -530,7 +573,7 @@ pub(super) fn effect_request_matches_query(request: &EffectRequest, query: &Effe
 
 pub(super) type StoredEgressRestrictionCommand = (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 
-pub(super) fn load_egress_restriction_command(
+fn load_egress_restriction_command(
     connection: &Connection,
     tenant_id: &str,
     idempotency_key: &str,
@@ -581,7 +624,7 @@ pub(super) fn load_egress_restriction_command(
         .transpose()
 }
 
-pub(super) fn persist_egress_restriction_command(
+fn persist_egress_restriction_command(
     transaction: &Transaction<'_>,
     command: &EgressRestrictionCommand,
 ) -> PortResult<()> {
@@ -637,7 +680,7 @@ pub(super) fn empty_egress_restriction_snapshot(
     })
 }
 
-pub(super) fn load_egress_restriction_binding(
+fn load_egress_restriction_binding(
     connection: &Connection,
     tenant_id: &str,
     effect_id: &str,
@@ -794,7 +837,7 @@ pub(super) fn load_egress_restriction_snapshot(
     }))
 }
 
-pub(super) fn persist_egress_restriction_state(
+fn persist_egress_restriction_state(
     transaction: &Transaction<'_>,
     key: &EgressRestrictionSessionKey,
     generation: u64,

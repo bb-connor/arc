@@ -63,33 +63,33 @@ mod test_clocks;
 
 
 mod classification;
-pub use classification::*;
+pub use classification::StructuredClassificationAdapter;
 
 mod flow_resolution;
-pub use flow_resolution::*;
+pub use flow_resolution::FlowResolverConfigError;
 use flow_resolution::flow_key;
 use flow_resolution::flow_transition_id;
 use flow_resolution::non_egress_declaration;
 use flow_resolution::map_declassification_error;
 
 mod declassification_outbox;
-pub use declassification_outbox::*;
-use declassification_outbox::acknowledge_exact_evidence;
+pub use declassification_outbox::DeclassificationReceiptDrainReport;
+pub use declassification_outbox::DeclassificationReconciliationReport;
+pub use declassification_outbox::DeclassificationCompactionReport;
+pub use declassification_outbox::DeclassificationReceiptOutboxDrainer;
+
 use declassification_outbox::append_and_ack_exact_evidence;
 
 mod declassification_outcome;
-use declassification_outcome::*;
 use declassification_outcome::PendingDeclassificationOutcome;
 use declassification_outcome::prepare_declassification_outcome_evidence;
 use declassification_outcome::commit_terminal_declassification_evidence;
 
 mod flow_denial;
-use flow_denial::*;
 use flow_denial::FlowDenialReceiptContext;
-use flow_denial::flow_denial_code;
+
 
 mod receipt_projection;
-use receipt_projection::*;
 use receipt_projection::canonical_body;
 use receipt_projection::digest;
 use receipt_projection::declassification_grant_hash;

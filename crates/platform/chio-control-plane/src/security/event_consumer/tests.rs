@@ -1,29 +1,41 @@
 
-    pub(super) use super::{
-        build_attested_finding_batch_publication, governed_approval_request_from_native,
-        AttestedFindingAdmissionArtifactPayload, AttestedFindingAdmissionArtifacts,
-        AttestedFindingBatchPlanner, AttestedFindingDispatchCommittedResume,
-        AttestedFindingPreDispatchReconstruction, AttestedFindingResponseCompletionProof,
-        AttestedFindingResponseCoordinator, AttestedFindingResponsePolicyPlanner,
-        AttestedFindingResponsePolicySelection, AttestedFindingResponseRecoveryLimits,
-        CorrelationAttestor, CorrelationPort, DurableAttestedFindingBatchPlanner,
-        DurableCorrelationIngress, KernelActiveResponseApprovalVerifier,
-        KernelAttestedFindingResponseCoordinator, NativeSecurityEventVerifier,
-        PreparedAttestedFindingResponse, ProductionCorrelationConsumer,
-        ReservedAttestedFindingResponsePlan, RuleCorrelationOutcome,
-        SecurityEventReceiptProjection, SqliteTemporalCorrelationPort,
-        TrustedSecurityEventProducer, TrustedSecurityEventReceiptProducer,
-        VerifiedSecurityEventIngress, SECURITY_EVENT_RECEIPT_PROJECTION_VERSION,
-    };
+    pub (super) use super::build_attested_finding_batch_publication;
+pub (super) use super::AttestedFindingAdmissionArtifacts;
+pub (super) use super::AttestedFindingBatchPlanner;
+pub (super) use super::AttestedFindingDispatchCommittedResume;
+pub (super) use super::AttestedFindingPreDispatchReconstruction;
+pub (super) use super::AttestedFindingResponseCompletionProof;
+pub (super) use super::AttestedFindingResponseCoordinator;
+pub (super) use super::AttestedFindingResponsePolicyPlanner;
+pub (super) use super::AttestedFindingResponsePolicySelection;
+pub (super) use super::AttestedFindingResponseRecoveryLimits;
+pub (super) use super::CorrelationAttestor;
+pub (super) use super::CorrelationPort;
+pub (super) use super::DurableAttestedFindingBatchPlanner;
+pub (super) use super::DurableCorrelationIngress;
+pub (super) use super::KernelActiveResponseApprovalVerifier;
+pub (super) use super::KernelAttestedFindingResponseCoordinator;
+pub (super) use super::NativeSecurityEventVerifier;
+pub (super) use super::PreparedAttestedFindingResponse;
+pub (super) use super::ProductionCorrelationConsumer;
+pub (super) use super::ReservedAttestedFindingResponsePlan;
+pub (super) use super::RuleCorrelationOutcome;
+pub (super) use super::SecurityEventReceiptProjection;
+pub (super) use super::SqliteTemporalCorrelationPort;
+pub (super) use super::TrustedSecurityEventProducer;
+pub (super) use super::TrustedSecurityEventReceiptProducer;
+pub (super) use super::VerifiedSecurityEventIngress;
+pub (super) use super::SECURITY_EVENT_RECEIPT_PROJECTION_VERSION;
     pub(super) use crate::security::{DurableActiveResponseExecutor, NativeSecurityReceiptSink};
-    pub(super) use chio_core::capability::governance::{
-        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-        GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntent,
-        CHIO_ACTIVE_RESPONSE_SERVER_ID, CHIO_RESPONSE_PLAN_SCHEMA,
-    };
+    pub (super) use chio_core::capability::governance::GovernedApprovalDecision;
+pub (super) use chio_core::capability::governance::GovernedApprovalTokenBody;
+pub (super) use chio_core::capability::governance::GovernedResponseEffect;
+pub (super) use chio_core::capability::governance::GovernedResponsePlanIntentBody;
+pub (super) use chio_core::capability::governance::CHIO_ACTIVE_RESPONSE_SERVER_ID;
+pub (super) use chio_core::capability::governance::CHIO_RESPONSE_PLAN_SCHEMA;
     pub(super) use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
     pub(super) use chio_core::capability::threshold_approval::ThresholdApproverIdentity;
-    pub(super) use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
+    pub (super) use chio_core::capability::token::CapabilityTokenBody;
     pub(super) use chio_core::{canonical_json_bytes, Ed25519Backend, Keypair};
     pub(super) use chio_core_types::receipt::body::{ChioReceipt, ChioReceiptBody};
     pub(super) use chio_core_types::receipt::decision::ToolCallAction;
@@ -39,46 +51,84 @@
         AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
         ReplayReservationState,
     };
-    pub(super) use chio_kernel::threshold_approval::{
-        authorization_capability_hash, ThresholdApprovalProposal, ThresholdApprovalProposalBody,
-        ThresholdApprovalRequirement,
-    };
-    pub(super) use chio_kernel::{
-        ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
-        ActiveResponseAuthorizationRequest, ActiveResponseCommittedDispatch,
-        ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
-        ActiveResponseExecutionRequest, ActiveResponseExecutorAuthority,
-        ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
-        ActiveResponseFindingAuthority, ActiveResponseFindingAuthorityError,
-        ActiveResponsePolicyResolutionError, ActiveResponseRequirement,
-        ActiveResponseSubmissionProof, ActiveResponseSubmissionProofBody,
-        AuthoritativeCorrelatedFindingEvidence, AutomaticActiveResponseDispatchFenceOutcome,
-        ChioKernel, GovernedSecurityRuntimePublication, KernelConfig, KernelError,
-        MemoryBudgetConfig, PreparedActiveResponseAdmission, SecurityDispatchOutcomeHandle,
-        SecurityPreDispatchContext, SecurityPreDispatchHook, DEFAULT_CHECKPOINT_BATCH_SIZE,
-        DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
-    };
+    pub (super) use chio_kernel::threshold_approval::ThresholdApprovalProposalBody;
+pub (super) use chio_kernel::threshold_approval::ThresholdApprovalRequirement;
+    pub (super) use chio_kernel::ActiveResponseArtifactAuthorityAttestationBody;
+pub (super) use chio_kernel::ActiveResponseCommittedDispatch;
+pub (super) use chio_kernel::ActiveResponseExecutionApproval;
+pub (super) use chio_kernel::ActiveResponseExecutionRequest;
+pub (super) use chio_kernel::ActiveResponseExecutorAuthority;
+pub (super) use chio_kernel::ActiveResponseExecutorError;
+pub (super) use chio_kernel::ActiveResponseFindingAuthority;
+pub (super) use chio_kernel::ActiveResponseFindingAuthorityError;
+pub (super) use chio_kernel::ActiveResponsePolicyResolutionError;
+pub (super) use chio_kernel::ActiveResponseRequirement;
+pub (super) use chio_kernel::ActiveResponseSubmissionProofBody;
+pub (super) use chio_kernel::AuthoritativeCorrelatedFindingEvidence;
+pub (super) use chio_kernel::AutomaticActiveResponseDispatchFenceOutcome;
+pub (super) use chio_kernel::GovernedSecurityRuntimePublication;
+pub (super) use chio_kernel::KernelConfig;
+pub (super) use chio_kernel::MemoryBudgetConfig;
+pub (super) use chio_kernel::SecurityDispatchOutcomeHandle;
+pub (super) use chio_kernel::SecurityPreDispatchContext;
+pub (super) use chio_kernel::SecurityPreDispatchHook;
+pub (super) use chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE;
+pub (super) use chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS;
+pub (super) use chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES;
     pub(super) use chio_quarantine::{
         CorrelationOutcome, CorrelationPolicy, CorrelationStatus, RuleLimits, TemporalRule,
     };
     pub(super) use chio_security_kernel::{Clock, SecurityEventIngress};
-    pub(super) use chio_security_types::ports::{
-        AdmissionArtifactRef, AlertDeliveryQuery, AlertDeliveryStatus, ApprovalVerifierPort,
-        AttestedFindingBatchBinding, AttestedFindingBatchBindings, AttestedFindingBatchKey,
-        AttestedFindingBatchPublication, AttestedFindingBatchStore,
-        AttestedFindingResponseAdmissionState, AttestedFindingResponseCompletionOutcome,
-        AttestedFindingResponseCompletionState, AttestedFindingResponseOutboxHealth,
-        AttestedFindingResponseOutboxKey, AttestedFindingResponseOutboxRecord,
-        AttestedFindingResponseOutboxStore, AttestedFindingResponseOutboxTransition,
-        AttestedFindingResponsePlanPublication, AttestedFindingResponsePlanningState,
-        CanonicalBody, CorrelationIngressStore, CreateOutcome, Digest32, EffectExecutionStatus,
-        EffectOperation, EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode,
-        EventAppend, EventId, GovernedApprovalRequest, GovernedApprovalReservationMutation,
-        IssuanceFreezeAdmissionQuery, LeaseOwnerId, OpaqueReceiptRef, PortError, PortErrorKind,
-        PortResult, PreparedActiveResponseDispatchBinding, ProducerId, ProducerTrustClass,
-        RecordId, RuleId, SecurityAlert, SecurityAlertPort, SecurityEventVerifierPort, SessionId,
-        TenantId, UnverifiedEventBatch, UnverifiedSecurityEvent, SecurityEventVerificationRecord,
-    };
+    pub (super) use chio_security_types::ports::AdmissionArtifactRef;
+pub (super) use chio_security_types::ports::AlertDeliveryQuery;
+pub (super) use chio_security_types::ports::AlertDeliveryStatus;
+pub (super) use chio_security_types::ports::AttestedFindingBatchBinding;
+pub (super) use chio_security_types::ports::AttestedFindingBatchBindings;
+pub (super) use chio_security_types::ports::AttestedFindingBatchKey;
+pub (super) use chio_security_types::ports::AttestedFindingBatchPublication;
+pub (super) use chio_security_types::ports::AttestedFindingBatchStore;
+pub (super) use chio_security_types::ports::AttestedFindingResponseAdmissionState;
+pub (super) use chio_security_types::ports::AttestedFindingResponseCompletionOutcome;
+pub (super) use chio_security_types::ports::AttestedFindingResponseCompletionState;
+pub (super) use chio_security_types::ports::AttestedFindingResponseOutboxHealth;
+pub (super) use chio_security_types::ports::AttestedFindingResponseOutboxKey;
+pub (super) use chio_security_types::ports::AttestedFindingResponseOutboxRecord;
+pub (super) use chio_security_types::ports::AttestedFindingResponseOutboxStore;
+pub (super) use chio_security_types::ports::AttestedFindingResponseOutboxTransition;
+pub (super) use chio_security_types::ports::AttestedFindingResponsePlanPublication;
+pub (super) use chio_security_types::ports::AttestedFindingResponsePlanningState;
+pub (super) use chio_security_types::ports::CanonicalBody;
+pub (super) use chio_security_types::ports::CorrelationIngressStore;
+pub (super) use chio_security_types::ports::CreateOutcome;
+pub (super) use chio_security_types::ports::Digest32;
+pub (super) use chio_security_types::ports::EffectExecutionStatus;
+pub (super) use chio_security_types::ports::EffectOperation;
+pub (super) use chio_security_types::ports::EffectPort;
+pub (super) use chio_security_types::ports::EffectRequest;
+pub (super) use chio_security_types::ports::EffectResult;
+pub (super) use chio_security_types::ports::EffectResultQuery;
+pub (super) use chio_security_types::ports::ErrorCode;
+pub (super) use chio_security_types::ports::EventAppend;
+pub (super) use chio_security_types::ports::EventId;
+pub (super) use chio_security_types::ports::IssuanceFreezeAdmissionQuery;
+pub (super) use chio_security_types::ports::LeaseOwnerId;
+pub (super) use chio_security_types::ports::OpaqueReceiptRef;
+pub (super) use chio_security_types::ports::PortError;
+pub (super) use chio_security_types::ports::PortErrorKind;
+pub (super) use chio_security_types::ports::PortResult;
+pub (super) use chio_security_types::ports::PreparedActiveResponseDispatchBinding;
+pub (super) use chio_security_types::ports::ProducerId;
+pub (super) use chio_security_types::ports::ProducerTrustClass;
+pub (super) use chio_security_types::ports::RecordId;
+pub (super) use chio_security_types::ports::RuleId;
+pub (super) use chio_security_types::ports::SecurityAlert;
+pub (super) use chio_security_types::ports::SecurityAlertPort;
+pub (super) use chio_security_types::ports::SecurityEventVerifierPort;
+pub (super) use chio_security_types::ports::SessionId;
+pub (super) use chio_security_types::ports::TenantId;
+pub (super) use chio_security_types::ports::UnverifiedEventBatch;
+pub (super) use chio_security_types::ports::UnverifiedSecurityEvent;
+pub (super) use chio_security_types::ports::SecurityEventVerificationRecord;
     pub(super) use chio_security_types::{
         OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
         ResponseEffectSpec, ResponseTarget, SecurityEventBody, SecurityEventBodyInput,

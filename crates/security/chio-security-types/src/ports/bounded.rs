@@ -1,4 +1,14 @@
-use super::*;
+use super::Vec;
+use super::fmt;
+use super::de;
+use super::SeqAccess;
+use super::Visitor;
+use super::Deserialize;
+use super::Deserializer;
+use super::Serialize;
+use super::RecordId;
+use super::EffectId;
+use super::DestinationId;
 
 const MAX_CANONICAL_BODY_BYTES: usize = 1_048_576;
 

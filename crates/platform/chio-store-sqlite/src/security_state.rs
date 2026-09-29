@@ -521,55 +521,129 @@ fn validate_security_state_database_binding(
 }
 
 mod codec;
-use codec::*;
+use codec::sqlite_error;
+use codec::schema_version_error;
+use codec::to_i64;
+use codec::from_i64;
+use codec::body_hash;
+use codec::validate_canonical_json_body;
+use codec::decode_digest;
+use codec::canonical_request_hash;
+use codec::validate_encrypted_blob_reference;
+use codec::encode_label;
+use codec::decode_label;
+use codec::normalize_sql;
+use codec::table_definition_is_exact;
+use codec::schema_object_definition_is_exact;
 
 mod containment;
-use containment::*;
+use containment::StoredEffectCommandProjection;
+use containment::load_overlay_snapshot;
 
 mod correlation;
-use correlation::*;
+use correlation::index_partition_event_in_transaction;
+use correlation::compare_and_swap_correlation_in_transaction;
+use correlation::validate_correlation_outcome_publication;
+use correlation::load_correlation_outcome_record;
+use correlation::insert_correlation_outcome_record;
+use correlation::validate_correlation_outcome_storage_binding;
+use correlation::load_correlation_partition_generation;
+use correlation::load_correlation_partial;
 
 mod correlation_schema;
-use correlation_schema::*;
+use correlation_schema::validate_attested_finding_batch_tenant_keys;
+use correlation_schema::table_has_foreign_key_violation;
+use correlation_schema::ensure_attested_finding_batch_tenant_keys;
+use correlation_schema::validate_correlation_durable_schema;
+use correlation_schema::upgrade_correlation_ingress_pending_index;
 
 mod declassification_codec;
-use declassification_codec::*;
+use declassification_codec::declassification_state_name;
+use declassification_codec::parse_declassification_state;
+use declassification_codec::encode_declassification_binding;
+use declassification_codec::decode_declassification_binding;
+use declassification_codec::declassification_phase_name;
+use declassification_codec::decode_declassification_receipt;
+use declassification_codec::validate_declassification_consumption_evidence;
+use declassification_codec::validate_declassification_outcome_evidence;
+use declassification_codec::decode_declassification_evidence_row;
+use declassification_codec::declassification_evidence_row;
+use declassification_codec::DeclassificationEvidenceCommit;
+use declassification_codec::declassification_evidence_matches;
+# [cfg (test)]
+use declassification_codec::load_declassification_use_record;
+# [cfg (test)]
+use declassification_codec::load_declassification_evidence_record;
 
 mod declassification_schema;
-use declassification_schema::*;
+use declassification_schema::DECLASSIFICATION_READINESS_CURSOR;
+use declassification_schema::prepare_declassification_schema_migration;
+use declassification_schema::validate_declassification_evidence_schema;
+use declassification_schema::validate_declassification_evidence_integrity;
 
 mod dispatch;
-use dispatch::*;
+use dispatch::load_response_dispatch;
 
 mod egress_restriction;
-use egress_restriction::*;
+use egress_restriction::effect_request_matches_query;
+use egress_restriction::empty_egress_restriction_snapshot;
+use egress_restriction::load_egress_restriction_snapshot;
 
 mod events;
-use events::*;
+use events::MAX_EVENT_SCAN_RESULTS;
+use events::EVENT_EVIDENCE_HASH_DOMAIN;
+use events::RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN;
+use events::parse_trust_class;
+use events::append_verified_in_transaction;
+use events::scan_verified_partition;
+use events::load_event_identity;
 
 mod finding_batches;
-use finding_batches::*;
+use finding_batches::load_attested_finding_batch_record;
+use finding_batches::validate_attested_response_execution_dispatch;
 
 mod lineage_fence;
-use lineage_fence::*;
 
 mod response_journal;
-use response_journal::*;
+use response_journal::decode_response_snapshot;
+use response_journal::response_mutation_scheduler_fence;
+use response_journal::load_response_plan;
 
 mod response_outbox;
-use response_outbox::*;
 
 mod response_schema;
-use response_schema::*;
+use response_schema::ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL;
+use response_schema::ATTESTED_FINDING_RESPONSE_OUTBOX_DUE_INDEX_DDL;
+use response_schema::ATTESTED_FINDING_RESPONSE_OUTBOX_IMMUTABLE_TRIGGER_DDL;
+use response_schema::ATTESTED_FINDING_RESPONSE_OUTBOX_DELETE_TRIGGER_DDL;
+use response_schema::ensure_lineage_fence_binding_columns;
+use response_schema::ensure_response_effect_generation_column;
+use response_schema::ensure_scheduler_lease_body_hash_column;
+use response_schema::ensure_scheduler_retry_health_columns;
+use response_schema::ensure_response_dispatch_commit_mode_column;
+use response_schema::ensure_attested_finding_response_outbox_schema;
+use response_schema::attested_finding_response_outbox_is_one_to_one;
 
 mod scheduler;
-use scheduler::*;
+use scheduler::MAX_SCHEDULER_CLAIMS;
+use scheduler::MAX_CLOCK_SKEW_MS;
+use scheduler::scheduler_lease_body_hash;
+use scheduler::load_valid_scheduler_lease;
+use scheduler::load_scheduler_retry;
+use scheduler::load_scheduler_lease;
+use scheduler::load_scheduler_claim;
+use scheduler::next_scheduler_fencing_token;
+use scheduler::validate_scheduler_fence;
+use scheduler::validate_scheduler_lease_binding;
 
 mod schema;
-use schema::*;
+use schema::SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION;
+use schema::migrate;
 
 mod session_throttle;
-use session_throttle::*;
+use session_throttle::load_session_throttle_snapshot;
 
 mod transition_journal;
-use transition_journal::*;
+use transition_journal::transition_status;
+use transition_journal::check_transition_replay;
+use transition_journal::record_transition;

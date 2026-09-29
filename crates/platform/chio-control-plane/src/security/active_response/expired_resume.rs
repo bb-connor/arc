@@ -16,7 +16,7 @@ impl<
         A: SecurityAlertPort + ?Sized,
     > DurableActiveResponseExecutor<S, E, R, A>
 {
-    pub(in crate::security::active_response) fn drive_loaded_dispatch(
+    pub(super) fn drive_loaded_dispatch(
         &self,
         request: &ValidatedExecutionRequest,
         dispatch: &ResponseDispatchRecord,
@@ -25,7 +25,7 @@ impl<
         self.drive_committed_dispatch(request, dispatch, recovered)
     }
 
-    pub(in crate::security::active_response) fn drive_committed_dispatch(
+    pub(super) fn drive_committed_dispatch(
         &self,
         request: &ValidatedExecutionRequest,
         dispatch: &ResponseDispatchRecord,

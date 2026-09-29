@@ -1,4 +1,38 @@
-use super::*;
+#[cfg(test)]
+use super::declassification;
+#[cfg(test)]
+use chio_security_types::ports::DeclassificationEvidenceQuery;
+#[cfg(test)]
+use chio_security_types::ports::DeclassificationUseQuery;
+#[cfg(test)]
+use chio_security_types::ports::DeclassificationUseRecord;
+#[cfg(test)]
+use rusqlite::Connection;
+use super::canonical_json_bytes;
+use super::ActiveDefenseReceiptBody;
+use super::derive_declassification_event_id;
+use super::derive_declassification_transition_id;
+use super::CanonicalBody;
+use super::DeclassificationConsumptionEvidenceCommit;
+use super::DeclassificationEvidencePhase;
+use super::DeclassificationEvidenceRecord;
+use super::DeclassificationOutcomeEvidenceCommit;
+use super::DeclassificationTransitionBinding;
+use super::DeclassificationUseState;
+use super::Digest32;
+use super::ErrorCode;
+use super::EventId;
+use super::GrantId;
+use super::OpaqueReceiptRef;
+use super::PortError;
+use super::PortResult;
+use super::ReceiptAppendRequest;
+use super::RecordId;
+use super::TenantId;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::from_i64;
+use super::decode_digest;
 
 
 
@@ -46,7 +80,7 @@ pub(super) fn decode_declassification_binding(bytes: &[u8]) -> PortResult<Declas
     Ok(binding)
 }
 
-pub(super) fn validate_declassification_binding_identity(
+fn validate_declassification_binding_identity(
     binding: &DeclassificationTransitionBinding,
     tenant_id: &TenantId,
     grant_id: &GrantId,
@@ -74,7 +108,7 @@ pub(super) fn declassification_phase_name(phase: DeclassificationEvidencePhase) 
     }
 }
 
-pub(super) fn parse_declassification_phase(value: &str) -> PortResult<DeclassificationEvidencePhase> {
+fn parse_declassification_phase(value: &str) -> PortResult<DeclassificationEvidencePhase> {
     match value {
         "consumption" => Ok(DeclassificationEvidencePhase::Consumption),
         "outcome" => Ok(DeclassificationEvidencePhase::Outcome),

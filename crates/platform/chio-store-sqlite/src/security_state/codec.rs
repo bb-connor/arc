@@ -1,4 +1,16 @@
-use super::*;
+use super::canonical_json_bytes;
+use super::sha256;
+use super::CanonicalBody;
+use super::Digest32;
+use super::PortError;
+use super::PortResult;
+use super::RecordId;
+use super::InformationLabel;
+use super::params;
+use super::Connection;
+use super::OptionalExtension;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
 
 
 pub(super) fn sqlite_error(error: rusqlite::Error) -> PortError {
@@ -40,7 +52,7 @@ pub(super) fn body_hash(body: &[u8]) -> [u8; 32] {
     result
 }
 
-pub(super) fn validate_body(body: &CanonicalBody, expected: &Digest32) -> PortResult<()> {
+fn validate_body(body: &CanonicalBody, expected: &Digest32) -> PortResult<()> {
     if body_hash(body.as_bytes()).as_slice() != expected.as_bytes() {
         return Err(PortError::integrity_failure());
     }

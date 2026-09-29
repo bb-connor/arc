@@ -64,7 +64,6 @@ pub struct DurableActiveResponseExecutor<
     response_executor: ResponseExecutor<S, E, R, A>,
 }
 mod executor;
-use executor::prepared_binding_from_dispatch_record;
 #[cfg(test)]
 mod tests {
     use super::super::adapters::NativeSecurityReceiptSink;

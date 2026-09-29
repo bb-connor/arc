@@ -1,4 +1,40 @@
-use super::*;
+use super::BTreeMap;
+use super::AtomicU64;
+use super::Ordering;
+use super::Arc;
+use super::Mutex;
+use super::MutexGuard;
+
+
+
+
+
+
+use super::BrokerExecuteRequest;
+use super::ProductionSqliteAttemptStore;
+use super::AttemptStore;
+use super::BrokerError;
+use super::Result;
+use super::BrokerServiceConfig;
+use super::BrokerServiceAuthorityBundle;
+use super::BrokerService;
+use super::RetainedPreparedDispatch;
+
+
+use super::failure_receipt_key_digest;
+use super::attempt_operation_gate_index;
+
+
+
+
+
+
+
+
+
+
+
+
 
 impl BrokerService {
 pub(crate) fn new_production(
@@ -21,7 +57,7 @@ pub(crate) fn new_production(
         Self::from_authorities(config, attempts, authorities)
     }
 
-    pub(super) fn from_authorities(
+    fn from_authorities(
         config: BrokerServiceConfig,
         attempts: Arc<dyn AttemptStore>,
         authorities: BrokerServiceAuthorityBundle,
@@ -70,7 +106,7 @@ pub(crate) fn new_production(
         })
     }
 
-    pub(super) fn attempt_operation_guard_for_digest(&self, digest: &str) -> Result<MutexGuard<'_, ()>> {
+    fn attempt_operation_guard_for_digest(&self, digest: &str) -> Result<MutexGuard<'_, ()>> {
         let gate_index = attempt_operation_gate_index(digest)?;
         self.attempt_operation_gates.get(gate_index).ok_or_else(||
             BrokerError::Invariant("broker attempt gate index is invalid".to_owned()))?

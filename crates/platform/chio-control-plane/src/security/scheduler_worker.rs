@@ -112,46 +112,55 @@ impl ResponseWorkerHealth {
 }
 
 mod outbox;
-use outbox::*;
+
+pub(in crate::security) use outbox::ProductionDeclassificationReceiptOutbox;
+#[cfg(test)]
 use outbox::DeclassificationReceiptOutboxPort;
-use outbox::NativeDeclassificationReceiptOutboxPort;
-use outbox::MAX_DECLASSIFICATION_OUTBOX_DRAIN_PASSES;
+
 
 mod worker;
-pub use worker::*;
+pub use worker::ProductionResponseWorkerLoopConfig;
 use worker::WORKER_CLAIM_DOMAIN;
+#[cfg(test)]
 use worker::MIN_WORKER_PROGRESS_DEADLINE;
+#[cfg(test)]
 use worker::MAX_WORKER_PROGRESS_DEADLINE;
-use worker::MAX_WORKER_TICK_INTERVAL;
+
 use worker::ResponseWorkerProgress;
-use worker::failed_health;
+
 use worker::worker_task_crash_error;
 
 mod custody;
-pub use custody::*;
+
+#[cfg(test)]
 use custody::MAX_RESPONSE_WORKER_JOIN_OWNERS;
-use custody::RESPONSE_WORKER_REAPER_POLL_INTERVAL;
+
 use custody::ResponseWorkerJoinPermit;
+#[cfg(test)]
 use custody::ResponseWorkerJoinJob;
-use custody::ResponseWorkerReaperState;
+
+#[cfg(test)]
 use custody::ResponseWorkerReaperRegistry;
-use custody::RESPONSE_WORKER_REAPER_REGISTRY;
+
 use custody::acquire_response_worker_join_permit;
+#[cfg(test)]
 use custody::join_response_worker_thread;
 use custody::ResponseWorkerTaskLiveness;
 
 mod scheduler;
-pub use scheduler::*;
-use scheduler::DynResponseScheduler;
-use scheduler::OwnedLease;
-use scheduler::outbox_health_status;
-use scheduler::WorkerClaimCommitment;
-use scheduler::response_worker_claim_incarnation_id;
-use scheduler::worker_claim_id;
+pub use scheduler::ProductionResponseSchedulerConfig;
+pub use scheduler::SqliteResponseWorkerPort;
+
+
+
+
+
+
 
 mod registry;
-pub use registry::*;
-use registry::ActiveDefenseRegistryState;
+pub use registry::ActiveDefenseServices;
+pub use registry::ActiveDefenseServiceRegistry;
+
 
 #[cfg(test)]
 mod tests;
@@ -172,7 +181,6 @@ pub struct ProductionResponseWorker {
     progress: Mutex<ResponseWorkerProgress>,
 }
 
-pub(super) use outbox::ProductionDeclassificationReceiptOutbox;
 
 
 

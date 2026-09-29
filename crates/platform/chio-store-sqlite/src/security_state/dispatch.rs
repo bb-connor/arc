@@ -1,4 +1,64 @@
-use super::*;
+
+use super::canonical_json_bytes;
+use super::sha256;
+use super::ActionId;
+use super::AutomaticResponseDispatchFenceOutcome;
+use super::AutomaticResponseDispatchFenceRecord;
+use super::AutomaticResponseDispatchFenceRequest;
+use super::CanonicalBody;
+use super::Digest32;
+use super::PortError;
+use super::PortResult;
+use super::PreparedActiveResponseDispatchBinding;
+use super::RecordId;
+use super::ResponseDispatchApproval;
+use super::ResponseDispatchAuthorization;
+use super::ResponseDispatchAuthorizationBody;
+use super::ResponseDispatchCommitMode;
+use super::ResponseDispatchCommitOutcome;
+use super::ResponseDispatchCommitRequest;
+use super::ResponseDispatchKey;
+use super::ResponseDispatchLease;
+use super::ResponseDispatchLoadOutcome;
+use super::ResponseDispatchRecord;
+use super::ResponseDispatchRecoveryOutcome;
+use super::ResponseDispatchRecoveryRequest;
+use super::ResponseDispatchStore;
+use super::ResponsePlanRecord;
+use super::ScheduledWork;
+use super::SchedulerWorkKey;
+use super::TenantId;
+use super::PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION;
+use super::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION;
+use super::ResponseApprovalRequirement;
+use super::ResponseMutationRecord;
+use super::ResponseSnapshot;
+use super::ResponseState;
+use super::ResponseTransitionCause;
+use super::params;
+use super::Connection;
+use super::OptionalExtension;
+use super::Transaction;
+use super::TransactionBehavior;
+use super::SqliteSecurityStateStore;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::sqlite_error;
+use super::to_i64;
+use super::from_i64;
+use super::body_hash;
+use super::validate_canonical_json_body;
+use super::decode_digest;
+use super::canonical_request_hash;
+use super::validate_attested_response_execution_dispatch;
+use super::decode_response_snapshot;
+use super::load_response_plan;
+use super::MAX_CLOCK_SKEW_MS;
+use super::scheduler_lease_body_hash;
+use super::load_valid_scheduler_lease;
+use super::load_scheduler_retry;
+use super::load_scheduler_lease;
+use super::next_scheduler_fencing_token;
 
 
 impl ResponseDispatchStore for SqliteSecurityStateStore {
@@ -608,7 +668,7 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
     }
 }
 
-pub(super) fn validate_initial_dispatch_history(
+fn validate_initial_dispatch_history(
     snapshot: &ResponseSnapshot,
     authorization: &ResponseDispatchAuthorizationBody,
 ) -> PortResult<()> {
@@ -673,7 +733,7 @@ pub(super) fn validate_initial_dispatch_history(
     }
 }
 
-pub(super) fn validate_response_dispatch_request(
+fn validate_response_dispatch_request(
     request: &ResponseDispatchCommitRequest,
 ) -> PortResult<ResponseSnapshot> {
     validate_canonical_json_body(
@@ -907,13 +967,13 @@ pub(super) fn load_response_dispatch(
     Ok(Some(record))
 }
 
-pub(super) fn prepared_binding_from_response_dispatch(
+fn prepared_binding_from_response_dispatch(
     record: &ResponseDispatchRecord,
 ) -> PreparedActiveResponseDispatchBinding {
     prepared_binding_from_response_authorization(&record.authorization.body)
 }
 
-pub(super) fn prepared_binding_from_response_authorization(
+fn prepared_binding_from_response_authorization(
     authorization: &ResponseDispatchAuthorizationBody,
 ) -> PreparedActiveResponseDispatchBinding {
     PreparedActiveResponseDispatchBinding {
@@ -932,7 +992,7 @@ pub(super) fn prepared_binding_from_response_authorization(
     }
 }
 
-pub(super) fn canonical_prepared_dispatch_binding(
+fn canonical_prepared_dispatch_binding(
     binding: &PreparedActiveResponseDispatchBinding,
 ) -> PortResult<(Vec<u8>, Digest32)> {
     let body = canonical_json_bytes(binding).map_err(|_| PortError::invalid_data())?;
@@ -943,7 +1003,7 @@ pub(super) fn canonical_prepared_dispatch_binding(
     Ok((body, hash))
 }
 
-pub(super) fn load_response_dispatch_for_identity(
+fn load_response_dispatch_for_identity(
     connection: &Connection,
     tenant_id: &TenantId,
     action_id: &ActionId,
@@ -984,7 +1044,7 @@ pub(super) fn load_response_dispatch_for_identity(
     )
 }
 
-pub(super) fn load_automatic_response_dispatch_fence(
+fn load_automatic_response_dispatch_fence(
     connection: &Connection,
     tenant_id: &TenantId,
     action_id: &ActionId,
@@ -1051,7 +1111,7 @@ pub(super) fn load_automatic_response_dispatch_fence(
     }))
 }
 
-pub(super) fn validate_automatic_response_dispatch_fence_binding_shape(
+fn validate_automatic_response_dispatch_fence_binding_shape(
     binding: &PreparedActiveResponseDispatchBinding,
 ) -> PortResult<()> {
     if binding.schema_version != PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
@@ -1068,7 +1128,7 @@ pub(super) fn validate_automatic_response_dispatch_fence_binding_shape(
     Ok(())
 }
 
-pub(super) fn validate_all_automatic_response_dispatch_fences(connection: &Connection) -> PortResult<()> {
+fn validate_all_automatic_response_dispatch_fences(connection: &Connection) -> PortResult<()> {
     type StoredFenceIdentity = (String, String, String);
     let mut statement = connection
         .prepare(
@@ -1098,7 +1158,7 @@ pub(super) fn validate_all_automatic_response_dispatch_fences(connection: &Conne
     Ok(())
 }
 
-pub(super) fn load_response_dispatch_commit_mode(
+fn load_response_dispatch_commit_mode(
     connection: &Connection,
     key: &ResponseDispatchKey,
 ) -> PortResult<Option<ResponseDispatchCommitMode>> {
@@ -1114,7 +1174,7 @@ pub(super) fn load_response_dispatch_commit_mode(
         .transpose()
 }
 
-pub(super) const fn response_dispatch_commit_mode(mode: ResponseDispatchCommitMode) -> &'static str {
+const fn response_dispatch_commit_mode(mode: ResponseDispatchCommitMode) -> &'static str {
     match mode {
         ResponseDispatchCommitMode::Fresh => "fresh",
         ResponseDispatchCommitMode::GovernedCommittedResume => "governed_committed_resume",
@@ -1124,7 +1184,7 @@ pub(super) const fn response_dispatch_commit_mode(mode: ResponseDispatchCommitMo
     }
 }
 
-pub(super) fn parse_response_dispatch_commit_mode(value: &str) -> PortResult<ResponseDispatchCommitMode> {
+fn parse_response_dispatch_commit_mode(value: &str) -> PortResult<ResponseDispatchCommitMode> {
     match value {
         "fresh" => Ok(ResponseDispatchCommitMode::Fresh),
         "governed_committed_resume" => Ok(ResponseDispatchCommitMode::GovernedCommittedResume),
@@ -1135,7 +1195,7 @@ pub(super) fn parse_response_dispatch_commit_mode(value: &str) -> PortResult<Res
     }
 }
 
-pub(super) fn load_response_dispatch_recovery(
+fn load_response_dispatch_recovery(
     connection: &Connection,
     request: &ResponseDispatchRecoveryRequest,
     request_hash: &[u8; 32],
@@ -1217,7 +1277,7 @@ pub(super) fn load_response_dispatch_recovery(
     Ok(Some(outcome))
 }
 
-pub(super) fn record_response_dispatch_recovery(
+fn record_response_dispatch_recovery(
     transaction: &Transaction<'_>,
     request: &ResponseDispatchRecoveryRequest,
     request_hash: &[u8; 32],

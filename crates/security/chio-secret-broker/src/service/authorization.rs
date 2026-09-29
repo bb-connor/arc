@@ -1,4 +1,50 @@
-use super::*;
+
+
+
+
+use super::SecretBackend;
+
+
+use super::capability_digest;
+use super::verify_capability;
+
+use super::proof_digest;
+use super::verify_request_proof;
+use super::BrokerExecuteRequest;
+use super::ProviderAdapter;
+use super::AdminAuthorization;
+use super::GovernedAdminAuthorizer;
+use super::broker_execute_request_registration_digest;
+use super::validate_parent_liveness;
+use super::validate_revocation_snapshot;
+use super::BrokerRevocationRequest;
+
+use super::CanonicalBrokerRevocationSet;
+
+use super::CapabilityLivenessRequest;
+use super::derive_attempt_ids_for_operation;
+use super::AttemptRegistration;
+use super::validate_identifier;
+use super::BrokerError;
+use super::Result;
+use super::BrokerService;
+use super::ValidatedBrokerAuthorities;
+use super::ValidatedBrokerAuditAuthorities;
+
+
+use super::broker_request_digest;
+
+
+
+
+
+
+
+
+
+
+
+
 
 impl BrokerService {
 
@@ -121,7 +167,7 @@ impl BrokerService {
         Ok(ValidatedBrokerAuthorities { revocation_set })
     }
 
-    pub(super) fn validate_audit_request_authorities(
+    fn validate_audit_request_authorities(
         &self,
         request: &BrokerExecuteRequest,
         revocation_authority_domain: &str,

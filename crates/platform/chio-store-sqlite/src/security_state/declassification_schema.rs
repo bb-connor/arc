@@ -1,7 +1,23 @@
-use super::*;
+// tenant-read-contract: security_declassification_tombstones; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_receipt_outbox; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_evidence_identity; class=tenant-predicate; principal=security-runtime
+// tenant-read-contract: security_declassification_uses; class=tenant-predicate; principal=security-runtime
+use super::declassification;
+use super::sha256;
+
+
+use super::PortError;
+use super::PortResult;
+use super::params;
+use super::Connection;
+use super::OptionalExtension;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::sqlite_error;
+use super::normalize_sql;
 
 pub(super) const DECLASSIFICATION_READINESS_CURSOR: &str = "declassification-evidence-schema-v2";
-pub(super) const DECLASSIFICATION_LIFECYCLE_CANONICAL_DDL: &str = r#"
+const DECLASSIFICATION_LIFECYCLE_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_declassification_lifecycle (
     singleton INTEGER NOT NULL PRIMARY KEY CHECK (singleton = 1),
     schema_version INTEGER NOT NULL CHECK (schema_version = 2),
@@ -15,7 +31,7 @@ CREATE TABLE security_declassification_lifecycle (
     CHECK (reconciliation_active = 0 OR live_dispatch_sealed = 0)
 )
 "#;
-pub(super) const DECLASSIFICATION_USES_CANONICAL_DDL: &str = r#"
+const DECLASSIFICATION_USES_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_declassification_uses (
     grant_id TEXT NOT NULL,
     tenant_id TEXT NOT NULL,
@@ -45,7 +61,7 @@ CREATE TABLE security_declassification_uses (
     PRIMARY KEY (tenant_id, grant_id)
 )
 "#;
-pub(super) const DECLASSIFICATION_IDENTITY_CANONICAL_DDL: &str = r#"
+const DECLASSIFICATION_IDENTITY_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_declassification_evidence_identity (
     evidence_id TEXT NOT NULL,
     transition_id TEXT NOT NULL,
@@ -57,7 +73,7 @@ CREATE TABLE security_declassification_evidence_identity (
     UNIQUE (tenant_id, transition_id)
 )
 "#;
-pub(super) const DECLASSIFICATION_OUTBOX_CANONICAL_DDL: &str = r#"
+const DECLASSIFICATION_OUTBOX_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_declassification_receipt_outbox (
     tenant_id TEXT NOT NULL,
     grant_id TEXT NOT NULL,
@@ -108,7 +124,7 @@ CREATE TABLE security_declassification_receipt_outbox (
         REFERENCES security_declassification_uses (tenant_id, grant_id)
 )
 "#;
-pub(super) const DECLASSIFICATION_TOMBSTONE_CANONICAL_DDL: &str = r#"
+const DECLASSIFICATION_TOMBSTONE_CANONICAL_DDL: &str = r#"
 CREATE TABLE security_declassification_tombstones (
     tenant_id TEXT NOT NULL,
     grant_id TEXT NOT NULL,
@@ -141,7 +157,7 @@ CREATE TABLE security_declassification_tombstones (
         )
 )
 "#;
-pub(super) const DECLASSIFICATION_IDENTITY_LEGACY_DDL: &str = r#"
+const DECLASSIFICATION_IDENTITY_LEGACY_DDL: &str = r#"
 CREATE TABLE security_declassification_evidence_identity (
     evidence_id TEXT NOT NULL PRIMARY KEY,
     transition_id TEXT NOT NULL UNIQUE,
@@ -151,7 +167,7 @@ CREATE TABLE security_declassification_evidence_identity (
     body_hash BLOB NOT NULL CHECK (length(body_hash) = 32)
 )
 "#;
-pub(super) const DECLASSIFICATION_OUTBOX_LEGACY_DDL: &str = r#"
+const DECLASSIFICATION_OUTBOX_LEGACY_DDL: &str = r#"
 CREATE TABLE security_declassification_receipt_outbox (
     tenant_id TEXT NOT NULL,
     grant_id TEXT NOT NULL,
@@ -200,7 +216,7 @@ CREATE TABLE security_declassification_receipt_outbox (
         REFERENCES security_declassification_uses (tenant_id, grant_id)
 )
 "#;
-pub(super) const DECLASSIFICATION_TOMBSTONE_LEGACY_DDL: &str = r#"
+const DECLASSIFICATION_TOMBSTONE_LEGACY_DDL: &str = r#"
 CREATE TABLE security_declassification_tombstones (
     tenant_id TEXT NOT NULL,
     grant_id TEXT NOT NULL,
@@ -367,7 +383,7 @@ pub(super) fn prepare_declassification_schema_migration(connection: &Connection)
         .map_err(sqlite_error)
 }
 
-pub(super) fn migrate_declassification_tenant_keys(connection: &Connection) -> PortResult<()> {
+fn migrate_declassification_tenant_keys(connection: &Connection) -> PortResult<()> {
     validate_declassification_evidence_integrity(connection)?;
     const IDENTITY_STAGING: &str = "security_declassification_evidence_identity_tenant_migration";
     const OUTBOX_STAGING: &str = "security_declassification_receipt_outbox_tenant_migration";

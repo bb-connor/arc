@@ -1,4 +1,52 @@
-use super::*;
+use super::Read;
+#[cfg(test)]
+use super::Write;
+# [cfg (unix)]
+use super::UnixStream;
+use super::Ordering;
+use super::Arc;
+use super::Mutex;
+use super::Duration;
+# [cfg (unix)]
+use super::Instant;
+use super::canonical_json_bytes;
+# [cfg (test)]
+use super::Ed25519Backend;
+# [cfg (test)]
+use super::Keypair;
+use super::Digest;
+use super::Sha256;
+
+
+use super::MAX_WIRE_BYTES;
+use super::PrepareDispatchAcknowledgement;
+use super::BrokerError;
+use super::Result;
+use super::IpcOperation;
+use super::AuthenticatedIpcRequest;
+use super::canonical_ipc_request_bytes;
+use super::read_bounded_sensitive_frame;
+
+
+use super::decode_canonical_ipc_request;
+#[cfg(test)]
+use super::BrokerIpcHandler;
+# [cfg (unix)]
+use super::BrokerIpcServeFailure;
+# [cfg (unix)]
+use super::UnixBrokerEndpoint;
+use super::MAX_BROKER_IPC_DEADLINE_MS;
+use super::BrokerIpcDeadlines;
+use super::BrokerIpcServeOutcome;
+# [cfg (unix)]
+use super::BrokerIpcDeadlineIo;
+# [cfg (unix)]
+use super::classify_broker_ipc_handler_result;
+# [cfg (unix)]
+use super::validate_broker_ipc_response_envelope;
+# [cfg (unix)]
+use super::write_broker_ipc_response;
+
 
 
 /// A privileged preparation may retain one descriptor while the kernel performs
@@ -32,7 +80,7 @@ pub(super) struct PreparedIpcConnection {
 
 #[cfg(unix)]
 impl PreparedIpcSlot {
-    pub(super) fn reserve(&self) -> Result<PreparedIpcPermit> {
+    fn reserve(&self) -> Result<PreparedIpcPermit> {
         self.busy
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .map_err(|_| {
@@ -166,7 +214,7 @@ impl UnixBrokerEndpoint {
         }
     }
 
-    pub(super) fn serve_prepared(
+    fn serve_prepared(
         &self,
         connection: PreparedIpcConnection,
         first: [u8; 1],

@@ -1,3 +1,6 @@
+use crate::security_state::transition_journal::{record_transition, transition_status};
+use chio_security_types::ports::DeclassificationEvidenceCommitStore;
+use chio_security_types::clock::SystemClock;
 use super::*;
 
 #[cfg(unix)]

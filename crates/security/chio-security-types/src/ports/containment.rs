@@ -1,5 +1,25 @@
 use super::identifiers::MAX_ID_BYTES;
-use super::*;
+# [cfg (feature = "std")]
+use super::format;
+use super::String;
+use super::Deserialize;
+use super::Serialize;
+use super::Digest32;
+use super::BoundedVec;
+# [cfg (feature = "std")]
+use super::sort_json_object_keys;
+use super::EffectRequest;
+use super::EffectResult;
+use super::EffectResultQuery;
+use super::EffectExecutionStatus;
+use super::TenantScopedId;
+use super::TenantId;
+use super::RecordId;
+use super::SessionId;
+use super::ActionId;
+use super::EffectId;
+use super::PortError;
+use super::PortResult;
 
 pub const CONTAINMENT_TARGET_DOMAIN: &[u8] = b"chio.security.containment-target.v1\0";
 pub const CONTAINMENT_OVERLAY_VERSION_DOMAIN: &[u8] = b"chio.response-effect-overlay-state.v1\0";

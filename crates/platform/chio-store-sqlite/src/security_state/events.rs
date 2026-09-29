@@ -1,11 +1,58 @@
-use super::*;
+use super::AdvisorySecurityEvent;
+use super::CanonicalBody;
+use super::CorrelationCasRequest;
+use super::CorrelationDeleteRequest;
+use super::CorrelationEventAdmission;
+use super::CorrelationEventAdmissionRequest;
+use super::CorrelationEventIndexRequest;
+use super::CorrelationOutcomeCommitRequest;
+use super::CorrelationOutcomeKey;
+use super::CorrelationOutcomePublication;
+use super::CorrelationPartial;
+use super::CorrelationPartitionKey;
+use super::CorrelationScan;
+use super::CreateOutcome;
+use super::Digest32;
+use super::EventAppend;
+use super::EventId;
+use super::EventPartitionScan;
+use super::PortError;
+use super::PortResult;
+use super::ProducerId;
+use super::ProducerTrustClass;
+use super::SecurityEventStore;
+use super::SecurityEventVerificationRecord;
+use super::VerifiedEventBatch;
+use super::params;
+use super::Connection;
+use super::OptionalExtension;
+use super::TransactionBehavior;
+use super::SqliteSecurityStateStore;
+# [cfg (target_os = "macos")]
+use super::security_state_lifecycle_lock_path;
+use super::sqlite_error;
+use super::to_i64;
+use super::from_i64;
+use super::validate_canonical_json_body;
+use super::decode_digest;
+use super::canonical_request_hash;
+use super::index_partition_event_in_transaction;
+use super::compare_and_swap_correlation_in_transaction;
+use super::validate_correlation_outcome_publication;
+use super::load_correlation_outcome_record;
+use super::insert_correlation_outcome_record;
+use super::validate_correlation_outcome_storage_binding;
+use super::load_correlation_partition_generation;
+use super::load_correlation_partial;
+use super::transition_status;
+use super::record_transition;
 
 pub(super) const MAX_EVENT_SCAN_RESULTS: u32 = 4_096;
 pub(super) const EVENT_EVIDENCE_HASH_DOMAIN: &[u8] = b"chio.verified-security-event-evidence.v1\0";
 pub(super) const RECEIPT_EVENT_EVIDENCE_HASH_DOMAIN: &[u8] =
     b"chio.verified-security-event-receipt-evidence.v1\0";
 
-pub(super) fn trust_class_name(value: ProducerTrustClass) -> &'static str {
+fn trust_class_name(value: ProducerTrustClass) -> &'static str {
     match value {
         ProducerTrustClass::InternalDetector => "internal_detector",
         ProducerTrustClass::VerifiedReceipt => "verified_receipt",
@@ -507,7 +554,7 @@ pub(super) fn load_event_identity(
         .map_err(sqlite_error)
 }
 
-pub(super) fn insert_event_identity(
+fn insert_event_identity(
     connection: &Connection,
     event_id: &str,
     tenant_id: &str,

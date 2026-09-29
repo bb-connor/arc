@@ -1,4 +1,24 @@
-use super::*;
+use super::Vec;
+use super::Deserialize;
+use super::Serialize;
+use super::Digest32;
+use super::BoundedVec;
+use super::EgressDestinationSet;
+use super::EgressDeniedDestinations;
+use super::EgressRestrictionEffectIds;
+# [cfg (feature = "std")]
+use super::issuance_freeze_domain_hash;
+use super::EffectRequest;
+use super::EffectResult;
+use super::EffectResultQuery;
+use super::EffectExecutionStatus;
+use super::TenantId;
+use super::SessionId;
+use super::ActionId;
+use super::EffectId;
+use super::DestinationId;
+use super::PortError;
+use super::PortResult;
 
 pub type EgressRestrictionContributions = BoundedVec<EgressRestrictionContribution, 256>;
 
@@ -252,5 +272,6 @@ pub fn predict_egress_apply(
 }
 
 }
+
 #[cfg(feature = "std")]
-pub use projection::*;
+pub use projection::{predict_egress_removal, empty_egress_restriction_snapshot, validate_egress_restriction_snapshot, egress_snapshot_version_hash, predict_egress_apply};

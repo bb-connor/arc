@@ -238,47 +238,58 @@ mod authorization;
 mod execution;
 
 mod failure;
-pub use failure::*;
+
 
 mod ipc;
-pub use ipc::*;
+pub use ipc::BrokerIpcHandler;
+# [cfg (unix)]
+pub use ipc::UnixBrokerEndpoint;
+pub use ipc::BrokerIpcDeadlines;
+pub use ipc::BrokerIpcServeOutcome;
 
 mod lifecycle;
 
 mod registration;
 
 mod request_digest;
-pub use request_digest::*;
+pub use request_digest::broker_request_digest;
 
 mod wire;
-pub use wire::*;
+pub use wire::IpcOperation;
+pub use wire::SensitiveIpcBytes;
+pub use wire::AuthenticatedIpcRequest;
+pub use wire::canonical_ipc_request_bytes;
+pub use wire::IpcResponse;
+pub use wire::read_bounded_frame;
+pub use wire::write_bounded_frame;
 use failure::FailureOrigin;
 use failure::FailureProjection;
 use failure::ExecutionFailure;
 use failure::ExecutionResult;
 use failure::execution_failure_after_capture_release;
-use failure::validate_execution_projection_for_attempt;
-use failure::attempt_has_capture_evidence;
-use failure::failure_projection_matches_attempt;
-use failure::execution_hold_query;
-use failure::pre_dispatch_authority_projection;
-use failure::failure_state_projection;
-use failure::failure_receipt_id;
+
+
+
+
+
+
+
 use failure::failure_receipt_key_digest;
-use failure::failure_bound_request_digest;
-use failure::failure_outcome_before_dispatch;
-use request_digest::REQUEST_DIGEST_DOMAIN;
+
+
+
 use request_digest::FAILURE_RECEIPT_REQUEST_DOMAIN;
 use request_digest::attempt_operation_gate_index;
-use wire::sensitive_json_invalid;
+
 use wire::read_bounded_sensitive_frame;
+#[cfg(test)]
 use wire::read_sensitive_frame_body;
 #[cfg(test)]
 pub(crate) use wire::reset_sensitive_drop_observer;
 #[cfg(test)]
 pub(crate) use wire::sensitive_drop_observation;
 pub(crate) use wire::BoundedZeroizingByteArray;
-pub(crate) use wire::BoundedZeroizingString;
+
 pub(crate) use wire::SensitiveJsonParser;
 pub(crate) use wire::checked_canonical_length;
 pub(crate) use wire::canonical_json_string_length;
@@ -298,3 +309,5 @@ use ipc::validate_broker_peer_uid;
 
 #[cfg(all(test, unix))]
 use ipc::{is_well_formed_broker_ipc_error_code, validate_broker_socket_identity};
+
+pub(crate) use failure::failure_receipt_id_for_canonical_request_digest;

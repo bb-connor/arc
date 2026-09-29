@@ -1,3 +1,4 @@
+use crate::security_state::lineage_fence::load_lineage_fence;
 use super::*;
 use chio_security_types::ports::PortErrorKind;
 

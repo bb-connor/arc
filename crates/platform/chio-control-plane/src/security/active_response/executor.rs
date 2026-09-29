@@ -1,4 +1,66 @@
-use super::*;
+
+use super::committed_readback;
+use super::readiness;
+use super::validate_lease_duration;
+use super::ActiveResponseRequestSource;
+use super::RawActiveResponseExecutionRequest;
+use super::decode_lower_hex_digest;
+use super::digest_is_zero;
+use super::has_durable_execution_proof;
+use super::recovery_id;
+use super::valid_prefixed_digest_id;
+use super::derive_active_response_dispatch_id;
+use super::ActiveResponseCommittedDispatch;
+use super::ActiveResponseEffectEvidence;
+use super::ActiveResponseExecutionApproval;
+use super::ActiveResponseExecutionEvidence;
+use super::ActiveResponseExecutionEvidenceParts;
+use super::ActiveResponseExecutionOrigin;
+use super::ActiveResponseExecutionOutcome;
+use super::ActiveResponseExecutionRequest;
+use super::ActiveResponseExecutorAuthority;
+use super::ActiveResponseExecutorAuthorityIdentity;
+use super::ActiveResponseExecutorError;
+use super::ActiveResponseFailedEffectEvidence;
+use super::ActiveResponseFailureEvidence;
+use super::ActiveResponseReceiptProofSource;
+use super::AutomaticActiveResponseDispatchFenceOutcome;
+use super::decode_response_record;
+use super::DurableActiveResponseOutcome;
+use super::ResponseExecutor;
+use super::Clock;
+use super::AutomaticResponseDispatchFenceOutcome;
+use super::AutomaticResponseDispatchFenceRequest;
+use super::Digest32;
+use super::EffectPort;
+use super::LeaseOwnerId;
+use super::PortErrorKind;
+use super::PreparedActiveResponseDispatchBinding;
+use super::RecordId;
+use super::ResponseDispatchApproval;
+use super::ResponseDispatchCommitOutcome;
+use super::ResponseDispatchKey;
+use super::ResponseDispatchLease;
+use super::ResponseDispatchLoadOutcome;
+use super::ResponseDispatchRecord;
+use super::ResponseDispatchRecoveryOutcome;
+use super::ResponseDispatchRecoveryRequest;
+use super::ResponseDispatchStore;
+use super::ResponsePlanKey;
+use super::ResponsePlanRecord;
+use super::ScheduledWork;
+use super::SchedulerWorkKey;
+use super::SecurityAlertPort;
+use super::SecurityReceiptSink;
+use super::PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION;
+use super::ResponseApprovalRequirement;
+use super::ResponsePlan;
+use super::ResponseState;
+use super::Arc;
+use super::DurableActiveResponseExecutorConfigError;
+use super::DurableActiveResponseExecutor;
+# [cfg (test)]
+use super::tests;
 
 
 const DISPATCH_ID_PREFIX: &str = "active_response_dispatch_";
@@ -145,7 +207,7 @@ impl<
         }
     }
 
-    pub(super) fn validate_execution_request(
+    fn validate_execution_request(
         &self,
         raw: RawActiveResponseExecutionRequest,
     ) -> Result<ValidatedExecutionRequest, ActiveResponseExecutorError> {
@@ -252,7 +314,7 @@ impl<
         })
     }
 
-    pub(super) fn commit_fresh_dispatch<Q: ActiveResponseRequestSource + ?Sized>(
+    fn commit_fresh_dispatch<Q: ActiveResponseRequestSource + ?Sized>(
         &self,
         request: ValidatedExecutionRequest,
         source: &Q,
@@ -303,7 +365,7 @@ impl<
         }
     }
 
-    pub(super) fn reconcile_commit_error(
+    fn reconcile_commit_error(
         &self,
         request: &ValidatedExecutionRequest,
         commit_error: chio_security_types::ports::PortError,
@@ -338,7 +400,7 @@ impl<
         }
     }
 
-    pub(super) fn validate_existing_dispatch(
+    fn validate_existing_dispatch(
         &self,
         request: &ValidatedExecutionRequest,
         record: &ResponseDispatchRecord,
@@ -396,7 +458,7 @@ impl<
         }
     }
 
-    pub(super) fn drive_dispatch(
+    fn drive_dispatch(
         &self,
         request: &ValidatedExecutionRequest,
         dispatch: &ResponseDispatchRecord,
@@ -465,7 +527,7 @@ impl<
         self.map_active_evidence(request, dispatch, &completed, recovered)
     }
 
-    pub(super) fn recover_work(
+    fn recover_work(
         &self,
         request: &ValidatedExecutionRequest,
         dispatch: &ResponseDispatchRecord,
@@ -488,7 +550,7 @@ impl<
         )
     }
 
-    pub(super) fn recover_expired_work(
+    fn recover_expired_work(
         &self,
         request: &ValidatedExecutionRequest,
         dispatch: &ResponseDispatchRecord,
@@ -512,7 +574,7 @@ impl<
         )
     }
 
-    pub(super) fn recover_work_with_expiry(
+    fn recover_work_with_expiry(
         &self,
         request: &ValidatedExecutionRequest,
         dispatch: &ResponseDispatchRecord,
@@ -565,7 +627,7 @@ impl<
         Ok(work)
     }
 
-    pub(super) fn validate_execution_work(
+    fn validate_execution_work(
         &self,
         work: &ScheduledWork,
     ) -> Result<(), ActiveResponseExecutorError> {
@@ -588,7 +650,7 @@ impl<
             })
     }
 
-    pub(super) fn map_active_evidence(
+    fn map_active_evidence(
         &self,
         request: &ValidatedExecutionRequest,
         dispatch: &ResponseDispatchRecord,
@@ -681,7 +743,7 @@ impl<
         ))
     }
 
-    pub(super) fn execution_time_before_commit(&self) -> Result<u64, ActiveResponseExecutorError> {
+    fn execution_time_before_commit(&self) -> Result<u64, ActiveResponseExecutorError> {
         self.clock
             .unix_millis()
             .map(chio_security_types::clock::UnixMillis::get)
@@ -692,7 +754,7 @@ impl<
             })
     }
 
-    pub(super) fn validate_automatic_dispatch_fence_request(
+    fn validate_automatic_dispatch_fence_request(
         &self,
         response_plan: &ResponsePlan,
         binding: &PreparedActiveResponseDispatchBinding,
@@ -734,7 +796,7 @@ impl<
         Ok(())
     }
 
-    pub(super) fn validate_committed_fence_outcome(
+    fn validate_committed_fence_outcome(
         &self,
         response_plan: &ResponsePlan,
         binding: &PreparedActiveResponseDispatchBinding,
@@ -754,7 +816,7 @@ impl<
         Ok(())
     }
 
-    pub(super) fn validate_fenced_fence_outcome(
+    fn validate_fenced_fence_outcome(
         &self,
         binding: &PreparedActiveResponseDispatchBinding,
         record: &chio_security_types::ports::AutomaticResponseDispatchFenceRecord,
@@ -787,7 +849,7 @@ impl<
             })
     }
 
-    pub(super) fn lease_expiry(&self, now_unix_ms: u64, plan_expiry_unix_ms: u64) -> Option<u64> {
+    fn lease_expiry(&self, now_unix_ms: u64, plan_expiry_unix_ms: u64) -> Option<u64> {
         let requested = now_unix_ms.checked_add(self.lease_duration_ms)?;
         let expires_at = requested.min(plan_expiry_unix_ms);
         (expires_at > now_unix_ms).then_some(expires_at)
@@ -867,7 +929,7 @@ impl<
     }
 }
 
-pub(super) fn prepared_binding_from_dispatch_record(
+fn prepared_binding_from_dispatch_record(
     record: &ResponseDispatchRecord,
 ) -> PreparedActiveResponseDispatchBinding {
     let authorization = &record.authorization.body;

@@ -417,10 +417,11 @@ fn matrix_with_recovery(
     let root = tempfile::tempdir()?;
     let output_path = root.path().join("child.log");
     let output = std::fs::File::create(&output_path)?;
+    let module = module_path!().split_once("::").ok_or("test module lacks crate prefix")?.1;
     let mut child = std::process::Command::new(std::env::current_exe()?)
         .args([
             "--exact",
-            &format!("security::adapters::tests::native_flow::support::process_recovery::{name}"),
+            &format!("{module}::{name}"),
             "--nocapture",
             "--test-threads=1",
         ])
