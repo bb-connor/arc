@@ -700,9 +700,9 @@ pub struct ChioKernel {
     /// taken control path.
     pub(super) emergency_stopped: AtomicBool,
     /// Unix timestamp (seconds) at which the kill switch was last engaged.
-    /// `0` means "never engaged" or "currently resumed". Written with
-    /// `SeqCst` before `emergency_stopped` is set to `true`, cleared to `0`
-    /// after `emergency_stopped` is set to `false`.
+    /// `0` means no trusted timestamp: never engaged, currently resumed or
+    /// time acquisition failed. The safety latch is independent of this
+    /// metadata and is published before attempting to read the clock.
     pub(super) emergency_stopped_since: AtomicU64,
     /// Operator-supplied reason for the most recent emergency stop. Set on
     /// `emergency_stop`, cleared on `emergency_resume`. Stored behind

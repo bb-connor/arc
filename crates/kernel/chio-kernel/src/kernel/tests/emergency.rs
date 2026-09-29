@@ -178,3 +178,6 @@ fn emergency_stop_receipt_records_deny_decision() {
         other => panic!("expected deny decision, got {other:?}"),
     }
 }
+
+#[path = "emergency/clock.rs"]
+mod clock;

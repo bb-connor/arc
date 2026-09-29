@@ -1657,7 +1657,10 @@ impl ChioKernel {
     /// deny receipt with reason `"kernel emergency stop active"` before
     /// touching capability validation or the guard pipeline. The kernel
     /// remains running so orchestrators and health probes see a live
-    /// process; it is inert.
+    /// process; it is inert. The stop latches even if time acquisition fails;
+    /// the returned clock error reports missing timing metadata, and
+    /// `emergency_stopped_since()` then returns `None`. Clock recovery never
+    /// resumes execution; only `emergency_resume()` clears the stop.
     ///
     /// The active capability set is NOT purged from the revocation store:
     /// the current `RevocationStore` trait has no bulk revoke API and
@@ -1666,14 +1669,14 @@ impl ChioKernel {
     /// this method should call it; until then, capability revocation is
     /// delegated to natural expiration.
     pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
-        let now_unix_ms = self.read_authority_time()?.get();
-        let now = now_unix_ms / 1000;
-        // Record the timestamp first so any concurrent reader that observes
-        // `emergency_stopped == true` sees a non-zero `since` value.
-        self.emergency_stopped_since.store(now, Ordering::SeqCst);
+        // Revoking execution cannot depend on the clock that may have triggered
+        // this incident. Publish the stop before reading potentially faulty time.
+        self.emergency_stopped_since.store(0, Ordering::SeqCst);
         self.emergency_stop_reason
             .store(Arc::new(Some(reason.to_string())));
         self.emergency_stopped.store(true, Ordering::SeqCst);
+        let now = self.read_authority_time()?.as_secs();
+        self.emergency_stopped_since.store(now, Ordering::SeqCst);
 
         warn!(
             reason = %redacted!(reason),
@@ -1743,7 +1746,8 @@ impl ChioKernel {
     }
 
     /// Return the unix timestamp (seconds) at which the kill switch was
-    /// engaged, or `None` when the kernel is currently running normally.
+    /// engaged, or `None` when running normally or trusted timing metadata is
+    /// unavailable. Use `is_emergency_stopped()` to inspect the safety latch.
     #[must_use]
     pub fn emergency_stopped_since(&self) -> Option<u64> {
         if !self.is_emergency_stopped() {
