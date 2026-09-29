@@ -128,7 +128,7 @@ fn retract_finding(
     label: &str,
 ) -> Result<(), AnyError> {
     let config = market_config();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let store = authority.finding_status_store();
     let intent_id = sha256_hex(format!("finding-market-exit-retraction:{label}").as_bytes());
     let intent_bytes = canonical_json_bytes(&serde_json::json!({
@@ -462,7 +462,7 @@ fn participation_request(
     Ok(serde_json::json!({
         "feeSchedule": serde_json::to_value(schedule)?,
         "statusOperatorAuthorityStatus": serde_json::to_value(
-            signed_status_operator_authority_status(unix_timestamp_now(), revoked_from)?,
+            signed_status_operator_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), revoked_from)?,
         )?,
     }))
 }
@@ -1401,7 +1401,8 @@ impl MarketWeb {
         // Seed a provisional affirmative report that `seed_market` replaces
         // from the venue's durable collateral acceptance time. The stale
         // report remains the pre-backing rejection input.
-        let now = unix_timestamp_now();
+        let now =
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
         let report = make_signed_report(&report_inputs, now.saturating_add(1))?;
         let stale_report = make_signed_report(&report_inputs, now)?;
 
@@ -1563,27 +1564,27 @@ impl MarketWeb {
         let body = serde_json::json!({
             "admission": serde_json::to_value(admission)?,
             "collateralAuthorityStatus": serde_json::to_value(
-                signed_collateral_authority_status(unix_timestamp_now(), None)?,
+                signed_collateral_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
             )?,
             "profileGovernanceAuthorityStatus": serde_json::to_value(
-                signed_governance_authority_status(unix_timestamp_now(), None)?,
+                signed_governance_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
             )?,
             "venueAuthorityStatus": serde_json::to_value(signed_venue_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                 None,
             )?)?,
             "listingAuthorityStatus": serde_json::to_value(signed_listing_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                 None,
             )?)?,
             "statusOperatorAuthorityStatus": serde_json::to_value(
-                signed_status_operator_authority_status(unix_timestamp_now(), None)?,
+                signed_status_operator_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
             )?,
             "sellerAuthorization": serde_json::to_value(&self.authorization)?,
             "sellerAuthorizationStatus": serde_json::to_value(
                 signed_seller_authorization_status(
                     &self.authorization,
-                    unix_timestamp_now(),
+                    unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                     None,
                 )?,
             )?,
@@ -1592,7 +1593,7 @@ impl MarketWeb {
             "feeSchedule": serde_json::to_value(schedule)?,
             "verifierReport": serde_json::to_value(report)?,
             "verifierAuthorityStatus": serde_json::to_value(signed_verifier_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                 None,
             )?)?,
             "listing": serde_json::to_value(listing)?,
@@ -1700,7 +1701,12 @@ impl MarketStack {
             &self.state,
             authed_post(
                 "/v1/findings/collateral",
-                collateral_registration_raw(&self.web.backing, unix_timestamp_now(), None)?,
+                collateral_registration_raw(
+                    &self.web.backing,
+                    unix_timestamp_now()
+                        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+                    None,
+                )?,
             )?,
         )
         .await?;
@@ -1721,7 +1727,9 @@ impl MarketStack {
         // The affirmative report is signed only after the venue has accepted
         // collateral. Wait until its exact evaluation instant so the current
         // authority-status reading is never future-dated at activation.
-        while unix_timestamp_now() < self.web.report.body.evaluation_time {
+        while unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+            < self.web.report.body.evaluation_time
+        {
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
         let authority = self
@@ -1737,7 +1745,11 @@ impl MarketStack {
             keypair(36),
             config.status_max_epoch_age_secs,
         )?
-        .publish_non_inclusion(&self.web.finding_id, &[], unix_timestamp_now())?;
+        .publish_non_inclusion(
+            &self.web.finding_id,
+            &[],
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+        )?;
         Ok(())
     }
 
@@ -1940,7 +1952,12 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
         &stack.state,
         authed_post(
             "/v1/findings/collateral",
-            collateral_registration_raw(&web.backing, unix_timestamp_now(), None)?,
+            collateral_registration_raw(
+                &web.backing,
+                unix_timestamp_now()
+                    .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+                None,
+            )?,
         )?,
     )
     .await?;
@@ -1953,7 +1970,7 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     // Rejection sweep over the activation surface. Every leg asserts the
     // specific status and that nothing was admitted.
 
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let mut revoked_governance_request: serde_json::Value =
         serde_json::from_str(&web.activate_request(&web.admission, &web.schedule, &web.report)?)?;
     revoked_governance_request["profileGovernanceAuthorityStatus"] =
@@ -2084,7 +2101,9 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     .await?;
 
     let mut future_pricing_body = web.pricing_hint.body.clone();
-    future_pricing_body.issued_at = unix_timestamp_now().saturating_add(60);
+    future_pricing_body.issued_at = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .saturating_add(60);
     let future_pricing = SignedListingPricingHint::sign(future_pricing_body, &web.operator)?;
     let mut future_pricing_admission =
         web.admission_body(&web.schedule_sha256, &web.report, ADMISSION_EXPIRES_AT)?;
@@ -2104,7 +2123,9 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     .await?;
 
     let mut post_status_pricing_body = web.pricing_hint.body.clone();
-    post_status_pricing_body.issued_at = unix_timestamp_now().saturating_sub(1);
+    post_status_pricing_body.issued_at = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .saturating_sub(1);
     let post_status_pricing =
         SignedListingPricingHint::sign(post_status_pricing_body, &web.operator)?;
     let mut post_status_admission =
@@ -2253,7 +2274,7 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     )
     .await?;
 
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let mut future_listing_body = web.listing.body.clone();
     future_listing_body.published_at = now.saturating_add(60);
     let future_listing = SignedGenericListing::sign(future_listing_body, &web.operator)?;
@@ -2437,7 +2458,8 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
         .as_mut()
         .ok_or_else(|| missing("finding market config"))?
         .venue
-        .valid_until = unix_timestamp_now();
+        .valid_until =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let (status, body) = send(
         &expired_venue_state,
         authed_post(
@@ -2517,7 +2539,9 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     retry_config.venue.valid_until = attempt.prepared_at.saturating_add(1);
     retry_config.status_feed_operator.authority.valid_until = attempt.prepared_at.saturating_add(1);
     let rollover = attempt.prepared_at.saturating_add(1);
-    while unix_timestamp_now() < rollover {
+    while unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        < rollover
+    {
         tokio::time::sleep(std::time::Duration::from_millis(25)).await;
     }
     let (status, body) = send(
@@ -2670,7 +2694,7 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
     let context = FindingAdmissionContext {
         venue_authority: &venue_key,
         venue_id: VENUE_ID,
-        now: unix_timestamp_now(),
+        now: unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         fee_schedule: &web.schedule,
         fee_schedule_gate: FindingFeeScheduleGate::Legacy,
         trusted_local_operator_signers: &trusted_signers,
@@ -2719,7 +2743,8 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
             age_secs: 20,
             max_age_secs: 300,
             valid_until: WINDOW_EXPIRES_AT,
-            generated_at: unix_timestamp_now(),
+            generated_at: unix_timestamp_now()
+                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         },
     };
     let request = SignedBidRequest::sign(
@@ -2736,7 +2761,8 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
                 max_invocations: Some(1),
                 capability_scope_prefix: web.scope.clone(),
             },
-            issued_at: unix_timestamp_now(),
+            issued_at: unix_timestamp_now()
+                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         },
         &agent,
     )?;
@@ -2747,7 +2773,8 @@ pub(super) async fn run_finding_publish_discover_admission() -> TestResult {
             issuer_keypair: &web.operator,
             agent_subject: agent.public_key(),
             token_id: "finding-token-0001".to_string(),
-            now: unix_timestamp_now(),
+            now: unix_timestamp_now()
+                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
             grant_constraints: Vec::new(),
             dpop_required: None,
         },
@@ -2812,82 +2839,12 @@ async fn enforced_penalty_block_refuses_a_fresh_activation() -> TestResult {
 }
 
 #[tokio::test]
-async fn noncanonical_publish_ingress_rejects() -> TestResult {
-    let mut stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
-    stack.seed_market().await?;
-    let web = &stack.web;
-
-    let parsed: serde_json::Value = serde_json::from_str(&web.second_raw_finding)?;
-
-    // Duplicate member names never reach the schema layer.
-    let duplicate_keys = r#"{"schema":"chio.finding.v1","schema":"chio.finding.v1"}"#.to_string();
-
-    // Uppercase hex survives canonicalization byte-for-byte and is caught
-    // by the registered schema's lowercase digest pattern.
-    let mut uppercase = parsed.clone();
-    uppercase["payload_sha256"] = serde_json::json!(HEX64.to_uppercase());
-    let uppercase = canonical_string(&uppercase)?;
-
-    // An explicit null option is either rejected by the schema or erased
-    // by typed deserialization, breaking typed-canonical equality.
-    let mut explicit_null = parsed.clone();
-    explicit_null["license_ref"] = serde_json::Value::Null;
-    let explicit_null = canonical_string(&explicit_null)?;
-
-    // A float token spells the same number noncanonically.
-    let float_token = web
-        .second_raw_finding
-        .replacen("\"units\":10}", "\"units\":10.0}", 1);
-    assert_ne!(float_token, web.second_raw_finding);
-
-    // Whitespace padding breaks raw-equals-canonical.
-    let padded = format!(" {}", web.second_raw_finding);
-
-    for raw in [
-        duplicate_keys,
-        uppercase,
-        explicit_null,
-        float_token,
-        padded,
-    ] {
-        let (status, body) = send(&stack.state, authed_post("/v1/findings/publish", raw)?).await?;
-        assert_eq!(
-            status,
-            StatusCode::BAD_REQUEST,
-            "{}",
-            String::from_utf8_lossy(&body)
-        );
-    }
-    // Nothing was indexed by any rejected spelling.
-    let (status, _) = send(
-        &stack.state,
-        public_get(&format!("/v1/findings/{}", web.second_finding_id))?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::NOT_FOUND);
-    Ok(())
-}
-
-#[tokio::test]
-async fn oversized_publish_body_rejects() -> TestResult {
-    let stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
-    let oversized = "x".repeat(FINDING_PUBLISH_MAX_BODY_BYTES + 1);
-    let (status, _) = send(
-        &stack.state,
-        authed_post("/v1/findings/publish", oversized)?,
-    )
-    .await?;
-    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
-    Ok(())
-}
-
-#[tokio::test]
 async fn future_issued_and_expired_findings_reject() -> TestResult {
     let mut stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
     stack.seed_market().await?;
     let web = &stack.web;
     let issuer = keypair(3);
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let mut future = web.finding.clone();
     future.descriptor.topic = "repo:backbay/chio#m2-exit-future".to_string();
@@ -3227,3 +3184,6 @@ fn activation_reverifies_profile_and_report_authority_lifecycle() -> TestResult 
     );
     Ok(())
 }
+
+#[path = "finding_market_exit_tests/ingress.rs"]
+mod ingress;

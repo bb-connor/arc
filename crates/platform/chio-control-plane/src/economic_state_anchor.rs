@@ -275,8 +275,9 @@ impl RemoteEconomicStateAnchor {
             .map_err(|error| EconomicStateAnchorError::Canonicalization(error.to_string()))?;
         let response = self.transport.post(path, &request)?;
         ensure_bounded_response(&response)?;
-        serde_json::from_slice(&response)
-            .map_err(|error| EconomicStateAnchorError::Canonicalization(error.to_string()))
+        chio_core::canonical::UntrustedJsonText::from_wire(&response, ECONOMIC_STATE_RESPONSE_LIMIT)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| EconomicStateAnchorError::UntrustedInput(error.into()))
     }
 
     fn compare_and_swap_verified_batch(

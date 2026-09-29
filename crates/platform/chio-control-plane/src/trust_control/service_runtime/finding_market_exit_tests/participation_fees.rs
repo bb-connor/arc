@@ -179,13 +179,16 @@ async fn expired_admission_loses_the_marker() -> TestResult {
     // Provisioning performs several cryptographic and SQLite setup steps. Keep
     // enough wall-clock headroom for this test to remain valid under the full
     // parallel control-plane suite before deliberately waiting for expiry.
-    let expires_at = unix_timestamp_now() + 30;
+    let expires_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")) + 30;
     let mut stack = provision_stack(LONG_EPOCH_SECS, expires_at)?;
     stack.seed_market().await?;
     let (status, body) = stack.activate().await?;
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
     assert!(stack.admission_marker().await?.is_some());
-    let remaining = expires_at.saturating_sub(unix_timestamp_now()) + 1;
+    let remaining = expires_at.saturating_sub(
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    ) + 1;
     tokio::time::sleep(std::time::Duration::from_secs(remaining)).await;
     assert!(
         stack.admission_marker().await?.is_none(),

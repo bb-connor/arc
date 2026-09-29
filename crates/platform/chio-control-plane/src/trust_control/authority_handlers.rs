@@ -152,6 +152,10 @@ pub(crate) async fn handle_scim_create_user(
     headers: HeaderMap,
     Json(payload): Json<ScimUserResource>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -168,7 +172,7 @@ pub(crate) async fn handle_scim_create_user(
         Ok(values) => values,
         Err(error) => return scim_error_response(StatusCode::CONFLICT, &error.to_string()),
     };
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let mut record = match build_scim_user_record(&provider, payload, now, None) {
         Ok(record) => record,
         Err(error) => return scim_error_response(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -191,6 +195,10 @@ pub(crate) async fn handle_scim_delete_user(
     AxumPath(user_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -212,7 +220,7 @@ pub(crate) async fn handle_scim_delete_user(
     if !record.active() {
         return scim_json_response(StatusCode::OK, &record.scim_user);
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let revocation_store = match state.revocation_store() {
         Ok(store) => store,
         Err(response) => return response,
@@ -456,6 +464,10 @@ pub(crate) async fn handle_evaluate_federation_policy(
     headers: HeaderMap,
     Json(request): Json<FederationAdmissionEvaluationRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -464,7 +476,7 @@ pub(crate) async fn handle_evaluate_federation_policy(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     match service_runtime::issuance::evaluate_federation_policy_request(&state, &request, now) {
         Ok(response) => Json(response).into_response(),
         Err(error) if error.to_string().contains("was not found") => {
@@ -517,6 +529,10 @@ pub(crate) async fn handle_revoke_capability(
     headers: HeaderMap,
     Json(payload): Json<RevokeCapabilityRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -535,7 +551,7 @@ pub(crate) async fn handle_revoke_capability(
                 // A locally originated capability revoke: the revoke instant is
                 // now, so the propagation lag is ~0. Emit so the
                 // capability-revocation SLO reflects real capability revokes.
-                let revoked_now = i64::try_from(unix_timestamp_now()).unwrap_or(0);
+                let revoked_now = i64::try_from(clock_now).unwrap_or(0);
                 super::cluster::observe_capability_revocation_lag(revoked_now);
             }
             respond_after_leader_visible_write(

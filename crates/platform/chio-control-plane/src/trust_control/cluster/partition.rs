@@ -97,8 +97,11 @@ pub(crate) async fn handle_internal_cluster_partition(
 }
 
 pub(crate) fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
+    let Ok(clock_now) = unix_timestamp_now() else {
+        return;
+    };
     if let Some(cluster) = state.cluster.as_ref() {
-        let now = unix_timestamp_now();
+        let now = clock_now;
         match cluster.lock() {
             Ok(mut guard) => {
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
@@ -126,7 +129,10 @@ pub(crate) fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
 }
 
 pub(crate) fn update_peer_reachable(state: &TrustServiceState, peer_url: &str) {
-    let now = unix_timestamp_now();
+    let Ok(clock_now) = unix_timestamp_now() else {
+        return;
+    };
+    let now = clock_now;
     update_peer_state(state, peer_url, |peer| {
         peer.health = PeerHealth::Healthy;
         peer.last_contact_at = Some(now);

@@ -168,7 +168,9 @@ fn read_message(input: &mut impl BufRead) -> Result<Message> {
     if frame.is_empty() || frame.len() > MAX_WIRE_BYTES || frame.last() != Some(&b'\n') {
         return Err(refused());
     }
-    serde_json::from_slice(&frame).map_err(|_| refused())
+    chio_core_types::canonical::UntrustedJsonText::from_wire(&frame, MAX_WIRE_BYTES)
+        .and_then(|input| input.decode_signed())
+        .map_err(BrokerError::from)
 }
 
 fn reply(output: &mut impl Write, id: &Value, result: Value) -> Result<()> {

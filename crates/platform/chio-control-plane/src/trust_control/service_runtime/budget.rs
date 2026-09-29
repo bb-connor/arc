@@ -1041,10 +1041,9 @@ impl RemoteBudgetStore {
             Err(poisoned) => poisoned.into_inner(),
         };
         let key = (capability_id.to_string(), grant_index);
-        let updated_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs() as i64)
-            .unwrap_or(0);
+        use chio_security_types::clock::{Clock, ClockError, SystemClock};
+        let updated_at = i64::try_from(SystemClock.unix_millis()?.as_secs())
+            .map_err(|_| ClockError::Overflow)?;
         let existing_cost_authoritative = cached_usage
             .get(&key)
             .is_some_and(|entry| entry.cost_authoritative);

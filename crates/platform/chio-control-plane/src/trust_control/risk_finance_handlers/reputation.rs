@@ -6,6 +6,10 @@ pub(crate) async fn handle_local_reputation(
     Query(query): Query<LocalReputationQuery>,
     headers: HeaderMap,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -45,7 +49,7 @@ pub(crate) async fn handle_local_reputation(
                     &inspection.subject_key,
                     inspection.since,
                     inspection.until,
-                    unix_timestamp_now(),
+                    clock_now,
                     &inspection.scoring,
                 ) {
                     Ok(report) => inspection.imported_trust = Some(report),
@@ -69,6 +73,10 @@ pub(crate) async fn handle_reputation_compare(
     headers: HeaderMap,
     Json(request): Json<ReputationCompareRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -130,7 +138,7 @@ pub(crate) async fn handle_reputation_compare(
             &local.subject_key,
             local.since,
             local.until,
-            unix_timestamp_now(),
+            clock_now,
             &local.scoring,
         ) {
             Ok(report) => Some(report),
@@ -144,10 +152,10 @@ pub(crate) async fn handle_reputation_compare(
         local,
         &request.passport,
         request.verifier_policy.as_ref(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .unwrap_or(0),
+        match unix_timestamp_now() {
+            Ok(now) => now,
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+        },
         shared_evidence,
         imported_trust,
     ) {

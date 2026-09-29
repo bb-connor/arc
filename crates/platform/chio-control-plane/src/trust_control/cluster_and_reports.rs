@@ -277,6 +277,9 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn compute_cluster_consensus_tracks_role_quorum_and_election_terms() {
+        let Ok(clock_now) = unix_timestamp_now() else {
+            return;
+        };
         let mut cluster = ClusterRuntimeState {
             self_url: "http://node-a".to_string(),
             peers: HashMap::from([
@@ -303,7 +306,7 @@ mod cluster_and_reports_tests {
             .peers
             .get_mut("http://node-b")
             .test_unwrap()
-            .last_contact_at = Some(unix_timestamp_now());
+            .last_contact_at = Some(clock_now);
         let with_quorum = compute_cluster_consensus_locked(&mut cluster);
         assert_eq!(with_quorum.role, "leader");
         assert!(with_quorum.has_quorum);
@@ -314,14 +317,14 @@ mod cluster_and_reports_tests {
             cluster_authority_lease_view_locked(&mut cluster, &with_quorum).test_unwrap();
         assert_eq!(with_quorum_lease.lease_epoch, 1);
         assert!(with_quorum_lease.lease_id.contains("http://node-a"));
-        assert!(with_quorum_lease.lease_expires_at >= unix_timestamp_now());
+        assert!(with_quorum_lease.lease_expires_at >= clock_now);
 
         cluster.peers.get_mut("http://node-c").test_unwrap().health = PeerHealth::Healthy;
         cluster
             .peers
             .get_mut("http://node-c")
             .test_unwrap()
-            .last_contact_at = Some(unix_timestamp_now());
+            .last_contact_at = Some(clock_now);
         let stable = compute_cluster_consensus_locked(&mut cluster);
         assert_eq!(stable.role, "leader");
         assert_eq!(stable.election_term, 1);
@@ -356,13 +359,16 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn compute_cluster_consensus_drops_stale_peers_after_authority_lease_timeout() {
+        let Ok(clock_now) = unix_timestamp_now() else {
+            return;
+        };
         let mut cluster = ClusterRuntimeState {
             self_url: "http://node-a".to_string(),
             peers: HashMap::from([(
                 "http://node-b".to_string(),
                 PeerSyncState {
                     health: PeerHealth::Healthy,
-                    last_contact_at: Some(unix_timestamp_now().saturating_sub(5)),
+                    last_contact_at: Some(clock_now.saturating_sub(5)),
                     ..PeerSyncState::default()
                 },
             )]),
@@ -377,107 +383,6 @@ mod cluster_and_reports_tests {
         assert!(!consensus.has_quorum);
         assert_eq!(consensus.reachable_nodes, 1);
         assert!(cluster_authority_lease_view_locked(&mut cluster, &consensus).is_none());
-    }
-
-    #[tokio::test]
-    async fn leader_visibility_responses_add_cluster_metadata_and_reject_scalars() {
-        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        update_peer_reachable(&state, "http://node-b");
-
-        let response = json_response_with_leader_visibility(&state, json!({ "stored": true }));
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .test_unwrap();
-        let body: Value = serde_json::from_slice(&body).test_unwrap();
-        assert_eq!(body["stored"], Value::Bool(true));
-        assert_eq!(
-            body["handledBy"],
-            Value::String("http://node-a".to_string())
-        );
-        assert_eq!(
-            body["leaderUrl"],
-            Value::String("http://node-a".to_string())
-        );
-        assert_eq!(body["visibleAtLeader"], Value::Bool(true));
-        assert_eq!(
-            body["clusterAuthority"]["authorityId"],
-            Value::String("http://node-a".to_string())
-        );
-        assert_eq!(body["clusterAuthority"]["term"], Value::from(1));
-        assert_eq!(body["clusterAuthority"]["leaseValid"], Value::Bool(true));
-
-        let scalar = json_response_with_leader_visibility(&state, "not-an-object");
-        assert_eq!(scalar.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        let body = to_bytes(scalar.into_body(), usize::MAX).await.test_unwrap();
-        let text = String::from_utf8(body.to_vec()).test_unwrap();
-        assert!(text.contains("success responses must be JSON objects"));
-    }
-
-    #[tokio::test]
-    async fn budget_quorum_commit_metadata_tracks_quorum_witnesses() {
-        let state = state_with_cluster(
-            "http://node-a",
-            &["http://node-b", "http://node-c"],
-            None,
-            None,
-            None,
-        );
-        update_peer_reachable(&state, "http://node-b");
-        update_peer_reachable(&state, "http://node-c");
-        update_peer_budget_acks(
-            &state,
-            "http://node-b",
-            &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
-                event_seq: 9,
-            }],
-        );
-        update_peer_budget_acks(
-            &state,
-            "http://node-c",
-            &[BudgetOriginAck {
-                origin_id: "http://node-a".to_string(),
-                event_seq: 7,
-            }],
-        );
-
-        let write = BudgetWriteToken {
-            origin_id: "http://node-a".to_string(),
-            event_seq: 8,
-            budget_term: 1,
-        };
-        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
-        assert!(commit.quorum_committed);
-        assert_eq!(commit.quorum_size, 2);
-        assert_eq!(commit.committed_nodes, 2); // self + node-b (acked 9 >= 8)
-        assert_eq!(
-            commit.witness_urls,
-            vec!["http://node-a".to_string(), "http://node-b".to_string()]
-        );
-
-        let response = json_response_with_leader_visibility_and_budget_commit(
-            &state,
-            json!({ "allowed": true }),
-            Some(commit),
-        );
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .test_unwrap();
-        let body: Value = serde_json::from_slice(&body).test_unwrap();
-        assert_eq!(body["budgetCommit"]["budgetSeq"], Value::from(8));
-        assert_eq!(body["budgetCommit"]["commitIndex"], Value::from(8));
-        assert_eq!(body["budgetCommit"]["quorumCommitted"], Value::Bool(true));
-        assert_eq!(body["budgetCommit"]["committedNodes"], Value::from(2));
-        assert_eq!(
-            body["budgetCommit"]["authorityId"],
-            Value::String("http://node-a".to_string())
-        );
-        assert_eq!(body["budgetCommit"]["budgetTerm"], Value::from(1));
-        assert_eq!(
-            body["budgetCommit"]["witnessUrls"],
-            json!(["http://node-a", "http://node-b"])
-        );
     }
 
     #[test]
@@ -1534,6 +1439,9 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn auth_helpers_and_metered_billing_validation_cover_error_paths() {
+        let Ok(clock_now) = unix_timestamp_now() else {
+            return;
+        };
         let mut headers = HeaderMap::new();
         let auth_error = bearer_token_from_headers(&headers).test_unwrap_err();
         assert_eq!(auth_error.status(), StatusCode::UNAUTHORIZED);
@@ -1638,7 +1546,7 @@ mod cluster_and_reports_tests {
 
         let cluster_state =
             state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        let issued_at = unix_timestamp_now() as i64;
+        let issued_at = clock_now as i64;
         let signature = cluster_peer_auth_signature(
             &cluster_state.config.service_token,
             "http://node-b",
@@ -2693,4 +2601,5 @@ mod cluster_and_reports_tests {
         // Fail-closed: only the gap-free prefix 1..3 remains committed.
         assert_eq!(store.max_mutation_event_seq().test_unwrap(), 3);
     }
+    mod visibility_and_quorum;
 }

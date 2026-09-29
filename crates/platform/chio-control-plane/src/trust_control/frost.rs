@@ -307,8 +307,9 @@ fn decode_response<T: DeserializeOwned>(
     egress_contract
         .enforce_response_bytes(bytes.len() as u64)
         .map_err(|error| FrostAnchorError::InvalidResponse(error.to_string()))?;
-    serde_json::from_slice(&bytes)
-        .map_err(|error| FrostAnchorError::InvalidResponse(error.to_string()))
+    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_ANCHOR_RESPONSE_BYTES as usize)
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| FrostAnchorError::UntrustedInput(error.into()))
 }
 
 fn unavailable(error: impl std::fmt::Display) -> FrostAnchorError {

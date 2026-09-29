@@ -229,8 +229,12 @@ pub(super) fn strict_artifact_ingress<T: serde::de::DeserializeOwned + serde::Se
     let schema: serde_json::Value = serde_json::from_str(schema_json).map_err(|_| {
         plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, "embedded schema invalid")
     })?;
-    let parsed: serde_json::Value = serde_json::from_str(raw)
-        .map_err(|_| plain_http_error(StatusCode::BAD_REQUEST, "artifact is not a JSON object"))?;
+    let parsed: serde_json::Value =
+        chio_core::canonical::UntrustedJsonText::from_wire((raw).as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| {
+                plain_http_error(StatusCode::BAD_REQUEST, "artifact is not a JSON object")
+            })?;
     let schema_path = std::path::Path::new(schema_label);
     let doc_path = std::path::Path::new("request-body");
     if chio_spec_validate::validate_value(schema_path, &schema, doc_path, &parsed).is_err() {
@@ -239,12 +243,15 @@ pub(super) fn strict_artifact_ingress<T: serde::de::DeserializeOwned + serde::Se
             "artifact rejected by the registered schema",
         ));
     }
-    let typed: T = serde_json::from_str(raw).map_err(|_| {
-        plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "artifact failed typed deserialization",
-        )
-    })?;
+    let typed: T =
+        chio_core::canonical::UntrustedJsonText::from_wire((raw).as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "artifact failed typed deserialization",
+                )
+            })?;
     let typed_bytes = chio_core::canonical_json_bytes(&typed).map_err(|_| {
         plain_http_error(StatusCode::BAD_REQUEST, "artifact failed canonicalization")
     })?;
@@ -279,12 +286,15 @@ fn strict_profile_registration_ingress(
             "profile registration bytes are not the canonical serialization",
         ));
     }
-    let request: FindingProfileRegistrationRequest = serde_json::from_str(raw).map_err(|_| {
-        plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "profile registration failed typed deserialization",
-        )
-    })?;
+    let request: FindingProfileRegistrationRequest =
+        chio_core::canonical::UntrustedJsonText::from_wire((raw).as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "profile registration failed typed deserialization",
+                )
+            })?;
     let typed_bytes = chio_core::canonical_json_bytes(&request).map_err(|_| {
         plain_http_error(
             StatusCode::BAD_REQUEST,
@@ -313,87 +323,6 @@ fn strict_profile_registration_ingress(
         "chio-finding/v1/challenge-verifier-profile.schema.json",
     )?;
     Ok((profile_bytes, request))
-}
-
-fn verify_profile_registration_authority(
-    request: &FindingProfileRegistrationRequest,
-    config: &FindingMarketConfig,
-    now: u64,
-) -> Result<(), String> {
-    if !config.governance_root.covers(now) {
-        return Err("profile governance authority is not live at registration".to_owned());
-    }
-    let governance_key = config
-        .governance_root
-        .key()
-        .map_err(|error| error.to_string())?;
-    verify_signed_profile(&request.profile, &governance_key).map_err(|error| error.to_string())?;
-    if !config
-        .governance_root
-        .covers(request.profile.body.issued_at)
-    {
-        return Err("profile was issued outside the governance key validity window".to_owned());
-    }
-    if now < request.profile.body.issued_at || now >= request.profile.body.expires_at {
-        return Err("verifier profile is not live at registration".to_owned());
-    }
-
-    verify_profile_governance_lifecycle(
-        &request.profile,
-        &request.governance_authority_status,
-        config,
-        now,
-        "profile registration",
-    )
-}
-
-fn verify_profile_governance_lifecycle(
-    profile: &SignedFindingChallengeVerifierProfile,
-    authority_status: &SignedFindingAuthorityStatus,
-    config: &FindingMarketConfig,
-    now: u64,
-    boundary: &'static str,
-) -> Result<(), String> {
-    if !config.governance_root.covers(now) {
-        return Err(format!(
-            "profile governance authority is not live at {boundary}"
-        ));
-    }
-    let governance_key = config
-        .governance_root
-        .key()
-        .map_err(|error| error.to_string())?;
-    let status_key = config
-        .authority_status
-        .key()
-        .map_err(|error| error.to_string())?;
-    verify_signed_authority_status(authority_status, &status_key)
-        .map_err(|error| error.to_string())?;
-    let status = &authority_status.body;
-    if !config.authority_status.covers(status.observed_at) || !config.authority_status.covers(now) {
-        return Err(format!("authority-status signer is not live at {boundary}"));
-    }
-    if status.status_ref != config.governance_root.revocation_status_ref
-        || status.authority_id != config.governance_root.authority_id
-        || status.key != governance_key
-        || status.key_epoch != config.governance_root.key_epoch
-    {
-        return Err("governance authority status does not bind the deployment pin".to_owned());
-    }
-    if status.observed_at < profile.body.issued_at {
-        return Err("governance authority status predates profile issuance".to_owned());
-    }
-    if status.observed_at > now
-        || now.saturating_sub(status.observed_at) > FINDING_AUTHORITY_STATUS_MAX_AGE_SECS
-    {
-        return Err("governance authority status is not a fresh current reading".to_owned());
-    }
-    if status.revoked_from.is_some() {
-        return Err(format!(
-            "profile governance authority is revoked at {boundary}"
-        ));
-    }
-    Ok(())
 }
 
 /// Re-load the exact recipe committed by a deterministic-replay Finding
@@ -488,6 +417,10 @@ pub(crate) async fn handle_publish_finding(
     headers: HeaderMap,
     raw: String,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -509,7 +442,7 @@ pub(crate) async fn handle_publish_finding(
     }
     // Both bounds enforce liveness: a correctly signed
     // but future-issued or expired finding must not become indexable.
-    let now = unix_timestamp_now();
+    let now = clock_now;
     if finding.issued_at > now {
         return plain_http_error(StatusCode::BAD_REQUEST, "finding is future-issued");
     }
@@ -634,6 +567,10 @@ struct FindingSearchResponse {
 }
 
 fn run_finding_search(state: &TrustServiceState, query: &FindingSearchQuery) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let (config, store) = match finding_market_context(state) {
         Ok(context) => context,
         Err(response) => return response,
@@ -661,7 +598,7 @@ fn run_finding_search(state: &TrustServiceState, query: &FindingSearchQuery) -> 
         .limit
         .unwrap_or(DEFAULT_LIST_LIMIT)
         .clamp(1, MAX_LIST_LIMIT);
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let rows = match store.search_findings(
         query.topic_prefix.as_deref(),
         query.context_sha256.as_deref(),
@@ -749,6 +686,10 @@ pub(crate) async fn handle_upload_finding_dependency(
     headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -763,7 +704,8 @@ pub(crate) async fn handle_upload_finding_dependency(
         );
     }
     let is_recipe = std::str::from_utf8(&body).ok().and_then(|text| {
-        serde_json::from_str::<serde_json::Value>(text)
+        chio_core::canonical::UntrustedJsonText::from_wire((text).as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed::<serde_json::Value>())
             .ok()
             .map(|value| {
                 value.get("schema").and_then(serde_json::Value::as_str)
@@ -790,13 +732,13 @@ pub(crate) async fn handle_upload_finding_dependency(
             return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
         }
         let digest = chio_core::sha256_hex(&strict_bytes);
-        return match store.put_recipe_blob(&digest, &strict_bytes, unix_timestamp_now()) {
+        return match store.put_recipe_blob(&digest, &strict_bytes, clock_now) {
             Ok(_) => Json(serde_json::json!({ "canonicalSha256": digest })).into_response(),
             Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
         };
     }
     let digest = chio_core::sha256_hex(&body);
-    match store.put_recipe_blob(&digest, &body, unix_timestamp_now()) {
+    match store.put_recipe_blob(&digest, &body, clock_now) {
         Ok(_) => Json(serde_json::json!({ "canonicalSha256": digest })).into_response(),
         Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     }
@@ -811,6 +753,10 @@ pub(crate) async fn handle_register_finding_profile(
     headers: HeaderMap,
     raw: String,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -822,7 +768,7 @@ pub(crate) async fn handle_register_finding_profile(
         Ok(accepted) => accepted,
         Err(response) => return response,
     };
-    let now = unix_timestamp_now();
+    let now = clock_now;
     if let Err(error) = verify_profile_registration_authority(&request, &config, now) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }
@@ -850,6 +796,10 @@ pub(crate) async fn handle_register_finding_collateral(
     headers: HeaderMap,
     Json(request): Json<FindingCollateralRegistrationRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -858,7 +808,7 @@ pub(crate) async fn handle_register_finding_collateral(
         Err(response) => return response,
     };
     let backing = &request.backing;
-    let now = unix_timestamp_now();
+    let now = clock_now;
     if let Err(error) = verify_collateral_authority_lifecycle(
         backing,
         &request.collateral_authority_status,
@@ -1265,6 +1215,10 @@ pub(crate) async fn handle_activate_finding(
     headers: HeaderMap,
     Json(request): Json<FindingActivateRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -1285,7 +1239,7 @@ pub(crate) async fn handle_activate_finding(
     if admission.finding_id != finding_id {
         return plain_http_error(StatusCode::BAD_REQUEST, "admission names another finding");
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let admission_json = match chio_core::canonical_json_bytes(&request.admission)
         .map_err(|_| ())
         .and_then(|bytes| String::from_utf8(bytes).map_err(|_| ()))
@@ -1400,7 +1354,12 @@ pub(crate) async fn handle_activate_finding(
         Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "unknown finding"),
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let finding: Finding = match serde_json::from_str(&artifact_json) {
+    let finding: Finding = match chio_core::canonical::UntrustedJsonText::from_wire(
+        artifact_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    {
         Ok(finding) => finding,
         Err(_) => {
             return plain_http_error(
@@ -1687,7 +1646,9 @@ pub(crate) async fn handle_activate_finding(
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
     let profile: SignedFindingChallengeVerifierProfile =
-        match serde_json::from_slice(&profile_bytes) {
+        match chio_core::canonical::UntrustedJsonText::from_wire(&profile_bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+        {
             Ok(profile) => profile,
             Err(_) => {
                 return plain_http_error(
@@ -2140,6 +2101,10 @@ pub(crate) async fn handle_finding_participation(
     headers: HeaderMap,
     Json(request): Json<FindingParticipationRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -2176,22 +2141,33 @@ pub(crate) async fn handle_finding_participation(
         Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "no active admission"),
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let admission: SignedFindingAdmission = match serde_json::from_str(&snapshot.envelope_json) {
-        Ok(admission) => admission,
-        Err(_) => {
-            return plain_http_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "stored admission failed deserialization",
-            )
-        }
-    };
-    let now = unix_timestamp_now();
+    let admission: SignedFindingAdmission =
+        match chio_core::canonical::UntrustedJsonText::from_wire(
+            snapshot.envelope_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        {
+            Ok(admission) => admission,
+            Err(_) => {
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "stored admission failed deserialization",
+                )
+            }
+        };
+    let now = clock_now;
     let artifact_json = match store.get_finding_bytes(&finding_id) {
         Ok(Some(bytes)) => bytes,
         Ok(None) => return plain_http_error(StatusCode::NOT_FOUND, "unknown finding"),
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let finding: Finding = match serde_json::from_str(&artifact_json) {
+    let finding: Finding = match chio_core::canonical::UntrustedJsonText::from_wire(
+        artifact_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    {
         Ok(finding) => finding,
         Err(_) => {
             return plain_http_error(
@@ -2374,6 +2350,10 @@ pub(crate) async fn handle_get_finding_admission(
     State(state): State<TrustServiceState>,
     AxumPath(finding_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let (config, store) = match finding_market_context(&state) {
         Ok(context) => context,
         Err(response) => return response,
@@ -2391,7 +2371,7 @@ pub(crate) async fn handle_get_finding_admission(
             )
         }
     };
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let status_operator_authority_status = state
         .finding_authority_status_resolver
         .as_ref()
@@ -2424,3 +2404,9 @@ pub(crate) async fn handle_get_finding_admission(
     )
         .into_response()
 }
+
+#[path = "finding_handlers/profile_authority.rs"]
+mod profile_authority;
+use profile_authority::{
+    verify_profile_governance_lifecycle, verify_profile_registration_authority,
+};

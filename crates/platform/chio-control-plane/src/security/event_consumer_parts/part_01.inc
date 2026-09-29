@@ -202,8 +202,7 @@ impl NativeSecurityEventVerifier {
     }
 
     fn parse_bound_body(&self, event: &UnverifiedSecurityEvent) -> PortResult<SecurityEventBody> {
-        let body: SecurityEventBody = serde_json::from_slice(event.canonical_body.as_bytes())
-            .map_err(|_| PortError::invalid_data())?;
+        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(event.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
         body.validate().map_err(|_| PortError::invalid_data())?;
         let canonical_body = canonical_json_bytes(&body).map_err(|_| PortError::invalid_data())?;
         let body_hash = Digest32::new(*sha256(&canonical_body).as_bytes());
@@ -226,8 +225,7 @@ impl NativeSecurityEventVerifier {
         body: &SecurityEventBody,
         enforce_freshness: bool,
     ) -> PortResult<SecurityEventVerificationRecord> {
-        let signed: SignedSecurityEvent = serde_json::from_slice(event.source_evidence.as_bytes())
-            .map_err(|_| PortError::invalid_data())?;
+        let signed: SignedSecurityEvent = chio_core::canonical::UntrustedJsonText::from_wire(event.source_evidence.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
         let canonical_signed =
             canonical_json_bytes(&signed).map_err(|_| PortError::invalid_data())?;
         let trusted = self
@@ -265,8 +263,7 @@ impl NativeSecurityEventVerifier {
         body: &SecurityEventBody,
         enforce_freshness: bool,
     ) -> PortResult<SecurityEventVerificationRecord> {
-        let receipt: ChioReceipt = serde_json::from_slice(event.source_evidence.as_bytes())
-            .map_err(|_| PortError::invalid_data())?;
+        let receipt: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(event.source_evidence.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
         let canonical_receipt =
             canonical_json_bytes(&receipt).map_err(|_| PortError::invalid_data())?;
         let trusted = self
@@ -805,8 +802,7 @@ impl CorrelationPort for SqliteTemporalCorrelationPort {
         event: &SecurityEventVerificationRecord,
         observed_at_unix_ms: u64,
     ) -> PortResult<Vec<RuleCorrelationOutcome>> {
-        let body: SecurityEventBody = serde_json::from_slice(event.canonical_body.as_bytes())
-            .map_err(|_| PortError::integrity_failure())?;
+        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(event.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::IntegrityFailure, error.code(), error))?;
         body.validate()
             .map_err(|_| PortError::integrity_failure())?;
         let mut outcomes = Vec::new();
@@ -954,8 +950,7 @@ impl ProductionCorrelationConsumer {
     }
 
     fn ensure_supported_policy(&self, verified: &SecurityEventVerificationRecord) -> PortResult<()> {
-        let body: SecurityEventBody = serde_json::from_slice(verified.canonical_body.as_bytes())
-            .map_err(|_| PortError::integrity_failure())?;
+        let body: SecurityEventBody = chio_core::canonical::UntrustedJsonText::from_wire(verified.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::IntegrityFailure, error.code(), error))?;
         if self.correlation.accepts_policy(&body.policy_version) {
             Ok(())
         } else {

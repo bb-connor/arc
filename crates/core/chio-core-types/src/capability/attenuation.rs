@@ -898,18 +898,15 @@ pub fn validate_attenuation_proof(
     if let Some(marker) = witness.cumulative_approval.as_ref() {
         marker.validate()?;
     }
-    let parent_scope: ChioScope =
-        serde_json::from_str(&witness.normalized_parent_scope).map_err(|err| {
-            Error::AttenuationViolation {
-                reason: format!("attenuation witness parent scope is invalid: {err}"),
-            }
-        })?;
-    let child_scope: ChioScope =
-        serde_json::from_str(&witness.normalized_child_scope).map_err(|err| {
-            Error::AttenuationViolation {
-                reason: format!("attenuation witness child scope is invalid: {err}"),
-            }
-        })?;
+    // Witness writers emit canonical scopes. Check the original bytes before
+    // interpreting authority, including duplicate keys and numeric spelling.
+    let decode_scope = |text: &str| {
+        crate::canonical::UntrustedJsonText::from_wire(text.as_bytes(), 1024 * 1024)
+            .and_then(|input| input.decode_canonical::<ChioScope>())
+            .map_err(|error| Error::UntrustedInput(error.into()))
+    };
+    let parent_scope = decode_scope(&witness.normalized_parent_scope)?;
+    let child_scope = decode_scope(&witness.normalized_child_scope)?;
     validate_attenuation(&parent_scope, &child_scope)?;
     if witness.cumulative_approval != cumulative_approval_delegation_marker(&child_scope)? {
         return Err(Error::AttenuationViolation {

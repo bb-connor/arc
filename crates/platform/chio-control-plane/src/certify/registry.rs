@@ -70,6 +70,7 @@ impl CertificationRegistry {
         &mut self,
         artifact: SignedCertificationCheck,
     ) -> Result<CertificationRegistryEntry, CliError> {
+        let clock_now = unix_now()?;
         verify_signed_certification_check(&artifact)?;
         self.version = CERTIFICATION_REGISTRY_VERSION.to_string();
         let artifact_id = certification_artifact_id(&artifact)?;
@@ -77,7 +78,7 @@ impl CertificationRegistry {
             return Ok(existing.clone());
         }
 
-        let published_at = unix_now();
+        let published_at = clock_now;
         for existing in self.artifacts.values_mut() {
             if existing.tool_server_id == artifact.body.target.tool_server_id
                 && existing.status == CertificationRegistryState::Active
@@ -168,8 +169,12 @@ impl CertificationRegistry {
                 "certification artifact `{artifact_id}` was not found"
             )));
         };
+        let revoked_at = match revoked_at {
+            Some(at) => at,
+            None => unix_now()?,
+        };
         entry.status = CertificationRegistryState::Revoked;
-        entry.revoked_at = Some(revoked_at.unwrap_or_else(unix_now));
+        entry.revoked_at = Some(revoked_at);
         entry.revoked_reason = reason.map(str::to_string);
         Ok(entry.clone())
     }
@@ -184,7 +189,10 @@ impl CertificationRegistry {
                 "certification artifact `{artifact_id}` was not found"
             )));
         };
-        let updated_at = request.updated_at.unwrap_or_else(unix_now);
+        let updated_at = match request.updated_at {
+            Some(at) => at,
+            None => unix_now()?,
+        };
         let dispute = CertificationDisputeRecord {
             state: request.state,
             updated_at,
@@ -211,7 +219,8 @@ impl CertificationRegistry {
         publisher: &CertificationPublicPublisher,
         metadata_expires_at: u64,
         query: &CertificationPublicSearchQuery,
-    ) -> CertificationPublicSearchResponse {
+    ) -> Result<CertificationPublicSearchResponse, crate::CliError> {
+        let clock_now = unix_now()?;
         let mut results = self
             .artifacts
             .values()
@@ -253,22 +262,23 @@ impl CertificationRegistry {
                 .then(right.entry.checked_at.cmp(&left.entry.checked_at))
                 .then(left.entry.artifact_id.cmp(&right.entry.artifact_id))
         });
-        CertificationPublicSearchResponse {
+        Ok(CertificationPublicSearchResponse {
             schema: CERTIFICATION_PUBLIC_SEARCH_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: clock_now,
             peer_count: 1,
             reachable_count: 1,
             count: results.len(),
             results,
             errors: Vec::new(),
-        }
+        })
     }
 
     pub(crate) fn transparency(
         &self,
         publisher: &CertificationPublicPublisher,
         query: &CertificationTransparencyQuery,
-    ) -> CertificationTransparencyResponse {
+    ) -> Result<CertificationTransparencyResponse, crate::CliError> {
+        let clock_now = unix_now()?;
         let mut events = Vec::new();
         for entry in self.artifacts.values() {
             if query
@@ -360,14 +370,14 @@ impl CertificationRegistry {
                 .cmp(&right.observed_at)
                 .then(left.artifact_id.cmp(&right.artifact_id))
         });
-        CertificationTransparencyResponse {
+        Ok(CertificationTransparencyResponse {
             schema: CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA.to_string(),
-            generated_at: unix_now(),
+            generated_at: clock_now,
             peer_count: 1,
             reachable_count: 1,
             count: events.len(),
             events,
             errors: Vec::new(),
-        }
+        })
     }
 }

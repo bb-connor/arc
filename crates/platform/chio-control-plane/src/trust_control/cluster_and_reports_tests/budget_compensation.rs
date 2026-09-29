@@ -144,7 +144,10 @@ fn apply_cluster_snapshot_fails_when_authority_fence_persistence_fails() {
         let mut guard = cluster.lock().test_unwrap();
         for peer in guard.peers.values_mut() {
             peer.health = PeerHealth::Healthy;
-            peer.last_contact_at = Some(unix_timestamp_now());
+            peer.last_contact_at = Some(
+                unix_timestamp_now()
+                    .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+            );
         }
     }
 

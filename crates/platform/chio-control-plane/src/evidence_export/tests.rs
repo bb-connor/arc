@@ -1,5 +1,6 @@
 use super::verification::*;
 use super::*;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 #[cfg(feature = "pq")]
@@ -206,7 +207,7 @@ fn manifest_for_bundle(bundle: &EvidenceExportBundle) -> EvidenceExportManifest 
     let disclosure_notice = maybe_build_disclosure_notice(&bundle.query);
     EvidenceExportManifest {
         schema: EVIDENCE_EXPORT_MANIFEST_SCHEMA.to_string(),
-        exported_at: unix_now(),
+        exported_at: unix_now().unwrap_or_else(|error| panic!("fixture clock: {error}")),
         query: bundle.query.clone(),
         proof_coverage: EvidenceProofCoverage {
             checkpointed_receipts: counts

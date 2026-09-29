@@ -490,7 +490,8 @@ fn profile_registration_raw(
             key: governance_key,
             key_epoch: pin.key_epoch,
             revoked_from: None,
-            observed_at: unix_timestamp_now(),
+            observed_at: unix_timestamp_now()
+                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         },
         &keypair(37),
     )?;
@@ -1360,7 +1361,9 @@ impl MarketWeb {
                 fee_schedule: &schedule,
                 collateral: &collateral,
             },
-            unix_timestamp_now().saturating_add(REPORT_MATURATION_SECS),
+            unix_timestamp_now()
+                .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+                .saturating_add(REPORT_MATURATION_SECS),
         )?;
 
         let mut admission = FindingAdmission {
@@ -1458,25 +1461,25 @@ impl MarketWeb {
         Ok(serde_json::json!({
             "admission": serde_json::to_value(&self.admission)?,
             "collateralAuthorityStatus": serde_json::to_value(
-                signed_collateral_authority_status(unix_timestamp_now())?,
+                signed_collateral_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")))?,
             )?,
             "profileGovernanceAuthorityStatus": serde_json::to_value(
-                signed_governance_authority_status(unix_timestamp_now(), None)?,
+                signed_governance_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
             )?,
             "venueAuthorityStatus": serde_json::to_value(signed_venue_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
             )?)?,
             "listingAuthorityStatus": serde_json::to_value(signed_listing_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
             )?)?,
             "statusOperatorAuthorityStatus": serde_json::to_value(
-                signed_status_operator_authority_status(unix_timestamp_now())?,
+                signed_status_operator_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")))?,
             )?,
             "sellerAuthorization": serde_json::to_value(&self.authorization)?,
             "sellerAuthorizationStatus": serde_json::to_value(
                 signed_seller_authorization_status(
                     &self.authorization,
-                    unix_timestamp_now(),
+                    unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
                 )?,
             )?,
             "terms": serde_json::to_value(&self.terms)?,
@@ -1484,7 +1487,7 @@ impl MarketWeb {
             "feeSchedule": serde_json::to_value(&self.schedule)?,
             "verifierReport": serde_json::to_value(&self.report)?,
             "verifierAuthorityStatus": serde_json::to_value(signed_verifier_authority_status(
-                unix_timestamp_now(),
+                unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
             )?)?,
             "listing": serde_json::to_value(&self.listing)?,
             "pricingHint": serde_json::to_value(&self.pricing_hint)?,
@@ -1509,7 +1512,8 @@ impl MarketWeb {
                 age_secs: 20,
                 max_age_secs: 300,
                 valid_until: WINDOW_EXPIRES_AT,
-                generated_at: unix_timestamp_now(),
+                generated_at: unix_timestamp_now()
+                    .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
             },
         }
     }
@@ -1620,7 +1624,11 @@ impl Deployment {
             state,
             authed_post(
                 "/v1/findings/collateral",
-                collateral_registration_raw(&web.backing, unix_timestamp_now())?,
+                collateral_registration_raw(
+                    &web.backing,
+                    unix_timestamp_now()
+                        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+                )?,
             )?,
         )
         .await?;
@@ -1635,7 +1643,11 @@ impl Deployment {
             .joint_authority_store
             .as_ref()
             .ok_or_else(|| missing("joint authority store before activation"))?;
-        publish_live_status_proof_b64(authority, &web.finding_id, unix_timestamp_now())?;
+        publish_live_status_proof_b64(
+            authority,
+            &web.finding_id,
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+        )?;
 
         let (status, body) = send(
             state,
@@ -1668,7 +1680,9 @@ fn allocation_accepted_at(
 }
 
 async fn wait_until_unix(target: u64) {
-    let remaining = target.saturating_sub(unix_timestamp_now());
+    let remaining = target.saturating_sub(
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    );
     if remaining > 0 {
         tokio::time::sleep(std::time::Duration::from_secs(remaining)).await;
     }
@@ -1684,7 +1698,7 @@ fn admission_witness(
     let context = FindingAdmissionContext {
         venue_authority: &venue_key,
         venue_id: VENUE_ID,
-        now: unix_timestamp_now(),
+        now: unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         fee_schedule: &web.schedule,
         fee_schedule_gate: FindingFeeScheduleGate::Legacy,
         trusted_local_operator_signers: &trusted_signers,
@@ -2165,7 +2179,7 @@ fn handshake(
     payout_destination: &str,
     token_id: &str,
 ) -> Result<Handshake, AnyError> {
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     handshake_at(
         web,
         witness,
@@ -2277,7 +2291,7 @@ fn dpop_proof(
         tool_name,
         arguments,
         nonce,
-        unix_timestamp_now(),
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )
 }
 
@@ -2343,7 +2357,10 @@ struct RevealRequestInputs<'a> {
 }
 
 fn reveal_request(inputs: &RevealRequestInputs<'_>) -> Result<ToolCallRequest, AnyError> {
-    reveal_request_at(inputs, unix_timestamp_now())
+    reveal_request_at(
+        inputs,
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    )
 }
 
 fn reveal_request_at(
@@ -2470,7 +2487,7 @@ fn reserve_and_accept(
     buyer: &Keypair,
     handshake: Handshake,
 ) -> Result<ReadyPurchase, AnyError> {
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let reservation_receipt = coordinator.reserve(
         &handshake.bid,
         &handshake.ask,
@@ -2557,7 +2574,7 @@ async fn open_lane(options: LaneOptions) -> Result<Lane, AnyError> {
         Some(publish_live_status_proof_b64(
             &authority,
             &deployment.web.finding_id,
-            unix_timestamp_now(),
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         )?)
     } else {
         None
@@ -2600,7 +2617,7 @@ impl Lane {
         let status_proof_b64 = live_status_proof_b64_at(
             &self.authority,
             &self.deployment.web.finding_id,
-            unix_timestamp_now(),
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         )?;
         let request = reveal_request(&RevealRequestInputs {
             request_id,
@@ -2871,7 +2888,8 @@ impl FindingPurchaseExecutor for RoutedPurchaseExecutor {
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| Self::execution_error("reveal payload missing"))?
             .to_owned();
-        let finalized_at = unix_timestamp_now();
+        let finalized_at =
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
         self.authority
             .finding_purchase_store()
             .register_community_fund_destination(
@@ -2926,7 +2944,8 @@ async fn cognition_market_live_purchase_route_exit() -> TestResult {
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
-    let fixed_now = unix_timestamp_now();
+    let fixed_now =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let replay_now = deployment
         .web
         .admission
@@ -3325,8 +3344,11 @@ pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
             install_verifier: true,
             install_status_verifier: true,
         })?;
-        let status_proof_b64 =
-            live_status_proof_b64_at(&authority, &deployment.web.finding_id, unix_timestamp_now())?;
+        let status_proof_b64 = live_status_proof_b64_at(
+            &authority,
+            &deployment.web.finding_id,
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+        )?;
         let request = reveal_request(&RevealRequestInputs {
             request_id: "wedge-reveal-1",
             capability: &purchase.capability,
@@ -3628,7 +3650,7 @@ async fn wedge_purchase_digest_mismatch_denies_and_releases() -> TestResult {
     assert_eq!(lane.calls.captures.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.releases.load(Ordering::SeqCst), 1);
     // A durable Deny cannot be selected into a paid terminal.
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     assert!(matches!(
         lane.coordinator.finalize_delivery(
             &lane.purchase.handshake.reservation_id,
@@ -3797,8 +3819,11 @@ async fn wedge_purchase_digest_mismatch_denies_and_releases() -> TestResult {
         install_verifier: true,
         install_status_verifier: true,
     })?;
-    let status_proof_b64 =
-        live_status_proof_b64_at(&authority, &deployment.web.finding_id, unix_timestamp_now())?;
+    let status_proof_b64 = live_status_proof_b64_at(
+        &authority,
+        &deployment.web.finding_id,
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    )?;
     let request = reveal_request(&RevealRequestInputs {
         request_id: "wedge-digest-mismatch-1",
         capability: &purchase.capability,
@@ -3845,7 +3870,7 @@ async fn wedge_purchase_denial_receipt_cannot_predate_its_reservation() -> TestR
             &lane.deployment.web.admission,
             &checkpoint,
             &inclusion_proof,
-            unix_timestamp_now(),
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         )
         .err()
         .ok_or_else(|| missing("backdated denial receipt was accepted"))?;
@@ -4146,7 +4171,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let live = publisher.publish_non_inclusion(&finding_id, &[], now)?;
     let live_status_proof_b64 = STANDARD.encode(&live.proof_bytes);
 
@@ -4174,7 +4199,8 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     )?;
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(lane.calls.captures.load(Ordering::SeqCst), 1);
-    let finalized_at = unix_timestamp_now();
+    let finalized_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     lane.authority
         .finding_purchase_store()
@@ -4495,7 +4521,9 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
         "reason": "recovery_status_gate_regression",
         "schema": "chio.finding.voluntary-retraction.v1",
     }))?;
-    let retraction_now = unix_timestamp_now().max(now + 1);
+    let retraction_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(now + 1);
     assert_eq!(
         status_store.issue_retraction_intent(&chio_store_sqlite::FindingRetractionIntentInput {
             intent_id: &intent_id,
@@ -4550,7 +4578,7 @@ async fn wedge_purchase_reservation_authenticates_the_buyer_and_replays() -> Tes
         &deployment.web.authorization,
         EXPOSURE_UNITS,
         RESERVATION_TTL_SECS,
-        unix_timestamp_now(),
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     );
     assert!(matches!(
         rejected,
@@ -4562,7 +4590,7 @@ async fn wedge_purchase_reservation_authenticates_the_buyer_and_replays() -> Tes
         .is_none());
 
     // Reserving the same ask for the same payer twice is idempotent.
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let first = coordinator.reserve(
         &exchange.bid,
         &exchange.ask,
@@ -4728,7 +4756,7 @@ async fn wedge_purchase_second_reservation_overcommits_the_allocation() -> TestR
         &deployment.web.authorization,
         EXPOSURE_UNITS,
         RESERVATION_TTL_SECS,
-        unix_timestamp_now(),
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
 
     // Two sales at the quoted price exceed the allocation's exposure cap.
@@ -4748,7 +4776,7 @@ async fn wedge_purchase_second_reservation_overcommits_the_allocation() -> TestR
         &deployment.web.authorization,
         EXPOSURE_UNITS,
         RESERVATION_TTL_SECS,
-        unix_timestamp_now(),
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     );
     let Err(PurchaseCoordinatorError::Store(reason)) = overcommitted else {
         return Err(missing("second reservation must overcommit the allocation"));
@@ -4762,8 +4790,10 @@ async fn wedge_purchase_second_reservation_overcommits_the_allocation() -> TestR
         .ok_or_else(|| missing("first reservation"))?;
     assert_eq!(surviving.state, FindingPurchaseReservationState::Open);
     assert_eq!(
-        purchase_store
-            .list_outstanding_exposure_total(&deployment.web.allocation_id, unix_timestamp_now())?,
+        purchase_store.list_outstanding_exposure_total(
+            &deployment.web.allocation_id,
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        )?,
         PRICE_UNITS
     );
     Ok(())
@@ -4828,7 +4858,7 @@ impl ReserveFixture {
 async fn wedge_purchase_reserve_refuses_an_unverified_venue_admission() -> TestResult {
     let fixture = open_reserve_fixture().await?;
     let purchase_store = fixture.authority.finding_purchase_store();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     // The same body, signed by a key that is not the venue authority.
     let forged: SignedFindingAdmission =
@@ -4888,7 +4918,7 @@ async fn wedge_purchase_reserve_refuses_an_unverified_venue_admission() -> TestR
 async fn wedge_purchase_reserve_binds_the_declared_settlement_authorities() -> TestResult {
     let fixture = open_reserve_fixture().await?;
     let purchase_store = fixture.authority.finding_purchase_store();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     // A coordinator holding a purchase key the admission never declared.
     let drifted_purchase = FindingPurchaseCoordinator::new(
@@ -5101,7 +5131,7 @@ async fn wedge_purchase_reserve_binds_the_declared_settlement_authorities() -> T
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_reservation_cannot_outlive_authority_status_signer() -> TestResult {
     let fixture = open_reserve_fixture().await?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let mut authority_status_pin = authority_pin(37, "authority-status");
     authority_status_pin.valid_until = now.saturating_add(1);
     let coordinator = FindingPurchaseCoordinator::new(
@@ -5142,7 +5172,7 @@ async fn wedge_purchase_reservation_cannot_outlive_authority_status_signer() -> 
 async fn wedge_purchase_reserve_requires_live_terminal_and_status_operator_standing() -> TestResult
 {
     let fixture = open_reserve_fixture().await?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let status_operator = market_config().status_feed_operator;
     let venue = market_config().venue;
     for (authority_id, expected_role) in [
@@ -5345,7 +5375,7 @@ async fn wedge_purchase_reserve_refuses_an_ask_outside_its_window() -> TestResul
 async fn wedge_purchase_reserve_refuses_a_self_minted_ask() -> TestResult {
     let fixture = open_reserve_fixture().await?;
     let purchase_store = fixture.authority.finding_purchase_store();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let interloper = keypair(9);
     let mut forged_body = fixture.exchange.ask.body.clone();
@@ -5425,7 +5455,7 @@ async fn wedge_purchase_reserve_refuses_a_malformed_purchase_grant() -> TestResu
     type MalformedGrantCase = (&'static str, &'static str, fn(&mut ToolGrant));
 
     let fixture = open_reserve_fixture().await?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let buyer = keypair(31);
     let operator = fixture.deployment.web.operator.clone();
 
@@ -5607,7 +5637,7 @@ async fn wedge_purchase_rejects_a_resigned_bid_envelope() -> TestResult {
     let status_proof_b64 = live_status_proof_b64_at(
         &lane.authority,
         &lane.deployment.web.finding_id,
-        unix_timestamp_now(),
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     let request = reveal_request(&RevealRequestInputs {
         request_id: "wedge-resigned-bid-1",
@@ -5650,7 +5680,11 @@ async fn wedge_purchase_superseded_admission_stops_transacting() -> TestResult {
         &lane.state,
         authed_post(
             "/v1/findings/collateral",
-            collateral_registration_raw(&second_backing, unix_timestamp_now())?,
+            collateral_registration_raw(
+                &second_backing,
+                unix_timestamp_now()
+                    .unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+            )?,
         )?,
     )
     .await?;
@@ -5671,7 +5705,9 @@ async fn wedge_purchase_superseded_admission_stops_transacting() -> TestResult {
             fee_schedule: &web.schedule,
             collateral: &keypair(4),
         },
-        unix_timestamp_now().saturating_add(1),
+        unix_timestamp_now()
+            .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+            .saturating_add(1),
     )?;
     let mut admission_body = web.admission.body.clone();
     admission_body.backing_allocation_id = second_backing.body.allocation_id.clone();
@@ -5686,30 +5722,30 @@ async fn wedge_purchase_superseded_admission_stops_transacting() -> TestResult {
     let activate = serde_json::json!({
         "admission": serde_json::to_value(&second_admission)?,
         "collateralAuthorityStatus": serde_json::to_value(
-            signed_collateral_authority_status(unix_timestamp_now())?,
+            signed_collateral_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")))?,
         )?,
         "profileGovernanceAuthorityStatus": serde_json::to_value(
-            signed_governance_authority_status(unix_timestamp_now(), None)?,
+            signed_governance_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")), None)?,
         )?,
         "venueAuthorityStatus": serde_json::to_value(signed_venue_authority_status(
-            unix_timestamp_now(),
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         )?)?,
         "listingAuthorityStatus": serde_json::to_value(signed_listing_authority_status(
-            unix_timestamp_now(),
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         )?)?,
         "statusOperatorAuthorityStatus": serde_json::to_value(
-            signed_status_operator_authority_status(unix_timestamp_now())?,
+            signed_status_operator_authority_status(unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")))?,
         )?,
         "sellerAuthorization": serde_json::to_value(&web.authorization)?,
         "sellerAuthorizationStatus": serde_json::to_value(
-            signed_seller_authorization_status(&web.authorization, unix_timestamp_now())?,
+            signed_seller_authorization_status(&web.authorization, unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")))?,
         )?,
         "terms": serde_json::to_value(&web.terms)?,
         "backing": serde_json::to_value(&second_backing)?,
         "feeSchedule": serde_json::to_value(&web.schedule)?,
         "verifierReport": serde_json::to_value(&second_report)?,
         "verifierAuthorityStatus": serde_json::to_value(signed_verifier_authority_status(
-            unix_timestamp_now(),
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         )?)?,
         "listing": serde_json::to_value(&web.listing)?,
         "pricingHint": serde_json::to_value(&web.pricing_hint)?,
@@ -5734,7 +5770,8 @@ async fn wedge_purchase_superseded_admission_stops_transacting() -> TestResult {
     assert_eq!(lane.invocations.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.authorizations.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.captures.load(Ordering::SeqCst), 0);
-    let released_at = unix_timestamp_now();
+    let released_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     lane.coordinator
         .release(&lane.purchase.handshake.reservation_id, released_at)?;
     let purchase_store = lane.authority.finding_purchase_store();
@@ -5770,7 +5807,7 @@ async fn wedge_purchase_superseded_admission_stops_transacting() -> TestResult {
         OTHER_BUYER_PAYOUT,
         "finding-purchase-token-0004",
     )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     assert!(matches!(
         lane.coordinator.reserve(
             &exchange.bid,
@@ -5837,7 +5874,7 @@ async fn wedge_purchase_terminal_closure_requires_live_authority_status() -> Tes
     let delivered = open_lane(LaneOptions::standard()).await?;
     let delivered_response = delivered.reveal("wedge-revoked-purchase-1", "nonce-revoked-1")?;
     assert_eq!(delivered_response.verdict, Verdict::Allow);
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     delivered
         .authority
         .finding_purchase_store()
@@ -5927,7 +5964,7 @@ async fn wedge_purchase_terminal_closure_requires_live_authority_status() -> Tes
             &denied.deployment.web.admission,
             &checkpoint,
             &inclusion_proof,
-            unix_timestamp_now(),
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         ),
         Err(PurchaseCoordinatorError::AuthorityLifecycle {
             role: "failed-delivery",
@@ -5942,7 +5979,7 @@ async fn wedge_purchase_reservation_rechecks_seller_authorization_status() -> Te
     let lane = open_lane(LaneOptions::standard()).await?;
     lane.coordinator.release(
         &lane.purchase.handshake.reservation_id,
-        unix_timestamp_now(),
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
 
     let buyer = keypair(32);
@@ -5953,7 +5990,7 @@ async fn wedge_purchase_reservation_rechecks_seller_authorization_status() -> Te
         OTHER_BUYER_PAYOUT,
         "finding-purchase-token-revoked-seller",
     )?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let revoked = coordinator_with_status(
         &lane.authority,
         Arc::new(TestTerminalAuthorityStatusResolver::revoked(
@@ -5986,7 +6023,7 @@ async fn wedge_purchase_reservation_rechecks_seller_authorization_status() -> Te
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_reservation_atomically_rejects_retracted_finding() -> TestResult {
     let lane = open_lane(LaneOptions::standard()).await?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     lane.coordinator
         .release(&lane.purchase.handshake.reservation_id, now)?;
 
@@ -6067,7 +6104,7 @@ async fn wedge_purchase_refuses_to_persist_an_unvalidatable_artifact() -> TestRe
     let purchase_store = lane.authority.finding_purchase_store();
     let allocation_id = lane.deployment.web.allocation_id.clone();
     let reservation_id = lane.purchase.handshake.reservation_id.clone();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     purchase_store.register_community_fund_destination(
         &allocation_id,
         COMMUNITY_FUND_DESTINATION,

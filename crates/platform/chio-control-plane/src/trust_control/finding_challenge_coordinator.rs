@@ -361,6 +361,9 @@ pub fn derive_retraction_intent_key(
 /// requested transition and leaves the durable state where it was.
 #[derive(Debug, thiserror::Error)]
 pub enum ChallengeCoordinatorError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("finding-market configuration rejected: {0}")]
     Configuration(String),
     #[error("signing key does not match its configured role pin: {0}")]
@@ -1079,8 +1082,10 @@ pub(crate) fn require_admitted_replay_decision_rule(
     };
     let strict = canonical_json_bytes_from_str(recipe_preimage)
         .map_err(|_| ChallengeCoordinatorError::ReplayDecisionRule("recipe is not canonical"))?;
-    let recipe: FindingReplayRecipeInput = serde_json::from_slice(&strict)
-        .map_err(|_| ChallengeCoordinatorError::ReplayDecisionRule("recipe is not typed"))?;
+    let recipe: FindingReplayRecipeInput =
+        chio_core::canonical::UntrustedJsonText::from_wire(&strict, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(ChallengeCoordinatorError::from)?;
     recipe
         .validate()
         .map_err(|_| ChallengeCoordinatorError::ReplayDecisionRule("recipe is invalid"))?;

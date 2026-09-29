@@ -39,8 +39,8 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
             "cross-boundary request treaty scope hash does not match verifier-owned store",
         );
     }
-    let treaty_scope: TreatyScope = serde_json::from_value(treaty_scope_record.raw_json)
-        .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    let treaty_scope: TreatyScope =
+        serde_json::from_value(treaty_scope_record.raw_json).map_err(ChioRuntimeError::Json)?;
     if treaty_scope.trust_bundle_sha256 != bundle.trust_bundle_sha256 {
         return rejected(
             "chio_treaty_scope_hash_mismatch",
@@ -66,8 +66,7 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
         );
     }
     let ladder_intersection: LadderIntersection =
-        serde_json::from_value(intersection_record.raw_json)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        serde_json::from_value(intersection_record.raw_json).map_err(ChioRuntimeError::Json)?;
     let action = ladder_intersection
         .action_classes
         .iter()
@@ -258,7 +257,10 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
                     ladder_intersection.expires_at_unix_ms,
                 ])
                 .min()
-                .ok_or_else(|| ChioRuntimeError::Json("missing treaty validity".into()))?,
+                .ok_or_else(|| ChioRuntimeError::Rejected {
+                    code: "runtime_treaty_validity_missing",
+                    detail: "missing treaty validity".into(),
+                })?,
             continuation_artifact_digest: continuation
                 .as_ref()
                 .map(|(artifact, _)| crate::hash::canonical_sha256(artifact))

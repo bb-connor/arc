@@ -17,6 +17,9 @@ pub use policy::NativeFlowPolicyEvidence;
 
 #[derive(Debug, thiserror::Error)]
 pub enum NativeFlowError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("native flow authority differs from original kernel custody")]
     AuthorityMismatch,
     #[error("legacy evidence stores cannot configure native flow authority")]
@@ -52,6 +55,19 @@ pub struct NativeFlowResolver {
 /// A verified policy result tied to the original resolver and kernel handle.
 /// The manifest registry and policy stay borrowed until custody is committed.
 /// It cannot be cloned, serialized or retargeted to another live request.
+///
+/// Captured authority can be borrowed by consumers:
+/// ```
+/// use chio_control_plane::security::adapters::PreparedNativeFlowDispatch;
+/// fn observe(_: &PreparedNativeFlowDispatch<'_>) {}
+/// ```
+/// It is private to the verifier and cannot be retargeted:
+/// ```compile_fail
+/// use chio_control_plane::security::adapters::PreparedNativeFlowDispatch;
+/// fn retarget(proof: &mut PreparedNativeFlowDispatch<'_>) {
+///     proof.prepared_at = 0;
+/// }
+/// ```
 #[must_use]
 pub struct PreparedNativeFlowDispatch<'a> {
     resolver: &'a NativeFlowResolver,

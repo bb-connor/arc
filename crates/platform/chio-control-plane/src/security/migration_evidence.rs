@@ -378,7 +378,9 @@ impl SignedEnterpriseMigrationCanaryEvidence {
         trusted_runner_key: &PublicKey,
     ) -> Result<Self, EnterpriseMigrationEvidenceError> {
         validate_wire_size(bytes, "canary evidence")?;
-        let artifact: Self = serde_json::from_slice(bytes)?;
+        let artifact: Self =
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_EVIDENCE_BYTES)
+                .and_then(|input| input.decode_signed())?;
         artifact.verify(trusted_runner_key)?;
         if canonical_json_bytes(&artifact)? != bytes {
             return Err(EnterpriseMigrationEvidenceError::NonCanonical);
@@ -559,7 +561,9 @@ impl SignedEnterpriseMigrationCutoverAttestation {
         trusted_runner_key: &PublicKey,
     ) -> Result<Self, EnterpriseMigrationEvidenceError> {
         validate_wire_size(bytes, "operator cutover attestation")?;
-        let artifact: Self = serde_json::from_slice(bytes)?;
+        let artifact: Self =
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_EVIDENCE_BYTES)
+                .and_then(|input| input.decode_signed())?;
         artifact.verify_against_canary(operator_key, canary, trusted_runner_key)?;
         if canonical_json_bytes(&artifact)? != bytes {
             return Err(EnterpriseMigrationEvidenceError::NonCanonical);
@@ -570,6 +574,8 @@ impl SignedEnterpriseMigrationCutoverAttestation {
 
 #[derive(Debug, Error)]
 pub enum EnterpriseMigrationEvidenceError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("invalid enterprise migration evidence: {0}")]
     Invalid(&'static str),
     #[error("enterprise migration evidence signature is invalid")]

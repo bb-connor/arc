@@ -1015,6 +1015,9 @@ impl VerifiedFiscalContinuityCommit {
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum FiscalStateAnchorError {
+    #[error(transparent)]
+    UntrustedInput(chio_core_types::canonical::SharedUntrustedJsonError),
+
     #[error("fiscal state anchor is unavailable")]
     Unavailable,
     #[error("fiscal state anchor compare-and-swap conflicted")]

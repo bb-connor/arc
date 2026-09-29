@@ -36,6 +36,8 @@ pub(crate) struct TrustFiscalRuntime {
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum TrustFiscalOperationError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("{0}")]
     Startup(String),
     #[error("invalid fiscal artifact: {0}")]
@@ -773,10 +775,8 @@ fn next_authority(
 }
 
 fn trusted_now(startup: &FiscalRuntimeStartup) -> Result<u64, TrustFiscalOperationError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?
-        .as_secs();
+    use chio_security_types::clock::{Clock, SystemClock};
+    let now = SystemClock.unix_millis()?.as_secs();
     if now < startup.checkpoint.body().trusted_clock_high_water {
         return Err(TrustFiscalOperationError::Startup(
             "system clock is below the anchored fiscal high-water mark".to_owned(),

@@ -13,10 +13,13 @@ fn internal_cluster_http_error(context: &'static str, error: &dyn std::fmt::Disp
 /// revoke and cluster-delta upserts) so the capability-revocation SLO reflects
 /// real capability revocations rather than passport lifecycle events.
 pub(crate) fn observe_capability_revocation_lag(revoked_at: i64) {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs() as i64)
-        .unwrap_or(0);
+    use chio_security_types::clock::{Clock, SystemClock};
+    let Ok(now) = SystemClock.unix_millis() else {
+        return;
+    };
+    let Ok(now) = i64::try_from(now.as_secs()) else {
+        return;
+    };
     let lag_seconds = now.saturating_sub(revoked_at).max(0) as f64;
     chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG
         .observe(&["control_plane"], lag_seconds);

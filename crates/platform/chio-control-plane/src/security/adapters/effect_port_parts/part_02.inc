@@ -1172,8 +1172,7 @@ fn decode_issuance_freeze_spec(
     key: &IssuanceFreezeKey,
 ) -> PortResult<IssuanceFreezeSpec> {
     let spec: IssuanceFreezeSpec =
-        serde_json::from_slice(request.canonical_contribution.as_bytes())
-            .map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(request.canonical_contribution.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
     let canonical =
         chio_core::canonical_json_bytes(&spec).map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != request.canonical_contribution.as_bytes() {

@@ -532,7 +532,7 @@ fn validate_escalate_alert_query(query: &EffectResultQuery) -> PortResult<()> {
 fn verify_canonical_json_contribution(body: &CanonicalBody, declared: Digest32) -> PortResult<()> {
     verify_contribution_hash(body, declared)?;
     let value: serde_json::Value =
-        serde_json::from_slice(body.as_bytes()).map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
     let canonical =
         chio_core::canonical_json_bytes(&value).map_err(|_| PortError::invalid_data())?;
     if canonical.as_slice() != body.as_bytes() {
@@ -888,7 +888,7 @@ impl ResponseEffectBackend for SessionThrottleBackend {
 
 fn decode_session_throttle_limits(body: &CanonicalBody) -> PortResult<SessionThrottleLimits> {
     let limits: SessionThrottleLimits =
-        serde_json::from_slice(body.as_bytes()).map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
     limits.validate()?;
     let canonical =
         chio_core::canonical_json_bytes(&limits).map_err(|_| PortError::invalid_data())?;
@@ -1221,7 +1221,7 @@ fn decode_capability_set_suspension_spec(
     body: &CanonicalBody,
 ) -> PortResult<CapabilitySetSuspensionSpec> {
     let spec: CapabilitySetSuspensionSpec =
-        serde_json::from_slice(body.as_bytes()).map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
     if spec.affected_ids.as_slice().is_empty() {
         return Err(PortError::invalid_data());
     }

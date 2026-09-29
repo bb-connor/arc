@@ -10,18 +10,14 @@ impl JsonRuntimeTrustFloorStateStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ChioRuntimeError> {
         let path = path.as_ref().to_path_buf();
         let mut state = if path.exists() {
-            let json = fs::read_to_string(&path).map_err(|error| {
-                ChioRuntimeError::Io(format!(
-                    "failed to read runtime trust-floor state {}: {error}",
-                    path.display()
-                ))
-            })?;
-            let state: RuntimeTrustFloorState = serde_json::from_str(&json).map_err(|error| {
-                ChioRuntimeError::Json(format!(
-                    "failed to parse runtime trust-floor state {}: {error}",
-                    path.display()
-                ))
-            })?;
+            let json = fs::read_to_string(&path).map_err(ChioRuntimeError::Io)?;
+            let state: RuntimeTrustFloorState =
+                chio_core_types::canonical::UntrustedJsonText::from_wire(
+                    json.as_bytes(),
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(ChioRuntimeError::from)?;
             state
         } else {
             RuntimeTrustFloorState {
@@ -106,22 +102,11 @@ impl JsonRuntimeTrustFloorStateStore {
     fn persist_state(&self, state: &RuntimeTrustFloorState) -> Result<(), ChioRuntimeError> {
         if let Some(parent) = self.path.parent() {
             if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|error| {
-                    ChioRuntimeError::Io(format!(
-                        "failed to create runtime trust-floor state directory {}: {error}",
-                        parent.display()
-                    ))
-                })?;
+                fs::create_dir_all(parent).map_err(ChioRuntimeError::Io)?;
             }
         }
-        let json = serde_json::to_string_pretty(state)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
-        fs::write(&self.path, format!("{json}\n")).map_err(|error| {
-            ChioRuntimeError::Io(format!(
-                "failed to write runtime trust-floor state {}: {error}",
-                self.path.display()
-            ))
-        })
+        let json = serde_json::to_string_pretty(state).map_err(ChioRuntimeError::Json)?;
+        fs::write(&self.path, format!("{json}\n")).map_err(ChioRuntimeError::Io)
     }
 }
 

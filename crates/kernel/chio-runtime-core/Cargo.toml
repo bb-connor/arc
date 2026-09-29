@@ -12,6 +12,7 @@ publish = false
 name = "chio_runtime_core"
 
 [dependencies]
+chio-security-types = { workspace = true, features = ["std"] }
 chio-attest-buyer-core = { workspace = true }
 chio-core-types = { workspace = true }
 chio-federation = { workspace = true }

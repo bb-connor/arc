@@ -20,19 +20,25 @@ mod trust_floors;
 pub struct SqliteRuntimeOrchestrationStore {
     pub(super) path: PathBuf,
     pub(super) connection: Mutex<Connection>,
+    clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
 }
 
 impl SqliteRuntimeOrchestrationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ChioRuntimeError> {
+        Self::open_with_clock(
+            path,
+            std::sync::Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ChioRuntimeError> {
         let path = path.as_ref().to_path_buf();
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|error| {
-                    ChioRuntimeError::Io(format!(
-                        "failed to create runtime orchestration store directory {}: {error}",
-                        parent.display()
-                    ))
-                })?;
+                fs::create_dir_all(parent).map_err(ChioRuntimeError::Io)?;
             }
         }
         let connection = Connection::open(&path).map_err(sqlite_error)?;
@@ -47,6 +53,7 @@ impl SqliteRuntimeOrchestrationStore {
             .map_err(sqlite_error)?;
         let store = Self {
             path,
+            clock,
             connection: Mutex::new(connection),
         };
         // A sealed source must be verified before legacy schema initialization
@@ -64,7 +71,7 @@ impl SqliteRuntimeOrchestrationStore {
 }
 
 pub(super) fn sqlite_error(error: rusqlite::Error) -> ChioRuntimeError {
-    ChioRuntimeError::Store(format!("runtime orchestration sqlite: {error}"))
+    ChioRuntimeError::Sqlite(error)
 }
 
 pub(super) fn sqlite_i64(value: u64, field: &str) -> Result<i64, ChioRuntimeError> {

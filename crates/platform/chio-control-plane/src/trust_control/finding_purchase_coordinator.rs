@@ -131,6 +131,9 @@ pub fn derive_reservation_id(ask_digest: &str, payer_hex: &str) -> String {
 /// requested transition.
 #[derive(Debug, thiserror::Error)]
 pub enum PurchaseCoordinatorError {
+    #[error(transparent)]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+
     #[error("purchase authority key does not match the configured pin")]
     AuthorityPinMismatch,
     #[error("authority-status pin is invalid or aliases a terminal signing authority")]
@@ -859,9 +862,12 @@ impl FindingPurchaseCoordinator {
                 "stored artifact digest does not match the admission".to_owned(),
             ));
         }
-        let finding: Finding = serde_json::from_str(&finding_json).map_err(|error| {
-            PurchaseCoordinatorError::FindingArtifact(format!("artifact JSON: {error}"))
-        })?;
+        let finding: Finding = chio_core::canonical::UntrustedJsonText::from_wire(
+            finding_json.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(PurchaseCoordinatorError::from)?;
         verify_finding(&finding)
             .map_err(|error| PurchaseCoordinatorError::FindingArtifact(error.to_string()))?;
         if finding.finding_id != admission.body.finding_id
@@ -1031,11 +1037,9 @@ impl FindingPurchaseCoordinator {
                     )
                 })?;
             let terms: SignedFindingMarketTerms =
-                serde_json::from_slice(&terms_bytes).map_err(|_| {
-                    PurchaseCoordinatorError::ParticipationBinding(
-                        "admission-bound terms are malformed".to_owned(),
-                    )
-                })?;
+                chio_core::canonical::UntrustedJsonText::from_wire(&terms_bytes, 64 * 1024 * 1024)
+                    .and_then(|input| input.decode_signed())
+                    .map_err(PurchaseCoordinatorError::from)?;
             terms.body.validate().map_err(|error| {
                 PurchaseCoordinatorError::ParticipationBinding(error.to_string())
             })?;
@@ -1521,12 +1525,13 @@ impl FindingPurchaseCoordinator {
                         "consumed reservation lost its purchase record".to_owned(),
                     )
                 })?;
-            let signed: SignedFindingPurchaseRecord = serde_json::from_slice(&retained.record_json)
-                .map_err(|_| {
-                    PurchaseCoordinatorError::Store(
-                        "retained purchase record failed deserialization".to_owned(),
-                    )
-                })?;
+            let signed: SignedFindingPurchaseRecord =
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    &retained.record_json,
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(PurchaseCoordinatorError::from)?;
             verify_signed_purchase_record(&signed, &admission.body.purchase_authority.key)
                 .map_err(|error| PurchaseCoordinatorError::ArtifactValidation(error.to_string()))?;
             if signed.body != record {
@@ -1706,11 +1711,12 @@ impl FindingPurchaseCoordinator {
                 .map_err(|error| PurchaseCoordinatorError::Store(error.to_string()))?
             {
                 let signed: SignedFindingFailedDelivery =
-                    serde_json::from_slice(&retained.record_json).map_err(|_| {
-                        PurchaseCoordinatorError::Store(
-                            "retained failed-delivery record failed deserialization".to_owned(),
-                        )
-                    })?;
+                    chio_core::canonical::UntrustedJsonText::from_wire(
+                        &retained.record_json,
+                        64 * 1024 * 1024,
+                    )
+                    .and_then(|input| input.decode_signed())
+                    .map_err(PurchaseCoordinatorError::from)?;
                 verify_signed_failed_delivery(
                     &signed,
                     &admission.body.failed_delivery_authority.key,

@@ -364,3 +364,6 @@ fn treaty_scope() -> TreatyScope {
         trust_bundle_sha256: "b".repeat(64),
     }
 }
+
+#[path = "runtime_store/authority_readers.rs"]
+mod authority_readers;

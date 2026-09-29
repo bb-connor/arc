@@ -536,7 +536,6 @@
 1	crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc	receipt_provenance_rejects_tampered_external_and_untrusted_sources	verifier .verify(&receipt_event( &trusted, ToolOrigin::HostExecutedProviderReported, 9_900, 10_000, )) .is_err()
 1	crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc	receipt_provenance_rejects_tampered_external_and_untrusted_sources	verifier .verify(&receipt_event( &untrusted, ToolOrigin::ChioInternal, 9_900, 10_000, )) .is_err()
 1	crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc	receipt_provenance_rejects_tampered_external_and_untrusted_sources	verifier.verify(&tampered).is_err()
-1	crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc	trusted_producer_signature_from_an_unconfigured_policy_is_rejected	verifier.verify(&event).is_err()
 1	crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02_recovery.inc	attestation_failure_leaves_ingress_pending_until_response_work_is_durable	drainer.drain_once(16).is_err()
 1	crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02_recovery.inc	attestation_failure_never_partially_publishes_raw_findings_to_planning	consumer.consume(&signed_event(&keypair)).is_err()
 1	crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02_recovery.inc	correlation_ingress_ack_loss_keeps_the_durable_tombstone_and_does_not_republish	drainer.drain_once(16).is_err()

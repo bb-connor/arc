@@ -11,6 +11,7 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
     query: &CreditProviderRiskPackageQuery,
     read_context: chio_kernel::ReceiptReadContext,
 ) -> Result<CreditProviderRiskPackage, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized = query.normalized();
     if let Err(message) = normalized.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -90,7 +91,7 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
         .map(|row| row.timestamp)
         .max()
         .is_none_or(|timestamp| {
-            unix_timestamp_now().saturating_sub(timestamp)
+            clock_now.saturating_sub(timestamp)
                 > UnderwritingDecisionPolicy::default().maximum_receipt_age_seconds
         });
 
@@ -99,7 +100,7 @@ pub(crate) fn build_credit_provider_risk_package_from_store(
 
     Ok(CreditProviderRiskPackage {
         schema: CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         subject_key,
         filters: normalized.clone(),
         support_boundary: CreditProviderRiskPackageSupportBoundary::default(),
@@ -178,6 +179,7 @@ pub(crate) fn build_credit_scorecard_report_with_context(
     read_context: chio_kernel::ReceiptReadContext,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditScorecardReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized_query = query.normalized();
     if let Err(message) = normalized_query.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -219,7 +221,7 @@ pub(crate) fn build_credit_scorecard_report_with_context(
             &inspection.subject_key,
             inspection.since,
             inspection.until,
-            unix_timestamp_now(),
+            clock_now,
             &inspection.scoring,
         )
         .map_err(|error| TrustHttpError::internal(error.to_string()))?,
@@ -254,7 +256,7 @@ pub(crate) fn build_credit_scorecard_report_with_context(
 
     Ok(CreditScorecardReport {
         schema: CREDIT_SCORECARD_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: normalized_query,
         support_boundary: CreditScorecardSupportBoundary::default(),
         summary: CreditScorecardSummary {
@@ -319,6 +321,7 @@ fn build_credit_facility_report_from_store_with_context(
     read_context: chio_kernel::ReceiptReadContext,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditFacilityReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let scorecard = build_credit_scorecard_report_with_context(
         receipt_store,
         receipt_db_path,
@@ -400,7 +403,7 @@ fn build_credit_facility_report_from_store_with_context(
 
     Ok(CreditFacilityReport {
         schema: CREDIT_FACILITY_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: scorecard.filters.clone(),
         scorecard: scorecard.summary,
         disposition,
@@ -420,6 +423,7 @@ pub(crate) fn build_credit_bond_report_from_store(
     query: &ExposureLedgerQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditBondReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let scorecard = build_credit_scorecard_report(
         receipt_store,
         receipt_db_path,
@@ -553,7 +557,7 @@ pub(crate) fn build_credit_bond_report_from_store(
 
     Ok(CreditBondReport {
         schema: CREDIT_BOND_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: scorecard.filters.clone(),
         exposure: exposure.summary,
         scorecard: scorecard.summary,
@@ -574,6 +578,7 @@ pub(crate) fn build_credit_bond_report_from_store(
 pub(crate) fn issue_signed_credit_bond_detailed(
     args: CreditIssuanceArgs<'_>,
 ) -> Result<SignedCreditBond, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let CreditIssuanceArgs {
         receipt_db_path,
         budget_db_path,
@@ -607,7 +612,7 @@ pub(crate) fn issue_signed_credit_bond_detailed(
         report.filters.tool_name.as_deref(),
     )?
     .map(|facility| facility.body.expires_at);
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_credit_bond_artifact(
         report,
         issued_at,
@@ -663,6 +668,7 @@ pub(crate) fn build_credit_bonded_execution_simulation_report_from_store(
     receipt_store: &SqliteReceiptStore,
     request: &CreditBondedExecutionSimulationRequest,
 ) -> Result<CreditBondedExecutionSimulationReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     request
         .query
         .validate()
@@ -716,7 +722,7 @@ pub(crate) fn build_credit_bonded_execution_simulation_report_from_store(
 
     Ok(CreditBondedExecutionSimulationReport {
         schema: CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         query: request.query.clone(),
         policy: request.policy.clone(),
         support_boundary,
@@ -1110,6 +1116,7 @@ pub(crate) use loss_lifecycle::{
 pub(crate) fn issue_signed_credit_facility_detailed(
     args: CreditIssuanceArgs<'_>,
 ) -> Result<SignedCreditFacility, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let CreditIssuanceArgs {
         receipt_db_path,
         budget_db_path,
@@ -1135,7 +1142,7 @@ pub(crate) fn issue_signed_credit_facility_detailed(
         query,
         &trusted_kernel_keys,
     )?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let artifact = build_credit_facility_artifact(
         report,
         issued_at,

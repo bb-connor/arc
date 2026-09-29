@@ -53,8 +53,12 @@ struct EvidenceGraphNode {
 fn graph_bound_signed_risk_report(
     bundle: &TransactionPassportRiskVerificationBundle,
 ) -> Result<RiskComptrollerReport, TransactionPassportError> {
-    let graph: EvidenceGraph = serde_json::from_slice(&bundle.evidence_graph_bytes)
-        .map_err(|error| invalid_graph(format!("invalid evidence graph: {error}")))?;
+    let graph: EvidenceGraph = chio_core::canonical::UntrustedJsonText::from_wire(
+        &bundle.evidence_graph_bytes,
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|error| invalid_graph(format!("invalid evidence graph: {error}")))?;
     let mut risk_nodes = graph
         .nodes
         .iter()
@@ -86,7 +90,9 @@ fn graph_bound_signed_risk_report(
         );
     }
     let value: serde_json::Value =
-        serde_json::from_slice(bytes).map_err(|error| risk_failed(error.to_string()))?;
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| risk_failed(error.to_string()))?;
     chio_risk_comptroller::validate_signed_risk_report(
         &bundle.passport,
         &value,

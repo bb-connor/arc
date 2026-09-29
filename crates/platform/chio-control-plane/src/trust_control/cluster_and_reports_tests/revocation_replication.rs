@@ -21,7 +21,9 @@ async fn revocation_delta_endpoint_negotiates_legacy_and_sequence_cursors() {
     }
     let stream_id = store.revocation_stream_id().test_unwrap();
 
-    let issued_at = unix_timestamp_now() as i64;
+    let issued_at = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        as i64;
     let signature = cluster_peer_auth_signature(
         &state.config.service_token,
         "http://node-b",

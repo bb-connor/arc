@@ -2,7 +2,6 @@ use std::cmp::{max, min};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -318,11 +317,9 @@ struct EvidenceVerificationResult {
     disclosure_notice: Option<EvidenceDisclosureNotice>,
 }
 
-fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+fn unix_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 fn ensure_clean_output_dir(path: &Path) -> Result<(), CliError> {
@@ -429,7 +426,10 @@ fn read_json_file<T: for<'de> Deserialize<'de>>(
     relative_path: &str,
 ) -> Result<T, CliError> {
     let path = input_dir.join(relative_path);
-    Ok(serde_json::from_slice(&fs::read(path)?)?)
+    Ok(
+        chio_core::canonical::UntrustedJsonText::from_wire(&fs::read(path)?, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())?,
+    )
 }
 
 fn read_ndjson_file<T: for<'de> Deserialize<'de>>(
@@ -447,15 +447,10 @@ fn read_ndjson_file<T: for<'de> Deserialize<'de>>(
         })?
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .enumerate()
-        .map(|(index, line)| {
-            serde_json::from_str(line).map_err(|error| {
-                CliError::attest_error(format!(
-                    "{relative_path} line {} does not parse as the current record schema \
-                     (records written by an older schema version must be re-exported): {error}",
-                    index + 1
-                ))
-            })
+        .map(|line| {
+            chio_core::canonical::UntrustedJsonText::from_wire((line).as_bytes(), 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(CliError::from)
         })
         .collect()
 }
@@ -575,7 +570,9 @@ fn policy_metadata(
 }
 
 fn read_federation_policy(path: &Path) -> Result<FederationPolicyDocument, CliError> {
-    let policy: FederationPolicyDocument = serde_json::from_slice(&fs::read(path)?)?;
+    let policy: FederationPolicyDocument =
+        chio_core::canonical::UntrustedJsonText::from_wire(&fs::read(path)?, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())?;
     verify_federation_policy(&policy)?;
     Ok(policy)
 }
@@ -899,6 +896,7 @@ fn write_evidence_package(
     policy_file: Option<&Path>,
     federation_policy: Option<&FederationPolicyDocument>,
 ) -> Result<(), CliError> {
+    let clock_now = unix_now()?;
     ensure_clean_output_dir(output)?;
     let transparency = match transparency {
         Some(summary) => {
@@ -1031,7 +1029,7 @@ fn write_evidence_package(
     let receipt_semantics = evidence_receipt_semantic_summary(&bundle.tool_receipts);
     let manifest = EvidenceExportManifest {
         schema: EVIDENCE_EXPORT_MANIFEST_SCHEMA.to_string(),
-        exported_at: unix_now(),
+        exported_at: clock_now,
         query: bundle.query,
         counts,
         proof_coverage,
@@ -1068,8 +1066,9 @@ pub struct EvidenceFederationPolicyCreateArgs<'a> {
 pub fn cmd_evidence_federation_policy_create(
     args: EvidenceFederationPolicyCreateArgs<'_>,
 ) -> Result<(), CliError> {
+    let clock_now = unix_now()?;
     let keypair = load_or_create_authority_keypair(args.signing_seed_file)?;
-    let created_at = unix_now();
+    let created_at = clock_now;
     if created_at > args.expires_at {
         return Err(CliError::attest_error(
             "--expires-at must be greater than or equal to the current Unix timestamp".to_string(),
@@ -1275,6 +1274,7 @@ pub fn cmd_evidence_import(
 }
 
 pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
+    let clock_now = unix_now()?;
     let package = load_verified_evidence_package(input)?;
     let manifest = package.manifest;
     let transparency = match package.transparency.as_ref() {
@@ -1293,7 +1293,7 @@ pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliErr
 
     let result = EvidenceVerificationResult {
         schema: manifest.schema,
-        verified_at: unix_now(),
+        verified_at: clock_now,
         tool_receipts: manifest.counts.tool_receipts,
         child_receipts: manifest.counts.child_receipts,
         checkpoints: manifest.counts.checkpoints,

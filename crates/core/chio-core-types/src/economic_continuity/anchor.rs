@@ -17,6 +17,7 @@ const DISPATCH_COMMIT_SIGNING_DOMAIN: &str = "CHIO-ECONOMIC-EFFECT-DISPATCH-COMM
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EconomicStateAnchorError {
+    UntrustedInput(crate::canonical::SharedUntrustedJsonError),
     Continuity(EconomicContinuityError),
     UnsupportedSchema { field: &'static str, value: String },
     PinMismatch(&'static str),
@@ -43,6 +44,7 @@ pub enum EconomicStateAnchorError {
 impl fmt::Display for EconomicStateAnchorError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::UntrustedInput(error) => write!(formatter, "{error}"),
             Self::Continuity(error) => write!(formatter, "{error}"),
             Self::UnsupportedSchema { field, value } => {
                 write!(
@@ -133,7 +135,14 @@ impl fmt::Display for EconomicStateAnchorError {
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for EconomicStateAnchorError {}
+impl std::error::Error for EconomicStateAnchorError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::UntrustedInput(error) => Some(error),
+            _ => None,
+        }
+    }
+}
 
 impl From<EconomicContinuityError> for EconomicStateAnchorError {
     fn from(error: EconomicContinuityError) -> Self {

@@ -47,8 +47,7 @@ where
     let continuation_artifact_digest = crate::hash::canonical_sha256(continuation)?;
     // Evaluation time is verifier-local, not an artifact. Bind all stored
     // evidence while allowing dispatch freshness to be checked at a later time.
-    let mut evidence =
-        serde_json::to_value(&bundle).map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    let mut evidence = serde_json::to_value(&bundle).map_err(ChioRuntimeError::Json)?;
     if let Some(object) = evidence.as_object_mut() {
         object.remove("nowUnixMs");
     }
@@ -82,7 +81,10 @@ where
                 bundle.revocation_epoch.valid_until_unix_ms,
             ])
             .min()
-            .ok_or_else(|| ChioRuntimeError::Json("missing swarm validity".into()))?,
+            .ok_or_else(|| ChioRuntimeError::Rejected {
+                code: "runtime_swarm_validity_missing",
+                detail: "missing swarm validity".into(),
+            })?,
         continuation_artifact_digest,
         evidence_digest,
         continuation_id_to_consume: match continuation.mode {

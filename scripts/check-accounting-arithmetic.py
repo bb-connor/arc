@@ -430,12 +430,11 @@ def ratchet_baseline(root: Path) -> int:
     ]
     script = Path(__file__).resolve()
     source = script.read_text(encoding="utf-8")
-    start_marker = "BASELINE: dict[str, BaselineEntry] = {\n"
+    start_marker = "BASELINE: dict[str, BaselineEntry] = {"
     start = source.index(start_marker) + len(start_marker)
-    end = source.index("\n}\n", start)
-    script.write_text(
-        source[:start] + "".join(rendered).rstrip("\n") + source[end:], encoding="utf-8"
-    )
+    end = source.index("}", start)
+    body = "\n" + "".join(rendered).rstrip("\n") + "\n" if rendered else ""
+    script.write_text(source[:start] + body + source[end:], encoding="utf-8")
     for line in dropped:
         print(f"dropped: {line}")
     for line in tightened:

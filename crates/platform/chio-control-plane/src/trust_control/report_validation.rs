@@ -166,7 +166,10 @@ fn cluster_peer_auth_is_rate_limited(node_id: &str, now: u64) -> bool {
 }
 
 fn record_cluster_peer_auth_failure(node_id: &str) {
-    let now = unix_timestamp_now();
+    let Ok(clock_now) = unix_timestamp_now() else {
+        return;
+    };
+    let now = clock_now;
     let Ok(mut failures) = CLUSTER_PEER_AUTH_FAILURES.lock() else {
         return;
     };
@@ -214,6 +217,8 @@ pub(crate) fn validate_cluster_peer_auth(
     config: &TrustServiceConfig,
     endpoint: &str,
 ) -> Result<ClusterPeerAuthContext, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     let node_id = headers
         .get(CLUSTER_NODE_ID_HEADER)
         .and_then(|value| value.to_str().ok())
@@ -250,7 +255,7 @@ pub(crate) fn validate_cluster_peer_auth(
             "cluster peer is not in the configured allowlist",
         ));
     }
-    let now = unix_timestamp_now() as i64;
+    let now = clock_now as i64;
     let expected =
         cluster_peer_auth_signature(&config.service_token, &node_id, endpoint, issued_at, term)
             .map_err(|error| {

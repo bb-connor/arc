@@ -334,8 +334,12 @@ impl PassportStatusRegistry {
             }))
     }
 
-    pub fn resolve(&self, passport_id: &str) -> PassportLifecycleResolution {
-        self.resolve_at(passport_id, unix_timestamp_now())
+    pub fn resolve(
+        &self,
+        passport_id: &str,
+    ) -> Result<PassportLifecycleResolution, crate::CliError> {
+        let clock_now = unix_timestamp_now()?;
+        Ok(self.resolve_at(passport_id, clock_now))
     }
 
     pub fn resolve_at(&self, passport_id: &str, at: u64) -> PassportLifecycleResolution {
@@ -369,8 +373,11 @@ impl PassportStatusRegistry {
                 "passport `{passport_id}` was not found in the lifecycle registry"
             )));
         };
+        let revoked_at = match revoked_at {
+            Some(at) => at,
+            None => unix_timestamp_now()?,
+        };
         entry.status = PassportLifecycleState::Revoked;
-        let revoked_at = revoked_at.unwrap_or_else(unix_timestamp_now);
         entry.revoked_at = Some(revoked_at);
         entry.updated_at = revoked_at;
         entry.revoked_reason = reason.map(str::to_string);
@@ -1423,11 +1430,9 @@ fn unix_from_rfc3339(value: &str) -> Result<u64, CliError> {
         .map_err(|_| CliError::cli_other_error(format!("invalid RFC3339 timestamp: {value}")))
 }
 
-fn unix_timestamp_now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 fn verify_passport_lifecycle_record(record: &PassportLifecycleRecord) -> Result<(), CliError> {
@@ -1586,7 +1591,8 @@ mod revocation_lag_tests {
         let mut before = String::new();
         chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG.render(&mut before);
 
-        let now = unix_timestamp_now();
+        let now =
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
         let revoked_at = now.saturating_sub(45);
         let _ = registry
             .revoke(&passport_id, Some("compromise"), Some(revoked_at))

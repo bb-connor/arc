@@ -15,6 +15,8 @@ use crate::policy;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
+    #[error(transparent)]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("record storage binding does not match {0}")]
     RecordBinding(&'static str),
 
@@ -184,6 +186,7 @@ impl CliError {
 
     pub fn report(&self) -> StructuredErrorReport {
         match self {
+            Self::Clock(error) => self.report_with_context(error.code(), serde_json::json!({}), "Restore trusted time before retrying."),
             Self::SignedJson(error) => self.report_with_context(
                 error.code(), serde_json::json!({}),
                 "Use an unambiguous JSON document matching the signed input contract.",

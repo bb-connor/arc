@@ -263,12 +263,15 @@ fn strict_intent_ingress(raw: &str) -> Result<SignedFindingStatusIntentSubmissio
             "status intent bytes are not the canonical serialization",
         ));
     }
-    let signed: SignedFindingStatusIntentSubmission = serde_json::from_str(raw).map_err(|_| {
-        plain_http_error(
-            StatusCode::BAD_REQUEST,
-            "status intent failed typed deserialization",
-        )
-    })?;
+    let signed: SignedFindingStatusIntentSubmission =
+        chio_core::canonical::UntrustedJsonText::from_wire((raw).as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "status intent failed typed deserialization",
+                )
+            })?;
     let typed = canonical_json_bytes(&signed).map_err(|_| {
         plain_http_error(
             StatusCode::BAD_REQUEST,
@@ -580,12 +583,15 @@ fn require_authorized_voluntary_source(
                 "voluntary retraction source is not authorized for the retained finding",
             )
         })?;
-    let finding: chio_finding::Finding = serde_json::from_str(&raw).map_err(|_| {
-        plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "retained finding cannot be authenticated for voluntary retraction",
-        )
-    })?;
+    let finding: chio_finding::Finding =
+        chio_core::canonical::UntrustedJsonText::from_wire(raw.as_bytes(), 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "retained finding cannot be authenticated for voluntary retraction",
+                )
+            })?;
     chio_finding::verify_finding(&finding).map_err(|_| {
         plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -633,7 +639,11 @@ pub(crate) async fn handle_get_finding_status_root(
     State(state): State<TrustServiceState>,
     AxumPath(feed_id): AxumPath<String>,
 ) -> Response {
-    let request_started_at = unix_timestamp_now();
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    let request_started_at = clock_now;
     let (_, store) = match status_context(&state, &feed_id, request_started_at) {
         Ok(context) => context,
         Err(response) => return response,
@@ -677,7 +687,11 @@ pub(crate) async fn handle_get_finding_status_proof(
     State(state): State<TrustServiceState>,
     AxumPath((feed_id, finding_id)): AxumPath<(String, String)>,
 ) -> Response {
-    let request_started_at = unix_timestamp_now();
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    let request_started_at = clock_now;
     let (_, store) = match status_context(&state, &feed_id, request_started_at) {
         Ok(context) => context,
         Err(response) => return response,
@@ -788,6 +802,10 @@ pub(crate) async fn handle_submit_finding_status_intent(
     headers: HeaderMap,
     raw: String,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -814,7 +832,7 @@ pub(crate) async fn handle_submit_finding_status_intent(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let config = match live_status_config(&state, &feed_id, now) {
         Ok(config) => config,
         Err(response) => return response,
@@ -1597,7 +1615,8 @@ mod tests {
     async fn root_and_proof_handlers_return_the_exact_verified_bytes(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (_temp, authority) = provision_authority()?;
-        let now = unix_timestamp_now();
+        let now =
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
         let market = live_market_config(now);
         market.validate()?;
         let store = authority.finding_status_store();
@@ -1843,7 +1862,8 @@ mod tests {
     async fn status_handlers_fail_closed_without_live_bond_or_authentication(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (_temp, authority) = provision_authority()?;
-        let now = unix_timestamp_now();
+        let now =
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
         let mut market = live_market_config(now);
         market.status_feed_service_bond.valid_until = now;
         let state = service_state(Arc::clone(&authority), market);
@@ -1870,7 +1890,8 @@ mod tests {
     async fn exact_status_intent_replay_recovers_after_deadline_but_new_stale_intent_rejects(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (_temp, authority) = provision_authority()?;
-        let now = unix_timestamp_now();
+        let now =
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
         let market = live_market_config(now);
         let seller = Keypair::from_seed(&[83; 32]);
         let issued_at = now.saturating_sub(

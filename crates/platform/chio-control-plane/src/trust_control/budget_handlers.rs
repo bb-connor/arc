@@ -149,17 +149,7 @@ pub(crate) async fn handle_try_increment_budget(
 /// `eventId` already carries NO idempotency guarantee (the store would otherwise
 /// auto-generate one internally), so minting it here changes no retry semantics.
 fn generated_budget_event_id() -> String {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_nanos())
-        .unwrap_or(0);
-    let sequence = COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!(
-        "cluster-budget-write-{}-{nanos}-{sequence}",
-        std::process::id()
-    )
+    format!("cluster-budget-write-{}", uuid::Uuid::new_v4())
 }
 
 /// Build the quorum-witness token for a budget write from its origin authority

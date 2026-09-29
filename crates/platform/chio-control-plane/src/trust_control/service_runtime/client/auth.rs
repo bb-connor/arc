@@ -9,12 +9,13 @@ impl TrustControlClient {
         endpoint: &str,
         term: Option<u64>,
     ) -> Result<ureq::Request, CliError> {
+        let clock_now = unix_timestamp_now()?;
         let Some(cluster_peer_auth) = self.cluster_peer_auth.as_ref() else {
             return Ok(client
                 .get(url)
                 .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
         };
-        let issued_at = unix_timestamp_now() as i64;
+        let issued_at = clock_now as i64;
         let signature = cluster_peer_auth_signature(
             &self.token,
             cluster_peer_auth.node_id.as_ref(),
@@ -40,12 +41,13 @@ impl TrustControlClient {
         endpoint: &str,
         term: Option<u64>,
     ) -> Result<ureq::Request, CliError> {
+        let clock_now = unix_timestamp_now()?;
         let Some(cluster_peer_auth) = self.cluster_peer_auth.as_ref() else {
             return Ok(client
                 .post(url)
                 .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
         };
-        let issued_at = unix_timestamp_now() as i64;
+        let issued_at = clock_now as i64;
         let signature = cluster_peer_auth_signature(
             &self.token,
             cluster_peer_auth.node_id.as_ref(),

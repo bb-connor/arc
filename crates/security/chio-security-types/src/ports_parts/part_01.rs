@@ -90,16 +90,26 @@ pub enum PortErrorKind {
     IntegrityFailure,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct PortError {
     kind: PortErrorKind,
     code: ErrorCode,
+    source: Option<alloc::sync::Arc<dyn core::error::Error + Send + Sync>>,
 }
 
 impl PortError {
     #[must_use]
     pub const fn new(kind: PortErrorKind, code: ErrorCode) -> Self {
-        Self { kind, code }
+        Self { kind, code, source: None }
+    }
+
+    /// Preserve a private cause while exposing only the registered rule.
+    pub fn with_source(
+        kind: PortErrorKind,
+        code: &'static str,
+        source: impl core::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        Self { kind, code: ErrorCode(code.to_string()), source: Some(alloc::sync::Arc::new(source)) }
     }
 
     #[must_use]
@@ -160,7 +170,22 @@ impl fmt::Display for PortError {
     }
 }
 
-impl core::error::Error for PortError {}
+impl core::error::Error for PortError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        self.source.as_deref().map(|source| source as &dyn core::error::Error)
+    }
+}
+
+impl fmt::Debug for PortError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PortError").field("kind", &self.kind).field("code", &self.code).finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for PortError {
+    fn eq(&self, other: &Self) -> bool { self.kind == other.kind && self.code == other.code }
+}
+impl Eq for PortError {}
 
 pub type PortResult<T> = Result<T, PortError>;
 

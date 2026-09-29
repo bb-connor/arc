@@ -144,10 +144,7 @@ impl FindingChallengeCoordinator {
                 .ok_or_else(|| {
                     ChallengeCoordinatorError::UnknownPurchaseRecord(purchase_key.clone())
                 })?;
-            let signed: SignedFindingPurchaseRecord = serde_json::from_slice(&row.record_json)
-                .map_err(|error| {
-                    ChallengeCoordinatorError::ArtifactValidation(error.to_string())
-                })?;
+            let signed: SignedFindingPurchaseRecord = chio_core::canonical::UntrustedJsonText::from_wire(&row.record_json, 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(ChallengeCoordinatorError::from)?;
             self.verify_purchase_record_from_retained_admission(identity, &signed, now)?;
             let record: &FindingPurchaseRecord = &signed.body;
             if record.finding_id != identity.finding_id
@@ -248,10 +245,7 @@ impl FindingChallengeCoordinator {
                 .ok_or_else(|| {
                     ChallengeCoordinatorError::UnknownPurchaseRecord(purchase_key.clone())
                 })?;
-            let signed: SignedFindingPurchaseRecord = serde_json::from_slice(&row.record_json)
-                .map_err(|error| {
-                    ChallengeCoordinatorError::ArtifactValidation(error.to_string())
-                })?;
+            let signed: SignedFindingPurchaseRecord = chio_core::canonical::UntrustedJsonText::from_wire(&row.record_json, 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(ChallengeCoordinatorError::from)?;
             self.verify_purchase_record_from_retained_admission(identity, &signed, now)?;
         }
         Ok(())

@@ -13,6 +13,8 @@ use alloc::string::String;
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 #[derive(Debug)]
 pub enum Error {
+    #[cfg_attr(feature = "std", error(transparent))]
+    UntrustedInput(crate::canonical::SharedUntrustedJsonError),
     #[cfg_attr(feature = "std", error("invalid public key: {0}"))]
     InvalidPublicKey(String),
 
@@ -91,6 +93,7 @@ impl From<serde_json::Error> for Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Error::UntrustedInput(error) => core::fmt::Display::fmt(error, f),
             Error::InvalidPublicKey(m) => write!(f, "invalid public key: {m}"),
             Error::InvalidHex(m) => write!(f, "invalid hex: {m}"),
             Error::InvalidSignature(m) => write!(f, "invalid signature: {m}"),
@@ -131,6 +134,7 @@ impl core::fmt::Display for Error {
 impl core::error::Error for Error {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
+            Error::UntrustedInput(error) => Some(error),
             Error::Json(err) => Some(err),
             _ => None,
         }

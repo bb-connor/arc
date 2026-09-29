@@ -135,6 +135,10 @@ pub(crate) async fn handle_create_passport_issuance_offer(
     headers: HeaderMap,
     Json(payload): Json<CreatePassportIssuanceOfferRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -155,7 +159,7 @@ pub(crate) async fn handle_create_passport_issuance_offer(
         if let Err(error) = portable_passport_status_reference_for_service(
             &state.config,
             &payload.passport,
-            unix_timestamp_now(),
+            clock_now,
         ) {
             return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
         }
@@ -165,7 +169,7 @@ pub(crate) async fn handle_create_passport_issuance_offer(
         payload.passport,
         payload.credential_configuration_id.as_deref(),
         payload.ttl_seconds,
-        unix_timestamp_now(),
+        clock_now,
     ) {
         Ok(record) => record,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -180,6 +184,10 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
     State(state): State<TrustServiceState>,
     Json(payload): Json<Oid4vciTokenRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let (path, mut registry) = match load_passport_issuance_registry_for_admin(&state.config) {
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -188,11 +196,10 @@ pub(crate) async fn handle_redeem_passport_issuance_token(
         Ok(metadata) => metadata,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let response =
-        match registry.redeem_pre_authorized_code(&metadata, &payload, unix_timestamp_now(), 300) {
-            Ok(response) => response,
-            Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-        };
+    let response = match registry.redeem_pre_authorized_code(&metadata, &payload, clock_now, 300) {
+        Ok(response) => response,
+        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    };
     if let Err(error) = registry.save(&path) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
@@ -204,6 +211,10 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
     headers: HeaderMap,
     Json(payload): Json<Oid4vciCredentialRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let access_token = match bearer_token_from_headers(&headers) {
         Ok(token) => token,
         Err(response) => return response,
@@ -236,7 +247,7 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
         &metadata,
         &access_token,
         &payload,
-        unix_timestamp_now(),
+        clock_now,
         portable_signing_keypair.as_ref(),
         portable_status_registry.as_ref(),
     ) {
@@ -296,6 +307,10 @@ pub(crate) async fn handle_publish_passport_status(
     headers: HeaderMap,
     Json(mut request): Json<PublishPassportStatusRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -306,11 +321,7 @@ pub(crate) async fn handle_publish_passport_status(
     if request.distribution.resolve_urls.is_empty() {
         request.distribution = default_passport_status_distribution(&state.config);
     }
-    let record = match registry.publish(
-        &request.passport,
-        unix_timestamp_now(),
-        request.distribution,
-    ) {
+    let record = match registry.publish(&request.passport, clock_now, request.distribution) {
         Ok(record) => record,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
@@ -325,6 +336,10 @@ pub(crate) async fn handle_resolve_passport_status(
     AxumPath(passport_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -332,7 +347,7 @@ pub(crate) async fn handle_resolve_passport_status(
         Ok((_, registry)) => registry,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let mut resolution = registry.resolve_at(&passport_id, unix_timestamp_now());
+    let mut resolution = registry.resolve_at(&passport_id, clock_now);
     resolution.source = Some("registry:trust-control".to_string());
     match resolution.validate() {
         Ok(()) => Json(resolution).into_response(),
@@ -344,11 +359,15 @@ pub(crate) async fn handle_public_resolve_passport_status(
     State(state): State<TrustServiceState>,
     AxumPath(passport_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let registry = match load_passport_status_registry_for_admin(&state.config) {
         Ok((_, registry)) => registry,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let mut resolution = registry.resolve_at(&passport_id, unix_timestamp_now());
+    let mut resolution = registry.resolve_at(&passport_id, clock_now);
     resolution.source = Some("registry:trust-control".to_string());
     match resolution.validate() {
         Ok(()) => Json(resolution).into_response(),
@@ -472,6 +491,10 @@ pub(crate) async fn handle_create_passport_challenge(
     headers: HeaderMap,
     Json(payload): Json<CreatePassportChallengeRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -490,7 +513,7 @@ pub(crate) async fn handle_create_passport_challenge(
             "challenge creation accepts either policy_id or policy, not both",
         );
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let (policy_ref, policy) = if let Some(policy_id) = payload.policy_id.as_deref() {
         let Some(registry) = state.verifier_policy_registry() else {
             return plain_http_error(
@@ -559,10 +582,12 @@ fn verify_passport_challenge_payload(
     expected_challenge: Option<&PassportPresentationChallenge>,
     consume: bool,
 ) -> Result<PassportPresentationVerification, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     if let Err(error) = configured_verifier_challenge_db_path(&state.config) {
         return Err(plain_http_error(StatusCode::CONFLICT, &error.to_string()));
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let challenge = expected_challenge.unwrap_or(&payload.presentation.challenge);
     let (resolved_policy, policy_source) = match resolve_verifier_policy_for_challenge(
         state.verifier_policy_registry(),
@@ -661,6 +686,10 @@ pub(crate) async fn handle_public_get_passport_challenge(
     State(state): State<TrustServiceState>,
     AxumPath(challenge_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let challenge_db_path = match configured_verifier_challenge_db_path(&state.config) {
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -669,7 +698,7 @@ pub(crate) async fn handle_public_get_passport_challenge(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    match store.fetch_active(&challenge_id, unix_timestamp_now()) {
+    match store.fetch_active(&challenge_id, clock_now) {
         Ok(challenge) => Json(challenge).into_response(),
         Err(error) if error.to_string().contains("not registered") => {
             plain_http_error(StatusCode::NOT_FOUND, &error.to_string())
@@ -682,6 +711,10 @@ pub(crate) async fn handle_public_verify_passport_challenge(
     State(state): State<TrustServiceState>,
     Json(payload): Json<VerifyPassportChallengeRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     match forward_post_to_leader(&state, PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
@@ -711,7 +744,7 @@ pub(crate) async fn handle_public_verify_passport_challenge(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let stored_challenge = match store.fetch_active(&challenge_id, unix_timestamp_now()) {
+    let stored_challenge = match store.fetch_active(&challenge_id, clock_now) {
         Ok(challenge) => challenge,
         Err(error) if error.to_string().contains("not registered") => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
@@ -739,6 +772,10 @@ pub(crate) async fn handle_create_oid4vp_request(
     headers: HeaderMap,
     Json(payload): Json<CreateOid4vpRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -751,7 +788,7 @@ pub(crate) async fn handle_create_oid4vp_request(
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let request = match build_oid4vp_request_for_service(&state.config, &payload, now) {
         Ok(request) => request,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -807,6 +844,10 @@ pub(crate) async fn handle_public_get_wallet_exchange(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let request_db_path = match configured_verifier_challenge_db_path(&state.config) {
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -815,7 +856,7 @@ pub(crate) async fn handle_public_get_wallet_exchange(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let snapshot = match store.snapshot(&request_id, unix_timestamp_now()) {
+    let snapshot = match store.snapshot(&request_id, clock_now) {
         Ok(snapshot) => snapshot,
         Err(error) if error.to_string().contains("not registered") => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
@@ -850,6 +891,10 @@ pub(crate) async fn handle_public_get_oid4vp_request(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let request_db_path = match configured_verifier_challenge_db_path(&state.config) {
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -858,7 +903,7 @@ pub(crate) async fn handle_public_get_oid4vp_request(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let (request, request_jwt) = match store.fetch_active(&request_id, unix_timestamp_now()) {
+    let (request, request_jwt) = match store.fetch_active(&request_id, clock_now) {
         Ok(values) => values,
         Err(error) if error.to_string().contains("not registered") => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
@@ -872,7 +917,7 @@ pub(crate) async fn handle_public_get_oid4vp_request(
     if let Err(error) = verify_signed_oid4vp_request_object_with_any_key(
         &request_jwt,
         &trusted_public_keys,
-        unix_timestamp_now(),
+        clock_now,
     ) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
@@ -894,6 +939,10 @@ pub(crate) async fn handle_public_launch_oid4vp_request(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let request_db_path = match configured_verifier_challenge_db_path(&state.config) {
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -902,7 +951,7 @@ pub(crate) async fn handle_public_launch_oid4vp_request(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let (request, _) = match store.fetch_active(&request_id, unix_timestamp_now()) {
+    let (request, _) = match store.fetch_active(&request_id, clock_now) {
         Ok(values) => values,
         Err(error) if error.to_string().contains("not registered") => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
@@ -916,6 +965,10 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
     State(state): State<TrustServiceState>,
     Form(payload): Form<Oid4vpDirectPostForm>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let unverified_response = match inspect_oid4vp_direct_post_response(&payload.response) {
         Ok(response) => response,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -935,7 +988,7 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let now = unix_timestamp_now();
+    let now = clock_now;
     let (request, request_jwt) = match store.fetch_active(&request_id, now) {
         Ok(values) => values,
         Err(error) if error.to_string().contains("not registered") => {
@@ -994,6 +1047,10 @@ pub(crate) async fn handle_federated_issue(
     headers: HeaderMap,
     Json(payload): Json<FederatedIssueRequest>,
 ) -> Response {
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -1010,7 +1067,7 @@ pub(crate) async fn handle_federated_issue(
             );
         }
     }
-    let now = unix_timestamp_now();
+    let now = clock_now;
     if let Some(policy) = payload.delegation_policy.as_ref() {
         if let Err(error) = verify_federated_delegation_policy(policy)
             .and_then(|_| ensure_federated_delegation_policy_active(policy, now))

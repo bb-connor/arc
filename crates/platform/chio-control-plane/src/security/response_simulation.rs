@@ -26,9 +26,18 @@ impl ResponseSimulationSnapshotSource for SqliteResponseSimulationSource {
         let mut scopes = Vec::new();
         for effect in plan.effects.as_slice() {
             if effect.kind == ResponseEffectKind::FreezeIssuance {
-                let spec: IssuanceFreezeSpec =
-                    serde_json::from_slice(effect.canonical_contribution.as_bytes())
-                        .map_err(|_| PortError::invalid_data())?;
+                let spec: IssuanceFreezeSpec = chio_core::canonical::UntrustedJsonText::from_wire(
+                    effect.canonical_contribution.as_bytes(),
+                    64 * 1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| {
+                    PortError::with_source(
+                        chio_security_types::ports::PortErrorKind::InvalidData,
+                        error.code(),
+                        error,
+                    )
+                })?;
                 // This read is separately versioned; never acquire or renew a
                 // live fence while modelling issuance.
                 let result = self.scope.resolve(&spec.acquisition.request)?;

@@ -383,3 +383,9 @@ pub struct BudgetListResponse {
     pub count: usize,
     pub usages: Vec<BudgetUsageView>,
 }
+
+impl From<chio_security_types::clock::ClockError> for TrustHttpError {
+    fn from(error: chio_security_types::clock::ClockError) -> Self {
+        Self::new(StatusCode::SERVICE_UNAVAILABLE, error.code())
+    }
+}

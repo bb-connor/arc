@@ -345,24 +345,6 @@ fn validate_attenuation_escalation_fails() {
 }
 
 #[test]
-fn attenuation_witness_roundtrip_and_forgery_rejection() {
-    let parent = make_scope(vec![make_grant(
-        "srv",
-        "tool",
-        vec![Operation::Invoke, Operation::ReadResult],
-    )]);
-    let child = make_scope(vec![make_grant("srv", "tool", vec![Operation::Invoke])]);
-
-    let witness = compute_attenuation_witness(&parent, &child).unwrap();
-    let parent_hash = scope_hash(&parent).unwrap();
-    let child_hash = scope_hash(&child).unwrap();
-
-    verify_attenuation_witness(&parent_hash, &child_hash, &witness).unwrap();
-    let forged = "00".repeat(32);
-    assert!(verify_attenuation_witness(&forged, &child_hash, &witness).is_err());
-}
-
-#[test]
 fn attenuated_capability_schema_and_budget_fail_closed() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
@@ -3161,3 +3143,5 @@ fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_chi
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
+
+mod authority_readers;

@@ -83,6 +83,7 @@ pub(crate) fn inspect_local_reputation_with_read_context(
     trusted_kernel_keys: &[String],
     read_context: &ReceiptReadContext,
 ) -> Result<LocalReputationInspection, KernelError> {
+    let clock_now = unix_now()?;
     let corpus = build_local_reputation_corpus_with_read_context(
         subject_key,
         receipt_db_path,
@@ -93,7 +94,7 @@ pub(crate) fn inspect_local_reputation_with_read_context(
     )?;
     let (scoring_source, scoring, probationary_receipt_count, probationary_min_days, ceiling) =
         scoring_context(issuance_policy, trusted_kernel_keys);
-    let now = unix_now();
+    let now = clock_now;
     let scorecard = compute_local_scorecard(subject_key, now, &corpus, &scoring);
     let probationary_status = ProbationaryStatus {
         below_receipt_target: scorecard.history_depth.receipt_count

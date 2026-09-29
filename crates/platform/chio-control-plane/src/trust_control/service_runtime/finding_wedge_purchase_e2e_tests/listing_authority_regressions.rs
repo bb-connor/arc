@@ -26,7 +26,7 @@ fn coordinator_with_listing(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_reserve_requires_live_listing_authority() -> TestResult {
     let fixture = open_reserve_fixture().await?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let listing = market_config().listing;
     let revoked = coordinator_with_listing(
         &fixture.authority,
@@ -128,7 +128,7 @@ async fn wedge_purchase_listing_pin_must_be_independent() -> TestResult {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_exact_replay_ignores_later_listing_retirement() -> TestResult {
     let fixture = open_reserve_fixture().await?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let first = fixture.reserve_with(&fixture.deployment.web.admission, now)?;
     let listing = market_config().listing;
 

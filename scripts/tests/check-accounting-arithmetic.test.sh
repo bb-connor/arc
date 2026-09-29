@@ -243,3 +243,19 @@ assert_rc "$(run_checker "$expired_checker" "$expired" "$work/expired.out" "$wor
 grep -F "baseline entry expired on 2000-01-01" "$work/expired.err" >/dev/null
 
 echo "check-accounting-arithmetic.test.sh: all assertions passed"
+
+# Ratcheting an empty baseline must remain valid and idempotent.
+cp "$REPO_ROOT/scripts/check-accounting-arithmetic.py" "$work/empty-baseline.py"
+python3 - "$work/empty-baseline.py" <<'PYEMPTY'
+from pathlib import Path
+import re, sys
+p = Path(sys.argv[1])
+s = p.read_text()
+s = re.sub(r"BASELINE: dict\[str, BaselineEntry\] = \{.*?\}", "BASELINE: dict[str, BaselineEntry] = {}", s, count=1, flags=re.S)
+p.write_text(s)
+PYEMPTY
+python3 "$work/empty-baseline.py" --root "$checked" --ratchet > "$work/empty-first.out"
+cp "$work/empty-baseline.py" "$work/empty-once.py"
+python3 "$work/empty-baseline.py" --root "$checked" --ratchet > "$work/empty-second.out"
+cmp "$work/empty-once.py" "$work/empty-baseline.py"
+echo 'ok: empty arithmetic baseline ratchet is idempotent'

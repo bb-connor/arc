@@ -75,7 +75,7 @@ fn activation_requires_profile_pinned_settlement_authorities() -> TestResult {
 #[test]
 fn venue_lifecycle_rejects_an_expired_deployment_pin() -> TestResult {
     let stack = provision_stack(LONG_EPOCH_SECS, ADMISSION_EXPIRES_AT)?;
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let mut config = market_config();
     config.venue.valid_until = now;
     let status = signed_venue_authority_status(now, None)?;
@@ -167,7 +167,8 @@ async fn participation_rejects_revoked_status_operator_before_fee_intent() -> Te
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
 
     tokio::time::sleep(std::time::Duration::from_millis(1_200)).await;
-    let revoked_at = unix_timestamp_now();
+    let revoked_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let renewal = participation_request(&stack.web.schedule, Some(revoked_at))?;
     let (status, body) = send(
         &stack.state,
@@ -200,7 +201,9 @@ async fn admission_views_recheck_current_status_operator_standing() -> TestResul
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
     assert!(stack.admission_marker().await?.is_some());
 
-    resolver.revoke(unix_timestamp_now());
+    resolver.revoke(
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    );
     assert!(stack.admission_marker().await?.is_none());
     let (status, _) = send(
         &stack.state,
@@ -221,7 +224,9 @@ async fn admission_views_recheck_current_venue_standing() -> TestResult {
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
     assert!(stack.admission_marker().await?.is_some());
 
-    resolver.revoke(unix_timestamp_now());
+    resolver.revoke(
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    );
     assert!(stack.admission_marker().await?.is_none());
     let (status, _) = send(
         &stack.state,
@@ -244,7 +249,9 @@ async fn admission_views_recheck_current_listing_authority_standing() -> TestRes
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
     assert!(stack.admission_marker().await?.is_some());
 
-    resolver.revoke(unix_timestamp_now());
+    resolver.revoke(
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    );
     assert!(stack.admission_marker().await?.is_none());
     let (status, _) = send(
         &stack.state,
@@ -274,7 +281,9 @@ async fn admission_views_recheck_bound_seller_authorization_standing() -> TestRe
     );
     assert!(stack.admission_marker().await?.is_some());
 
-    resolver.revoke(unix_timestamp_now());
+    resolver.revoke(
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    );
     assert!(stack.admission_marker().await?.is_none());
     let (status, _) = send(
         &stack.state,
@@ -321,7 +330,9 @@ async fn activation_requires_current_terminal_authority_standing_before_fees() -
     let resolver = Arc::new(TestStatusOperatorAuthorityResolver::default());
     stack.state.finding_authority_status_resolver = Some(resolver.clone());
     stack.seed_market().await?;
-    resolver.revoke(unix_timestamp_now());
+    resolver.revoke(
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    );
 
     let (status, response) = stack.activate().await?;
     assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -345,7 +356,8 @@ async fn activation_and_admission_views_require_a_live_status_service_bond() -> 
         .as_mut()
         .ok_or_else(|| missing("finding market config"))?
         .status_feed_service_bond
-        .valid_until = unix_timestamp_now();
+        .valid_until =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let (status, response) = activation.activate().await?;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(String::from_utf8_lossy(&response).contains("service bond is not live"));
@@ -372,7 +384,8 @@ async fn activation_and_admission_views_require_a_live_status_service_bond() -> 
         .as_mut()
         .ok_or_else(|| missing("finding market config"))?
         .status_feed_service_bond
-        .valid_until = unix_timestamp_now();
+        .valid_until =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     assert!(discovery.admission_marker().await?.is_none());
     Ok(())
 }
@@ -397,7 +410,8 @@ async fn participation_renewal_requires_a_live_status_service_bond_before_fees()
         .as_mut()
         .ok_or_else(|| missing("finding market config"))?
         .status_feed_service_bond
-        .valid_until = unix_timestamp_now();
+        .valid_until =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let renewal = participation_request(&stack.web.schedule, None)?;
     let (status, response) = send(
         &stack.state,
@@ -444,7 +458,10 @@ async fn participation_renewal_rejects_a_sales_block_before_fee_intent() -> Test
         .as_ref()
         .ok_or_else(|| missing("finding market authority"))?
         .finding_purchase_store()
-        .block_new_slots(LISTING_ID, unix_timestamp_now())?;
+        .block_new_slots(
+            LISTING_ID,
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+        )?;
     assert!(
         stack.admission_marker().await?.is_none(),
         "a sales-blocked listing must be hidden from discovery"
@@ -513,7 +530,9 @@ async fn participation_renewal_rechecks_admission_authorities_before_fees() -> T
         );
 
         tokio::time::sleep(std::time::Duration::from_millis(1_200)).await;
-        resolver.revoke(unix_timestamp_now());
+        resolver.revoke(
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+        );
         let renewal = participation_request(&stack.web.schedule, None)?;
         let (status, response) = send(
             &stack.state,

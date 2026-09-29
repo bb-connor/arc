@@ -1204,8 +1204,10 @@ fn load_attempt_row(connection: &Connection, attempt_id: &str) -> Result<Option<
     let Some(row) = row else {
         return Ok(None);
     };
-    let quotas: Vec<ExecutionQuota> = serde_json::from_slice(&row.15)
-        .map_err(|error| BrokerError::Invariant(format!("stored quota set is invalid: {error}")))?;
+    let quotas: Vec<ExecutionQuota> =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(&row.15, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(BrokerError::from)?;
     let record = AttemptRecord {
         registration: AttemptRegistration {
             ids: AttemptIds {

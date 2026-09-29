@@ -79,6 +79,7 @@ pub(crate) fn build_credit_loss_lifecycle_report_from_store(
     receipt_store: &SqliteReceiptStore,
     query: &CreditLossLifecycleQuery,
 ) -> Result<CreditLossLifecycleReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     query.validate().map_err(TrustHttpError::bad_request)?;
 
     let bond_row = receipt_store
@@ -396,7 +397,7 @@ pub(crate) fn build_credit_loss_lifecycle_report_from_store(
 
     Ok(CreditLossLifecycleReport {
         schema: CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         query: query.clone(),
         summary: chio_kernel::CreditLossLifecycleSummary {
             bond_id: bond.body.bond_id.clone(),
@@ -440,9 +441,10 @@ pub(crate) fn issue_signed_credit_loss_lifecycle_detailed(
     authority_db_path: Option<&Path>,
     request: &CreditLossLifecycleIssueRequest,
 ) -> Result<SignedCreditLossLifecycle, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let mut report = build_credit_loss_lifecycle_report_from_store(&receipt_store, &request.query)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let (
         reserve_control_source_id,
         authority_chain,

@@ -1,17 +1,14 @@
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::CliError;
 
 use super::types::SignedCertificationCheck;
 use super::verify::verify_signed_certification_check;
 
-pub(crate) fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+pub(crate) fn unix_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 pub(crate) fn normalize_registry_url(url: &str) -> String {

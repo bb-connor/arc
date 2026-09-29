@@ -193,7 +193,7 @@ fn test_trusted_runtime_assurance_policy() -> RuntimeAssuranceIssuancePolicy {
 }
 
 fn test_azure_runtime_attestation() -> RuntimeAttestationEvidence {
-    let now = unix_now();
+    let now = unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
         verifier: "https://maa.contoso.test/".to_string(),
@@ -212,7 +212,7 @@ fn test_azure_runtime_attestation() -> RuntimeAttestationEvidence {
 }
 
 fn test_google_runtime_attestation() -> RuntimeAttestationEvidence {
-    let now = unix_now();
+    let now = unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.google-confidential-vm.jwt.v1".to_string(),
         verifier: "https://confidentialcomputing.googleapis.com".to_string(),
@@ -617,7 +617,7 @@ fn strong_local_history_allows_trusted_invoke_scope() {
     let kernel_kp = Keypair::generate();
     let subject_hex = subject_kp.public_key().to_hex();
     let issuer_hex = issuer_kp.public_key().to_hex();
-    let now = unix_now();
+    let now = unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let subject_capability = make_subject_capability(
         "cap-history-001",
         &subject_kp,
@@ -777,7 +777,7 @@ fn issuance_verification_returns_canonical_subject_and_provenance() {
     let verified = verify_runtime_attestation_for_issuance(
         Some(&test_azure_runtime_attestation()),
         Some(&policy),
-        unix_now(),
+        unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )
     .test_expect("trusted attestation should verify")
     .test_expect("verified record should be returned when runtime policy is present");
@@ -801,9 +801,13 @@ fn issuance_verification_returns_canonical_subject_and_provenance() {
 #[test]
 fn issuance_verification_returns_verified_record_without_runtime_policy() {
     let evidence = test_azure_runtime_attestation();
-    let verified = verify_runtime_attestation_for_issuance(Some(&evidence), None, unix_now())
-        .test_expect("attestation should pass local binding validation")
-        .test_expect("verified record should still be returned without runtime policy");
+    let verified = verify_runtime_attestation_for_issuance(
+        Some(&evidence),
+        None,
+        unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    )
+    .test_expect("attestation should pass local binding validation")
+    .test_expect("verified record should still be returned without runtime policy");
 
     assert!(!verified.policy_outcome.trust_policy_configured);
     assert!(!verified.is_locally_accepted());
@@ -833,7 +837,7 @@ fn workload_identity_validation_denies_conflicting_attestation_without_policy() 
         None,
     );
     let subject_kp = Keypair::generate();
-    let now = unix_now();
+    let now = unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let requested_scope = ChioScope {
         grants: vec![ToolGrant {
             server_id: "payments".to_string(),

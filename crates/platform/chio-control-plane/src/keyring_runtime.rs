@@ -1373,7 +1373,9 @@ fn load_authority_seed_handoff(
     path: &Path,
 ) -> Result<(AuthoritySeedHandoff, Keypair, PrivateFileIdentity), CliError> {
     let (bytes, identity) = read_private_file(path, 1_024)?;
-    let handoff: AuthoritySeedHandoff = serde_json::from_slice(&bytes)?;
+    let handoff: AuthoritySeedHandoff =
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())?;
     let keypair = Keypair::from_seed_hex(&handoff.seed_hex)?;
     handoff.validate_keypair(&keypair)?;
     Ok((handoff, keypair, identity))

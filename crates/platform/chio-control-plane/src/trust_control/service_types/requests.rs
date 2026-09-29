@@ -336,7 +336,11 @@ pub(crate) fn ensure_requested_capability_within_parent_snapshot(
     parent_snapshot: &CapabilitySnapshot,
     now: u64,
 ) -> Result<(), CliError> {
-    let parent_scope: ChioScope = serde_json::from_str(&parent_snapshot.grants_json)?;
+    let parent_scope: ChioScope = chio_core::canonical::UntrustedJsonText::from_wire(
+        parent_snapshot.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed())?;
     if !capability.scope.is_subset_of(&parent_scope) {
         return Err(CliError::cli_other_error(
             "requested capability scope exceeds the imported upstream capability scope".to_string(),

@@ -1063,6 +1063,7 @@ pub(crate) fn build_underwriting_simulation_report_from_store(
     read_context: chio_kernel::ReceiptReadContext,
     trusted_kernel_keys: &[String],
 ) -> Result<UnderwritingSimulationReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let input = build_underwriting_policy_input(
         receipt_store,
         receipt_db_path,
@@ -1083,7 +1084,7 @@ pub(crate) fn build_underwriting_simulation_report_from_store(
 
     Ok(UnderwritingSimulationReport {
         schema: UNDERWRITING_SIMULATION_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         input,
         delta: build_underwriting_simulation_delta(&default_evaluation, &simulated_evaluation),
         default_evaluation,
@@ -1125,6 +1126,7 @@ pub(crate) fn issue_signed_underwriting_decision_detailed(
     read_context: chio_kernel::ReceiptReadContext,
     fiscal_runtime: Option<&TrustFiscalRuntime>,
 ) -> Result<SignedUnderwritingDecision, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     // Load the signing keypair first so its public key anchors the reputation
     // scoring trust set (chio-reputation::receipt_integrity_valid fails closed
@@ -1142,7 +1144,7 @@ pub(crate) fn issue_signed_underwriting_decision_detailed(
         &trusted_kernel_keys,
     )?;
     let quoted_exposure = build_underwriting_quoted_exposure(&receipt_store, query, read_context)?;
-    let issued_at = unix_timestamp_now();
+    let issued_at = clock_now;
     let mut artifact = if let Some(runtime) = fiscal_runtime {
         runtime
             .with_resolver(|resolver| {

@@ -345,14 +345,13 @@ pub(crate) fn load_verifier_policy_registry(
     path: Option<&std::path::Path>,
     surface: &str,
 ) -> Result<Option<Arc<VerifierPolicyRegistry>>, CliError> {
+    let clock_now = unix_timestamp_now()?;
     let Some(path) = path else {
         return Ok(None);
     };
     let registry = VerifierPolicyRegistry::load(path)?;
     for document in registry.policies.values() {
-        if let Err(error) =
-            ensure_signed_passport_verifier_policy_active(document, unix_timestamp_now())
-        {
+        if let Err(error) = ensure_signed_passport_verifier_policy_active(document, clock_now) {
             warn!(
                 surface,
                 policy_id = %document.body.policy_id,
@@ -483,6 +482,7 @@ fn configured_certification_discovery_path(config: &TrustServiceConfig) -> Resul
 pub(crate) fn configured_public_certification_metadata(
     config: &TrustServiceConfig,
 ) -> Result<CertificationPublicMetadata, CliError> {
+    let clock_now = unix_timestamp_now()?;
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
             "public certification metadata requires --advertise-url on the trust-control service"
@@ -495,7 +495,7 @@ pub(crate) fn configured_public_certification_metadata(
             "public certification metadata requires a non-empty advertise_url".to_string(),
         ));
     }
-    let generated_at = unix_timestamp_now();
+    let generated_at = clock_now;
     Ok(CertificationPublicMetadata {
         schema: "chio.certify.discovery-metadata.v1".to_string(),
         generated_at,
@@ -940,11 +940,9 @@ pub(crate) fn build_oid4vp_verifier_jwks(
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
-pub(crate) fn now_unix_secs() -> Result<u64, CliError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| CliError::cli_other_error(format!("system clock error: {error}")))
-        .map(|duration| duration.as_secs())
+pub(crate) fn now_unix_secs() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 fn public_discovery_version(config: &TrustServiceConfig) -> Result<u64, CliError> {
@@ -1220,12 +1218,8 @@ pub(crate) fn resolve_portable_issuer_public_keys(
             "failed to fetch portable issuer JWKS from `{jwks_url}`: {transport}"
         )),
     })?;
-    let jwks: chio_credentials::PortableJwkSet = serde_json::from_reader(response.into_reader())
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to decode portable issuer JWKS from `{jwks_url}`: {error}"
-            ))
-        })?;
+    let jwks: chio_credentials::PortableJwkSet =
+        crate::json_input::read(response.into_reader(), 4 * 1024 * 1024)?;
     jwks.keys.first().ok_or_else(|| {
         CliError::cli_other_error(format!(
             "portable issuer JWKS at `{jwks_url}` did not publish any keys"
@@ -1253,9 +1247,10 @@ pub(crate) fn resolve_oid4vp_passport_lifecycle(
     passport_id: &str,
     status_ref: Option<&chio_credentials::Oid4vciChioPassportStatusReference>,
 ) -> Result<Option<PassportLifecycleResolution>, CliError> {
+    let clock_now = unix_timestamp_now()?;
     if let Some(path) = config.passport_statuses_file.as_deref() {
         let registry = PassportStatusRegistry::load(path)?;
-        return Ok(Some(registry.resolve_at(passport_id, unix_timestamp_now())));
+        return Ok(Some(registry.resolve_at(passport_id, clock_now)));
     }
     let Some(status_ref) = status_ref else {
         return Ok(None);
@@ -1286,12 +1281,8 @@ pub(crate) fn resolve_oid4vp_passport_lifecycle(
             "failed to resolve portable passport lifecycle from `{url}`: {transport}"
         )),
     })?;
-    let lifecycle: PassportLifecycleResolution = serde_json::from_reader(response.into_reader())
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to decode portable passport lifecycle from `{url}`: {error}"
-            ))
-        })?;
+    let lifecycle: PassportLifecycleResolution =
+        crate::json_input::read(response.into_reader(), 4 * 1024 * 1024)?;
     lifecycle
         .validate()
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;

@@ -311,8 +311,7 @@ impl FindingChallengeCoordinator {
             return Err(ChallengeCoordinatorError::OutcomeBinding);
         }
         let outcome: SignedFindingChallengeOutcome =
-            serde_json::from_slice(&retained.outcome_envelope_json)
-                .map_err(|error| ChallengeCoordinatorError::OutcomeEnvelope(error.to_string()))?;
+            chio_core::canonical::UntrustedJsonText::from_wire(&retained.outcome_envelope_json, 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(ChallengeCoordinatorError::from)?;
         let canonical =
             canonical_json_bytes(&outcome).map_err(|_| ChallengeCoordinatorError::Canonical)?;
         if canonical != retained.outcome_envelope_json

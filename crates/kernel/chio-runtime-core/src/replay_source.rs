@@ -192,8 +192,12 @@ impl RuntimeReplaySourceSeal {
 
     pub(crate) fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ChioRuntimeError> {
         check_size(bytes.len())?;
-        let persisted: PersistedSeal = serde_json::from_slice(bytes)
-            .map_err(|_| invalid("runtime replay source seal encoding is invalid"))?;
+        let persisted: PersistedSeal = chio_core_types::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            MAX_RUNTIME_REPLAY_SOURCE_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(ChioRuntimeError::from)?;
         let seal = Self::from_body(persisted.body)?;
         if seal.inventory_sha256 != persisted.inventory_sha256 || seal.canonical_bytes()? != bytes {
             return Err(invalid(

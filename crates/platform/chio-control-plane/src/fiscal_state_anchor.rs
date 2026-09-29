@@ -243,7 +243,9 @@ impl RemoteFiscalStateAnchor {
         if response.is_empty() || response.len() > FISCAL_STATE_TRANSPORT_LIMIT {
             return Err(FiscalStateAnchorError::Divergence);
         }
-        serde_json::from_slice(&response).map_err(|_| FiscalStateAnchorError::Divergence)
+        chio_core::canonical::UntrustedJsonText::from_wire(&response, FISCAL_STATE_TRANSPORT_LIMIT)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| FiscalStateAnchorError::UntrustedInput(error.into()))
     }
 
     fn verify_response(

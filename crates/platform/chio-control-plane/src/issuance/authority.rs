@@ -126,8 +126,9 @@ impl PolicyBackedCapabilityAuthority {
         runtime_attestation: Option<RuntimeAttestationEvidence>,
         aggregate_family_limit: Option<u32>,
     ) -> Result<CapabilityToken, KernelError> {
+        let clock_now = unix_now()?;
         let mut scope = scope;
-        let now = unix_now();
+        let now = clock_now;
         let verified_runtime_attestation = verify_runtime_attestation_for_issuance(
             runtime_attestation.as_ref(),
             self.runtime_assurance_policy.as_ref(),

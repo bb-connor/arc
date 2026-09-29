@@ -372,7 +372,8 @@ fn fiscal_operation_error(error: TrustFiscalOperationError) -> Response {
     let status = match &error {
         TrustFiscalOperationError::InvalidArtifact(_) => StatusCode::UNPROCESSABLE_ENTITY,
         TrustFiscalOperationError::Store(FiscalStoreError::Conflict) => StatusCode::CONFLICT,
-        TrustFiscalOperationError::Startup(_)
+        TrustFiscalOperationError::Clock(_)
+        | TrustFiscalOperationError::Startup(_)
         | TrustFiscalOperationError::Store(_)
         | TrustFiscalOperationError::Commit(_) => StatusCode::SERVICE_UNAVAILABLE,
     };

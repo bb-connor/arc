@@ -56,7 +56,10 @@ pub(crate) async fn handle_runtime_attestation_appraisal_import(
     }
 
     Json::<RuntimeAttestationAppraisalImportReport>(
-        build_runtime_attestation_appraisal_import_report(&request, unix_timestamp_now()),
+        build_runtime_attestation_appraisal_import_report(
+            &request,
+            unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+        ),
     )
     .into_response()
 }

@@ -114,7 +114,8 @@ pub(crate) async fn handle_public_search_certifications(
         Ok(metadata) => metadata,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(registry.search_public(&metadata.publisher, metadata.expires_at, &query)).into_response()
+    certification_result(registry.search_public(&metadata.publisher, metadata.expires_at, &query))
+        .into_response()
 }
 
 pub(crate) async fn handle_public_certification_transparency(
@@ -129,7 +130,7 @@ pub(crate) async fn handle_public_certification_transparency(
         Ok(metadata) => metadata,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(registry.transparency(&metadata.publisher, &query)).into_response()
+    certification_result(registry.transparency(&metadata.publisher, &query)).into_response()
 }
 
 pub(crate) async fn handle_public_generic_namespace(
@@ -338,7 +339,7 @@ pub(crate) async fn handle_discover_certification(
     };
     let response =
         crate::certify::network::discover_certifications_across_network(&network, &tool_server_id);
-    Json(response).into_response()
+    certification_result(response).into_response()
 }
 
 pub(crate) async fn handle_search_certification_marketplace(
@@ -353,8 +354,10 @@ pub(crate) async fn handle_search_certification_marketplace(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(crate::certify::network::search_public_certifications_across_network(&network, &query))
-        .into_response()
+    certification_result(
+        crate::certify::network::search_public_certifications_across_network(&network, &query),
+    )
+    .into_response()
 }
 
 pub(crate) async fn handle_transparency_certification_marketplace(
@@ -369,7 +372,7 @@ pub(crate) async fn handle_transparency_certification_marketplace(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(
+    certification_result(
         crate::certify::network::transparency_public_certifications_across_network(
             &network, &query,
         ),
@@ -389,8 +392,10 @@ pub(crate) async fn handle_consume_certification_marketplace(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    Json(crate::certify::network::consume_public_certification_across_network(&network, &request))
-        .into_response()
+    certification_result(
+        crate::certify::network::consume_public_certification_across_network(&network, &request),
+    )
+    .into_response()
 }
 
 pub(crate) async fn handle_revoke_certification(
@@ -443,4 +448,11 @@ pub(crate) async fn handle_dispute_certification(
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
     Json(entry).into_response()
+}
+
+fn certification_result<T: serde::Serialize>(result: Result<T, CliError>) -> Response {
+    match result {
+        Ok(value) => Json(value).into_response(),
+        Err(error) => plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+    }
 }

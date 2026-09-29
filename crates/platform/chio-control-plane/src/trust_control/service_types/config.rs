@@ -48,12 +48,10 @@ impl TrustFiscalRuntimeConfig {
                 policy_path.display()
             ))
         })?;
-        let genesis_policy = serde_json::from_slice(&bytes).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to parse fiscal genesis policy {}: {error}",
-                policy_path.display()
-            ))
-        })?;
+        let genesis_policy =
+            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(CliError::from)?;
         Ok(Self {
             genesis_policy,
             anchor_url,

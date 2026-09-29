@@ -27,7 +27,8 @@ use super::verify::{certification_artifact_id, verify_signed_certification_check
 pub fn discover_certifications_across_network(
     network: &CertificationDiscoveryNetwork,
     tool_server_id: &str,
-) -> CertificationDiscoveryResponse {
+) -> Result<CertificationDiscoveryResponse, crate::CliError> {
+    let clock_now = unix_now()?;
     let mut peers = Vec::new();
     let mut reachable_count = 0;
     let mut active_count = 0;
@@ -40,7 +41,7 @@ pub fn discover_certifications_across_network(
             Ok(metadata) => match validate_public_certification_metadata(
                 &metadata,
                 Some(&operator.registry_url),
-                unix_now(),
+                clock_now,
             ) {
                 Ok(()) => {
                     reachable_count += 1;
@@ -102,7 +103,7 @@ pub fn discover_certifications_across_network(
         }
     }
 
-    CertificationDiscoveryResponse {
+    Ok(CertificationDiscoveryResponse {
         tool_server_id: tool_server_id.to_string(),
         peer_count: peers.len(),
         reachable_count,
@@ -111,7 +112,7 @@ pub fn discover_certifications_across_network(
         superseded_count,
         not_found_count,
         peers,
-    }
+    })
 }
 
 fn selected_network_operators<'a>(
@@ -146,7 +147,8 @@ fn parse_operator_ids_csv(operator_ids: Option<&str>) -> Vec<String> {
 pub fn search_public_certifications_across_network(
     network: &CertificationDiscoveryNetwork,
     query: &CertificationMarketplaceSearchQuery,
-) -> CertificationPublicSearchResponse {
+) -> Result<CertificationPublicSearchResponse, crate::CliError> {
+    let clock_now = unix_now()?;
     let mut results = Vec::new();
     let mut errors = Vec::new();
     let mut reachable_count = 0;
@@ -154,9 +156,9 @@ pub fn search_public_certifications_across_network(
     let operators = match selected_network_operators(network, &operator_ids) {
         Ok(operators) => operators,
         Err(error) => {
-            return CertificationPublicSearchResponse {
+            return Ok(CertificationPublicSearchResponse {
                 schema: CERTIFICATION_PUBLIC_SEARCH_SCHEMA.to_string(),
-                generated_at: unix_now(),
+                generated_at: clock_now,
                 peer_count: 0,
                 reachable_count: 0,
                 count: 0,
@@ -167,7 +169,7 @@ pub fn search_public_certifications_across_network(
                     registry_url: String::new(),
                     error: error.to_string(),
                 }],
-            };
+            });
         }
     };
     let peer_count = operators.len();
@@ -176,7 +178,7 @@ pub fn search_public_certifications_across_network(
             Ok(metadata) => match validate_public_certification_metadata(
                 &metadata,
                 Some(&operator.registry_url),
-                unix_now(),
+                clock_now,
             ) {
                 Ok(()) => match crate::trust_control::service_runtime::public_registry::search_public_certifications(
                     &operator.registry_url,
@@ -219,21 +221,22 @@ pub fn search_public_certifications_across_network(
             .then(right.entry.published_at.cmp(&left.entry.published_at))
             .then(left.entry.artifact_id.cmp(&right.entry.artifact_id))
     });
-    CertificationPublicSearchResponse {
+    Ok(CertificationPublicSearchResponse {
         schema: CERTIFICATION_PUBLIC_SEARCH_SCHEMA.to_string(),
-        generated_at: unix_now(),
+        generated_at: clock_now,
         peer_count,
         reachable_count,
         count: results.len(),
         results,
         errors,
-    }
+    })
 }
 
 pub fn transparency_public_certifications_across_network(
     network: &CertificationDiscoveryNetwork,
     query: &CertificationMarketplaceTransparencyQuery,
-) -> CertificationTransparencyResponse {
+) -> Result<CertificationTransparencyResponse, crate::CliError> {
+    let clock_now = unix_now()?;
     let mut events = Vec::new();
     let mut errors = Vec::new();
     let mut reachable_count = 0;
@@ -241,9 +244,9 @@ pub fn transparency_public_certifications_across_network(
     let operators = match selected_network_operators(network, &operator_ids) {
         Ok(operators) => operators,
         Err(error) => {
-            return CertificationTransparencyResponse {
+            return Ok(CertificationTransparencyResponse {
                 schema: CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA.to_string(),
-                generated_at: unix_now(),
+                generated_at: clock_now,
                 peer_count: 0,
                 reachable_count: 0,
                 count: 0,
@@ -254,7 +257,7 @@ pub fn transparency_public_certifications_across_network(
                     registry_url: String::new(),
                     error: error.to_string(),
                 }],
-            };
+            });
         }
     };
     let peer_count = operators.len();
@@ -263,7 +266,7 @@ pub fn transparency_public_certifications_across_network(
             Ok(metadata) => match validate_public_certification_metadata(
                 &metadata,
                 Some(&operator.registry_url),
-                unix_now(),
+                clock_now,
             ) {
                 Ok(()) => match crate::trust_control::service_runtime::public_registry::resolve_public_certification_transparency(
                     &operator.registry_url,
@@ -308,27 +311,28 @@ pub fn transparency_public_certifications_across_network(
             )
             .then(left.artifact_id.cmp(&right.artifact_id))
     });
-    CertificationTransparencyResponse {
+    Ok(CertificationTransparencyResponse {
         schema: CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA.to_string(),
-        generated_at: unix_now(),
+        generated_at: clock_now,
         peer_count,
         reachable_count,
         count: events.len(),
         events,
         errors,
-    }
+    })
 }
 
 pub fn consume_public_certification_across_network(
     network: &CertificationDiscoveryNetwork,
     request: &CertificationConsumptionRequest,
-) -> CertificationConsumptionResponse {
+) -> Result<CertificationConsumptionResponse, crate::CliError> {
+    let clock_now = unix_now()?;
     let mut decisions = Vec::new();
     let mut admitted_artifact_ids = Vec::new();
     let operators = match selected_network_operators(network, &request.operator_ids) {
         Ok(operators) => operators,
         Err(error) => {
-            return CertificationConsumptionResponse {
+            return Ok(CertificationConsumptionResponse {
                 policy_profile: CERTIFICATION_CONSUMPTION_POLICY_PROFILE_V1.to_string(),
                 tool_server_id: request.tool_server_id.clone(),
                 admitted_count: 0,
@@ -343,7 +347,7 @@ pub fn consume_public_certification_across_network(
                     reasons: vec![error.to_string()],
                     resolution: None,
                 }],
-            };
+            });
         }
     };
     for operator in operators {
@@ -360,7 +364,7 @@ pub fn consume_public_certification_across_network(
             Ok(metadata) => match validate_public_certification_metadata(
                 &metadata,
                 Some(&operator.registry_url),
-                unix_now(),
+                clock_now,
             ) {
                 Ok(()) => {
                     decision.metadata_valid = true;
@@ -450,14 +454,14 @@ pub fn consume_public_certification_across_network(
         .filter(|decision| decision.accepted)
         .count();
     let rejected_count = decisions.len().saturating_sub(admitted_count);
-    CertificationConsumptionResponse {
+    Ok(CertificationConsumptionResponse {
         policy_profile: CERTIFICATION_CONSUMPTION_POLICY_PROFILE_V1.to_string(),
         tool_server_id: request.tool_server_id.clone(),
         admitted_count,
         rejected_count,
         admitted_artifact_ids,
         decisions,
-    }
+    })
 }
 
 pub fn publish_certification_across_network(
@@ -543,7 +547,7 @@ pub fn cmd_certify_registry_discover(
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
-        discover_certifications_across_network(&network, tool_server_id)
+        discover_certifications_across_network(&network, tool_server_id)?
     };
 
     if json_output {

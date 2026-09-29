@@ -15,6 +15,10 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         .as_ref()
         .map(|view| view.self_url.clone())
         .or_else(|| cluster_self_url(&state));
+    let federation = match trust_federation_health_snapshot(&state) {
+        Ok(snapshot) => snapshot,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+    };
     Json(json!({
         "ok": true,
         "leaderUrl": leader_url.clone(),
@@ -22,7 +26,7 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         "clustered": state.cluster.is_some(),
         "authority": trust_authority_health_snapshot(&state),
         "stores": trust_store_health_snapshot(&state.config),
-        "federation": trust_federation_health_snapshot(&state),
+        "federation": federation,
         "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
     }))
     .into_response()
@@ -121,7 +125,8 @@ fn verifier_policy_health_counts(
     }
 }
 
-fn trust_federation_health_snapshot(state: &TrustServiceState) -> Value {
+fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, crate::CliError> {
+    let clock_now = unix_timestamp_now()?;
     let loaded_enterprise_provider_summary = state
         .enterprise_provider_registry()
         .map(enterprise_provider_health_counts)
@@ -169,15 +174,14 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Value {
 
     let loaded_verifier_policy_summary = state
         .verifier_policy_registry()
-        .map(|registry| verifier_policy_health_counts(registry, unix_timestamp_now()))
+        .map(|registry| verifier_policy_health_counts(registry, clock_now))
         .unwrap_or_default();
 
     let verifier_policy_summary = if let Some(path) = state.config.verifier_policies_file.as_deref()
     {
         match VerifierPolicyRegistry::load(path) {
             Ok(registry) => {
-                let configured_counts =
-                    verifier_policy_health_counts(&registry, unix_timestamp_now());
+                let configured_counts = verifier_policy_health_counts(&registry, clock_now);
                 json!({
                     "configured": true,
                     "available": true,
@@ -395,8 +399,7 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Value {
                 "publishEnabledCount": 0,
             })
         };
-
-    json!({
+    Ok(json!({
         "enterpriseProviders": enterprise_provider_summary,
         "openAdmissionPolicies": federation_policy_summary,
         "scimLifecycle": scim_lifecycle_summary,
@@ -405,7 +408,7 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Value {
         "certificationDiscovery": certification_discovery_summary,
         "issuancePolicyConfigured": state.config.issuance_policy.is_some(),
         "runtimeAssurancePolicyConfigured": state.config.runtime_assurance_policy.is_some(),
-    })
+    }))
 }
 
 fn trust_cluster_health_snapshot(

@@ -9,6 +9,7 @@ pub(crate) fn build_underwriting_policy_input(
     read_context: chio_kernel::ReceiptReadContext,
     trusted_kernel_keys: &[String],
 ) -> Result<UnderwritingPolicyInput, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized_query = query.normalized();
     if let Err(message) = normalized_query.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -34,7 +35,7 @@ pub(crate) fn build_underwriting_policy_input(
     let (settlements, governed_actions, metered_billing, selection) = receipt_store
         .query_behavioral_feed_receipts(&behavioral_query)
         .map_err(|error| TrustHttpError::internal(error.to_string()))?;
-    let generated_at = unix_timestamp_now();
+    let generated_at = clock_now;
     let reputation = match normalized_query.agent_subject.as_deref() {
         Some(subject_key) => Some(
             reputation::build_behavioral_feed_reputation_summary(
@@ -877,7 +878,12 @@ pub(crate) fn build_budget_utilization_report(
 }
 
 fn resolve_budget_grant(snapshot: &CapabilitySnapshot, grant_index: u32) -> ResolvedBudgetGrant {
-    let scope = match serde_json::from_str::<ChioScope>(&snapshot.grants_json) {
+    let scope = match chio_core::canonical::UntrustedJsonText::from_wire(
+        snapshot.grants_json.as_bytes(),
+        64 * 1024 * 1024,
+    )
+    .and_then(|input| input.decode_signed::<ChioScope>())
+    {
         Ok(scope) => scope,
         Err(error) => {
             return ResolvedBudgetGrant {
@@ -928,11 +934,9 @@ fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
     }
 }
 
-pub(crate) fn unix_timestamp_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+pub(crate) fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 pub(crate) fn open_receipt_store(

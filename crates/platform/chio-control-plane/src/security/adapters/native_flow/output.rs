@@ -8,8 +8,12 @@ impl NativeFlowResolver {
         context: &chio_kernel::tool_outcome::DurableSecurityReleaseContext<'_>,
     ) -> Result<InformationLabel, NativeFlowError> {
         let request: chio_kernel::ToolCallRequest =
-            serde_json::from_str(context.request_canonical_json())
-                .map_err(|_| NativeFlowError::PolicyEvidence)?;
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                (context.request_canonical_json()).as_bytes(),
+                64 * 1024 * 1024,
+            )
+            .and_then(|input| input.decode_signed())
+            .map_err(NativeFlowError::from)?;
         self.classified_output_label(&request, context.security_context(), context.output())
     }
 

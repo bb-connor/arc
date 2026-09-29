@@ -361,7 +361,7 @@ pub(crate) fn build_public_generic_listing_report(
             &metadata.publisher,
             metadata.expires_at,
             &crate::certify::CertificationPublicSearchQuery::default(),
-        );
+        )?;
         for result in public.results {
             listings.push(build_signed_generic_listing_from_certification_entry(
                 &result.entry,

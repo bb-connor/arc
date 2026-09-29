@@ -19,7 +19,7 @@ async fn wedge_purchase_finalization_uses_the_durable_verdict_and_capture() -> T
     let purchase_store = lane.authority.finding_purchase_store();
     let allocation_id = lane.deployment.web.allocation_id.clone();
     let reservation_id = lane.purchase.handshake.reservation_id.clone();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     purchase_store.register_community_fund_destination(
         &allocation_id,
         COMMUNITY_FUND_DESTINATION,

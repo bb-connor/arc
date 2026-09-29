@@ -278,12 +278,9 @@ impl EnterpriseProviderRegistry {
                 path.display()
             ))
         })?;
-        let registry = serde_json::from_slice::<Self>(&bytes).map_err(|error| {
-            CliError::cli_json_error(format!(
-                "failed to parse enterprise provider registry {}: {error}",
-                path.display()
-            ))
-        })?;
+        let registry = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed::<Self>())
+            .map_err(CliError::from)?;
         registry.with_revalidated_records()
     }
 
@@ -361,12 +358,9 @@ impl CertificationDiscoveryNetwork {
                 path.display()
             ))
         })?;
-        let network = serde_json::from_slice::<Self>(&bytes).map_err(|error| {
-            CliError::cli_json_error(format!(
-                "failed to parse certification discovery network {}: {error}",
-                path.display()
-            ))
-        })?;
+        let network = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed::<Self>())
+            .map_err(CliError::from)?;
         network.with_revalidated_records()
     }
 

@@ -51,9 +51,18 @@ impl NativeSecurityReceiptSink {
     }
 
     fn validate_request(request: &ReceiptAppendRequest) -> PortResult<ActiveDefenseReceiptBody> {
-        let body: ActiveDefenseReceiptBody =
-            serde_json::from_slice(request.canonical_body.as_bytes())
-                .map_err(|_| PortError::invalid_data())?;
+        let body: ActiveDefenseReceiptBody = chio_core::canonical::UntrustedJsonText::from_wire(
+            request.canonical_body.as_bytes(),
+            64 * 1024 * 1024,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| {
+            PortError::with_source(
+                chio_security_types::ports::PortErrorKind::InvalidData,
+                error.code(),
+                error,
+            )
+        })?;
         let canonical = canonical_json_bytes(&body).map_err(|_| PortError::invalid_data())?;
         if canonical.as_slice() != request.canonical_body.as_bytes()
             || body.header().tenant_id != request.tenant_id
@@ -834,7 +843,15 @@ impl SqliteSiemOutbox {
             return Ok(None);
         };
         let alert: SecurityAlert =
-            serde_json::from_slice(&command_json).map_err(|_| PortError::integrity_failure())?;
+            chio_core::canonical::UntrustedJsonText::from_wire(&command_json, 64 * 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(|error| {
+                    PortError::with_source(
+                        chio_security_types::ports::PortErrorKind::IntegrityFailure,
+                        error.code(),
+                        error,
+                    )
+                })?;
         let canonical = canonical_json_bytes(&alert).map_err(|_| PortError::integrity_failure())?;
         let actual_hash = chio_core::sha256(&canonical);
         if canonical != command_json
@@ -917,7 +934,15 @@ impl SqliteSiemOutbox {
             let command_hash: Vec<u8> = row.get(1).map_err(|_| PortError::invalid_data())?;
             let attempts: i64 = row.get(2).map_err(|_| PortError::invalid_data())?;
             let alert: SecurityAlert =
-                serde_json::from_slice(&command_json).map_err(|_| PortError::invalid_data())?;
+                chio_core::canonical::UntrustedJsonText::from_wire(&command_json, 64 * 1024 * 1024)
+                    .and_then(|input| input.decode_signed())
+                    .map_err(|error| {
+                        PortError::with_source(
+                            chio_security_types::ports::PortErrorKind::InvalidData,
+                            error.code(),
+                            error,
+                        )
+                    })?;
             let canonical = canonical_json_bytes(&alert).map_err(|_| PortError::invalid_data())?;
             let actual_hash = chio_core::sha256(&canonical);
             if canonical != command_json || actual_hash.as_bytes().as_slice() != command_hash {

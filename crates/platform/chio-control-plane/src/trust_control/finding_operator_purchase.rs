@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
@@ -317,7 +316,7 @@ impl FindingOperatorPurchaseExecutor {
                 return Ok(now);
             }
         }
-        unix_timestamp_now()
+        unix_timestamp_now().map_err(FindingPurchaseExecutionError::from)
     }
 
     fn credential(
@@ -1693,11 +1692,9 @@ fn validate_credential_text(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn unix_timestamp_now() -> Result<u64, FindingPurchaseExecutionError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(execution_internal)
+fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 fn execution_internal(error: impl std::fmt::Display) -> FindingPurchaseExecutionError {

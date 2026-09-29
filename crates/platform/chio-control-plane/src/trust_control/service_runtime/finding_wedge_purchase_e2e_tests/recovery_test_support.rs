@@ -56,7 +56,7 @@ fn assert_superseded_reservation_replays(lane: &Lane, web: &MarketWeb) -> TestRe
         &web.authorization,
         EXPOSURE_UNITS,
         RESERVATION_TTL_SECS,
-        unix_timestamp_now(),
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     assert_eq!(
         VerifiedReservationReceipt::from_signed(&replayed, &keypair(16).public_key())?.receipt_id(),

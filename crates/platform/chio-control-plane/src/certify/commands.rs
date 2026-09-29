@@ -259,7 +259,7 @@ pub fn cmd_certify_registry_search(
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
-        network::search_public_certifications_across_network(&network, &query)
+        network::search_public_certifications_across_network(&network, &query)?
     };
     if json_output {
         println!("{}", serde_json::to_string_pretty(&response)?);
@@ -307,7 +307,7 @@ pub fn cmd_certify_registry_transparency(
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
-        network::transparency_public_certifications_across_network(&network, &query)
+        network::transparency_public_certifications_across_network(&network, &query)?
     };
     if json_output {
         println!("{}", serde_json::to_string_pretty(&response)?);
@@ -351,7 +351,7 @@ pub fn cmd_certify_registry_consume(
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
-        network::consume_public_certification_across_network(&network, &request)
+        network::consume_public_certification_across_network(&network, &request)?
     };
     if json_output {
         println!("{}", serde_json::to_string_pretty(&response)?);

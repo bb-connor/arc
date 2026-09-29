@@ -115,7 +115,8 @@ pub(crate) fn cluster_replication_heads(
 pub(crate) fn build_cluster_state_snapshot(
     state: &TrustServiceState,
 ) -> Result<ClusterStateSnapshotResponse, CliError> {
-    let generated_at = unix_timestamp_now();
+    let clock_now = unix_timestamp_now()?;
+    let generated_at = clock_now;
     let consensus = cluster_consensus_view(state);
     let authority_lease = cluster_authority_lease_view(state);
     let authority = if let Some(path) = state.config.authority_db_path.as_deref() {
@@ -547,6 +548,7 @@ fn seed_cluster_authority_from_snapshot(
     snapshot_election_term: u64,
     authority_lease: Option<&ClusterAuthorityLeaseView>,
 ) -> Result<(), CliError> {
+    let clock_now = unix_timestamp_now()?;
     let Some(cluster) = state.cluster.as_ref() else {
         return Ok(());
     };
@@ -576,7 +578,7 @@ fn seed_cluster_authority_from_snapshot(
                 .as_deref()
                 .is_some_and(|leader| leader != guard.self_url);
         if conflicting_same_term_self_leader {
-            let now = unix_timestamp_now();
+            let now = clock_now;
             guard.election_term = guard.election_term.saturating_add(1);
             guard.last_leader_url = Some(guard.self_url.clone());
             guard.term_started_at = Some(now);

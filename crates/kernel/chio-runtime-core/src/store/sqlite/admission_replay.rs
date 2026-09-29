@@ -11,8 +11,7 @@ use crate::ChioRuntimeError;
 impl SqliteRuntimeOrchestrationStore {
     pub fn insert_bundle(&self, bundle: RuntimeAdmissionBundle) -> Result<(), ChioRuntimeError> {
         let bundle_sha256 = runtime_admission_bundle_sha256(&bundle)?;
-        let raw_json = serde_json::to_string(&bundle)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        let raw_json = serde_json::to_string(&bundle).map_err(ChioRuntimeError::Json)?;
         let mut connection = self.lock_connection()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -58,20 +57,32 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         admission_id: &str,
     ) -> Result<Option<RuntimeAdmissionBundle>, ChioRuntimeError> {
         let connection = self.lock_connection()?;
-        let raw_json: Option<String> = connection
+        let row: Option<(String, String)> = connection
             .query_row(
-                "SELECT raw_json FROM runtime_admission_bundles WHERE admission_id = ?1",
+                "SELECT bundle_sha256, raw_json FROM runtime_admission_bundles WHERE admission_id = ?1",
                 params![admission_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()
             .map_err(sqlite_error)?;
-        raw_json
-            .map(|json| {
-                serde_json::from_str(&json)
-                    .map_err(|error| ChioRuntimeError::Json(error.to_string()))
-            })
-            .transpose()
+        row.map(|(stored_hash, json)| {
+            let bundle: RuntimeAdmissionBundle =
+                chio_core_types::canonical::UntrustedJsonText::from_wire(
+                    json.as_bytes(),
+                    64 * 1024 * 1024,
+                )?
+                .decode_signed()?;
+            if bundle.admission_id != admission_id
+                || runtime_admission_bundle_sha256(&bundle)? != stored_hash
+            {
+                return Err(ChioRuntimeError::Rejected {
+                    code: "runtime_stored_bundle_binding_mismatch",
+                    detail: "stored bundle does not match its index and digest".to_owned(),
+                });
+            }
+            Ok(bundle)
+        })
+        .transpose()
     }
 
     fn treaty_runtime_artifact(

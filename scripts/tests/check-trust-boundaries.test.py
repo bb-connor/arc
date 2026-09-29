@@ -40,6 +40,20 @@ class BoundaryGateCalibration(unittest.TestCase):
     def test_current_sources_match(self):
         self.assertEqual(self.errors(), [])
 
+    def test_reviewed_authority_owner_cannot_be_unregistered(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        path = next(iter(catalog["reviewed_authority_owners"]))
+        catalog["signed_input_files"].remove(path)
+        with patch.object(self, "catalog", catalog):
+            self.assertTrue(any("reviewed authority owner is unregistered" in error for error in self.errors()))
+
+    def test_reviewed_authority_owner_cannot_return_to_baseline(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        path = next(path for path in catalog["reviewed_authority_owners"] if path in catalog["decoder_file_contracts"])
+        catalog["decoder_file_contracts"][path]["kind"] = "raw-input-baseline"
+        with patch.object(self, "catalog", catalog):
+            self.assertTrue(any("reviewed authority owner regressed to baseline" in error for error in self.errors()))
+
     def test_reviewed_kernel_sqlite_owner_cannot_be_unregistered(self):
         catalog = json.loads(json.dumps(self.catalog))
         path = next(iter(catalog["reviewed_kernel_sqlite_owners"]))
@@ -60,7 +74,8 @@ class BoundaryGateCalibration(unittest.TestCase):
         self.assertTrue(any("unscoped tenant SQL" in error for error in errors), errors)
 
     def test_raw_signed_decoder_is_rejected(self):
-        path = self.catalog["signed_input_files"][0]
+        path = "crates/kernel/chio-runtime-core/src/serde_io.rs"
+        self.assertIn(path, self.catalog["signed_input_files"])
         errors = self.errors(path, lambda text: text + '\nfn bypass(s: &str) { serde_json::from_str(s) }')
         self.assertTrue(any("raw_decoders" in error for error in errors), errors)
 
@@ -69,7 +84,8 @@ class BoundaryGateCalibration(unittest.TestCase):
         self.assertTrue(any("decoder census changed" in error for error in errors), errors)
 
     def test_imported_decoder_cannot_bypass_registered_owner(self):
-        path = self.catalog["signed_input_files"][0]
+        path = "crates/kernel/chio-runtime-core/src/serde_io.rs"
+        self.assertIn(path, self.catalog["signed_input_files"])
         for declaration, call in [
             ("use serde_json::from_str;", "from_str(s)"),
             ("use serde_json::{from_str as parse};", "parse::<Value>(s)"),
@@ -87,7 +103,8 @@ class BoundaryGateCalibration(unittest.TestCase):
         self.assertTrue(any("decoder census changed" in error for error in errors), errors)
 
     def test_documented_decoders_are_not_production_calls(self):
-        path = self.catalog["signed_input_files"][0]
+        path = "crates/kernel/chio-runtime-core/src/serde_io.rs"
+        self.assertIn(path, self.catalog["signed_input_files"])
         errors = self.errors(path, lambda text: text + '\n/// fn example() { serde_json::from_slice(bytes); }\nfn text_only() { let s = "serde_json::from_str(bytes)"; }')
         self.assertEqual(errors, [])
 
@@ -100,6 +117,11 @@ class BoundaryGateCalibration(unittest.TestCase):
         catalog["tables"][next(iter(catalog["tables"]))].pop("runtime_family")
         with patch.object(self, "catalog", catalog):
             self.assertTrue(any("runtime matrix is incomplete" in error for error in self.errors()))
+
+    def test_borrowed_dispatch_proof_fields_are_sealed(self):
+        path = "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs"
+        errors = self.errors(path, lambda source: source.replace("    prepared_at: u64,", "    pub prepared_at: u64,", 1))
+        self.assertTrue(any("proof fields are not sealed: PreparedNativeFlowDispatch" in error for error in errors), errors)
 
     def test_public_proof_field_is_rejected(self):
         proof = self.catalog["proofs"][0]

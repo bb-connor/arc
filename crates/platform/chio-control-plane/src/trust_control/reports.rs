@@ -20,6 +20,8 @@ pub(crate) fn build_operator_report(
     budget_store: &SqliteBudgetStore,
     query: &OperatorReportQuery,
 ) -> Result<OperatorReport, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     let activity = receipt_store
         .query_receipt_analytics(&query.to_receipt_analytics_query())
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
@@ -44,7 +46,7 @@ pub(crate) fn build_operator_report(
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
 
     Ok(OperatorReport {
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: query.clone(),
         activity,
         cost_attribution,
@@ -142,9 +144,11 @@ fn build_runtime_attestation_appraisal_report(
     runtime_assurance_policy: Option<&crate::policy::RuntimeAssuranceIssuancePolicy>,
     evidence: &RuntimeAttestationEvidence,
 ) -> Result<RuntimeAttestationAppraisalReport, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     let appraisal = derive_runtime_attestation_appraisal(evidence)
         .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))?;
-    let generated_at = unix_timestamp_now();
+    let generated_at = clock_now;
     let trust_policy =
         runtime_assurance_policy.and_then(|policy| policy.attestation_trust_policy.as_ref());
     let policy_outcome = match trust_policy {
@@ -206,6 +210,8 @@ fn build_behavioral_feed_report(
     query: &BehavioralFeedQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<BehavioralFeedReport, Response> {
+    let clock_now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     let normalized_query = query.normalized();
     let operator_query = normalized_query.to_operator_report_query();
     let activity = receipt_store
@@ -220,7 +226,7 @@ fn build_behavioral_feed_report(
     let (settlements, governed_actions, metered_billing, selection) = receipt_store
         .query_behavioral_feed_receipts(&normalized_query)
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
-    let generated_at = unix_timestamp_now();
+    let generated_at = clock_now;
     let reputation = match normalized_query.agent_subject.as_deref() {
         Some(subject_key) => Some(
             reputation::build_behavioral_feed_reputation_summary(
@@ -323,6 +329,7 @@ pub(crate) fn build_exposure_ledger_report_with_context(
     query: &ExposureLedgerQuery,
     read_context: chio_kernel::ReceiptReadContext,
 ) -> Result<ExposureLedgerReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized_query = query.normalized();
     if let Err(message) = normalized_query.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -445,7 +452,7 @@ pub(crate) fn build_exposure_ledger_report_with_context(
     let currencies = positions_by_currency.keys().cloned().collect::<Vec<_>>();
     Ok(ExposureLedgerReport {
         schema: EXPOSURE_LEDGER_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         filters: normalized_query,
         support_boundary: ExposureLedgerSupportBoundary::default(),
         summary: ExposureLedgerSummary {
@@ -590,7 +597,8 @@ fn build_capital_allocation_decision_artifact_from_store(
     request: &CapitalAllocationDecisionRequest,
     trusted_kernel_keys: &[String],
 ) -> Result<CapitalAllocationDecisionArtifact, TrustHttpError> {
-    let issued_at = unix_timestamp_now();
+    let clock_now = unix_timestamp_now()?;
+    let issued_at = clock_now;
     let normalized_query = request.query.normalized();
     normalized_query
         .validate()

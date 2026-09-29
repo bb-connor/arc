@@ -4924,6 +4924,7 @@ dependencies = [
  "chio-federation",
  "chio-kernel",
  "chio-runtime-proof-parity",
+ "chio-security-types",
  "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-swarm-authority",

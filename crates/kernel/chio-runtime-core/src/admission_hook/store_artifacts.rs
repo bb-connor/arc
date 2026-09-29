@@ -30,8 +30,7 @@ where
         );
     }
     let artifact_sha256 = record.artifact_sha256;
-    let artifact: T = serde_json::from_value(record.raw_json)
-        .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    let artifact: T = serde_json::from_value(record.raw_json).map_err(ChioRuntimeError::Json)?;
     Ok((artifact, artifact_sha256))
 }
 
@@ -52,8 +51,8 @@ where
             "cross-boundary request referenced treaty evidence that is not in the verifier-owned store",
         );
     };
-    let invocation: BilateralInvocation = serde_json::from_value(record.raw_json)
-        .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    let invocation: BilateralInvocation =
+        serde_json::from_value(record.raw_json).map_err(ChioRuntimeError::Json)?;
     let artifact_sha256 = bilateral_invocation_binding_sha256(&invocation)?;
     if artifact_sha256 != reference.artifact_sha256 {
         return rejected(

@@ -20,6 +20,13 @@ fn replace_under_restored_trigger(
 fn assert_corruption_not_repaired(
     corrupt: impl FnOnce(&Connection, &RuntimeReplaySourceSeal) -> TestResult,
 ) -> TestResult {
+    assert_corruption_not_repaired_with_code("runtime_replay_source_invalid", corrupt)
+}
+
+fn assert_corruption_not_repaired_with_code(
+    code: &'static str,
+    corrupt: impl FnOnce(&Connection, &RuntimeReplaySourceSeal) -> TestResult,
+) -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("corrupt-seal.sqlite3");
     let store = SqliteRuntimeOrchestrationStore::open(&path)?;
@@ -29,18 +36,9 @@ fn assert_corruption_not_repaired(
     let raw = Connection::open(&path)?;
     corrupt(&raw, &seal)?;
     let corrupted = raw_snapshot(&raw)?;
-    assert_code(
-        store.verify_legacy_replay_source_seal(&seal),
-        "runtime_replay_source_invalid",
-    );
-    assert_code(
-        store.load_legacy_replay_source_seal(&binding),
-        "runtime_replay_source_invalid",
-    );
-    assert_code(
-        store.seal_legacy_replay_source(&binding),
-        "runtime_replay_source_invalid",
-    );
+    assert_code(store.verify_legacy_replay_source_seal(&seal), code);
+    assert_code(store.load_legacy_replay_source_seal(&binding), code);
+    assert_code(store.seal_legacy_replay_source(&binding), code);
     assert_eq!(
         raw_snapshot(&raw)?,
         corrupted,
@@ -48,7 +46,7 @@ fn assert_corruption_not_repaired(
     );
     drop(store);
     match SqliteRuntimeOrchestrationStore::open(&path) {
-        Err(error) => assert_eq!(error.code(), "runtime_replay_source_invalid"),
+        Err(error) => assert_eq!(error.code(), code),
         Ok(_) => panic!("reopening a corrupt sealed source must fail closed"),
     }
     assert_eq!(
@@ -118,7 +116,12 @@ fn missing_singleton_cannot_be_resealed_as_an_unsealed_source() -> TestResult {
 #[test]
 fn malformed_noncanonical_and_digest_mismatched_seal_bytes_are_not_repaired() -> TestResult {
     for mutation in 0..3 {
-        assert_corruption_not_repaired(|raw, seal| {
+        let code = if mutation == 0 {
+            "urn:chio:error:attest:signed-json-invalid-input"
+        } else {
+            "runtime_replay_source_invalid"
+        };
+        assert_corruption_not_repaired_with_code(code, |raw, seal| {
             let bytes = match mutation {
                 0 => b"{".to_vec(),
                 1 => {

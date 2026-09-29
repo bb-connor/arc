@@ -44,8 +44,7 @@ impl InMemoryRuntimeAdmissionStore {
         validate_state_label(evidence_kind, "runtime_treaty_artifact_invalid_kind")?;
         validate_non_empty(evidence_id, "runtime_treaty_artifact_empty_id")?;
         let artifact_sha256 = canonical_sha256(artifact)?;
-        let raw_json = serde_json::to_value(artifact)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        let raw_json = serde_json::to_value(artifact).map_err(ChioRuntimeError::Json)?;
         let mut treaty_artifacts = self.treaty_artifacts.lock().map_err(|_| {
             ChioRuntimeError::Store("runtime treaty artifact store is poisoned".to_string())
         })?;

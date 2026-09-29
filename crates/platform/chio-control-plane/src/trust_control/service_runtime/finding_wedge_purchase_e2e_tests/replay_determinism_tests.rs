@@ -13,7 +13,7 @@ async fn wedge_purchase_settlement_replays_byte_identically_across_clocks() -> T
 
     let purchase_store = lane.authority.finding_purchase_store();
     let reservation_id = lane.purchase.handshake.reservation_id.clone();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     purchase_store.register_community_fund_destination(
         &lane.deployment.web.allocation_id,
         COMMUNITY_FUND_DESTINATION,
@@ -51,7 +51,7 @@ async fn wedge_purchase_denial_replays_byte_identically_across_clocks() -> TestR
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
 
     let reservation_id = lane.purchase.handshake.reservation_id.clone();
-    let now = unix_timestamp_now();
+    let now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     let (checkpoint, inclusion_proof) = denial_checkpoint(&response.receipt)?;
     let first = lane.coordinator.finalize_denial(
         &reservation_id,

@@ -14,6 +14,7 @@ pub mod attestation;
 pub mod certify;
 mod durable_admission;
 mod error;
+mod json_input;
 mod signed_input;
 pub use chio_enterprise_export as enterprise_export;
 #[cfg(test)]

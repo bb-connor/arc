@@ -1,6 +1,6 @@
 # Remaining security engineering work
 
-Source base: `f16d4e781c`, with the kernel/SQLite batch on `packet/3-retention-accounting`,
+Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
 The current batch has its own implementation and verification record below; this queue does not establish hosted or release qualification.
@@ -9,10 +9,10 @@ The current batch has its own implementation and verification record below; this
 
 | Work | Current recorded scope | Interpretation |
 | --- | --- | --- |
-| Decoder classification | 374 `raw-input-baseline` files; control plane 43, runtime core 13; kernel and SQLite baseline owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
-| Arithmetic | 122 pending of 638 original entries; 516 classified, including 132 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries have dispositions. |
-| Ambient clocks | 157 occurrences at 152 inventory keys | The scoped kernel/SQLite review migrated 22 production reads and classified 90 fixture occurrences. Other owners remain. |
-| Negative assertions | Baseline contains 1,264 assertions at 1,181 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
+| Decoder classification | 298 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel and SQLite baseline owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
+| Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
+| Ambient clocks | 142 occurrences at 137 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Other owners remain. |
+| Negative assertions | Baseline contains 1,263 assertions at 1,180 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
 | Schema/domain duplication | Wire lock records 200 identifiers declared in multiple files; domain gate has 38 debt entries | Snapshot/growth gates exist; consolidation and domain-shape repairs remain. Domain debt includes both duplicates and shape exceptions. |
 
@@ -36,13 +36,17 @@ replay, reopen, substitution and corrupt-row tests through production paths.
 Structured local parser causes and reviewed-owner gates accompany the changes.
 Use the execution record for the exact terminal checks and residual boundaries.
 
-The next substantial source batch is item 2, followed by item 3's compiler and
-secret-ownership work. This continuation does not erase the other queues.
+The four-owner part of item 2 is implemented and locally qualified in the
+[authority-boundary record](2026-09-28-authority-boundary-closure.md). Item 2
+continues with the remaining product/protocol owners; item 3 is the next distinct
+compiler and secret-ownership package. This continuation does not erase the other queues.
 
 ### 2. Remaining authority boundaries and rejection semantics
 
-Continue the reader and proof-result census through control plane, runtime,
-broker, core types and then remaining product/protocol owners. Complete the
+Continue the reader and proof-result census through the remaining product/protocol
+owners. The core-types/runtime/broker/control-plane baseline readers now have
+explicit contracts; their [execution record](2026-09-28-authority-boundary-closure.md)
+separates implementation from local qualification. Complete the
 TCB-wide error-source migration from U1/mechanism C, registered redacted rejection
 codes, and specific negative assertions/mutations. Finish remaining clock,
 deadline, quota and lease types by owner. Every assertion or decoder needs its
@@ -51,7 +55,7 @@ real contract, not a mass syntactic replacement.
 References: corrections 1D/1F/3A/4A/4B, Packet 8, packets 10.2/10.3, and
 [pass 8 U1](2026-09-26-security-review-pass-8.md). Original proof-type and error
 counts in the reviews are historical; do not quote them as today's unresolved
-defect count. The eleven registered sealed proof types are bounded delivered work,
+defect count. The twelve registered sealed proof types are bounded delivered work,
 not a workspace-wide proof-result audit.
 
 ### 3. Compiler enforcement and secret ownership

@@ -291,7 +291,7 @@ pub fn egress_restriction_version_hash(
 
 fn decode_egress_restriction(body: &CanonicalBody) -> PortResult<RestrictEgressContribution> {
     let contribution: RestrictEgressContribution =
-        serde_json::from_slice(body.as_bytes()).map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
     let canonical = chio_core::canonical_json_bytes(&contribution)
         .map_err(|_| PortError::integrity_failure())?;
     if canonical.as_slice() != body.as_bytes() {
@@ -401,7 +401,7 @@ fn verify_contribution_hash(body: &CanonicalBody, declared: Digest32) -> PortRes
 
 fn decode_session_suspension(body: &CanonicalBody) -> PortResult<SessionSuspensionContribution> {
     let contribution: SessionSuspensionContribution =
-        serde_json::from_slice(body.as_bytes()).map_err(|_| PortError::invalid_data())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::InvalidData, error.code(), error))?;
     if contribution.posture_rank == 0 {
         return Err(PortError::invalid_data());
     }

@@ -280,10 +280,7 @@ impl DeclassificationReceiptOutboxDrainer {
             .load_stranded_declassification_consumptions_batch(max_records)?;
         let mut reconciled = 0_u32;
         for consumption in stranded {
-            let body = serde_json::from_slice::<ActiveDefenseReceiptBody>(
-                consumption.receipt.canonical_body.as_bytes(),
-            )
-            .map_err(|_| PortError::integrity_failure())?;
+            let body = chio_core::canonical::UntrustedJsonText::from_wire(consumption.receipt.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::IntegrityFailure, error.code(), error))?;
             let ActiveDefenseReceiptBody::DeclassificationConsumption(body) = body else {
                 return Err(PortError::integrity_failure());
             };
@@ -511,10 +508,7 @@ impl DeclassificationReceiptOutboxDrainer {
             {
                 return Err(PortError::integrity_failure());
             }
-            let consumption_body = serde_json::from_slice::<ActiveDefenseReceiptBody>(
-                candidate.consumption.receipt.canonical_body.as_bytes(),
-            )
-            .map_err(|_| PortError::integrity_failure())?;
+            let consumption_body = chio_core::canonical::UntrustedJsonText::from_wire(candidate.consumption.receipt.canonical_body.as_bytes(), 64 * 1024 * 1024).and_then(|input| input.decode_signed::<ActiveDefenseReceiptBody>()).map_err(|error| PortError::with_source(chio_security_types::ports::PortErrorKind::IntegrityFailure, error.code(), error))?;
             let ActiveDefenseReceiptBody::DeclassificationConsumption(consumption_body) =
                 consumption_body
             else {

@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::PublicKey;
 use chio_credentials::{
@@ -22,11 +21,9 @@ use serde::{Deserialize, Serialize};
 use crate::issuance::{self, LocalReputationInspection, ReputationScoringSource};
 use crate::{load_or_create_authority_keypair, policy::load_policy, trust_control, CliError};
 
-fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+fn unix_now() -> Result<u64, chio_security_types::clock::ClockError> {
+    use chio_security_types::clock::{Clock, SystemClock};
+    SystemClock.unix_millis().map(|now| now.as_secs())
 }
 
 /// Load the local authority public key from a seed file and return it as the
@@ -64,6 +61,7 @@ pub struct ReputationLocalCommand<'a> {
 }
 
 pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), CliError> {
+    let clock_now = unix_now()?;
     let ReputationLocalCommand {
         subject_public_key,
         since,
@@ -114,7 +112,7 @@ pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), C
             &inspection.subject_key,
             inspection.since,
             inspection.until,
-            unix_now(),
+            clock_now,
             &inspection.scoring,
         )?);
     }
@@ -203,6 +201,7 @@ pub struct ReputationCompareCommand<'a> {
 }
 
 pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(), CliError> {
+    let clock_now = unix_now()?;
     let ReputationCompareCommand {
         subject_public_key,
         passport_path,
@@ -264,7 +263,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
                 &local.subject_key,
                 local.since,
                 local.until,
-                unix_now(),
+                clock_now,
                 &local.scoring,
             )?
         };
@@ -283,7 +282,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
             local,
             &passport,
             verifier_policy.as_ref(),
-            unix_now(),
+            clock_now,
             shared_evidence,
             Some(imported_trust),
         )?

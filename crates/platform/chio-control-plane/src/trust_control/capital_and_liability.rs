@@ -9,6 +9,7 @@ pub(crate) fn build_capital_book_report_from_store(
     receipt_store: &SqliteReceiptStore,
     query: &CapitalBookQuery,
 ) -> Result<CapitalBookReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized = query.normalized();
     normalized.validate().map_err(TrustHttpError::bad_request)?;
     let subject_key = normalized
@@ -92,7 +93,7 @@ pub(crate) fn build_capital_book_report_from_store(
     } else {
         CreditLossLifecycleListReport {
             schema: chio_kernel::CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_timestamp_now(),
+            generated_at: clock_now,
             query: CreditLossLifecycleListQuery {
                 event_id: None,
                 bond_id: None,
@@ -545,7 +546,7 @@ pub(crate) fn build_capital_book_report_from_store(
     let summary_currencies = currency.into_iter().collect::<Vec<_>>();
     Ok(CapitalBookReport {
         schema: CAPITAL_BOOK_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         query: normalized,
         subject_key,
         support_boundary: CapitalBookSupportBoundary::default(),
@@ -623,7 +624,8 @@ pub(crate) fn build_capital_execution_instruction_artifact_from_store(
     receipt_store: &SqliteReceiptStore,
     request: &CapitalExecutionInstructionRequest,
 ) -> Result<CapitalExecutionInstructionArtifact, TrustHttpError> {
-    let issued_at = unix_timestamp_now();
+    let clock_now = unix_timestamp_now()?;
+    let issued_at = clock_now;
     let transfer_governed_receipt_id =
         validate_capital_execution_instruction_request(request, issued_at)?;
 
@@ -1285,6 +1287,7 @@ pub(crate) fn build_credit_backtest_report_from_store(
     query: &CreditBacktestQuery,
     trusted_kernel_keys: &[String],
 ) -> Result<CreditBacktestReport, TrustHttpError> {
+    let clock_now = unix_timestamp_now()?;
     let normalized = query.normalized();
     if let Err(message) = normalized.validate() {
         return Err(TrustHttpError::bad_request(message));
@@ -1293,7 +1296,10 @@ pub(crate) fn build_credit_backtest_report_from_store(
     let window_count = normalized.window_count_or_default();
     let window_seconds = normalized.window_seconds_or_default();
     let stale_after_seconds = normalized.stale_after_seconds_or_default();
-    let end_anchor = normalized.until.unwrap_or_else(unix_timestamp_now);
+    let end_anchor = match normalized.until {
+        Some(at) => at,
+        None => unix_timestamp_now()?,
+    };
     let earliest_start = normalized.since.unwrap_or_else(|| {
         end_anchor.saturating_sub(window_seconds.saturating_mul(window_count as u64))
     });
@@ -1441,7 +1447,7 @@ pub(crate) fn build_credit_backtest_report_from_store(
 
     Ok(CreditBacktestReport {
         schema: CREDIT_BACKTEST_REPORT_SCHEMA.to_string(),
-        generated_at: unix_timestamp_now(),
+        generated_at: clock_now,
         query: normalized,
         summary: CreditBacktestSummary {
             windows_evaluated: windows.len() as u64,

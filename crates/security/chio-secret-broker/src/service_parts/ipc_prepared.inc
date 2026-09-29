@@ -49,8 +49,7 @@ impl UnixBrokerEndpoint {
         let operation = IpcOperation::PrepareConnection;
         let permit = self.prepared.reserve();
         let authenticated: crate::registration::AuthenticatedAttemptRequest =
-            serde_json::from_slice(&request.payload)
-                .map_err(|_| prepared_client_fault("prepared connection payload is invalid"))?;
+            chio_core_types::canonical::UntrustedJsonText::from_wire(&request.payload, MAX_WIRE_BYTES).and_then(|input| input.decode_signed()).map_err(|error| BrokerIpcServeFailure::Client(error.into()))?;
         let tenant = request.tenant_scope.clone();
         let handled = match &permit {
             Ok(_) => self.handler.prepare_connection(request),
@@ -63,9 +62,7 @@ impl UnixBrokerEndpoint {
             .map_err(BrokerIpcServeFailure::Internal)?;
         let binding = if response.accepted {
             let acknowledgement: PrepareDispatchAcknowledgement =
-                serde_json::from_slice(&response.response).map_err(|_| {
-                    prepared_internal_fault("prepared connection acknowledgement is invalid")
-                })?;
+                chio_core_types::canonical::UntrustedJsonText::from_wire(&response.response, MAX_WIRE_BYTES).and_then(|input| input.decode_signed()).map_err(|error| BrokerIpcServeFailure::Internal(error.into()))?;
             acknowledgement
                 .validate_for(&authenticated.registration, &authenticated.request)
                 .map_err(BrokerIpcServeFailure::Internal)?;

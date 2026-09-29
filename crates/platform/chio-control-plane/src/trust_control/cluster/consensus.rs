@@ -216,6 +216,7 @@ pub(crate) fn cluster_authority_lease_view_locked(
     cluster: &mut ClusterRuntimeState,
     consensus: &ClusterConsensusView,
 ) -> Option<ClusterAuthorityLeaseView> {
+    let clock_now = unix_timestamp_now().ok()?;
     let leader_url = consensus.leader_url.clone()?;
     let lease_epoch = consensus.election_term;
     let lease_id = format!("{leader_url}#term-{lease_epoch}");
@@ -231,7 +232,7 @@ pub(crate) fn cluster_authority_lease_view_locked(
         lease_valid: consensus.has_quorum
             && cluster
                 .lease_expires_at
-                .is_some_and(|expires_at| expires_at >= unix_timestamp_now()),
+                .is_some_and(|expires_at| expires_at >= clock_now),
     })
 }
 
@@ -333,7 +334,11 @@ pub(crate) fn cluster_consensus_and_authority_lease_view(
 pub(crate) fn compute_cluster_consensus_locked(
     cluster: &mut ClusterRuntimeState,
 ) -> ClusterConsensusView {
-    let now = unix_timestamp_now();
+    let clock_now = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(_) => return unavailable_cluster_consensus(cluster),
+    };
+    let now = clock_now;
     let lease_ttl_secs = Duration::from_millis(cluster.lease_ttl_ms).as_secs().max(1);
     let quorum_size = cluster.peers.len().div_ceil(2) + 1;
     let mut candidates = vec![cluster.self_url.clone()];
@@ -380,6 +385,21 @@ pub(crate) fn compute_cluster_consensus_locked(
         has_quorum,
         quorum_size,
         reachable_nodes,
+        election_term: cluster.election_term,
+    }
+}
+
+fn unavailable_cluster_consensus(cluster: &mut ClusterRuntimeState) -> ClusterConsensusView {
+    cluster.lease_expires_at = None;
+    cluster.term_started_at = None;
+    cluster.last_leader_url = None;
+    ClusterConsensusView {
+        self_url: cluster.self_url.clone(),
+        leader_url: None,
+        role: "candidate",
+        has_quorum: false,
+        quorum_size: cluster.peers.len().div_ceil(2) + 1,
+        reachable_nodes: 1,
         election_term: cluster.election_term,
     }
 }

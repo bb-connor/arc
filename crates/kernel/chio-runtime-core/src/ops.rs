@@ -664,12 +664,10 @@ fn runtime_evidence_manifest_report_binding_mismatches(
         "proof_regeneration_report" => &manifest.proof_regeneration_report_sha256,
         _ => return Ok(false),
     };
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
-        ChioRuntimeError::Json(format!(
-            "Chio runtime evidence health artifact JSON {}: {error}",
-            entry.path
-        ))
-    })?;
+    let value: serde_json::Value =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, 64 * 1024 * 1024)
+            .and_then(|input| input.decode_signed())
+            .map_err(ChioRuntimeError::from)?;
     Ok(canonical_sha256(&value)? != *expected)
 }
 

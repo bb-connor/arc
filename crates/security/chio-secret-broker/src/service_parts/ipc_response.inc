@@ -83,7 +83,7 @@ fn validate_signed_broker_execute_failure(response: &IpcResponse) -> bool {
     if !is_well_formed_broker_execute_diagnostic_code(error_code) {
         return false;
     }
-    let Ok(failure) = serde_json::from_slice::<BrokerExecuteFailure>(&response.response) else {
+    let Ok(failure) = chio_core_types::canonical::UntrustedJsonText::from_wire(&response.response, MAX_WIRE_BYTES).and_then(|input| input.decode_canonical::<BrokerExecuteFailure>()) else {
         return false;
     };
     let Ok(canonical) = canonical_json_bytes(&failure) else {
