@@ -491,7 +491,7 @@ fn monetary_allow_receipt_contains_financial_metadata() {
     assert_eq!(usage.committed_cost_units().unwrap(), 75);
 }
 
-pub(super) fn ambiguous_retained_hold_none_sample() -> u64 {
+fn ambiguous_retained_hold_none_sample() -> u64 {
     let mut out = String::new();
     chio_metrics_spec::runtime::families::AMBIGUOUS_DISPATCH_RETAINED_HOLD.render(&mut out);
     out.lines()

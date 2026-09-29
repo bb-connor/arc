@@ -47,9 +47,9 @@ impl Guard for RecordingGuard {
 
 /// A tool server whose `invoke` never returns, modeling a wedged tool server.
 pub(super) struct HangingToolServer {
-    id: String,
-    tools: Vec<String>,
-    invocations: Arc<AtomicU64>,
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
+    pub(super) invocations: Arc<AtomicU64>,
 }
 
 #[async_trait::async_trait]

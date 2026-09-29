@@ -13,7 +13,9 @@ use chio_kernel::{
 };
 use chio_store_sqlite::SqliteReceiptStore;
 
-include!("../support/treaty_dsse.rs");
+#[path = "../support/treaty_dsse.rs"]
+mod treaty_dsse;
+use treaty_dsse::TreatyDsseAdmissionHook;
 
 struct UnavailableCosigner;
 

@@ -1,4 +1,3 @@
-use super::*;
 macro_rules! delegate_authority_fenced_budget_methods {
     ($field:ident) => {
         fn try_charge_cost_with_ids_and_authority(
@@ -150,3 +149,5 @@ macro_rules! reject_authority_fenced_budget_methods {
         }
     };
 }
+
+pub(in crate::kernel::tests) use {delegate_authority_fenced_budget_methods, reject_authority_fenced_budget_methods};

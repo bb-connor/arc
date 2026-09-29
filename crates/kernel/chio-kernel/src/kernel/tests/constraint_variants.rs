@@ -1,3 +1,4 @@
+use super::*;
 // Constraint-variant tests.
 //
 // Included by `src/kernel/tests.rs`, so this file inherits the outer

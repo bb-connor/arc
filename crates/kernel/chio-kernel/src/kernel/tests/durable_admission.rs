@@ -1,4 +1,5 @@
 use super::*;
+use receipt_projection::AdmissionReceiptProjectionStore;
 
 
 
@@ -177,8 +178,8 @@ fn finding_memory_lineage_requires_a_durable_terminal_projection() {
 
 #[derive(Default)]
 struct TestAdmissionState {
-    operation: Option<AdmissionOperationV1>,
-    retained_request: Option<crate::admission_operation::RetainedToolAdmissionRequestV1>,
+    pub(super) operation: Option<AdmissionOperationV1>,
+    pub(super) retained_request: Option<crate::admission_operation::RetainedToolAdmissionRequestV1>,
     claim: Option<UntrustedAdmissionRecoveryClaim>,
     raw_outcome: Option<RawInvocationOutcomeV1>,
     tool_outcome: Option<ToolOutcomeRecordV1>,
@@ -199,7 +200,7 @@ pub(super) struct TestAdmissionOperationStore {
     dpop_recovery: dpop_acquisition::TestDpop,
     approval_recovery: governed_acquisition::TestApproval,
     runtime_recovery: runtime_participant::TestRuntimeRecovery,
-    fence: std::sync::Mutex<StoreMutationFence>,
+    pub(super) fence: std::sync::Mutex<StoreMutationFence>,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
     fail_next_evaluation_begin: std::sync::atomic::AtomicBool,
     fail_next_evaluation_stage: std::sync::atomic::AtomicBool,
@@ -210,11 +211,11 @@ pub(super) struct TestAdmissionOperationStore {
     panic_capture_boundary: std::sync::atomic::AtomicU8,
     substitute_capture_participant: std::sync::atomic::AtomicBool,
     budget: std::sync::Arc<crate::budget_store::InMemoryBudgetStore>,
-    state: std::sync::Mutex<TestAdmissionState>,
+    pub(super) state: std::sync::Mutex<TestAdmissionState>,
 }
 
 impl TestAdmissionOperationStore {
-    fn new(fence: StoreMutationFence) -> Self {
+    pub(super) fn new(fence: StoreMutationFence) -> Self {
         Self {
             caller_share_times: std::sync::Mutex::new(Vec::new()),
             recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults::default(),
@@ -281,7 +282,7 @@ impl TestAdmissionOperationStore {
         *self.fence.lock().expect("test admission fence lock") = fence;
     }
 
-    fn operation(&self) -> AdmissionOperationV1 {
+    pub(super) fn operation(&self) -> AdmissionOperationV1 {
         self.state
             .lock()
             .expect("test admission state lock")
@@ -326,7 +327,7 @@ impl TestAdmissionOperationStore {
             .store(true, Ordering::SeqCst);
     }
 
-    fn budget_store(&self) -> std::sync::Arc<crate::budget_store::InMemoryBudgetStore> {
+    pub(super) fn budget_store(&self) -> std::sync::Arc<crate::budget_store::InMemoryBudgetStore> {
         self.budget.clone()
     }
 
@@ -437,7 +438,7 @@ impl ReceiptStore for TestAdmissionOperationStore {
     }
 }
 
-pub(super) struct QualifiedDurablePaymentAdapter {
+struct QualifiedDurablePaymentAdapter {
     authorization_references: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
     settlement_actions: std::sync::Arc<std::sync::Mutex<Vec<&'static str>>>,
     settlement_references: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
@@ -1195,7 +1196,7 @@ impl ToolOutcomeStore for TestAdmissionOperationStore {
 
 impl QualifiedToolOutcomeStore for TestAdmissionOperationStore {}
 
-pub(super) fn assert_same_receipt(left: &ChioReceipt, right: &ChioReceipt) {
+fn assert_same_receipt(left: &ChioReceipt, right: &ChioReceipt) {
     assert_eq!(
         chio_core::canonical::canonical_json_bytes(left).expect("canonical left receipt"),
         chio_core::canonical::canonical_json_bytes(right).expect("canonical right receipt")
@@ -1210,11 +1211,11 @@ pub(super) fn admission_test_fence() -> StoreMutationFence {
     }
 }
 
-pub(super) struct DurableAdmissionCheckingServer {
-    id: String,
-    tools: Vec<String>,
-    invocations: std::sync::Arc<AtomicU64>,
-    store: std::sync::Arc<TestAdmissionOperationStore>,
+struct DurableAdmissionCheckingServer {
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
+    pub(super) invocations: std::sync::Arc<AtomicU64>,
+    pub(super) store: std::sync::Arc<TestAdmissionOperationStore>,
 }
 
 #[async_trait::async_trait]
@@ -1306,7 +1307,7 @@ pub(super) fn durable_admission_fixture(
     durable_admission_fixture_with_grants(request_id, vec![make_grant("durable-server", "mutate")])
 }
 
-pub(super) fn durable_admission_fixture_with_grants(
+fn durable_admission_fixture_with_grants(
     request_id: &str,
     grants: Vec<ToolGrant>,
 ) -> (
@@ -2097,7 +2098,7 @@ fn durable_pre_dispatch_denial_commits_terminal_compensation() {
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
 
-pub(super) struct VersionlessPostInvocationHook;
+struct VersionlessPostInvocationHook;
 
 impl crate::post_invocation::PostInvocationHook for VersionlessPostInvocationHook {
     fn name(&self) -> &str {
@@ -2113,7 +2114,7 @@ impl crate::post_invocation::PostInvocationHook for VersionlessPostInvocationHoo
     }
 }
 
-pub(super) struct StableRedactingPostInvocationHook {
+struct StableRedactingPostInvocationHook {
     replacement: &'static str,
 }
 

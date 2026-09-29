@@ -9,7 +9,7 @@ struct DenyingRuntimeAdmissionHook {
 }
 
 pub(super) struct AllowingRuntimeAdmissionHook {
-    calls: std::sync::Arc<AtomicU64>,
+    pub(super) calls: std::sync::Arc<AtomicU64>,
 }
 
 struct MetadataInspectingRuntimeAdmissionHook {
@@ -30,34 +30,34 @@ struct ReleaseTrackingRuntimeAdmissionHook {
 }
 
 pub(super) struct FailingReleaseRuntimeAdmissionHook {
-    calls: std::sync::Arc<AtomicU64>,
-    releases: std::sync::Arc<AtomicU64>,
-    expected_request_id: &'static str,
-    admission_id: &'static str,
-    lease_id: &'static str,
+    pub(super) calls: std::sync::Arc<AtomicU64>,
+    pub(super) releases: std::sync::Arc<AtomicU64>,
+    pub(super) expected_request_id: &'static str,
+    pub(super) admission_id: &'static str,
+    pub(super) lease_id: &'static str,
 }
 
 pub(super) struct FailingAfterSideEffectServer {
-    id: String,
-    tools: Vec<String>,
-    invocations: std::sync::Arc<AtomicU64>,
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
+    pub(super) invocations: std::sync::Arc<AtomicU64>,
 }
 
 pub(super) struct UrlElicitationBeforeSideEffectServer {
-    id: String,
-    tools: Vec<String>,
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
     stream_attempts: std::sync::Arc<AtomicU64>,
 }
 
 pub(super) struct CancellationAfterSideEffectServer {
-    id: String,
-    tools: Vec<String>,
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
     side_effects: std::sync::Arc<AtomicU64>,
 }
 
 pub(super) struct IncompleteAfterSideEffectServer {
-    id: String,
-    tools: Vec<String>,
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
     side_effects: std::sync::Arc<AtomicU64>,
 }
 
@@ -77,8 +77,8 @@ struct IncompleteStreamAfterSideEffectServer {
 // then returns ToolNotRegistered from dispatch. An unregistered server would be
 // denied before runtime admission and never reach the generic dispatch-error arm.
 pub(super) struct ToolNotRegisteredDispatchServer {
-    id: String,
-    tools: Vec<String>,
+    pub(super) id: String,
+    pub(super) tools: Vec<String>,
     side_effects: std::sync::Arc<AtomicU64>,
 }
 
@@ -325,7 +325,7 @@ impl NestedFlowClient for NoopNestedFlowClient {
 }
 
 impl FailingAfterSideEffectServer {
-    fn new(id: &str, tools: Vec<&str>, invocations: std::sync::Arc<AtomicU64>) -> Self {
+    pub(super) fn new(id: &str, tools: Vec<&str>, invocations: std::sync::Arc<AtomicU64>) -> Self {
         Self {
             id: id.to_string(),
             tools: tools.into_iter().map(String::from).collect(),
@@ -335,7 +335,7 @@ impl FailingAfterSideEffectServer {
 }
 
 impl UrlElicitationBeforeSideEffectServer {
-    fn new(id: &str, tools: Vec<&str>, stream_attempts: std::sync::Arc<AtomicU64>) -> Self {
+    pub(super) fn new(id: &str, tools: Vec<&str>, stream_attempts: std::sync::Arc<AtomicU64>) -> Self {
         Self {
             id: id.to_string(),
             tools: tools.into_iter().map(String::from).collect(),
@@ -345,7 +345,7 @@ impl UrlElicitationBeforeSideEffectServer {
 }
 
 impl CancellationAfterSideEffectServer {
-    fn new(id: &str, tools: Vec<&str>, side_effects: std::sync::Arc<AtomicU64>) -> Self {
+    pub(super) fn new(id: &str, tools: Vec<&str>, side_effects: std::sync::Arc<AtomicU64>) -> Self {
         Self {
             id: id.to_string(),
             tools: tools.into_iter().map(String::from).collect(),
@@ -355,7 +355,7 @@ impl CancellationAfterSideEffectServer {
 }
 
 impl IncompleteAfterSideEffectServer {
-    fn new(id: &str, tools: Vec<&str>, side_effects: std::sync::Arc<AtomicU64>) -> Self {
+    pub(super) fn new(id: &str, tools: Vec<&str>, side_effects: std::sync::Arc<AtomicU64>) -> Self {
         Self {
             id: id.to_string(),
             tools: tools.into_iter().map(String::from).collect(),
@@ -544,7 +544,7 @@ impl ToolServerConnection for IncompleteStreamAfterSideEffectServer {
 }
 
 impl ToolNotRegisteredDispatchServer {
-    fn new(id: &str, tools: Vec<&str>, side_effects: std::sync::Arc<AtomicU64>) -> Self {
+    pub(super) fn new(id: &str, tools: Vec<&str>, side_effects: std::sync::Arc<AtomicU64>) -> Self {
         Self {
             id: id.to_string(),
             tools: tools.into_iter().map(String::from).collect(),

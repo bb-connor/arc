@@ -145,8 +145,8 @@ impl RuntimeAdmissionHook for ReportAdmission {
             context.request,
             ["kernel.org-a", "kernel.org-b"],
             [
-                &self.treaty.origin_keypair.public_key(),
-                &self.treaty.local_keypair.public_key(),
+                &self.treaty.origin_public_key(),
+                &self.treaty.local_public_key(),
             ],
             context.now_unix_ms,
         )?;

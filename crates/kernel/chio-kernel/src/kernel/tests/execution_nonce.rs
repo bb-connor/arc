@@ -2139,8 +2139,8 @@ fn delegated_reserving_child_with_non_monetary_grant_sibling_share_freed_after_t
 // ---------------------------------------------------------------------------
 
 pub(super) struct StampFailingBudgetStore {
-    inner: InMemoryBudgetStore,
-    fail_mark: std::sync::Arc<AtomicBool>,
+    pub(super) inner: InMemoryBudgetStore,
+    pub(super) fail_mark: std::sync::Arc<AtomicBool>,
 }
 
 impl BudgetStore for StampFailingBudgetStore {

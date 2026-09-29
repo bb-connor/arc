@@ -1,15 +1,24 @@
+use super::{Keypair, ChioReceipt, ChioReceiptBody, ToolCallAction, Decision, KernelError, RuntimeAdmissionContext, VerifiedFederationTreatyMaterial, FederationTreatyVerification, FederationTreatyAdmissionBinding, RuntimeAdmissionHook, RuntimeAdmissionDecision};
 // Shared signed-treaty fixture for kernel unit and SQLite integration tests.
-struct TreatyDsseAdmissionHook {
+pub(super) struct TreatyDsseAdmissionHook {
     origin_keypair: Keypair,
     local_keypair: Keypair,
 }
 
 impl TreatyDsseAdmissionHook {
-    fn new(origin_keypair: Keypair, local_keypair: Keypair) -> Self {
+    pub(super) fn new(origin_keypair: Keypair, local_keypair: Keypair) -> Self {
         Self {
             origin_keypair,
             local_keypair,
         }
+    }
+
+    pub(super) fn origin_public_key(&self) -> chio_core::PublicKey {
+        self.origin_keypair.public_key()
+    }
+
+    pub(super) fn local_public_key(&self) -> chio_core::PublicKey {
+        self.local_keypair.public_key()
     }
 
     fn extensions(
@@ -69,7 +78,7 @@ impl TreatyDsseAdmissionHook {
         )
     }
 
-    fn verified_material(
+    pub(super) fn verified_material(
         &self,
         context: &RuntimeAdmissionContext<'_>,
     ) -> Result<VerifiedFederationTreatyMaterial, KernelError> {

@@ -112,7 +112,7 @@ use crate::tool_outcome::{
     RawInvocationOutcomeV1, ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore,
     ToolOutcomeStoreError,
 };
-use receipt_projection::AdmissionReceiptProjectionStore;
+
 use proptest::prelude::*;
 
 use crate::budget_store::{
@@ -125,7 +125,7 @@ use crate::budget_store::{
 
 #[path = "tests/support.rs"]
 mod support;
-use support::{SqliteReceiptStore, SqliteRevocationStore, make_keypair, make_signed_receipt, unique_receipt_db_path, make_elicited_content, make_grant, make_scope, make_capability, make_direct_attenuated_capability, make_request, make_request_with_arguments, make_operation_context, session_tool_call, session_capability_list, session_root_list, session_resource_list, session_resource_read, session_prompt_list, session_prompt_get, session_completion, tool_call_value_output, tool_call_stream_output, assert_content_addressed_receipt_id, make_chain_bound_delegation_link, make_chain_bound_capability, set_capability_trust_root_for_scope, V2DelegatedChildInput, make_v2_delegated_child, EchoServer, SideEffectServer, IncompleteServer, StreamingServer, EventDrainServer, FailingEventDrainServer, NestedFlowServer, MockNestedFlowClient, DocsResourceProvider, StubPaymentAdapter, DecliningPaymentAdapter, PrepaidSettledPaymentAdapter, AppendOnlyReceiptStore, RetentionCapableReceiptStore, PointLookupReceiptStore, ErroringReceiptStore, FailingCheckpointHydrationReceiptStore, FailingSessionAnchorReceiptStore, RecordingSessionAnchorReceiptStore, FailingRequestLineageReceiptStore};
+use support::{make_config, make_kernel, DeadWriterReceiptStore, RejectingDeadWriterReceiptStore, SnapshotTrackingDeadWriterStore, SqliteReceiptStore, SqliteRevocationStore, make_keypair, make_signed_receipt, unique_receipt_db_path, make_elicited_content, make_grant, make_scope, make_capability, make_direct_attenuated_capability, make_request, make_request_with_arguments, make_operation_context, session_tool_call, session_capability_list, session_root_list, session_resource_list, session_resource_read, session_prompt_list, session_prompt_get, session_completion, tool_call_value_output, tool_call_stream_output, assert_content_addressed_receipt_id, make_chain_bound_delegation_link, make_chain_bound_capability, set_capability_trust_root_for_scope, V2DelegatedChildInput, make_v2_delegated_child, EchoServer, SideEffectServer, IncompleteServer, StreamingServer, EventDrainServer, FailingEventDrainServer, NestedFlowServer, MockNestedFlowClient, DocsResourceProvider, StubPaymentAdapter, DecliningPaymentAdapter, PrepaidSettledPaymentAdapter, AppendOnlyReceiptStore, RetentionCapableReceiptStore, PointLookupReceiptStore, ErroringReceiptStore, FailingCheckpointHydrationReceiptStore, FailingSessionAnchorReceiptStore, RecordingSessionAnchorReceiptStore, FailingRequestLineageReceiptStore};
 #[path = "tests/support_providers.rs"]
 mod support_providers;
 use support_providers::{FilesystemResourceProvider, ExamplePromptProvider};
@@ -136,6 +136,7 @@ use support_delegation_plain::{make_chain_bound_plain_capability};
 
 #[path = "tests/support_monetary.rs"]
 mod support_monetary;
+use support::budget_store_impls::{delegate_authority_fenced_budget_methods, reject_authority_fenced_budget_methods};
 use support_monetary::{MonetaryCostServer, FailingMonetaryServer, UnmeasuredCostServer, CountingMonetaryServer, PendingMonetaryServer, StaticPriceOracle, make_monetary_grant, make_monetary_config, SiblingSumMonetaryFixture, make_sibling_sum_monetary_fixture, SiblingSumInvocationFixture, make_invocation_limited_grant, make_sibling_sum_invocation_fixture, spawn_payment_test_server, spawn_bound_acp_test_server, make_governed_monetary_grant, with_minimum_runtime_assurance, with_minimum_autonomy_tier, make_governed_acp_monetary_grant, make_governed_intent, GovernedAcpIntentFixture, make_governed_acp_intent, make_runtime_attestation, make_trusted_azure_runtime_attestation, make_trusted_google_runtime_attestation, make_trusted_nitro_runtime_attestation, make_attestation_trust_policy, make_attested_attestation_trust_policy, make_metered_billing_context, make_governed_call_chain_context, make_governed_upstream_call_chain_proof, attach_governed_upstream_call_chain_proof, GovernedCallChainContinuationTokenFixture, make_governed_call_chain_continuation_token, attach_governed_call_chain_continuation_token, make_governed_autonomy_context, CreditBondFixture, make_credit_bond, make_governed_approval_token, TrackingPaymentAdapter, make_dpop_kernel_and_cap, make_dpop_proof, ReverseFailingBudgetStore};
 #[path = "tests/settlement_routing.rs"]
 mod settlement_routing;
@@ -160,7 +161,6 @@ mod security_dispatch;
 mod session_sampling_elicitation;
 #[path = "tests/budget.rs"]
 mod budget;
-use budget::{ambiguous_retained_hold_none_sample};
 #[path = "tests/budget_cross_currency.rs"]
 mod budget_cross_currency;
 #[path = "tests/budget_governed_fallback.rs"]
@@ -229,7 +229,7 @@ use federation_cosign::{CountingRejectingCosigner, FailingAppendReceiptStore, ha
 mod revocation_durability;
 #[path = "tests/durable_admission.rs"]
 mod durable_admission;
-use durable_admission::{TestAdmissionOperationStore, QualifiedDurablePaymentAdapter, assert_same_receipt, admission_test_fence, DurableAdmissionCheckingServer, durable_admission_fixture, durable_admission_fixture_with_grants, VersionlessPostInvocationHook, StableRedactingPostInvocationHook};
+use durable_admission::{TestAdmissionOperationStore, admission_test_fence, durable_admission_fixture};
 #[path = "tests/durable_admission_url_elicitation_support.rs"]
 mod durable_admission_url_elicitation_support;
 use durable_admission_url_elicitation_support::{DurableUrlElicitationServer};
@@ -258,3 +258,7 @@ use sim_payment::{make_mustprepay_intent, make_no_ceiling_mustprepay_grant};
 
 #[path = "tests/financial_accounting.rs"]
 mod financial_accounting;
+
+#[path = "../../tests/support/treaty_dsse.rs"]
+mod treaty_dsse;
+use treaty_dsse::TreatyDsseAdmissionHook;

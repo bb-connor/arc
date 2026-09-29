@@ -63,7 +63,7 @@ async fn concurrent_duplicate_request_ids_keep_federation_scopes_isolated(
 }
 
 pub(super) struct CountingRejectingCosigner {
-    calls: std::sync::Arc<AtomicU64>,
+    pub(super) calls: std::sync::Arc<AtomicU64>,
 }
 
 impl BilateralCoSigningProtocol for CountingRejectingCosigner {
@@ -78,9 +78,7 @@ impl BilateralCoSigningProtocol for CountingRejectingCosigner {
     }
 }
 
-#[path = "../../../tests/support/treaty_dsse.rs"]
-mod treaty_dsse;
-use treaty_dsse::*;
+
 
 struct ForgedTreatyMetadataAdmissionHook;
 
@@ -117,7 +115,7 @@ impl RuntimeAdmissionHook for ForgedTreatyMetadataAdmissionHook {
 }
 
 pub(super) struct FailingAppendReceiptStore {
-    called: std::sync::Arc<AtomicBool>,
+    pub(super) called: std::sync::Arc<AtomicBool>,
 }
 
 struct CountingAppendReceiptStore {

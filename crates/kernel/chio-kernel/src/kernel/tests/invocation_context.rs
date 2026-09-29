@@ -1,11 +1,11 @@
 use super::*;
 pub(super) struct CallerContextProbe {
-    observations: std::sync::Arc<Mutex<Vec<(String, crate::ToolInvocationContext, bool)>>>,
-    stream: bool,
+    pub(super) observations: std::sync::Arc<Mutex<Vec<(String, crate::ToolInvocationContext, bool)>>>,
+    pub(super) stream: bool,
 }
 
 impl CallerContextProbe {
-    fn observe(
+    pub(super) fn observe(
         &self,
         route: &str,
         context: &crate::ToolInvocationContext,

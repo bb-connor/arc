@@ -1,12 +1,12 @@
 use super::*;
 impl SqliteReceiptStore {
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, ReceiptStoreError> {
+    pub(in crate::kernel::tests) fn connection(&self) -> Result<MutexGuard<'_, Connection>, ReceiptStoreError> {
         self.connection.lock().map_err(|_| {
             ReceiptStoreError::Conflict("sqlite receipt store lock poisoned".to_string())
         })
     }
 
-    fn load_checkpoint_by_seq_locked(
+    pub(super) fn load_checkpoint_by_seq_locked(
         connection: &Connection,
         checkpoint_seq: u64,
     ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
@@ -22,7 +22,7 @@ impl SqliteReceiptStore {
             .map_err(Into::into)
     }
 
-    fn load_checkpoint_by_seq(
+    pub(in crate::kernel::tests) fn load_checkpoint_by_seq(
         &self,
         checkpoint_seq: u64,
     ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
@@ -30,14 +30,14 @@ impl SqliteReceiptStore {
         Self::load_checkpoint_by_seq_locked(&connection, checkpoint_seq)
     }
 
-    fn flip_status_on_checkpoint(&self, flag: std::sync::Arc<std::sync::atomic::AtomicBool>) {
+    pub(in crate::kernel::tests) fn flip_status_on_checkpoint(&self, flag: std::sync::Arc<std::sync::atomic::AtomicBool>) {
         *self
             .checkpoint_status_flip
             .lock()
             .expect("checkpoint status flip lock") = Some(flag);
     }
 
-    fn load_chio_receipt_for_test(
+    pub(super) fn load_chio_receipt_for_test(
         &self,
         receipt_id: &str,
     ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
@@ -52,7 +52,7 @@ impl SqliteReceiptStore {
             .transpose()
     }
 
-    fn load_retained_chio_receipt_commitment_for_test(
+    pub(super) fn load_retained_chio_receipt_commitment_for_test(
         &self,
         receipt_id: &str,
     ) -> Result<Option<crate::receipt_store::RetainedReceiptCommitment>, ReceiptStoreError> {
@@ -87,7 +87,7 @@ impl SqliteReceiptStore {
         }))
     }
 
-    fn create_next_receipt_checkpoint_with_status_flip(
+    pub(super) fn create_next_receipt_checkpoint_with_status_flip(
         &self,
         max_batch: u64,
         keypair: &Keypair,

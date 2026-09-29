@@ -28,7 +28,7 @@ use super::*;
 
 
 
-pub(super) struct FixedThresholdRequirement(ThresholdApprovalRequirement);
+pub(super) struct FixedThresholdRequirement(pub(super) ThresholdApprovalRequirement);
 
 impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
     fn resolve_requirement(

@@ -109,9 +109,9 @@ impl GovernedApprovalReplayStore for PostDispatchFailingApprovalReplayStore {
 }
 
 pub(super) struct CountingDispatchServer {
-    id: String,
-    tool: String,
-    invocations: std::sync::Arc<AtomicU64>,
+    pub(super) id: String,
+    pub(super) tool: String,
+    pub(super) invocations: std::sync::Arc<AtomicU64>,
 }
 
 #[async_trait::async_trait]
@@ -136,11 +136,11 @@ impl ToolServerConnection for CountingDispatchServer {
 }
 
 struct PostDispatchApprovalCommitFixture {
-    kernel: ChioKernel,
+    pub(super) kernel: ChioKernel,
     agent: Keypair,
     capability: CapabilityToken,
-    request: ToolCallRequest,
-    invocations: std::sync::Arc<AtomicU64>,
+    pub(super) request: ToolCallRequest,
+    pub(super) invocations: std::sync::Arc<AtomicU64>,
 }
 
 pub(super) fn post_dispatch_approval_commit_fixture(

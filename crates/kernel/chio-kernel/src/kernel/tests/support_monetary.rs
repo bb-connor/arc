@@ -1,18 +1,18 @@
 use super::*;
 pub(super) struct MonetaryCostServer {
-    id: String,
-    reported_cost: Option<ToolInvocationCost>,
+    pub(super) id: String,
+    pub(super) reported_cost: Option<ToolInvocationCost>,
 }
 
 pub(super) struct FailingMonetaryServer {
-    id: String,
+    pub(super) id: String,
 }
 
 /// A monetary tool server that dispatches a pass-through but reports that it
 /// does not measure realized cost, mirroring the sidecar mediated route's
 /// pre-execution authorization gate.
 pub(super) struct UnmeasuredCostServer {
-    id: String,
+    pub(super) id: String,
 }
 
 #[async_trait::async_trait]
@@ -40,14 +40,14 @@ impl ToolServerConnection for UnmeasuredCostServer {
 }
 
 pub(super) struct CountingMonetaryServer {
-    id: String,
-    invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(super) id: String,
+    pub(super) invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 pub(super) struct PendingMonetaryServer {
-    id: String,
-    started: std::sync::Arc<tokio::sync::Notify>,
-    invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(super) id: String,
+    pub(super) started: std::sync::Arc<tokio::sync::Notify>,
+    pub(super) invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 pub(super) struct StaticPriceOracle {
@@ -55,7 +55,7 @@ pub(super) struct StaticPriceOracle {
 }
 
 impl StaticPriceOracle {
-    fn new(
+    pub(super) fn new(
         rates: impl IntoIterator<Item = ((String, String), Result<ExchangeRate, PriceOracleError>)>,
     ) -> Self {
         Self {
@@ -94,7 +94,7 @@ impl PriceOracle for StaticPriceOracle {
 }
 
 impl MonetaryCostServer {
-    fn new(id: &str, cost_units: u64, currency: &str) -> Self {
+    pub(super) fn new(id: &str, cost_units: u64, currency: &str) -> Self {
         Self {
             id: id.to_string(),
             reported_cost: Some(ToolInvocationCost {
@@ -105,7 +105,7 @@ impl MonetaryCostServer {
         }
     }
 
-    fn no_cost(id: &str) -> Self {
+    pub(super) fn no_cost(id: &str) -> Self {
         Self {
             id: id.to_string(),
             reported_cost: None,
@@ -290,12 +290,12 @@ pub(super) fn make_monetary_config() -> KernelConfig {
 }
 
 pub(super) struct SiblingSumMonetaryFixture {
-    kernel: ChioKernel,
-    child_a: CapabilityToken,
-    child_b: CapabilityToken,
-    child_a_kp: Keypair,
-    child_b_kp: Keypair,
-    path: PathBuf,
+    pub(super) kernel: ChioKernel,
+    pub(super) child_a: CapabilityToken,
+    pub(super) child_b: CapabilityToken,
+    pub(super) child_a_kp: Keypair,
+    pub(super) child_b_kp: Keypair,
+    pub(super) path: PathBuf,
 }
 
 pub(super) fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture {
@@ -363,12 +363,12 @@ pub(super) fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonet
 }
 
 pub(super) struct SiblingSumInvocationFixture {
-    kernel: ChioKernel,
-    child_a: CapabilityToken,
-    child_b: CapabilityToken,
-    child_a_kp: Keypair,
-    child_b_kp: Keypair,
-    path: PathBuf,
+    pub(super) kernel: ChioKernel,
+    pub(super) child_a: CapabilityToken,
+    pub(super) child_b: CapabilityToken,
+    pub(super) child_a_kp: Keypair,
+    pub(super) child_b_kp: Keypair,
+    pub(super) path: PathBuf,
 }
 
 pub(super) fn make_invocation_limited_grant(server: &str, tool: &str, max_invocations: u32) -> ToolGrant {
@@ -685,15 +685,15 @@ pub(super) fn make_governed_intent(
 }
 
 pub(super) struct GovernedAcpIntentFixture<'a> {
-    id: &'a str,
-    server: &'a str,
-    tool: &'a str,
-    purpose: &'a str,
-    seller: &'a str,
-    shared_payment_token_id: &'a str,
-    settlement_destination_ref: Option<&'a str>,
-    units: u64,
-    currency: &'a str,
+    pub(super) id: &'a str,
+    pub(super) server: &'a str,
+    pub(super) tool: &'a str,
+    pub(super) purpose: &'a str,
+    pub(super) seller: &'a str,
+    pub(super) shared_payment_token_id: &'a str,
+    pub(super) settlement_destination_ref: Option<&'a str>,
+    pub(super) units: u64,
+    pub(super) currency: &'a str,
 }
 
 pub(super) fn make_governed_acp_intent(fixture: GovernedAcpIntentFixture<'_>) -> GovernedTransactionIntent {
@@ -957,14 +957,14 @@ pub(super) fn attach_governed_upstream_call_chain_proof(
 }
 
 pub(super) struct GovernedCallChainContinuationTokenFixture<'a> {
-    signer: &'a Keypair,
-    subject: &'a PublicKey,
-    call_chain: &'a GovernedCallChainContext,
-    parent_session_anchor: SessionAnchorReference,
-    parent_receipt_hash: &'a str,
-    server_id: &'a str,
-    tool_name: &'a str,
-    governed_intent_hash: Option<&'a str>,
+    pub(super) signer: &'a Keypair,
+    pub(super) subject: &'a PublicKey,
+    pub(super) call_chain: &'a GovernedCallChainContext,
+    pub(super) parent_session_anchor: SessionAnchorReference,
+    pub(super) parent_receipt_hash: &'a str,
+    pub(super) server_id: &'a str,
+    pub(super) tool_name: &'a str,
+    pub(super) governed_intent_hash: Option<&'a str>,
 }
 
 pub(super) fn make_governed_call_chain_continuation_token(
@@ -1028,14 +1028,14 @@ pub(super) fn make_governed_autonomy_context(
 }
 
 pub(super) struct CreditBondFixture<'a> {
-    signer: &'a Keypair,
-    cap: &'a CapabilityToken,
-    server: &'a str,
-    tool: &'a str,
-    disposition: CreditBondDisposition,
-    lifecycle_state: CreditBondLifecycleState,
-    expires_at: u64,
-    runtime_assurance_met: bool,
+    pub(super) signer: &'a Keypair,
+    pub(super) cap: &'a CapabilityToken,
+    pub(super) server: &'a str,
+    pub(super) tool: &'a str,
+    pub(super) disposition: CreditBondDisposition,
+    pub(super) lifecycle_state: CreditBondLifecycleState,
+    pub(super) expires_at: u64,
+    pub(super) runtime_assurance_met: bool,
 }
 
 pub(super) fn make_credit_bond(fixture: CreditBondFixture<'_>) -> SignedCreditBond {
@@ -1141,14 +1141,14 @@ pub(super) fn make_governed_approval_token(
 
 #[derive(Clone)]
 pub(super) struct TrackingPaymentAdapter {
-    authorized: std::sync::Arc<std::sync::atomic::AtomicUsize>,
-    captured: std::sync::Arc<std::sync::atomic::AtomicUsize>,
-    released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
-    refunded: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(super) authorized: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(super) captured: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(super) released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub(super) refunded: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl TrackingPaymentAdapter {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             authorized: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             captured: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -1308,11 +1308,11 @@ pub(super) fn make_dpop_proof(
 /// A budget store spy that authorizes holds normally but returns `Err` on every
 /// reverse. Used to exercise the drop-guard pending-reversal escalation path.
 pub(super) struct ReverseFailingBudgetStore {
-    inner: InMemoryBudgetStore,
+    pub(super) inner: InMemoryBudgetStore,
 }
 
 impl ReverseFailingBudgetStore {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             inner: InMemoryBudgetStore::new(),
         }
