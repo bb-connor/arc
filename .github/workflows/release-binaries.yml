@@ -273,7 +273,7 @@ jobs:
           cargo auditable build --release --locked --target x86_64-unknown-linux-gnu \
             -p chio-secret-broker -p chio-active-response-authority -p chio-keyring --bins
           cargo auditable build --release --locked --target x86_64-unknown-linux-musl \
-            -p chio-cage --bin chio-cage-init --features real-linux-enforcement
+            -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement
           cargo auditable build --release --locked --target x86_64-unknown-linux-musl \
             -p chio-secret-broker --bin chio-broker-mcp
           cargo auditable build --release --locked --target x86_64-unknown-linux-musl \

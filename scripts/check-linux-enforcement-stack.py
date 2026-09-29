@@ -538,6 +538,7 @@ def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
         "CHIO_CAGE_TEST_DYNAMIC_RUNTIME",
         "CHIO_CAGE_TEST_HELPER",
         "cargo build --locked --target x86_64-unknown-linux-musl",
+        "-p chio-cage-init --bin chio-cage-init",
         '$static_target_dir/x86_64-unknown-linux-musl/debug/chio-cage-init',
         'readelf -hW "$static_helper"',
         'readelf -lW "$static_helper"',
@@ -550,6 +551,18 @@ def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
             errors.append(f"real Linux runner is missing required contract: {required}")
     if "Linux:aarch64" in linux_runner:
         errors.append("real Linux runner enables an architecture outside the reviewed set")
+    release_workflow = read_text(
+        root / ".github/workflows/release-binaries.yml",
+        errors,
+        "native security release workflow",
+    )
+    release_command = " ".join(release_workflow.replace("\\\n", " ").split())
+    helper_recipe = (
+        "cargo auditable build --release --locked --target x86_64-unknown-linux-musl "
+        "-p chio-cage-init --bin chio-cage-init --features real-linux-enforcement"
+    )
+    if helper_recipe not in release_command:
+        errors.append("release recipe must build the isolated chio-cage-init package")
 
 
 def find_locked_package(lock: dict, name: str, version: str) -> dict | None:

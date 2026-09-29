@@ -10,15 +10,15 @@ trap 'rm -rf "$work"' EXIT
 make_fixture() {
   local root="$1"
   mkdir -p \
+    "$root/.github/workflows" \
     "$root/third_party/provenance" \
     "$root/third_party/nono-chio/src" \
     "$root/crates/security/chio-cage/src/launch" \
-    "$root/crates/security/chio-cage/src/launch/linux_parts" \
-    "$root/crates/security/chio-cage/src/launch/linux_parts/part_01_sections" \
     "$root/crates/security/chio-cage/scripts" \
     "$root/crates/security/chio-cage/tests"
   cp "$REPO_ROOT/NOTICE" "$root/"
   cp "$REPO_ROOT/Cargo.toml" "$root/"
+  cp "$REPO_ROOT/.github/workflows/release-binaries.yml" "$root/.github/workflows/"
   cp "$REPO_ROOT/third_party/provenance/linux-enforcement-stack.toml" \
     "$root/third_party/provenance/"
   cp \
@@ -72,6 +72,18 @@ cp -R "$valid" "$partial"
 python3 -c 'from pathlib import Path; p=Path("'$partial'/third_party/provenance/linux-enforcement-stack.toml"); s=p.read_text(); p.write_text(s.replace("partially_enforced = \"reject\"", "partially_enforced = \"accept\""))'
 test "$(run_checker "$partial" "$work/partial.out" "$work/partial.err")" = 1
 grep -F 'partial Landlock enforcement must be rejected' "$work/partial.err" >/dev/null
+
+wrong_helper_package="$work/wrong-helper-package"
+cp -R "$valid" "$wrong_helper_package"
+python3 - "$wrong_helper_package" <<'PYTEST'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / ".github/workflows/release-binaries.yml"
+s = p.read_text()
+p.write_text(s.replace("-p chio-cage-init --bin chio-cage-init", "-p chio-cage --bin chio-cage-init"))
+PYTEST
+test "$(run_checker "$wrong_helper_package" "$work/helper-package.out" "$work/helper-package.err")" = 1
+grep -F 'release recipe must build the isolated chio-cage-init package' "$work/helper-package.err" >/dev/null
 
 tampered_wrapper="$work/tampered-wrapper"
 cp -R "$valid" "$tampered_wrapper"
