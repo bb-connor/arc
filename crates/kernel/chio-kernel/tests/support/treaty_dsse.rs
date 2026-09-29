@@ -110,7 +110,7 @@ impl TreatyDsseAdmissionHook {
                 metadata: None,
                 trust_level: chio_core::receipt::kinds::TrustLevel::default(),
                 tenant_id: None,
-                kernel_key: self.local_keypair.public_key(),
+                kernel_key: self.local_public_key(),
                 bbs_projection_version: None,
             },
             &self.local_keypair,
@@ -127,8 +127,8 @@ impl TreatyDsseAdmissionHook {
             Self::extensions(&source_receipt)?,
         )
         .map_err(|error| KernelError::Internal(error.to_string()))?;
-        let origin_public_key = self.origin_keypair.public_key();
-        let local_public_key = self.local_keypair.public_key();
+        let origin_public_key = self.origin_public_key();
+        let local_public_key = self.local_public_key();
         VerifiedFederationTreatyMaterial::verify(FederationTreatyVerification {
             envelope: &envelope,
             participant_kernel_ids: ["kernel.org-a", "kernel.org-b"],

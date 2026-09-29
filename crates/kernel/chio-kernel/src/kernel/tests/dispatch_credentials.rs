@@ -135,7 +135,7 @@ impl ToolServerConnection for CountingDispatchServer {
     }
 }
 
-struct PostDispatchApprovalCommitFixture {
+pub(super) struct PostDispatchApprovalCommitFixture {
     pub(super) kernel: ChioKernel,
     agent: Keypair,
     capability: CapabilityToken,

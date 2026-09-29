@@ -56,8 +56,8 @@ impl ReceiptStore for RejectingDeadWriterReceiptStore {
 /// BEFORE any writer-backed metadata write runs. Arming is deferred so capability
 /// issuance during test setup (which also records lineage) still succeeds.
 pub(in crate::kernel::tests) struct SnapshotTrackingDeadWriterStore {
-    snapshot_attempted: std::sync::Arc<AtomicBool>,
-    fail_snapshots: std::sync::Arc<AtomicBool>,
+    pub(in crate::kernel::tests) snapshot_attempted: std::sync::Arc<AtomicBool>,
+    pub(in crate::kernel::tests) fail_snapshots: std::sync::Arc<AtomicBool>,
 }
 
 impl ReceiptStore for SnapshotTrackingDeadWriterStore {

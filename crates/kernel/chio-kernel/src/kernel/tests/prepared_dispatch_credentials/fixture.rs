@@ -5,7 +5,7 @@ pub(super) struct Fixture {
     pub(super) request: ToolCallRequest,
     pub(super) nonce: Arc<NonceState>,
     pub(super) clock: Arc<FixtureClock>,
-    pub(super) approval: Arc<ApprovalState>,
+    approval: Arc<ApprovalState>,
 }
 
 impl Fixture {
@@ -96,7 +96,7 @@ impl Fixture {
 }
 
 pub(super) struct NonceState {
-    pub(super) store: InMemoryExecutionNonceStore,
+    store: InMemoryExecutionNonceStore,
     pub(super) mode: AtomicU8,
     reserves: AtomicU64,
     rollbacks: AtomicU64,

@@ -591,7 +591,7 @@ jobs:
             kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
             kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
             kernel::tests::boot_receipts::session_reports_use_boot_selected_hybrid_authority \
-            kernel::tests::settlement_routing_tests::session_reports_never_seed_claim_route_or_invoke_settlement \
+            kernel::tests::settlement_routing::settlement_routing_tests::session_reports_never_seed_claim_route_or_invoke_settlement \
             -- cargo test --locked -p chio-kernel --features pq --lib session_reports
 
       - name: Exact receipt evaluation isolation

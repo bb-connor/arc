@@ -1,17 +1,7 @@
 use super::*;
 // Cross-kernel federation bilateral co-signing tests.
 //
-// Included by `src/kernel/tests.rs`; shares helpers (`make_config`,
-// `make_keypair`, `make_scope`, `make_grant`, `make_capability`,
-// `make_request_with_arguments`, `EchoServer`) with the sibling
-// test files.
-//
-// Coverage:
-//   * post-sign hook fires on federated requests and persists a
-//     DualSignedReceipt that verifies against both pinned peer keys,
-//   * non-federated requests still work and leave no dual-signed
-//     artifact behind,
-//   * missing peer pin fails closed.
+// Shared fixtures are imported from the parent test module.
 
 #[tokio::test(flavor = "current_thread")]
 async fn concurrent_duplicate_request_ids_keep_federation_scopes_isolated(

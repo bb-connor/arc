@@ -373,10 +373,10 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::security_participant_state::
 
 run_exact_target --label "native dispatch ledger callbacks" --allow-filtered --expected \
-  kernel::tests::native_dispatch_ledger::native_dispatch_ledger_confirms_both_reads_without_activating_dispatch \
-  kernel::tests::native_dispatch_ledger::native_dispatch_ledger_faults_deny_even_when_history_survives \
-  kernel::tests::native_dispatch_ledger::native_dispatch_ledger_rejects_invalid_inputs_before_egress_mutation \
-  -- cargo test -p chio-kernel --lib kernel::tests::native_dispatch_ledger::
+  kernel::tests::durable_admission::native_dispatch_ledger::native_dispatch_ledger_confirms_both_reads_without_activating_dispatch \
+  kernel::tests::durable_admission::native_dispatch_ledger::native_dispatch_ledger_faults_deny_even_when_history_survives \
+  kernel::tests::durable_admission::native_dispatch_ledger::native_dispatch_ledger_rejects_invalid_inputs_before_egress_mutation \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::native_dispatch_ledger::
 
 run_exact_target --label "public nested credential custody" --allow-filtered --expected \
   admission_operation_store::tests::dpop_replay::claims::kernel_routes::nested_session::public_nested_context_authority_error_clears_inflight_without_claims \
@@ -399,39 +399,39 @@ run_exact_target --label "native flow observation contracts" --allow-filtered --
   -- cargo test -p chio-kernel --lib admission_operation::native_flow_observation::
 
 run_exact_target --label "original security authority selection" --allow-filtered --expected \
-  kernel::tests::security_binding::adding_security_context_cannot_recover_an_unbound_terminal \
-  kernel::tests::security_binding::changed_security_identity_cannot_recover_a_completed_operation \
-  kernel::tests::security_binding::changed_security_identity_is_rejected_before_dispatch_capture \
-  kernel::tests::security_binding::changed_security_requirements_cannot_recover_an_unbound_terminal \
-  kernel::tests::security_binding::native_authority::codec::context_only_v2_keeps_its_exact_historical_bytes_and_hash \
-  kernel::tests::security_binding::native_authority::codec::native_retained_codec_is_strict_and_hash_domain_is_versioned \
-  kernel::tests::security_binding::native_authority::native_raw_return_recovery_requires_original_selection \
-  kernel::tests::security_binding::native_authority::native_selection_cannot_be_added_to_context_only_history \
-  kernel::tests::security_binding::native_authority::native_selection_cannot_fall_back_without_a_durable_store \
-  kernel::tests::security_binding::native_authority::native_selection_change_is_rejected_before_dispatch_capture \
-  kernel::tests::security_binding::native_authority::native_selection_errors_and_panics_fail_closed_before_admission \
-  kernel::tests::security_binding::native_authority::native_selection_rejects_missing_context_or_optional_enforcement_before_begin \
-  kernel::tests::security_binding::native_authority::native_selection_requires_retained_admission_outside_mode_coverage \
-  kernel::tests::security_binding::native_authority::nested_native_selection_cannot_change_on_terminal_replay \
-  kernel::tests::security_binding::native_authority::ordinary_native_selection_cannot_change_on_terminal_replay \
-  kernel::tests::security_binding::nested_security_replay_checks_every_identity_field_and_preserves_flow_observations \
-  kernel::tests::security_binding::ordinary_security_replay_checks_every_identity_field_and_preserves_flow_observations \
-  kernel::tests::security_binding::retention::retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid_generations \
-  kernel::tests::security_binding::retention::retained_v2_binds_security_but_not_mutable_flow_generation \
-  kernel::tests::security_binding::retention::unbound_retained_v1_keeps_its_exact_hash_and_bytes \
-  kernel::tests::security_binding::security_binding_preserves_large_ordinary_requests \
-  kernel::tests::security_binding::security_bound_raw_return_recovers_without_a_live_request_or_redispatch \
-  -- cargo test -p chio-kernel --lib kernel::tests::security_binding::
+  kernel::tests::durable_admission::security_binding::adding_security_context_cannot_recover_an_unbound_terminal \
+  kernel::tests::durable_admission::security_binding::changed_security_identity_cannot_recover_a_completed_operation \
+  kernel::tests::durable_admission::security_binding::changed_security_identity_is_rejected_before_dispatch_capture \
+  kernel::tests::durable_admission::security_binding::changed_security_requirements_cannot_recover_an_unbound_terminal \
+  kernel::tests::durable_admission::security_binding::native_authority::codec::current_profile_with_context_only_binding_has_exact_bytes_and_hash \
+  kernel::tests::durable_admission::security_binding::native_authority::codec::native_retained_codec_is_strict_and_hash_domain_is_versioned \
+  kernel::tests::durable_admission::security_binding::native_authority::native_raw_return_recovery_requires_original_selection \
+  kernel::tests::durable_admission::security_binding::native_authority::native_selection_cannot_be_added_to_context_only_history \
+  kernel::tests::durable_admission::security_binding::native_authority::native_selection_cannot_fall_back_without_a_durable_store \
+  kernel::tests::durable_admission::security_binding::native_authority::native_selection_change_is_rejected_before_dispatch_capture \
+  kernel::tests::durable_admission::security_binding::native_authority::native_selection_errors_and_panics_fail_closed_before_admission \
+  kernel::tests::durable_admission::security_binding::native_authority::native_selection_rejects_missing_context_or_optional_enforcement_before_begin \
+  kernel::tests::durable_admission::security_binding::native_authority::native_selection_requires_retained_admission_outside_mode_coverage \
+  kernel::tests::durable_admission::security_binding::native_authority::nested_native_selection_cannot_change_on_terminal_replay \
+  kernel::tests::durable_admission::security_binding::native_authority::ordinary_native_selection_cannot_change_on_terminal_replay \
+  kernel::tests::durable_admission::security_binding::nested_security_replay_checks_every_identity_field_and_preserves_flow_observations \
+  kernel::tests::durable_admission::security_binding::ordinary_security_replay_checks_every_identity_field_and_preserves_flow_observations \
+  kernel::tests::durable_admission::security_binding::retention::retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid_generations \
+  kernel::tests::durable_admission::security_binding::retention::retained_current_profile_binds_security_but_not_mutable_flow_generation \
+  kernel::tests::durable_admission::security_binding::retention::current_profile_without_security_context_keeps_its_exact_inner_hash \
+  kernel::tests::durable_admission::security_binding::security_binding_preserves_large_ordinary_requests \
+  kernel::tests::durable_admission::security_binding::security_bound_raw_return_recovers_without_a_live_request_or_redispatch \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::security_binding::
 
 run_exact_target --label "original operation authority profile" --allow-filtered --expected \
   admission_operation::authority_profile::tests::pinned_executor_is_versioned_and_cannot_be_downgraded_or_null \
   admission_operation::authority_profile::tests::profile_codec_checks_schema_fields_and_each_selected_generation \
   admission_operation::authority_profile::tests::profile_debug_contains_no_authority_identifiers \
   admission_operation::authority_profile::tests::profile_requires_explicit_absence_and_consistent_runtime_declarations \
-  kernel::tests::authority_profile::changed_runtime_authority_cannot_reuse_original_admission \
-  kernel::tests::authority_profile::changed_runtime_generation_cannot_reuse_original_admission \
-  kernel::tests::authority_profile::immutable_request_commits_to_every_original_profile_selection \
-  kernel::tests::authority_profile::prepared_credentials_cannot_rebind_the_original_authority_profile \
+  kernel::tests::durable_admission::authority_profile::changed_runtime_authority_cannot_reuse_original_admission \
+  kernel::tests::durable_admission::authority_profile::changed_runtime_generation_cannot_reuse_original_admission \
+  kernel::tests::durable_admission::authority_profile::immutable_request_commits_to_every_original_profile_selection \
+  kernel::tests::durable_admission::authority_profile::prepared_credentials_cannot_rebind_the_original_authority_profile \
   -- cargo test -p chio-kernel --lib authority_profile
 run_exact_target --label "runtime profile non-upgrade" --allow-filtered --expected \
   admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_absent_or_historical_authority_profile \
@@ -458,40 +458,40 @@ run_exact_target --label "physical dispatch hold ownership" --allow-filtered --e
   -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::budget_atomicity::capture_owner::
 
 run_exact_target --label "qualified recovery lease boundary" --allow-filtered --expected \
-  kernel::tests::recovery_lease::qualification_contains_claim_panic_after_persistence \
-  kernel::tests::recovery_lease::qualification_contains_claim_panic_before_persistence \
-  kernel::tests::recovery_lease::qualification_contains_operation_read_panic \
-  kernel::tests::recovery_lease::qualification_contains_revalidation_panic \
-  kernel::tests::recovery_lease::qualification_preserves_ordinary_errors_without_creating_claims \
-  -- cargo test -p chio-kernel --lib kernel::tests::recovery_lease
+  kernel::tests::durable_admission::recovery_lease::qualification_contains_claim_panic_after_persistence \
+  kernel::tests::durable_admission::recovery_lease::qualification_contains_claim_panic_before_persistence \
+  kernel::tests::durable_admission::recovery_lease::qualification_contains_operation_read_panic \
+  kernel::tests::durable_admission::recovery_lease::qualification_contains_revalidation_panic \
+  kernel::tests::durable_admission::recovery_lease::qualification_preserves_ordinary_errors_without_creating_claims \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::recovery_lease
 run_exact_target --label "runtime recovery lease containment" --allow-filtered --expected \
-  kernel::tests::runtime_participant::acquisition::runtime_lease_panic_denies_swallowed_failure_and_preserves_recovery \
-  -- cargo test -p chio-kernel --lib kernel::tests::runtime_participant::acquisition::runtime_lease_panic_denies_swallowed_failure_and_preserves_recovery
+  kernel::tests::durable_admission::runtime_participant::acquisition::runtime_lease_panic_denies_swallowed_failure_and_preserves_recovery \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::runtime_participant::acquisition::runtime_lease_panic_denies_swallowed_failure_and_preserves_recovery
 
 run_exact_target --label "kernel-owned native preparation" --allow-filtered --expected \
-  kernel::tests::native_acquisition::input::input_callback_cannot_suppress_skip_repeat_or_retarget_the_join \
-  kernel::tests::native_acquisition::input::input_join_requires_exact_intent_acknowledgement_and_independent_history \
-  kernel::tests::native_acquisition::egress_ports::unsupported_native_egress_ports_reject_commands_and_history_without_mutation \
-  kernel::tests::native_acquisition::native_callback_cannot_suppress_skip_repeat_or_retarget_its_join \
-  kernel::tests::native_acquisition::native_dispatch_checks_live_selection_before_optional_fallbacks \
-  kernel::tests::native_acquisition::native_dispatch_retains_original_requirement_when_live_selection_is_absent \
-  kernel::tests::native_acquisition::native_hook_without_preparation_support_denies_before_any_join \
-  kernel::tests::native_acquisition::native_join_requires_matching_acknowledgement_and_anchored_readback \
-  kernel::tests::native_acquisition::native_preparation_rejects_substituted_original_request_before_any_join \
-  kernel::tests::native_acquisition::native_recovery_lease_panic_does_not_poison_the_mutation_sequencer \
-  kernel::tests::native_acquisition::nested_native_join_only_hook_cannot_activate_dispatch \
-  -- cargo test -p chio-kernel --lib kernel::tests::native_acquisition
+  kernel::tests::durable_admission::native_acquisition::input::input_callback_cannot_suppress_skip_repeat_or_retarget_the_join \
+  kernel::tests::durable_admission::native_acquisition::input::input_join_requires_exact_intent_acknowledgement_and_independent_history \
+  kernel::tests::durable_admission::native_acquisition::egress_ports::unsupported_native_egress_ports_reject_commands_and_history_without_mutation \
+  kernel::tests::durable_admission::native_acquisition::native_callback_cannot_suppress_skip_repeat_or_retarget_its_join \
+  kernel::tests::durable_admission::native_acquisition::native_dispatch_checks_live_selection_before_optional_fallbacks \
+  kernel::tests::durable_admission::native_acquisition::native_dispatch_retains_original_requirement_when_live_selection_is_absent \
+  kernel::tests::durable_admission::native_acquisition::native_hook_without_preparation_support_denies_before_any_join \
+  kernel::tests::durable_admission::native_acquisition::native_join_requires_matching_acknowledgement_and_anchored_readback \
+  kernel::tests::durable_admission::native_acquisition::native_preparation_rejects_substituted_original_request_before_any_join \
+  kernel::tests::durable_admission::native_acquisition::native_recovery_lease_panic_does_not_poison_the_mutation_sequencer \
+  kernel::tests::durable_admission::native_acquisition::nested_native_join_only_hook_cannot_activate_dispatch \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::native_acquisition
 
 run_exact_target --label "kernel-owned native egress" --allow-filtered --expected \
-  kernel::tests::native_egress::native_egress_acquisition_faults_never_return_custody_and_read_after_writes \
-  kernel::tests::native_egress::native_egress_changed_live_material_or_identity_cannot_prepare \
-  kernel::tests::native_egress::native_egress_changed_observation_or_expiry_denies_before_acquisition \
-  kernel::tests::native_egress::native_egress_commit_faults_preserve_acquisition_and_deny_success \
-  kernel::tests::native_egress::native_egress_coordinator_binds_fresh_generation_and_both_commitments \
-  kernel::tests::native_egress::native_egress_generation_change_after_acquisition_prevents_commitment \
-  kernel::tests::native_egress::native_egress_observation_time_must_fall_inside_the_read_interval \
-  kernel::tests::native_egress::native_egress_operation_change_after_preparation_prevents_acquisition \
-  -- cargo test -p chio-kernel --lib kernel::tests::native_egress
+  kernel::tests::durable_admission::native_egress::native_egress_acquisition_faults_never_return_custody_and_read_after_writes \
+  kernel::tests::durable_admission::native_egress::native_egress_changed_live_material_or_identity_cannot_prepare \
+  kernel::tests::durable_admission::native_egress::native_egress_changed_observation_or_expiry_denies_before_acquisition \
+  kernel::tests::durable_admission::native_egress::native_egress_commit_faults_preserve_acquisition_and_deny_success \
+  kernel::tests::durable_admission::native_egress::native_egress_coordinator_binds_fresh_generation_and_both_commitments \
+  kernel::tests::durable_admission::native_egress::native_egress_generation_change_after_acquisition_prevents_commitment \
+  kernel::tests::durable_admission::native_egress::native_egress_observation_time_must_fall_inside_the_read_interval \
+  kernel::tests::durable_admission::native_egress::native_egress_operation_change_after_preparation_prevents_acquisition \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::native_egress
 
 run_exact_target --label "native dispatch attachment contracts" --allow-filtered --expected \
   admission_operation::capture::tests::native_dispatch_attachment_commits_with_dispatch_and_cannot_be_replaced \
@@ -691,12 +691,12 @@ run_exact_target --label "prepared flow dispatch binding" --allow-filtered --exp
   -- cargo test -p chio-control-plane --lib security::adapters::tests::prepared_dispatch::
 
 run_exact_target --label "security dispatch credential boundaries" --allow-filtered --expected \
+  kernel::tests::security_dispatch::clock::dpop_rule_codes_survive_root_and_nested_signed_denials \
+  kernel::tests::security_dispatch::clock::governed_window_refusals_keep_their_code_in_root_and_nested_receipts \
+  kernel::tests::security_dispatch::clock::nonce_clock_failure_keeps_its_code_in_the_signed_denial \
   kernel::tests::security_dispatch::credentials::security_rejection_keeps_credentials_reversible_until_dispatch \
   kernel::tests::security_dispatch::credentials::security_rejection_releases_dpop_nonce_and_approval_as_one_attempt \
   kernel::tests::security_dispatch::credentials::security_rejection_reports_unconfirmed_credential_rollback \
-  kernel::tests::security_dispatch::legacy_nonce::confirmed_legacy_nonce_retention_survives_reversible_cleanup \
-  kernel::tests::security_dispatch::legacy_nonce::legacy_nonce_failure_stays_failed_without_another_store_call \
-  kernel::tests::security_dispatch::legacy_nonce::retention_failure_after_security_acceptance_records_failed_dispatch \
   kernel::tests::security_dispatch::nested_security_callbacks_preserve_the_effect_boundary \
   kernel::tests::security_dispatch::rejection_with_warning_logging_does_not_call_hook_name \
   -- cargo test -p chio-kernel --lib kernel::tests::security_dispatch::
@@ -720,24 +720,24 @@ run_exact_target --label "frozen dispatch participant context" --allow-filtered 
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_reject_changed_operation_references_in_caller_decode \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_reject_changed_operation_references_in_live_context \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_require_every_reference_and_reject_substitution \
-  kernel::tests::return_context::capture_callback_panics_retain_uncertainty_without_poisoning_recovery \
-  kernel::tests::return_context::changed_capture_participant_denies_before_tool_effect_and_retains_accounting \
-  kernel::tests::return_context::frozen_return_context_cannot_cross_operations_with_the_same_request_id \
-  kernel::tests::return_context::frozen_return_context_keeps_limits_and_metadata_when_kernel_configuration_changes \
-  kernel::tests::return_context::frozen_return_context_rejects_substituted_return_request_before_persistence \
-  kernel::tests::return_context::invalid_return_context_cannot_commit_dispatch_or_capture_budget \
-  kernel::tests::return_context::nested_return_context_preserves_large_request_behavior \
-  kernel::tests::return_context::ordinary_return_context_preserves_large_request_behavior \
-  kernel::tests::return_context::return_context_rejects_request_or_grant_substitution_before_commit \
-  kernel::tests::return_context::signing::callbacks::signer_callback_cannot_extend_the_original_finalization_lease \
-  kernel::tests::return_context::signing::callbacks::signer_can_reenter_without_holding_the_mutation_sequencer \
-  kernel::tests::return_context::signing::callbacks::signer_identity_substitution_cannot_publish_a_terminal \
-  kernel::tests::return_context::signing::callbacks::signer_panic_preserves_finalizing_without_poisoning_the_sequencer \
-  kernel::tests::return_context::signing::completed_replay_does_not_weaken_the_current_crypto_floor \
-  kernel::tests::return_context::signing::completed_replay_uses_original_signer_without_reinvocation \
-  kernel::tests::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
-  kernel::tests::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
-  kernel::tests::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
+  kernel::tests::durable_admission::return_context::capture_callback_panics_retain_uncertainty_without_poisoning_recovery \
+  kernel::tests::durable_admission::return_context::changed_capture_participant_denies_before_tool_effect_and_retains_accounting \
+  kernel::tests::durable_admission::return_context::frozen_return_context_cannot_cross_operations_with_the_same_request_id \
+  kernel::tests::durable_admission::return_context::frozen_return_context_keeps_limits_and_metadata_when_kernel_configuration_changes \
+  kernel::tests::durable_admission::return_context::frozen_return_context_rejects_substituted_return_request_before_persistence \
+  kernel::tests::durable_admission::return_context::invalid_return_context_cannot_commit_dispatch_or_capture_budget \
+  kernel::tests::durable_admission::return_context::nested_return_context_preserves_large_request_behavior \
+  kernel::tests::durable_admission::return_context::ordinary_return_context_preserves_large_request_behavior \
+  kernel::tests::durable_admission::return_context::return_context_rejects_request_or_grant_substitution_before_commit \
+  kernel::tests::durable_admission::return_context::signing::callbacks::signer_callback_cannot_extend_the_original_finalization_lease \
+  kernel::tests::durable_admission::return_context::signing::callbacks::signer_can_reenter_without_holding_the_mutation_sequencer \
+  kernel::tests::durable_admission::return_context::signing::callbacks::signer_identity_substitution_cannot_publish_a_terminal \
+  kernel::tests::durable_admission::return_context::signing::callbacks::signer_panic_preserves_finalizing_without_poisoning_the_sequencer \
+  kernel::tests::durable_admission::return_context::signing::completed_replay_does_not_weaken_the_current_crypto_floor \
+  kernel::tests::durable_admission::return_context::signing::completed_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::durable_admission::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
+  kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
   -- cargo test -p chio-kernel --lib return_context::
 
 run_exact_target --label "durable caller participant persistence" --allow-filtered --expected \
@@ -747,32 +747,32 @@ run_exact_target --label "durable caller participant persistence" --allow-filter
   -- cargo test -p chio-store-sqlite --test execution_nonce_caller_execution dispatch_context::
 
 run_exact_target --label "frozen federation context" --allow-filtered --expected \
-  kernel::tests::federation_context::evidence::retained_federation_context_recovery_uses_original_pin_time \
-  kernel::tests::federation_context::evidence::retained_federation_context_rejects_a_changed_local_identity \
-  kernel::tests::federation_context::evidence::retained_treaty_evidence_rejects_unknown_fields \
-  kernel::tests::federation_context::evidence::retained_treaty_evidence_reverification_checks_original_signatures_and_keys \
-  kernel::tests::federation_context::nested_retained_federation_context_rejection_compensates_before_dispatch \
-  kernel::tests::federation_context::recovery_isolation::concurrent_recovery_keeps_distinct_treaty_reports_for_the_same_request_id \
-  kernel::tests::federation_context::retained_federation_context_does_not_bypass_public_replay_revocation \
-  kernel::tests::federation_context::retained_federation_context_finalizing_recovery_survives_owner_rotation \
-  kernel::tests::federation_context::retained_federation_context_is_private_and_cannot_be_removed_by_schema_downgrade \
-  kernel::tests::federation_context::retained_federation_context_recovers_without_live_peer_or_new_runtime_admission \
-  kernel::tests::federation_context::retained_federation_context_rejects_wrong_treaty_pin_before_dispatch \
-  kernel::tests::federation_context::retained_federation_context_tampering_fails_the_committed_outcome_binding \
-  kernel::tests::federation_context::security_release_requirement_and_federation_survive_either_codec_order \
-  -- cargo test -p chio-kernel --lib kernel::tests::federation_context::
+  kernel::tests::durable_admission::federation_context::evidence::retained_federation_context_recovery_uses_original_pin_time \
+  kernel::tests::durable_admission::federation_context::evidence::retained_federation_context_rejects_a_changed_local_identity \
+  kernel::tests::durable_admission::federation_context::evidence::retained_treaty_evidence_rejects_unknown_fields \
+  kernel::tests::durable_admission::federation_context::evidence::retained_treaty_evidence_reverification_checks_original_signatures_and_keys \
+  kernel::tests::durable_admission::federation_context::nested_retained_federation_context_rejection_compensates_before_dispatch \
+  kernel::tests::durable_admission::federation_context::recovery_isolation::concurrent_recovery_keeps_distinct_treaty_reports_for_the_same_request_id \
+  kernel::tests::durable_admission::federation_context::retained_federation_context_does_not_bypass_public_replay_revocation \
+  kernel::tests::durable_admission::federation_context::retained_federation_context_finalizing_recovery_survives_owner_rotation \
+  kernel::tests::durable_admission::federation_context::retained_federation_context_is_private_and_cannot_be_removed_by_schema_downgrade \
+  kernel::tests::durable_admission::federation_context::retained_federation_context_recovers_without_live_peer_or_new_runtime_admission \
+  kernel::tests::durable_admission::federation_context::retained_federation_context_rejects_wrong_treaty_pin_before_dispatch \
+  kernel::tests::durable_admission::federation_context::retained_federation_context_tampering_fails_the_committed_outcome_binding \
+  kernel::tests::durable_admission::federation_context::security_release_requirement_and_federation_survive_either_codec_order \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::federation_context::
 
 run_exact_target --label "frozen durable receipt signing" --allow-filtered --expected \
-  kernel::tests::return_context::signing::callbacks::signer_can_reenter_without_holding_the_mutation_sequencer \
-  kernel::tests::return_context::signing::callbacks::signer_callback_cannot_extend_the_original_finalization_lease \
-  kernel::tests::return_context::signing::callbacks::signer_identity_substitution_cannot_publish_a_terminal \
-  kernel::tests::return_context::signing::callbacks::signer_panic_preserves_finalizing_without_poisoning_the_sequencer \
-  kernel::tests::return_context::signing::completed_replay_does_not_weaken_the_current_crypto_floor \
-  kernel::tests::return_context::signing::completed_replay_uses_original_signer_without_reinvocation \
-  kernel::tests::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
-  kernel::tests::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
-  kernel::tests::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
-  -- cargo test -p chio-kernel --lib kernel::tests::return_context::signing::
+  kernel::tests::durable_admission::return_context::signing::callbacks::signer_can_reenter_without_holding_the_mutation_sequencer \
+  kernel::tests::durable_admission::return_context::signing::callbacks::signer_callback_cannot_extend_the_original_finalization_lease \
+  kernel::tests::durable_admission::return_context::signing::callbacks::signer_identity_substitution_cannot_publish_a_terminal \
+  kernel::tests::durable_admission::return_context::signing::callbacks::signer_panic_preserves_finalizing_without_poisoning_the_sequencer \
+  kernel::tests::durable_admission::return_context::signing::completed_replay_does_not_weaken_the_current_crypto_floor \
+  kernel::tests::durable_admission::return_context::signing::completed_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::durable_admission::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
+  kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::return_context::signing::
 
 run_exact_target --label "durable security release recovery" --expected \
   checkpoint_faults::checkpoint_write_failure_cannot_reconsume_a_live_owner \
@@ -803,15 +803,15 @@ run_exact_target --label "durable security release recovery" --expected \
   -- cargo test -p chio-store-sqlite --test security_release_recovery
 
 run_exact_target --label "dispatch rejection payment custody" --allow-filtered --expected \
-  kernel::tests::dispatch_commit_failure::freeze_rejection_after_payment_does_not_invent_credential_custody \
-  kernel::tests::dispatch_commit_failure::freeze_rejection_after_payment_retains_the_authorizing_approval \
-  kernel::tests::dispatch_commit_failure::mustprepay::explicit_unsafe_no_charge_mustprepay_records_the_actual_request_reference \
-  kernel::tests::dispatch_commit_failure::mustprepay::no_charge_mustprepay_requires_a_durable_payment_participant_before_authorization \
-  kernel::tests::dispatch_commit_failure::security_rejection_after_payment_preserves_actual_credential_disposition \
-  kernel::tests::dispatch_commit_failure::unconfirmed_dispatch_commit_retains_payment_quota_and_approval \
-  kernel::tests::dispatch_commit_failure::unconfirmed_payment_authorization_receipt_names_the_attempted_durable_operation \
-  kernel::tests::dispatch_commit_failure::unconfirmed_payment_unwind_receipt_names_the_attempted_durable_operation \
-  -- cargo test -p chio-kernel --lib kernel::tests::dispatch_commit_failure::
+  kernel::tests::durable_admission::dispatch_commit_failure::freeze_rejection_after_payment_does_not_invent_credential_custody \
+  kernel::tests::durable_admission::dispatch_commit_failure::freeze_rejection_after_payment_retains_the_authorizing_approval \
+  kernel::tests::durable_admission::dispatch_commit_failure::mustprepay::explicit_unsafe_no_charge_mustprepay_records_the_actual_request_reference \
+  kernel::tests::durable_admission::dispatch_commit_failure::mustprepay::no_charge_mustprepay_requires_a_durable_payment_participant_before_authorization \
+  kernel::tests::durable_admission::dispatch_commit_failure::security_rejection_after_payment_preserves_actual_credential_disposition \
+  kernel::tests::durable_admission::dispatch_commit_failure::unconfirmed_dispatch_commit_retains_payment_quota_and_approval \
+  kernel::tests::durable_admission::dispatch_commit_failure::unconfirmed_payment_authorization_receipt_names_the_attempted_durable_operation \
+  kernel::tests::durable_admission::dispatch_commit_failure::unconfirmed_payment_unwind_receipt_names_the_attempted_durable_operation \
+  -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::dispatch_commit_failure::
 
 run_exact_target --label "security runtime composition" --allow-filtered --expected \
   security::tests::active_defense_builder_installs_exact_boundary_order \

@@ -1,16 +1,7 @@
 use super::*;
 // Multi-tenant receipt isolation tests.
 //
-// Included by `src/kernel/tests.rs`. Shares helper items from
-// `tests/all.rs` via the surrounding `tests.rs` `include!`s.
-//
-// These tests anchor the core kernel behaviour:
-//   * a session whose auth_context carries an enterprise_identity with
-//     tenant_id stamps that tenant on every receipt signed during its
-//     tool-call evaluation;
-//   * a session without a tenant claim produces receipts whose
-//     tenant_id is `None`;
-//   * the tenant tag is never read from the `ToolCallRequest` itself.
+// Shared fixtures are imported from the parent test module.
 
 pub(super) fn oauth_auth_with_enterprise_tenant(tenant: &str) -> SessionAuthContext {
     SessionAuthContext::streamable_http_oauth_bearer_with_claims(OAuthBearerSessionAuthInput {

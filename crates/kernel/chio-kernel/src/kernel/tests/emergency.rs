@@ -1,14 +1,8 @@
 use super::*;
 // Emergency kill-switch tests.
 //
-// Included by `src/kernel/tests.rs`, which already imported `super::*`
-// and all helper items from `tests/all.rs`. The helpers used here
-// (`make_config`, `make_scope`, `make_grant`, `make_keypair`,
-// `make_capability`, `make_request`, `EchoServer`) are all defined in
-// `tests/all.rs` and visible via the surrounding `tests` module.
+// Shared fixtures are imported from the parent test module.
 
-// `thread` and `ChioScope` are already in scope from `tests/all.rs` via
-// the surrounding `tests.rs` `include!`s. Only pull in items that are not
 // already imported.
 
 fn kernel_with_echo() -> (ChioKernel, Keypair, ChioScope) {

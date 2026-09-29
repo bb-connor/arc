@@ -1,9 +1,7 @@
 use super::*;
 // Constraint-variant tests.
 //
-// Included by `src/kernel/tests.rs`, so this file inherits the outer
-// `use super::*;` environment along with the helpers defined at the
-// top of `tests/all.rs` (make_config, make_capability, EchoServer, etc.).
+// Shared fixtures are imported from the parent test module.
 
 /// A grant with `MemoryStoreAllowlist` should deny a request whose
 /// arguments carry a `store` value outside the allowlist, and allow

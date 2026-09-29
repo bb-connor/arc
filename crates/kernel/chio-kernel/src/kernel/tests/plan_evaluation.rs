@@ -1,10 +1,7 @@
 use super::*;
 // Plan-level evaluation tests.
 //
-// Included by `src/kernel/tests.rs`. Inherits `super::*` plus the
-// helpers defined at the top of `tests/all.rs` (`make_config`,
-// `make_keypair`, `make_capability`, `make_scope`, `make_grant`,
-// `EchoServer`, etc.).
+// Shared fixtures are imported from the parent test module.
 
 fn planned_call(
     request_id: &str,

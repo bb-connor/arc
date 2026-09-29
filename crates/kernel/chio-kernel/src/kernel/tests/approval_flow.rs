@@ -1,21 +1,10 @@
 use super::*;
 // HITL kernel-level flow tests.
 //
-// Included by `src/kernel/tests.rs`; the test module imports from the
-// surrounding `kernel::tests` scope via `super::*`. Helpers such as
-// `make_keypair` come from `tests/all.rs`.
-//
-// Scope: these tests exercise the HITL subsystem (approval store,
-// approval guard, channels, replay protection, restart persistence)
-// directly rather than through the full kernel evaluate path. Running
-// the full pipeline would require standing up every downstream store
-// (revocation, budget, authority, receipt log) for every case; a
-// focused test against the primitives is faster and still covers every
-// approval behaviour.
+// Shared fixtures are imported from the parent test module.
 
 // Note: `GovernedApprovalDecision`, `GovernedApprovalToken`,
 // `GovernedApprovalTokenBody`, and `Keypair` are already brought into
-// scope by `tests/all.rs`. Only pull in HITL-specific items. These
 // paths intentionally resolve through `crate::approval*` so the test
 // exercises the same type identities that downstream consumers see.
 

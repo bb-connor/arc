@@ -1,19 +1,7 @@
 use super::*;
 // Memory-provenance tests.
 //
-// Included by `src/kernel/tests.rs`. Shares helper items from
-// `tests/all.rs` via the surrounding `tests.rs` `include!`s
-// (`make_config`, `make_keypair`, `make_scope`, `make_grant`,
-// `make_capability`, `EchoServer`, etc.).
-//
-// Coverage:
-//   * governed writes append provenance entries,
-//   * governed reads surface provenance metadata on the receipt,
-//   * reads of entries with no provenance are flagged as unverified,
-//   * hash-chain tamper is detected by verify_entry.
-//
-// `std::sync::Arc` is already brought into scope by the sibling
-// `tests/emergency.rs` include.
+// Shared fixtures are imported from the parent test module.
 
 fn install_provenance_store(
     kernel: &mut ChioKernel,

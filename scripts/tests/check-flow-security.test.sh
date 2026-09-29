@@ -198,7 +198,7 @@ required_native_commands = {
         "cargo", "test", "-p", "chio-kernel", "--lib", "admission_operation::sequencer::tests::",
     ],
     "frozen federation context": [
-        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::federation_context::",
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::durable_admission::federation_context::",
     ],
     "frozen dispatch participant context": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "return_context::",
@@ -208,7 +208,7 @@ required_native_commands = {
         "execution_nonce_caller_execution", "dispatch_context::",
     ],
     "frozen durable receipt signing": [
-        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::return_context::signing::",
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::durable_admission::return_context::signing::",
     ],
     "durable release output binding": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "tool_outcome::security_release::context::tests::",
@@ -225,7 +225,7 @@ required_native_commands = {
         "admission_operation::capture::tests::native_dispatch_attachment_",
     ],
     "native dispatch ledger callbacks": [
-        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::native_dispatch_ledger::",
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::durable_admission::native_dispatch_ledger::",
     ],
     "native dispatch participant snapshots": [
         "cargo", "test", "-p", "chio-store-sqlite", "--lib", "ledger_snapshot",
@@ -234,7 +234,7 @@ required_native_commands = {
         "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::security_dispatch::",
     ],
     "dispatch rejection payment custody": [
-        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::dispatch_commit_failure::",
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::durable_admission::dispatch_commit_failure::",
     ],
     "native global journal migration": [
         "cargo", "test", "-p", "chio-store-sqlite", "--lib",
@@ -265,7 +265,7 @@ required_native_commands = {
         "security::adapters::native_flow::tests::",
     ],
     "kernel-owned native egress": [
-        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::native_egress",
+        "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::durable_admission::native_egress",
     ],
     "prepared flow dispatch binding": [
         "cargo", "test", "-p", "chio-control-plane", "--lib",
@@ -288,7 +288,7 @@ required_native_commands = {
     ],
     "original security authority selection": [
         "cargo", "test", "-p", "chio-kernel", "--lib",
-        "kernel::tests::security_binding::",
+        "kernel::tests::durable_admission::security_binding::",
     ],
     "native authority admission integration": [
         "cargo", "test", "-p", "chio-store-sqlite", "--test",

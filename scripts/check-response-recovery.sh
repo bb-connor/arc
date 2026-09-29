@@ -39,16 +39,16 @@ main() {
   run_tests "application-time lineage change invalidates approval" cargo test -p chio-quarantine --lib blast::tests::changed_descendant_under_fence_releases_and_invalidates_approval -- --exact
   run_tests "application-time lineage fence exact recovery" cargo test -p chio-quarantine --lib blast::tests::exact_fence_is_requeried_and_can_be_recovered_by_exact_action_binding -- --exact
   run_tests "authoritative issuance freeze blocks issue and delegation" cargo test -p chio-security-kernel --test issuance_freeze active_freeze_store_outage_and_tamper_all_fail_closed -- --exact
-  run_tests "kernel enforces the installed issuance freeze authority" cargo test -p chio-kernel --lib kernel::tests::installed_issuance_admission_rejects_freeze_and_principal_substitution -- --exact
+  run_tests "kernel enforces the installed issuance freeze authority" cargo test -p chio-kernel --lib kernel::tests::capability_validation::installed_issuance_admission_rejects_freeze_and_principal_substitution -- --exact
   run_tests "orphan lineage fence expiry and recovery" cargo test -p chio-store-sqlite --test security_state lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens -- --exact
 
   # Governed approval is isolated from the ordinary admission saga on current
   # main. Exercise its typed bindings, durable kernel replay, and production
   # adapter recovery without reviving the superseded admission-store design.
   run_tests "approval proposal mutation and exact quorum matrix" cargo test -p chio-conformance --test protocol_primitives_authority_bindings threshold_proposal_mutations_and_exact_quorum_fail_closed -- --exact
-  run_tests "approval token binding and validity-window matrix" cargo test -p chio-kernel --lib kernel::tests::governed_approval_token_binds_every_authorization_field_and_time_window -- --exact
+  run_tests "approval token binding and validity-window matrix" cargo test -p chio-kernel --lib kernel::tests::approval_flow::governed_approval_token_binds_every_authorization_field_and_time_window -- --exact
   run_tests "approval ordered-effect mutation binding" cargo test -p chio-core-types --test governed_active_response_intent active_response_plan_uses_an_explicit_typed_variant_and_binds_the_complete_body -- --exact
-  run_tests "active-response approval durable replay" cargo test -p chio-kernel --lib kernel::tests::active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch -- --exact
+  run_tests "active-response approval durable replay" cargo test -p chio-kernel --lib kernel::tests::approval_flow::active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch -- --exact
   run_tests "governed approval port exact live binding" cargo test -p chio-quarantine --lib approval::tests::governed_prepare_returns_only_an_exact_live_kernel_binding -- --exact
   run_tests "governed approval port malformed reservation denial" cargo test -p chio-quarantine --lib approval::tests::malformed_reservations_wrong_bindings_and_zero_digests_fail_closed -- --exact
   run_tests "governed approval port exact reconstruction" cargo test -p chio-quarantine --lib approval::tests::reconstruction_is_exact_missing_aware_and_never_rebinds -- --exact
