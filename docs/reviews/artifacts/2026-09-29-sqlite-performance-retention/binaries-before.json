@@ -1,0 +1,5 @@
+{
+  "receipt_retention_liveness": "/tmp/arc-security-launch/target/debug/deps/receipt_retention_liveness-deafd7d8e2b01328",
+  "store_authorization_path": "/tmp/arc-security-launch/target/debug/deps/store_authorization_path-55a6e10585bd455a",
+  "chio_store_sqlite": "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652"
+}

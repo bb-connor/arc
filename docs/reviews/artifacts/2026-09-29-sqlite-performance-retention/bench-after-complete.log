@@ -1,0 +1,86 @@
+Gnuplot not found, using plotters backend
+authorization fixture CHIO_AUTHORIZATION_ROWS=1000
+Benchmarking budget_charge_release_pair_populated
+Benchmarking budget_charge_release_pair_populated: Warming up for 200.00 ms
+Benchmarking budget_charge_release_pair_populated: Collecting 10 samples in estimated 1.4684 s (165 iterations)
+Benchmarking budget_charge_release_pair_populated: Analyzing
+budget_charge_release_pair_populated
+                        time:   [8.5045 ms 8.9113 ms 9.3861 ms]
+                        change: [-7.0635% +1.3529% +10.597%] (p = 0.78 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+
+Benchmarking budget_usage_read_populated
+Benchmarking budget_usage_read_populated: Warming up for 200.00 ms
+Benchmarking budget_usage_read_populated: Collecting 10 samples in estimated 1.0009 s (17k iterations)
+Benchmarking budget_usage_read_populated: Analyzing
+budget_usage_read_populated
+                        time:   [60.358 µs 60.818 µs 62.065 µs]
+                        change: [-15.707% -14.287% -11.844%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+
+Benchmarking budget_charge_reverse_pair_populated
+Benchmarking budget_charge_reverse_pair_populated: Warming up for 200.00 ms
+Benchmarking budget_charge_reverse_pair_populated: Collecting 10 samples in estimated 1.0212 s (110 iterations)
+Benchmarking budget_charge_reverse_pair_populated: Analyzing
+budget_charge_reverse_pair_populated
+                        time:   [8.3142 ms 8.6201 ms 9.0283 ms]
+                        change: [-7.1027% +0.6436% +7.9560%] (p = 0.88 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low severe
+  1 (10.00%) high mild
+
+Benchmarking admission_operation_record_populated
+Benchmarking admission_operation_record_populated: Warming up for 200.00 ms
+Benchmarking admission_operation_record_populated: Collecting 10 samples in estimated 1.1647 s (330 iterations)
+Benchmarking admission_operation_record_populated: Analyzing
+admission_operation_record_populated
+                        time:   [3.3833 ms 3.4624 ms 3.5757 ms]
+                        change: [+1.7306% +6.2809% +10.881%] (p = 0.02 < 0.05)
+                        Performance has regressed.
+
+Benchmarking admission_operation_read_populated
+Benchmarking admission_operation_read_populated: Warming up for 200.00 ms
+Benchmarking admission_operation_read_populated: Collecting 10 samples in estimated 1.0006 s (8415 iterations)
+Benchmarking admission_operation_read_populated: Analyzing
+admission_operation_read_populated
+                        time:   [118.67 µs 118.79 µs 118.95 µs]
+                        change: [-4.4305% -3.2084% -2.4335%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+
+authorization fixture CHIO_AUTHORIZATION_SUSPENSIONS=128
+Benchmarking security_state_denial_read_populated
+Benchmarking security_state_denial_read_populated: Warming up for 200.00 ms
+Benchmarking security_state_denial_read_populated: Collecting 10 samples in estimated 1.6002 s (110 iterations)
+Benchmarking security_state_denial_read_populated: Analyzing
+security_state_denial_read_populated
+                        time:   [14.531 ms 14.667 ms 14.952 ms]
+                        change: [-29.721% -29.127% -28.186%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+
+Benchmarking security_state_allow_read_populated
+Benchmarking security_state_allow_read_populated: Warming up for 200.00 ms
+Benchmarking security_state_allow_read_populated: Collecting 10 samples in estimated 1.6123 s (110 iterations)
+Benchmarking security_state_allow_read_populated: Analyzing
+security_state_allow_read_populated
+                        time:   [14.575 ms 14.652 ms 14.705 ms]
+                        change: [-30.150% -29.772% -29.394%] (p = 0.00 < 0.05)
+                        Performance has improved.
+
+Benchmarking authorization_store_composite_populated
+Benchmarking authorization_store_composite_populated: Warming up for 200.00 ms
+Benchmarking authorization_store_composite_populated: Collecting 10 samples in estimated 1.3909 s (20 iterations)
+Benchmarking authorization_store_composite_populated: Analyzing
+authorization_store_composite_populated
+                        time:   [65.232 ms 67.205 ms 69.048 ms]
+                        change: [-9.1158% -5.3380% -1.8690%] (p = 0.01 < 0.05)
+                        Performance has improved.
+

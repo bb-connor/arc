@@ -1,0 +1,10 @@
+
+running 5 tests
+test budget_store::checked_accounting::memory_preserves_unsigned_ceiling_and_refuses_overflow_atomically ... ok
+test budget_store::checked_accounting::sqlite_range_refusal_leaves_no_hold_usage_or_sequence ... ok
+test budget_store::checked_accounting::sql_hold_predicate_refuses_underflow_and_wrong_remainder_without_rust_precheck ... ok
+test budget_store::checked_accounting::concurrent_partial_releases_cannot_spend_the_same_exposure ... ok
+test budget_store::checked_accounting::refused_sql_writes_roll_back_every_budget_participant_and_reopen ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1891 filtered out; finished in 32.48s
+

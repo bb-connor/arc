@@ -767,11 +767,16 @@ required despite its measured cost.
 
 #### 9.3 Statement caching on per-operation reads (P3)
 
-- [ ] Switch the per-operation reads to `prepare_cached`, leaving schema, migration
+- [x] Switch the per-operation reads to `prepare_cached`, leaving schema, migration
       and `list_*`/reporting paths on `prepare`. Set the connection statement-cache
       capacity explicitly rather than relying on the default.
-- [ ] Do not convert all 420 sites on faith. Convert the paths 9.1 shows on the
+- [x] Do not convert all 420 sites on faith. Convert the paths 9.1 shows on the
       authorization critical path and record the delta.
+
+The [September 29 execution record](../../reviews/2026-09-29-sqlite-performance-retention-execution.md)
+records the 16 selected reader functions, explicit capacity 64, all eight paired
+measurements and their local development-profile scope. Release/default-size
+qualification remains separate.
 
 #### 9.4 Connection strategy (P4) - NOT IN THIS CANDIDATE
 
@@ -798,7 +803,7 @@ successor's work.
 
 #### 9.5 Redundant read on the charge path (P5)
 
-- [ ] Fold the duplicate `ensure_open_hold` read in
+- [x] Fold the duplicate `ensure_open_hold` read in
       `budget_store/trait_impl.rs` (once for the guard near `:972`, again near
       `:1037`) into one, preserving the guard semantics pass 2 verified. Do this
       inside the 9.3 pass rather than as its own change.

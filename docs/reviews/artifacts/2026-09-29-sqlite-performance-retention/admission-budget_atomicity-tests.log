@@ -1,0 +1,18 @@
+
+running 13 tests
+test admission_operation_store::tests::budget_atomicity::capture_owner::custody_readback::budget_custody_readback_distinguishes_absent_unheld_and_reversed_operations ... ok
+test admission_operation_store::tests::budget_atomicity::capture_owner::combined_capture_rejects_another_operations_hold_before_and_after_owner_capture ... ok
+test admission_operation_store::tests::budget_atomicity::capture_owner::budget_only_references_preserve_split_capture_and_exact_replay ... ok
+test admission_operation_store::tests::budget_atomicity::capture_owner::custody_readback::native_capture_readback_authenticates_physical_members_inside_its_snapshot ... ok
+test admission_operation_store::tests::budget_atomicity::capture_owner::custody_readback::original_budget_custody_readback_binds_hold_owner_and_preserves_accounting ... ok
+test admission_operation_store::tests::budget_atomicity::capture_owner::custody_readback::budget_custody_readback_rejects_deleted_and_substituted_physical_quota_members ... ok
+test admission_operation_store::tests::budget_atomicity::capture_owner::later_revocation_does_not_rewrite_an_original_capture_on_exact_replay ... ok
+test admission_operation_store::tests::budget_atomicity::capture_owner::missing_committed_admission_cannot_be_reclassified_as_a_budget_only_reference ... ok
+test admission_operation_store::tests::budget_atomicity::claimed_joint_budget_transactions_are_one_durable_write_each ... ok
+test admission_operation_store::tests::budget_atomicity::combined_budget_authorization_payment_journal_and_operation_commit_are_atomic ... ok
+test admission_operation_store::tests::budget_atomicity::combined_budget_capture_and_dispatch_commit_is_atomic_and_exactly_replayable ... ok
+test admission_operation_store::tests::budget_atomicity::capture_owner::combined_capture_rechecks_all_original_revocation_members_before_any_mutation ... ok
+test admission_operation_store::tests::budget_atomicity::pre_dispatch_compensation_requires_the_executable_hold_to_be_reversed ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1883 filtered out; finished in 19.62s
+

@@ -1,0 +1,18 @@
+
+running 13 tests
+test admission_operation_store::tests::recovery::claimed_transition_persists_the_claim_and_the_command_in_one_write ... ok
+test admission_operation_store::tests::recovery::fused_active_claim_noop_preserves_expiry_commit_head_and_anchor ... ok
+test admission_operation_store::tests::recovery::decision_time_can_arrive_out_of_order_across_operations ... ok
+test admission_operation_store::tests::recovery::fused_noop_commit_refusal_is_not_an_uncertain_write ... ok
+test admission_operation_store::tests::recovery::fused_security::fused_claim_rejects_expiry_at_the_authority_clock_before_callback ... ok
+test admission_operation_store::tests::recovery::qualified_recovery_rechecks_history_version_fence_and_expiry ... ok
+test admission_operation_store::tests::recovery::recovery_claim_retry_returns_the_persisted_lease_when_expiry_changes ... ok
+test admission_operation_store::tests::recovery::recovery_claim_rolls_forward_only_for_the_same_claimant ... ok
+test admission_operation_store::tests::recovery::recovery_claims_are_bounded_fenced_and_time_monotonic ... ok
+test admission_operation_store::tests::recovery::refused_or_rejected_claimed_transition_leaves_no_claim_behind ... ok
+test admission_operation_store::tests::recovery::scoped_runtime_clock_qualifies_deterministic_admission_time ... ok
+test admission_operation_store::tests::recovery::fused_security::fused_claim_cannot_fabricate_security_participant_custody ... ok
+test admission_operation_store::tests::recovery::recovery_claims_advance_a_full_batch_without_hiding_later_operations ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1883 filtered out; finished in 23.14s
+

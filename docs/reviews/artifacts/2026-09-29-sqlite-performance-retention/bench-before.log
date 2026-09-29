@@ -1,0 +1,86 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+    Finished `dev` profile [unoptimized] target(s) in 48.17s
+     Running benches/store_authorization_path.rs (target/debug/deps/store_authorization_path-55a6e10585bd455a)
+Gnuplot not found, using plotters backend
+authorization fixture CHIO_AUTHORIZATION_ROWS=1000
+Benchmarking budget_charge_release_pair_populated
+Benchmarking budget_charge_release_pair_populated: Warming up for 200.00 ms
+Benchmarking budget_charge_release_pair_populated: Collecting 10 samples in estimated 1.4895 s (165 iterations)
+Benchmarking budget_charge_release_pair_populated: Analyzing
+budget_charge_release_pair_populated
+                        time:   [8.6673 ms 8.8922 ms 9.0475 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+
+Benchmarking budget_usage_read_populated
+Benchmarking budget_usage_read_populated: Warming up for 200.00 ms
+Benchmarking budget_usage_read_populated: Collecting 10 samples in estimated 1.0002 s (14k iterations)
+Benchmarking budget_usage_read_populated: Analyzing
+budget_usage_read_populated
+                        time:   [70.000 µs 70.134 µs 70.290 µs]
+
+Benchmarking budget_charge_reverse_pair_populated
+Benchmarking budget_charge_reverse_pair_populated: Warming up for 200.00 ms
+Benchmarking budget_charge_reverse_pair_populated: Collecting 10 samples in estimated 1.0105 s (110 iterations)
+Benchmarking budget_charge_reverse_pair_populated: Analyzing
+budget_charge_reverse_pair_populated
+                        time:   [8.8776 ms 9.3157 ms 9.8096 ms]
+
+Benchmarking admission_operation_record_populated
+Benchmarking admission_operation_record_populated: Warming up for 200.00 ms
+Benchmarking admission_operation_record_populated: Collecting 10 samples in estimated 1.1740 s (330 iterations)
+Benchmarking admission_operation_record_populated: Analyzing
+admission_operation_record_populated
+                        time:   [3.6450 ms 3.8687 ms 4.2877 ms]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high severe
+
+Benchmarking admission_operation_read_populated
+Benchmarking admission_operation_read_populated: Warming up for 200.00 ms
+Benchmarking admission_operation_read_populated: Collecting 10 samples in estimated 1.0012 s (7975 iterations)
+Benchmarking admission_operation_read_populated: Analyzing
+admission_operation_read_populated
+                        time:   [124.00 µs 125.46 µs 126.72 µs]
+
+authorization fixture CHIO_AUTHORIZATION_SUSPENSIONS=128
+Benchmarking security_state_denial_read_populated
+Benchmarking security_state_denial_read_populated: Warming up for 200.00 ms
+
+Warning: Unable to complete 10 samples in 1.0s. You may wish to increase target time to 1.1s or enable flat sampling.
+Benchmarking security_state_denial_read_populated: Collecting 10 samples in estimated 1.1302 s (55 iterations)
+Benchmarking security_state_denial_read_populated: Analyzing
+security_state_denial_read_populated
+                        time:   [20.307 ms 20.343 ms 20.431 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+
+Benchmarking security_state_allow_read_populated
+Benchmarking security_state_allow_read_populated: Warming up for 200.00 ms
+
+Warning: Unable to complete 10 samples in 1.0s. You may wish to increase target time to 1.1s or enable flat sampling.
+Benchmarking security_state_allow_read_populated: Collecting 10 samples in estimated 1.1468 s (55 iterations)
+Benchmarking security_state_allow_read_populated: Analyzing
+security_state_allow_read_populated
+                        time:   [20.362 ms 20.456 ms 20.652 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+
+provision authority: invalid sqlite authority store: authority database parent must be owned by the effective user and not group or world writable
+error: bench failed, to rerun pass `-p chio-store-sqlite --bench store_authorization_path`
+
+Caused by:
+  process didn't exit successfully: `/tmp/arc-security-launch/target/debug/deps/store_authorization_path-55a6e10585bd455a --save-baseline sqlite-batch-before --sample-size 10 --warm-up-time 0.2 --measurement-time 1 --bench` (exit status: 1)

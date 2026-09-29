@@ -1,0 +1,9 @@
+{
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+    "budget_store::tests::statement_caching::",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "exit_code": 101
+}

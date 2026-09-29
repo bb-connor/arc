@@ -1,0 +1,8 @@
+
+running 3 tests
+test admission_operation_store::tests::authority_clock::authority_clock_rollback_is_rejected_without_mutating_history ... ok
+test admission_operation_store::tests::authority_clock::delayed_time_cannot_create_revalidate_or_use_an_expired_lease ... ok
+test admission_operation_store::tests::authority_clock::decision_order_is_local_but_observation_order_is_global ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1893 filtered out; finished in 4.18s
+

@@ -1,0 +1,167 @@
+
+running 144 tests
+test budget_store::checked_accounting::memory_preserves_unsigned_ceiling_and_refuses_overflow_atomically ... ok
+test budget_store::checked_accounting::sqlite_range_refusal_leaves_no_hold_usage_or_sequence ... ok
+test budget_store::checked_accounting::sql_hold_predicate_refuses_underflow_and_wrong_remainder_without_rust_precheck ... ok
+test budget_store::composite::native_capture::tests::native_capture_cumulative_delta_preserves_identity_currency_and_exact_amount ... ok
+test budget_store::composite::native_capture::tests::native_capture_quota_delta_requires_exact_bounded_unique_accounting ... ok
+test budget_store::checked_accounting::concurrent_partial_releases_cannot_spend_the_same_exposure ... FAILED
+test budget_store::checked_accounting::refused_sql_writes_roll_back_every_budget_participant_and_reopen ... FAILED
+test budget_store::connection_recovery::a_panic_after_anchor_sync_recovers_with_the_commit_visible ... ok
+test budget_store::connection_recovery::a_denied_rollback_fences_the_store ... ok
+test budget_store::connection_recovery::standalone_denied_rollback_fences_the_store ... ok
+test budget_store::connection_recovery::standalone_panic_after_commit_recovers_with_the_write_visible ... ok
+test budget_store::connection_recovery::standalone_panic_before_commit_rolls_back_and_the_store_serves ... ok
+test budget_store::connection_recovery::standalone_store_pairs_no_artifact_with_a_commit ... ok
+test budget_store::connection_recovery::a_panic_before_commit_rolls_back_and_the_store_serves ... ok
+test budget_store::import_boundaries::import_floor_is_exact_monotonic_and_persistent ... ok
+test budget_store::import_boundaries::import_floor_refuses_empty_authority_without_persisting_it ... ok
+test budget_store::composite::caller_resume::tests::approved_caller_replay_refuses_expired_lease_without_new_hold_or_event ... ok
+test budget_store::import_boundaries::import_floor_refuses_invalid_sequence_without_advancing_any_origin ... ok
+test budget_store::reaper::tests::budget_hold_snapshot_projects_reserved_hold ... ok
+test budget_store::reaper::tests::list_open_delegated_reserved_hold_ids_enumerates_only_open_delegated_reserved ... ok
+test budget_store::reaper::tests::mark_hold_reserved_on_missing_hold_fails_closed ... ok
+test budget_store::reaper::tests::reaper_forfeits_captured_orphan_at_worst_case ... ok
+test budget_store::import_boundaries::verified_snapshot_refuses_corrupted_local_provenance_without_replacing_it ... ok
+test budget_store::reaper::tests::reaper_forfeits_expired_invocation_reserve_keeping_it_consumed ... ok
+test budget_store::reaper::tests::reaper_reclaims_kernel_authored_holds_bearing_authority ... ok
+test budget_store::reaper::tests::reaper_reconciles_admitted_hold_and_reverses_orphan ... ok
+test budget_store::reaper::tests::request_id_has_reserved_hold_matches_by_prefix_and_escapes_like_metacharacters ... ok
+test budget_store::reaper::tests::reserve_invocation_hold_is_reversible_and_returns_the_invocation ... ok
+test budget_store::reaper::tests::ttl_reaper_settles_expired_hold_after_invocation_capture ... ok
+test budget_store::reaper::tests::ttl_reaper_settles_expired_unreconciled_reserved_holds_at_worst_case ... ok
+test budget_store::tests::abandoned_seqs_advance_the_head_but_genuine_gaps_still_cap ... ok
+test budget_store::tests::anchor_provenance_rejects_wrong_cluster_root_before_install ... ok
+test budget_store::tests::authority_replay::sqlite_held_reconciliation_requires_invocation_capture ... ok
+test budget_store::tests::ack_head_reset_trigger_is_idempotent_across_reopens_and_concurrent_opens ... ok
+test budget_store::tests::budget_ack_head_watermark_recomputes_after_delete_caps_below_hole ... ok
+test budget_store::tests::abandoned_seq_ranges_round_trip_and_advance_the_head ... ok
+test budget_store::tests::authority_replay::sqlite_rich_replays_require_the_persisted_authority_after_reopen ... ok
+test budget_store::tests::budget_ack_heads_caps_partial_head_at_interior_gap ... ok
+test budget_store::tests::budget_ack_heads_reports_contiguous_prefix_only ... ok
+test budget_store::connection_recovery::a_panic_between_commit_and_anchor_sync_refuses_until_a_reopen_reconciles ... ok
+test budget_store::tests::budget_ack_heads_stays_pinned_at_a_post_watermark_gap ... ok
+test budget_store::tests::budget_ack_heads_recognizes_multi_authority_global_contiguity ... ok
+test budget_store::tests::budget_store_hold_authority_requires_exact_lease_inmemory ... ok
+test budget_store::tests::budget_store_compensated_identity_is_terminal_and_fresh_identity_succeeds_sqlite ... ok
+test budget_store::tests::budget_mutation_events_delete_trigger_resets_watermark_even_without_manual_call ... ok
+test budget_store::tests::budget_store_event_id_retry_rejects_authority_rollover_sqlite ... ok
+test budget_store::tests::budget_store_list_mutation_events_preserves_append_order_sqlite ... ok
+test budget_store::tests::budget_store_zero_cost_invocation_succeeds_and_records_zero_inmemory ... ok
+test budget_store::tests::budget_store_open_hold_rejects_missing_authorize_event_sqlite ... ok
+test budget_store::tests::budget_store_zero_max_total_denies_any_charge_inmemory ... ok
+test budget_store::tests::budget_store_reduce_charge_cost_allows_zero_invocation_release_sqlite ... ok
+test budget_store::tests::budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite ... ok
+test budget_store::tests::budget_store_zero_cost_invocation_succeeds_and_records_zero_sqlite ... ok
+test budget_store::tests::budget_store_zero_max_total_denies_any_charge_sqlite ... ok
+test budget_store::tests::budget_usage_query_rejects_negative_persisted_counter ... ok
+test budget_store::tests::caller_provided_snapshot_anchor_cannot_create_usage_or_coverage ... ok
+test budget_store::tests::composite_lifecycle::below_threshold_cumulative_operation_captures_without_attachment ... ok
+test budget_store::tests::composite_lifecycle::captured_hold_redundantly_persists_authority_time ... ok
+test budget_store::tests::composite_lifecycle::approval_vs_reversal_and_last_unit_admission_are_serialized ... ok
+test budget_store::tests::composite_lifecycle::cumulative_approval_state_flip_cannot_skip_attachment ... ok
+test budget_store::tests::composite_lifecycle::denied_candidate_does_not_claim_the_operation_authorization_slot ... ok
+test budget_store::tests::composite_lifecycle::composite_release_and_reverse_restore_durable_reservations ... ok
+test budget_store::tests::composite_lifecycle::every_quota_participant_exhausts_atomically_and_maximum_is_immutable ... ok
+test budget_store::tests::composite_lifecycle::provision_refuses_populated_legacy_budget_state ... ok
+test budget_store::tests::composite_lifecycle::millisecond_shaped_supplemental_expiry_is_rejected ... ok
+test budget_store::tests::composite_lifecycle::cumulative_approval_attach_is_exact_idempotent_and_survives_capture ... ok
+test budget_store::tests::composite_lifecycle::v10_payment_journal_migrates_to_accept_pre_authorization_cancellation ... ok
+test budget_store::tests::composite_lifecycle::composite_authorize_capture_and_settlement_survive_response_loss_and_restart ... ok
+test budget_store::tests::composite_lifecycle::serving_rejects_cumulative_operation_corruption_hidden_by_account_totals ... ok
+test budget_store::tests::composite_lifecycle::serving_rejects_structured_hold_event_frontier_corruption ... ok
+test budget_store::tests::concurrent_charge_overrun_bound ... ok
+test budget_store::tests::composite_lifecycle::v6_operation_authorization_index_migrates_to_ignore_denials ... ok
+test budget_store::tests::durability::budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite ... ok
+test budget_store::tests::durability::budget_store_reduce_charge_cost_releases_exposure_only_inmemory ... ok
+test budget_store::tests::durability::budget_store_reduce_charge_cost_releases_exposure_only_sqlite ... ok
+test budget_store::tests::durability::budget_store_reverse_charge_cost_restores_prior_state_inmemory ... ok
+test budget_store::tests::durability::budget_store_reverse_charge_cost_restores_prior_state_sqlite ... ok
+test budget_store::tests::durability::budget_store_settle_charge_cost_moves_exposure_to_realized_inmemory ... ok
+test budget_store::tests::durability::budget_store_settle_charge_cost_moves_exposure_to_realized_sqlite ... ok
+test budget_store::tests::durability::budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_exceeds_per_invocation_cap_inmemory ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_atomic_increment_sqlite ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_exceeds_total_cap_inmemory ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_exceeds_per_invocation_cap_sqlite ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_with_ids_is_idempotent_inmemory ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_exceeds_total_cap_sqlite ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_within_limits_returns_true_inmemory ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_with_ids_is_idempotent_sqlite ... ok
+test budget_store::tests::durability::budget_usage_record_includes_split_cost_state ... ok
+test budget_store::tests::durability::budget_store_try_charge_cost_within_limits_returns_true_sqlite ... ok
+test budget_store::tests::durability::compensated_kernel_budget_holds_require_fresh_request_identity ... ok
+test budget_store::tests::durability::historical_captured_hold_does_not_block_fresh_specific_hold_cleanup ... ok
+test budget_store::tests::durability::independent_plain_opens_reject_composite_authorization_without_mutation ... ok
+test budget_store::tests::durability::rollback_shaped_unrelated_event_cannot_reopen_budget_hold ... ok
+test budget_store::tests::durability::sqlite_budget_store_capture_overflow_rolls_back_hold_transition ... ok
+test budget_store::tests::composite_lifecycle::v9_event_quota_projection_migrates_without_losing_history ... ok
+test budget_store::tests::durability::sqlite_budget_store_migrates_invocation_captured_column ... ok
+test budget_store::tests::durability::sqlite_budget_store_preserves_imported_seq_across_failover_writes ... ok
+test budget_store::tests::durability::sqlite_budget_store_rejects_capture_schema_stamp_without_column ... ok
+test budget_store::tests::durability::sqlite_budget_store_rejects_unrepresentable_authorization_without_mutation ... ok
+test budget_store::tests::durability::sqlite_budget_store_rejects_future_budget_schema_version ... ok
+test budget_store::tests::durability::sqlite_budget_store_rejects_unsupported_imported_mutation_atomically ... ok
+test budget_store::tests::durability::sqlite_budget_store_upsert_usage_keeps_newer_seq_state ... ok
+test budget_store::tests::durability::sqlite_budget_store_rolls_back_snapshot_when_event_exceeds_integer_range ... ok
+test budget_store::tests::durability::sqlite_budget_store_uses_seq_for_same_key_delta_queries ... ok
+test budget_store::tests::durability::sqlite_captured_before_dispatch_cancellation_rejects_partial_exposure ... ok
+test budget_store::tests::durability::sqlite_budget_store_v1_existing_capture_column_quarantines_open_hold ... ok
+test budget_store::tests::durability::sqlite_captured_reconciled_hold_rejects_legacy_mutations_without_hold_id ... ok
+test budget_store::tests::durability::sqlite_invocation_count_overflow_is_atomic ... ok
+test budget_store::tests::durability::sqlite_legacy_event_only_authorization_replays_once_with_invocation_limit ... ok
+test budget_store::tests::durability::sqlite_live_hold_blocks_unheld_legacy_mutations_without_state_drift ... ok
+test budget_store::tests::durability::sqlite_oversized_grant_index_fails_before_mutation ... ok
+test budget_store::tests::composite_lifecycle::zero_limit_aggregate_quota_persists_and_replays_a_durable_denial ... ok
+test budget_store::tests::durability::sqlite_partial_release_replay_preserves_event_time_state ... ok
+test budget_store::tests::durability::sqlite_rich_reverse_supports_kernel_cleanup_with_durable_projection ... ok
+test budget_store::tests::elected_leader_provenance_bootstraps_a_fresh_pre_upgrade_follower ... ok
+test budget_store::tests::full_snapshot_proves_holes_only_with_atomic_abandoned_ranges ... ok
+test budget_store::tests::full_snapshot_rejects_an_unproved_claimed_head_atomically ... ok
+test budget_store::tests::full_snapshot_proves_coverage_from_payload_without_local_rows ... ok
+test budget_store::tests::full_snapshot_rejects_forged_origin_heads_atomically ... ok
+test budget_store::tests::identical_local_migration_anchor_is_idempotent_but_does_not_prove_coverage ... ok
+test budget_store::tests::full_snapshot_rejects_local_history_missing_from_payload_atomically ... ok
+test budget_store::tests::import_mutation_record_keeps_duplicate_release_events_idempotent_sqlite ... ok
+test budget_store::tests::full_snapshot_requires_the_exact_immutable_anchor_set ... ok
+test budget_store::tests::list_abandoned_event_seqs_in_range_bounds_upper_and_limit ... ok
+test budget_store::tests::import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite ... ok
+test budget_store::tests::import_snapshot_records_duplicate_event_rejects_peer_transport_sequence_injection_sqlite ... ok
+test budget_store::tests::import_snapshot_records_replay_is_idempotent_when_peer_cursor_is_lost_sqlite ... ok
+test budget_store::tests::max_mutation_event_seq_reports_head ... ok
+test budget_store::tests::mutation_event_seq_for_event_id_returns_this_events_seq_not_authority_max ... ok
+test budget_store::tests::migration_anchor_does_not_bootstrap_coverage_over_later_events ... ok
+test budget_store::tests::mutation_event_witness_returns_stored_origin_authority ... ok
+test budget_store::tests::open_hold_stays_reserved_without_reap ... ok
+test budget_store::tests::reap_orphaned_holds_is_reachable_through_budget_store_trait ... ok
+test budget_store::tests::reopen_rebuilds_forged_snapshot_proof_caches_from_genesis ... ok
+test budget_store::tests::sqlite_budget_store_rejects_pre_split_budget_schema ... ok
+test budget_store::tests::sqlite_budget_store_persists_across_reopen ... ok
+test budget_store::tests::snapshot_export_keeps_every_same_sequence_usage_in_identity_order ... ok
+test budget_store::tests::snapshot_export_is_consistent_while_another_connection_commits ... ok
+test budget_store::tests::sqlite_store_reports_truthful_single_node_guarantee_level ... ok
+test budget_store::tests::statement_caching::cached_budget_reads_rebind_parameters_and_observe_external_commits ... ok
+test budget_store::tests::upsert_usage_does_not_resurrect_split_cost_state_from_stale_seq ... ok
+test budget_store::tests::upsert_usage_preserves_newer_split_cost_state ... ok
+test budget_store::tests::statement_caching::hold_mutations_validate_one_snapshot_and_preserve_replay ... ok
+
+failures:
+
+---- budget_store::checked_accounting::concurrent_partial_releases_cannot_spend_the_same_exposure stdout ----
+
+thread 'budget_store::checked_accounting::concurrent_partial_releases_cannot_spend_the_same_exposure' (1996986) panicked at crates/platform/chio-store-sqlite/src/budget_store/tests/checked_accounting.rs:13:10:
+provision owner: expected Ok(..), got Err(Invalid("serving lock root must be owned by the effective user and not group or world writable"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- budget_store::checked_accounting::refused_sql_writes_roll_back_every_budget_participant_and_reopen stdout ----
+
+thread 'budget_store::checked_accounting::refused_sql_writes_roll_back_every_budget_participant_and_reopen' (1996988) panicked at crates/platform/chio-store-sqlite/src/budget_store/tests/checked_accounting.rs:13:10:
+provision owner: expected Ok(..), got Err(Invalid("serving lock root must be owned by the effective user and not group or world writable"))
+
+
+failures:
+    budget_store::checked_accounting::concurrent_partial_releases_cannot_spend_the_same_exposure
+    budget_store::checked_accounting::refused_sql_writes_roll_back_every_budget_participant_and_reopen
+
+test result: FAILED. 142 passed; 2 failed; 0 ignored; 0 measured; 1752 filtered out; finished in 47.41s
+

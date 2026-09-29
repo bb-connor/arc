@@ -1,0 +1,57 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 14s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-c45af002eb0b1652)
+
+running 1 test
+retention case=0 phase=begin
+retention case=0 phase=open
+retention case=0 operation=0 kind=Rotate
+retention case=0 phase=flush
+retention case=0 phase=rotate
+retention case=0 phase=flush
+retention case=0 phase=health
+retention case=0 phase=probe
+retention case=0 operation=1 kind=AppendTool(4)
+retention case=0 phase=probe
+retention case=0 operation=2 kind=AppendChild(4)
+retention case=0 phase=probe
+retention case=0 operation=3 kind=Rotate
+retention case=0 phase=flush
+retention case=0 phase=rotate
+retention case=0 phase=flush
+retention case=0 phase=health
+retention case=0 phase=probe
+retention case=0 operation=4 kind=Rotate
+retention case=0 phase=flush
+retention case=0 phase=rotate
+retention case=0 phase=flush
+retention case=0 phase=health
+retention case=0 phase=probe
+retention case=0 phase=flush
+retention case=0 phase=health
+retention case=0 phase=reopen
+retention case=0 phase=read-live-ids
+Error: Fail(Reason("case completion must follow both writer owners' teardown at crates/platform/chio-store-sqlite/src/receipt_store/tests/retention/state_machine.rs:192"), [Rotate, AppendTool(4), AppendChild(4), Rotate, Rotate])
+test receipt_store::tests::retention::state_machine::prop_retention_preserves_append_invariant ... FAILED
+
+failures:
+
+failures:
+    receipt_store::tests::retention::state_machine::prop_retention_preserves_append_invariant
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1895 filtered out; finished in 0.84s
+
+error: test failed, to rerun pass `-p chio-store-sqlite --lib`

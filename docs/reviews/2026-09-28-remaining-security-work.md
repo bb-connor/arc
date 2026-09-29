@@ -112,10 +112,15 @@ No new historical compatibility aliases were introduced.
 
 ### 5. Measured storage performance
 
-Packet 9.3/9.5 remains: use statement caching on measured authorization paths,
-set cache capacities explicitly and remove redundant hold reads without changing
-fencing or transaction semantics. The current budget implementation still loads
-the hold twice within a reversal path. Record populated-store before/after cost.
+Packet 9.3/9.5 is implemented and locally measured in the
+[September 29 execution record](2026-09-29-sqlite-performance-retention-execution.md).
+Sixteen hot reader functions cache compiled SQL with explicit capacity 64;
+reversal, release and settlement reuse their already-validated hold inside the
+original transaction. Observed compilation counts fall from four to one and
+validation reads from two to one. The paired development-profile run records
+all eight paths, including unchanged write-pair intervals and an admission-write
+control slowdown. The smaller local population does not qualify release latency
+or default-population scaling.
 
 Exact financial aggregation, typed cost columns, indexed query shapes and initial
 populated benchmarks already landed. Do not redo them. Broad read-pool/single-
@@ -129,8 +134,14 @@ remain acceptance work.
 Resolve the historical retention stall #1045 using the original workload and
 blocked-stack/ownership evidence, then repair its demonstrated cause and retain
 a deterministic regression. The property is already enabled. Passing it again
-does not explain the old timeout. Run original scale gates after the owner is
-stable.
+does not explain the old timeout. The September 29 diagnostic recovered the
+original 256-case configuration and canceled job. Its current-owner slow-sync
+run completed 242 cases before the preset 900-second overall limit while still
+progressing; stack attachment was denied. Saved counterexamples and deterministic
+ownership checks passed separately. These observations do not close the historical
+root cause or complete the original-scale gate. Configure supported stack capture
+before another long attempt, then repair demonstrated ownership faults and run
+the original scale gate.
 
 Complete lifecycle trace linkage to actual commit, external effect and receipt
 boundaries, and resolve the original larger temporal-model timeout. The finite

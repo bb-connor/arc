@@ -1,0 +1,135 @@
+[
+  {
+    "name": "serving",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "serving_owner::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 97.75,
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1895 filtered out; finished in 0.85s",
+      "test result: ok. 91 passed; 0 failed; 1 ignored; 0 measured; 1804 filtered out; finished in 97.71s"
+    ]
+  },
+  {
+    "name": "admission-integrity",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "admission_operation_store::tests::integrity::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 7.9,
+    "summaries": [
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1890 filtered out; finished in 7.87s"
+    ]
+  },
+  {
+    "name": "admission-recovery",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "admission_operation_store::tests::recovery::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 23.17,
+    "summaries": [
+      "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1883 filtered out; finished in 23.14s"
+    ]
+  },
+  {
+    "name": "admission-schema",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "admission_operation_store::tests::schema::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 22.62,
+    "summaries": [
+      "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1883 filtered out; finished in 22.58s"
+    ]
+  },
+  {
+    "name": "admission-connection_recovery",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "admission_operation_store::tests::connection_recovery::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 5.08,
+    "summaries": [
+      "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1892 filtered out; finished in 5.03s"
+    ]
+  },
+  {
+    "name": "admission-authority_clock",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "admission_operation_store::tests::authority_clock::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 4.22,
+    "summaries": [
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1893 filtered out; finished in 4.18s"
+    ]
+  },
+  {
+    "name": "admission-budget_atomicity",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "admission_operation_store::tests::budget_atomicity::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 19.63,
+    "summaries": [
+      "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1883 filtered out; finished in 19.62s"
+    ]
+  },
+  {
+    "name": "admission-replay",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "--exact",
+      "admission_operation_store::tests::begin_replays_exactly_conflicts_before_mutation_and_retains_rows",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 1.68,
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1895 filtered out; finished in 1.65s"
+    ]
+  },
+  {
+    "name": "security-connection",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "security_state::participant_source::tests::connection_recovery::",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 0.73,
+    "summaries": [
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 1889 filtered out; finished in 0.71s"
+    ]
+  },
+  {
+    "name": "retention-ownership",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/receipt_retention_liveness-deafd7d8e2b01328",
+      "--skip",
+      "retention_workload_commits_are_serialized_on_writer",
+      "--test-threads=4"
+    ],
+    "exit_code": 0,
+    "seconds": 0.78,
+    "summaries": [
+      "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.76s"
+    ]
+  }
+]

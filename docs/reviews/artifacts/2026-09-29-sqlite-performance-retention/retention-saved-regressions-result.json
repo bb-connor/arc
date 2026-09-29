@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+    "--exact",
+    "receipt_store::tests::retention::state_machine::prop_retention_preserves_append_invariant",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "seconds": 10.08,
+  "completed_cases": 4,
+  "generated_cases": 1,
+  "saved_regressions": 3,
+  "sync_delay_ms": 0
+}

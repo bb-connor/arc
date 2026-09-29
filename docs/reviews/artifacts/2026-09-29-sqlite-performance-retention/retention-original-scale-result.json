@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/tmp/arc-security-launch/.superpowers/sdd/2026-09-29-sqlite-performance-retention/retention-candidate",
+    "--exact",
+    "receipt_store::tests::retention::state_machine::prop_retention_preserves_append_invariant",
+    "--nocapture"
+  ],
+  "cases": 256,
+  "seed": "20260926",
+  "sync_delay_ms": 3,
+  "overall_budget_seconds": 900,
+  "no_progress_budget_seconds": 45,
+  "source_scope": "Current receipt production owner at a3669c03d1 plus extracted original property with phase diagnostics; historical workload size, not the historical binary/unknown seed.",
+  "original_executable": "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+  "binary_sha256": "387661a537bae7c16b56b99def2b15e5d049110f453373d1d6587fc03d3c2cb8",
+  "interposer_sha256": "1900d80668dbc07452a7bc8b20b768fc1911ee2cbdee1ae38acb1c4d011b3350",
+  "pid": 1984713,
+  "timeout": "overall",
+  "exit_code": -15,
+  "seconds": 900.8,
+  "completed_cases": 242
+}

@@ -1,0 +1,12 @@
+
+running 7 tests
+test security_state::participant_source::tests::connection_recovery::neither_connection_pairs_an_artifact_with_a_commit ... ok
+test security_state::participant_source::tests::connection_recovery::participant_source_denied_rollback_fences_the_source ... ok
+test security_state::participant_source::tests::connection_recovery::participant_source_panic_before_commit_rolls_back_and_the_source_serves ... ok
+test security_state::participant_source::tests::connection_recovery::participant_source_panic_after_commit_recovers_with_the_write_visible ... ok
+test security_state::participant_source::tests::connection_recovery::security_state_denied_rollback_fences_the_store ... ok
+test security_state::participant_source::tests::connection_recovery::security_state_panic_before_commit_rolls_back_and_the_store_serves ... ok
+test security_state::participant_source::tests::connection_recovery::security_state_panic_after_commit_recovers_with_the_write_visible ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 1889 filtered out; finished in 0.71s
+

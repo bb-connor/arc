@@ -1,0 +1,9 @@
+{
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+    "budget_store::checked_accounting::",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 32.55
+}

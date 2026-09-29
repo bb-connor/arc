@@ -1,0 +1,7 @@
+
+running 2 tests
+test budget_store::tests::statement_caching::cached_budget_reads_rebind_parameters_and_observe_external_commits ... ok
+test budget_store::tests::statement_caching::hold_mutations_validate_one_snapshot_and_preserve_replay ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1894 filtered out; finished in 0.54s
+

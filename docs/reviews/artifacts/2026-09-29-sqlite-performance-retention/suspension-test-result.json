@@ -1,0 +1,8 @@
+{
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/capability_set_suspensions-462ad287a52a27b3",
+    "--test-threads=4"
+  ],
+  "exit_code": 0,
+  "seconds": 0.47
+}

@@ -1,0 +1,40 @@
+49: 2026-08-01T03:38:40.9482148Z   CHIO_CI_RUSTFLAGS: -D warnings -C link-arg=-Wl,--threads=1
+50: 2026-08-01T03:38:40.9482859Z   PROPTEST_CASES: 256
+51: 2026-08-01T03:38:40.9483309Z ##[endgroup]
+92: 2026-08-01T03:38:41.1875993Z ##[group]Fetching the repository
+93: 2026-08-01T03:38:41.1877826Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +95ff6dcc3c9f87dc5041a753e67733ab34d6c8cb:refs/remotes/pull/1044/merge
+94: 2026-08-01T03:38:44.9883450Z From https://github.com/bb-connor/arc
+95: 2026-08-01T03:38:44.9885025Z  * [new ref]         95ff6dcc3c9f87dc5041a753e67733ab34d6c8cb -> pull/1044/merge
+96: 2026-08-01T03:38:44.9929854Z ##[endgroup]
+119: 2026-08-01T03:38:46.0038343Z 
+120: 2026-08-01T03:38:46.0039007Z HEAD is now at 95ff6dc Merge 72f469b0fa5bfea5eaaa93c4f854a356bcc62ae9 into ff68701435c6227140feaca0202fc7b4e43428db
+121: 2026-08-01T03:38:46.0973008Z ##[endgroup]
+122: 2026-08-01T03:38:46.1020922Z [command]/usr/bin/git log -1 --format=%H
+123: 2026-08-01T03:38:46.1054114Z 95ff6dcc3c9f87dc5041a753e67733ab34d6c8cb
+124: 2026-08-01T03:38:46.1371171Z Prepare all required actions
+134: 2026-08-01T03:38:46.8184206Z   CHIO_CI_RUSTFLAGS: -D warnings -C link-arg=-Wl,--threads=1
+135: 2026-08-01T03:38:46.8184646Z   PROPTEST_CASES: 256
+136: 2026-08-01T03:38:46.8184946Z ##[endgroup]
+154: 2026-08-01T03:38:46.8512043Z   CHIO_CI_RUSTFLAGS: -D warnings -C link-arg=-Wl,--threads=1
+155: 2026-08-01T03:38:46.8512522Z   PROPTEST_CASES: 256
+156: 2026-08-01T03:38:46.8512857Z ##[endgroup]
+196: 2026-08-01T03:38:55.3696174Z   CHIO_CI_RUSTFLAGS: -D warnings -C link-arg=-Wl,--threads=1
+197: 2026-08-01T03:38:55.3696515Z   PROPTEST_CASES: 256
+198: 2026-08-01T03:38:55.3696730Z ##[endgroup]
+318: 2026-08-01T03:39:04.2426626Z   CHIO_CI_RUSTFLAGS: -D warnings -C link-arg=-Wl,--threads=1
+319: 2026-08-01T03:39:04.2427147Z   PROPTEST_CASES: 256
+320: 2026-08-01T03:39:04.2427349Z ##[endgroup]
+510: 2026-08-01T03:39:06.5456374Z   CHIO_CI_RUSTFLAGS: -D warnings -C link-arg=-Wl,--threads=1
+511: 2026-08-01T03:39:06.5456737Z   PROPTEST_CASES: 256
+512: 2026-08-01T03:39:06.5456962Z   CACHE_ON_FAILURE: false
+16642: 2026-08-01T05:09:40.9561653Z test serving_owner::tests::revocation_only_snapshot_rollback_is_rejected_by_the_global_anchor ... ok
+16643: 2026-08-01T05:09:41.1813141Z test receipt_store::tests::head_property::prop_incremental_head_matches_full_audit has been running for over 60 seconds
+16644: 2026-08-01T05:09:41.6367808Z test serving_owner::tests::scoped_identity::scoped_identity_qualifies_deterministic_authority_ids ... ok
+16694: 2026-08-01T05:09:50.8152400Z test tool_outcome_store::tests::tool_return_atomically_persists_blob_and_advances_operation ... ok
+16695: 2026-08-01T05:10:04.1442752Z test receipt_store::tests::retention::state_machine::prop_retention_preserves_append_invariant has been running for over 60 seconds
+16696: 2026-08-01T05:18:48.2532098Z test receipt_store::tests::head_property::prop_incremental_head_matches_full_audit ... ok
+16697: 2026-08-01T07:38:52.0796026Z ##[error]The operation was canceled.
+16698: 2026-08-01T07:38:52.1144379Z Post job cleanup.
+16715: 2026-08-01T07:38:52.4843398Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+16716: 2026-08-01T07:38:52.5453654Z Cleaning up orphan processes
+16717: 2026-08-01T07:38:52.5765110Z Terminate orphan process: pid (19666) (cargo)

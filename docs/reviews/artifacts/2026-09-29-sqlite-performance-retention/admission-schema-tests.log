@@ -1,0 +1,18 @@
+
+running 13 tests
+test admission_operation_store::tests::schema::applied_assignment_result_requires_the_exact_participant_head ... ok
+test admission_operation_store::tests::schema::canonical_schema_rejects_a_same_name_no_op_trigger ... ok
+test admission_operation_store::tests::schema::canonical_schema_rejects_a_weakened_table_definition ... ok
+test admission_operation_store::tests::schema::caller_wait::populated_v33_caller_wait_upgrade_preserves_original_rows_and_commit_chain ... ok
+test admission_operation_store::tests::schema::canonical_schema_rejects_an_unexpected_trigger_with_an_unrelated_name ... ok
+test admission_operation_store::tests::schema::fresh_provision_creates_the_operation_schema_after_serving_lease_schema ... ok
+test admission_operation_store::tests::schema::current_schema_reopen_rejects_assignment_results_without_evidence_columns ... ok
+test admission_operation_store::tests::schema::persisted_operations_use_rfc_8785_bytes ... ok
+test admission_operation_store::tests::schema::not_applied_assignment_result_retains_exact_artifacts_and_head ... ok
+test admission_operation_store::tests::schema::provision_migrates_v1_operation_state_without_losing_replay_identity ... ok
+test admission_operation_store::tests::schema::provision_migrates_v2_commit_chain_across_closed_serving_epochs ... ok
+test admission_operation_store::tests::schema::provision_migrates_v4_channel_commit_kind_without_changing_history ... ok
+test admission_operation_store::tests::schema::provision_migrates_v8_threshold_token_ids_to_proposal_scope ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1883 filtered out; finished in 22.58s
+

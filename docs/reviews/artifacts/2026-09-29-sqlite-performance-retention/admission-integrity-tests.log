@@ -1,0 +1,11 @@
+
+running 6 tests
+test admission_operation_store::tests::integrity::post_open_tampering_is_rejected_by_every_read_path_and_rows_cannot_be_deleted ... ok
+test admission_operation_store::tests::integrity::commit_log_binds_each_mutation_to_the_active_serving_lease ... ok
+test admission_operation_store::tests::integrity::a_new_serving_epoch_reclaims_an_unexpired_stale_owner_lease ... ok
+test admission_operation_store::tests::integrity::stale_owner_fences_reads_and_mutations ... ok
+test admission_operation_store::tests::integrity::transaction_failures_leave_no_partial_begin_or_cas_commit ... ok
+test admission_operation_store::tests::integrity::corrupt_rows_and_partial_current_schema_fail_closed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1890 filtered out; finished in 7.87s
+

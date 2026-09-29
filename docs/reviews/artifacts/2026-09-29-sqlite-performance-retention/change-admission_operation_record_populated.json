@@ -1,0 +1,20 @@
+{
+  "mean": {
+    "confidence_interval": {
+      "confidence_level": 0.95,
+      "lower_bound": 0.017306351934780473,
+      "upper_bound": 0.10880600801674982
+    },
+    "point_estimate": 0.06280940718584649,
+    "standard_error": 0.023326424193927796
+  },
+  "median": {
+    "confidence_interval": {
+      "confidence_level": 0.95,
+      "lower_bound": 0.005307883673433267,
+      "upper_bound": 0.12289687356590817
+    },
+    "point_estimate": 0.06086862623387157,
+    "standard_error": 0.028589082142403847
+  }
+}

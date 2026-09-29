@@ -32,20 +32,25 @@
 
 **Interfaces:** Consume existing public authorization/store APIs and scoped SQLite transactions. Produce bounded per-connection prepared statement caches and one validated hold per mutation; no new public API required.
 
-- [ ] Capture before measurements and SQL preparation/read counts on populated authorization paths.
-- [ ] Write a regression observing redundant hold reads and current-row/authority behavior; run the relevant failing assertion before repair.
-- [ ] Cache measured hot reads with explicit connection capacity and remove redundant hold reads within the original transaction.
-- [ ] Run focused budget, replay, authority and connection recovery tests plus before/after measurements. Expected: preserved refusal/rollback behavior, fewer compilations/reads, recorded latency delta.
-- [ ] Commit implementation and evidence.
+- [x] Capture before measurements and SQL preparation/read counts on populated authorization paths.
+- [x] Write a regression observing redundant hold reads and current-row/authority behavior; run the relevant failing assertion before repair.
+- [x] Cache measured hot reads with explicit connection capacity and remove redundant hold reads within the original transaction.
+- [x] Run focused budget, replay, authority and connection recovery tests plus before/after measurements. Expected: preserved refusal/rollback behavior, fewer compilations/reads, recorded latency delta.
+- [x] Commit implementation and evidence.
 
-### Task 2: Original retention workload and demonstrated liveness repair
+### Task 2: Original retention workload and demonstrated liveness repair (incomplete)
 
 **Files:** receipt_store/tests/retention.rs, receipt_store/tests/retention_liveness.rs, tests/receipt_retention_liveness.rs and its diagnostic support, actual implicated writer/checkpointer/rotation owner, batch evidence.
 
 **Interfaces:** Consume the original issue source/configuration and existing public receipt APIs. Produce a reproducible ownership diagnosis, a minimal repair where demonstrated, and a bounded regression/qualification artifact.
 
-- [ ] Recover exact historical source, runner configuration and original failure evidence; compare against current ownership.
-- [ ] Reproduce under a bounded process/watchdog with blocked-stack and ownership diagnostics, keeping workload and seed explicit.
+- [x] Recover exact historical source, runner configuration and original failure evidence; compare against current ownership.
+- [x] Run the original 256-case workload under a bounded process/watchdog with explicit seed and slow syncs. Result: 242 cases complete before the overall 900-second limit; progress continued. Thread wait states captured, stack attachment denied. This diagnostic did not reproduce the historical stall.
 - [ ] Write a deterministic regression for any demonstrated cause, observe failure, then repair the responsible owner. Do not invent a cause if the evidence only establishes nonreproduction.
-- [ ] Run the owning regression and bounded original-scale workload. Expected: terminal counts and exact receipt partition/health or an honestly preserved remaining diagnostic gap.
-- [ ] Commit repair and evidence; reconcile the roadmap and propose the next substantive batch.
+- [x] Qualify the diagnostic completion correction and existing deterministic ownership checks. Preserve terminal counts, receipt partition/health assertions and the remaining diagnostic gap.
+- [ ] Complete the full 256-case slow-sync qualification after supported ownership/stack capture is established.
+- [x] Commit the diagnostic and evidence; reconcile the roadmap and propose the next substantive batch. No production receipt repair is claimed.
+
+Status: Packet 9.3/9.5 is locally implemented and measured. Retention issue 1045
+root cause/repair and the complete 256-case slow-sync gate remain open. See
+[execution evidence](../../reviews/2026-09-29-sqlite-performance-retention-execution.md).

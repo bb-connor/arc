@@ -1,0 +1,304 @@
+
+running 1 test
+retention case=0 phase=begin
+retention case=0 phase=open
+retention case=0 operation=0 kind=Rotate
+retention case=0 phase=flush
+retention case=0 phase=rotate
+retention case=0 phase=flush
+retention case=0 phase=health
+retention case=0 phase=probe
+retention case=0 operation=1 kind=AppendTool(4)
+retention case=0 phase=probe
+retention case=0 operation=2 kind=AppendChild(4)
+retention case=0 phase=probe
+retention case=0 operation=3 kind=Rotate
+retention case=0 phase=flush
+retention case=0 phase=rotate
+retention case=0 phase=flush
+retention case=0 phase=health
+retention case=0 phase=probe
+retention case=0 operation=4 kind=Rotate
+retention case=0 phase=flush
+retention case=0 phase=rotate
+retention case=0 phase=flush
+retention case=0 phase=health
+retention case=0 phase=probe
+retention case=0 phase=flush
+retention case=0 phase=health
+retention case=0 phase=reopen
+retention case=0 phase=read-live-ids
+retention case=0 phase=complete
+retention case=1 phase=begin
+retention case=1 phase=open
+retention case=1 operation=0 kind=AppendTool(3)
+retention case=1 phase=probe
+retention case=1 operation=1 kind=Rotate
+retention case=1 phase=flush
+retention case=1 phase=rotate
+retention case=1 phase=flush
+retention case=1 phase=health
+retention case=1 phase=probe
+retention case=1 operation=2 kind=AppendTool(6)
+retention case=1 phase=probe
+retention case=1 operation=3 kind=AppendChild(5)
+retention case=1 phase=probe
+retention case=1 operation=4 kind=Rotate
+retention case=1 phase=flush
+retention case=1 phase=rotate
+retention case=1 phase=flush
+retention case=1 phase=health
+retention case=1 phase=probe
+retention case=1 operation=5 kind=Rotate
+retention case=1 phase=flush
+retention case=1 phase=rotate
+retention case=1 phase=flush
+retention case=1 phase=health
+retention case=1 phase=probe
+retention case=1 operation=6 kind=Rotate
+retention case=1 phase=flush
+retention case=1 phase=rotate
+retention case=1 phase=flush
+retention case=1 phase=health
+retention case=1 phase=probe
+retention case=1 operation=7 kind=AppendTool(4)
+retention case=1 phase=probe
+retention case=1 phase=flush
+retention case=1 phase=health
+retention case=1 phase=reopen
+retention case=1 phase=read-live-ids
+retention case=1 phase=complete
+retention case=2 phase=begin
+retention case=2 phase=open
+retention case=2 operation=0 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=1 kind=AppendTool(4)
+retention case=2 phase=probe
+retention case=2 operation=2 kind=AppendChild(2)
+retention case=2 phase=probe
+retention case=2 operation=3 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=4 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=5 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=6 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=7 kind=AppendChild(6)
+retention case=2 phase=probe
+retention case=2 operation=8 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=9 kind=AppendChild(4)
+retention case=2 phase=probe
+retention case=2 operation=10 kind=AppendChild(7)
+retention case=2 phase=probe
+retention case=2 operation=11 kind=AppendTool(3)
+retention case=2 phase=probe
+retention case=2 operation=12 kind=AppendChild(7)
+retention case=2 phase=probe
+retention case=2 operation=13 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=14 kind=AppendChild(3)
+retention case=2 phase=probe
+retention case=2 operation=15 kind=AppendTool(5)
+retention case=2 phase=probe
+retention case=2 operation=16 kind=AppendTool(6)
+retention case=2 phase=probe
+retention case=2 operation=17 kind=AppendTool(6)
+retention case=2 phase=probe
+retention case=2 operation=18 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=19 kind=AppendChild(0)
+retention case=2 phase=probe
+retention case=2 operation=20 kind=AppendTool(1)
+retention case=2 phase=probe
+retention case=2 operation=21 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=22 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=23 kind=AppendChild(3)
+retention case=2 phase=probe
+retention case=2 operation=24 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=25 kind=AppendChild(1)
+retention case=2 phase=probe
+retention case=2 operation=26 kind=AppendTool(1)
+retention case=2 phase=probe
+retention case=2 operation=27 kind=AppendTool(3)
+retention case=2 phase=probe
+retention case=2 operation=28 kind=AppendTool(7)
+retention case=2 phase=probe
+retention case=2 operation=29 kind=AppendTool(2)
+retention case=2 phase=probe
+retention case=2 operation=30 kind=AppendTool(7)
+retention case=2 phase=probe
+retention case=2 operation=31 kind=AppendTool(3)
+retention case=2 phase=probe
+retention case=2 operation=32 kind=Rotate
+retention case=2 phase=flush
+retention case=2 phase=rotate
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=probe
+retention case=2 operation=33 kind=AppendTool(6)
+retention case=2 phase=probe
+retention case=2 phase=flush
+retention case=2 phase=health
+retention case=2 phase=reopen
+retention case=2 phase=read-live-ids
+retention case=2 phase=complete
+retention case=3 phase=begin
+retention case=3 phase=open
+retention case=3 operation=0 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=1 kind=AppendTool(6)
+retention case=3 phase=probe
+retention case=3 operation=2 kind=AppendChild(7)
+retention case=3 phase=probe
+retention case=3 operation=3 kind=AppendChild(2)
+retention case=3 phase=probe
+retention case=3 operation=4 kind=AppendTool(0)
+retention case=3 phase=probe
+retention case=3 operation=5 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=6 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=7 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=8 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=9 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=10 kind=AppendChild(6)
+retention case=3 phase=probe
+retention case=3 operation=11 kind=AppendChild(7)
+retention case=3 phase=probe
+retention case=3 operation=12 kind=AppendTool(1)
+retention case=3 phase=probe
+retention case=3 operation=13 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=14 kind=AppendChild(2)
+retention case=3 phase=probe
+retention case=3 operation=15 kind=AppendChild(5)
+retention case=3 phase=probe
+retention case=3 operation=16 kind=AppendChild(7)
+retention case=3 phase=probe
+retention case=3 operation=17 kind=AppendChild(7)
+retention case=3 phase=probe
+retention case=3 operation=18 kind=AppendTool(3)
+retention case=3 phase=probe
+retention case=3 operation=19 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=20 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=21 kind=AppendTool(2)
+retention case=3 phase=probe
+retention case=3 operation=22 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 operation=23 kind=AppendChild(0)
+retention case=3 phase=probe
+retention case=3 operation=24 kind=AppendTool(7)
+retention case=3 phase=probe
+retention case=3 operation=25 kind=AppendChild(2)
+retention case=3 phase=probe
+retention case=3 operation=26 kind=AppendTool(7)
+retention case=3 phase=probe
+retention case=3 operation=27 kind=Rotate
+retention case=3 phase=flush
+retention case=3 phase=rotate
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=probe
+retention case=3 phase=flush
+retention case=3 phase=health
+retention case=3 phase=reopen
+retention case=3 phase=read-live-ids
+retention case=3 phase=complete
+test receipt_store::tests::retention::state_machine::prop_retention_preserves_append_invariant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1895 filtered out; finished in 10.06s
+

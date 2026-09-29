@@ -1,0 +1,9 @@
+{
+  "command": "CARGO_INCREMENTAL=0 CHIO_RETENTION_CASES=1 PROPTEST_MAX_SHRINK_ITERS=0 PROPTEST_RNG_SEED=20260926 cargo test --locked -p chio-store-sqlite --lib receipt_store::tests::retention::state_machine::prop_retention_preserves_append_invariant -- --exact --nocapture",
+  "exit_code": 101,
+  "summaries": [
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1895 filtered out; finished in 0.84s"
+  ],
+  "completed_cases": 0,
+  "teardown_observations": 0
+}

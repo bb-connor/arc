@@ -1,0 +1,103 @@
+
+running 92 tests
+test serving_owner::connection_recovery::a_panic_after_anchor_sync_recovers_with_the_commit_visible ... ok
+test serving_owner::connection_recovery::a_panic_before_commit_rolls_back_and_the_authority_serves ... ok
+test serving_owner::global_commit_chain::schema_tests::nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor ... ok
+test serving_owner::connection_recovery::a_denied_rollback_fences_the_authority_connection_for_every_store ... ok
+test serving_owner::global_commit_chain::schema_tests::unexpected_trigger_on_previous_global_schema_is_not_repaired ... ok
+test serving_owner::global_commit_chain::tests::authority_snapshot_includes_payment_projection ... ok
+test serving_owner::global_commit_chain::tests::channel_release_projection_references_are_exact_and_unknown_kinds_stay_closed ... ok
+test serving_owner::global_commit_chain::tests::factor_assignment_authority_coverage_is_exact_and_closed ... ok
+test serving_owner::global_commit_chain::tests::factor_assignment_authority_reference_is_exact ... ok
+test serving_owner::global_commit_chain::tests::pre_channel_compatibility_requires_every_channel_table_to_be_empty ... ok
+test serving_owner::global_commit_chain::tests::pre_factor_assignment_compatibility_requires_empty_projection ... ok
+test serving_owner::global_commit_chain::tests::pre_payment_compatibility_requires_empty_payment_projection ... ok
+test serving_owner::global_commit_chain::schema_tests::ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor ... ok
+test serving_owner::relocation::tests::resumed_export_finalization_refuses_a_replaced_database_inode ... ok
+test serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds ... ok
+test serving_owner::connection_recovery::a_panic_between_commit_and_anchor_sync_fences_until_a_reopen_reconciles ... ok
+test serving_owner::rollback_anchor::tests::a_live_reader_is_not_downgraded_by_anchor_file_tampering ... ok
+test serving_owner::rollback_anchor::tests::a_companion_snapshot_proves_against_the_anchor_it_captured ... ok
+test serving_owner::rollback_anchor::tests::anchor_corruption_without_a_valid_slot_fails_closed ... ok
+test serving_owner::rollback_anchor::tests::companion_reads_reject_a_restored_database_claiming_a_higher_head ... ok
+test serving_owner::rollback_anchor::tests::companion_reads_survive_concurrent_commits ... ok
+test serving_owner::rollback_anchor::tests::corrupt_newest_slot_cannot_launder_database_rollback_to_surviving_anchor ... ok
+test serving_owner::rollback_anchor::tests::database_ahead_of_anchor_is_reconciled_before_serving ... ok
+test serving_owner::rollback_anchor::tests::equal_epoch_with_a_different_serving_lease_is_rejected ... ok
+test serving_owner::rollback_anchor::tests::equal_length_divergent_commit_history_is_rejected ... ok
+test serving_owner::tests::a_failed_provision_cleans_up_only_what_it_created ... ok
+test serving_owner::rollback_anchor::tests::existing_store_with_a_missing_anchor_cannot_be_reseeded ... ok
+test serving_owner::rollback_anchor::tests::in_place_snapshot_rollback_cannot_remove_replay_or_time_heads ... ok
+test serving_owner::tests::a_legacy_global_projection_constraint_is_rejected_rather_than_migrated ... ok
+test serving_owner::tests::baseline_verification_rejects_live_projection_tampering ... ok
+test serving_owner::rollback_anchor::tests::database_ahead_of_surviving_anchor_recovers_torn_newest_slot ... ok
+test serving_owner::tests::authorization_then_revocation_replays_the_serialized_authorization ... ok
+test serving_owner::tests::budget_database_ahead_of_anchor_recovers_only_a_valid_chain_extension ... ok
+test serving_owner::tests::challenge_projection::finding_challenge_projection_rejects_retained_submission_tampering ... ok
+test serving_owner::tests::budget_only_snapshot_rollback_is_rejected_by_the_global_anchor ... ok
+test serving_owner::tests::database_identity_and_lock_error_helpers_fail_closed ... ok
+test serving_owner::tests::challenge_projection::finding_challenge_projection_rejects_offline_state_tampering ... ok
+
+running 1 test
+test serving_owner::tests::database_symlink_and_hardlink_aliases_are_rejected ... ok
+test serving_owner::tests::serving_owner_child_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1895 filtered out; finished in 0.85s
+
+test serving_owner::tests::concurrent_process_open_is_fenced_before_serving ... ok
+test serving_owner::tests::concurrent_provisioning_creates_one_owner_and_one_lock ... ok
+test serving_owner::tests::denied_authorization_tombstones_the_hold_identity ... ok
+test serving_owner::tests::finding_challenge_projection_covers_retained_outcome_bytes ... ok
+test serving_owner::tests::finding_market_projection_commits_manually_admitted_buyer_slots ... ok
+test serving_owner::tests::finding_challenge_snapshot_rollback_is_rejected_by_the_global_anchor ... ok
+test serving_owner::tests::initial_provision_refuses_nonempty_legacy_authority_state ... ok
+test serving_owner::tests::finding_market_projection_rejects_v9_snapshot_with_uncommitted_manual_slot ... ok
+test serving_owner::tests::joint_authorization_replay_uses_stored_revocation_head ... ok
+test serving_owner::tests::fresh_joint_authorization_rejects_historical_revocation_fence ... ok
+test serving_owner::tests::joint_capture_replays_after_supplemental_authorization_expires ... ok
+test serving_owner::tests::joint_cumulative_approval_survives_owner_epoch_rotation ... ok
+test serving_owner::tests::joint_store_owns_budget_and_revocation_with_one_fence ... ok
+test serving_owner::tests::joint_structured_mutations_require_the_exact_active_authority ... ok
+test serving_owner::tests::normalized_schema_rejects_cross_hold_operations_and_invalid_quota_indices ... ok
+test serving_owner::tests::joint_hold_lifecycle_and_event_replays_survive_owner_epoch_rotation ... ok
+test serving_owner::tests::preprovision_snapshot_cannot_reset_local_path_identity ... ok
+test serving_owner::tests::provisioned_store_rejects_independent_mutable_opens ... ok
+test serving_owner::tests::provisioning::partial_provision_fails_closed ... ok
+test serving_owner::tests::provisioning_rejects_unsafe_database_and_lock_root_modes ... ok
+test serving_owner::tests::missing_path_identity_migrates_only_after_anchor_proof_and_is_idempotent ... ok
+test serving_owner::tests::provisioning::a_transient_lock_root_failure_does_not_wedge_provisioning ... ok
+test serving_owner::tests::offline_provision_upgrade_is_fenced_and_idempotent ... ok
+test serving_owner::tests::relocation::import_checks_external_manifest_before_retiring_the_export ... ok
+test serving_owner::tests::relocation::import_refuses_stores_that_were_not_exported_or_no_longer_match_their_seal ... ok
+test serving_owner::tests::relocation::a_provisioned_store_that_never_served_relocates_and_serves_at_the_new_path ... ok
+test serving_owner::tests::relocation::refused_wal_backed_import_does_not_checkpoint_foreign_state_on_close ... ok
+test serving_owner::tests::relocation::exported_store_refuses_serving_until_a_copy_is_imported_elsewhere ... ok
+test serving_owner::tests::relocation::restoring_pre_export_database_cannot_undo_retirement ... ok
+test serving_owner::tests::relocation::relocation_preserves_other_authorities_in_a_shared_lock_root ... ok
+test serving_owner::tests::relocation::verified_import_retries_after_lock_artifact_io_refusal ... ok
+test serving_owner::tests::replaced_or_hardlinked_path_identity_marker_is_rejected ... ok
+test serving_owner::tests::replaced_or_hardlinked_serving_lock_is_rejected ... ok
+test serving_owner::tests::revocation_only_snapshot_rollback_is_rejected_by_the_global_anchor ... ok
+test serving_owner::tests::revocations_do_not_create_budget_replication_holes ... ok
+test serving_owner::tests::revoked_leaf_or_ancestor_is_atomically_denied_without_reservations ... ok
+test serving_owner::tests::scoped_identity::live_store_verifies_the_configured_database_identity ... ok
+test serving_owner::tests::scoped_identity::scoped_identity_qualifies_deterministic_authority_ids ... ok
+test serving_owner::tests::scoped_identity::scoped_identity_rejects_invalid_or_exhausted_ids ... ok
+test serving_owner::tests::serving_open_rejects_corrupted_lease_history ... ok
+test serving_owner::tests::serving_lease_history_preserves_only_real_historical_revocation_commits ... ok
+test serving_owner::tests::serving_open_rejects_forged_historical_budget_authority ... ok
+test serving_owner::tests::serving_open_rejects_invalid_revocation_commit_metadata ... ok
+test serving_owner::tests::serving_open_rejects_forged_historical_revocation_provenance ... ok
+test serving_owner::tests::serving_open_rejects_owner_update_trigger_before_epoch_mutation ... ok
+test serving_owner::tests::serving_open_rejects_substituted_lease_history_trigger ... ok
+test serving_owner::tests::serving_open_rejects_unexpected_lease_history_trigger ... ok
+test serving_owner::tests::serving_open_rejects_partial_supplemental_projection ... ok
+test serving_owner::tests::serving_open_rejects_noncanonical_projection_members ... ok
+test serving_owner::tests::serving_owner_child_process ... ignored, child-process serving-owner helper
+test serving_owner::tests::serving_open_rejects_weakened_lease_history_table ... ok
+test serving_owner::tests::serving_open_rejects_unjournaled_valid_revocation_commit ... ok
+test serving_owner::tests::serving_open_rejects_unsafe_or_noncanonical_store_uuid ... ok
+test serving_owner::tests::stale_serving_epoch_fences_budget_and_revocation_access ... ok
+
+test result: ok. 91 passed; 0 failed; 1 ignored; 0 measured; 1804 filtered out; finished in 97.71s
+

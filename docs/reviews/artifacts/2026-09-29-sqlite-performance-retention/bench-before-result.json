@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/store_authorization_path-55a6e10585bd455a",
+    "--save-baseline",
+    "sqlite-batch-before",
+    "--sample-size",
+    "10",
+    "--warm-up-time",
+    "0.2",
+    "--measurement-time",
+    "1",
+    "--bench"
+  ],
+  "phase": "before",
+  "rows": 1000,
+  "capabilities": 512,
+  "suspensions": 128,
+  "profile": "dev, unoptimized Rust, incremental disabled",
+  "executable_sha256": "a9e17b05ce90d0c038d7715d8ee6cdebc552d6b88d84e0f02c35017a1f8ed2d3",
+  "pid": 1982550,
+  "exit_code": 0,
+  "seconds": 98.21
+}

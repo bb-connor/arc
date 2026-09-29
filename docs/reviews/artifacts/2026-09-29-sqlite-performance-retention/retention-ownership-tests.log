@@ -1,0 +1,9 @@
+
+running 4 tests
+test rotation_waits_behind_the_writer_commit_it_cannot_preempt ... ok
+test sync_shim::failed_open_tests::failed_parent_open_keeps_its_required_close_callback ... ok
+test workload::released_caller_timeout_reports_the_stalled_step ... ok
+test appends_wait_behind_the_rotation_holding_the_archive_sync ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.76s
+

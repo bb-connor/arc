@@ -1,0 +1,9 @@
+
+running 4 tests
+test member_and_command_integrity_corruption_fail_closed ... ok
+test overlapping_sets_compose_and_remove_only_the_exact_contribution ... ok
+test journal_survives_restart_and_rejects_set_action_and_fence_rebinding ... ok
+test tenant_isolation::exact_tenant_identifiers_remain_isolated_after_restart ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+

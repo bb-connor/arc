@@ -1,0 +1,15 @@
+[
+  {
+    "name": "budget",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio_store_sqlite-c45af002eb0b1652",
+      "budget_store::",
+      "--test-threads=4"
+    ],
+    "exit_code": 101,
+    "seconds": 47.44,
+    "summaries": [
+      "test result: FAILED. 142 passed; 2 failed; 0 ignored; 0 measured; 1752 filtered out; finished in 47.41s"
+    ]
+  }
+]
