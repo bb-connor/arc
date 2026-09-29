@@ -1,6 +1,8 @@
+#[cfg(feature = "std")]
+use super::PortResult;
 use super::{
-    BoundedVec, CanonicalBody, ClassifierId, ClassifierVersion, Deserialize, Digest32, PortResult,
-    RecordId, RequestId, Serialize, TenantId,
+    BoundedVec, CanonicalBody, ClassifierId, ClassifierVersion, Deserialize, Digest32, RecordId,
+    RequestId, Serialize, TenantId,
 };
 
 pub type ClassificationFindings = BoundedVec<ClassificationFinding, 256>;

@@ -1,9 +1,13 @@
 #[cfg(feature = "std")]
 use super::sort_json_object_keys;
 use super::{
-    ActionId, BoundedVec, Deserialize, Digest32, EffectExecutionStatus, EffectId, EffectRequest,
-    EffectResult, EffectResultQuery, PortError, PortResult, RecordId, RecordIdSet, Serialize,
-    TenantId, Vec, RESPONSE_AFFECTED_SET_DOMAIN,
+    ActionId, BoundedVec, Deserialize, Digest32, EffectId, EffectRequest, EffectResult, RecordId,
+    RecordIdSet, Serialize, TenantId,
+};
+#[cfg(feature = "std")]
+use super::{
+    EffectExecutionStatus, EffectResultQuery, PortError, PortResult, Vec,
+    RESPONSE_AFFECTED_SET_DOMAIN,
 };
 
 pub const CAPABILITY_SET_SUSPENSION_VERSION_DOMAIN: &[u8] =

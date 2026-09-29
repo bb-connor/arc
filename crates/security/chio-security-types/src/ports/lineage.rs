@@ -1,8 +1,9 @@
 use super::{
     ActionId, BoundedVec, Deserialize, Digest32, EffectId, IssuanceFreezeKey, LeaseOwnerId,
-    PortError, PortResult, RecordId, RecordIdSet, ScheduledWork, Serialize, TenantId,
-    TenantScopedId, Vec,
+    RecordId, RecordIdSet, ScheduledWork, Serialize, TenantId, Vec,
 };
+#[cfg(feature = "std")]
+use super::{PortError, PortResult, TenantScopedId};
 
 pub const LINEAGE_FENCE_MAX_LEASE_MS: u64 = 60_000;
 pub const LINEAGE_FENCE_RENEWAL_MARGIN_MS: u64 = 20_000;

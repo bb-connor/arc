@@ -1,6 +1,8 @@
+#[cfg(feature = "std")]
+use super::PortResult;
 use super::{
-    BoundedVec, CanonicalBody, Deserialize, Digest32, EventId, PortResult, ProducerId, RecordId,
-    RuleId, Serialize, TenantId,
+    BoundedVec, CanonicalBody, Deserialize, Digest32, EventId, ProducerId, RecordId, RuleId,
+    Serialize, TenantId,
 };
 
 pub type VerifiedEventBatch = BoundedVec<SecurityEventVerificationRecord, 4_096>;

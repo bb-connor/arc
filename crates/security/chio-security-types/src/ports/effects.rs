@@ -1,7 +1,10 @@
 use super::{
-    ActionId, CanonicalBody, Deserialize, Digest32, EffectId, ErrorCode, LeaseOwnerId,
+    ActionId, CanonicalBody, Deserialize, Digest32, EffectId, ErrorCode, LeaseOwnerId, RecordId,
+    ResponseEffectKind, ResponseTarget, Serialize, TenantId,
+};
+#[cfg(feature = "std")]
+use super::{
     LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest, PortError, PortResult,
-    RecordId, ResponseEffectKind, ResponseTarget, Serialize, TenantId,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

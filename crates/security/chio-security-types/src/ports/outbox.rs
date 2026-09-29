@@ -1,9 +1,11 @@
 use super::identifiers::validate_nonzero_id;
 use super::{
     fmt, ActionId, AdmissionArtifactRef, AttestedFindingBatchBinding, Box, CanonicalBody,
-    CreateOutcome, Deserialize, Digest32, ErrorCode, OpaqueReceiptRef, PortResult, RecordId,
-    ResponseDispatchApproval, Serialize, TenantId, Vec,
+    Deserialize, Digest32, ErrorCode, OpaqueReceiptRef, RecordId, ResponseDispatchApproval,
+    Serialize, TenantId,
 };
+#[cfg(feature = "std")]
+use super::{CreateOutcome, PortResult, Vec};
 
 pub const ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION: u8 = 1;
 pub const PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION: u8 = 1;

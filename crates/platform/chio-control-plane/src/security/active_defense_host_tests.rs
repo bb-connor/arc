@@ -113,6 +113,9 @@ impl FixedClock {
         let worker_read = std::thread::current()
             .name()
             .is_some_and(|name| name == "chio-response-worker");
+        if worker_read && self.panic_once.swap(false, Ordering::AcqRel) {
+            panic!("injected worker clock panic");
+        }
         if self.block_once.swap(false, Ordering::AcqRel)
             || (worker_read && self.block_worker_once.swap(false, Ordering::AcqRel))
         {

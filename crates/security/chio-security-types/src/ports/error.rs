@@ -1,4 +1,5 @@
 use super::{ErrorCode, IdError};
+use alloc::string::ToString;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 

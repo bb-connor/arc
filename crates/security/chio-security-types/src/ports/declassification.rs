@@ -1,9 +1,11 @@
 #[cfg(feature = "std")]
 use super::{format, vec};
 use super::{
-    Deserialize, Digest32, ErrorCode, EventId, GrantId, OpaqueReceiptRef, PortError, PortResult,
-    ReceiptAppendRequest, RecordId, RequestId, Serialize, String, TenantId, Vec,
+    Deserialize, Digest32, ErrorCode, GrantId, OpaqueReceiptRef, PortError, PortResult,
+    ReceiptAppendRequest, RecordId, RequestId, Serialize, TenantId,
 };
+#[cfg(feature = "std")]
+use super::{EventId, String, Vec};
 
 pub const DECLASSIFICATION_EVIDENCE_SCHEMA_VERSION: u8 = 2;
 pub const DECLASSIFICATION_EVIDENCE_INITIAL_RETRY_MS: u64 = 1_000;

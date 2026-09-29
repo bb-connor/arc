@@ -1,10 +1,11 @@
 #[cfg(feature = "std")]
 use super::{format, sort_json_object_keys};
 use super::{
-    ActionId, BoundedVec, Deserialize, Digest32, EffectExecutionStatus, EffectId, EffectRequest,
-    EffectResult, EffectResultQuery, PortError, PortResult, RecordId, Serialize, SessionId, String,
-    TenantId, Vec,
+    ActionId, BoundedVec, Deserialize, Digest32, EffectId, EffectRequest, EffectResult, PortError,
+    PortResult, RecordId, Serialize, SessionId, TenantId,
 };
+#[cfg(feature = "std")]
+use super::{EffectExecutionStatus, EffectResultQuery, String, Vec};
 
 pub const SESSION_THROTTLE_VERSION_DOMAIN: &[u8] =
     b"chio.response-effect-session-throttle-state.v1\0";

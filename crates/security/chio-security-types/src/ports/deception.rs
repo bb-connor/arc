@@ -1,3 +1,4 @@
+#[cfg(feature = "std")]
 use super::{
     DecoyArtifactLookup, DecoyScan, PortResult, SealedDecoyCasRequest, SealedDecoyPage,
     SealedDecoyRecord, SealedMarkerLookup, SealedPublicRefLookup, WatermarkObservation,

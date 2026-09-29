@@ -1,4 +1,6 @@
-use super::{Deserialize, Digest32, PortResult, RecordId, Serialize, TenantId};
+#[cfg(feature = "std")]
+use super::PortResult;
+use super::{Deserialize, Digest32, RecordId, Serialize, TenantId};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

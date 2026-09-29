@@ -1,8 +1,9 @@
 use super::{
-    ActionId, CanonicalBody, CreateOutcome, Deserialize, Digest32, EffectId, LeaseOwnerId,
-    OpaqueReceiptRef, PortError, PortResult, RecordId, ScheduledWork, SchedulerClaimRequest,
-    Serialize, TenantId, Vec,
+    ActionId, CanonicalBody, Deserialize, Digest32, EffectId, LeaseOwnerId, OpaqueReceiptRef,
+    RecordId, ScheduledWork, Serialize, TenantId,
 };
+#[cfg(feature = "std")]
+use super::{CreateOutcome, PortError, PortResult, SchedulerClaimRequest, Vec};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

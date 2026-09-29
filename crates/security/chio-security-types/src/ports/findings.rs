@@ -1,9 +1,11 @@
 #[cfg(feature = "std")]
 use super::format;
 use super::{
-    ActionId, BoundedVec, CanonicalBody, CreateOutcome, Deserialize, Digest32, OpaqueReceiptRef,
-    PortError, PortResult, RecordId, Serialize, String, TenantId, Vec,
+    ActionId, BoundedVec, CanonicalBody, Deserialize, Digest32, OpaqueReceiptRef, RecordId,
+    Serialize, TenantId,
 };
+#[cfg(feature = "std")]
+use super::{CreateOutcome, PortError, PortResult, String, Vec};
 
 pub const ATTESTED_FINDING_BATCH_SCHEMA_VERSION: u8 = 1;
 pub const MAX_ATTESTED_FINDING_BATCH_SIZE: usize = 4_096;

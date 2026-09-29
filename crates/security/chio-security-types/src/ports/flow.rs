@@ -1,6 +1,8 @@
+#[cfg(feature = "std")]
+use super::PortResult;
 use super::{
     Deserialize, Digest32, InformationLabel, IsolationEpochId, LineageId, OpaqueReceiptRef,
-    PortResult, RecordId, RequestId, Serialize, SessionId, TenantId,
+    RecordId, RequestId, Serialize, SessionId, TenantId,
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

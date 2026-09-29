@@ -1,10 +1,16 @@
+#[cfg(feature = "std")]
+#[cfg(feature = "std")]
 use super::identifiers::MAX_ID_BYTES;
 #[cfg(feature = "std")]
 use super::{format, sort_json_object_keys};
 use super::{
-    ActionId, BoundedVec, Deserialize, Digest32, EffectExecutionStatus, EffectId, EffectRequest,
-    EffectResult, EffectResultQuery, PortError, PortResult, RecordId, Serialize, SessionId, String,
-    TenantId, TenantScopedId,
+    ActionId, BoundedVec, Deserialize, Digest32, EffectId, EffectRequest, EffectResult, Serialize,
+    TenantScopedId,
+};
+#[cfg(feature = "std")]
+use super::{
+    EffectExecutionStatus, EffectResultQuery, PortError, PortResult, RecordId, SessionId, String,
+    TenantId,
 };
 
 pub const CONTAINMENT_TARGET_DOMAIN: &[u8] = b"chio.security.containment-target.v1\0";

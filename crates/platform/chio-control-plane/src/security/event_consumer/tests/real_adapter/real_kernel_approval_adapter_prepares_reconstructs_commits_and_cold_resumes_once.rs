@@ -24,7 +24,7 @@ fn real_kernel_approval_adapter_prepares_reconstructs_commits_and_cold_resumes_o
         fixture.native_request().response_plan()
     );
     assert_eq!(
-        governed_approval_request_from_native(&kernel_prepared.test_request())
+        governed_approval_request_from_native(kernel_prepared.test_request())
             .unwrap_or_else(|error| panic!("project retained real adapter request: {error}")),
         fixture.governed_request()
     );

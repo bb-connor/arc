@@ -95,9 +95,9 @@ pub use correlation::{
 };
 
 mod admission;
-use admission::governed_approval_request_from_native;
 #[cfg(test)]
-use admission::{digest_from_canonical_hex, AttestedFindingAdmissionArtifactPayload};
+use admission::digest_from_canonical_hex;
+use admission::governed_approval_request_from_native;
 pub use admission::{AttestedFindingAdmissionArtifacts, AttestedFindingResponsePolicySelection};
 
 mod reservation;

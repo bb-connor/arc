@@ -274,9 +274,9 @@ pub(super) use faults::{LedgerFailureProbe, WriteFault};
 #[test]
 fn native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen() -> TestResult {
     for (mutation, reason) in [
-        ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = CAST('{}' AS BLOB)", "missing field `schema`"),
-        ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = zeroblob(1048577)", "native dispatch ledger record exceeds its physical bound"),
-        ("DELETE FROM admission_operation_native_dispatch_ledger", "native dispatch ledger lost its exact global commitment"),
+        ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = CAST('{}' AS BLOB)", "admission operation invariant failed: native security state: urn:chio:error:attest:signed-json-invalid-shape"),
+        ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = zeroblob(1048577)", "admission operation invariant failed: native security state: native dispatch ledger record exceeds its physical bound"),
+        ("DELETE FROM admission_operation_native_dispatch_ledger", "admission operation invariant failed: native security state: native dispatch ledger lost its exact global commitment"),
     ] {
         let mut fixture = public_fixture()?;
         let resolver = Arc::new(NativeFlowResolver::new(
@@ -292,7 +292,11 @@ fn native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen() 
             Ok(())
         });
         let error = result.err().ok_or("corrupted native ledger reopened")?;
-        assert!(error.to_string().contains(reason), "{mutation}: {error}");
+        assert!(
+            matches!(error.downcast_ref::<chio_store_sqlite::SqliteServingOwnerError>(),
+                Some(chio_store_sqlite::SqliteServingOwnerError::Invalid(detail)) if detail == reason),
+            "{mutation}: {error}"
+        );
     }
     Ok(())
 }

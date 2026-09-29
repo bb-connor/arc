@@ -1,5 +1,7 @@
+#[cfg(feature = "std")]
+use super::PortResult;
 use super::{
-    ActionId, AdmissionArtifactRef, CanonicalBody, Deserialize, Digest32, PortResult,
+    ActionId, AdmissionArtifactRef, CanonicalBody, Deserialize, Digest32,
     PreparedActiveResponseDispatchBinding, RecordId, Serialize, TenantId,
 };
 

@@ -1,10 +1,12 @@
 #[cfg(feature = "std")]
 use super::issuance_freeze_domain_hash;
 use super::{
-    ActionId, BoundedVec, Deserialize, DestinationId, Digest32, EffectExecutionStatus, EffectId,
-    EffectRequest, EffectResult, EffectResultQuery, EgressDeniedDestinations, EgressDestinationSet,
-    EgressRestrictionEffectIds, PortError, PortResult, Serialize, SessionId, TenantId, Vec,
+    ActionId, BoundedVec, Deserialize, DestinationId, Digest32, EffectId, EffectRequest,
+    EffectResult, EgressDeniedDestinations, EgressDestinationSet, EgressRestrictionEffectIds,
+    Serialize, SessionId, TenantId,
 };
+#[cfg(feature = "std")]
+use super::{EffectExecutionStatus, EffectResultQuery, PortError, PortResult, Vec};
 
 pub type EgressRestrictionContributions = BoundedVec<EgressRestrictionContribution, 256>;
 

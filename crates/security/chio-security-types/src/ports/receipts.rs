@@ -1,6 +1,7 @@
+#[cfg(feature = "std")]
+use super::PortResult;
 use super::{
-    CanonicalBody, Deserialize, Digest32, OpaqueReceiptRef, PortResult, RecordId, Serialize,
-    TenantId,
+    CanonicalBody, Deserialize, Digest32, OpaqueReceiptRef, RecordId, Serialize, TenantId,
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

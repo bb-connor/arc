@@ -126,11 +126,6 @@ mod custody;
 use custody::{
     acquire_response_worker_join_permit, ResponseWorkerJoinPermit, ResponseWorkerTaskLiveness,
 };
-#[cfg(test)]
-use custody::{
-    join_response_worker_thread, ResponseWorkerJoinJob, ResponseWorkerReaperRegistry,
-    MAX_RESPONSE_WORKER_JOIN_OWNERS,
-};
 
 mod scheduler;
 pub use scheduler::{ProductionResponseSchedulerConfig, SqliteResponseWorkerPort};
