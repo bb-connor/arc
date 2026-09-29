@@ -26,8 +26,39 @@ Calibrated checker tests reject reordered commits, unrequested acknowledgements
 and a clean lift after failed restoration. The mutations come from the production
 state machine over a test store. They do not independently establish an external
 effect journal, signed receipt delivery, OS crash behavior or Rust/TLA refinement.
-Signed receipt integrity is exercised separately by the owning control-plane
-regression.
+The separate durable-port fixture described below supplies external journal and
+signed receipt linkage.
+
+The required `--durable-traces` artifact has schema
+`chio.response-durable-trace.v1`. Generate it by setting
+`CHIO_DURABLE_LIFECYCLE_TRACE` to a file while running the control-plane test
+`durable_lifecycle_trace_links_commits_effects_and_signed_receipts`. It executes
+the real durable executor, SQLite response and session-throttle stores,
+`SessionThrottleBackend`, native receipt signer and SQLite receipt index. The
+happy, effect acknowledgement loss and receipt acknowledgement loss scenarios
+drop every store/executor/backend owner, reopen, recover activation, replay it,
+expire the response, remove its throttle and reopen again for final readback.
+These are controlled owner restarts, not process crashes or OS power loss.
+
+Production debug observations carry identifiers and hashes after successful
+commits. SQLite connection guards are released before subscribers run. The
+initial dispatch atomically commits a range of mutations; later commits cover a
+single generation. A receipt observation follows successful indexed persistence
+and verification. Events do not confer authority, contain no secret payload and
+are not a global ordering guarantee for concurrent callers. The fixture is a
+single worker so its event order can be checked against its independent reopened
+native command journal, final response body and stored signed receipts.
+
+The checker independently verifies Ed25519 signatures against the pinned public
+test key, evidence IDs, receipt body hashes, mutation/plan bindings, native
+command results, commit/request/acknowledgement order and restart placement. Its
+canonical encoder intentionally accepts only the fixture's ASCII/integer JSON
+subset. The public test key and trace file do not establish trusted production
+capture. The scheduled lane requires this generated artifact and runs mutation
+controls against it before the finite model; missing evidence cannot silently
+skip the durable linkage check. Other native effect kinds, concurrent workers,
+partial failure combinations, process crashes and full Rust/TLA refinement remain
+outside this fixture's coverage.
 
 Four Kani harnesses in `chio-security-types::kani_public_harnesses` call the
 production clock fence, deadline, skew arithmetic and response state guards.
@@ -70,3 +101,12 @@ this reduced claim. Their existing safety configurations remain unchanged.
 Both scripts preserve per-case logs and source hashes. Their workflow verdicts
 require terminal success and retain evidence on failure. Local completion does
 not establish a hosted result for the current candidate.
+
+The scheduled gate also runs the source-pinned
+[revocation progress obligations](revocation-progress.md). Seven positive
+inductive checks retain all four authorities and eight capabilities with
+unbounded integer epochs; four mutants require concrete counterexamples.
+This replaces the expensive original temporal search operationally, while
+retaining its unverified historical status. Source correspondence and the
+well-founded weak-fairness argument are explicit manual obligations. Each SMT
+query, result, counterexample and implementation/source hash is preserved.

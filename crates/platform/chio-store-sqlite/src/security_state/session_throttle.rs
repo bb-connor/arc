@@ -671,6 +671,8 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
             }
             persist_session_throttle_command(&transaction, &request.command)?;
             transaction.commit().map_err(sqlite_error)?;
+            drop(connection);
+            super::lifecycle_observation::throttle_committed(&request.command);
             return Ok(stored);
         }
         if binding.is_some()
@@ -723,6 +725,8 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
         }
         persist_session_throttle_command(&transaction, &request.command)?;
         transaction.commit().map_err(sqlite_error)?;
+        drop(connection);
+        super::lifecycle_observation::throttle_committed(&request.command);
         Ok(stored)
     }
 
@@ -786,6 +790,8 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
             }
             persist_session_throttle_command(&transaction, &request.command)?;
             transaction.commit().map_err(sqlite_error)?;
+            drop(connection);
+            super::lifecycle_observation::throttle_committed(&request.command);
             return Ok(current);
         };
         let limits = decode_session_throttle_limits(&request.command.request)?;
@@ -827,6 +833,8 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
         }
         persist_session_throttle_command(&transaction, &request.command)?;
         transaction.commit().map_err(sqlite_error)?;
+        drop(connection);
+        super::lifecycle_observation::throttle_committed(&request.command);
         Ok(stored)
     }
 

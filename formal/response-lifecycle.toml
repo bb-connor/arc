@@ -2,6 +2,7 @@ schema = "chio.response-lifecycle-linkage.v1"
 model = "formal/apalache/ResponseLifecycle.tla"
 config = "formal/apalache/MCResponseLifecycle.cfg"
 runtime_trace = "chio.response-runtime-trace.v1"
+durable_trace = "chio.response-durable-trace.v1"
 claim = "Finite lifecycle abstraction, actual Rust guards and exercised runtime traces; no claim of full implementation refinement."
 
 [[hook]]
@@ -37,7 +38,7 @@ boundary = "bound dispatch admission"
 [[hook]]
 path = "crates/security/chio-quarantine/src/fuzz.rs"
 symbol = "lifecycle_seed_corpus_reaches_apply_rollback_expiry_and_restart"
-boundary = "production runtime trace emitter"
+boundary = "state-machine mutation trace emitter"
 
 [[hook]]
 path = "crates/security/chio-security-types/src/clock.rs"
@@ -75,3 +76,23 @@ falsifies = "LiftedPlanClearsItsTargets"
 [[negative]]
 config = "formal/apalache/_negative_tests/MCResponseLifecycleTimeoutUnresolvedBroken.cfg"
 falsifies = "ReceiptStateTruthful"
+
+[[hook]]
+path = "crates/platform/chio-store-sqlite/src/security_state/lifecycle_observation.rs"
+symbol = "response_committed"
+boundary = "response generation after successful SQLite commit"
+
+[[hook]]
+path = "crates/platform/chio-store-sqlite/src/security_state/lifecycle_observation.rs"
+symbol = "throttle_committed"
+boundary = "native throttle command after successful SQLite commit"
+
+[[hook]]
+path = "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs"
+symbol = "sign_and_append"
+boundary = "native receipt after durable append and signature verification"
+
+[[hook]]
+path = "crates/platform/chio-control-plane/src/security/active_response/tests/lifecycle_trace.rs"
+symbol = "durable_lifecycle_trace_links_commits_effects_and_signed_receipts"
+boundary = "real store restart and lost acknowledgement evidence emitter"

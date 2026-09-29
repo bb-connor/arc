@@ -82,9 +82,15 @@ def main():
     parser.add_argument("--java", default="java")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--runtime-traces", type=Path)
+    parser.add_argument("--durable-traces", type=Path, required=True)
     args = parser.parse_args()
     if not args.jar or not Path(args.jar).is_file():
         parser.error("--jar or TLA2TOOLS_JAR must name a TLC or Apalache jar containing tlc2.TLC")
+    from formal.durable_lifecycle import validate_durable_trace
+    try:
+        durable_results = validate_durable_trace(json.loads(args.durable_traces.read_text()), validate_runtime_trace)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise SystemExit(f"invalid durable lifecycle evidence: {error}") from error
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     linkage = tomllib.loads((ROOT / "formal/response-lifecycle.toml").read_text())
@@ -141,7 +147,9 @@ def main():
                 break
     report = {"model_sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
               "scope": "finite abstraction; runtime correspondence is tested separately",
-              "production_hooks": hooks, "results": results}
+              "production_hooks": hooks, "results": results,
+              "durable_trace_sha256": hashlib.sha256(args.durable_traces.read_bytes()).hexdigest(),
+              "durable_scenarios": durable_results}
     if args.runtime_traces:
         traces = json.loads(args.runtime_traces.read_text())
         if traces.get("schema") != linkage["runtime_trace"] or traces.get("owner") != "ResponseStateMachine":

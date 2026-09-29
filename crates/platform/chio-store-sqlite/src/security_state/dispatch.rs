@@ -432,6 +432,8 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
             initial_work,
         };
         transaction.commit().map_err(sqlite_error)?;
+        drop(connection);
+        super::lifecycle_observation::response_committed(&request.response_plan, 0);
         Ok(ResponseDispatchCommitOutcome::Committed(record))
     }
 

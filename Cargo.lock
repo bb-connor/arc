@@ -3313,6 +3313,7 @@ dependencies = [
  "tower 0.5.3",
  "tower-http",
  "tracing",
+ "tracing-subscriber",
  "ureq 2.12.1",
  "url",
  "uuid",

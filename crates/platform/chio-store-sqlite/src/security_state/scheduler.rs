@@ -665,6 +665,11 @@ impl ResponseSchedulerStore for SqliteSecurityStateStore {
             &request_hash,
         )?;
         transaction.commit().map_err(sqlite_error)?;
+        drop(connection);
+        super::lifecycle_observation::response_committed(
+            &request.candidate,
+            request.candidate.generation,
+        );
         Ok(request.candidate.clone())
     }
 

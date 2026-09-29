@@ -43,11 +43,11 @@ formal/response-lifecycle.toml and the owning workflow.
 Interfaces: production ResponseStore, SessionThrottleBackend, native signed
 receipt sink and durable executor; versioned trace validation.
 
-- [ ] Add refusal regressions for missing real commits, effect/receipt mismatch,
+- [x] Add refusal regressions for missing real commits, effect/receipt mismatch,
       reordering, false completion and replay/restart substitution.
-- [ ] Emit bounded structured events at committed production boundaries. Exercise
+- [x] Emit bounded structured events at committed production boundaries. Exercise
       the real stores, backend and signer through activation, rollback and recovery.
-- [ ] Validate generated artifacts and require the trace in the assurance lane;
+- [x] Validate generated artifacts and require the trace in the assurance lane;
       retain the separate finite-model claim and actual Rust evidence.
 
 ### Task 3: Larger temporal model timeout

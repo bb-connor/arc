@@ -1999,4 +1999,5 @@ mod tests {
     }
 
     mod fail_closed;
+    mod lifecycle_trace;
 }

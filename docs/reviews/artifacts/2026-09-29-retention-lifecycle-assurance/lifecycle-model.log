@@ -1,0 +1,9 @@
+MCResponseLifecycle: PASS
+MCResponseLifecycleAcknowledgeUnexecutedBroken: PASS
+MCResponseLifecycleActivateUnacknowledgedBroken: PASS
+MCResponseLifecycleClearOnRemoveBroken: PASS
+MCResponseLifecycleDryRunDispatchBroken: PASS
+MCResponseLifecycleGuessNotExecutedBroken: PASS
+MCResponseLifecycleLiftUnrestoredBroken: PASS
+MCResponseLifecycleOverlapLiftWitness: PASS
+MCResponseLifecycleTimeoutUnresolvedBroken: PASS

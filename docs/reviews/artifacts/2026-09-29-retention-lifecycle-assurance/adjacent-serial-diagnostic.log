@@ -1,0 +1,49 @@
+
+running 44 tests
+test security::active_response::tests::activated_dispatch_replays_original_proof_after_expiry_and_rollback_start ... ok
+test security::active_response::tests::activated_dispatch_replays_original_proof_after_full_lift ... ok
+test security::active_response::tests::authoritative_effect_rejection_after_scheduler_takeover_terminally_recovers ... ok
+test security::active_response::tests::authoritative_effect_rejection_returns_failed_before_any_effect_evidence ... ok
+test security::active_response::tests::automatic_fence_boundary::forged_canonical_shaped_dispatch_id_is_rejected_before_store_mutation ... ok
+test security::active_response::tests::automatic_fence_boundary::forged_execution_dispatch_id_is_rejected_before_store_access ... ok
+test security::active_response::tests::automatic_fence_boundary::malformed_existing_fence_outcome_is_reported_as_unknown ... ok
+test security::active_response::tests::automatic_fence_boundary::malformed_fenced_outcome_is_reported_as_unknown ... ok
+test security::active_response::tests::committed_effect_request_ambiguity_cannot_be_terminal_failed ... ok
+test security::active_response::tests::committed_partial_apply_then_full_rollback_returns_signed_terminal_outcome ... ok
+test security::active_response::tests::committed_retry_remains_exact_after_wall_clock_advances ... ok
+test security::active_response::tests::existing_dispatch_collision_is_rejected_before_mutation ... ok
+test security::active_response::tests::existing_dispatch_rejects_a_foreign_live_scheduler_lease ... ok
+test security::active_response::tests::fail_closed::ambiguous_effect_port_error_reports_unknown_and_remains_retryable ... ok
+test security::active_response::tests::fail_closed::expired_request_and_approval_mode_mismatch_fail_before_commit ... ok
+test security::active_response::tests::fail_closed::malformed_hash_record_and_authority_mismatch_fail_closed ... ok
+test security::active_response::tests::fail_closed::rejects_oversized_execution_lease ... ok
+test security::active_response::tests::fresh_dispatch_commits_executes_and_maps_exact_durable_evidence ... ok
+test security::active_response::tests::governed_dispatch_commits_exact_approval_and_executes ... ok
+test security::active_response::tests::lifecycle_trace::durable_lifecycle_trace_links_commits_effects_and_signed_receipts ... ok
+test security::active_response::tests::persisted_apply_failure_recovers_after_receipt_ack_loss_and_lease_expiry ... ok
+test security::active_response::tests::readiness_probes_dispatch_effect_receipt_and_alert_durability ... ok
+test security::active_response::tests::same_dispatch_retry_after_ack_loss_recovers_without_reapplying_effect ... ok
+test security::active_response::tests::takeover_recovers_completed_effect_before_rolling_back_expired_lease ... ok
+test security::active_response::tests::two_workers_sharing_one_executor_signer_cannot_execute_one_live_lease ... ok
+test security::adapters::effect_port::tests::alert_and_throttle_are_probed_but_cannot_make_an_incomplete_router_ready::alert_and_throttle_are_probed_but_cannot_make_an_incomplete_router_ready ... ok
+test security::adapters::effect_port::tests::completed_remove_can_be_retried_without_false_mutation::completed_remove_can_be_retried_without_false_mutation ... ok
+test security::adapters::effect_port::tests::escalate_alert_distinguishes_tamper_from_outbox_unavailability::escalate_alert_distinguishes_tamper_from_outbox_unavailability ... ok
+test security::adapters::effect_port::tests::escalate_alert_exact_query_rejects_wrong_bindings_and_remove::escalate_alert_exact_query_rejects_wrong_bindings_and_remove ... ok
+test security::adapters::effect_port::tests::escalate_alert_pending_and_delivered_replay_return_one_stable_result::escalate_alert_pending_and_delivered_replay_return_one_stable_result ... ok
+test security::adapters::effect_port::tests::escalate_alert_recovers_page_ack_loss_retry_and_backend_restart::escalate_alert_recovers_page_ack_loss_retry_and_backend_restart ... ok
+test security::adapters::effect_port::tests::global_readiness_probes_installed_backend_but_rejects_incomplete_matrix::global_readiness_probes_installed_backend_but_rejects_incomplete_matrix ... ok
+test security::adapters::effect_port::tests::malformed_or_rebound_session_effects_fail_before_mutation::malformed_or_rebound_session_effects_fail_before_mutation ... ok
+test security::adapters::effect_port::tests::neutral_containment_commitments_match_the_legacy_adapter_domains::neutral_containment_commitments_match_the_legacy_adapter_domains ... ok
+test security::adapters::effect_port::tests::overlapping_session_suspensions_remove_only_their_own_contribution::overlapping_session_suspensions_remove_only_their_own_contribution ... ok
+test security::adapters::effect_port::tests::restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped::restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped ... ok
+test security::adapters::effect_port::tests::session_target_derivation_matches_the_enforcement_guard::session_target_derivation_matches_the_enforcement_guard ... ok
+test security::adapters::effect_port::tests::sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper::sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper ... ok
+test security::adapters::effect_port::tests::sqlite_overlay_executes_under_the_real_scheduler_fence::sqlite_overlay_executes_under_the_real_scheduler_fence ... ok
+test security::adapters::effect_port::tests::suspend_session_apply_and_ack_loss_query_bind_the_exact_contribution::suspend_session_apply_and_ack_loss_query_bind_the_exact_contribution ... ok
+test security::adapters::effect_port::tests::throttle_backend_recovers_apply_and_remove_ack_loss_across_restart::throttle_backend_recovers_apply_and_remove_ack_loss_across_restart ... ok
+test security::adapters::effect_port::tests::throttle_backend_rejects_rebinding_noncanonical_limits_and_outage::throttle_backend_rejects_rebinding_noncanonical_limits_and_outage ... ok
+test security::adapters::effect_port::tests::unsupported_effects_fail_closed_before_overlay_mutation::unsupported_effects_fail_closed_before_overlay_mutation ... ok
+test security::adapters::native_evidence::tests::scheduler_health_page_projects_runtime_retry_and_plan_into_closed_receipt ... ok
+
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 1139 filtered out; finished in 20.76s
+

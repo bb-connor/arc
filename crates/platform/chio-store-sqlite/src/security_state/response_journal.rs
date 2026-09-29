@@ -61,6 +61,8 @@ impl ResponseStore for SqliteSecurityStateStore {
             )
             .map_err(sqlite_error)?;
         transaction.commit().map_err(sqlite_error)?;
+        drop(connection);
+        super::lifecycle_observation::response_committed(record, 0);
         Ok(CreateOutcome::Created)
     }
 
@@ -164,6 +166,11 @@ impl ResponseStore for SqliteSecurityStateStore {
             &request_hash,
         )?;
         transaction.commit().map_err(sqlite_error)?;
+        drop(connection);
+        super::lifecycle_observation::response_committed(
+            &request.record,
+            request.record.generation,
+        );
         Ok(request.record.clone())
     }
 

@@ -1,0 +1,176 @@
+TLC2 Version 2.19 of 08 August 2024
+Running breadth-first search Model-Checking with fp 62 and seed 5213608257566622657 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2091690] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycleOverlapLiftWitness.tla
+Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycle.tla
+Parsing file /tmp/Naturals.tla
+Parsing file /tmp/FiniteSets.tla
+Parsing file /tmp/Sequences.tla
+Semantic processing of module Naturals
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module ResponseLifecycle
+Semantic processing of module ResponseLifecycleOverlapLiftWitness
+Starting... (2026-09-29 11:14:55)
+Computing initial states...
+Computed 2 initial states...
+Finished computing initial states: 4 distinct states generated at 2026-09-29 11:14:55.
+Error: Invariant LiftedPlanClearsItsTargets is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ dispatch = <<"none", "none">>
+/\ state = <<"planned", "planned">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<0, 0>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"planned", "planned">>, <<"planned", "none">>>>
+/\ clock = 0
+
+State 2: <Dispatch line 179, col 5 to line 187, col 70 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "none">>
+/\ state = <<"applying", "planned">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<1, 0>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"planned", "planned">>, <<"planned", "none">>>>
+/\ clock = 0
+
+State 3: <Dispatch line 179, col 5 to line 187, col 70 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "applying">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"planned", "planned">>, <<"planned", "none">>>>
+/\ clock = 0
+
+State 4: <RequestEffect line 190, col 5 to line 196, col 86 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "applying">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"planned", "none">>>>
+/\ clock = 0
+
+State 5: <RequestEffect line 190, col 5 to line 196, col 86 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "applying">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"requested", "none">>>>
+/\ clock = 0
+
+State 6: <ExecuteEffect line 201, col 5 to line 208, col 64 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "applying">>
+/\ overlay = <<{1}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"requested", "none">>>>
+/\ clock = 0
+
+State 7: <ExecuteEffect line 201, col 5 to line 208, col 64 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "applying">>
+/\ overlay = <<{1, 2}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"applied", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"requested", "none">>>>
+/\ clock = 0
+
+State 8: <AcknowledgeEffect line 211, col 5 to line 224, col 86 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "applying">>
+/\ overlay = <<{1, 2}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"applied", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"applied", "none">>>>
+/\ clock = 0
+
+State 9: <Activate line 227, col 5 to line 233, col 87 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "active">>
+/\ overlay = <<{1, 2}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"applied", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"applied", "none">>>>
+/\ clock = 0
+
+State 10: <BeginRollback line 279, col 5 to line 281, col 87 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "rolling_back">>
+/\ overlay = <<{1, 2}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"applied", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"applied", "none">>>>
+/\ clock = 0
+
+State 11: <RequestRollback line 284, col 5 to line 289, col 86 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "rolling_back">>
+/\ overlay = <<{1, 2}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"applied", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"rollback_requested", "none">>>>
+/\ clock = 0
+
+State 12: <ExecuteRollback line 292, col 5 to line 302, col 64 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "rolling_back">>
+/\ overlay = <<{1}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"restored", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"rollback_requested", "none">>>>
+/\ clock = 0
+
+State 13: <AcknowledgeRollback line 305, col 5 to line 313, col 86 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "rolling_back">>
+/\ overlay = <<{1}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"restored", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"restored", "none">>>>
+/\ clock = 0
+
+State 14: <Lift line 316, col 5 to line 321, col 87 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "committed">>
+/\ state = <<"applying", "lifted">>
+/\ overlay = <<{1}, {}>>
+/\ owner = <<1, 1>>
+/\ mode = <<"live", "live">>
+/\ restricted = <<TRUE, FALSE>>
+/\ journal = <<<<"applied", "none">>, <<"restored", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"restored", "none">>>>
+/\ clock = 0
+
+65474 states generated, 14436 distinct states found, 3211 states left on queue.
+The depth of the complete state graph search is 14.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 7 and the 95th percentile is 3).
+Finished in 01s at (2026-09-29 11:14:56)

@@ -1,0 +1,66 @@
+TLC2 Version 2.19 of 08 August 2024
+Running breadth-first search Model-Checking with fp 71 and seed -2740758243274310482 with 2 workers on 12 cores with 1820MB heap and 64MB offheap memory [pid: 2091447] (Linux 6.17.0-1020-oracle aarch64, Eclipse Adoptium 21.0.11 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycleAcknowledgeUnexecutedBroken.tla
+Parsing file /tmp/chio-response-model-tafd6d49/ResponseLifecycle.tla
+Parsing file /tmp/Naturals.tla
+Parsing file /tmp/FiniteSets.tla
+Parsing file /tmp/Sequences.tla
+Semantic processing of module Naturals
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module ResponseLifecycle
+Semantic processing of module ResponseLifecycleAcknowledgeUnexecutedBroken
+Starting... (2026-09-29 11:14:45)
+Computing initial states...
+Computed 2 initial states...
+Finished computing initial states: 4 distinct states generated at 2026-09-29 11:14:46.
+Error: Invariant ReceiptStateTruthful is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ dispatch = <<"none", "none">>
+/\ state = <<"planned", "planned">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<0, 0>>
+/\ mode = <<"live", "dry_run">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"planned", "planned">>, <<"planned", "none">>>>
+/\ clock = 0
+
+State 2: <Dispatch line 179, col 5 to line 187, col 70 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "none">>
+/\ state = <<"applying", "planned">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<1, 0>>
+/\ mode = <<"live", "dry_run">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"planned", "planned">>, <<"planned", "none">>>>
+/\ clock = 0
+
+State 3: <RequestEffect line 190, col 5 to line 196, col 86 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "none">>
+/\ state = <<"applying", "planned">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<1, 0>>
+/\ mode = <<"live", "dry_run">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"requested", "planned">>, <<"planned", "none">>>>
+/\ clock = 0
+
+State 4: <AcknowledgeEffect line 211, col 5 to line 224, col 86 of module ResponseLifecycle>
+/\ dispatch = <<"committed", "none">>
+/\ state = <<"applying", "planned">>
+/\ overlay = <<{}, {}>>
+/\ owner = <<1, 0>>
+/\ mode = <<"live", "dry_run">>
+/\ restricted = <<FALSE, FALSE>>
+/\ journal = <<<<"none", "none">>, <<"none", "none">>>>
+/\ effect = <<<<"applied", "planned">>, <<"planned", "none">>>>
+/\ clock = 0
+
+187 states generated, 107 distinct states found, 73 states left on queue.
+The depth of the complete state graph search is 4.
+The average outdegree of the complete state graph is 3 (minimum is 0, the maximum 7 and the 95th percentile is 7).
+Finished in 01s at (2026-09-29 11:14:46)

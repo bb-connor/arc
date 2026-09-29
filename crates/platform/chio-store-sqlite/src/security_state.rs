@@ -571,6 +571,7 @@ use finding_batches::{
 
 mod lineage_fence;
 
+mod lifecycle_observation;
 mod response_journal;
 use response_journal::{
     decode_response_snapshot, load_response_plan, response_mutation_scheduler_fence,

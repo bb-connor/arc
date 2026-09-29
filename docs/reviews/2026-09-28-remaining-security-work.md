@@ -139,14 +139,23 @@ original 256-case configuration and canceled job. Its current-owner slow-sync
 run completed 242 cases before the preset 900-second overall limit while still
 progressing; stack attachment was denied. Saved counterexamples and deterministic
 ownership checks passed separately. These observations do not close the historical
-root cause or complete the original-scale gate. Configure supported stack capture
-before another long attempt, then repair demonstrated ownership faults and run
-the original scale gate.
+root cause or complete the original-scale gate. Use the new in-process capture for a supported blocked attempt, then repair
+demonstrated ownership faults and complete the original scale gate.
 
-Complete lifecycle trace linkage to actual commit, external effect and receipt
-boundaries, and resolve the original larger temporal-model timeout. The finite
-model, bounded proofs, focused fuzz targets and cutpoint tests already exist;
-their local results do not close the broader liveness/refinement claims.
+The [retention/lifecycle assurance batch](2026-09-29-retention-lifecycle-assurance-execution.md)
+adds in-process sync entry stacks and lock ownership through delegated I/O,
+watchdog coverage through teardown, and a bounded diagnostic runner. Its
+calibration does not close issue 1045 or complete the original-scale gate.
+
+Durable lifecycle linkage now covers real SQLite response commits, native
+session-throttle commands and signed stored receipts through owner restart and
+effect/receipt acknowledgement loss. The scheduled lane requires generated
+artifacts and corruption controls. Other effects, concurrent workers and crash
+cutpoints remain outside that fixture. The original 4-authority/8-capability
+length-24 query is still unverified; source-pinned inductive progress obligations
+at those cardinalities plus finite TLC witnesses replace its expensive operational
+rerun. Projection correspondence and the fairness argument remain manual, so the
+broader liveness/refinement claim is not closed.
 
 ### 7. Candidate qualification and delivery
 

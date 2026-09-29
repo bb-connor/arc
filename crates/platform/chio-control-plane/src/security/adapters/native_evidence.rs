@@ -157,6 +157,10 @@ impl SecurityReceiptSink for NativeSecurityReceiptSink {
             &[self.signer.public_key()],
         )
         .map_err(|_| PortError::integrity_failure())?;
+        tracing::debug!(target: "chio::response_lifecycle",
+            boundary = "receipt_persisted", tenant_id = request.tenant_id.as_str(),
+            evidence_id = request.evidence_id.as_str(), transition_id = request.transition_id.as_str(),
+            body_hash = hex::encode(request.body_hash.as_bytes()));
         Ok(request.evidence_id.clone())
     }
 }

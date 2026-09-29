@@ -1,0 +1,155 @@
+{
+  "model_sha256": "95edb9bb1b4c317ec15eb91d10b511161b90855ec98b24baf2a0c3be042aa2d4",
+  "scope": "finite abstraction; runtime correspondence is tested separately",
+  "production_hooks": [
+    {
+      "path": "crates/security/chio-security-types/src/response_execution.rs",
+      "symbol": "new",
+      "boundary": "FreshLiveAdmission mode refusal",
+      "sha256": "e9126063c769bc6e417a5db1bf2b04c63a83b1752dc72db6d65633e79d813652"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/response_state.rs",
+      "symbol": "is_legal_response_transition",
+      "boundary": "legal lifecycle edges",
+      "sha256": "5cda952a6dcb9fc582a7698e3e5b19e70ae3bfbf9cdf2cce164b15eed8c65dad"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/response_state.rs",
+      "symbol": "rollback_effect_is_restored",
+      "boundary": "clean rollback prerequisite",
+      "sha256": "5cda952a6dcb9fc582a7698e3e5b19e70ae3bfbf9cdf2cce164b15eed8c65dad"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/response.rs",
+      "symbol": "all_applied_reversible_effects_restored",
+      "boundary": "snapshot rollback guard",
+      "sha256": "e72cd07d690287c9155872e486b4a2a18e5922fb8355cf01e64b47b98ece5a5b"
+    },
+    {
+      "path": "crates/security/chio-quarantine/src/simulation.rs",
+      "symbol": "evaluate_response_simulation",
+      "boundary": "independent overlapping contributions",
+      "sha256": "6651ad52865fe66d7720d776f0369f4bce0055dd865769d9f3a6cb7457b7065b"
+    },
+    {
+      "path": "crates/security/chio-quarantine/src/executor_proof.rs",
+      "symbol": "validate_dispatch_authorization",
+      "boundary": "bound dispatch admission",
+      "sha256": "ba1ac9c4e19593c089edda8fdef589ddf804b9580ea019f1fdf5de0db6b8bf7c"
+    },
+    {
+      "path": "crates/security/chio-quarantine/src/fuzz.rs",
+      "symbol": "lifecycle_seed_corpus_reaches_apply_rollback_expiry_and_restart",
+      "boundary": "state-machine mutation trace emitter",
+      "sha256": "950699f92e3f4b7225f7c053b3a73c15ed23156a038b660017ebaa4f8b5d0cdf"
+    },
+    {
+      "path": "crates/security/chio-security-types/src/clock.rs",
+      "symbol": "remaining_nanos",
+      "boundary": "fixed retry authority window",
+      "sha256": "b1322064e86ace6e69e7d15a3c9daad30703368a47d3449f70b375268e36ade5"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/lifecycle_observation.rs",
+      "symbol": "response_committed",
+      "boundary": "response generation after successful SQLite commit",
+      "sha256": "44edaf06cec350c3a3dd3dfa766724a2d89cc24479284d7192dc3bce7b34070f"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/lifecycle_observation.rs",
+      "symbol": "throttle_committed",
+      "boundary": "native throttle command after successful SQLite commit",
+      "sha256": "44edaf06cec350c3a3dd3dfa766724a2d89cc24479284d7192dc3bce7b34070f"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs",
+      "symbol": "sign_and_append",
+      "boundary": "native receipt after durable append and signature verification",
+      "sha256": "00f8c4f77dec8a61d007297d32e3a24d46288aa45eaeac41e5617249717ea2bd"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/active_response/tests/lifecycle_trace.rs",
+      "symbol": "durable_lifecycle_trace_links_commits_effects_and_signed_receipts",
+      "boundary": "real store restart and lost acknowledgement evidence emitter",
+      "sha256": "bd3e99c3f52f03ad1e7e7e2da8f82332c131f385db59da99cfd5a6a465309d49"
+    }
+  ],
+  "results": [
+    {
+      "config": "formal/apalache/MCResponseLifecycle.cfg",
+      "passed": true,
+      "expected_counterexample": null,
+      "exit_code": 0
+    },
+    {
+      "config": "formal/apalache/_negative_tests/MCResponseLifecycleAcknowledgeUnexecutedBroken.cfg",
+      "passed": true,
+      "expected_counterexample": "ReceiptStateTruthful",
+      "exit_code": 12
+    },
+    {
+      "config": "formal/apalache/_negative_tests/MCResponseLifecycleActivateUnacknowledgedBroken.cfg",
+      "passed": true,
+      "expected_counterexample": "ReceiptStateTruthful",
+      "exit_code": 12
+    },
+    {
+      "config": "formal/apalache/_negative_tests/MCResponseLifecycleClearOnRemoveBroken.cfg",
+      "passed": true,
+      "expected_counterexample": "OverlapPreserved",
+      "exit_code": 12
+    },
+    {
+      "config": "formal/apalache/_negative_tests/MCResponseLifecycleDryRunDispatchBroken.cfg",
+      "passed": true,
+      "expected_counterexample": "DryRunIsolation",
+      "exit_code": 12
+    },
+    {
+      "config": "formal/apalache/_negative_tests/MCResponseLifecycleGuessNotExecutedBroken.cfg",
+      "passed": true,
+      "expected_counterexample": "ReceiptStateTruthful",
+      "exit_code": 12
+    },
+    {
+      "config": "formal/apalache/_negative_tests/MCResponseLifecycleLiftUnrestoredBroken.cfg",
+      "passed": true,
+      "expected_counterexample": "NoFalseCleanLift",
+      "exit_code": 12
+    },
+    {
+      "config": "formal/apalache/_negative_tests/MCResponseLifecycleOverlapLiftWitness.cfg",
+      "passed": true,
+      "expected_counterexample": "LiftedPlanClearsItsTargets",
+      "exit_code": 12
+    },
+    {
+      "config": "formal/apalache/_negative_tests/MCResponseLifecycleTimeoutUnresolvedBroken.cfg",
+      "passed": true,
+      "expected_counterexample": "ReceiptStateTruthful",
+      "exit_code": 12
+    }
+  ],
+  "durable_trace_sha256": "3303825666e749c063d2a9e6269fcbba5d2b5bece6dc1801dfc76d3626489160",
+  "durable_scenarios": {
+    "effect_ack_loss": {
+      "generations": 10,
+      "signed_receipts": 10,
+      "native_commands": 2,
+      "restarts": 2
+    },
+    "happy": {
+      "generations": 10,
+      "signed_receipts": 10,
+      "native_commands": 2,
+      "restarts": 2
+    },
+    "receipt_ack_loss": {
+      "generations": 10,
+      "signed_receipts": 10,
+      "native_commands": 2,
+      "restarts": 2
+    }
+  }
+}
