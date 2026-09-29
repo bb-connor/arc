@@ -1,6 +1,208 @@
-//! Shared pure issuance composition and scope validation.
-
 use super::*;
+
+pub const ISSUANCE_FREEZE_VERSION_DOMAIN: &[u8] =
+    b"chio.response-effect-issuance-freeze-state.v1\0";
+pub const ISSUANCE_FREEZE_INSTALLED_CONTRIBUTION_DOMAIN: &[u8] =
+    b"chio.response-effect-issuance-freeze-contribution.v1\0";
+pub type IssuanceFreezeContributions = BoundedVec<IssuanceFreezeContribution, 256>;
+pub type IssuanceFreezeMatches = BoundedVec<IssuanceFreezeMatch, 256>;
+
+/// Closed contribution body for a commit-indexed issuance freeze.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeSpec {
+    pub lineage_id: LineageId,
+    pub acquisition: BlastRadiusFenceAcquisition,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeKey {
+    pub tenant_id: TenantId,
+    pub lineage_id: LineageId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeContribution {
+    pub action_id: ActionId,
+    pub effect_id: EffectId,
+    pub commit_index: u64,
+    pub affected_set_hash: Digest32,
+    pub frozen_affected_ids: RecordIdSet,
+    pub graph_slice_hash: Digest32,
+    /// Rolling external safety lease. Maintenance may extend this beyond the
+    /// immutable response-plan expiry while removal is still incomplete.
+    pub external_fence: LineageFence,
+    pub contribution_hash: Digest32,
+    /// Immutable authorization expiry copied from the response plan.
+    pub expires_at_unix_ms: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeSnapshot {
+    pub key: IssuanceFreezeKey,
+    pub generation: u64,
+    pub contributions: IssuanceFreezeContributions,
+    pub highest_scheduler_fencing_token: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeCommand {
+    pub request: EffectRequest,
+    pub result: EffectResult,
+    pub resulting_snapshot: IssuanceFreezeSnapshot,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeApplyRequest {
+    pub key: IssuanceFreezeKey,
+    pub contribution: IssuanceFreezeContribution,
+    pub expected_generation: u64,
+    pub scheduler_fencing_token: u64,
+    pub command: IssuanceFreezeCommand,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeRemoveRequest {
+    pub key: IssuanceFreezeKey,
+    pub action_id: ActionId,
+    pub effect_id: EffectId,
+    pub expected_generation: u64,
+    pub scheduler_fencing_token: u64,
+    pub command: IssuanceFreezeCommand,
+}
+
+/// Exact durable removal command whose external fence release has started but
+/// whose local contribution cleanup has not yet committed.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezePendingRelease {
+    pub request: IssuanceFreezeRemoveRequest,
+    pub contribution: IssuanceFreezeContribution,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "status", deny_unknown_fields)]
+pub enum IssuanceFreezeOperationStatus {
+    NotExecuted,
+    ReleasePending {
+        contribution: Box<IssuanceFreezeContribution>,
+    },
+    Completed {
+        result: EffectResult,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CapabilityIssuanceOperation {
+    Issue,
+    Delegate,
+}
+
+impl CapabilityIssuanceOperation {
+    pub fn validate_parent(self, parent_capability_id: Option<&RecordId>) -> PortResult<()> {
+        if matches!(
+            (self, parent_capability_id),
+            (Self::Issue, None) | (Self::Delegate, Some(_))
+        ) {
+            Ok(())
+        } else {
+            Err(PortError::invalid_data())
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeAdmissionQuery {
+    pub tenant_id: TenantId,
+    pub lineage_id: LineageId,
+    pub operation: CapabilityIssuanceOperation,
+    pub parent_capability_id: Option<RecordId>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeMatch {
+    pub action_id: ActionId,
+    pub effect_id: EffectId,
+    pub commit_index: u64,
+    pub affected_set_hash: Digest32,
+    pub contribution_hash: Digest32,
+    pub expires_at_unix_ms: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IssuanceFreezeAdmissionDecision {
+    pub query: IssuanceFreezeAdmissionQuery,
+    pub frozen: bool,
+    pub active_matches: IssuanceFreezeMatches,
+}
+
+#[cfg(feature = "std")]
+pub trait IssuanceFreezeStore: Send + Sync {
+    fn ensure_issuance_freezes_ready(&self) -> PortResult<()>;
+    fn apply_issuance_freeze(
+        &self,
+        request: &IssuanceFreezeApplyRequest,
+    ) -> PortResult<IssuanceFreezeSnapshot>;
+    fn prepare_issuance_freeze_remove(
+        &self,
+        request: &IssuanceFreezeRemoveRequest,
+    ) -> PortResult<IssuanceFreezeContribution>;
+    fn complete_issuance_freeze_remove(
+        &self,
+        request: &IssuanceFreezeRemoveRequest,
+    ) -> PortResult<IssuanceFreezeSnapshot>;
+    fn load_issuance_freezes(
+        &self,
+        key: &IssuanceFreezeKey,
+    ) -> PortResult<Option<IssuanceFreezeSnapshot>>;
+    fn evaluate_issuance_freeze(
+        &self,
+        query: &IssuanceFreezeAdmissionQuery,
+    ) -> PortResult<IssuanceFreezeAdmissionDecision>;
+    fn load_issuance_freeze_operation(
+        &self,
+        query: &EffectResultQuery,
+    ) -> PortResult<IssuanceFreezeOperationStatus>;
+    fn load_pending_issuance_freeze_release(
+        &self,
+        _key: &IssuanceFreezeKey,
+        _action_id: &ActionId,
+        _effect_id: &EffectId,
+    ) -> PortResult<Option<IssuanceFreezePendingRelease>> {
+        Err(PortError::unavailable())
+    }
+    fn load_completed_issuance_freeze_release(
+        &self,
+        _key: &IssuanceFreezeKey,
+        _action_id: &ActionId,
+        _effect_id: &EffectId,
+        _plan_hash: Digest32,
+    ) -> PortResult<Option<IssuanceFreezeCommand>> {
+        Err(PortError::unavailable())
+    }
+    fn maintain_issuance_freeze_fence(
+        &self,
+        _request: &IssuanceFreezeFenceMaintenanceRequest,
+    ) -> PortResult<IssuanceFreezeSnapshot> {
+        Err(PortError::unavailable())
+    }
+}
+
+#[cfg(feature = "std")]
+mod projection {
+use super::*;
+
+
 
 #[derive(Serialize)]
 #[serde(deny_unknown_fields)]
@@ -293,3 +495,7 @@ impl IssuanceFreezeSpec {
         Ok(())
     }
 }
+
+}
+#[cfg(feature = "std")]
+pub use projection::*;

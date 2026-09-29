@@ -1,4 +1,108 @@
 use super::*;
+
+pub type EgressRestrictionContributions = BoundedVec<EgressRestrictionContribution, 256>;
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EgressRestrictionSessionKey {
+    pub tenant_id: TenantId,
+    pub session_id: SessionId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EgressRestrictionContribution {
+    pub effect_id: EffectId,
+    pub destinations: EgressDestinationSet,
+    pub contribution_hash: Digest32,
+    pub expires_at_unix_ms: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EgressRestrictionCommand {
+    pub request: EffectRequest,
+    pub result: EffectResult,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EgressRestrictionApplyRequest {
+    pub key: EgressRestrictionSessionKey,
+    pub action_id: ActionId,
+    pub contribution: EgressRestrictionContribution,
+    pub expected_generation: u64,
+    pub scheduler_fencing_token: u64,
+    pub command: EgressRestrictionCommand,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EgressRestrictionRemoveRequest {
+    pub key: EgressRestrictionSessionKey,
+    pub action_id: ActionId,
+    pub effect_id: EffectId,
+    pub expected_generation: u64,
+    pub scheduler_fencing_token: u64,
+    pub command: EgressRestrictionCommand,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EgressRestrictionSnapshot {
+    pub key: EgressRestrictionSessionKey,
+    pub generation: u64,
+    pub contributions: EgressRestrictionContributions,
+    pub denied_destinations: EgressDeniedDestinations,
+    pub highest_fencing_token: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EgressDestinationQuery {
+    pub key: EgressRestrictionSessionKey,
+    pub destination_id: DestinationId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EgressRestrictionDecision {
+    pub key: EgressRestrictionSessionKey,
+    pub destination_id: DestinationId,
+    pub denied: bool,
+    pub active_effect_ids: EgressRestrictionEffectIds,
+    pub generation: u64,
+}
+
+#[cfg(feature = "std")]
+pub trait EgressRestrictionStore: Send + Sync {
+    fn ensure_egress_restrictions_ready(&self) -> PortResult<()>;
+    fn apply_egress_restriction(
+        &self,
+        request: &EgressRestrictionApplyRequest,
+    ) -> PortResult<EgressRestrictionSnapshot>;
+    fn remove_egress_restriction(
+        &self,
+        request: &EgressRestrictionRemoveRequest,
+    ) -> PortResult<EgressRestrictionSnapshot>;
+    fn load_egress_restrictions(
+        &self,
+        key: &EgressRestrictionSessionKey,
+    ) -> PortResult<Option<EgressRestrictionSnapshot>>;
+    fn evaluate_destination(
+        &self,
+        query: &EgressDestinationQuery,
+    ) -> PortResult<EgressRestrictionDecision>;
+    fn load_egress_restriction_result(
+        &self,
+        query: &EffectResultQuery,
+    ) -> PortResult<EffectExecutionStatus>;
+}
+
+#[cfg(feature = "std")]
+mod projection {
+use super::*;
+
 use alloc::collections::BTreeSet;
 
 const EGRESS_VERSION_DOMAIN: &[u8] = b"chio.response-effect-egress-state.v1\0";
@@ -146,3 +250,7 @@ pub fn predict_egress_apply(
     validate_egress_restriction_snapshot(&next, &next.key)?;
     Ok(next)
 }
+
+}
+#[cfg(feature = "std")]
+pub use projection::*;

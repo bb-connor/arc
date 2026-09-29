@@ -1,3 +1,7 @@
+use super::identifiers::validate_nonzero_id;
+use super::*;
+
+
 pub const ATTESTED_FINDING_RESPONSE_PLAN_SCHEMA_VERSION: u8 = 1;
 pub const PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION: u8 = 1;
 pub const MAX_ATTESTED_FINDING_RESPONSE_OUTBOX_SCAN: u32 = 4_096;
