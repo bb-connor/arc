@@ -1,0 +1,3 @@
+workspace decoder census changed; classify new files and entry points
+workspace decoder file contracts are incomplete
+constructors changed; review and update docs/security/trust-boundary-inventory.json

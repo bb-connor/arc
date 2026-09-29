@@ -197,7 +197,7 @@ def crash_host(config, directory, env):
 
 
 def no_publication(directory):
-    database = directory / "publications.db"
+    database = directory / "tool-data" / "publications.db"
     if database.exists():
         with sqlite3.connect(database) as db:
             assert db.execute("SELECT count(*) FROM reports").fetchone()[0] == 0

@@ -1,6 +1,7 @@
 use super::*;
 
 pub(super) fn validate_authorization_request(
+    clock: &RemoteClock,
     request: &AuthorizationRequest,
     supported_scopes: &[String],
     expected_resource: &str,
@@ -56,7 +57,8 @@ pub(super) fn validate_authorization_request(
         ));
     }
     let _ = parse_request_time_authorization_details(request.authorization_details.as_deref())?;
-    let _ = parse_request_time_transaction_context(request.chio_transaction_context.as_deref())?;
+    let _ =
+        parse_request_time_transaction_context(clock, request.chio_transaction_context.as_deref())?;
     let _ = resolve_requested_scopes(request.scope.as_deref(), supported_scopes)?;
     Ok(resource)
 }

@@ -23,12 +23,8 @@ this crate holds no transport and speaks no protocol wire format itself.
   registered `TargetProtocolExecutor`.
 - Plan and sign route selection (`routing::plan_authoritative_route`) from
   governed-intent control-plane hints and per-protocol route availability.
-- Declare the lifecycle contract that claim-eligible and compatibility-only
-  A2A/ACP surfaces publish, and derive publication fidelity and semantic
+- Declare the lifecycle contract that authoritative A2A/ACP surfaces publish, and derive publication fidelity and semantic
   hints from `x-chio-*` tool schema extensions.
-- Provide `sync_bridge_shared::block_on_tool_server_invoke`, a synchronous
-  bridge shim shared by compatibility-surface edges that fails closed under a
-  current-thread Tokio runtime instead of deadlocking.
 
 ## Public API
 
@@ -46,13 +42,10 @@ this crate holds no transport and speaks no protocol wire format itself.
 - `routing::{plan_authoritative_route, RouteSelectionEvidence,
   RouteAvailabilityStatus}` - route planning and its signed evidence.
 - `lifecycle::{RuntimeLifecycleSurface, RuntimeLifecycleContract,
-  runtime_lifecycle_contract}` - claim-eligible vs. compatibility-only
-  lifecycle contracts.
+  runtime_lifecycle_contract}` - authoritative lifecycle contracts.
 - `semantic_hints::{BridgeFidelity, BridgeSemanticHints,
   semantic_hints_for_tool}` - publication fidelity and semantic-hint
   derivation from tool schemas.
-- `sync_bridge_shared::block_on_tool_server_invoke` - shared sync-bridge shim
-  for compatibility-surface edges.
 - `error::BridgeError` - the crate's error type.
 
 ## Testing

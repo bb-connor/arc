@@ -13,9 +13,7 @@ pub(crate) fn resolve_sidecar_payment_adapter(
     match config {
         Some(config) => {
             config.validate().map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "invalid payment adapter configuration: {error}"
-                ))
+                CliError::cli_other_error(format!("invalid payment adapter configuration: {error}"))
             })?;
             Ok(Some(config.build_adapter()))
         }
@@ -110,11 +108,7 @@ pub(crate) fn cmd_run(
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
     if durable_admission.is_none() {
         configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-        opt_in_ephemeral_revocation_for_local_session(
-            &mut kernel,
-            revocation_db_path,
-            control_url,
-        );
+        opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
     attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
@@ -419,7 +413,11 @@ pub(crate) fn cmd_api_protect(
     allow_ephemeral_receipts: bool,
     upstream_timeout_secs: Option<u64>,
 ) -> Result<(), CliError> {
-    require_durable_or_ephemeral_optin(receipt_store, allow_ephemeral_receipts, authority_seed_path)?;
+    require_durable_or_ephemeral_optin(
+        receipt_store,
+        allow_ephemeral_receipts,
+        authority_seed_path,
+    )?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -447,7 +445,8 @@ pub(crate) fn cmd_api_protect(
             spec_content: None,
             spec_path: spec_path.map(|path| path.display().to_string()),
             listen_addr: listen_addr.to_string(),
-            receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
+            receipt_db: durable_receipt_db_path(receipt_store)
+                .map(|path| path.display().to_string()),
             // The boot gate above already required an explicit opt-in when the
             // receipt store is missing or in-memory, so mirror the operator's
             // choice into the proxy's own durable-by-default gate.
@@ -503,7 +502,11 @@ pub(crate) fn cmd_start(
     allow_ephemeral_receipts: bool,
     print_config: bool,
 ) -> Result<(), CliError> {
-    require_durable_or_ephemeral_optin(receipt_store, allow_ephemeral_receipts, authority_seed_path)?;
+    require_durable_or_ephemeral_optin(
+        receipt_store,
+        allow_ephemeral_receipts,
+        authority_seed_path,
+    )?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -672,11 +675,7 @@ pub(crate) fn cmd_check(
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
     if durable_admission.is_none() {
         configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-        opt_in_ephemeral_revocation_for_local_session(
-            &mut kernel,
-            revocation_db_path,
-            control_url,
-        );
+        opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
     attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
@@ -735,7 +734,7 @@ pub(crate) fn cmd_check(
         supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     }));
 
     let response = match kernel.evaluate_session_operation(&context, &operation)? {
@@ -1171,14 +1170,13 @@ pub(crate) fn cmd_mcp_serve_http(
         auth_jwt_issuer,
         auth_jwks_uri,
     )?;
-    let native_launch_factory = Arc::new(
-        crate::mcp_cli::SignedCagePolicyLaunchFactory::new(
-            cage_policy_path.to_path_buf(),
-            cage_policy_signer.to_string(),
-        )?,
-    );
+    let native_launch_factory = Arc::new(crate::mcp_cli::SignedCagePolicyLaunchFactory::new(
+        cage_policy_path.to_path_buf(),
+        cage_policy_signer.to_string(),
+    )?);
 
     remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
+        clock: Default::default(),
         listen,
         auth_token,
         auth_jwt_public_key: auth_jwt_public_key.map(ToOwned::to_owned),
@@ -1380,9 +1378,7 @@ pub(crate) fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<
     })
 }
 
-pub(crate) fn load_roster_policy(
-    path: &Path,
-) -> Result<trust_control::RosterPolicy, CliError> {
+pub(crate) fn load_roster_policy(path: &Path) -> Result<trust_control::RosterPolicy, CliError> {
     let bytes = std::fs::read(path).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to read roster policy file `{}`: {error}",
@@ -1465,8 +1461,8 @@ pub(crate) fn cmd_trust_serve(
         fiscal_anchor_token,
         fiscal_admission_signing_seed,
     ) {
-        (Some(policy), Some(anchor_url), Some(anchor_token), Some(admission_seed)) => Some(
-            trust_control::TrustFiscalRuntimeConfig::from_policy_file(
+        (Some(policy), Some(anchor_url), Some(anchor_token), Some(admission_seed)) => {
+            Some(trust_control::TrustFiscalRuntimeConfig::from_policy_file(
                 policy,
                 anchor_url.to_owned(),
                 anchor_token.to_owned(),
@@ -1474,8 +1470,8 @@ pub(crate) fn cmd_trust_serve(
                 fiscal_admission_authority_id.to_owned(),
                 fiscal_admission_signer_key_epoch,
                 admission_seed.to_path_buf(),
-            )?,
-        ),
+            )?)
+        }
         (None, None, None, None) => None,
         _ => {
             return Err(CliError::cli_other_error(
@@ -1494,7 +1490,8 @@ pub(crate) fn cmd_trust_serve(
         authority_seed_path: authority_seed_path.map(Path::to_path_buf),
         authority_db_path: authority_db_path.map(Path::to_path_buf),
         authority_keyring_config_path: authority_keyring_config_path.map(Path::to_path_buf),
-        authority_keyring_receipt_anchor_root: authority_keyring_receipt_anchor_root.map(Path::to_path_buf),
+        authority_keyring_receipt_anchor_root: authority_keyring_receipt_anchor_root
+            .map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
         joint_authority_db_path: session_db_path.map(Path::to_path_buf),
         fiscal_runtime,

@@ -25,6 +25,7 @@ use boundaries::*;
 mod transaction_tests;
 
 pub struct SqliteCapabilityAuthority {
+    clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
     path: PathBuf,
     cached_public_key: Mutex<PublicKey>,
     cached_trusted_public_keys: Mutex<Vec<PublicKey>>,
@@ -50,6 +51,16 @@ pub struct AuthorityClusterFence {
 
 impl SqliteCapabilityAuthority {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, AuthorityStoreError> {
+        Self::open_with_clock(
+            path,
+            std::sync::Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, AuthorityStoreError> {
         let path = path.as_ref().to_path_buf();
         // Resolve any `file:` URI to its on-disk parent before creating it, so a
         // URI-configured store creates the real backing directory rather than a
@@ -70,7 +81,7 @@ impl SqliteCapabilityAuthority {
             params![
                 bootstrap.seed_hex(),
                 bootstrap.public_key().to_hex(),
-                authority_sqlite_integer(unix_now()?, "rotation time")?
+                authority_sqlite_integer(clock.unix_millis()?.as_secs(), "rotation time")?
             ],
         )?;
         let current_public_key = transaction
@@ -101,12 +112,13 @@ impl SqliteCapabilityAuthority {
             "#,
             params![
                 current_public_key.public_key().to_hex(),
-                authority_sqlite_integer(unix_now()?, "rotation time")?
+                authority_sqlite_integer(clock.unix_millis()?.as_secs(), "rotation time")?
             ],
         )?;
         let status = Self::read_status_from_connection(&transaction)?;
         transaction.commit()?;
         Ok(Self {
+            clock,
             path,
             cached_public_key: Mutex::new(status.public_key),
             cached_trusted_public_keys: Mutex::new(status.trusted_public_keys),
@@ -134,7 +146,7 @@ impl SqliteCapabilityAuthority {
         })?;
         let generation = authority_generation(next_generation)?;
         let keypair = Keypair::generate();
-        let rotated_at = unix_now()?;
+        let rotated_at = self.clock.unix_millis()?.as_secs();
         transaction.execute(
             "UPDATE authority_state SET seed_hex = ?1, public_key_hex = ?2,
              generation = ?3, rotated_at = ?4 WHERE singleton_id = 1",
@@ -389,7 +401,12 @@ impl SqliteCapabilityAuthority {
                 && next_leader.is_some())
             || (same_term_same_leader && fence_authority_state_is_stale);
         if should_update {
-            Self::write_cluster_fence_to_connection(&transaction, next_leader, election_term)?;
+            Self::write_cluster_fence_to_connection(
+                &transaction,
+                next_leader,
+                election_term,
+                self.clock.unix_millis()?.as_secs(),
+            )?;
         }
         transaction.commit()?;
         Ok(should_update)
@@ -436,6 +453,7 @@ impl SqliteCapabilityAuthority {
             &transaction,
             Some(leader_url.to_string()),
             election_term,
+            self.clock.unix_millis()?.as_secs(),
         )?;
         transaction.commit()?;
         Ok(())
@@ -812,6 +830,7 @@ impl SqliteCapabilityAuthority {
         connection: &Connection,
         leader_url: Option<String>,
         election_term: u64,
+        now: u64,
     ) -> Result<(), AuthorityStoreError> {
         let (_, authority_generation, authority_rotated_at) =
             Self::read_public_state_from_connection(connection)?;
@@ -829,7 +848,7 @@ impl SqliteCapabilityAuthority {
             params![
                 leader_url,
                 authority_sqlite_integer(election_term, "election term")?,
-                authority_sqlite_integer(unix_now()?, "fence update time")?,
+                authority_sqlite_integer(now, "fence update time")?,
                 authority_sqlite_integer(authority_generation, "fence generation")?,
                 authority_sqlite_integer(authority_rotated_at, "fence rotation time")?,
             ],
@@ -861,7 +880,7 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
         let keypair = self
             .read_current_keypair()
             .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
-        let now = unix_now()?;
+        let now = self.clock.unix_millis()?.as_secs();
         let body = CapabilityTokenBody {
             id: format!("cap-{}", Uuid::now_v7()),
             issuer: keypair.public_key(),
@@ -876,13 +895,6 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
         CapabilityToken::sign(body, &keypair)
             .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
     }
-}
-
-fn unix_now() -> Result<u64, chio_security_types::clock::ClockError> {
-    Ok(
-        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
-            .as_secs(),
-    )
 }
 
 #[cfg(test)]

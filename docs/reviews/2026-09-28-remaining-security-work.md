@@ -9,9 +9,9 @@ The current batch has its own implementation and verification record below; this
 
 | Work | Current recorded scope | Interpretation |
 | --- | --- | --- |
-| Decoder classification | 281 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite and the selected native/remote/A2A protocol owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
+| Decoder classification | 279 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite and the selected native/remote/A2A protocol owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
-| Ambient clocks | 156 occurrences at 151 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. Expanded remote/A2A scanning adds 13 existing occurrences (five remote production reads and eight fixtures), while two policy reads are retired. Other owners remain. |
+| Ambient clocks | 157 occurrences at 152 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. Expanded ACP scanning adds six preexisting calls: three receipt/compliance production owners still queued and three fixtures. Other owners remain. |
 | Negative assertions | Baseline contains 1,260 assertions at 1,177 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
 | Schema/domain duplication | Wire lock records 163 identifiers declared in multiple files; domain gate has 32 shape exceptions and zero duplicate byte domains | Six duplicated byte domains and 37 schema duplicates retired with 43 canonical identity pins. Remaining schema consolidation and domain-shape repairs stay queued. |
@@ -85,23 +85,31 @@ readers, typed local rejection causes, fallible policy clocks and fenced A2A tas
 retention are implemented. The active-response and budget-test size overages are
 removed without cap increases. See the execution record for exact check status.
 
+The [remote lifecycle, ACP and native CI batch](2026-09-29-remote-lifecycle-acp-native-ci-execution.md)
+implements those four follow-up tasks: remote clock custody and transactional
+session renewal; complete ACP bypass removal; bounded original-byte ACP ingress
+and typed local causes; and explicit native CI/SDK/example/conformance fixtures.
+Focused local evidence is recorded there. Native x86_64 execution and the
+Docker/provider-dependent mini-SWE campaigns remain separate acceptance gates.
+
 The next substantial batch is:
 
-1. Migrate the five inventoried remote MCP production clock reads and their
-   callers: OAuth/JWT issuance and expiry, sessions/replay fences/recovery,
-   rate-limit windows and lifecycle pruning. Inject one shared clock owner;
-   retain custody on clock faults, use checked deadlines and counters, and
-   test rollback, exact expiry, restart and concurrent lifecycle paths.
-2. Remove ACP edge's `compatibility-surface` and direct invocation wrapper.
-   Move its behavioral scenarios to kernel-mediated execution or explicit
-   mocks, including notification and task lifecycle behavior.
-3. Continue original-byte, resource-bound and typed local rejection contracts
-   through ACP edge/proxy, including framed transport, kernel-checker inputs
-   and capability projection. Update the source gate and focused caller tests.
-4. Wire native process-host, SDK/example and conformance jobs to qualified
-   enforcing-host fixtures and the explicit helper, independent anchor and
-   read-grant inputs. Preserve ordinary non-native worker coverage; the native
-   recovery campaigns require fresh terminal evidence under the enforced profile.
+1. Complete the native consumer campaign: supply the remaining mini-SWE
+   filesystem dependencies and broker-backed Docker/provider access, then run
+   discovery, recovery, packaged SDK/examples and conformance on a supported
+   enforcing Linux x86_64 host. Preserve exact terminal evidence per campaign;
+   do not broaden ambient grants to make a fixture pass.
+2. Migrate ACP proxy receipt, kernel-signer and compliance timestamps to one
+   configured fallible clock with checked expiry and rollback/restart tests.
+   These three preexisting production readers are now explicitly inventoried.
+3. Replace remaining string-only semantic errors in remote MCP and ACP with
+   domain error variants and registered codes, preserving source chains through
+   caller responses, task completion and receipt generation. Keep wire errors
+   redacted and test the public caller boundaries.
+4. Extend the original-byte migration to the OpenAPI/MCP bridge owner and its
+   conformance callers, taking bounds and error provenance through actual
+   ingress before typed projection. Keep the wider reader inventory and the
+   structural/assurance queues open until their owners are handled.
 
 Broader semantic error taxonomy, other product/protocol readers, and the
 remaining structural/declaration/assurance queues below remain open.

@@ -1111,6 +1111,9 @@
     "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire",
     "crates/protocol/chio-a2a-edge/src/conversion.rs::extract_arguments_from_message::from_wire",
     "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire",
+    "crates/protocol/chio-acp-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire",
+    "crates/protocol/chio-acp-proxy/src/input.rs::decode::from_wire",
+    "crates/protocol/chio-acp-proxy/src/kernel_checker.rs::parse_token::from_wire",
     "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame::from_wire",
     "crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire",
@@ -6082,23 +6085,16 @@
     "crates/protocol/chio-acp-edge/src/bridge.rs": [
       "extract_capability_ref::from_value"
     ],
-    "crates/protocol/chio-acp-edge/src/fuzz.rs": [
-      "fuzz_acp_envelope_decode::from_str"
-    ],
     "crates/protocol/chio-acp-proxy/src/interceptor.rs": [
       "decode_jsonrpc_params::from_value",
       "extract_execution_nonce::from_value"
     ],
     "crates/protocol/chio-acp-proxy/src/kernel_checker.rs": [
-      "extract_capability_ref::from_value",
-      "parse_token::from_str"
+      "extract_capability_ref::from_value"
     ],
     "crates/protocol/chio-acp-proxy/src/protocol.rs": [
       "parse_session_update::from_value",
       "parse_session_update::from_value"
-    ],
-    "crates/protocol/chio-acp-proxy/src/transport.rs": [
-      "recv::from_str"
     ],
     "crates/protocol/chio-anthropic-tools-adapter/src/adapter.rs": [
       "nested_message_body::from_str",
@@ -7818,25 +7814,17 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/protocol/chio-acp-edge/src/fuzz.rs": {
-      "kind": "example-or-fuzz",
-      "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
-    },
     "crates/protocol/chio-acp-proxy/src/interceptor.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
     "crates/protocol/chio-acp-proxy/src/kernel_checker.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "bounded-original-and-typed-projection",
+      "contract": "parse_token bounds original capability bytes at 64 KiB, rejects duplicate keys and retains UntrustedJsonError through CapabilityCheckError and AcpProxyError. Capability-ref projection is typed and preserves BridgeError::UntrustedInput."
     },
     "crates/protocol/chio-acp-proxy/src/protocol.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
-    "crates/protocol/chio-acp-proxy/src/transport.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/protocol/chio-anthropic-tools-adapter/src/adapter.rs": {
       "kind": "raw-input-baseline",
@@ -11941,5 +11929,14 @@
       "migrations": [],
       "retained_typed_conversions": []
     }
+  },
+  "reviewed_acp_boundaries": {
+    "edge": "Public handle_jsonrpc accepts original bytes bounded at 8 MiB; duplicate keys reject before projection; local_error preserves typed rejection for notifications without a wire reply. Registry ownership is mandatory and every invocation uses kernel admission.",
+    "proxy": "AcpMessage is constructible only through bounded original-byte decoding. AcpFrameReader poisons after malformed, oversized or truncated frames and never parses a rejected tail. Typed input sources survive interceptor and kernel-checker rejection.",
+    "tests": [
+      "crates/protocol/chio-acp-edge/src/tests/original_input.rs",
+      "crates/protocol/chio-acp-proxy/src/input.rs",
+      "crates/protocol/chio-acp-proxy/src/tests/attestation_denials.rs"
+    ]
   }
 }

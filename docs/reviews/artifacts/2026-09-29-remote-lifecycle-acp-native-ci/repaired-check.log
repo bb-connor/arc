@@ -1,0 +1,67 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Checking chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+    Checking chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+    Checking chio-http-session v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-session)
+    Checking chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+    Checking chio-edge-metrics v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-edge-metrics)
+    Checking chio-trace-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-trace-validate)
+    Checking chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+    Checking chio-siem v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-siem)
+    Checking chio-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guards)
+    Checking chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+    Checking chio-mcp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-edge)
+    Checking chio-finding-challenge v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-challenge)
+    Checking chio-security-kernel v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-kernel)
+    Checking chio-acp-proxy v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-proxy)
+    Checking chio-mcp-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-adapter)
+    Checking chio-acp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-edge)
+    Checking chio-policy v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-policy)
+    Checking chio-data-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards)
+    Checking chio-external-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-external-guards)
+    Checking chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+    Checking chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+    Checking chio-trust-market-context v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-trust-market-context)
+    Checking chio-enterprise-export v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-enterprise-export)
+    Checking chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+    Checking chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+warning: unused variable: `now`
+   --> crates/platform/chio-store-sqlite/src/authority.rs:408:9
+    |
+408 |         now: u64,
+    |         ^^^ help: if this is intentional, prefix it with an underscore: `_now`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-store-sqlite` (lib) generated 1 warning (run `cargo fix --lib -p chio-store-sqlite` to apply 1 suggestion)
+    Checking chio-conformance v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-conformance)
+    Checking chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> crates/platform/chio-control-plane/src/trust_control/report_validation.rs:422:27
+    |
+422 |                 authority.enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term)
+    |                           ^^^^^^^^^^^^^^^^^^^^^--------------------------------------------------- argument #3 of type `u64` is missing
+    |
+note: method defined here
+   --> crates/platform/chio-store-sqlite/src/authority.rs:404:12
+    |
+404 |     pub fn enforce_cluster_fence(
+    |            ^^^^^^^^^^^^^^^^^^^^^
+help: provide the argument
+    |
+422 |                 authority.enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term, /* u64 */)
+    |                                                                                                  +++++++++++
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `chio-control-plane` (lib) due to 1 previous error

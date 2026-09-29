@@ -7,7 +7,7 @@ fn interceptor_client_to_agent_always_forwarded() {
         "method": "session/prompt",
         "params": {"sessionId": "s1", "message": "hello"}
     });
-    let result = interceptor.intercept(Direction::ClientToAgent, &msg);
+    let result = interceptor.intercept_value(Direction::ClientToAgent, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
@@ -27,7 +27,7 @@ fn interceptor_fs_read_blocked_returns_correct_error_json() {
             "path": "/etc/shadow"
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Block(v)) => {
@@ -58,7 +58,7 @@ fn interceptor_fs_write_blocked_returns_correct_error_json() {
             "content": "malicious"
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Block(v)) => {
@@ -85,7 +85,7 @@ fn interceptor_terminal_create_blocked_returns_correct_error_json() {
             "args": ["-rf", "/"]
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Block(v)) => {
@@ -120,7 +120,7 @@ fn interceptor_session_update_tool_call_generates_receipt() {
             }
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::ForwardWithReceipt(_, receipt)) => {
@@ -147,7 +147,7 @@ fn interceptor_session_update_agent_message_chunk_forwarded() {
             }
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
@@ -164,7 +164,7 @@ fn interceptor_response_message_forwarded_unchanged() {
         "id": 1,
         "result": {"status": "ok"}
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
@@ -180,7 +180,7 @@ fn interceptor_message_without_method_forwarded() {
         "jsonrpc": "2.0",
         "id": 5
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
@@ -199,7 +199,7 @@ fn interceptor_fs_read_missing_params_returns_protocol_error() {
         "id": 102,
         "method": "fs/read_text_file"
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(
         result.is_err(),
         "missing params should produce a protocol error"
@@ -219,7 +219,7 @@ fn interceptor_fs_read_rejects_empty_session_id_before_forwarding() {
         }
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .expect_err("empty sessionId must fail at the ACP request boundary");
     assert_eq!(
         err.to_string(),
@@ -240,7 +240,7 @@ fn interceptor_fs_read_rejects_padded_session_id_before_forwarding() {
         }
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .expect_err("padded sessionId must fail at the ACP request boundary");
     assert_eq!(
         err.to_string(),
@@ -256,7 +256,7 @@ fn interceptor_fs_write_missing_params_returns_protocol_error() {
         "id": 103,
         "method": "fs/write_text_file"
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(
         result.is_err(),
         "missing params should produce a protocol error"
@@ -280,7 +280,7 @@ fn interceptor_session_update_rejects_empty_tool_call_id_before_receipt() {
         }
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .expect_err("empty toolCallId must not produce an ACP audit receipt");
     assert_eq!(
         err.to_string(),
@@ -305,7 +305,7 @@ fn interceptor_session_update_rejects_padded_tool_call_id_before_receipt() {
         }
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .expect_err("padded toolCallId must not produce an ACP audit receipt");
     assert_eq!(
         err.to_string(),
@@ -329,10 +329,11 @@ fn interceptor_session_update_rejects_malformed_tool_call_shape_before_forwardin
     });
 
     let err = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .expect_err("malformed tool-call update must fail before forwarding");
 
-    assert!(err.to_string().contains("malformed tool call update"));
+    assert!(matches!(err, AcpProxyError::SharedInput(_)));
+    assert!(std::error::Error::source(&err).is_some());
 }
 
 #[test]
@@ -343,7 +344,7 @@ fn interceptor_terminal_create_missing_params_returns_protocol_error() {
         "id": 104,
         "method": "terminal/create"
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(
         result.is_err(),
         "missing params should produce a protocol error"
@@ -363,7 +364,7 @@ fn interceptor_fs_write_allowed_in_prefix() {
             "content": "hello"
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(_)) => {}
@@ -384,7 +385,7 @@ fn interceptor_terminal_create_with_injection_arg_blocked() {
             "args": ["build; rm -rf /"]
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Block(v)) => {
@@ -408,7 +409,7 @@ fn interceptor_session_update_tool_call_update_with_status_generates_receipt() {
             }
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::ForwardWithReceipt(_, receipt)) => {
@@ -436,7 +437,7 @@ fn interceptor_session_update_tool_call_update_without_status_forwarded() {
             }
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(_)) => {}
@@ -463,7 +464,7 @@ fn interceptor_permission_request_forwarded() {
             ]
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
@@ -486,7 +487,7 @@ fn interceptor_permission_request_rejects_empty_boundary_ids() {
         }
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &empty_session)
+        .intercept_value(Direction::AgentToClient, &empty_session)
         .expect_err("empty permission sessionId must fail at the ACP boundary");
     assert_eq!(
         err.to_string(),
@@ -505,7 +506,7 @@ fn interceptor_permission_request_rejects_empty_boundary_ids() {
         }
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &empty_option)
+        .intercept_value(Direction::AgentToClient, &empty_option)
         .expect_err("empty permission optionId must fail at the ACP boundary");
     assert_eq!(
         err.to_string(),
@@ -522,7 +523,7 @@ fn interceptor_unknown_method_forwarded() {
         "method": "some/future/method",
         "params": {}
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
@@ -543,11 +544,10 @@ fn interceptor_session_update_rejects_bad_params_before_forwarding() {
         "params": "not an object"
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .expect_err("malformed session/update params must fail at the ACP boundary");
     assert!(
-        err.to_string()
-            .contains("protocol error: invalid session/update params:"),
+        matches!(err, AcpProxyError::UntrustedInput(_)),
         "unexpected malformed session/update error: {err}"
     );
 }
@@ -560,7 +560,7 @@ fn interceptor_session_update_rejects_missing_params_before_forwarding() {
         "method": "session/update"
     });
     let err = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .expect_err("missing session/update params must fail at the ACP boundary");
     assert_eq!(
         err.to_string(),
@@ -580,7 +580,7 @@ fn interceptor_permission_request_with_empty_options() {
             "options": []
         }
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
@@ -596,7 +596,7 @@ fn interceptor_permission_request_with_no_params_forwarded() {
         "id": 301,
         "method": "session/request_permission"
     });
-    let result = interceptor.intercept(Direction::AgentToClient, &msg);
+    let result = interceptor.intercept_value(Direction::AgentToClient, &msg);
     assert!(result.is_ok());
     match result {
         Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),

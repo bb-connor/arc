@@ -1,0 +1,42 @@
+name: Enforced native consumer fixture
+description: Qualify the native host and provide explicit helper, independent anchors and read grants.
+runs:
+  using: composite
+  steps:
+    - name: Build enforcing helper and discovery probe
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$(uname -s):$(uname -m)" = "Linux:x86_64"
+        export CARGO_INCREMENTAL=0
+        cargo build --locked -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement
+        cargo test --locked -p chio-cli --features real-linux-enforcement --test enforced_discovery --no-run --message-format=json > "$RUNNER_TEMP/native-discovery-build.jsonl"
+        python3 - "$RUNNER_TEMP/native-discovery-build.jsonl" "$RUNNER_TEMP/native-discovery-binary" <<'PY'
+        import json, pathlib, sys
+        records = [json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
+        binaries = [record["executable"] for record in records if record.get("reason") == "compiler-artifact" and record.get("target", {}).get("name") == "enforced_discovery" and record.get("executable")]
+        if len(binaries) != 1:
+            raise SystemExit("expected one native discovery test executable")
+        pathlib.Path(sys.argv[2]).write_text(binaries[0])
+        PY
+    - name: Require terminal filesystem, identity, deadline and cleanup evidence
+      shell: bash
+      run: |
+        set -euo pipefail
+        native_probe=$(cat "$RUNNER_TEMP/native-discovery-binary")
+        helper=$(realpath target/debug/chio-cage-init)
+        sudo env CHIO_CAGE_TEST_HELPER="$helper" "$native_probe" --exact privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup --nocapture 2>&1 | tee "$RUNNER_TEMP/native-discovery.log"
+        rg -q 'test result: ok\. 1 passed; 0 failed' "$RUNNER_TEMP/native-discovery.log"
+    - name: Prepare independent authority fixture for non-root consumers
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 scripts/prepare-enforced-native-fixture.py \
+          --helper "$(realpath target/debug/chio-cage-init)" \
+          --directory "$RUNNER_TEMP/enforced-native-fixture" \
+          --read-path /usr --read-path /etc/ld.so.cache \
+          --read-path /opt/hostedtoolcache \
+          --read-path "$GITHUB_WORKSPACE/sdks" \
+          --read-path "$GITHUB_WORKSPACE/examples" \
+          --read-path "$GITHUB_WORKSPACE/crates/products/chio-cli/tests/process_host" \
+          --github-env "$GITHUB_ENV"

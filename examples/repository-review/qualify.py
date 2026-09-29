@@ -114,7 +114,7 @@ def exercise(binary, output, temporary):
         # Erase the oracle to prove recovery does not consume it.
         (directory / "publisher/first-publication.json").unlink()
         assert len(list((directory / "sockets").glob("*.sock"))) == 1
-        with sqlite3.connect(directory / "publications.db") as db:
+        with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
             assert db.execute("SELECT COUNT(*) FROM reports").fetchone()[0] == 1
         if profile == "inventory":
             config = json.loads((directory / "run.json").read_text())
@@ -184,7 +184,7 @@ def exercise(binary, output, temporary):
             )
         # The local publication row is not itself signed. Its full report must
         # still match the parameters of the verified original invocation.
-        with sqlite3.connect(directory / "publications.db") as db:
+        with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
             original_report = db.execute(
                 "SELECT report FROM reports WHERE id=1"
             ).fetchone()[0]
@@ -198,14 +198,14 @@ def exercise(binary, output, temporary):
                 "published report does not match its signed invocation"
                 in rejected.stderr
             )
-            with sqlite3.connect(directory / "publications.db") as db:
+            with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
                 assert db.execute("SELECT count(*) FROM reports").fetchone()[0] == 1
                 assert (
                     db.execute("SELECT report FROM reports WHERE id=1").fetchone()[0]
                     == original_report + "\ntampered"
                 )
         finally:
-            with sqlite3.connect(directory / "publications.db") as db:
+            with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
                 db.execute("UPDATE reports SET report=? WHERE id=1", (original_report,))
         command(*app, "run", "--run-dir", directory)
         secrets = [
@@ -233,7 +233,7 @@ def exercise(binary, output, temporary):
             "editor",
         )
         command(*app, "run", "--run-dir", directory, success=False)
-        with sqlite3.connect(directory / "publications.db") as db:
+        with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
             assert db.execute("SELECT COUNT(*) FROM reports").fetchone()[0] == 1
         destination = output / name
         destination.mkdir(mode=0o700)
@@ -266,7 +266,7 @@ def exercise(binary, output, temporary):
     command(
         sys.executable, HERE / "review.py", "run", "--run-dir", limited, success=False
     )
-    assert not (limited / "publications.db").exists()
+    assert not (limited / "tool-data" / "publications.db").exists()
     assert "limit_reached" in (limited / "publisher/worker.log").read_text()
     summary = {
         "profiles": reports,

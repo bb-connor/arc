@@ -125,7 +125,7 @@ def handoffs(directory):
     if native.exists():
         with sqlite3.connect(f"file:{native}?mode=ro", uri=True) as db:
             return [row[0] for row in db.execute("SELECT message_key FROM mailbox_messages")]
-    return effects(directory / "effects.db")["messages"]
+    return effects(directory / "tool-data" / "effects.db")["messages"]
 
 
 def valid_report(report, files):
@@ -178,7 +178,7 @@ def ndjson(directory, pattern):
 def summarize(
     directory, files, provider_db, started_ms, first_ms, completed, attempts, calls, keyed
 ):
-    observed = effects(directory / "effects.db")
+    observed = effects(directory / "tool-data" / "effects.db")
     observed["messages"] = handoffs(directory)
     valid = sum(valid_report(report, files) for report in observed["reports"])
     return {
@@ -201,6 +201,7 @@ def summarize(
 
 
 def chio_trial(binary, consumer, directory, scenario, spec, endpoint):
+    (directory / "tool-data").mkdir(mode=0o700)
     files = corpus(directory / "corpus")
     (directory / "policy.yaml").write_text("""kernel:
   max_capability_ttl: 3600
@@ -237,12 +238,14 @@ capabilities:
                 "--server",
                 name,
                 "--database",
-                str(directory / "effects.db"),
+                str(directory / "tool-data" / "effects.db"),
                 "--corpus",
                 str(directory / "corpus"),
             ],
             directory / ("launch-" + name),
             directory,
+            read_paths=[consumer / "tools.py", directory / "corpus", directory / "tool-data"],
+            write_paths=[directory / "tool-data"],
         )
 
     write(
@@ -413,12 +416,13 @@ def interrupt_host(invoke, directory, markers):
 
 
 def baseline_trial(consumer, directory, scenario, spec, endpoint):
+    (directory / "tool-data").mkdir(mode=0o700)
     files = corpus(directory / "corpus")
     settings = {
         "directory": str(directory),
         "mode": spec.get("mode", scenario),
         "endpoint": endpoint,
-        "database": str(directory / "effects.db"),
+        "database": str(directory / "tool-data" / "effects.db"),
         "sources": list(map(str, files)),
         "kill": resolve(spec.get("kill"), "baseline"),
         "hang": INTERRUPTION if spec.get("interrupt") else None,

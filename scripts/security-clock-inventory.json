@@ -129,16 +129,17 @@
     "crates/protocol/chio-a2a-adapter/src/tests/support.rs::unique_path": 1,
     "crates/protocol/chio-a2a-edge/src/tests/all.rs::unix_now": 1,
     "crates/protocol/chio-a2a-edge/src/tests/nonce_preflight.rs::capability_for_tool": 1,
+    "crates/protocol/chio-acp-edge/src/tests/nonce_preflight.rs::capability_for_tool": 1,
+    "crates/protocol/chio-acp-proxy/src/compliance.rs::generate_compliance_certificate": 1,
+    "crates/protocol/chio-acp-proxy/src/kernel_signer.rs::sign_acp_receipt": 1,
+    "crates/protocol/chio-acp-proxy/src/receipt.rs::now_unix_secs": 1,
+    "crates/protocol/chio-acp-proxy/src/tests/attestation_support.rs::now_secs": 1,
+    "crates/protocol/chio-acp-proxy/src/tests/core_guards.rs::fs_guard_blocks_symlink_escape_by_default": 1,
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::signed_manifest_rejects_discovered_tool_surface_drift": 1,
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::write_stdio_server_script": 1,
     "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs::unique_test_dir": 1,
     "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs::unix_now": 1,
     "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support_config.rs::test_dir": 1,
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::mcp_rate_limit_now": 1,
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs::session_now_millis": 1,
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs::unix_now": 1,
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/local_server.rs::sign_access_token": 1,
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs::stored_capabilities_are_current": 1,
     "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs::expected_resume_agent_id_is_revalidated_from_identity_federation_seed": 1,
     "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs::identity_federation_derives_stable_keypair_per_principal": 1,
     "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_runtime.rs::private_remote_admission_directory": 1,
@@ -949,17 +950,17 @@
     }
   },
   "native_protocol_review_2026_09_29": {
-    "contract": "Policy UTC reads migrated. A2A deferred tasks use shared AuthorityDeadline with kernel fenced observations; retained results count toward capacity. Scanner now includes remote MCP and A2A edge; remote production ambient reads remain explicit next-batch work.",
+    "contract": "Policy and A2A migrations recorded by the preceding batch. The remote production readers below are now migrated by remote_acp_lifecycle_review_2026_09_29.",
     "sites": {
       "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs::unix_now": {
         "occurrences": 1,
-        "disposition": "remaining",
-        "contract": "Existing remote MCP ambient read newly included in scan. Shared clock and deadline migration remains queued; not qualified by original-byte input hardening."
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
       },
       "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs::session_now_millis": {
         "occurrences": 1,
-        "disposition": "remaining",
-        "contract": "Existing remote MCP ambient read newly included in scan. Shared clock and deadline migration remains queued; not qualified by original-byte input hardening."
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
       },
       "crates/protocol/chio-a2a-edge/src/tests/nonce_preflight.rs::capability_for_tool": {
         "occurrences": 1,
@@ -993,8 +994,8 @@
       },
       "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs::stored_capabilities_are_current": {
         "occurrences": 1,
-        "disposition": "remaining",
-        "contract": "Existing remote MCP ambient read newly included in scan. Shared clock and deadline migration remains queued; not qualified by original-byte input hardening."
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
       },
       "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_runtime.rs::private_remote_admission_directory": {
         "occurrences": 1,
@@ -1003,8 +1004,8 @@
       },
       "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/local_server.rs::sign_access_token": {
         "occurrences": 1,
-        "disposition": "remaining",
-        "contract": "Existing remote MCP ambient read newly included in scan. Shared clock and deadline migration remains queued; not qualified by original-byte input hardening."
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
       },
       "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support_config.rs::test_dir": {
         "occurrences": 1,
@@ -1023,8 +1024,8 @@
       },
       "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::mcp_rate_limit_now": {
         "occurrences": 1,
-        "disposition": "remaining",
-        "contract": "Existing remote MCP ambient read newly included in scan. Shared clock and deadline migration remains queued; not qualified by original-byte input hardening."
+        "disposition": "migrated",
+        "contract": "Replaced by the shared RemoteClock owner and checked lifecycle deadlines; test helpers are cfg(test) only."
       },
       "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::signed_manifest_rejects_discovered_tool_surface_drift": {
         "occurrences": 1,
@@ -1057,5 +1058,43 @@
         "contract": "Test fixture extraction or removal of legacy launch path; see current fixture keys."
       }
     }
+  },
+  "remote_acp_lifecycle_review_2026_09_29": {
+    "remote_contract": "RemoteClock shares a fallible high-water owner across OAuth, replay, lifecycle, stores, rate windows and kernel authority. Five production ambient readers removed. Deadlines and counters use checked operations; failures retain custody.",
+    "new_scan_roots": [
+      "crates/protocol/chio-acp-edge/",
+      "crates/protocol/chio-acp-proxy/"
+    ],
+    "newly_inventoried_sites": {
+      "crates/protocol/chio-acp-edge/src/tests/nonce_preflight.rs::capability_for_tool": {
+        "disposition": "test-fixture",
+        "contract": "Existing test setup only."
+      },
+      "crates/protocol/chio-acp-proxy/src/compliance.rs::generate_compliance_certificate": {
+        "disposition": "remaining-production",
+        "contract": "Existing receipt or compliance timestamp owner; migrate in the next protocol clock batch."
+      },
+      "crates/protocol/chio-acp-proxy/src/kernel_signer.rs::sign_acp_receipt": {
+        "disposition": "remaining-production",
+        "contract": "Existing receipt or compliance timestamp owner; migrate in the next protocol clock batch."
+      },
+      "crates/protocol/chio-acp-proxy/src/receipt.rs::now_unix_secs": {
+        "disposition": "remaining-production",
+        "contract": "Existing receipt or compliance timestamp owner; migrate in the next protocol clock batch."
+      },
+      "crates/protocol/chio-acp-proxy/src/tests/attestation_support.rs::now_secs": {
+        "disposition": "test-fixture",
+        "contract": "Existing test setup only."
+      },
+      "crates/protocol/chio-acp-proxy/src/tests/core_guards.rs::fs_guard_blocks_symlink_escape_by_default": {
+        "disposition": "test-fixture",
+        "contract": "Existing test setup only."
+      }
+    },
+    "tests": [
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs",
+      "crates/protocol/chio-mcp-remote/src/rate_limit.rs",
+      "crates/protocol/chio-acp-edge/src/tests/original_input.rs"
+    ]
   }
 }

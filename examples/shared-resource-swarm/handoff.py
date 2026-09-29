@@ -35,7 +35,7 @@ def assign(
             task,
         )
     return store.assign_work(
-        directory / "resource.db",
+        directory / "tool-data" / "resource.db",
         "release-board",
         expected_generation,
         owner,
@@ -123,7 +123,7 @@ def schedule(args, directory, revised, callers):
                 raise TimeoutError("old worker did not reach the handoff barrier")
             time.sleep(0.05)
         paused = json.loads(marker.read_text())
-        before = store.inspect(directory / "resource.db")
+        before = store.inspect(directory / "tool-data" / "resource.db")
         if (
             before["mutations"]
             or paused["task_result"]["structuredContent"]["task_revision"] != 0
@@ -143,7 +143,9 @@ def schedule(args, directory, revised, callers):
                 revised,
             )["task_revision"]
         else:
-            revision = store.revise_task(directory / "resource.db", 0, revised)
+            revision = store.revise_task(
+                directory / "tool-data" / "resource.db", 0, revised
+            )
         run.write(
             directory / "handoff-event.json",
             {
@@ -157,7 +159,7 @@ def schedule(args, directory, revised, callers):
         )
         replacement = launch("replacement")
         replacement.wait(timeout=240)
-        after = store.inspect(directory / "resource.db")
+        after = store.inspect(directory / "tool-data" / "resource.db")
         run.write(directory / "after-replacement.json", after)
         if replacement.returncode != 0 or not assess_current(after)["accepted"]:
             raise RuntimeError("replacement did not produce the revised assessment")
@@ -251,7 +253,8 @@ def main():
     for name in ROLES:
         (directory / name).mkdir(mode=0o700)
     seed, revised = inputs()
-    store.initialize(directory / "resource.db", seed)
+    (directory / "tool-data").mkdir(exist_ok=True)
+    store.initialize(directory / "tool-data" / "resource.db", seed)
     if args.backend == "chio":
         binary, key = run.prepare_host(
             args, directory, ROLES, operator=args.ownership == "resource"

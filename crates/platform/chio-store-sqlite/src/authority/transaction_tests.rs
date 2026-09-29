@@ -280,3 +280,39 @@ fn capability_issuance_refuses_overflowing_expiry() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn injected_clock_failure_preserves_authority_and_cluster_fence() -> TestResult {
+    use chio_security_types::clock::{Clock, ClockError, ClockReading, FixedClock};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    struct ControlledClock(AtomicBool);
+    impl Clock for ControlledClock {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            if self.0.load(Ordering::SeqCst) {
+                Err(ClockError::Unavailable)
+            } else {
+                FixedClock::new(1_000).read()
+            }
+        }
+    }
+    let root = tempfile::tempdir()?;
+    let clock = Arc::new(ControlledClock(AtomicBool::new(false)));
+    let authority =
+        SqliteCapabilityAuthority::open_with_clock(root.path().join("clock.db"), clock.clone())?;
+    let before = authority.snapshot()?;
+    let fence = authority.cluster_fence()?;
+    clock.0.store(true, Ordering::SeqCst);
+    assert!(matches!(
+        authority.rotate(),
+        Err(AuthorityStoreError::Clock(ClockError::Unavailable))
+    ));
+    assert!(matches!(
+        authority.enforce_cluster_fence("leader", 1),
+        Err(AuthorityStoreError::Clock(ClockError::Unavailable))
+    ));
+    assert_eq!(authority.snapshot()?, before);
+    assert_eq!(authority.cluster_fence()?, fence);
+    clock.0.store(false, Ordering::SeqCst);
+    assert_eq!(authority.rotate()?.generation, before.generation + 1);
+    Ok(())
+}

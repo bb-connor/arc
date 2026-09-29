@@ -14,6 +14,7 @@ def route(server, tool):
 
 
 def prepare(binary, directory, consumer, mode, endpoint):
+    (directory / "tool-data").mkdir(mode=0o700)
     (directory / "policy.yaml").write_text("""kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 2
@@ -47,10 +48,12 @@ capabilities:
                         demo_python(),
                         str(consumer / "server.py"),
                         "--database",
-                        str(directory / "publications.db"),
+                        str(directory / "tool-data" / "publications.db"),
                     ],
                     directory / "launch-reports",
                     directory,
+                    read_paths=[consumer / "server.py", directory / "tool-data"],
+                    write_paths=[directory / "tool-data"],
                 )
             ],
             "mailboxes": [
@@ -152,7 +155,7 @@ def exercise_swarm(binary, destination, temporary, consumer):
                     ("reports", "read"),
                     ("chio-ipc", "send_results"),
                 }
-            with sqlite3.connect(directory / "publications.db") as db:
+            with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
                 tables = {
                     row[0]
                     for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")

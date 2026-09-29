@@ -9,8 +9,7 @@ outward protocol edges (A2A, ACP, MCP, OpenAI-shaped bridges) and
 one set of signed-lineage types so capability, scope, route, and trace are
 computed the same way regardless of which edge originated the request.
 Execution is synchronous: the orchestrator and every `TargetProtocolExecutor`
-call the kernel's blocking evaluation entry point directly; edges on an async
-runtime cross back in through `sync_bridge_shared::block_on_tool_server_invoke`.
+call the kernel's blocking evaluation entry point directly.
 
 ## Module map
 
@@ -21,11 +20,10 @@ runtime cross back in through `sync_bridge_shared::block_on_tool_server_invoke`.
 | `src/discovery.rs` | `DiscoveryProtocol` enum, its parser and `Display`, and `TargetProtocolRegistry` (executor lookup, default-target resolution). |
 | `src/error.rs` | `BridgeError`, the crate's error type. |
 | `src/execution.rs` | `CrossProtocolExecutionRequest`/`CrossProtocolTargetRequest`, the `TargetProtocolExecutor` trait, and the built-in `OpenAiTargetExecutor`. |
-| `src/lifecycle.rs` | `RuntimeLifecycleSurface`/`RuntimeLifecycleContract`: entrypoint and delivery-mode metadata for claim-eligible vs. compatibility-only bridge surfaces. |
+| `src/lifecycle.rs` | `RuntimeLifecycleSurface`/`RuntimeLifecycleContract`: entrypoint and delivery-mode metadata for authoritative bridge surfaces. |
 | `src/orchestrator.rs` | `CrossProtocolOrchestrator::execute`, deny-path signing, trace-context construction, and `OrchestratedToolCall` (including its receipt-metadata rendering). |
 | `src/routing.rs` | Route-candidate evidence, `plan_authoritative_route`, and signed `RouteSelectionEvidence`. |
 | `src/semantic_hints.rs` | `BridgeFidelity` and `BridgeSemanticHints`, derived from `x-chio-*` tool schema extensions. |
-| `src/sync_bridge_shared.rs` | `block_on_tool_server_invoke`: shared synchronous-bridge shim for compatibility-surface edges, mirroring the kernel's runtime-flavor gate. |
 | `src/validation.rs` | Private (`mod validation`, not `pub`). Request-identity validation and capability-ref cross-checks used by the orchestrator; schema-extension accessors used by `discovery` and `semantic_hints`. |
 | `src/tests.rs` | `#[cfg(test)]` unit tests: mock `CapabilityBridge`/`TargetProtocolExecutor`/`ToolServerConnection`, orchestrator lineage checks, and route-planning behavior. |
 
@@ -89,8 +87,7 @@ and `sha256_hex`. `chio-manifest` supplies `ToolDefinition` and
 `LatencyHint` for target-protocol and semantic-hint resolution.
 
 External: `serde`/`serde_json` for every wire type, `thiserror` for
-`BridgeError`, `tokio` and `futures` for the runtime-flavor detection and
-non-Tokio fallback in `sync_bridge_shared`. `async-trait` is a declared
+`BridgeError`. `async-trait` is a declared
 dependency but is exercised only by the crate's own `#[cfg(test)]` mock
 `ToolServerConnection`; the crate's own traits (`CapabilityBridge`,
 `TargetProtocolExecutor`) are synchronous.

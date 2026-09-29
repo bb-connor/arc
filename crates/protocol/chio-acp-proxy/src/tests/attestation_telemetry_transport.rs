@@ -110,8 +110,7 @@ fn telemetry_exporters_write_and_fail_cleanly() {
     assert!(contents.contains("\"toolName\":\"terminal/create\""));
     let _ = fs::remove_file(&output_path);
 
-    let bad_exporter =
-        JsonFileExporter::new(std::env::temp_dir().to_string_lossy().into_owned());
+    let bad_exporter = JsonFileExporter::new(std::env::temp_dir().to_string_lossy().into_owned());
     let error = bad_exporter
         .export(std::slice::from_ref(&span))
         .expect_err("directory path should fail");
@@ -134,7 +133,7 @@ fn transport_round_trips_json_and_lifecycle() {
     });
     transport.send(&message).expect("send should succeed");
     let received = transport.recv().expect("recv should succeed");
-    assert_eq!(received, Some(message));
+    assert_eq!(received.as_ref().map(AcpMessage::as_value), Some(&message));
 
     transport.kill().expect("kill should succeed");
     let status = transport.wait().expect("wait should succeed");
@@ -146,7 +145,7 @@ fn transport_handles_eof_and_invalid_json() {
     let mut eof_transport =
         AcpTransport::spawn("sh", &["-c".to_string(), "exit 0".to_string()], &[])
             .expect("transport should spawn");
-    assert_eq!(eof_transport.recv().expect("recv should succeed"), None);
+    assert!(eof_transport.recv().expect("recv should succeed").is_none());
     assert_eq!(eof_transport.wait().expect("wait should succeed"), Some(0));
 
     let mut invalid_transport = AcpTransport::spawn(
@@ -158,7 +157,7 @@ fn transport_handles_eof_and_invalid_json() {
     let error = invalid_transport
         .recv()
         .expect_err("invalid json should return protocol error");
-    assert!(matches!(error, AcpProxyError::Protocol(_)));
+    assert!(matches!(error, AcpProxyError::UntrustedInput(_)));
     assert_eq!(
         invalid_transport.wait().expect("wait should succeed"),
         Some(0)
@@ -191,7 +190,7 @@ fn proxy_with_kernel_wraps_transport_and_interceptor() {
         "params": {}
     });
     match proxy
-        .process_client_message(&client_message)
+        .process_client_message(&AcpMessage::decode(client_message.to_string().as_bytes()).unwrap())
         .expect("client message should process")
     {
         InterceptResult::Forward(value) => assert_eq!(value, client_message),
@@ -212,7 +211,7 @@ fn proxy_with_kernel_wraps_transport_and_interceptor() {
         }
     });
     match proxy
-        .process_agent_message(&agent_message)
+        .process_agent_message(&AcpMessage::decode(agent_message.to_string().as_bytes()).unwrap())
         .expect("agent message should process")
     {
         InterceptResult::ForwardWithReceipt(value, receipt) => {
@@ -230,7 +229,7 @@ fn proxy_with_kernel_wraps_transport_and_interceptor() {
     });
     proxy.send_to_agent(&echoed).expect("send should succeed");
     let received = proxy.recv_from_agent().expect("recv should succeed");
-    assert_eq!(received, Some(echoed));
+    assert_eq!(received.as_ref().map(AcpMessage::as_value), Some(&echoed));
 
     proxy.shutdown().expect("shutdown should succeed");
 }

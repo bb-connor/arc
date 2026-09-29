@@ -21,8 +21,13 @@ fn proof(key: &Keypair, nonce: String, issued_at: u64) -> DpopProof {
     .unwrap()
 }
 
-fn verify(proof: &DpopProof, store: &DpopNonceStore, config: &DpopConfig) -> Result<(), String> {
+fn verify(
+    proof: &DpopProof,
+    store: &DpopNonceStore,
+    config: &DpopConfig,
+) -> Result<(), SenderConstraintError> {
     verify_sender_dpop_proof(
+        &RemoteClock::default(),
         proof,
         "sender-binding",
         "chio-mcp",
@@ -37,7 +42,8 @@ fn verify(proof: &DpopProof, store: &DpopNonceStore, config: &DpopConfig) -> Res
 fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
+    let store =
+        DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
     let proof = proof(
         &key,
         "sender-proof".to_owned(),
@@ -48,7 +54,8 @@ fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
     assert_eq!(store.utilization().unwrap().0, 1);
     // Characterize the former local-TTL path: the same cache configuration
     // immediately forgets local-only markers, although this proof is valid.
-    let legacy = DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
+    let legacy =
+        DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
     assert!(legacy
         .check_and_insert(&proof.body.nonce, "sender-binding")
         .unwrap());
@@ -61,12 +68,18 @@ fn sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs() {
 fn sender_dpop_rejects_oversized_keys_before_signature_verification_or_storage() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
+    let store =
+        DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
     let mut proof = proof(&key, "nonce".to_owned(), unix_now());
     proof.body.nonce = "private-marker".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES);
     let error = verify(&proof, &store, &config).unwrap_err();
-    assert!(error.contains("4096-byte limit"));
-    assert!(!error.contains("private-marker"));
+    assert!(matches!(
+        error,
+        SenderConstraintError::Replay(chio_kernel::KernelError::Dpop(
+            chio_kernel::dpop::DpopError::IdentityLimit
+        ))
+    ));
+    assert!(!error.to_string().contains("private-marker"));
     assert_eq!(store.utilization().unwrap().0, 0);
     assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
 }
@@ -75,15 +88,20 @@ fn sender_dpop_rejects_oversized_keys_before_signature_verification_or_storage()
 fn sender_dpop_byte_pressure_preserves_the_consumed_proof() {
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 40, Duration::ZERO).expect("positive replay store test capacities");
+    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 40, Duration::ZERO)
+        .expect("positive replay store test capacities");
     let first = proof(&key, "first".to_owned(), unix_now());
     verify(&first, &store, &config).unwrap();
     let second = proof(&key, "second".to_owned(), unix_now());
-    assert!(verify(&second, &store, &config)
-        .unwrap_err()
-        .contains("byte capacity"));
+    assert!(matches!(
+        verify(&second, &store, &config),
+        Err(SenderConstraintError::Replay(
+            chio_kernel::KernelError::Dpop(chio_kernel::dpop::DpopError::IdentityCapacity)
+        ))
+    ));
     assert!(verify(&first, &store, &config)
         .unwrap_err()
+        .to_string()
         .contains("already used"));
     assert_eq!(store.utilization().unwrap().0, 1);
 }
@@ -91,21 +109,35 @@ fn sender_dpop_byte_pressure_preserves_the_consumed_proof() {
 #[test]
 fn sender_legacy_profile_rejects_a_durable_domain_even_when_resigned_as_v1() {
     use chio_kernel::admission_operation::{AdmissionDigest, AdmissionIdentifier};
-    use chio_kernel::dpop::authority::{DpopReplayAuthorityInputV1, DpopReplayAuthorityV1, DPOP_AUTHORITY_SCHEMA};
+    use chio_kernel::dpop::authority::{
+        DpopReplayAuthorityInputV1, DpopReplayAuthorityV1, DPOP_AUTHORITY_SCHEMA,
+    };
     let key = Keypair::generate();
     let config = DpopConfig::default();
-    let store = DpopNonceStore::new(8, Duration::from_secs(300)).expect("positive replay store test capacities");
+    let store = DpopNonceStore::new(8, Duration::from_secs(300))
+        .expect("positive replay store test capacities");
     let mut body = proof(&key, "authority-proof".into(), unix_now()).body;
-    body.replay_authority = Some(DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
-        destination_store_uuid: AdmissionIdentifier::try_new("destination", "018f9878-7047-7abc-8c98-120dc65700ea").unwrap(),
-        dpop_authority_id: AdmissionIdentifier::try_new("authority", "configured").unwrap(),
-        expectation_id: AdmissionDigest::try_new("expectation", "a".repeat(64)).unwrap(),
-        proof_ttl_secs: 300, max_clock_skew_secs: 30,
-    }).unwrap());
+    body.replay_authority = Some(
+        DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
+            destination_store_uuid: AdmissionIdentifier::try_new(
+                "destination",
+                "018f9878-7047-7abc-8c98-120dc65700ea",
+            )
+            .unwrap(),
+            dpop_authority_id: AdmissionIdentifier::try_new("authority", "configured").unwrap(),
+            expectation_id: AdmissionDigest::try_new("expectation", "a".repeat(64)).unwrap(),
+            proof_ttl_secs: 300,
+            max_clock_skew_secs: 30,
+        })
+        .unwrap(),
+    );
     for schema in [chio_kernel::DPOP_SCHEMA, DPOP_AUTHORITY_SCHEMA] {
         body.schema = schema.into();
         let signed = DpopProof::sign(body.clone(), &key).unwrap();
-        assert!(verify(&signed, &store, &config).unwrap_err().contains("unsupported DPoP schema"));
+        assert!(verify(&signed, &store, &config)
+            .unwrap_err()
+            .to_string()
+            .contains("unsupported DPoP schema"));
         assert_eq!(store.utilization().unwrap().0, 0);
     }
 }

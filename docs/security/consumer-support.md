@@ -51,8 +51,9 @@ inventory, not Rust macro expansion or a semantic proof of all network effects.
 
 | ID | Exact path and symbol | Role / selected profile | Acceptance owner and current state |
 | --- | --- | --- | --- |
+| C32 | `crates/platform/chio-control-plane/src/lib.rs::build_kernel_with_clock` | Service-owned clock composition for C01/C04/C05 | Remote rollback, exact-expiry, restart and persisted-renewal clock regressions; constructor inventory pins the injected factory and kernel entry |
 | C01 | `crates/platform/chio-control-plane/src/lib.rs::build_kernel` | Ordinary host factory | `build_kernel_registers_default_guard_profile`, `build_kernel_registers_post_invocation_pipeline`; flow gate owns missing-port negatives |
-| C02 | same file, `build_kernel_components` | Private composition for C01/C03 | C01 tests plus `security/active_defense_host_tests.rs` and flow installation-order gate |
+| C02 | same file, `build_kernel_components` | Private composition for C03/C32 | C01 tests plus `security/active_defense_host_tests.rs` and flow installation-order gate |
 | C03 | same file, `build_kernel_with_active_defense` | Trusted native host factory | `ensure_ready`, pre/post guards, dispatch and issuance installation; M3 dependency gate required |
 | C04 | `crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs::RemoteSessionFactory::spawn_session` | Ordinary remote MCP host | Remote `tests::session_runtime`, 60 current library cases and exact early-startup rejection; P02 owns hosted role separation |
 | C05 | same file, `RemoteSessionFactory::restore_session` | Restarted ordinary remote MCP host | Remote session runtime/restoration tests and exact MCP retained-profile test; no profile upgrade on restart |

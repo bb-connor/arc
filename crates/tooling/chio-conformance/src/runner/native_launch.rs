@@ -16,7 +16,12 @@ pub(super) fn configured_cage_arguments() -> Result<Vec<OsString>, RunnerError> 
 fn cage_arguments(
     setting: impl Fn(&str) -> Option<OsString>,
 ) -> Result<Vec<OsString>, RunnerError> {
-    let mut arguments = vec![OsString::from("--stage"), OsString::from("enforced")];
+    let mut arguments = vec![
+        OsString::from("--stage"),
+        OsString::from("enforced"),
+        OsString::from("--max-artifact-bytes"),
+        OsString::from("67108864"),
+    ];
     for (variable, flag) in [
         ("CHIO_CAGE_INIT", "--cage-init"),
         ("CHIO_RECEIPT_ANCHOR_ROOT", "--receipt-rollback-anchor-root"),
@@ -43,7 +48,62 @@ fn cage_arguments(
         arguments.push("--read-path".into());
         arguments.push(path.into());
     }
+    let uid = identity_id(&setting, "CHIO_CAGE_EXECUTION_UID")?;
+    let gid = identity_id(&setting, "CHIO_CAGE_EXECUTION_GID")?;
+    arguments.extend([
+        "--execution-uid".into(),
+        uid.to_string().into(),
+        "--execution-gid".into(),
+        gid.to_string().into(),
+    ]);
+    let groups = setting("CHIO_CAGE_EXECUTION_SUPPLEMENTARY_GIDS")
+        .and_then(|value| value.into_string().ok())
+        .ok_or_else(|| {
+            RunnerError::InvalidSecurityMaterial(
+                "explicit supplementary groups are required".into(),
+            )
+        })?;
+    if groups.len() > 1024 || (!groups.is_empty() && groups.split(',').count() > 64) {
+        return Err(RunnerError::InvalidSecurityMaterial(
+            "supplementary groups exceed the bound".into(),
+        ));
+    }
+    let mut previous = None;
+    for group in groups.split(',').filter(|_| !groups.is_empty()) {
+        let group = group
+            .parse::<u32>()
+            .ok()
+            .filter(|group| *group != 0 && *group != u32::MAX && *group != gid)
+            .ok_or_else(|| {
+                RunnerError::InvalidSecurityMaterial("invalid supplementary group".into())
+            })?;
+        if previous.is_some_and(|value| value >= group) {
+            return Err(RunnerError::InvalidSecurityMaterial(
+                "supplementary groups must be sorted and unique".into(),
+            ));
+        }
+        previous = Some(group);
+        arguments.extend([
+            "--execution-supplementary-gid".into(),
+            group.to_string().into(),
+        ]);
+    }
     Ok(arguments)
+}
+
+fn identity_id(
+    setting: &impl Fn(&str) -> Option<OsString>,
+    name: &str,
+) -> Result<u32, RunnerError> {
+    setting(name)
+        .and_then(|value| value.into_string().ok())
+        .and_then(|value| value.parse().ok())
+        .filter(|value| *value != 0 && *value != u32::MAX)
+        .ok_or_else(|| {
+            RunnerError::InvalidSecurityMaterial(format!(
+                "{name} must identify a non-root execution identity"
+            ))
+        })
 }
 
 fn required_path(
@@ -77,6 +137,8 @@ mod tests {
         let grants = root.path().join("read-paths.txt");
         std::fs::write(&grants, "/usr/lib\n/reviewed path\n")?;
         let arguments = cage_arguments(|name| match name {
+            "CHIO_CAGE_EXECUTION_UID" | "CHIO_CAGE_EXECUTION_GID" => Some("10001".into()),
+            "CHIO_CAGE_EXECUTION_SUPPLEMENTARY_GIDS" => Some("".into()),
             "CHIO_CAGE_INIT" => Some("/helper".into()),
             "CHIO_RECEIPT_ANCHOR_ROOT" => Some("/anchor".into()),
             "CHIO_CAGE_READ_PATHS_FILE" => Some(grants.clone().into_os_string()),
@@ -85,6 +147,8 @@ mod tests {
         let expected: Vec<OsString> = [
             "--stage",
             "enforced",
+            "--max-artifact-bytes",
+            "67108864",
             "--cage-init",
             "/helper",
             "--receipt-rollback-anchor-root",
@@ -93,6 +157,10 @@ mod tests {
             "/usr/lib",
             "--read-path",
             "/reviewed path",
+            "--execution-uid",
+            "10001",
+            "--execution-gid",
+            "10001",
         ]
         .into_iter()
         .map(OsString::from)
@@ -112,6 +180,43 @@ mod tests {
                     grants.clone().into_os_string()
                 } else {
                     "/configured".into()
+                })
+            });
+            assert!(matches!(
+                result,
+                Err(RunnerError::InvalidSecurityMaterial(_))
+            ));
+        }
+        Ok(())
+    }
+    #[test]
+    fn identities_and_group_sets_are_explicit_and_bounded() -> Result<(), RunnerError> {
+        let root = tempfile::tempdir()?;
+        let grants = root.path().join("grants");
+        std::fs::write(&grants, "/usr\n")?;
+        for (uid, groups) in [
+            ("0", "".to_owned()),
+            ("4294967295", "".to_owned()),
+            ("1001", "0".to_owned()),
+            ("1001", "1002".to_owned()),
+            ("1001", "3,,4".to_owned()),
+            ("1001", "4,3".to_owned()),
+            ("1001", "3,3".to_owned()),
+            (
+                "1001",
+                (3..68)
+                    .map(|group| group.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
+        ] {
+            let result = cage_arguments(|name| {
+                Some(match name {
+                    "CHIO_CAGE_EXECUTION_UID" => uid.into(),
+                    "CHIO_CAGE_EXECUTION_GID" => "1002".into(),
+                    "CHIO_CAGE_EXECUTION_SUPPLEMENTARY_GIDS" => groups.clone().into(),
+                    "CHIO_CAGE_READ_PATHS_FILE" => grants.clone().into_os_string(),
+                    _ => "/configured".into(),
                 })
             });
             assert!(matches!(

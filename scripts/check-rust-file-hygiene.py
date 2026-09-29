@@ -148,7 +148,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests.rs": allow(
         "2027-01-31",
         "existing oversized MCP edge runtime test suite; capped to current size until split",
-        max_lines=4_512,
+        max_lines=4_496,
     ),
     "crates/products/chio-cli/tests/certify.rs": allow(
         "2027-01-31",
@@ -285,7 +285,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs": allow(
         "2027-01-31",
         "receipt retention regression suite; capped to current size until split",
-        max_lines=4_581,
+        max_lines=4_416,
     ),
     "crates/platform/chio-store-sqlite/src/receipt_store/tests/verified_head.rs": allow(
         "2026-10-31",
@@ -305,7 +305,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/budget_store/tests.rs": allow(
         "2026-12-31",
         "existing oversized budget store test suite; capped to current size until split",
-        max_lines=2_479,
+        max_lines=2_399,
     ),
     "crates/economy/chio-web3/src/settlement_proof.rs": allow(
         "2026-11-30",
@@ -455,14 +455,14 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-acp-proxy/src/lib.rs": allow(
         "2027-01-31",
         "ACP proxy surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=12_263,
+        max_lines=12_252,
         max_fragments=33,
     ),
     "crates/protocol/chio-a2a-adapter/src/lib.rs": allow(
         "2027-01-31",
         "A2A adapter surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=12_016,
-        max_fragments=18,
+        max_lines=5_454,
+        max_fragments=10,
     ),
     "crates/trust/chio-credentials/src/lib.rs": allow(
         "2027-01-31",
@@ -473,8 +473,8 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-mcp-remote/src/lib.rs": allow(
         "2027-01-31",
         "MCP remote surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=7_716,
-        max_fragments=9,
+        max_lines=5_991,
+        max_fragments=8,
     ),
     "crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs": allow(
         "2027-01-31",
@@ -491,7 +491,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-acp-edge/src/lib.rs": allow(
         "2027-01-31",
         "ACP edge surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=5_768,
+        max_lines=5_488,
         max_fragments=10,
     ),
     "crates/platform/chio-store-sqlite/src/finding_challenge_store.rs": allow(
@@ -503,7 +503,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-a2a-edge/src/lib.rs": allow(
         "2027-01-31",
         "A2A edge surface assembled from include! fragments; capped until the fragments become modules",
-        max_lines=5_913,
+        max_lines=5_818,
         max_fragments=11,
     ),
     "crates/kernel/chio-kernel/src/budget_store/in_memory.rs": allow(
@@ -533,14 +533,12 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs": allow(
         "2026-12-31",
         "MCP stdio transport assembled from include! fragments; capped until the fragments become modules",
-        max_lines=3_211,
+        max_lines=2_715,
         max_fragments=2,
     ),
-
     "crates/guards/chio-policy/src/evaluate.rs": allow(
         "2026-12-31",
         "policy evaluation production fragments remain pending module ownership; tests are a separate module",
-        max_lines=1_909,
         max_fragments=4,
     ),
     "third_party/regress-chio/tests/unicodesets.rs": allow(

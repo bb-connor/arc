@@ -1,0 +1,27 @@
+Single read-only review by /root/remote_acp_native_final_review (gpt-6-astra, high).
+Base 723bf9ee97; uncommitted implementation snapshot. No builds, mutations or
+nested agents. The reviewer did not re-review subsequent repairs.
+
+Important 1: Ready/touch published lifecycle state before a later persistence
+counter or clock failure. Repeated failing touches could extend live authority.
+Repair: propose a snapshot, finish fallible serialization/counter/persistence
+using the original fenced observation, then publish under the lifecycle lock.
+Evidence: persistence_counter_exhaustion_cannot_initialize_or_extend_live_authority
+and persisted_transitions_use_one_fenced_observation, plus the complete remote
+owning suite. Other rollback, expiry and restart regressions remain covered.
+
+Important 2: fixture grants omitted copied AI SDK tools, corpus/publication
+state and extracted repository-review modules. Repair: explicit module reads
+and isolated tool-data reads/writes, migrated consumer paths, portable SDK and
+example tests. Native execution itself still needs an enforcing host.
+
+Minor: stale compatibility rustdoc attached to kernel-mediated invoke.
+Repair: removed obsolete descriptions along with the legacy implementation.
+
+No additional concrete ACP admission, duplicate-key, typed projection or
+rejected-frame-tail defect was found by the reviewer. Notification invocation
+and deferred execution reach the orchestrator; rejected frames poison readers.
+
+Declined to qualify: real native execution, hosted CI, Docker/provider-dependent
+mini-SWE campaigns. They remain acceptance work. No unconditional hosted,
+release, M5 or post-fix independent approval is inferred from this review.

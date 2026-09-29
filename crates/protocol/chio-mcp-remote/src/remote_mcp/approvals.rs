@@ -211,7 +211,10 @@ pub(super) async fn submit(
             "capability does not belong to session",
         );
     };
-    let now = session_now_millis() / 1000;
+    let now = match state.factory.config.clock.seconds() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
     if capability.expires_at <= now {
         return failure(StatusCode::CONFLICT, "capability expired");
     }
@@ -314,7 +317,10 @@ pub(super) async fn decide(
             failure(StatusCode::CONFLICT, "approval decision is terminal")
         };
     }
-    let now = session_now_millis() / 1000;
+    let now = match state.factory.config.clock.seconds() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
     if now >= record.expires_at {
         return failure(StatusCode::CONFLICT, "approval expired; no artifact issued");
     }

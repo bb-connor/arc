@@ -2587,6 +2587,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
+ "chio-security-types",
  "chio-test-support",
  "serde",
  "serde_json",

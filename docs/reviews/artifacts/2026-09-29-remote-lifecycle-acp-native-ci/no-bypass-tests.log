@@ -1,0 +1,71 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling xtask v0.1.0 (/tmp/arc-security-launch/xtask)
+   Compiling chio-anchor v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-anchor)
+   Compiling chio-runtime-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-core)
+   Compiling chio-formal-diff-tests v0.1.0 (/tmp/arc-security-launch/formal/diff-tests)
+    Finished `test` profile [unoptimized] target(s) in 49.98s
+     Running unittests src/main.rs (target/debug/deps/xtask-2c8e61efaef52e53)
+
+running 28 tests
+test adapter_no_bypass::constructors::tests::constructor_alias_and_macro_mutations_cannot_escape_inventory ... ok
+test adapter_no_bypass::source::tests::test_only_includes_are_not_required ... ok
+test adapter_no_bypass::constructors::tests::constructor_inventory_retains_nested_and_function_pointer_references ... ok
+test adapter_no_bypass::source::tests::included_rs_sources_are_not_counted_twice ... ok
+test adapter_no_bypass::source::tests::unsafe_or_dynamic_include_paths_fail_closed ... ok
+test adapter_no_bypass::source::tests::nested_fragments_are_checked_at_their_physical_path ... ok
+test adapter_no_bypass::tests::cfg_test_impls_are_ignored ... ok
+test adapter_no_bypass::source::tests::symlinked_includes_and_ancestors_fail_closed ... ok
+test adapter_no_bypass::tests::comments_strings_and_unrelated_functions_do_not_mediate_command_new ... ok
+test adapter_no_bypass::constructors::tests::dispatch_inventory_includes_trait_methods_and_function_references ... ok
+test adapter_no_bypass::source::tests::missing_and_cyclic_includes_fail_closed ... ok
+test adapter_no_bypass::constructors::tests::injected_clock_constructors_and_function_pointers_are_inventoried ... ok
+test adapter_no_bypass::tests::inherent_and_trait_methods_with_the_same_name_do_not_merge ... ok
+test adapter_no_bypass::source::tests::production_include_under_a_test_named_path_is_still_checked ... ok
+test adapter_no_bypass::tests::process_lifecycle_exception_is_function_scoped ... ok
+test adapter_no_bypass::tests::compatibility_exception_requires_the_feature_cfg ... ok
+test adapter_no_bypass::constructors::tests::new_and_removed_physical_constructor_sites_fail_the_inventory ... ok
+test adapter_no_bypass::tests::removed_acp_bypass_is_rejected_even_with_compatibility_cfg ... ok
+test adapter_no_bypass::tests::strings_do_not_satisfy_named_call_contracts ... ok
+test adapter_no_bypass::tests::unrelated_kernel_function_does_not_mediate_invoke ... ok
+test adapter_no_bypass::tests::removed_a2a_bypass_is_rejected_even_with_compatibility_cfg ... ok
+test adapter_no_bypass::tests::unrelated_evaluate_function_does_not_mediate_spawn ... ok
+test adapter_no_bypass::tests::supervision_thread_exception_does_not_authorize_a_process_launch_in_its_closure ... ok
+test adapter_no_bypass::source::tests::include_depth_is_bounded_without_rejecting_the_limit ... ok
+test adapter_no_bypass::tests::native_launch_gate_requires_authority_evidence_and_receipts_in_order ... ok
+test adapter_no_bypass::tests::prepared_runtime_boundary_requires_both_entry_and_leaf_calls ... ok
+test adapter_no_bypass::tests::startup_factory_flow_gates_cannot_be_removed ... ok
+test adapter_no_bypass::tests::every_current_mediation_contract_detects_a_removed_required_call ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 154 filtered out; finished in 1.18s
+
+     Running tests/itf_to_regression.rs (target/debug/deps/itf_to_regression-80b747f84350d9c9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+     Running tests/qualify_parity.rs (target/debug/deps/qualify_parity-8255263709f877db)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/workspace_root.rs (target/debug/deps/workspace_root-6777b75297e61412)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+

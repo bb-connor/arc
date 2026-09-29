@@ -37,7 +37,9 @@ impl CapabilityBridge for AcpCapabilityBridge {
             .cloned()
             .map(serde_json::from_value)
             .transpose()
-            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))
+            .map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })
     }
 
     fn inject_capability_ref(
@@ -48,8 +50,9 @@ impl CapabilityBridge for AcpCapabilityBridge {
         let chio_metadata = ensure_chio_metadata(envelope)?;
         chio_metadata.insert(
             "capabilityRef".to_string(),
-            serde_json::to_value(cap_ref)
-                .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?,
+            serde_json::to_value(cap_ref).map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })?,
         );
         Ok(())
     }
@@ -162,17 +165,13 @@ fn evaluate_bridge_fidelity(
     }
 }
 
+#[cfg(test)]
 fn current_unix_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-}
-
-fn current_unix_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_millis() as u64)
+    chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
+        .unwrap_or_else(|error| panic!("test clock: {error}"))
+        .unix_millis()
+        .get()
+        / 1000
 }
 
 fn execute_orchestrated_acp_request(

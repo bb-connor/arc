@@ -1,0 +1,469 @@
+{
+  "schema": "chio.local-check-inputs.v1",
+  "base_commit": "723bf9ee97222bf64c7d8122ac704ed30bfde808",
+  "branch": "packet/3-retention-accounting",
+  "host": {
+    "system": "Linux",
+    "machine": "aarch64"
+  },
+  "scope": "Changed implementation, tests, workflow, inventory and delivery documents. Evidence archive and preexisting output are excluded.",
+  "qualification": "Focused local checks only; native enforcing-host execution and hosted CI remain unqualified.",
+  "files": [
+    {
+      "path": ".github/actions/enforced-native-fixture/action.yml",
+      "sha256": "937383bce6c0f9773ab9f73a66fcffd5807207f773f1083f4c23f16b6d7aaead"
+    },
+    {
+      "path": ".github/workflows/conformance-matrix.yml",
+      "sha256": "7e96e6b68dd9d3a7e44e64687fe78bbd3fd18ed864ecca016c740a0edff70f7a"
+    },
+    {
+      "path": ".github/workflows/process-workers.yml",
+      "sha256": "87e8e63fc247468a7c3e014d457fa4560636c7986f61152b7721b710c6430260"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "9e4fa6ce800e55f810fa4270178342d0d696854fb665cc67a3cf6694d1f47a97"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/clock.rs",
+      "sha256": "260b78cfb4b5ef0a7ab45b656ebe5eb50d9561d7a280a328005f6f5ba7674e9e"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/lib.rs",
+      "sha256": "3f4afe85f16c3e0621b9a0a8f69196491c602672530e8d9f761fc0b8603f466f"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/authority.rs",
+      "sha256": "e742cb6691b0f13ed6c6977e58104e111562ed77980f1946a0103895757224ed"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/authority/transaction_tests.rs",
+      "sha256": "7f7454ba1cd531c2aac89c10d2da41337ddee469d10209499299e6f2b54db138"
+    },
+    {
+      "path": "crates/products/chio-cli/Cargo.toml",
+      "sha256": "800bb37309ab60aa1d153bc1c1b478abecefa0568827db1aa26012e85a75f8ba"
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/runtime.rs",
+      "sha256": "7f9e6efafc6efbba01b1bb9bff84906d27d5e9954c81fadfb777c4933519184c"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/process_host.rs",
+      "sha256": "0b09821af5561a5447f5508cffd32321c9a835dd4315ce05571d1c7b6546c880"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/process_host/recovery.py",
+      "sha256": "60115930447ad92073242a53b5ef96b3d97d120a62c3f0568349cf824398e519"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/process_host/runner.py",
+      "sha256": "54696cb2412b63ad51e147b2fa03a85b01e0eae0c646e6429b1b145befd83f05"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/process_host_native.rs",
+      "sha256": "635a6b496e9f17981264f17ce96a13edcf66cc4943f225fabafd2dd25b1cec03"
+    },
+    {
+      "path": "crates/protocol/chio-a2a-edge/src/conversion.rs",
+      "sha256": "b345a7b41788533c229ba962835d8f35912cc35ba6862efa61e2621d515dd53c"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/ARCHITECTURE.md",
+      "sha256": "182101bf42b07c9b8a98f0928fa69763ca7b9189aefc0947822b30137beb18a7"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/Cargo.toml",
+      "sha256": "ada7f41377f9ddde80492aa050471d21e6cefad9c2983f4a264cf38977230905"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/README.md",
+      "sha256": "7bbc1e0c3fa4c5e01969406b67b98e23b27252872a859f5e993f9ed1d1eec33c"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/bridge.rs",
+      "sha256": "35080c277df5d3d60087765c5ea03c2ce497eec8554f4d1d6eb7b16ca1b29aa8"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/conversion.rs",
+      "sha256": "d81c25969e409343d43769fcd73b639f7285900f3913e69a6e968016f0804e6e"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/edge.rs",
+      "sha256": "2d6f27f56926505e53c88ab3c6a96328b42255ef4d736619bcbd3729dc6e47c2"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/error.rs",
+      "sha256": "462ca9d7b8923a92a01e59ce1fe0abb4e01a70706a60ffff9f1bde43f2e976f6"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/fuzz.rs",
+      "sha256": "9ab3a45f44ad892d02cc7476b25b27f337ed93356f60c51892db5bec5a12f6a8"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/jsonrpc.rs",
+      "sha256": "e27b5df09f957ba3e33d2d5e965998936af707c741033d5b582b6a5d37a5b071"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/lib.rs",
+      "sha256": "19a324df4ba87a8fa77a44d92f275e43601f28da8cbf1f2fcb77bb56b1b3ed52"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/tests/all.rs",
+      "sha256": "fce0c27eee1657e2ed709cc91f4f658179f8d817314c14c1ebb0f85f9d4c8a0d"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/tests/config_and_serde.rs",
+      "sha256": "7e4be1d4e705f0d9f5d138649606b8e888fb74af838a40f0d300dbfc0ae74dbb"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/tests/nonce_preflight.rs",
+      "sha256": "54425fc847f5250f88ef6ae0f493977e748ab1a33f8b0ea3eafefaf283242d5b"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/tests/original_input.rs",
+      "sha256": "6a489f2cfa7400fa6f78db376d105d321c704c78c323bab2d9f1cff8422eb74e"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/tests/permissions.rs",
+      "sha256": "e28a6e29734510c1b2aa65012a50287f9cc1e4f70828599f10a767f24c501159"
+    },
+    {
+      "path": "crates/protocol/chio-acp-edge/src/types.rs",
+      "sha256": "28b5eebc30258759cf51b766e293cf50a6a2420287544ccc53f03947b2f4520c"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/attestation.rs",
+      "sha256": "adae7f4aa6c8494a36be1a9cc21d2398e63a43aed877a74d39f22f40de4755b6"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/input.rs",
+      "sha256": "29b7e155aafdbf088a915935f40f24866646f27a55aca9b2851d2aa4519dc9cc"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/interceptor.rs",
+      "sha256": "3b221d5cd026c1f3e953c9edffe3aed859c82e4060c7b1e2c52a846475270065"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/kernel_checker.rs",
+      "sha256": "67d5d54c4ce8f369740c66236ae23b48c3624a83e3465a28bf8557c47d96fcb8"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/lib.rs",
+      "sha256": "2965bffe2de8bd7131dd9c6dd3e8982df897a492069c89062f81d8682af1cd4c"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/protocol.rs",
+      "sha256": "9c113373547dd74da53d232db5548b7ac6f6740143a6bb88233a6338d77f1e5d"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/proxy.rs",
+      "sha256": "bc83e22d66327811f65377b5ba64335f441c538df0512979891cdb80cb582a97"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/tests/attestation_denials.rs",
+      "sha256": "16ba89b3b7ab4d181f030c7b4829003d64c469a66996159d67e594063f402f52"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/tests/attestation_lifecycle.rs",
+      "sha256": "be18d7e8eba9a86f70ad06f0443f331d46f0be0d64a80c4f3a6594d6cb120ac9"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/tests/attestation_telemetry_transport.rs",
+      "sha256": "677e91025f1c3a5cc9a605444502cb3073e149984cdb292f9bfd4bd46bb3289c"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/tests/core_interceptor.rs",
+      "sha256": "6ebd11eebd336fd410bcfb6069ecfb96ca85998aa2f41f9fa36c07f94f3855cf"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/tests/core_protocol.rs",
+      "sha256": "ed88517d00a637b7552d988e3b822cbaa49ddf64eca65866fafb3e74b8b6b143"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/tests/extended_interceptor.rs",
+      "sha256": "0980dfa96cb0d141098ff13bcee43fbe2052760954cc90d2ec09244fbf9c9089"
+    },
+    {
+      "path": "crates/protocol/chio-acp-proxy/src/transport.rs",
+      "sha256": "40351d32d6299cd7c533359ad5028a0e1254ab9b3b643ea5a889c6babc5c6c43"
+    },
+    {
+      "path": "crates/protocol/chio-cross-protocol/ARCHITECTURE.md",
+      "sha256": "9e18d85821dd29d3a2aeebf2ca19383bb8c062905dc18ca74cd973bbdb335873"
+    },
+    {
+      "path": "crates/protocol/chio-cross-protocol/README.md",
+      "sha256": "00e770a8f61cc2cb6ee09f85d66e5ea5e06248c4c1bb20eb283766c34f9ef4d3"
+    },
+    {
+      "path": "crates/protocol/chio-cross-protocol/src/execution.rs",
+      "sha256": "9e6061724419e1eb571011eba2a45ce911811278d18a0c668412633b86e7b58b"
+    },
+    {
+      "path": "crates/protocol/chio-cross-protocol/src/lib.rs",
+      "sha256": "ad8b2f9550adb76392f107d2926cc701d595cf0c628fa2abd6b34036543653dc"
+    },
+    {
+      "path": "crates/protocol/chio-cross-protocol/src/lifecycle.rs",
+      "sha256": "0738de0322a7aef32c0afc89211784b90cf3e59ab8cf2312dc320851dd011935"
+    },
+    {
+      "path": "crates/protocol/chio-cross-protocol/src/sync_bridge_shared.rs",
+      "deleted": true
+    },
+    {
+      "path": "crates/protocol/chio-cross-protocol/src/tests.rs",
+      "sha256": "3397c5ff3acf3ec4874dcf488fbbdb9ce4b8522c7f378b6b28d19a34fdc6cda3"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/Cargo.toml",
+      "sha256": "b2bfc6a1b377c2a23bfb5c61da6f8024c1c5ccfafd88f04d16a3fe1f004189c9"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/clock.rs",
+      "sha256": "b6f873b4f722c9b79b0a3ac5e68127412b1611c12523e7188cac3e574841ad96"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/input.rs",
+      "sha256": "000457404ac8cf01d87fe365f9c8f802acc7ab5ea35e652c3df20a6350dc5518"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/lib.rs",
+      "sha256": "2ef436f567121b0ea759d68a658c98040f2fe197b5ef21710ef1f85ac822ae0c"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/rate_limit.rs",
+      "sha256": "485005facddf1b5ab2fc6fc29666c369faef86d6f329c758c8246b1255bc0a00"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs",
+      "sha256": "36c443ec8bbaec21b2dd1ab844bb63f5dee91d75cfdba356a8608313e6df81d6"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs",
+      "sha256": "bdcf7232466feda0e2d49c37d05430f330d9a92a5e254db411936dfb59a50ce6"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs",
+      "sha256": "f0054e02261e9407491759c061f11bcfa3f5b65d1a2215c4ff0b116d0d097c47"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+      "sha256": "2b5831041041cdc749c0d52c0c83b3b060e8640fc36fceb85d50cace3aa823d2"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs",
+      "sha256": "82e2f2d78f9ff5ef746e0946fa4a58545da8fc28d708fb1046adc959121f9b19"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs",
+      "sha256": "e379f7de78f3a01baf9e2b5715878cf7efd0f189764bd5c4dc812ca68f2f2cbb"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs",
+      "sha256": "6fe1bc4aa313fbcbabfc293a2ffa5ec7f5e57e4832abd0df9c52b59d08c83be2"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/local_server.rs",
+      "sha256": "a41092bb56521555d6878adf092fb948576bbef315ec60efa9327f6b8a37c3be"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/request_validation.rs",
+      "sha256": "81e5f9c00df023e6479a0455db6f6dfd6333cd775f0667265d3f7e4f3a25d74f"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs",
+      "sha256": "ab39c653b18c64f213864b2b03ad04e696d8be1e5fe92cf3cfde1bf75acce70d"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs",
+      "sha256": "c7a39d6010698c79270c94cafce7e0a3f4239e31a3f82eaf84f6d56fa82ed45f"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/ledger.rs",
+      "sha256": "1561ad624e54d4ed3d33232cd890c6d366ec84899adc31d01762398cb7d669fd"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/session.rs",
+      "sha256": "b3a63abcd7ad1b137c2c94057fcedf9b2e780ab87f0adf098e87155dcea97cf2"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs",
+      "sha256": "f8a3ef7ba02e056a2cbd6bd3d8b6eb32ea75db60429e7ab8e9060ab650d56550"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs",
+      "sha256": "aaa99f0d28242fe79ecc57ed9d38e56c3e0bd2033104a0ec78c961e493e98c5d"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs",
+      "sha256": "9ce27ceaa75628de19debd635f7baa1965b95d6babcbf1b66cbda640222a75b1"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs",
+      "sha256": "12d3b8f7b387cec0218261b1f049b395bd1e021cd32312ea0f945738e9b0c3ac"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/bearer_verifier.rs",
+      "sha256": "7bab4865bc51ae2a1eb11135b266474bccd2b2004b1943cb5cf7bdf10a9f6f05"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs",
+      "sha256": "7306574d0e7a8188213628bc9016e3f4ea90da1c8c45c98eed96774aac8e4897"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/dpop_replay.rs",
+      "sha256": "c2117f287a742f588bc222e637546838a743d19e1f22eab7e7c9fcec081c439e"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_recovery.rs",
+      "sha256": "8839f9934d5c7b0e1510983bb623a3e6db8b8112c2fabdaa3ccba603029a667d"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_runtime.rs",
+      "sha256": "b0316b9c292b278fc820348e1f5c304638127ebb3ea7f4fb25f158fa5d17a36c"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/src/runner.rs",
+      "sha256": "7d84a9bd73ba0c0bfd93d536988544df3df984bd88980f814b3acb9da725b49a"
+    },
+    {
+      "path": "crates/tooling/chio-conformance/src/runner/native_launch.rs",
+      "sha256": "8f5b484d02dcd5d246f55b882dcf4001e2f8fb7ce1c4780361fc3d8482cb9890"
+    },
+    {
+      "path": "docs/reviews/2026-09-28-remaining-security-work.md",
+      "sha256": "22acb53175d32d432abc566be731574e4d3fc4f9170071c490d230731ab25365"
+    },
+    {
+      "path": "docs/reviews/2026-09-29-remote-lifecycle-acp-native-ci-execution.md",
+      "sha256": "64c515b1dacf03dc2e7e8755028dc0e91011aaa9c96164db19f9e6d1408f7a57"
+    },
+    {
+      "path": "docs/security/consumer-support.md",
+      "sha256": "e0fe4307a27a57ac307ce5f6380ffbbe65bb86203c580bbe6afbd8c13b6b6565"
+    },
+    {
+      "path": "docs/security/trust-boundary-inventory.json",
+      "sha256": "afa6c364d87d5e882a05bc3f649300df8817c71f61b9643f205daf644ee64f1c"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-29-remote-lifecycle-acp-native-ci.md",
+      "sha256": "6fb7ef35aac9b9e456a363d69b7449301afa73fc7fcf363608b2f86d7833975a"
+    },
+    {
+      "path": "examples/repository-review/adaptive/configuration.py",
+      "sha256": "0b35e5e3b53cea5185a3b8350bc09b97e27bfff7ec7c6c3f0b104f4f55364181"
+    },
+    {
+      "path": "examples/repository-review/adaptive/qualification.py",
+      "sha256": "39ba21f342101ae443d5ef8ad1b8b73ce6274e8d86320e522eb0f7620b7840de"
+    },
+    {
+      "path": "examples/repository-review/adaptive/qualification_checks.py",
+      "sha256": "e13fa750910934ac2c6058578b7be7747926b2aa37340646ba09dfd31a0a32ce"
+    },
+    {
+      "path": "examples/repository-review/adaptive/verification.py",
+      "sha256": "fa2d227671bcd3496d29ec83e2cf8ade6f41e7fa049724258eddfa6a0f558e3c"
+    },
+    {
+      "path": "examples/repository-review/distribution/qualify.py",
+      "sha256": "3c2434ee3905cdaca03c6a375d46698e15f349f8d288e6de0aad0d357bbb9e42"
+    },
+    {
+      "path": "examples/repository-review/qualify.py",
+      "sha256": "c07286070d4e561c826d5fda45c8f59bbed948e394bb43eeea2ae4cd7dea05aa"
+    },
+    {
+      "path": "examples/repository-review/review.py",
+      "sha256": "96bc49533d20abc0bb414034cd779bbe7a0015ec19dd0989ada67eeaa60bce96"
+    },
+    {
+      "path": "examples/shared-resource-swarm/handoff.py",
+      "sha256": "fbf7b370b3e1077f396fb60f315a9e6c0cc86c0ba49770b4b5c3a3866e615fca"
+    },
+    {
+      "path": "examples/shared-resource-swarm/probe_dispatch.py",
+      "sha256": "2a593259d1170725ebe2dedce725c1a9d54731af376c61c38c5bde4981193754"
+    },
+    {
+      "path": "examples/shared-resource-swarm/qualify_native.py",
+      "sha256": "1c6151fc27ffc80be4b6f0147eb12e73046fb4e4778a66774e883bef9788f7dc"
+    },
+    {
+      "path": "examples/shared-resource-swarm/qualify_ownership.py",
+      "sha256": "cbf282592ebe66c2655475c8919af13d40aec024c5900066e564c6e52d452f46"
+    },
+    {
+      "path": "examples/shared-resource-swarm/run.py",
+      "sha256": "a03edbe78e4aca153b75ec04957e31bbc97bf1b080d35799114e07389122d36f"
+    },
+    {
+      "path": "examples/shared-resource-swarm/test_acceptance.py",
+      "sha256": "ab1aecdbfaaa2577e0f386ae07e7f666d2e448fb08d488fed1a10a8e9320086b"
+    },
+    {
+      "path": "formal/adapter-source-inventory.toml",
+      "sha256": "e4587d372041782effa4a407dd9191eb95109a6ea01fb3a0cc9443a83233e2eb"
+    },
+    {
+      "path": "scripts/check-rust-file-hygiene.py",
+      "sha256": "840c2d37cae6d0dc05605bc501dd23d09c62fb45ba2c14466b06dfda93c68933"
+    },
+    {
+      "path": "scripts/check-security-clocks.py",
+      "sha256": "5a54861d8731b58e30c540342d35c374532389bc52a0f2687c70b082f8924f9b"
+    },
+    {
+      "path": "scripts/prepare-enforced-native-fixture.py",
+      "sha256": "56d0c1700c3811355dfed02bf4e9160b8937948409fe0b8c2f0094abb9a1af24"
+    },
+    {
+      "path": "scripts/security-clock-inventory.json",
+      "sha256": "550fdb3ba3736c0a002d6ad3a5bd82667cfe826e74cc1f5d309c5b34e2c33097"
+    },
+    {
+      "path": "scripts/tests/check-process-ci-inventory.test.py",
+      "sha256": "5d8cc2ea212a0202bbb9beaa64183209e3165c8f20618e2497395836b05ac12a"
+    },
+    {
+      "path": "scripts/tests/prepare-enforced-native-fixture.test.py",
+      "sha256": "5e1f886543341f6acd05ca6fd326efa9393c0a6b730e098c866a9aecbabdbce3"
+    },
+    {
+      "path": "sdks/python/chio-process/src/chio_process/launch.py",
+      "sha256": "b5c75a298aacf56ba2d7ee25a43776faa72ded2cfec3af1157f5db396a376ba2"
+    },
+    {
+      "path": "sdks/python/chio-process/tests/test_launch.py",
+      "sha256": "cf5b4b196b899ccde1fe2e48825ce9751959f04272312aa588db1bb88e72eaae"
+    },
+    {
+      "path": "sdks/typescript/packages/ai-sdk-process/benchmark/run.py",
+      "sha256": "f0f23d6f6b1ed9107b35d21eaa9f0eb784436316202697cae5c7034354fb9127"
+    },
+    {
+      "path": "sdks/typescript/packages/ai-sdk-process/qualification/pressure_profiles.py",
+      "sha256": "87f2a1d55e07b304a88e86f7984043c16d4a855894b435089b520d40a3978478"
+    },
+    {
+      "path": "sdks/typescript/packages/ai-sdk-process/qualification/qualify.py",
+      "sha256": "fbe3f9273513e0be7e06978b939b51388637b91cc9c909d16e650c0b66196ba8"
+    },
+    {
+      "path": "sdks/typescript/packages/ai-sdk-process/qualification/swarm_profiles.py",
+      "sha256": "ab8f279a055676ae5536e74c8c32426e94fc24ce019d63a9d1d9b609cb70caca"
+    },
+    {
+      "path": "xtask/src/adapter_no_bypass.rs",
+      "sha256": "f52c84e2a3fbf794e1ad58a3bed826ba8d6319614fa9de79806e5768ac25f603"
+    },
+    {
+      "path": "xtask/src/adapter_no_bypass/constructors.rs",
+      "sha256": "97ccc6e8f537ee16959c883b73a26f19d5e8917486bcf6b92afa69ae189d6d88"
+    }
+  ]
+}

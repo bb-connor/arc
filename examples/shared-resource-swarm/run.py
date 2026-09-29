@@ -60,6 +60,7 @@ capabilities:
         ttl: 3600
 """
     (directory / "policy.yaml").write_text(policy)
+    (directory / "tool-data").mkdir(exist_ok=True)
     server = provision_native_demo(
         binary,
         "board",
@@ -67,10 +68,12 @@ capabilities:
             demo_python(),
             str(HERE / "server.py"),
             "--database",
-            str(directory / "resource.db"),
+            str(directory / "tool-data" / "resource.db"),
         ],
         directory / "launch",
         directory,
+        read_paths=[directory / "tool-data"],
+        write_paths=[directory / "tool-data"],
     )
     servers = [server]
     if operator:
@@ -82,11 +85,13 @@ capabilities:
                     demo_python(),
                     str(HERE / "server.py"),
                     "--database",
-                    str(directory / "resource.db"),
+                    str(directory / "tool-data" / "resource.db"),
                     "--operator",
                 ],
                 directory / "launch-operator",
                 directory,
+                read_paths=[directory / "tool-data"],
+                write_paths=[directory / "tool-data"],
             )
         )
     config = {
@@ -191,7 +196,7 @@ def worker_bootstrap(args, directory, name, services, **extra):
     settings = {
         "backend": args.backend,
         "directory": str(directory / name),
-        "database": str(directory / "resource.db"),
+        "database": str(directory / "tool-data" / "resource.db"),
         "services": services,
         "model": args.model,
         "provider": args.provider,
@@ -269,7 +274,7 @@ def workers(args, directory):
 
 
 def report(args, directory, statuses, roles=ROLES, assessor=assess):
-    snapshot = store.inspect(directory / "resource.db")
+    snapshot = store.inspect(directory / "tool-data" / "resource.db")
     result = {
         "schema": "chio.shared-resource.live-baseline.v1",
         "backend": args.backend,
@@ -404,8 +409,10 @@ def main():
     directory.mkdir(mode=0o700)
     for name in ROLES:
         (directory / name).mkdir(mode=0o700)
+    (directory / "tool-data").mkdir(exist_ok=True)
     store.initialize(
-        directory / "resource.db", json.loads((HERE / "seed.json").read_text())
+        directory / "tool-data" / "resource.db",
+        json.loads((HERE / "seed.json").read_text()),
     )
     if args.backend == "chio":
         binary, key = prepare_host(args, directory)

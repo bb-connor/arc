@@ -18,7 +18,9 @@
 
 #![forbid(unsafe_code)]
 
+mod input;
 use chio_core::crypto::PublicKey;
+pub use input::{AcpFrameReader, AcpMessage, MAX_ACP_MESSAGE_BYTES};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -46,8 +48,21 @@ include!("tests.rs");
 // ---------- error type ----------
 
 /// Errors produced by the ACP proxy.
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 pub enum AcpProxyError {
+    #[error("{0}")]
+    SharedInput(#[from] chio_core::canonical::SharedUntrustedJsonError),
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+    #[error("urn:chio:error:transport:upstream-failure")]
+    Io(#[from] std::io::Error),
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    TruncatedFrame,
+    #[error("urn:chio:error:transport:upstream-failure")]
+    ClosedTransport,
+    #[error("{0}")]
+    Capability(#[from] CapabilityCheckError),
+
     /// A JSON-RPC protocol-level error (malformed message, bad params).
     #[error("protocol error: {0}")]
     Protocol(String),
@@ -63,4 +78,10 @@ pub enum AcpProxyError {
     /// A transport-level error (process spawn, pipe I/O).
     #[error("transport error: {0}")]
     Transport(String),
+}
+
+impl std::fmt::Debug for AcpProxyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
 }

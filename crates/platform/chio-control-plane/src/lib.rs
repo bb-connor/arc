@@ -101,7 +101,20 @@ pub enum JwtProviderProfile {
 }
 
 pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) -> ChioKernel {
-    build_kernel_components(loaded_policy, kernel_kp, None)
+    build_kernel_with_clock(
+        loaded_policy,
+        kernel_kp,
+        Arc::new(chio_security_types::clock::SystemClock),
+    )
+}
+
+/// Build a kernel using the same clock as the enclosing service authority owners.
+pub fn build_kernel_with_clock(
+    loaded_policy: policy::LoadedPolicy,
+    kernel_kp: &Keypair,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> ChioKernel {
+    build_kernel_components(loaded_policy, kernel_kp, None, clock)
 }
 
 /// Build a kernel with the complete fail-closed active-defense adapter set.
@@ -116,7 +129,12 @@ pub fn build_kernel_with_active_defense(
     runtime: security::ActiveDefenseRuntime,
 ) -> Result<ChioKernel, security::ActiveDefenseInstallError> {
     runtime.ensure_ready()?;
-    let mut kernel = build_kernel_components(loaded_policy, kernel_kp, Some(&runtime));
+    let mut kernel = build_kernel_components(
+        loaded_policy,
+        kernel_kp,
+        Some(&runtime),
+        Arc::new(chio_security_types::clock::SystemClock),
+    );
     runtime.install_dispatch_and_issuance(&mut kernel)?;
     Ok(kernel)
 }
@@ -125,6 +143,7 @@ fn build_kernel_components(
     loaded_policy: policy::LoadedPolicy,
     kernel_kp: &Keypair,
     active_defense: Option<&security::ActiveDefenseRuntime>,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> ChioKernel {
     let policy::LoadedPolicy {
         identity,
@@ -155,7 +174,7 @@ fn build_kernel_components(
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     };
 
-    let mut kernel = ChioKernel::new(config);
+    let mut kernel = ChioKernel::new_with_clock(config, clock);
     if kernel_policy.require_swarm_admission {
         kernel.require_swarm_admission();
     }
@@ -349,7 +368,10 @@ pub fn configure_capability_authority(
         (Some(path), None) => {
             let keypair = load_or_create_authority_keypair(path)?;
             kernel.set_capability_authority(issuance::wrap_capability_authority(
-                Box::new(chio_kernel::LocalCapabilityAuthority::new(keypair)),
+                Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
+                    keypair,
+                    kernel.authority_clock(),
+                )),
                 issuance_policy,
                 runtime_assurance_policy,
                 receipt_db_path,
@@ -358,7 +380,12 @@ pub fn configure_capability_authority(
         }
         (None, Some(path)) => {
             kernel.set_capability_authority(issuance::wrap_capability_authority(
-                Box::new(chio_store_sqlite::SqliteCapabilityAuthority::open(path)?),
+                Box::new(
+                    chio_store_sqlite::SqliteCapabilityAuthority::open_with_clock(
+                        path,
+                        kernel.authority_clock(),
+                    )?,
+                ),
                 issuance_policy,
                 runtime_assurance_policy,
                 receipt_db_path,
@@ -371,8 +398,9 @@ pub fn configure_capability_authority(
                 || receipt_db_path.is_some()
             {
                 kernel.set_capability_authority(issuance::wrap_capability_authority(
-                    Box::new(chio_kernel::LocalCapabilityAuthority::new(
+                    Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
                         default_authority_keypair.clone(),
+                        kernel.authority_clock(),
                     )),
                     issuance_policy,
                     runtime_assurance_policy,

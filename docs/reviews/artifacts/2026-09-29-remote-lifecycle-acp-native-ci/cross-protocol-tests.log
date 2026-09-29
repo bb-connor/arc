@@ -1,0 +1,57 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+    Finished `test` profile [unoptimized] target(s) in 45.74s
+     Running unittests src/lib.rs (target/debug/deps/chio_cross_protocol-9ed1a7eeddb6ee2e)
+
+running 35 tests
+test tests::bridge_fidelity_helpers_report_publication_state ... ok
+test tests::attenuate_scope_for_tool_narrows_wildcard_parent_grants ... ok
+test tests::capability_envelope_serializes_without_parent_capability_token ... ok
+test tests::cross_protocol_kernel_request_preserves_complete_authorization_context ... ok
+test tests::execution_boundary_rejects_authenticated_session_without_security_context ... ok
+test tests::execution_boundary_rejects_unadmitted_bridge_security ... ok
+test tests::orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target ... ok
+test tests::cross_protocol_routing_preserves_registry_admitted_flow_canonical_bytes ... ok
+test tests::orchestrator_denies_unregistered_non_native_target_with_signed_route_selection ... ok
+test tests::orchestrator_rejects_capability_ref_origin_protocol_drift ... ok
+test tests::orchestrator_executes_and_preserves_bridge_lineage ... ok
+test tests::orchestrator_preserves_model_metadata_for_model_constrained_grant ... ok
+test tests::execution_boundary_rejects_forged_digest_flow_and_topology_fields ... ok
+test tests::orchestrator_capability_envelope_uses_selected_native_fallback_target ... ok
+test tests::orchestrator_rejects_empty_origin_request_id_before_signed_lineage ... ok
+test tests::orchestrator_dispatches_to_registered_openai_target_executor ... ok
+test tests::orchestrator_dispatches_to_registered_target_executor ... ok
+test tests::plan_authoritative_route_denies_unregistered_target_even_when_marked_available ... ok
+test tests::plan_authoritative_route_attentuates_to_native_fallback_when_requested_route_is_unavailable ... ok
+test tests::runtime_lifecycle_contract_serializes_shared_surface_metadata ... ok
+test tests::plan_authoritative_route_prefers_registered_protocol_from_governed_intent ... ok
+test tests::schema_extension_returns_named_extension_only_for_object_schema ... ok
+test tests::semantic_hints_respect_extensions_and_defaults ... ok
+test tests::source_receipt_context_is_preserved_as_non_authoritative_metadata ... ok
+test tests::target_protocol_can_be_registry_derived ... ok
+test tests::target_protocol_defaults_to_native ... ok
+test tests::orchestrator_rejects_forged_capability_ref_parent_hash ... ok
+test tests::plan_authoritative_route_denies_when_projected_protocols_are_disallowed_without_native ... ok
+test tests::target_protocol_reads_schema_extension ... ok
+test tests::target_protocol_rejects_unknown_extension_value ... ok
+test tests::target_protocol_rejects_non_string_extension_value ... ok
+test tests::parent_capability_hash_commits_to_signed_token_not_id_only ... ok
+test tests::orchestrator_rejects_padded_or_control_execution_identity_before_signed_lineage ... ok
+test tests::pending_approval_metadata_is_not_labeled_allow ... ok
+test tests::native_cross_protocol_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+

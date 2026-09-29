@@ -47,7 +47,9 @@ impl CapabilityBridge for AcpGuardCapabilityBridge {
             .cloned()
             .map(serde_json::from_value)
             .transpose()
-            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))
+            .map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })
     }
 
     fn inject_capability_ref(
@@ -78,8 +80,9 @@ impl CapabilityBridge for AcpGuardCapabilityBridge {
         };
         chio_obj.insert(
             "capabilityRef".to_string(),
-            serde_json::to_value(cap_ref)
-                .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?,
+            serde_json::to_value(cap_ref).map_err(|error| {
+                BridgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
+            })?,
         );
         Ok(())
     }
@@ -182,9 +185,11 @@ impl KernelCapabilityChecker {
     }
 
     fn parse_token(&self, token_json: &str) -> Result<CapabilityToken, CapabilityCheckError> {
-        serde_json::from_str(token_json).map_err(|error| {
-            CapabilityCheckError::InvalidToken(format!("failed to parse token: {error}"))
-        })
+        Ok(chio_core::canonical::UntrustedJsonText::from_wire(
+            token_json.as_bytes(),
+            input::MAX_CAPABILITY_BYTES,
+        )?
+        .decode_signed()?)
     }
 
     fn map_request(
@@ -289,7 +294,7 @@ impl CapabilityChecker for KernelCapabilityChecker {
         request: &AcpCapabilityRequest,
     ) -> Result<AcpVerdict, CapabilityCheckError> {
         let token_json = match &request.token {
-            Some(token) if !token.trim().is_empty() => token,
+            Some(token) => token,
             _ => {
                 return Ok(AcpVerdict {
                     allowed: false,
@@ -302,19 +307,7 @@ impl CapabilityChecker for KernelCapabilityChecker {
             }
         };
 
-        let capability = match self.parse_token(token_json) {
-            Ok(capability) => capability,
-            Err(error) => {
-                return Ok(AcpVerdict {
-                    allowed: false,
-                    capability_id: None,
-                    receipt_id: None,
-                    receipt_request_id: None,
-                    execution_nonce: None,
-                    reason: error.to_string(),
-                });
-            }
-        };
+        let capability = self.parse_token(token_json)?;
         // ACP fs/read_text_file, fs/write_text_file, and terminal/create
         // request parameters do not carry a toolCallId. Only the operations
         // that mutate an existing tool call (terminal_kill, terminal_release)
@@ -379,41 +372,42 @@ impl CapabilityChecker for KernelCapabilityChecker {
                     self.server_id
                 ))
             })?;
-        let orchestrated = CrossProtocolOrchestrator::new(
-            self.kernel.as_ref(),
-            self.manifest_registry.as_ref(),
-        )
-            .execute(
-                &AcpGuardCapabilityBridge,
-                CrossProtocolExecutionRequest {
-                    origin_request_id: format!("acp-guard-{}-{request_hash}", request.session_id),
-                    kernel_request_id: kernel_request_id.clone(),
-                    target_protocol: DiscoveryProtocol::Native,
-                    target_server_id: self.server_id.clone(),
-                    target_tool_name: tool_name.to_string(),
-                    bridge_security,
-                    agent_id: capability.subject.to_hex(),
-                    arguments: arguments.clone(),
-                    capability: capability.clone(),
-                    source_envelope: self.build_source_envelope(
-                        request,
-                        &arguments,
-                        tool_call_id,
-                        &kernel_request_id,
-                    ),
-                    dpop_proof: None,
-                    execution_nonce: request.execution_nonce.clone(),
-                    governed_intent: None,
-                    approval_token: None,
-                    approval_tokens: Vec::new(),
-                    threshold_approval_proposal: None,
-                    supplemental_authorization: None,
-                    model_metadata: None,
-                    authenticated_session_id: None,
-                    security_context: None,
-                },
-            )
-            .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?;
+        let orchestrated =
+            CrossProtocolOrchestrator::new(self.kernel.as_ref(), self.manifest_registry.as_ref())
+                .execute(
+                    &AcpGuardCapabilityBridge,
+                    CrossProtocolExecutionRequest {
+                        origin_request_id: format!(
+                            "acp-guard-{}-{request_hash}",
+                            request.session_id
+                        ),
+                        kernel_request_id: kernel_request_id.clone(),
+                        target_protocol: DiscoveryProtocol::Native,
+                        target_server_id: self.server_id.clone(),
+                        target_tool_name: tool_name.to_string(),
+                        bridge_security,
+                        agent_id: capability.subject.to_hex(),
+                        arguments: arguments.clone(),
+                        capability: capability.clone(),
+                        source_envelope: self.build_source_envelope(
+                            request,
+                            &arguments,
+                            tool_call_id,
+                            &kernel_request_id,
+                        ),
+                        dpop_proof: None,
+                        execution_nonce: request.execution_nonce.clone(),
+                        governed_intent: None,
+                        approval_token: None,
+                        approval_tokens: Vec::new(),
+                        threshold_approval_proposal: None,
+                        supplemental_authorization: None,
+                        model_metadata: None,
+                        authenticated_session_id: None,
+                        security_context: None,
+                    },
+                )
+                .map_err(CapabilityCheckError::Bridge)?;
 
         let response = orchestrated.response;
         let capability_id = Some(response.receipt.capability_id.clone());

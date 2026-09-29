@@ -134,10 +134,7 @@ pub fn fuzz_acp_envelope_decode(data: &[u8]) {
                 if trimmed.is_empty() {
                     continue;
                 }
-                let Ok(message) = serde_json::from_str::<serde_json::Value>(trimmed) else {
-                    continue;
-                };
-                let _ = edge.handle_jsonrpc(message, &kernel, &execution);
+                let _ = edge.handle_jsonrpc(trimmed.as_bytes(), &kernel, &execution);
             }
             Err(_) => return,
         }

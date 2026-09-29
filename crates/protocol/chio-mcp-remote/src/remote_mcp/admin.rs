@@ -58,7 +58,15 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
         return response;
     }
 
-    state.sessions.cleanup_due_sessions().await;
+    if let Err(error) = state.sessions.cleanup_due_sessions().await {
+        return input::with_source(
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "MCP lifecycle cleanup unavailable",
+            ),
+            error,
+        );
+    }
     let (active, terminal) = state.sessions.snapshot().await;
     let authority = match load_authority_status(&state) {
         Ok(status) => status,
@@ -626,7 +634,15 @@ async fn handle_admin_sessions(State(state): State<RemoteAppState>, request: Req
         return response;
     }
 
-    state.sessions.cleanup_due_sessions().await;
+    if let Err(error) = state.sessions.cleanup_due_sessions().await {
+        return input::with_source(
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "MCP lifecycle cleanup unavailable",
+            ),
+            error,
+        );
+    }
     let (active, terminal) = state.sessions.snapshot().await;
     Json(json!({
         "configured": true,

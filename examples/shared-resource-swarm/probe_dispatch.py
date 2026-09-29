@@ -45,7 +45,9 @@ def main():
     directory.mkdir(mode=0o700)
     (directory / "benchmark").mkdir(mode=0o700)
     seed = json.loads((run.HERE / "seed.json").read_text())
-    store.initialize(directory / "resource.db", seed)
+    (directory / "tool-data").mkdir(exist_ok=True)
+    store.initialize(directory / "tool-data" / "resource.db", seed)
+    (directory / "tool-data").mkdir(exist_ok=True)
     store.initialize(directory / "baseline.db", seed)
     started = time.perf_counter()
     binary, key = run.prepare_host(args, directory, roles=("benchmark",))
@@ -144,7 +146,10 @@ def main():
         baseline.close()
     resources = {
         name: store.inspect(directory / file)
-        for name, file in [("baseline", "baseline.db"), ("chio", "resource.db")]
+        for name, file in [
+            ("baseline", "baseline.db"),
+            ("chio", "tool-data/resource.db"),
+        ]
     }
     assert all(len(r["mutations"]) == 0 for r in resources.values())
     for backend, resource in resources.items():
@@ -222,8 +227,14 @@ def main():
             for backend, resource in resources.items()
         },
         "limits": [
-            "Single-host serial diagnostic, not concurrent throughput or end-to-end agent performance. Build-profile labels require matching build provenance.",
-            "Baseline has persistent resource request identity and deduplication but no Chio authority mediation or signed kernel receipts.",
+            (
+                "Single-host serial diagnostic, not concurrent throughput or end-to-end agent "
+                "performance. Build-profile labels require matching build provenance."
+            ),
+            (
+                "Baseline has persistent resource request identity and deduplication but no Chio "
+                "authority mediation or signed kernel receipts."
+            ),
             "Known completed replay measured, not uncertain redispatch.",
             "No installation time, model latency or human setup effort is included.",
         ],

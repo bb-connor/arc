@@ -29,7 +29,8 @@ def main():
     for name in run.ROLES:
         (directory / name).mkdir(mode=0o700)
     seed, revised = handoff.inputs()
-    store.initialize(directory / "resource.db", seed)
+    (directory / "tool-data").mkdir(exist_ok=True)
+    store.initialize(directory / "tool-data" / "resource.db", seed)
     binary, key = run.prepare_host(args, directory, operator=True)
     connections = {
         name: json.loads((directory / name / "connection.json").read_text())
@@ -183,7 +184,7 @@ def main():
             assert "did not verify" in str(error)
         else:
             raise AssertionError("wrong trusted verifier key was accepted")
-    snapshot = store.inspect(directory / "resource.db")
+    snapshot = store.inspect(directory / "tool-data" / "resource.db")
     assert handoff.assess_current(snapshot)["accepted"]
     assert len(snapshot["mutations"]) == 2
     assigned = [o for o in snapshot["operations"] if o["request"]["name"] == "assign"]
@@ -206,7 +207,7 @@ def main():
             sys.executable,
             str(HERE / "server.py"),
             "--database",
-            str(directory / "resource.db"),
+            str(directory / "tool-data" / "resource.db"),
         ]
     ) as unauthenticated:
         try:
@@ -218,7 +219,8 @@ def main():
         else:
             raise AssertionError("resource accepted a missing caller binding")
     assert (
-        store.inspect(directory / "resource.db")["mutations"] == snapshot["mutations"]
+        store.inspect(directory / "tool-data" / "resource.db")["mutations"]
+        == snapshot["mutations"]
     )
     (directory / "receipts.ndjson").write_text(
         "\n".join(dict.fromkeys(receipts)) + "\n"

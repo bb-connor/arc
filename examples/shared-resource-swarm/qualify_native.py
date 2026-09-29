@@ -28,8 +28,10 @@ def main():
     directory.mkdir(mode=0o700)
     for name in run.ROLES:
         (directory / name).mkdir(mode=0o700)
+    (directory / "tool-data").mkdir(exist_ok=True)
     store.initialize(
-        directory / "resource.db", json.loads((HERE / "seed.json").read_text())
+        directory / "tool-data" / "resource.db",
+        json.loads((HERE / "seed.json").read_text()),
     )
     binary, key = run.prepare_host(args, directory, operator=args.resource_ownership)
     connection_path = directory / "compatibility" / "connection.json"
@@ -132,7 +134,7 @@ def main():
         m for m in result["messages"] if m.type == "tool" and m.name == "board__replace"
     )
     assert replacement_message.artifact["chio"]["receipt_json"] == original_receipts[0]
-    snapshot = store.inspect(directory / "resource.db")
+    snapshot = store.inspect(directory / "tool-data" / "resource.db")
     assert len(snapshot["mutations"]) == 1
     operation_id = snapshot["mutations"][0]["operation_id"]
     operation = next(o for o in snapshot["operations"] if o["id"] == operation_id)

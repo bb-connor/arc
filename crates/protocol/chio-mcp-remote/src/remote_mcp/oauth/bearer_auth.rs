@@ -381,7 +381,7 @@ impl JwtBearerVerifier {
             ));
         }
 
-        let now = unix_now();
+        let now = self.clock.seconds().map_err(clock::rejection)?;
         if let Some(nbf) = claims.nbf {
             if now < nbf {
                 return Err(unauthorized_bearer_response(
@@ -439,8 +439,8 @@ impl JwtBearerVerifier {
             })?;
         }
         if let Some(value) = claims.chio_transaction_context.clone() {
-            let context =
-                parse_request_time_transaction_context_from_value(value).map_err(|_| {
+            let context = parse_request_time_transaction_context_from_value(&self.clock, value)
+                .map_err(|_| {
                     unauthorized_bearer_response(
                         "JWT bearer chio_transaction_context claim is invalid",
                         protected_resource_metadata,
@@ -467,6 +467,7 @@ impl JwtBearerVerifier {
             }
         }
         validate_sender_constraint_runtime(
+            &self.clock,
             claims.cnf.as_ref(),
             headers,
             claims.jti.as_deref(),
@@ -632,7 +633,7 @@ impl IntrospectionBearerVerifier {
         }
 
         let claims = input.introspection.claims;
-        let now = unix_now();
+        let now = self.clock.seconds().map_err(clock::rejection)?;
         if let Some(nbf) = claims.nbf {
             if now < nbf {
                 return Err(unauthorized_bearer_response(
@@ -692,8 +693,8 @@ impl IntrospectionBearerVerifier {
             })?;
         }
         if let Some(value) = claims.chio_transaction_context.clone() {
-            let context =
-                parse_request_time_transaction_context_from_value(value).map_err(|_| {
+            let context = parse_request_time_transaction_context_from_value(&self.clock, value)
+                .map_err(|_| {
                     unauthorized_bearer_response(
                         "bearer chio_transaction_context claim is invalid",
                         input.protected_resource_metadata,
@@ -720,6 +721,7 @@ impl IntrospectionBearerVerifier {
             }
         }
         validate_sender_constraint_runtime(
+            &self.clock,
             claims.cnf.as_ref(),
             input.headers,
             claims.jti.as_deref(),

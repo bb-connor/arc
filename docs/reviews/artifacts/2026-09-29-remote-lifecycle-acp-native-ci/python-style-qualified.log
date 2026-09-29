@@ -1,0 +1,13 @@
+SDK: 6 files; format=['--config', 'sdks/python/chio-process/pyproject.toml']; lint=['--config', 'sdks/python/chio-process/pyproject.toml']
+6 files left unchanged
+6 files already formatted
+All checks passed!
+shared-resource: 6 files; format=['--isolated']; lint=['--isolated', '--select', 'E,F,I,UP,B', '--ignore', 'E501']
+5 files reformatted, 1 file left unchanged
+6 files already formatted
+All checks passed!
+repository and scripts: 13 files; format=[]; lint=[]
+13 files reformatted
+13 files already formatted
+All checks passed!
+Parsed 25 sources; formatting preserved every AST.

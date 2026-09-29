@@ -3,6 +3,13 @@
 /// Errors produced by the ACP edge.
 #[derive(Debug, thiserror::Error)]
 pub enum AcpEdgeError {
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
+    #[error("{}", .0.code())]
+    Clock(#[from] ClockError),
+    #[error("urn:chio:error:transport:task-capacity-exceeded")]
+    TaskCapacity,
+
     /// A tool was not found.
     #[error("tool not found: {0}")]
     ToolNotFound(String),

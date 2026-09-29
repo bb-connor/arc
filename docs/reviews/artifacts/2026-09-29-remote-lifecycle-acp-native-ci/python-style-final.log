@@ -1,0 +1,30 @@
+Parsed 25 changed Python sources.
+Would reformat: crates/products/chio-cli/tests/process_host/recovery.py
+Would reformat: crates/products/chio-cli/tests/process_host/runner.py
+Would reformat: examples/repository-review/adaptive/configuration.py
+Would reformat: examples/repository-review/adaptive/qualification.py
+Would reformat: examples/repository-review/adaptive/qualification_checks.py
+Would reformat: examples/repository-review/adaptive/verification.py
+Would reformat: examples/repository-review/distribution/qualify.py
+Would reformat: examples/repository-review/qualify.py
+Would reformat: examples/repository-review/review.py
+Would reformat: examples/shared-resource-swarm/handoff.py
+Would reformat: examples/shared-resource-swarm/probe_dispatch.py
+Would reformat: examples/shared-resource-swarm/qualify_native.py
+Would reformat: examples/shared-resource-swarm/qualify_ownership.py
+Would reformat: examples/shared-resource-swarm/run.py
+Would reformat: scripts/check-security-clocks.py
+Would reformat: scripts/prepare-enforced-native-fixture.py
+Would reformat: scripts/tests/check-process-ci-inventory.test.py
+Would reformat: scripts/tests/prepare-enforced-native-fixture.test.py
+Would reformat: sdks/typescript/packages/ai-sdk-process/benchmark/run.py
+Would reformat: sdks/typescript/packages/ai-sdk-process/qualification/pressure_profiles.py
+Would reformat: sdks/typescript/packages/ai-sdk-process/qualification/qualify.py
+Would reformat: sdks/typescript/packages/ai-sdk-process/qualification/swarm_profiles.py
+22 files would be reformatted, 3 files already formatted
+Traceback (most recent call last):
+  File "<stdin>", line 9, in <module>
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['uv', 'tool', 'run', '--offline', 'ruff', 'format', '--check', 'crates/products/chio-cli/tests/process_host/recovery.py', 'crates/products/chio-cli/tests/process_host/runner.py', 'examples/repository-review/adaptive/configuration.py', 'examples/repository-review/adaptive/qualification.py', 'examples/repository-review/adaptive/qualification_checks.py', 'examples/repository-review/adaptive/verification.py', 'examples/repository-review/distribution/qualify.py', 'examples/repository-review/qualify.py', 'examples/repository-review/review.py', 'examples/shared-resource-swarm/handoff.py', 'examples/shared-resource-swarm/probe_dispatch.py', 'examples/shared-resource-swarm/qualify_native.py', 'examples/shared-resource-swarm/qualify_ownership.py', 'examples/shared-resource-swarm/run.py', 'examples/shared-resource-swarm/test_acceptance.py', 'scripts/check-security-clocks.py', 'scripts/prepare-enforced-native-fixture.py', 'scripts/tests/check-process-ci-inventory.test.py', 'scripts/tests/prepare-enforced-native-fixture.test.py', 'sdks/python/chio-process/src/chio_process/launch.py', 'sdks/python/chio-process/tests/test_launch.py', 'sdks/typescript/packages/ai-sdk-process/benchmark/run.py', 'sdks/typescript/packages/ai-sdk-process/qualification/pressure_profiles.py', 'sdks/typescript/packages/ai-sdk-process/qualification/qualify.py', 'sdks/typescript/packages/ai-sdk-process/qualification/swarm_profiles.py']' returned non-zero exit status 1.

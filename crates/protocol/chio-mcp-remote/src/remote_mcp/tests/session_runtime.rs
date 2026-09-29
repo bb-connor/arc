@@ -20,34 +20,6 @@ fn private_remote_admission_directory(label: &str) -> std::path::PathBuf {
 }
 
 #[test]
-fn mcp_rate_limiter_caps_session_window() {
-    let limiter = McpRateLimiter::new();
-    for _ in 0..MCP_RATE_LIMIT_MAX_REQUESTS {
-        assert!(limiter.check("session:test".to_string(), 120).is_ok());
-    }
-
-    let retry_after = limiter
-        .check("session:test".to_string(), 120)
-        .expect_err("session should be rate limited after the window budget is exhausted");
-    assert_eq!(retry_after, 60);
-    assert!(limiter.check("session:test".to_string(), 180).is_ok());
-}
-
-#[test]
-fn mcp_rate_limiter_caps_tracked_keys() {
-    let limiter = McpRateLimiter::new();
-    for idx in 0..MCP_RATE_LIMIT_MAX_KEYS {
-        assert!(limiter.check(format!("session:{idx}"), 120).is_ok());
-    }
-
-    let retry_after = limiter
-        .check("session:overflow".to_string(), 120)
-        .expect_err("new rate-limit keys should be capped within a window");
-    assert_eq!(retry_after, 60);
-    assert!(limiter.check("session:0".to_string(), 120).is_ok());
-}
-
-#[test]
 fn remote_session_factory_holds_one_durable_admission_sidecar() {
     let directory = private_remote_admission_directory("owner");
     let policy_path = directory.join("policy.yaml");

@@ -320,7 +320,11 @@ impl RemoteSessionFactory {
         let upstream_capabilities = upstream_server.upstream_capabilities();
 
         let kernel_kp = self.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
-        let mut kernel = build_kernel(loaded_policy, &kernel_kp);
+        let mut kernel = chio_control_plane::build_kernel_with_clock(
+            loaded_policy,
+            &kernel_kp,
+            Arc::new(self.config.clock.clone()),
+        );
         configure_receipt_store(
             &mut kernel,
             self.config.receipt_db_path.as_deref(),
@@ -418,6 +422,7 @@ impl RemoteSessionFactory {
         });
 
         Ok(Arc::new(RemoteSession::new(RemoteSessionInit {
+            clock: self.config.clock.clone(),
             session_id,
             agent_id,
             capabilities: session_capabilities,
@@ -441,7 +446,7 @@ impl RemoteSessionFactory {
             resume_hmac_keyring: self.resume_hmac_keyring.clone(),
             resume_generation: 0,
             upstream_transport: upstream_notification_source,
-        })))
+        })?))
     }
 
     /// Incompatible authenticated sessions remain inactive (`None`). A failed
@@ -459,7 +464,7 @@ impl RemoteSessionFactory {
         validate_resume_record_integrity_with_keyring(
             resume_hmac_keyring,
             record,
-            session_now_millis(),
+            self.config.clock.millis()?,
         )?;
         if record.runtime_contract_fingerprint != self.runtime_contract_fingerprint {
             return Ok(None);
@@ -498,7 +503,11 @@ impl RemoteSessionFactory {
         let upstream_capabilities = upstream_server.upstream_capabilities();
 
         let kernel_kp = self.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
-        let mut kernel = build_kernel(loaded_policy, &kernel_kp);
+        let mut kernel = chio_control_plane::build_kernel_with_clock(
+            loaded_policy,
+            &kernel_kp,
+            Arc::new(self.config.clock.clone()),
+        );
         configure_receipt_store(
             &mut kernel,
             self.config.receipt_db_path.as_deref(),
@@ -542,7 +551,10 @@ impl RemoteSessionFactory {
         let issued_capabilities = match record.policy_fingerprint.as_deref() {
             Some(stored)
                 if stored == policy_fingerprint
-                    && stored_capabilities_are_current(&record.issued_capabilities)
+                    && stored_capabilities_are_current(
+                        &record.issued_capabilities,
+                        self.config.clock.seconds()?,
+                    )
                     && stored_capability_issuers_are_trusted(
                         &kernel,
                         &record.issued_capabilities,
@@ -609,6 +621,7 @@ impl RemoteSessionFactory {
         });
 
         Ok(Some(Arc::new(RemoteSession::new(RemoteSessionInit {
+            clock: self.config.clock.clone(),
             session_id: record.session_id.clone(),
             agent_id: record.agent_id.clone(),
             capabilities: session_capabilities,
@@ -632,7 +645,7 @@ impl RemoteSessionFactory {
             resume_hmac_keyring: self.resume_hmac_keyring.clone(),
             resume_generation: record.resume_generation,
             upstream_transport: upstream_notification_source,
-        }))))
+        })?)))
     }
 }
 

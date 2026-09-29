@@ -5,98 +5,7 @@ pub fn serve_http(config: RemoteServeHttpConfig) -> Result<(), CliError> {
     runtime.block_on(async move { serve_http_async(config).await })
 }
 
-const MCP_RATE_LIMIT_MAX_REQUESTS: u32 = 600;
-const MCP_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
-const MCP_RATE_LIMIT_MAX_KEYS: usize = 4_096;
 const MCP_MAX_POST_BODY_BYTES: usize = 8 * 1024 * 1024;
-
-#[derive(Clone)]
-struct McpRateLimiter {
-    windows: Arc<StdMutex<HashMap<String, McpRateWindow>>>,
-}
-
-#[derive(Clone, Copy)]
-struct McpRateWindow {
-    window_start: u64,
-    count: u32,
-}
-
-impl McpRateLimiter {
-    fn new() -> Self {
-        Self {
-            windows: Arc::new(StdMutex::new(HashMap::new())),
-        }
-    }
-
-    fn check(&self, key: String, now: u64) -> Result<(), u64> {
-        let window_secs = MCP_RATE_LIMIT_WINDOW.as_secs().max(1);
-        let window_start = now.saturating_sub(now % window_secs);
-        let retry_after = window_start
-            .saturating_add(window_secs)
-            .saturating_sub(now)
-            .max(1);
-        let mut windows = self.windows.lock().map_err(|_| retry_after)?;
-        if windows.len() >= MCP_RATE_LIMIT_MAX_KEYS && !windows.contains_key(&key) {
-            windows.retain(|_, window| window.window_start == window_start);
-            if windows.len() >= MCP_RATE_LIMIT_MAX_KEYS {
-                return Err(retry_after);
-            }
-        }
-        match windows.get_mut(&key) {
-            Some(window) if window.window_start == window_start => {
-                if window.count >= MCP_RATE_LIMIT_MAX_REQUESTS {
-                    return Err(retry_after);
-                }
-                window.count = window.count.saturating_add(1);
-            }
-            _ => {
-                windows.insert(
-                    key,
-                    McpRateWindow {
-                        window_start,
-                        count: 1,
-                    },
-                );
-            }
-        }
-        Ok(())
-    }
-}
-
-async fn rate_limit_mcp_request(
-    axum::extract::ConnectInfo(chio_http_serve::CappedPeerAddr(remote_addr)): axum::extract::ConnectInfo<
-        chio_http_serve::CappedPeerAddr,
-    >,
-    State(limiter): State<McpRateLimiter>,
-    request: Request,
-    next: axum::middleware::Next,
-) -> Response {
-    let key = mcp_rate_limit_key(remote_addr);
-    if let Err(retry_after) = limiter.check(key, mcp_rate_limit_now()) {
-        let mut response = (
-            StatusCode::TOO_MANY_REQUESTS,
-            "MCP request rate limit exceeded",
-        )
-            .into_response();
-        if let Ok(value) = HeaderValue::from_str(&retry_after.to_string()) {
-            response
-                .headers_mut()
-                .insert(HeaderName::from_static("retry-after"), value);
-        }
-        return response;
-    }
-    next.run(request).await
-}
-
-fn mcp_rate_limit_key(remote_addr: SocketAddr) -> String {
-    format!("ip:{}", remote_addr.ip())
-}
-
-fn mcp_rate_limit_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_secs())
-}
 
 fn load_enterprise_provider_registry(
     path: Option<&FsPath>,
@@ -156,6 +65,7 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
 
     let factory = Arc::new(RemoteSessionFactory::new(config.clone())?);
     let sessions = Arc::new(RemoteSessionLedger::new(
+        config.clock.clone(),
         config.lifecycle_policy(),
         config.session_db_path.clone(),
         factory.resume_hmac_keyring.clone(),
@@ -171,7 +81,7 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         })
         .await?;
     }
-    sessions.cleanup_due_sessions().await;
+    sessions.cleanup_due_sessions().await?;
 
     let state = RemoteAppState {
         sessions,
@@ -197,7 +107,7 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
             post(handle_post).get(handle_get).delete(handle_delete),
         )
         .route_layer(axum::middleware::from_fn_with_state(
-            McpRateLimiter::new(),
+            McpRateLimiter::new(config.clock.clone()),
             rate_limit_mcp_request,
         ));
 
@@ -297,7 +207,7 @@ async fn restore_persisted_sessions(
     sessions: &RemoteSessionLedger,
     mut restore: impl FnMut(&RemoteSessionResumeRecord) -> Result<Option<Arc<RemoteSession>>, CliError>,
 ) -> Result<(), CliError> {
-    let loaded_records = load_active_session_records(path, keyring)?;
+    let loaded_records = load_active_session_records(path, keyring, sessions.clock.millis()?)?;
     for session_id in loaded_records.invalid_session_ids {
         if let Err(delete_error) = delete_active_session_record(path, &session_id) {
             warn!(session_id = %session_id, error = %delete_error,
@@ -330,6 +240,9 @@ async fn fail_closed_session_after_persistence_error(
     session: &Arc<RemoteSession>,
     persistence_error: CliError,
 ) -> Response {
+    if let CliError::Clock(error) = persistence_error {
+        return clock::rejection(error);
+    }
     warn!(
         session_id = %session.session_id,
         error = %persistence_error,
@@ -342,7 +255,10 @@ async fn fail_closed_session_after_persistence_error(
             "failed to persist terminal MCP session state after resume-state persistence failure"
         );
         if !session.lifecycle_snapshot().state.is_terminal() {
-            session.mark_closed();
+            session.mark_terminal(
+                RemoteSessionState::Closed,
+                session.lifecycle_snapshot().last_seen_at,
+            );
             state.sessions.remove_active(&session.session_id).await;
             if let Err(shutdown_error) = session.shutdown_upstream_transport() {
                 warn!(
@@ -575,7 +491,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         let _stream_lock = stream_lock;
         yield Ok::<Event, Infallible>(
             Event::default()
-                .id(session_for_stream.next_stream_event_id())
+                .id(match session_for_stream.next_stream_event_id() { Ok(id) => id, Err(_) => return })
                 .retry(std::time::Duration::from_millis(DEFAULT_STREAM_RETRY_MILLIS))
                 .data("")
         );
@@ -731,7 +647,10 @@ fn sse_response_from_events(
     session_header: Option<&str>,
     response_mode: &'static str,
 ) -> Response {
-    let priming_event_id = session.next_stream_event_id();
+    let priming_event_id = match session.next_stream_event_id() {
+        Ok(id) => id,
+        Err(error) => return clock::rejection(error),
+    };
     let stream = stream! {
         yield Ok::<Event, Infallible>(
             Event::default()
@@ -763,7 +682,10 @@ fn sse_response_from_buffered_events(
     stream_lock: tokio::sync::OwnedMutexGuard<()>,
     response_mode: &'static str,
 ) -> Response {
-    let priming_event_id = session.next_stream_event_id();
+    let priming_event_id = match session.next_stream_event_id() {
+        Ok(id) => id,
+        Err(error) => return clock::rejection(error),
+    };
     let stream = stream! {
         let _stream_lock = stream_lock;
         yield Ok::<Event, Infallible>(

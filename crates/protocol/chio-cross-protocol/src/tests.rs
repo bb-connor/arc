@@ -1609,7 +1609,6 @@ fn runtime_lifecycle_contract_serializes_shared_surface_metadata() {
     assert_eq!(json["followUpEntrypoint"], "task/get");
     assert_eq!(json["cancelEntrypoint"], "task/cancel");
     assert_eq!(json["claimEligible"], true);
-    assert_eq!(json["compatibilityOnly"], false);
 }
 
 #[test]

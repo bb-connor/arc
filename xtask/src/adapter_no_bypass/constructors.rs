@@ -23,6 +23,7 @@ pub(super) struct Site {
 
 const FACTORIES: &[&str] = &[
     "build_kernel",
+    "build_kernel_with_clock",
     "build_kernel_components",
     "build_kernel_with_active_defense",
     "build_mcp_edge_kernel",
@@ -331,6 +332,13 @@ mod tests {
             visitor
                 .references
                 .get(&("host".into(), "ChioKernel::new_with_clock".into())),
+            Some(&2)
+        );
+        let injected = inspect("fn host() { let factory = build_kernel_with_clock; build_kernel_with_clock(policy, key, clock); }")?;
+        assert_eq!(
+            injected
+                .references
+                .get(&("host".into(), "build_kernel_with_clock".into())),
             Some(&2)
         );
         Ok(())

@@ -1,12 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Shared lifecycle surfaces for claim-eligible and compatibility routes.
+/// Shared lifecycle surfaces for kernel-mediated routes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeLifecycleSurface {
     A2aAuthoritative,
     AcpAuthoritative,
-    AcpCompatibility,
 }
 
 /// Canonical runtime lifecycle contract surfaced by claim-eligible bridges.
@@ -21,7 +20,6 @@ pub struct RuntimeLifecycleContract {
     pub stream_delivery: String,
     pub partial_output_delivery: String,
     pub claim_eligible: bool,
-    pub compatibility_only: bool,
 }
 
 #[must_use]
@@ -36,7 +34,6 @@ pub fn runtime_lifecycle_contract(surface: RuntimeLifecycleSurface) -> RuntimeLi
             stream_delivery: "collated_terminal_payload".to_string(),
             partial_output_delivery: "collated_terminal_payload".to_string(),
             claim_eligible: true,
-            compatibility_only: false,
         },
         RuntimeLifecycleSurface::AcpAuthoritative => RuntimeLifecycleContract {
             surface: "acp_authoritative".to_string(),
@@ -47,18 +44,6 @@ pub fn runtime_lifecycle_contract(surface: RuntimeLifecycleSurface) -> RuntimeLi
             stream_delivery: "resumed_terminal_payload".to_string(),
             partial_output_delivery: "resumed_terminal_payload".to_string(),
             claim_eligible: true,
-            compatibility_only: false,
-        },
-        RuntimeLifecycleSurface::AcpCompatibility => RuntimeLifecycleContract {
-            surface: "acp_compatibility".to_string(),
-            blocking_entrypoint: "tool/invoke".to_string(),
-            stream_entrypoint: "unsupported".to_string(),
-            follow_up_entrypoint: "unsupported".to_string(),
-            cancel_entrypoint: "unsupported".to_string(),
-            stream_delivery: "collected_final_payload_only".to_string(),
-            partial_output_delivery: "collected_final_payload_only".to_string(),
-            claim_eligible: false,
-            compatibility_only: true,
         },
     }
 }

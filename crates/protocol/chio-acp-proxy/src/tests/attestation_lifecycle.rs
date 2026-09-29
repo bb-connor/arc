@@ -25,7 +25,7 @@ fn interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards() {
     });
 
     match denying
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("deny path should still return a block response")
     {
         InterceptResult::Block(value) => {
@@ -44,19 +44,11 @@ fn interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards() {
         Some(Box::new(ErrorChecker)),
         AcpAttestationMode::Required,
     );
-    match erroring
-        .intercept(Direction::AgentToClient, &read)
-        .expect("error path should still return a block response")
-    {
-        InterceptResult::Block(value) => {
-            assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
-            assert!(value["error"]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("failed closed"));
-        }
-        other => panic!("expected Block for checker error, got {:?}", other),
-    }
+    let error = erroring
+        .intercept_value(Direction::AgentToClient, &read)
+        .expect_err("checker fault denies with local cause");
+    assert!(matches!(error, AcpProxyError::Capability(_)));
+    assert!(std::error::Error::source(&error).is_some());
 }
 
 #[test]
@@ -88,7 +80,7 @@ fn interceptor_clears_capability_context_after_terminal_status_updates() {
         }
     });
     interceptor
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("read should be allowed");
 
     let started = json!({
@@ -105,7 +97,7 @@ fn interceptor_clears_capability_context_after_terminal_status_updates() {
         }
     });
     interceptor
-        .intercept(Direction::AgentToClient, &started)
+        .intercept_value(Direction::AgentToClient, &started)
         .expect("started update should bind the live capability context");
 
     let completed = json!({
@@ -121,7 +113,7 @@ fn interceptor_clears_capability_context_after_terminal_status_updates() {
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &completed)
+        .intercept_value(Direction::AgentToClient, &completed)
         .expect("completed update should produce a receipt")
     {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -147,7 +139,7 @@ fn interceptor_clears_capability_context_after_terminal_status_updates() {
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &later_update)
+        .intercept_value(Direction::AgentToClient, &later_update)
         .expect("later update should still be forwarded")
     {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -205,7 +197,7 @@ fn cap_context_for_fs_read_links_to_later_session_update_via_request_id() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &read)
+        .intercept_value(Direction::AgentToClient, &read)
         .expect("read without toolCallId should still be allowed")
     {
         InterceptResult::Forward(value) => assert_eq!(value, read),
@@ -236,7 +228,7 @@ fn cap_context_for_fs_read_links_to_later_session_update_via_request_id() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &update)
+        .intercept_value(Direction::AgentToClient, &update)
         .expect("matching session/update should produce a receipt")
     {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -277,7 +269,7 @@ fn cap_context_for_fs_read_links_to_later_session_update_via_request_id() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &completed)
+        .intercept_value(Direction::AgentToClient, &completed)
         .expect("completed update should still resolve the bound context")
     {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -349,12 +341,8 @@ fn terminal_kill_without_receipt_fails_closed() {
         .with_allowed_command("cargo")
         .with_server_id("proxy-server");
     // No capability checker installed: lifecycle ops must fail closed.
-    let interceptor = MessageInterceptor::with_kernel(
-        config,
-        None,
-        None,
-        AcpAttestationMode::BestEffort,
-    );
+    let interceptor =
+        MessageInterceptor::with_kernel(config, None, None, AcpAttestationMode::BestEffort);
 
     let kill = json!({
         "jsonrpc": "2.0",
@@ -367,7 +355,7 @@ fn terminal_kill_without_receipt_fails_closed() {
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &kill)
+        .intercept_value(Direction::AgentToClient, &kill)
         .expect("kill without checker should still return a JSON-RPC response")
     {
         InterceptResult::Block(value) => {
@@ -388,12 +376,8 @@ fn terminal_release_without_receipt_fails_closed() {
         .with_allowed_path_prefix("/home/user/project")
         .with_allowed_command("cargo")
         .with_server_id("proxy-server");
-    let interceptor = MessageInterceptor::with_kernel(
-        config,
-        None,
-        None,
-        AcpAttestationMode::BestEffort,
-    );
+    let interceptor =
+        MessageInterceptor::with_kernel(config, None, None, AcpAttestationMode::BestEffort);
 
     let release = json!({
         "jsonrpc": "2.0",
@@ -406,7 +390,7 @@ fn terminal_release_without_receipt_fails_closed() {
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &release)
+        .intercept_value(Direction::AgentToClient, &release)
         .expect("release without checker should still return a JSON-RPC response")
     {
         InterceptResult::Block(value) => {
@@ -453,7 +437,7 @@ fn terminal_kill_with_authorized_receipt_succeeds() {
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &kill)
+        .intercept_value(Direction::AgentToClient, &kill)
         .expect("kill with authorized receipt should be forwarded")
     {
         InterceptResult::Forward(value) => assert_eq!(value, kill),
@@ -461,7 +445,11 @@ fn terminal_kill_with_authorized_receipt_succeeds() {
     }
 
     let recorded = requests.lock().expect("recording checker should lock");
-    assert_eq!(recorded.len(), 1, "checker should be consulted exactly once");
+    assert_eq!(
+        recorded.len(),
+        1,
+        "checker should be consulted exactly once"
+    );
     assert_eq!(recorded[0].session_id, "session-kill-ok");
     assert_eq!(recorded[0].operation, "terminal_kill");
     assert_eq!(recorded[0].resource, "term-kill");
@@ -506,7 +494,7 @@ fn terminal_release_with_authorized_receipt_succeeds() {
     });
 
     match interceptor
-        .intercept(Direction::AgentToClient, &release)
+        .intercept_value(Direction::AgentToClient, &release)
         .expect("release with authorized receipt should be forwarded")
     {
         InterceptResult::Forward(value) => assert_eq!(value, release),
@@ -514,7 +502,11 @@ fn terminal_release_with_authorized_receipt_succeeds() {
     }
 
     let recorded = requests.lock().expect("recording checker should lock");
-    assert_eq!(recorded.len(), 1, "checker should be consulted exactly once");
+    assert_eq!(
+        recorded.len(),
+        1,
+        "checker should be consulted exactly once"
+    );
     assert_eq!(recorded[0].session_id, "session-release-ok");
     assert_eq!(recorded[0].operation, "terminal_release");
     assert_eq!(recorded[0].resource, "term-release");
@@ -564,7 +556,7 @@ fn terminal_kill_with_mismatched_parameter_hash_fails_closed() {
         },
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &approved_kill)
+        .intercept_value(Direction::AgentToClient, &approved_kill)
         .expect("approved kill should evaluate")
     {
         InterceptResult::Forward(_) => {}
@@ -586,15 +578,14 @@ fn terminal_kill_with_mismatched_parameter_hash_fails_closed() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &attacker_kill)
+        .intercept_value(Direction::AgentToClient, &attacker_kill)
         .expect("mismatched kill should still return a JSON-RPC response")
     {
         InterceptResult::Block(value) => {
             assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
             let message = value["error"]["message"].as_str().unwrap_or_default();
             assert!(
-                message.contains("parameter hash mismatch")
-                    || message.contains("authorization"),
+                message.contains("parameter hash mismatch") || message.contains("authorization"),
                 "unexpected message: {message}"
             );
         }
@@ -618,15 +609,12 @@ fn terminal_kill_with_mismatched_parameter_hash_fails_closed() {
         }
     });
     match interceptor
-        .intercept(Direction::AgentToClient, &cross_session_kill)
+        .intercept_value(Direction::AgentToClient, &cross_session_kill)
         .expect("cross-session kill should still return a JSON-RPC response")
     {
         InterceptResult::Block(value) => {
             assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
         }
-        other => panic!(
-            "expected Block for cross-session replay, got {:?}",
-            other
-        ),
+        other => panic!("expected Block for cross-session replay, got {:?}", other),
     }
 }

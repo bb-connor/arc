@@ -6,7 +6,7 @@ use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex as StdMutex, Weak};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use async_stream::stream;
 use axum::extract::{Form, Path as AxumPath, Query, Request, State};
@@ -68,9 +68,8 @@ use chio_control_plane::trust_control::{
     self, ChildReceiptQuery, RevocationQuery, ToolReceiptQuery,
 };
 use chio_control_plane::{
-    authority_public_key_from_seed_file, build_kernel, configure_budget_store,
-    configure_capability_authority, configure_receipt_store, configure_revocation_store,
-    durable_admission_sidecar_path,
+    authority_public_key_from_seed_file, configure_budget_store, configure_capability_authority,
+    configure_receipt_store, configure_revocation_store, durable_admission_sidecar_path,
     enterprise_federation::{
         EnterpriseProviderKind, EnterpriseProviderRecord, EnterpriseProviderRegistry,
     },
@@ -138,6 +137,7 @@ type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
 
 #[derive(Clone)]
 pub struct RemoteServeHttpConfig {
+    pub clock: RemoteClock,
     pub listen: SocketAddr,
     pub auth_token: Option<String>,
     pub auth_jwt_public_key: Option<String>,
@@ -368,6 +368,7 @@ enum RemoteSessionEntry {
 
 #[derive(Clone)]
 struct RemoteSessionLedger {
+    clock: RemoteClock,
     active: Arc<Mutex<HashMap<String, Arc<RemoteSession>>>>,
     terminal: Arc<Mutex<HashMap<String, Arc<RemoteSessionDiagnosticRecord>>>>,
     lifecycle_policy: SessionLifecyclePolicy,
@@ -465,6 +466,8 @@ impl RemoteSessionState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct RemoteSessionLifecycleSnapshot {
+    #[serde(skip)]
+    deadline: Option<AuthorityDeadline>,
     state: RemoteSessionState,
     created_at: u64,
     last_seen_at: u64,
@@ -599,6 +602,7 @@ impl Default for RemoteSessionOwnershipSnapshot {
 
 #[derive(Debug)]
 struct RemoteSession {
+    clock: RemoteClock,
     session_id: String,
     agent_id: String,
     capabilities: Vec<RemoteSessionCapability>,
@@ -640,6 +644,7 @@ impl std::fmt::Debug for RemoteSessionUpstreamTransport {
 }
 
 struct RemoteSessionInit {
+    clock: RemoteClock,
     session_id: String,
     agent_id: String,
     capabilities: Vec<RemoteSessionCapability>,
@@ -720,6 +725,7 @@ enum JwtVerificationKeySource {
 
 #[derive(Clone)]
 struct JwtBearerVerifier {
+    clock: RemoteClock,
     key_source: JwtVerificationKeySource,
     issuer: Option<String>,
     audience: Option<String>,
@@ -732,6 +738,7 @@ struct JwtBearerVerifier {
 
 #[derive(Clone)]
 struct IntrospectionBearerVerifier {
+    clock: RemoteClock,
     client: HttpClient,
     introspection_url: Url,
     client_id: Option<String>,
@@ -768,6 +775,7 @@ struct AuthorizationServerMetadata {
 
 #[derive(Clone)]
 struct LocalAuthorizationServer {
+    clock: RemoteClock,
     signing_key: Keypair,
     issuer: String,
     default_audience: String,
@@ -802,6 +810,7 @@ impl RemoteAppState {
 
 #[derive(Clone, Debug)]
 struct AuthorizationCodeGrant {
+    deadline: AuthorityDeadline,
     client_id: String,
     redirect_uri: String,
     resource: String,
@@ -1023,8 +1032,9 @@ impl BroadcastJsonRpcWriter {
         }
     }
 
-    fn next_event(&self, message: Value) -> RemoteSessionEvent {
-        let next = self.next_event_id.fetch_add(1, Ordering::SeqCst) + 1;
+    fn next_event(&self, message: Value) -> std::io::Result<RemoteSessionEvent> {
+        let next =
+            crate::clock::next_counter(&self.next_event_id).map_err(std::io::Error::other)?;
         let event_id = format!("{}-{next}", self.session_id);
         let kind = classify_remote_session_event(&message);
         if kind == RemoteSessionEventKind::Notification {
@@ -1040,12 +1050,12 @@ impl BroadcastJsonRpcWriter {
             }
         }
 
-        RemoteSessionEvent {
+        Ok(RemoteSessionEvent {
             seq: next,
             event_id,
             kind,
             message,
-        }
+        })
     }
 
     fn flush_complete_lines(&mut self) -> io::Result<()> {
@@ -1060,7 +1070,7 @@ impl BroadcastJsonRpcWriter {
 
             let message: Value = decode_json(&line, MAX_SESSION_JSON_BYTES)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-            let _ = self.event_tx.send(self.next_event(message));
+            let _ = self.event_tx.send(self.next_event(message)?);
         }
 
         Ok(())

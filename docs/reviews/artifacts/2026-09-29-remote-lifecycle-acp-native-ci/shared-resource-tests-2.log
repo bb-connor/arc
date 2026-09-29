@@ -1,0 +1,31 @@
+Using CPython 3.11.15
+Creating virtual environment at: sdks/python/chio-langgraph/.venv
+   Building chio-sdk-python @ file:///tmp/arc-security-launch/sdks/python/chio-sdk-python
+   Building chio-process @ file:///tmp/arc-security-launch/sdks/python/chio-process
+   Building chio-langgraph @ file:///tmp/arc-security-launch/sdks/python/chio-langgraph
+   Building chio-adapter-base @ file:///tmp/arc-security-launch/sdks/python/chio-adapter-base
+Downloading pydantic-core (1.9MiB)
+Downloading pygments (1.2MiB)
+Downloading zstandard (4.8MiB)
+Downloading ruff (10.3MiB)
+Downloading ast-serialize (1.2MiB)
+Downloading mypy (13.3MiB)
+ Downloaded ast-serialize
+ Downloaded pydantic-core
+      Built chio-process @ file:///tmp/arc-security-launch/sdks/python/chio-process
+      Built chio-adapter-base @ file:///tmp/arc-security-launch/sdks/python/chio-adapter-base
+      Built chio-sdk-python @ file:///tmp/arc-security-launch/sdks/python/chio-sdk-python
+      Built chio-langgraph @ file:///tmp/arc-security-launch/sdks/python/chio-langgraph
+ Downloaded zstandard
+ Downloaded ruff
+ Downloaded pygments
+ Downloaded mypy
+warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+Installed 52 packages in 674ms
+.................................
+----------------------------------------------------------------------
+Ran 33 tests in 4.340s
+
+OK

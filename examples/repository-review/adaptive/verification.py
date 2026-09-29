@@ -92,7 +92,7 @@ def verify(config, directory, runner):
         raise ValueError(
             "delegation metadata differs from the signed coordinator handoff"
         )
-    for job, child in zip(reviews, children):
+    for job, child in zip(reviews, children, strict=True):
         if results[child]["slot"] != job["slot"]:
             raise ValueError("child identity does not match its assigned review slot")
         spawn = receipt_for(coordinator, "chio-process", f"spawn_review_{job['slot']}")
@@ -117,7 +117,7 @@ def verify(config, directory, runner):
     if receipt["decision"]["verdict"] != "allow":
         raise ValueError("publication receipt did not allow the invocation")
     with sqlite3.connect(
-        f"file:{directory / 'publications.db'}?mode=ro", uri=True
+        f"file:{directory / 'tool-data' / 'publications.db'}?mode=ro", uri=True
     ) as db:
         stored = db.execute(
             "SELECT snapshot_hash,report_hash,report FROM reports WHERE id=?",

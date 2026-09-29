@@ -11,19 +11,27 @@ pub(super) fn generate_authorization_code() -> String {
     format!("code-{}", sha256_hex(entropy.as_bytes()))
 }
 
-pub(super) fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> String {
-    let header = URL_SAFE_NO_PAD.encode(
-        serde_json::to_vec(&json!({
-            "alg": "EdDSA",
-            "typ": "JWT",
-            "kid": jwk_key_id(&keypair.public_key()),
-        }))
-        .unwrap_or_default(),
-    );
-    let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(claims).unwrap_or_default());
+pub(super) fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> Result<String, Response> {
+    let encode = |value: &Value| {
+        canonical_json_bytes(value)
+            .map(|bytes| URL_SAFE_NO_PAD.encode(bytes))
+            .map_err(|error| {
+                crate::input::with_source(
+                    oauth_token_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "server_error",
+                        "token canonicalization failed",
+                    ),
+                    error,
+                )
+            })
+    };
+    let header =
+        encode(&json!({"alg": "EdDSA", "typ": "JWT", "kid": jwk_key_id(&keypair.public_key())}))?;
+    let payload = encode(claims)?;
     let signing_input = format!("{header}.{payload}");
     let signature = URL_SAFE_NO_PAD.encode(keypair.sign(signing_input.as_bytes()).to_bytes());
-    format!("{signing_input}.{signature}")
+    Ok(format!("{signing_input}.{signature}"))
 }
 
 pub(super) fn jwk_key_id(public_key: &PublicKey) -> String {
@@ -76,50 +84,39 @@ pub(super) fn html_escape(value: &str) -> String {
         .replace('\'', "&#39;")
 }
 
-
+#[cfg(test)]
 pub(super) fn unix_now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+    RemoteClock::default().seconds().expect("test clock")
 }
-
+#[cfg(test)]
 pub(super) fn session_now_millis() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0)
+    RemoteClock::default().millis().expect("test clock")
 }
 
 pub(super) fn read_session_lifecycle_policy() -> SessionLifecyclePolicy {
     SessionLifecyclePolicy {
         idle_expiry_millis: read_env_u64(
             SESSION_IDLE_EXPIRY_ENV,
-            None,
             DEFAULT_SESSION_IDLE_EXPIRY_MILLIS,
         ),
         drain_grace_millis: read_env_u64(
             SESSION_DRAIN_GRACE_ENV,
-            None,
             DEFAULT_SESSION_DRAIN_GRACE_MILLIS,
         ),
         reaper_interval_millis: read_env_u64(
             SESSION_REAPER_INTERVAL_ENV,
-            None,
             DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
         ),
         tombstone_retention_millis: read_env_u64(
             SESSION_TOMBSTONE_RETENTION_ENV,
-            None,
             DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
         ),
     }
 }
 
-pub(super) fn read_env_u64(name: &str, legacy_name: Option<&str>, default: u64) -> u64 {
+pub(super) fn read_env_u64(name: &str, default: u64) -> u64 {
     std::env::var(name)
         .ok()
-        .or_else(|| legacy_name.and_then(|legacy_name| std::env::var(legacy_name).ok()))
         .and_then(|value| value.parse::<u64>().ok())
         .filter(|value| *value > 0)
         .unwrap_or(default)

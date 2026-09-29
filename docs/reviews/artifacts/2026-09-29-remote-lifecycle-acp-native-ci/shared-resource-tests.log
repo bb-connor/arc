@@ -1,0 +1,41 @@
+E.E........................
+======================================================================
+ERROR: test_correct_scripted_output_does_not_satisfy_live_baseline (test_acceptance.AcceptanceTests.test_correct_scripted_output_does_not_satisfy_live_baseline)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/arc-security-launch/examples/shared-resource-swarm/test_acceptance.py", line 78, in test_correct_scripted_output_does_not_satisfy_live_baseline
+    report = run.report(
+        SimpleNamespace(
+    ...<7 lines>...
+        {name: 0 for name in run.ROLES},
+    )
+  File "/tmp/arc-security-launch/examples/shared-resource-swarm/run.py", line 266, in report
+    snapshot = store.inspect(directory / "tool-data" / "resource.db")
+  File "/tmp/arc-security-launch/examples/shared-resource-swarm/store.py", line 358, in inspect
+    with closing(connect(path)) as db:
+                 ~~~~~~~^^^^^^
+  File "/tmp/arc-security-launch/examples/shared-resource-swarm/store.py", line 31, in connect
+    db = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=rw", uri=True)
+sqlite3.OperationalError: unable to open database file
+
+======================================================================
+ERROR: test_graph (unittest.loader._FailedTest.test_graph)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_graph
+Traceback (most recent call last):
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/tmp/arc-security-launch/examples/shared-resource-swarm/test_graph.py", line 8, in <module>
+    import graph
+  File "/tmp/arc-security-launch/examples/shared-resource-swarm/graph.py", line 8, in <module>
+    from langchain_core.messages import AIMessage, ToolMessage
+ModuleNotFoundError: No module named 'langchain_core'
+
+
+----------------------------------------------------------------------
+Ran 27 tests in 3.068s
+
+FAILED (errors=2)

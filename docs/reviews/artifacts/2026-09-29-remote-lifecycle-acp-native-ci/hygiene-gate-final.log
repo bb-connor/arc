@@ -1,0 +1,13 @@
+tightened: crates/protocol/chio-mcp-edge/src/runtime/runtime_tests.rs: cap 4512 -> 4496
+tightened: crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs: cap 4581 -> 4416
+tightened: crates/platform/chio-store-sqlite/src/budget_store/tests.rs: cap 2479 -> 2399
+tightened: crates/protocol/chio-acp-proxy/src/lib.rs: cap 12263 -> 12252
+tightened: crates/protocol/chio-a2a-adapter/src/lib.rs: cap 12016 -> 5454
+tightened: crates/protocol/chio-a2a-adapter/src/lib.rs: fragments 18 -> 10
+tightened: crates/protocol/chio-mcp-remote/src/lib.rs: cap 7716 -> 5991
+tightened: crates/protocol/chio-mcp-remote/src/lib.rs: fragments 9 -> 8
+tightened: crates/protocol/chio-acp-edge/src/lib.rs: cap 5768 -> 5488
+tightened: crates/protocol/chio-a2a-edge/src/lib.rs: cap 5913 -> 5818
+tightened: crates/protocol/chio-mcp-adapter/src/transport/stdio.rs: cap 3211 -> 2715
+tightened: crates/guards/chio-policy/src/evaluate.rs: line cap dropped, 1909 lines is under 2000
+allowlist ratcheted: 105 entries kept, 0 dropped, 12 tightened, expiries 2026-10-31, 2026-11-30, 2026-12-31, 2027-01-31

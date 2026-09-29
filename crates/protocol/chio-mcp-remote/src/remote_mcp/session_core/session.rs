@@ -1,11 +1,13 @@
 use super::*;
 
 impl RemoteSession {
-    pub(super) fn new(init: RemoteSessionInit) -> Self {
-        let now = session_now_millis();
+    pub(super) fn new(init: RemoteSessionInit) -> Result<Self, CliError> {
+        let reading = init.clock.read()?;
+        let now = reading.unix_millis().get();
         let mut lifecycle_snapshot =
             init.lifecycle_snapshot
                 .unwrap_or(RemoteSessionLifecycleSnapshot {
+                    deadline: None,
                     state: RemoteSessionState::Initializing,
                     created_at: now,
                     last_seen_at: now,
@@ -14,8 +16,14 @@ impl RemoteSession {
                 });
         if lifecycle_snapshot.state == RemoteSessionState::Ready {
             lifecycle_snapshot.drain_deadline_at = None;
+            lifecycle_snapshot.deadline = Some(AuthorityDeadline::new(
+                UnixMillis::new(lifecycle_snapshot.last_seen_at),
+                UnixMillis::new(lifecycle_snapshot.idle_expires_at),
+                reading,
+            )?);
         }
-        Self {
+        Ok(Self {
+            clock: init.clock,
             session_id: init.session_id,
             agent_id: init.agent_id,
             capabilities: init.capabilities,
@@ -44,7 +52,7 @@ impl RemoteSession {
             upstream_transport: RemoteSessionUpstreamTransport {
                 inner: init.upstream_transport,
             },
-        }
+        })
     }
 
     pub(super) fn send(&self, message: Value) -> Result<(), CliError> {
@@ -57,9 +65,9 @@ impl RemoteSession {
         self.event_tx.subscribe()
     }
 
-    pub(super) fn next_stream_event_id(&self) -> String {
-        let next = self.next_event_id.fetch_add(1, Ordering::SeqCst) + 1;
-        format!("{}-{next}", self.session_id)
+    pub(super) fn next_stream_event_id(&self) -> Result<String, ClockError> {
+        let next = crate::clock::next_counter(&self.next_event_id)?;
+        Ok(format!("{}-{next}", self.session_id))
     }
 
     pub(super) fn has_active_notification_stream(&self) -> bool {
@@ -139,6 +147,7 @@ impl RemoteSession {
             .lock()
             .map(|guard| guard.clone())
             .unwrap_or(RemoteSessionLifecycleSnapshot {
+                deadline: None,
                 state: RemoteSessionState::Closed,
                 created_at: 0,
                 last_seen_at: 0,
@@ -161,6 +170,13 @@ impl RemoteSession {
         if lifecycle.state != RemoteSessionState::Ready {
             return Ok(None);
         }
+        self.resume_record_for_lifecycle(lifecycle).map(Some)
+    }
+
+    fn resume_record_for_lifecycle(
+        &self,
+        lifecycle: RemoteSessionLifecycleSnapshot,
+    ) -> Result<RemoteSessionResumeRecord, CliError> {
         let protocol_version = self
             .protocol_version
             .lock()
@@ -203,13 +219,28 @@ impl RemoteSession {
                     self.session_id
                 ))
             })?;
+        self.sign_resume_record(
+            lifecycle,
+            protocol_version,
+            peer_capabilities,
+            initialize_params,
+        )
+    }
+
+    fn sign_resume_record(
+        &self,
+        lifecycle: RemoteSessionLifecycleSnapshot,
+        protocol_version: Option<String>,
+        peer_capabilities: PeerCapabilities,
+        initialize_params: Value,
+    ) -> Result<RemoteSessionResumeRecord, CliError> {
         let keyring = self.resume_hmac_keyring.as_ref().ok_or_else(|| {
             CliError::cli_other_error(format!(
                 "ready MCP session {} is missing its resume HMAC keyring",
                 self.session_id
             ))
         })?;
-        let resume_generation = self.resume_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let resume_generation = crate::clock::next_counter(&self.resume_generation)?;
         let mut record = RemoteSessionResumeRecord {
             session_id: self.session_id.clone(),
             agent_id: self.agent_id.clone(),
@@ -226,25 +257,22 @@ impl RemoteSession {
             resume_generation,
             resume_integrity: keyring.empty_tag_for_current(),
         };
-        record.resume_integrity.tag = compute_resume_record_integrity_tag(&keyring.current, &record)?;
-        Ok(Some(record))
+        record.resume_integrity.tag =
+            compute_resume_record_integrity_tag(&keyring.current, &record)?;
+        Ok(record)
     }
 
-    pub(super) fn persist_resumable_record(&self) -> Result<(), CliError> {
-        let Some(path) = self.session_db_path.as_deref() else {
-            return Ok(());
-        };
-        let Some(record) = self.resume_record()? else {
-            return Ok(());
-        };
+    fn persist_record(
+        &self,
+        path: &FsPath,
+        record: &RemoteSessionResumeRecord,
+        now: u64,
+    ) -> Result<(), CliError> {
         let keyring = self.resume_hmac_keyring.as_deref().ok_or_else(|| {
-            CliError::cli_other_error(format!(
-                "refusing to persist resumable MCP session {} without a dedicated HMAC keyring",
-                self.session_id
-            ))
+            CliError::cli_other_error("resumable MCP session requires a dedicated HMAC keyring")
         })?;
         self.ensure_session_store_owned()?;
-        persist_active_session_record(path, &record, keyring)
+        persist_active_session_record(path, record, keyring, now)
     }
 
     pub(super) fn remove_resumable_record(&self) -> Result<(), CliError> {
@@ -265,8 +293,8 @@ impl RemoteSession {
         }
     }
 
-    pub(super) fn next_terminal_persistence_epoch(&self) -> u64 {
-        self.resume_generation.fetch_add(1, Ordering::SeqCst) + 1
+    pub(super) fn next_terminal_persistence_epoch(&self) -> Result<u64, CliError> {
+        Ok(crate::clock::next_counter(&self.resume_generation)?)
     }
 
     pub(super) fn shutdown_upstream_transport(&self) -> Result<(), CliError> {
@@ -284,100 +312,127 @@ impl RemoteSession {
         initialize_params: Value,
         peer_capabilities: PeerCapabilities,
     ) -> Result<(), CliError> {
-        *self.protocol_version.lock().map_err(|_| {
-            CliError::cli_other_error(format!(
-                "failed to lock protocol version for MCP session {}",
-                self.session_id
-            ))
-        })? = protocol_version;
-        *self.initialize_params.lock().map_err(|_| {
-            CliError::cli_other_error(format!(
-                "failed to lock initialize parameters for MCP session {}",
-                self.session_id
-            ))
-        })? = Some(initialize_params);
-        *self.peer_capabilities.lock().map_err(|_| {
-            CliError::cli_other_error(format!(
-                "failed to lock peer capabilities for MCP session {}",
-                self.session_id
-            ))
-        })? = Some(peer_capabilities);
-        let mut lifecycle = self.lifecycle.lock().map_err(|_| {
-            CliError::cli_other_error(format!(
-                "failed to lock lifecycle state for MCP session {}",
-                self.session_id
-            ))
-        })?;
-        lifecycle.state = RemoteSessionState::Ready;
-        lifecycle.last_seen_at = session_now_millis();
-        lifecycle.idle_expires_at = lifecycle
-            .last_seen_at
-            .saturating_add(self.lifecycle_policy.idle_expiry_millis);
-        lifecycle.drain_deadline_at = None;
-        drop(lifecycle);
-        self.persist_resumable_record()
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        if lifecycle.state != RemoteSessionState::Initializing {
+            return Err(CliError::cli_other_error(
+                "only an initializing MCP session can become ready",
+            ));
+        }
+        let reading = self.clock.read()?;
+        let deadline =
+            AuthorityDeadline::for_timeout_ms(reading, self.lifecycle_policy.idle_expiry_millis)?;
+        let now = reading.unix_millis();
+        let expires = now.checked_add(self.lifecycle_policy.idle_expiry_millis)?;
+        // Acquire every metadata lock before changing any state. A failed clock
+        // or poisoned lock leaves the initialization available for retry.
+        let mut version = self
+            .protocol_version
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        let mut params = self
+            .initialize_params
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        let mut capabilities = self
+            .peer_capabilities
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        let mut proposed = lifecycle.clone();
+        proposed.state = RemoteSessionState::Ready;
+        proposed.last_seen_at = now.get();
+        proposed.idle_expires_at = expires.get();
+        proposed.deadline = Some(deadline);
+        proposed.drain_deadline_at = None;
+        if let Some(path) = self.session_db_path.as_deref() {
+            let record = self.sign_resume_record(
+                proposed.clone(),
+                protocol_version.clone(),
+                peer_capabilities.clone(),
+                initialize_params.clone(),
+            )?;
+            self.persist_record(path, &record, now.get())?;
+        }
+        *version = protocol_version;
+        *params = Some(initialize_params);
+        *capabilities = Some(peer_capabilities);
+        *lifecycle = proposed;
+        Ok(())
     }
 
     pub(super) fn touch(&self) -> Result<(), CliError> {
-        let mut touched = false;
-        let mut lifecycle = self.lifecycle.lock().map_err(|_| {
-            CliError::cli_other_error(format!(
-                "failed to lock lifecycle state for MCP session {}",
-                self.session_id
-            ))
-        })?;
-        if lifecycle.state == RemoteSessionState::Ready {
-            let now = session_now_millis();
-            touched = now.saturating_sub(lifecycle.last_seen_at)
-                >= SESSION_TOUCH_PERSIST_INTERVAL_MILLIS;
-            lifecycle.last_seen_at = now;
-            lifecycle.idle_expires_at = lifecycle
-                .last_seen_at
-                .saturating_add(self.lifecycle_policy.idle_expiry_millis);
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        if lifecycle.state != RemoteSessionState::Ready {
+            return Ok(());
         }
-        drop(lifecycle);
-        if touched {
-            self.persist_resumable_record()?;
+        let reading = self.clock.read()?;
+        let mut proposed = lifecycle.clone();
+        proposed
+            .deadline
+            .as_mut()
+            .ok_or(ClockError::InvalidWindow)?
+            .remaining(reading)?;
+        let now = reading.unix_millis();
+        let deadline =
+            AuthorityDeadline::for_timeout_ms(reading, self.lifecycle_policy.idle_expiry_millis)?;
+        let expires = now.checked_add(self.lifecycle_policy.idle_expiry_millis)?;
+        let persist = now.duration_since(UnixMillis::new(lifecycle.last_seen_at))?
+            >= SESSION_TOUCH_PERSIST_INTERVAL_MILLIS;
+        proposed.last_seen_at = now.get();
+        proposed.idle_expires_at = expires.get();
+        proposed.deadline = Some(deadline);
+        if persist {
+            if let Some(path) = self.session_db_path.as_deref() {
+                let record = self.resume_record_for_lifecycle(proposed.clone())?;
+                self.persist_record(path, &record, now.get())?;
+            }
         }
+        *lifecycle = proposed;
         Ok(())
     }
 
     pub(super) fn begin_draining(&self) -> Result<(), CliError> {
-        self.remove_resumable_record()?;
-        if let Ok(mut guard) = self.lifecycle.lock() {
-            guard.state = RemoteSessionState::Draining;
-            guard.last_seen_at = session_now_millis();
-            guard.drain_deadline_at = Some(
-                guard
-                    .last_seen_at
-                    .saturating_add(self.lifecycle_policy.drain_grace_millis),
-            );
+        let mut guard = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        if guard.state != RemoteSessionState::Ready {
+            return Ok(());
         }
+        let reading = self.clock.read()?;
+        let deadline =
+            AuthorityDeadline::for_timeout_ms(reading, self.lifecycle_policy.drain_grace_millis)?;
+        let expires = reading
+            .unix_millis()
+            .checked_add(self.lifecycle_policy.drain_grace_millis)?;
+        self.remove_resumable_record()?;
+        guard.state = RemoteSessionState::Draining;
+        guard.last_seen_at = reading.unix_millis().get();
+        guard.drain_deadline_at = Some(expires.get());
+        guard.deadline = Some(deadline);
         Ok(())
     }
 
-    pub(super) fn mark_deleted(&self) {
-        if let Ok(mut guard) = self.lifecycle.lock() {
-            guard.state = RemoteSessionState::Deleted;
-            guard.last_seen_at = session_now_millis();
-            guard.drain_deadline_at = None;
+    pub(super) fn deadline_expired(&self) -> Result<bool, CliError> {
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        let reading = self.clock.read()?;
+        match lifecycle
+            .deadline
+            .as_mut()
+            .map(|deadline| deadline.remaining(reading))
+        {
+            Some(Err(ClockError::Expired)) => Ok(true),
+            Some(Err(error)) => Err(error.into()),
+            _ => Ok(false),
         }
     }
 
-    pub(super) fn mark_expired(&self) {
-        if let Ok(mut guard) = self.lifecycle.lock() {
-            guard.state = RemoteSessionState::Expired;
-            guard.last_seen_at = session_now_millis();
-            guard.drain_deadline_at = None;
-        }
-    }
-
-    pub(super) fn mark_closed(&self) {
-        if let Ok(mut guard) = self.lifecycle.lock() {
-            guard.state = RemoteSessionState::Closed;
-            guard.last_seen_at = session_now_millis();
-            guard.drain_deadline_at = None;
-        }
+    pub(super) fn mark_terminal(&self, state: RemoteSessionState, now: u64) {
+        // Terminal intent is already durable. Poison cannot restore dispatch authority.
+        let mut guard = self
+            .lifecycle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        guard.state = state;
+        guard.last_seen_at = now;
+        guard.drain_deadline_at = None;
+        guard.deadline = None;
     }
 
     pub(super) fn auth_context(&self) -> &SessionAuthContext {
@@ -392,7 +447,7 @@ impl RemoteSession {
             lifecycle: self.lifecycle_snapshot(),
             protocol_version: self.protocol_version(),
             ownership: self.ownership_snapshot(),
-            terminal_at: session_now_millis(),
+            terminal_at: self.lifecycle_snapshot().last_seen_at,
         }
     }
 

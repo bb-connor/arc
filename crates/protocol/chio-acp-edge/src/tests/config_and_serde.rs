@@ -1,16 +1,15 @@
 // ---- Deduplication tests ----
 
 #[test]
-fn duplicate_tools_across_manifests_deduplicated() {
+fn duplicate_manifest_owners_are_rejected() {
     let m1 = test_manifest();
     let m2 = test_manifest();
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![m1, m2]).test_unwrap();
-    assert_eq!(edge.capabilities().len(), 4);
+    assert!(new_test_edge(AcpEdgeConfig::default(), vec![m1, m2]).is_err());
 }
 
 #[test]
 fn colliding_capability_ids_are_withheld_deterministically() {
-    let edge = ChioAcpEdge::new(
+    let edge = new_test_edge(
         AcpEdgeConfig::default(),
         vec![test_manifest(), colliding_search_manifest()],
     )

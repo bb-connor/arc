@@ -4,28 +4,28 @@ use super::*;
 
 #[test]
 fn read_file_gets_filesystem_category() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let cap = edge.capability("read_file").test_unwrap();
     assert_eq!(cap.category, AcpCategory::Filesystem);
 }
 
 #[test]
 fn write_file_gets_filesystem_category() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let cap = edge.capability("write_file").test_unwrap();
     assert_eq!(cap.category, AcpCategory::Filesystem);
 }
 
 #[test]
 fn exec_command_gets_terminal_category() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let cap = edge.capability("exec_command").test_unwrap();
     assert_eq!(cap.category, AcpCategory::Terminal);
 }
 
 #[test]
 fn search_gets_default_tool_category() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let cap = edge.capability("search").test_unwrap();
     assert_eq!(cap.category, AcpCategory::Tool);
 }
@@ -34,33 +34,35 @@ fn search_gets_default_tool_category() {
 
 #[test]
 fn side_effect_tools_require_permission() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let cap = edge.capability("write_file").test_unwrap();
     assert!(cap.requires_permission);
 }
 
 #[test]
 fn permission_denied_by_default_for_required_caps() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let (kernel, execution) = kernel_execution(Box::new(test_server()), "test-srv", "read_file");
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let request = PermissionRequest {
         capability_id: "write_file".to_string(),
         arguments: json!({}),
     };
     assert_eq!(
-        edge.compatibility().preview_permission(&request),
+        edge.evaluate_permission_with_kernel(&request, &kernel, &execution),
         PermissionDecision::Deny
     );
 }
 
 #[test]
 fn permission_denied_for_unknown_capability() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let (kernel, execution) = kernel_execution(Box::new(test_server()), "test-srv", "read_file");
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let request = PermissionRequest {
         capability_id: "nonexistent".to_string(),
         arguments: json!({}),
     };
     assert_eq!(
-        edge.compatibility().preview_permission(&request),
+        edge.evaluate_permission_with_kernel(&request, &kernel, &execution),
         PermissionDecision::Deny
     );
 }
@@ -72,7 +74,7 @@ fn permission_not_required_when_config_disabled() {
         default_category: AcpCategory::Tool,
         ..AcpEdgeConfig::default()
     };
-    let edge = ChioAcpEdge::new(config, vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(config, vec![test_manifest()]).test_unwrap();
     // read_file has no side effects and require_permission is false
     let cap = edge.capability("read_file").test_unwrap();
     assert!(!cap.requires_permission);
@@ -80,7 +82,7 @@ fn permission_not_required_when_config_disabled() {
 
 #[test]
 fn permission_with_capability_allows_matching_scope() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let subject = Keypair::generate();
@@ -109,7 +111,7 @@ fn permission_with_capability_allows_matching_scope() {
 
 #[test]
 fn permission_with_capability_denies_sender_bound_scope_without_dpop() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let subject = Keypair::generate();
@@ -144,7 +146,7 @@ fn permission_with_capability_denies_sender_bound_scope_without_dpop() {
 
 #[test]
 fn permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let subject = Keypair::generate();
@@ -189,7 +191,7 @@ fn permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop() {
 
 #[test]
 fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
@@ -246,7 +248,7 @@ fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
 
 #[test]
 fn jsonrpc_permission_preview_uses_kernel_dpop_config() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
@@ -291,7 +293,7 @@ fn jsonrpc_permission_preview_uses_kernel_dpop_config() {
         model_metadata: None,
     };
 
-    let response = edge.handle_jsonrpc(
+    let response = edge.handle_jsonrpc_value(
         json!({
             "jsonrpc": "2.0",
             "id": 42,
@@ -313,7 +315,7 @@ fn jsonrpc_permission_preview_uses_kernel_dpop_config() {
 
 #[test]
 fn permission_with_capability_denies_out_of_scope_request() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let subject = Keypair::generate();

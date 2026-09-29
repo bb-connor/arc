@@ -615,7 +615,7 @@ fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, Cl
 fn load_resume_hmac_keyring(
     config: &RemoteServeHttpConfig,
 ) -> Result<Option<Arc<RemoteSessionHmacKeyring>>, CliError> {
-    load_resume_hmac_keyring_at(config, session_now_millis())
+    load_resume_hmac_keyring_at(config, config.clock.millis()?)
 }
 
 fn load_resume_hmac_keyring_at(
@@ -677,7 +677,11 @@ fn load_resume_hmac_keyring_at(
                 old.key_id, old.version, current.version
             )));
         }
-        if old.verify_until_millis > now.saturating_add(MAX_REMOTE_SESSION_HMAC_GRACE_MILLIS) {
+        if old.verify_until_millis
+            > now
+                .checked_add(MAX_REMOTE_SESSION_HMAC_GRACE_MILLIS)
+                .ok_or(ClockError::Overflow)?
+        {
             return Err(CliError::cli_other_error(format!(
                 "remote MCP resume HMAC grace key {} version {} exceeds the seven-day verification window",
                 old.key_id, old.version

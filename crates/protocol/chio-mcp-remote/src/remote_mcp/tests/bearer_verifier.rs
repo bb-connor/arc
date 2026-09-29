@@ -96,6 +96,7 @@ fn test_introspection_verifier(
 ) -> IntrospectionBearerVerifier {
     let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     IntrospectionBearerVerifier {
+        clock: RemoteClock::default(),
         client: HttpClient::builder().build().expect("build http client"),
         introspection_url: Url::parse("http://127.0.0.1:9/introspect")
             .expect("parse introspection url"),
@@ -135,6 +136,7 @@ fn jwt_bearer_verifier_builds_oauth_session_auth_context() {
         }),
     );
     let verifier = JwtBearerVerifier {
+        clock: RemoteClock::default(),
         key_source: JwtVerificationKeySource::Static(keypair.public_key()),
         issuer: Some("https://issuer.example".to_string()),
         audience: Some("chio-mcp".to_string()),
@@ -258,6 +260,7 @@ fn jwt_bearer_verifier_authenticates_rs256_jwks_token() {
         "rsa-key-1",
     );
     let verifier = JwtBearerVerifier {
+        clock: RemoteClock::default(),
         key_source: JwtVerificationKeySource::Jwks(JwtJwksKeySet {
             keys_by_kid: HashMap::from([(
                 "rsa-key-1".to_string(),
@@ -317,6 +320,7 @@ fn jwt_bearer_verifier_authenticates_es256_jwks_token() {
         "ec-key-1",
     );
     let verifier = JwtBearerVerifier {
+        clock: RemoteClock::default(),
         key_source: JwtVerificationKeySource::Jwks(JwtJwksKeySet {
             keys_by_kid: HashMap::from([(
                 "ec-key-1".to_string(),
@@ -370,6 +374,7 @@ fn jwt_bearer_verifier_authenticates_ps256_jwks_token() {
         "pss-key-1",
     );
     let verifier = JwtBearerVerifier {
+        clock: RemoteClock::default(),
         key_source: JwtVerificationKeySource::Jwks(JwtJwksKeySet {
             keys_by_kid: HashMap::from([(
                 "pss-key-1".to_string(),
@@ -422,6 +427,7 @@ fn jwt_bearer_verifier_authenticates_es384_jwks_token() {
         "ec384-key-1",
     );
     let verifier = JwtBearerVerifier {
+        clock: RemoteClock::default(),
         key_source: JwtVerificationKeySource::Jwks(JwtJwksKeySet {
             keys_by_kid: HashMap::from([(
                 "ec384-key-1".to_string(),

@@ -10,7 +10,7 @@ import shutil
 import stat
 import subprocess
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 
@@ -37,6 +37,8 @@ def provision_native_demo(
     working_directory: str | Path,
     *,
     environment: Mapping[str, str] | None = None,
+    read_paths: Sequence[str | Path] = (),
+    write_paths: Sequence[str | Path] = (),
 ) -> dict:
     """Provision a fresh policy and return one process-host server configuration.
 
@@ -50,12 +52,12 @@ def provision_native_demo(
     """
     if not command or not command[0]:
         raise ValueError("A native MCP command is required")
-    cage_arguments = _native_cage_arguments()
+    output = Path(output_dir).resolve()
+    cage_arguments = _native_cage_arguments(output)
     target = shutil.which(command[0])
     if target is None:
         raise ValueError("Native MCP executable was not found")
     bound_command = [str(Path(target).resolve(strict=True)), *command[1:]]
-    output = Path(output_dir).resolve()
     if os.path.lexists(output_dir):
         raise FileExistsError("Native MCP demo policy output already exists")
     arguments = [
@@ -81,6 +83,23 @@ def provision_native_demo(
         "--server-version",
         "1",
     ]
+    groups = sorted(set(os.getgroups()) - {os.getgid()})
+    if len(groups) > 64:
+        raise ValueError("native supplementary groups exceed the bound")
+    for group in groups:
+        if group == 0:
+            raise ValueError("native execution cannot retain root supplementary group")
+        arguments.extend(["--execution-supplementary-gid", str(group)])
+    anchor = Path(os.environ["CHIO_RECEIPT_ANCHOR_ROOT"]).resolve()
+    for flag, paths in (("--read-path", read_paths), ("--write-path", write_paths)):
+        for path in paths:
+            grant = Path(path).resolve(strict=True)
+            if grant == Path("/") or any(
+                protected == grant or grant in protected.parents or protected in grant.parents
+                for protected in (output, anchor)
+            ):
+                raise ValueError("tool grants cannot include launch authority or receipt anchors")
+            arguments.extend([flag, str(grant)])
     for argument in bound_command[1:]:
         arguments.extend(["--target-arg", argument])
     subprocess.run(
@@ -99,8 +118,8 @@ def provision_native_demo(
     }
 
 
-def _native_cage_arguments() -> list[str]:
-    arguments = ["--stage", "enforced"]
+def _native_cage_arguments(output: Path) -> list[str]:
+    arguments = ["--stage", "enforced", "--max-artifact-bytes", str(64 * 1024 * 1024)]
     for variable, flag in (
         ("CHIO_CAGE_INIT", "--cage-init"),
         ("CHIO_RECEIPT_ANCHOR_ROOT", "--receipt-rollback-anchor-root"),
@@ -113,11 +132,20 @@ def _native_cage_arguments() -> list[str]:
     if not os.path.isabs(grants):
         raise ValueError("CHIO_CAGE_READ_PATHS_FILE must name the reviewed read-grants file")
     with open(grants, encoding="utf-8") as handle:
-        for line in handle:
-            path = line.rstrip("\r\n")
+        text = handle.read(64 * 1024 + 1)
+        if len(text.encode("utf-8")) > 64 * 1024:
+            raise ValueError("native read grants exceed 64 KiB")
+        for path in text.splitlines():
             if not path:
                 continue
             if not os.path.isabs(path):
                 raise ValueError("read grants must be absolute paths")
-            arguments.extend(["--read-path", path])
+            grant = Path(path).resolve()
+            anchor = Path(os.environ["CHIO_RECEIPT_ANCHOR_ROOT"]).resolve()
+            if grant == Path("/") or any(
+                protected == grant or grant in protected.parents or protected in grant.parents
+                for protected in (output, anchor)
+            ):
+                raise ValueError("read grants cannot include launch authority or receipt anchors")
+            arguments.extend(["--read-path", str(grant)])
     return arguments

@@ -154,6 +154,7 @@ def wait_for(path, process):
 def prepare(binary, directory, host_crash=False):
     directory.mkdir(mode=0o700)
     state = directory / "host"
+    (directory / "tool-data").mkdir(exist_ok=True)
     policy = directory / "policy.yaml"
     policy.write_text("""kernel:
   max_capability_ttl: 3600
@@ -182,10 +183,12 @@ capabilities:
                     demo_python(),
                     str(HERE / "recovery.py"),
                     "--mcp",
-                    str(directory / "publications.jsonl"),
+                    str(directory / "tool-data" / "publications.jsonl"),
                 ],
                 directory / "launch-reports",
                 directory,
+                read_paths=[directory / "tool-data"],
+                write_paths=[directory / "tool-data"],
             )
         ],
         "mailboxes": [{"id": "jobs"}],
@@ -319,7 +322,10 @@ def exercise(binary, directory, host_crash):
         w["state"] == "completed" and w["attempts"] == 2 for w in result["workers"]
     )
     assert all(w["peak_resident_bytes"] > 0 for w in result["workers"])
-    assert len((directory / "publications.jsonl").read_text().splitlines()) == 1
+    assert (
+        len((directory / "tool-data" / "publications.jsonl").read_text().splitlines())
+        == 1
+    )
     for action in ("send", "publish"):
         first = json.loads((directory / f"{action}-1.json").read_text())
         second = json.loads((directory / f"{action}-2.json").read_text())
@@ -388,7 +394,7 @@ def concurrency(binary, directory, parallel):
 
 def unknown(binary, directory):
     state, path, _ = prepare(binary, directory)
-    publications = directory / "publications.jsonl"
+    publications = directory / "tool-data" / "publications.jsonl"
     publications.with_suffix(".pause").touch()
     process = subprocess.Popen(
         [binary, "process", "run", "--state", str(state), "--plan", str(path)],
@@ -644,7 +650,10 @@ def relocated(binary, directory):
             resumed.kill()
             resumed.communicate(timeout=10)
     assert result["complete"]
-    assert len((directory / "publications.jsonl").read_text().splitlines()) == 1
+    assert (
+        len((directory / "tool-data" / "publications.jsonl").read_text().splitlines())
+        == 1
+    )
     for action in ("send", "publish"):
         first_receipt = json.loads((directory / f"{action}-1.json").read_text())
         second = json.loads((directory / f"{action}-2.json").read_text())

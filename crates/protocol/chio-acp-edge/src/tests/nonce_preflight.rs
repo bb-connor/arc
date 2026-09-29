@@ -1,3 +1,4 @@
+use super::tests::new_test_edge;
 use chio_core::capability::{
     scope::{ChioScope, Operation, ToolGrant},
     token::CapabilityTokenBody,
@@ -146,7 +147,7 @@ fn generated_request_id_rejects_threshold_approvals() {
         supplemental_authorization: None,
         model_metadata: None,
     };
-    let edge = ChioAcpEdge::new(
+    let edge = new_test_edge(
         AcpEdgeConfig {
             peer_capabilities: chio_mcp_edge::authorization::authorization_capabilities(),
             ..AcpEdgeConfig::default()
@@ -165,7 +166,7 @@ fn generated_request_id_rejects_threshold_approvals() {
 
 #[test]
 fn strict_nonce_retries_require_and_accept_stable_request_ids() {
-    let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
@@ -240,8 +241,14 @@ fn strict_nonce_retries_require_and_accept_stable_request_ids() {
         .test_expect_err("generated MCP-target IDs must reject execution nonces");
     assert!(mcp_error.to_string().contains("invoke_with_request_id"));
 
-    edge.start_stream_with_request_id(request_id, "read_file", arguments.clone(), &retry_execution)
-        .test_expect("stable stream IDs should accept execution nonces");
+    edge.start_stream_with_request_id(
+        request_id,
+        "read_file",
+        arguments.clone(),
+        &retry_execution,
+        &kernel,
+    )
+    .test_expect("stable stream IDs should accept execution nonces");
     let retry = edge
         .invoke_with_request_id(
             request_id,

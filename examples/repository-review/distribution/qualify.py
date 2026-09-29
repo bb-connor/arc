@@ -212,7 +212,7 @@ def exercise(kit, temporary):
         )
     finally:
         source.write_bytes(saved)
-    with sqlite3.connect(state / "run/publications.db") as db:
+    with sqlite3.connect(state / "run/tool-data/publications.db") as db:
         assert db.execute("SELECT count(*) FROM reports").fetchone()[0] == 1
 
     output = kit / "evidence"

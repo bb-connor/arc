@@ -28,20 +28,23 @@ impl ChioAcpEdge {
         })
     }
 
-    fn jsonrpc_error_response(id: Value, error: AcpEdgeError) -> Value {
-        let (code, message) = match error {
-            AcpEdgeError::InvalidRequest(message) => (-32602, message),
-            other => (-32603, other.to_string()),
+    fn jsonrpc_error_response(id: Value, error: AcpEdgeError) -> AcpJsonRpcResponse {
+        let code = if matches!(
+            error,
+            AcpEdgeError::InvalidRequest(_) | AcpEdgeError::UntrustedInput(_)
+        ) {
+            -32602
+        } else {
+            -32603
         };
-
-        json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": {
-                "code": code,
-                "message": message
-            }
-        })
+        let message = match &error {
+            AcpEdgeError::InvalidRequest(message) => message.clone(),
+            _ => error.to_string(),
+        };
+        AcpJsonRpcResponse::with_error(
+            json!({"jsonrpc":"2.0", "id":id, "error":{"code":code,"message":message}}),
+            error,
+        )
     }
 
     fn parse_jsonrpc_envelope(message: &Value) -> Result<AcpJsonRpcEnvelope, Option<Value>> {
@@ -170,6 +173,25 @@ impl ChioAcpEdge {
     }
 
     fn jsonrpc_arguments(params: &Value) -> Value {
-        params.get("arguments").cloned().unwrap_or_else(|| json!({}))
+        params
+            .get("arguments")
+            .cloned()
+            .unwrap_or_else(|| json!({}))
+    }
+}
+
+const MAX_ACP_REQUEST_BYTES: usize = 8 * 1024 * 1024;
+impl ChioAcpEdge {
+    /// Validate bounded original bytes before projecting a request.
+    pub fn handle_jsonrpc(
+        &self,
+        bytes: &[u8],
+        kernel: &ChioKernel,
+        execution: &AcpKernelExecutionContext,
+    ) -> Result<AcpJsonRpcResponse, AcpEdgeError> {
+        let message =
+            chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_ACP_REQUEST_BYTES)?
+                .decode_signed()?;
+        Ok(self.handle_jsonrpc_value(message, kernel, execution))
     }
 }

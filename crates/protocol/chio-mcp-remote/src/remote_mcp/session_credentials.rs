@@ -215,7 +215,10 @@ async fn issue(
                 .map(|owner| owner.upstream_server.tool_names())
         })
         .unwrap_or_default();
-    let now = unix_now();
+    let now = match state.factory.config.clock.seconds() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
     for tool in &allowed_tools {
         let covered = session.issued_capabilities.iter().any(|capability| {
             capability.expires_at > now
@@ -241,7 +244,10 @@ async fn issue(
         .map(|cap| cap.expires_at)
         .min()
         .unwrap_or(now)
-        .min(now.saturating_add(input.ttl_seconds));
+        .min(match now.checked_add(input.ttl_seconds) {
+            Some(expiry) => expiry,
+            None => return clock::rejection(ClockError::Overflow),
+        });
     if expires_at <= now {
         return unavailable();
     }
@@ -279,7 +285,15 @@ async fn issue(
     if let Err(error) = session.ensure_session_store_owned() {
         return storage_error(error);
     }
-    if let Err(error) = persist_active_session_record(path, &resume, keyring) {
+    if let Err(error) = persist_active_session_record(
+        path,
+        &resume,
+        keyring,
+        match state.factory.config.clock.millis() {
+            Ok(now) => now,
+            Err(error) => return clock::rejection(error),
+        },
+    ) {
         return storage_error(error);
     }
     if let Err(error) = persist_record(path, &keypair, &record) {
@@ -410,7 +424,12 @@ pub(super) async fn authenticate_request(
     else {
         return Err(unavailable());
     };
-    let now = unix_now();
+    let now = state
+        .factory
+        .config
+        .clock
+        .seconds()
+        .map_err(clock::rejection)?;
     if record.session_id != session_id
         || record.subject_key != session.agent_id
         || record.server_id != state.factory.config.server_id
@@ -602,7 +621,18 @@ pub(super) fn reserve_call(
     message: &Value,
 ) -> Result<CallReservation, Response> {
     let (path, keypair) = operator_runtime(state)?;
-    reserve_at(path, &keypair, credential, message)
+    reserve_at(
+        path,
+        &keypair,
+        credential,
+        message,
+        state
+            .factory
+            .config
+            .clock
+            .seconds()
+            .map_err(clock::rejection)?,
+    )
 }
 
 fn reserve_at(
@@ -610,6 +640,7 @@ fn reserve_at(
     keypair: &Keypair,
     credential: &SessionCredential,
     message: &Value,
+    now: u64,
 ) -> Result<CallReservation, Response> {
     let request_id = message
         .pointer("/params/_meta/chioRequestId")
@@ -684,7 +715,7 @@ fn reserve_at(
             )
             .map_err(storage_error)?,
         ),
-        started_at: unix_now(),
+        started_at: now,
         state: "pending".to_owned(),
         response: None,
         delivery_ack: None,
@@ -969,7 +1000,7 @@ mod tests {
         let message = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
             "name":"write_file","arguments":{"path":"/workspace/one"},"_meta":{"chioRequestId":"logical-one"}}});
         let Ok(CallReservation::Pending(pending)) =
-            reserve_at(&path, &keypair, &credential, &message)
+            reserve_at(&path, &keypair, &credential, &message, unix_now())
         else {
             return Err("reserve".into());
         };
@@ -986,11 +1017,11 @@ mod tests {
         assert_eq!(acknowledgement.acknowledgement.len(), 43);
         let mut next = message.clone();
         next["params"]["_meta"]["chioRequestId"] = json!("logical-two");
-        assert!(reserve_at(&path, &keypair, &credential, &next).is_err());
+        assert!(reserve_at(&path, &keypair, &credential, &next, unix_now()).is_err());
         credential.token_hash = "rotated".to_owned();
-        assert!(reserve_at(&path, &keypair, &credential, &next).is_err());
+        assert!(reserve_at(&path, &keypair, &credential, &next, unix_now()).is_err());
         let Ok(CallReservation::Replay(replayed)) =
-            reserve_at(&path, &keypair, &credential, &message)
+            reserve_at(&path, &keypair, &credential, &message, unix_now())
         else {
             return Err("replay".into());
         };
@@ -1006,21 +1037,21 @@ mod tests {
             forged[field] = json!("wrong");
             let forged = serde_json::from_value(forged)?;
             assert!(acknowledge_at(&path, &keypair, &credential, &forged).is_err());
-            assert!(reserve_at(&path, &keypair, &credential, &next).is_err());
+            assert!(reserve_at(&path, &keypair, &credential, &next, unix_now()).is_err());
         }
         acknowledge_at(&path, &keypair, &credential, &acknowledgement)
             .map_err(|_| "acknowledge")?;
         acknowledge_at(&path, &keypair, &credential, &acknowledgement)
             .map_err(|_| "idempotent acknowledge")?;
         assert!(matches!(
-            reserve_at(&path, &keypair, &credential, &next),
+            reserve_at(&path, &keypair, &credential, &next, unix_now()),
             Ok(CallReservation::Pending(_))
         ));
         acknowledge_at(&path, &keypair, &credential, &acknowledgement)
             .map_err(|_| "old acknowledge")?;
         let mut third = next.clone();
         third["params"]["_meta"]["chioRequestId"] = json!("logical-three");
-        assert!(reserve_at(&path, &keypair, &credential, &third).is_err());
+        assert!(reserve_at(&path, &keypair, &credential, &third, unix_now()).is_err());
         drop(lease);
         std::fs::remove_dir_all(directory)?;
         Ok(())
@@ -1038,7 +1069,7 @@ mod tests {
         let message = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
             "name":"write_file","arguments":{"path":"/outside-resource"},"_meta":{"chioRequestId":"tool-error"}}});
         let Ok(CallReservation::Pending(pending)) =
-            reserve_at(&path, &keypair, &credential, &message)
+            reserve_at(&path, &keypair, &credential, &message, unix_now())
         else {
             return Err("reserve tool error".into());
         };
@@ -1064,16 +1095,16 @@ mod tests {
         );
         let mut next = message.clone();
         next["params"]["_meta"]["chioRequestId"] = json!("after-error");
-        assert!(reserve_at(&path, &keypair, &credential, &next).is_err());
+        assert!(reserve_at(&path, &keypair, &credential, &next, unix_now()).is_err());
         let acknowledgement =
             serde_json::from_value(delivered["result"]["_meta"]["chioDelivery"].clone())?;
         acknowledge_at(&path, &keypair, &credential, &acknowledgement)
             .map_err(|_| "acknowledge")?;
         assert!(
-            matches!(reserve_at(&path, &keypair, &credential, &message), Ok(CallReservation::Replay(value)) if value == delivered)
+            matches!(reserve_at(&path, &keypair, &credential, &message, unix_now()), Ok(CallReservation::Replay(value)) if value == delivered)
         );
         assert!(matches!(
-            reserve_at(&path, &keypair, &credential, &next),
+            reserve_at(&path, &keypair, &credential, &next, unix_now()),
             Ok(CallReservation::Pending(_))
         ));
         drop(lease);
@@ -1092,22 +1123,22 @@ mod tests {
         let message = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
             "name":"write_file","arguments":{"path":"/workspace/one"},"_meta":{"chioRequestId":"logical-one"}}});
         let Ok(CallReservation::Pending(pending)) =
-            reserve_at(&path, &keypair, &credential, &message)
+            reserve_at(&path, &keypair, &credential, &message, unix_now())
         else {
             return Err("first call was not durably reserved".into());
         };
-        assert!(reserve_at(&path, &keypair, &credential, &message).is_err());
+        assert!(reserve_at(&path, &keypair, &credential, &message, unix_now()).is_err());
         credential.token_hash = "rotated-token".to_owned();
         let mut another = message.clone();
         another["params"]["_meta"]["chioRequestId"] = json!("logical-two");
-        assert!(reserve_at(&path, &keypair, &credential, &another).is_err());
+        assert!(reserve_at(&path, &keypair, &credential, &another, unix_now()).is_err());
         let mut forged = pending;
         forged.state = "completed".to_owned();
         open_db(&path)?.execute(
             &format!("UPDATE {LATCH_TABLE} SET record_json=?1"),
             params![serde_json::to_string(&forged)?],
         )?;
-        assert!(reserve_at(&path, &keypair, &credential, &another).is_err());
+        assert!(reserve_at(&path, &keypair, &credential, &another, unix_now()).is_err());
         drop(lease);
         std::fs::remove_dir_all(directory)?;
         Ok(())
@@ -1124,7 +1155,7 @@ mod tests {
         let message = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
             "name":"write_file","arguments":{"path":"/workspace/one"},"_meta":{"chioRequestId":"logical-one"}}});
         let Ok(CallReservation::Pending(mut pending)) =
-            reserve_at(&path, &keypair, &credential, &message)
+            reserve_at(&path, &keypair, &credential, &message, unix_now())
         else {
             return Err("first call was not reserved".into());
         };
@@ -1134,14 +1165,14 @@ mod tests {
         let mut retry = message.clone();
         retry["id"] = json!(99);
         let Ok(CallReservation::Replay(response)) =
-            reserve_at(&path, &keypair, &credential, &retry)
+            reserve_at(&path, &keypair, &credential, &retry, unix_now())
         else {
             return Err("exact completed request was not replayed".into());
         };
         assert_eq!(response["id"], 99);
         assert_eq!(response["result"]["ownerResult"], true);
         retry["params"]["arguments"]["path"] = json!("/workspace/two");
-        assert!(reserve_at(&path, &keypair, &credential, &retry).is_err());
+        assert!(reserve_at(&path, &keypair, &credential, &retry, unix_now()).is_err());
         drop(lease);
         std::fs::remove_dir_all(directory)?;
         Ok(())

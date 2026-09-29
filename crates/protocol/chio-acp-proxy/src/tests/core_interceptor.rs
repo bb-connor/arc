@@ -15,9 +15,8 @@ fn interceptor_jsonrpc_param_decoder_preserves_method_specific_protocol_errors()
         "fs/read_text_file",
     )
     .expect_err("invalid typed params should fail closed");
-    assert!(invalid
-        .to_string()
-        .contains("protocol error: invalid fs/read_text_file params:"));
+    assert!(matches!(invalid, AcpProxyError::UntrustedInput(_)));
+    assert!(std::error::Error::source(&invalid).is_some());
 
     let decoded = match MessageInterceptor::decode_jsonrpc_params::<ReadTextFileParams>(
         &json!({
@@ -47,7 +46,7 @@ fn interceptor_forwards_unrelated_message() {
         "params": {}
     });
     let result = interceptor
-        .intercept(Direction::ClientToAgent, &msg)
+        .intercept_value(Direction::ClientToAgent, &msg)
         .unwrap();
     match result {
         InterceptResult::Forward(v) => assert_eq!(v, msg),
@@ -68,7 +67,7 @@ fn interceptor_blocks_fs_read_outside_prefix() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Block(v) => {
@@ -91,7 +90,7 @@ fn interceptor_allows_fs_read_in_prefix() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Forward(_) => {}
@@ -113,7 +112,7 @@ fn interceptor_blocks_terminal_create_unlisted_command() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Block(v) => {
@@ -137,7 +136,7 @@ fn interceptor_allows_terminal_create_listed_command() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Forward(_) => {}
@@ -160,15 +159,12 @@ fn interceptor_blocks_terminal_create_with_out_of_scope_cwd() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Block(v) => {
             assert!(v.get("error").is_some());
-            assert!(v["error"]["message"]
-                .as_str()
-                .unwrap_or("")
-                .contains("cwd"));
+            assert!(v["error"]["message"].as_str().unwrap_or("").contains("cwd"));
         }
         other => panic!("expected Block for out-of-scope cwd, got {:?}", other),
     }
@@ -189,7 +185,7 @@ fn interceptor_allows_terminal_create_with_in_scope_cwd() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Forward(_) => {}
@@ -214,7 +210,7 @@ fn interceptor_generates_receipt_for_tool_call() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::ForwardWithReceipt(_, receipt) => {
@@ -240,7 +236,7 @@ fn interceptor_forwards_client_to_agent_unchanged() {
         }
     });
     let result = interceptor
-        .intercept(Direction::ClientToAgent, &msg)
+        .intercept_value(Direction::ClientToAgent, &msg)
         .unwrap();
     match result {
         InterceptResult::Forward(v) => assert_eq!(v, msg),
@@ -265,7 +261,7 @@ fn interceptor_blocks_fs_write_with_traversal() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Block(v) => {
@@ -299,7 +295,7 @@ fn interceptor_handles_new_method_variants() {
         });
 
         let result = interceptor
-            .intercept(Direction::AgentToClient, &msg)
+            .intercept_value(Direction::AgentToClient, &msg)
             .unwrap();
         match result {
             InterceptResult::Forward(_) => {}
@@ -321,7 +317,7 @@ fn interceptor_uses_correct_error_code() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Block(v) => {
@@ -352,7 +348,7 @@ fn interceptor_blocks_fs_read_prefix_substring() {
         }
     });
     let result = interceptor
-        .intercept(Direction::AgentToClient, &msg)
+        .intercept_value(Direction::AgentToClient, &msg)
         .unwrap();
     match result {
         InterceptResult::Block(v) => {
@@ -389,3 +385,16 @@ fn proxy_creation_and_shutdown() {
 }
 
 // -- Audit entry content hash test --
+
+#[test]
+fn public_interceptor_retains_native_projection_errors() {
+    use std::error::Error;
+    let interceptor = MessageInterceptor::new(test_config());
+    let message = AcpMessage::decode(br#"{"jsonrpc":"2.0","id":7,"method":"fs/read_text_file","params":{"sessionId":"session","path":{"private_marker":true}}}"#).unwrap();
+    let error = interceptor
+        .intercept(Direction::AgentToClient, &message)
+        .unwrap_err();
+    assert!(matches!(error, AcpProxyError::UntrustedInput(_)));
+    assert!(error.source().is_some());
+    assert!(!format!("{error:?} {error}").contains("private_marker"));
+}

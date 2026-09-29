@@ -72,7 +72,10 @@ async fn resolve_session_entry(
     state: &RemoteAppState,
     session_id: &str,
 ) -> Option<RemoteSessionEntry> {
-    state.sessions.cleanup_due_sessions().await;
+    if let Err(error) = state.sessions.cleanup_due_sessions().await {
+        warn!(%error, "MCP lookup denied while lifecycle custody is retained");
+        return None;
+    }
     state.sessions.lookup(session_id).await
 }
 
@@ -92,7 +95,9 @@ async fn session_reaper_loop(
             _ = tokio::time::sleep(interval) => {}
             _ = shutdown.changed() => return,
         }
-        state.sessions.cleanup_due_sessions().await;
+        if let Err(error) = state.sessions.cleanup_due_sessions().await {
+            warn!(%error, "MCP reaper retained custody");
+        }
     }
 }
 
@@ -447,7 +452,7 @@ fn build_remote_auth_mode(
     let provider_profile = config
         .auth_jwt_provider_profile
         .unwrap_or(JwtProviderProfile::Generic);
-    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime()?;
+    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime(&config.clock)?;
 
     if config.auth_token.is_some()
         && (config.auth_jwt_public_key.is_some()
@@ -490,6 +495,7 @@ fn build_remote_auth_mode(
     if let Some(seed_path) = config.auth_server_seed_path.as_deref() {
         return Ok(RemoteAuthMode::JwtBearer {
             verifier: Arc::new(JwtBearerVerifier {
+                clock: config.clock.clone(),
                 key_source: JwtVerificationKeySource::Static(
                     load_or_create_authority_keypair(seed_path)?.public_key(),
                 ),
@@ -535,6 +541,7 @@ fn build_remote_auth_mode(
             })?;
         return Ok(RemoteAuthMode::IntrospectionBearer {
             verifier: Arc::new(IntrospectionBearerVerifier {
+                clock: config.clock.clone(),
                 client: client_builder_with_contract(&egress_contract)
                     .timeout(Duration::from_secs(TOKEN_INTROSPECTION_TIMEOUT_SECS))
                     .build()
@@ -591,6 +598,7 @@ fn build_remote_auth_mode(
 
     Ok(RemoteAuthMode::JwtBearer {
         verifier: Arc::new(JwtBearerVerifier {
+            clock: config.clock.clone(),
             key_source,
             issuer: config
                 .auth_jwt_issuer
@@ -616,12 +624,17 @@ fn build_remote_auth_mode(
     })
 }
 
-fn build_sender_dpop_runtime() -> Result<(Arc<DpopNonceStore>, DpopConfig), CliError> {
+fn build_sender_dpop_runtime(
+    clock: &RemoteClock,
+) -> Result<(Arc<DpopNonceStore>, DpopConfig), CliError> {
     let config = DpopConfig::default();
     let store = Arc::new(
-        DpopNonceStore::new(
+        DpopNonceStore::with_clock(
             config.nonce_store_capacity,
+            config.nonce_store_capacity,
+            chio_kernel::dpop::DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
             Duration::from_secs(config.proof_ttl_secs),
+            Arc::new(clock.clone()),
         )
         .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     );
@@ -655,8 +668,9 @@ fn build_local_auth_server(
     })?;
     let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
     let default_audience = effective_resource_indicator(config, &base_url);
-    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime()?;
+    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime(&config.clock)?;
     Ok(Some(LocalAuthorizationServer {
+        clock: config.clock.clone(),
         signing_key,
         issuer,
         default_audience,
@@ -738,6 +752,7 @@ fn parse_request_time_authorization_details(
 }
 
 fn parse_request_time_transaction_context_from_value(
+    clock: &RemoteClock,
     value: Value,
 ) -> Result<GovernedAuthorizationTransactionContext, Response> {
     let context: GovernedAuthorizationTransactionContext =
@@ -748,11 +763,12 @@ fn parse_request_time_transaction_context_from_value(
                 error,
             )
         })?;
-    validate_request_time_transaction_context(&context)?;
+    validate_request_time_transaction_context(clock, &context)?;
     Ok(context)
 }
 
 fn parse_request_time_transaction_context(
+    clock: &RemoteClock,
     raw: Option<&str>,
 ) -> Result<Option<GovernedAuthorizationTransactionContext>, Response> {
     let Some(raw) = raw else {
@@ -764,7 +780,7 @@ fn parse_request_time_transaction_context(
             error,
         )
     })?;
-    parse_request_time_transaction_context_from_value(value).map(Some)
+    parse_request_time_transaction_context_from_value(clock, value).map(Some)
 }
 
 fn validate_request_time_authorization_details(
@@ -879,6 +895,7 @@ fn validate_request_time_authorization_details(
 }
 
 fn validate_request_time_transaction_context(
+    clock: &RemoteClock,
     context: &GovernedAuthorizationTransactionContext,
 ) -> Result<(), Response> {
     if context.intent_id.trim().is_empty() {
@@ -979,7 +996,7 @@ fn validate_request_time_transaction_context(
     }
     if let Some(identity_assertion) = context.identity_assertion.as_ref() {
         identity_assertion
-            .validate_at(unix_now())
+            .validate_at(clock.seconds().map_err(clock::rejection)?)
             .map_err(|message| {
                 oauth_token_error(StatusCode::BAD_REQUEST, "invalid_request", &message)
             })?;
@@ -1126,6 +1143,7 @@ fn decode_sender_dpop_proof(raw: &str) -> Result<DpopProof, SenderConstraintErro
 }
 
 fn verify_sender_dpop_proof(
+    clock: &RemoteClock,
     proof: &DpopProof,
     expected_binding_id: &str,
     expected_target: &str,
@@ -1133,55 +1151,63 @@ fn verify_sender_dpop_proof(
     expected_agent_key: &PublicKey,
     nonce_store: &DpopNonceStore,
     config: &DpopConfig,
-) -> Result<(), String> {
-    chio_kernel::dpop::validate_dpop_replay_identity(&proof.body.nonce, &proof.body.capability_id)
-        .map_err(|error| error.to_string())?;
-    if !is_supported_dpop_schema(&proof.body.schema) || proof.body.replay_authority.is_some() {
-        return Err(format!("unsupported DPoP schema `{}`", proof.body.schema));
-    }
-    if proof.body.agent_key != *expected_agent_key {
-        return Err("DPoP proof agent_key did not match the bound sender key".to_string());
-    }
-    let expected_action_hash = sha256_hex(HTTP_DPOP_ACTION_HASH_EMPTY);
-    if proof.body.capability_id != expected_binding_id
-        || proof.body.tool_server != expected_target
-        || proof.body.tool_name != expected_method
-        || proof.body.action_hash != expected_action_hash
-    {
-        return Err(
-            "DPoP proof did not match the expected binding id, target, method, or action hash"
-                .to_string(),
-        );
-    }
-    if proof.body.nonce.trim().is_empty() {
-        return Err("DPoP proof nonce must not be empty".to_string());
-    }
+) -> Result<(), SenderConstraintError> {
+    let now = clock.seconds()?;
+    let expires_at = proof
+        .body
+        .issued_at
+        .checked_add(config.proof_ttl_secs)
+        .ok_or(ClockError::Overflow)?;
+    let latest = now
+        .checked_add(config.max_clock_skew_secs)
+        .ok_or(ClockError::Overflow)?;
+    chio_kernel::dpop::validate_dpop_replay_identity(&proof.body.nonce, &proof.body.capability_id)?;
+    (|| -> Result<(), String> {
+        if !is_supported_dpop_schema(&proof.body.schema) || proof.body.replay_authority.is_some() {
+            return Err(format!("unsupported DPoP schema `{}`", proof.body.schema));
+        }
+        if proof.body.agent_key != *expected_agent_key {
+            return Err("DPoP proof agent_key did not match the bound sender key".to_string());
+        }
+        let expected_action_hash = sha256_hex(HTTP_DPOP_ACTION_HASH_EMPTY);
+        if proof.body.capability_id != expected_binding_id
+            || proof.body.tool_server != expected_target
+            || proof.body.tool_name != expected_method
+            || proof.body.action_hash != expected_action_hash
+        {
+            return Err(
+                "DPoP proof did not match the expected binding id, target, method, or action hash"
+                    .to_string(),
+            );
+        }
+        if proof.body.nonce.trim().is_empty() {
+            return Err("DPoP proof nonce must not be empty".to_string());
+        }
 
-    let now = unix_now();
-    if proof.body.issued_at > now.saturating_add(config.max_clock_skew_secs) {
-        return Err("DPoP proof is too far in the future".to_string());
-    }
-    if now > proof.body.issued_at.saturating_add(config.proof_ttl_secs) {
-        return Err("DPoP proof is stale".to_string());
-    }
+        if proof.body.issued_at > latest {
+            return Err("DPoP proof is too far in the future".to_string());
+        }
+        if now >= expires_at {
+            return Err("DPoP proof is stale".to_string());
+        }
 
-    let message = canonical_json_bytes(&proof.body)
-        .map_err(|error| format!("failed to canonicalize DPoP proof body: {error}"))?;
-    if !proof.body.agent_key.verify(&message, &proof.signature) {
-        return Err("DPoP proof signature is invalid".to_string());
-    }
-    match nonce_store.check_and_insert_through(
-        &proof.body.nonce,
-        expected_binding_id,
-        proof.body.issued_at.saturating_add(config.proof_ttl_secs),
-    ) {
+        let message = canonical_json_bytes(&proof.body)
+            .map_err(|error| format!("failed to canonicalize DPoP proof body: {error}"))?;
+        if !proof.body.agent_key.verify(&message, &proof.signature) {
+            return Err("DPoP proof signature is invalid".to_string());
+        }
+        Ok(())
+    })()
+    .map_err(SenderConstraintError::from)?;
+    match nonce_store.check_and_insert_through(&proof.body.nonce, expected_binding_id, expires_at) {
         Ok(true) => Ok(()),
-        Ok(false) => Err("DPoP proof nonce was already used".to_string()),
-        Err(error) => Err(format!("DPoP nonce verification failed: {error}")),
+        Ok(false) => Err("DPoP proof nonce was already used".to_string().into()),
+        Err(error) => Err(error.into()),
     }
 }
 
 fn validate_sender_constraint_runtime(
+    clock: &RemoteClock,
     sender_constraint: Option<&ChioSenderConstraintClaims>,
     headers: &HeaderMap,
     expected_binding_id: Option<&str>,
@@ -1193,27 +1219,7 @@ fn validate_sender_constraint_runtime(
     let Some(sender_constraint) = sender_constraint else {
         return Ok(());
     };
-    if let Some(sender_key) = sender_constraint.chio_sender_key.as_deref() {
-        let binding_id = expected_binding_id.ok_or_else(|| {
-            "sender-constrained token is missing the binding identifier".to_string()
-        })?;
-        let proof = headers
-            .get(DPOP_HEADER)
-            .and_then(|value| value.to_str().ok())
-            .ok_or_else(|| "missing DPoP proof header".to_string())?;
-        let proof = decode_sender_dpop_proof(proof)?;
-        let sender_key = PublicKey::from_hex(sender_key)
-            .map_err(|error| format!("token cnf.chioSenderKey is invalid: {error}"))?;
-        verify_sender_dpop_proof(
-            &proof,
-            binding_id,
-            expected_target,
-            expected_method,
-            &sender_key,
-            nonce_store,
-            config,
-        )?;
-    }
+
     if let Some(expected_thumbprint) = sender_constraint.mtls_thumbprint_sha256.as_deref() {
         let actual_thumbprint = headers
             .get(CHIO_MTLS_THUMBPRINT_HEADER)
@@ -1237,6 +1243,28 @@ fn validate_sender_constraint_runtime(
                     .into(),
             );
         }
+    }
+    if let Some(sender_key) = sender_constraint.chio_sender_key.as_deref() {
+        let binding_id = expected_binding_id.ok_or_else(|| {
+            "sender-constrained token is missing the binding identifier".to_string()
+        })?;
+        let proof = headers
+            .get(DPOP_HEADER)
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| "missing DPoP proof header".to_string())?;
+        let proof = decode_sender_dpop_proof(proof)?;
+        let sender_key = PublicKey::from_hex(sender_key)
+            .map_err(|error| format!("token cnf.chioSenderKey is invalid: {error}"))?;
+        verify_sender_dpop_proof(
+            clock,
+            &proof,
+            binding_id,
+            expected_target,
+            expected_method,
+            &sender_key,
+            nonce_store,
+            config,
+        )?;
     }
     Ok(())
 }

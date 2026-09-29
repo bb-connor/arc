@@ -105,6 +105,10 @@ pub struct AcpVerdict {
 /// Error type for capability check failures.
 #[derive(Debug, thiserror::Error)]
 pub enum CapabilityCheckError {
+    #[error("{0}")]
+    Bridge(#[from] chio_cross_protocol::error::BridgeError),
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     /// The token was malformed or could not be parsed.
     #[error("invalid token: {0}")]
     InvalidToken(String),

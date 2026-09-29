@@ -27,6 +27,7 @@ chio-mcp-adapter = { workspace = true }
 chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-secure-ipc = { workspace = true }
+chio-security-types = { workspace = true, features = ["std"] }
 chio-store-sqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -51,6 +52,5 @@ zeroize = { workspace = true }
 workspace = true
 
 [dev-dependencies]
-chio-security-types = { workspace = true }
 chio-siem = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"] }

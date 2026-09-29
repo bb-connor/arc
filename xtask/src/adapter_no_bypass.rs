@@ -61,7 +61,6 @@ struct CallFact {
 
 #[derive(Clone, Debug)]
 struct FunctionFacts {
-    compatibility_surface: bool,
     statements: Vec<String>,
     calls: Vec<CallFact>,
     paths: BTreeSet<String>,
@@ -82,7 +81,6 @@ struct ExceptionRule {
     kind: DangerousKind,
     receiver: Option<&'static str>,
     class: &'static str,
-    compatibility_only: bool,
 }
 
 const EXCEPTION_RULES: &[ExceptionRule] = &[
@@ -114,7 +112,6 @@ const EXCEPTION_RULES: &[ExceptionRule] = &[
         kind: DangerousKind::CommandNew,
         receiver: None,
         class: "ACP agent process lifecycle",
-        compatibility_only: false,
     },
     ExceptionRule {
         path: "crates/protocol/chio-acp-proxy/src/transport.rs",
@@ -122,23 +119,13 @@ const EXCEPTION_RULES: &[ExceptionRule] = &[
         kind: DangerousKind::Spawn,
         receiver: Some("cmd"),
         class: "ACP agent process lifecycle",
-        compatibility_only: false,
     },
     ExceptionRule {
         path: "crates/protocol/chio-acp-edge/src/edge.rs",
-        function: "ChioAcpEdge::invoke_passthrough",
-        kind: DangerousKind::Invoke,
-        receiver: Some("server"),
-        class: "ACP compatibility-only passthrough",
-        compatibility_only: true,
-    },
-    ExceptionRule {
-        path: "crates/protocol/chio-acp-edge/src/edge.rs",
-        function: "ChioAcpEdge::handle_jsonrpc",
+        function: "ChioAcpEdge::handle_jsonrpc_value",
         kind: DangerousKind::Invoke,
         receiver: Some("self"),
         class: "ACP authoritative dispatch into the kernel-backed invoke method",
-        compatibility_only: false,
     },
 ];
 
@@ -153,7 +140,6 @@ const fn mcp_thread_rule(
         kind: DangerousKind::Spawn,
         receiver: Some(receiver),
         class: "MCP admitted-process supervision thread",
-        compatibility_only: false,
     }
 }
 
@@ -393,7 +379,7 @@ const CALL_CONTRACTS: &[CallContract] = &[
     },
     CallContract {
         path: "crates/protocol/chio-acp-edge/src/edge.rs",
-        function: "ChioAcpEdge::handle_jsonrpc",
+        function: "ChioAcpEdge::handle_jsonrpc_value",
         target: "validate_execution_context",
         minimum: 2,
     },
@@ -779,15 +765,12 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
 }
 
 impl FunctionVisitor {
-    fn record_function(&mut self, name: String, attrs: &[Attribute], block: &syn::Block) {
+    fn record_function(&mut self, name: String, _attrs: &[Attribute], block: &syn::Block) {
         let mut body = BodyVisitor::default();
         body.visit_block(block);
         self.functions.push((
             name,
             FunctionFacts {
-                compatibility_surface: attrs.iter().any(|attribute| {
-                    normalize_tokens(attribute).contains("feature=\"compatibility-surface\"")
-                }),
                 statements: block.stmts.iter().map(normalize_tokens).collect(),
                 calls: body.calls,
                 paths: body.paths,
@@ -918,13 +901,6 @@ fn validate_dangerous_calls(
                     ));
                 }
                 let index = matching[0];
-                let rule = EXCEPTION_RULES[index];
-                if rule.compatibility_only && !facts.compatibility_surface {
-                    return Err(format!(
-                        "{} exception lacks compatibility-surface cfg in {path}::{function}",
-                        rule.class
-                    ));
-                }
                 observed[index] += 1;
             }
         }
@@ -1230,6 +1206,20 @@ mod tests {
             }
         "#;
         assert!(validate_fixture("crates/protocol/chio-a2a-edge/src/edge.rs", source).is_err());
+    }
+
+    #[test]
+    fn removed_acp_bypass_is_rejected_even_with_compatibility_cfg() {
+        let source = r#"
+            struct ChioAcpEdge;
+            impl ChioAcpEdge {
+                #[cfg(any(test, feature = "compatibility-surface"))]
+                fn invoke_passthrough(&self, server: &dyn Server) {
+                    let _result = server.invoke("tool");
+                }
+            }
+        "#;
+        assert!(validate_fixture("crates/protocol/chio-acp-edge/src/edge.rs", source).is_err());
     }
 
     #[test]

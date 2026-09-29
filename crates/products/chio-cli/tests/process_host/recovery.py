@@ -66,12 +66,13 @@ def exercise(binary, directory):
     from chio_process import ProcessClient, WorkerError
     from chio_process.launch import demo_python, provision_native_demo
 
+    (directory / "tool-data").mkdir(exist_ok=True)
     state = directory / "state"
     sockets = directory / "sockets"
     sockets.mkdir(mode=0o700)
     descriptors = directory / "descriptors"
     descriptors.mkdir(mode=0o700)
-    publications = directory / "publications.jsonl"
+    publications = directory / "tool-data" / "publications.jsonl"
     publications.with_suffix(".source.txt").write_text("A useful report source.")
     policy = directory / "policy.yaml"
     original_policy = """kernel:
@@ -106,6 +107,8 @@ capabilities:
                 ],
                 directory / "launch-reports",
                 directory,
+                read_paths=[directory / "tool-data"],
+                write_paths=[directory / "tool-data"],
             )
         ],
         "limits": {"max_calls": 10, "max_processes": 4, "max_depth": 2},

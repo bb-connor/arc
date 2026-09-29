@@ -45,7 +45,7 @@ def corruption(config, directory, result):
         )
     finally:
         path.write_bytes(original)
-    with sqlite3.connect(directory / "publications.db") as db:
+    with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
         original_report = db.execute("SELECT report FROM reports").fetchone()[0]
         db.execute("UPDATE reports SET report = 'Forged report'")
     try:
@@ -54,7 +54,7 @@ def corruption(config, directory, result):
             "signed invocation",
         )
     finally:
-        with sqlite3.connect(directory / "publications.db") as db:
+        with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
             db.execute("UPDATE reports SET report = ?", (original_report,))
     snapshot = directory / "snapshot.json"
     original = snapshot.read_bytes()
@@ -142,7 +142,7 @@ def scopes(config, directory, result):
         directory / "kernel.pub",
     )
     assert json.loads(verified.stdout)["receipts_verified"] == len(probes)
-    with sqlite3.connect(directory / "publications.db") as db:
+    with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
         assert db.execute("SELECT count(*) FROM reports").fetchone()[0] == 1
     return credentials
 

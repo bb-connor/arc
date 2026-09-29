@@ -36,7 +36,7 @@ def exercise_pressure(binary, destination, temporary, consumer):
             result = json.loads(
                 (directory / ("result.json" if success else "failure-3.json")).read_text()
             )
-            with sqlite3.connect(directory / "publications.db") as db:
+            with sqlite3.connect(directory / "tool-data" / "publications.db") as db:
                 exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='reads'").fetchone()
                 reads = (
                     db.execute("SELECT file_index FROM reads ORDER BY id").fetchall()

@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufReader, Write};
 use std::process::{Child, Command, Stdio};
 
 /// Manages the stdio transport to a spawned ACP agent subprocess.
@@ -7,7 +7,7 @@ use std::process::{Child, Command, Stdio};
 /// process's stdin/stdout.
 pub struct AcpTransport {
     child: Child,
-    reader: BufReader<std::process::ChildStdout>,
+    reader: AcpFrameReader<BufReader<std::process::ChildStdout>>,
 }
 
 impl AcpTransport {
@@ -28,15 +28,13 @@ impl AcpTransport {
             cmd.env(key, value);
         }
 
-        let mut child = cmd.spawn().map_err(|e| {
-            AcpProxyError::Transport(format!("failed to spawn agent process '{command}': {e}"))
-        })?;
+        let mut child = cmd.spawn()?;
 
         let stdout = child.stdout.take().ok_or_else(|| {
             AcpProxyError::Transport("agent process stdout not captured".to_string())
         })?;
 
-        let reader = BufReader::new(stdout);
+        let reader = AcpFrameReader::new(BufReader::new(stdout));
 
         Ok(Self { child, reader })
     }
@@ -47,19 +45,10 @@ impl AcpTransport {
             AcpProxyError::Transport("agent process stdin not available".to_string())
         })?;
 
-        let serialized = serde_json::to_string(message).map_err(|e| {
-            AcpProxyError::Protocol(format!("failed to serialize message: {e}"))
-        })?;
-
-        stdin.write_all(serialized.as_bytes()).map_err(|e| {
-            AcpProxyError::Transport(format!("failed to write to agent stdin: {e}"))
-        })?;
-        stdin.write_all(b"\n").map_err(|e| {
-            AcpProxyError::Transport(format!("failed to write newline to agent stdin: {e}"))
-        })?;
-        stdin.flush().map_err(|e| {
-            AcpProxyError::Transport(format!("failed to flush agent stdin: {e}"))
-        })?;
+        let serialized = input::encode(message)?;
+        stdin.write_all(&serialized)?;
+        stdin.write_all(b"\n")?;
+        stdin.flush()?;
 
         Ok(())
     }
@@ -67,40 +56,18 @@ impl AcpTransport {
     /// Read the next JSON-RPC message from the agent's stdout.
     ///
     /// Returns `Ok(None)` when the agent has closed its stdout (EOF).
-    pub fn recv(&mut self) -> Result<Option<serde_json::Value>, AcpProxyError> {
-        let mut line = String::new();
-        let bytes_read = self.reader.read_line(&mut line).map_err(|e| {
-            AcpProxyError::Transport(format!("failed to read from agent stdout: {e}"))
-        })?;
-
-        if bytes_read == 0 {
-            return Ok(None);
-        }
-
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            return Ok(None);
-        }
-
-        let value: serde_json::Value = serde_json::from_str(trimmed).map_err(|e| {
-            AcpProxyError::Protocol(format!("invalid JSON from agent: {e}"))
-        })?;
-
-        Ok(Some(value))
+    pub fn recv(&mut self) -> Result<Option<AcpMessage>, AcpProxyError> {
+        self.reader.recv()
     }
 
     /// Attempt to kill the agent subprocess.
     pub fn kill(&mut self) -> Result<(), AcpProxyError> {
-        self.child.kill().map_err(|e| {
-            AcpProxyError::Transport(format!("failed to kill agent process: {e}"))
-        })
+        self.child.kill().map_err(AcpProxyError::from)
     }
 
     /// Wait for the agent subprocess to exit and return its status code.
     pub fn wait(&mut self) -> Result<Option<i32>, AcpProxyError> {
-        let status = self.child.wait().map_err(|e| {
-            AcpProxyError::Transport(format!("failed to wait on agent process: {e}"))
-        })?;
+        let status = self.child.wait()?;
         Ok(status.code())
     }
 }

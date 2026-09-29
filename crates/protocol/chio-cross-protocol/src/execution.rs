@@ -38,7 +38,7 @@ pub struct CrossProtocolExecutionRequest {
     pub supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
     pub model_metadata: Option<ModelMetadata>,
     /// Exact authenticated session supplied by the trusted protocol host.
-    /// Sessionless compatibility callers leave this unset.
+    /// Sessionless protocol callers leave this unset.
     pub authenticated_session_id: Option<SessionId>,
     /// Authoritative identity and isolation state supplied by the trusted
     /// protocol host. Wire request fields are never used to construct it.

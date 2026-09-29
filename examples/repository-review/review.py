@@ -15,9 +15,8 @@ import time
 import uuid
 from pathlib import Path
 
-from chio_process.launch import demo_python, provision_native_demo
-
 import native
+from chio_process.launch import demo_python, provision_native_demo
 from snapshot import capture, digest, encoded, load
 
 HERE = Path(__file__).resolve().parent
@@ -63,6 +62,7 @@ def prepare(args):
     directory.mkdir(mode=0o700, parents=False, exist_ok=False)
     snapshot = capture(args.repo, args.base, args.head)
     snapshot_hash = digest(snapshot)
+    (directory / "tool-data").mkdir(exist_ok=True)
     write(directory / "snapshot.json", snapshot)
     for child in ("sockets", "connections", *ROLES):
         (directory / child).mkdir(mode=0o700)
@@ -125,10 +125,17 @@ capabilities:
                         "--snapshot-hash",
                         snapshot_hash,
                         "--database",
-                        str(directory / "publications.db"),
+                        str(directory / "tool-data" / "publications.db"),
                     ],
                     directory / "launch-repo",
                     directory,
+                    read_paths=[
+                        HERE / "tools.py",
+                        HERE / "snapshot.py",
+                        directory / "snapshot.json",
+                        directory / "tool-data",
+                    ],
+                    write_paths=[directory / "tool-data"],
                 )
             ],
             "limits": {"max_processes": 5, "max_depth": 2, "max_calls": args.max_calls},
@@ -372,7 +379,7 @@ def run(args):
             raise RuntimeError("worker completion identity mismatch")
         published = json.loads(results["publisher"]["text"])["structuredContent"]
         with sqlite3.connect(
-            f"file:{directory / 'publications.db'}?mode=ro", uri=True
+            f"file:{directory / 'tool-data' / 'publications.db'}?mode=ro", uri=True
         ) as db:
             stored = db.execute(
                 "SELECT report FROM reports WHERE id=?", (published["report_id"],)

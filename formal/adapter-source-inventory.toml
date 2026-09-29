@@ -44,14 +44,14 @@ contract_sources = [
 id = "C01"
 path = "crates/platform/chio-control-plane/src/lib.rs"
 symbol = "build_kernel"
-target = "build_kernel_components"
+target = "build_kernel_with_clock"
 references = 1
 
 [[constructor_sites]]
 id = "C02"
 path = "crates/platform/chio-control-plane/src/lib.rs"
 symbol = "build_kernel_components"
-target = "ChioKernel::new"
+target = "ChioKernel::new_with_clock"
 references = 1
 
 [[constructor_sites]]
@@ -65,14 +65,14 @@ references = 1
 id = "C04"
 path = "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs"
 symbol = "RemoteSessionFactory::spawn_session"
-target = "build_kernel"
+target = "chio_control_plane::build_kernel_with_clock"
 references = 1
 
 [[constructor_sites]]
 id = "C05"
 path = "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs"
 symbol = "RemoteSessionFactory::restore_session"
-target = "build_kernel"
+target = "chio_control_plane::build_kernel_with_clock"
 references = 1
 
 [[constructor_sites]]
@@ -832,4 +832,11 @@ id = "D091"
 path = "examples/rust-runtime-consumer/src/main.rs"
 symbol = "recover"
 target = ".evaluate_tool_call_blocking"
+references = 1
+
+[[constructor_sites]]
+id = "C32"
+path = "crates/platform/chio-control-plane/src/lib.rs"
+symbol = "build_kernel_with_clock"
+target = "build_kernel_components"
 references = 1

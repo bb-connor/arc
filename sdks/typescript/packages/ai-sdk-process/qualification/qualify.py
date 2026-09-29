@@ -55,7 +55,7 @@ def snapshot_executable(source, output):
 
 
 def count(directory):
-    path = directory / "publications.db"
+    path = directory / "tool-data" / "publications.db"
     if not path.exists():
         return 0
     with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as db:
@@ -64,11 +64,12 @@ def count(directory):
 
 def settings(directory, consumer, mode):
     directory.mkdir(mode=0o700)
+    (directory / "tool-data").mkdir(mode=0o700)
     return {
         "directory": str(directory),
         "mode": mode,
         "streaming": mode in ("host-death", "denied"),
-        "database": str(directory / "publications.db"),
+        "database": str(directory / "tool-data" / "publications.db"),
         "python": sys.executable,
         "server": str(consumer / "server.py"),
     }
@@ -104,7 +105,13 @@ capabilities:
             "policy": "policy.yaml",
             "servers": [
                 provision_native_demo(
-                    binary, "reports", server, directory / "launch-reports", directory
+                    binary,
+                    "reports",
+                    server,
+                    directory / "launch-reports",
+                    directory,
+                    read_paths=[consumer / "server.py", directory / "tool-data"],
+                    write_paths=[directory / "tool-data"],
                 )
             ],
             "limits": {

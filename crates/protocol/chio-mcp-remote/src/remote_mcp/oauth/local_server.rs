@@ -31,6 +31,7 @@ impl LocalAuthorizationServer {
         request: &AuthorizationRequest,
     ) -> Result<String, Response> {
         let resource = validate_authorization_request(
+            &self.clock,
             request,
             &self.supported_scopes,
             &self.default_audience,
@@ -38,8 +39,10 @@ impl LocalAuthorizationServer {
         let scopes = resolve_requested_scopes(request.scope.as_deref(), &self.supported_scopes)?;
         let authorization_details =
             parse_request_time_authorization_details(request.authorization_details.as_deref())?;
-        let transaction_context =
-            parse_request_time_transaction_context(request.chio_transaction_context.as_deref())?;
+        let transaction_context = parse_request_time_transaction_context(
+            &self.clock,
+            request.chio_transaction_context.as_deref(),
+        )?;
         validate_request_time_transaction_context_binding(
             transaction_context.as_ref(),
             &request.client_id,
@@ -145,14 +148,17 @@ impl LocalAuthorizationServer {
             chio_sender_attestation_sha256: form.chio_sender_attestation_sha256.clone(),
         };
         let resource = validate_authorization_request(
+            &self.clock,
             &request,
             &self.supported_scopes,
             &self.default_audience,
         )?;
         let authorization_details =
             parse_request_time_authorization_details(form.authorization_details.as_deref())?;
-        let transaction_context =
-            parse_request_time_transaction_context(form.chio_transaction_context.as_deref())?;
+        let transaction_context = parse_request_time_transaction_context(
+            &self.clock,
+            form.chio_transaction_context.as_deref(),
+        )?;
         validate_request_time_transaction_context_binding(
             transaction_context.as_ref(),
             &form.client_id,
@@ -175,7 +181,19 @@ impl LocalAuthorizationServer {
 
         let scopes = resolve_requested_scopes(form.scope.as_deref(), &self.supported_scopes)?;
         let code = generate_authorization_code();
+        let mut codes = self
+            .codes
+            .lock()
+            .map_err(|_| clock::rejection(ClockError::Unavailable))?;
+        let reading = self.clock.read().map_err(clock::rejection)?;
+        let timeout_ms = self
+            .code_ttl_secs
+            .checked_mul(1000)
+            .ok_or_else(|| clock::rejection(ClockError::Overflow))?;
+        let deadline =
+            AuthorityDeadline::for_timeout_ms(reading, timeout_ms).map_err(clock::rejection)?;
         let grant = AuthorizationCodeGrant {
+            deadline,
             client_id: form.client_id.clone(),
             redirect_uri: form.redirect_uri.clone(),
             resource: resource.clone(),
@@ -183,19 +201,35 @@ impl LocalAuthorizationServer {
             subject: self.subject.clone(),
             code_challenge: form.code_challenge,
             code_challenge_method: form.code_challenge_method,
-            expires_at: unix_now().saturating_add(self.code_ttl_secs),
+            expires_at: reading
+                .unix_millis()
+                .as_secs()
+                .checked_add(self.code_ttl_secs)
+                .ok_or_else(|| clock::rejection(ClockError::Overflow))?,
             authorization_details,
             transaction_context,
             sender_constraint,
         };
-        match self.codes.lock() {
-            Ok(mut guard) => {
-                guard.insert(code.clone(), grant);
-            }
-            Err(poisoned) => {
-                poisoned.into_inner().insert(code.clone(), grant);
+        let mut expired = Vec::new();
+        for (id, retained) in codes.iter_mut() {
+            match retained.deadline.remaining(reading) {
+                Err(ClockError::Expired) => expired.push(id.clone()),
+                Err(error) => return Err(clock::rejection(error)),
+                Ok(_) => {}
             }
         }
+        for id in expired {
+            codes.remove(&id);
+        }
+        if codes.len() >= 4096 {
+            return Err(oauth_token_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "temporarily_unavailable",
+                "authorization grant capacity exhausted",
+            ));
+        }
+        codes.insert(code.clone(), grant);
+        drop(codes);
 
         let mut redirect_uri = Url::parse(&form.redirect_uri)
             .map_err(|_| plain_http_error(StatusCode::BAD_REQUEST, "invalid redirect_uri"))?;
@@ -257,11 +291,11 @@ impl LocalAuthorizationServer {
             )
         })?;
 
-        let grant = match self.codes.lock() {
-            Ok(mut guard) => guard.remove(code),
-            Err(poisoned) => poisoned.into_inner().remove(code),
-        }
-        .ok_or_else(|| {
+        let mut codes = self
+            .codes
+            .lock()
+            .map_err(|_| clock::rejection(ClockError::Unavailable))?;
+        let mut grant = codes.get(code).cloned().ok_or_else(|| {
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
                 "invalid_grant",
@@ -269,7 +303,13 @@ impl LocalAuthorizationServer {
             )
         })?;
 
-        if unix_now() >= grant.expires_at {
+        let reading = self.clock.read().map_err(clock::rejection)?;
+        let expired = match grant.deadline.remaining(reading) {
+            Ok(_) => false,
+            Err(ClockError::Expired) => true,
+            Err(error) => return Err(clock::rejection(error)),
+        };
+        if reading.unix_millis().as_secs() >= grant.expires_at || expired {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
                 "invalid_grant",
@@ -305,7 +345,18 @@ impl LocalAuthorizationServer {
                 "resource parameter mismatch",
             ));
         }
+        let response = self.issue_token_response(TokenResponseInput {
+            subject: grant.subject.clone(),
+            client_id: grant.client_id.clone(),
+            resource,
+            scopes: grant.scopes.clone(),
+            authorization_details: grant.authorization_details.clone(),
+            transaction_context: grant.transaction_context.clone(),
+            sender_constraint: grant.sender_constraint.clone(),
+            grant_type: Some("authorization_code".to_string()),
+        })?;
         validate_sender_constraint_runtime(
+            &self.clock,
             grant.sender_constraint.as_ref(),
             headers,
             Some(code),
@@ -321,16 +372,8 @@ impl LocalAuthorizationServer {
             response
         })?;
 
-        Ok(self.issue_token_response(TokenResponseInput {
-            subject: grant.subject,
-            client_id: grant.client_id,
-            resource,
-            scopes: grant.scopes,
-            authorization_details: grant.authorization_details,
-            transaction_context: grant.transaction_context,
-            sender_constraint: grant.sender_constraint,
-            grant_type: Some("authorization_code".to_string()),
-        }))
+        codes.remove(code);
+        Ok(response)
     }
 
     pub(super) fn exchange_subject_token(
@@ -370,21 +413,6 @@ impl LocalAuthorizationServer {
             ));
         }
         let (claims, _) = self.validate_subject_token(subject_token)?;
-        validate_sender_constraint_runtime(
-            claims.cnf.as_ref(),
-            headers,
-            claims.jti.as_deref(),
-            &self.token_endpoint_url(),
-            "POST",
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
-        )
-        .map_err(|error| {
-            let mut response =
-                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &error.to_string());
-            response.extensions_mut().insert(Arc::new(error));
-            response
-        })?;
         let subject = claims.sub.clone().unwrap_or_else(|| self.subject.clone());
         let client_id = claims
             .client_id
@@ -400,7 +428,10 @@ impl LocalAuthorizationServer {
             None => None,
         };
         let transaction_context = match claims.chio_transaction_context {
-            Some(value) => Some(parse_request_time_transaction_context_from_value(value)?),
+            Some(value) => Some(parse_request_time_transaction_context_from_value(
+                &self.clock,
+                value,
+            )?),
             None => None,
         };
         validate_request_time_transaction_context_binding(
@@ -409,16 +440,33 @@ impl LocalAuthorizationServer {
             None,
         )?;
 
-        Ok(self.issue_token_response(TokenResponseInput {
+        let response = self.issue_token_response(TokenResponseInput {
             subject,
             client_id,
             resource,
             scopes,
             authorization_details,
             transaction_context,
-            sender_constraint: claims.cnf,
+            sender_constraint: claims.cnf.clone(),
             grant_type: Some("urn:ietf:params:oauth:grant-type:token-exchange".to_string()),
-        }))
+        })?;
+        validate_sender_constraint_runtime(
+            &self.clock,
+            claims.cnf.as_ref(),
+            headers,
+            claims.jti.as_deref(),
+            &self.token_endpoint_url(),
+            "POST",
+            &self.sender_dpop_nonce_store,
+            &self.sender_dpop_config,
+        )
+        .map_err(|error| {
+            let mut response =
+                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &error.to_string());
+            response.extensions_mut().insert(Arc::new(error));
+            response
+        })?;
+        Ok(response)
     }
 
     fn validate_subject_token(&self, token: &str) -> Result<(JwtClaims, String), Response> {
@@ -445,7 +493,7 @@ impl LocalAuthorizationServer {
             ));
         }
         if let Some(exp) = claims.exp {
-            if unix_now() >= exp {
+            if self.clock.seconds().map_err(clock::rejection)? >= exp {
                 return Err(oauth_token_error(
                     StatusCode::BAD_REQUEST,
                     "invalid_grant",
@@ -457,7 +505,7 @@ impl LocalAuthorizationServer {
             let _ = parse_request_time_authorization_details_from_value(value)?;
         }
         if let Some(value) = claims.chio_transaction_context.clone() {
-            let context = parse_request_time_transaction_context_from_value(value)?;
+            let context = parse_request_time_transaction_context_from_value(&self.clock, value)?;
             if context.identity_assertion.is_some() {
                 let expected_client_id = claims.client_id.as_deref().ok_or_else(|| {
                     oauth_token_error(
@@ -476,7 +524,7 @@ impl LocalAuthorizationServer {
         Ok((claims, signed_input))
     }
 
-    fn issue_token_response(&self, input: TokenResponseInput) -> Value {
+    fn issue_token_response(&self, input: TokenResponseInput) -> Result<Value, Response> {
         let access_token = self.sign_access_token(SignedAccessTokenInput {
             subject: &input.subject,
             client_id: &input.client_id,
@@ -485,23 +533,23 @@ impl LocalAuthorizationServer {
             authorization_details: input.authorization_details.as_deref(),
             transaction_context: input.transaction_context.as_ref(),
             sender_constraint: input.sender_constraint.as_ref(),
-        });
-        json!({
+        })?;
+        Ok(json!({
             "access_token": access_token,
             "token_type": "Bearer",
             "expires_in": self.access_token_ttl_secs,
             "scope": input.scopes.join(" "),
             "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
             "grant_type": input.grant_type,
-        })
+        }))
     }
 
-    fn sign_access_token(&self, input: SignedAccessTokenInput<'_>) -> String {
-        let now = unix_now();
-        let issued_at_nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
+    fn sign_access_token(&self, input: SignedAccessTokenInput<'_>) -> Result<String, Response> {
+        let now = self.clock.seconds().map_err(clock::rejection)?;
+        let expires_at = now
+            .checked_add(self.access_token_ttl_secs)
+            .filter(|expiry| *expiry > now)
+            .ok_or_else(|| clock::rejection(ClockError::Overflow))?;
         let mut claims = json!({
             "iss": self.issuer,
             "sub": input.subject,
@@ -510,17 +558,8 @@ impl LocalAuthorizationServer {
             "client_id": input.client_id,
             "resource": input.resource,
             "iat": now,
-            "exp": now.saturating_add(self.access_token_ttl_secs),
-            "jti": format!(
-                "atk-{}",
-                sha256_hex(
-                    format!(
-                        "{issued_at_nanos}:{}:{}:{}",
-                        input.subject, input.client_id, input.resource
-                    )
-                        .as_bytes()
-                )
-            ),
+            "exp": expires_at,
+            "jti": generate_authorization_code(),
         });
         if let Some(details) = input.authorization_details {
             claims[CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM] = json!(details);

@@ -3,17 +3,16 @@ use std::path::Path as FsPath;
 #[cfg(target_os = "linux")]
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::token::CapabilityToken;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use tracing::warn;
 
 use super::{
-    decode_json, session_now_millis, validate_resume_record_integrity_with_keyring,
-    validate_terminal_fence_integrity, validate_terminal_tombstone_integrity, CliError,
-    RemoteSessionDiagnosticRecord, RemoteSessionHmacKeyring, RemoteSessionResumeRecord,
-    RemoteSessionTerminalFence, RemoteSessionTombstoneRecord, MAX_SESSION_JSON_BYTES,
+    decode_json, validate_resume_record_integrity_with_keyring, validate_terminal_fence_integrity,
+    validate_terminal_tombstone_integrity, CliError, RemoteSessionDiagnosticRecord,
+    RemoteSessionHmacKeyring, RemoteSessionResumeRecord, RemoteSessionTerminalFence,
+    RemoteSessionTombstoneRecord, MAX_SESSION_JSON_BYTES,
 };
 
 pub(super) const SESSION_ACTIVE_TABLE: &str = "remote_active_sessions";
@@ -705,8 +704,9 @@ pub(super) fn open_session_state_db(path: &FsPath) -> Result<Connection, CliErro
 pub(super) fn load_active_session_records(
     path: &FsPath,
     keyring: &RemoteSessionHmacKeyring,
+    now: u64,
 ) -> Result<LoadedActiveSessionRecords, CliError> {
-    load_active_session_records_at(path, keyring, session_now_millis())
+    load_active_session_records_at(path, keyring, now)
 }
 
 fn load_active_session_records_at(
@@ -791,9 +791,10 @@ fn load_active_session_records_at(
 pub(super) fn load_terminal_session_records(
     path: &FsPath,
     keyring: &RemoteSessionHmacKeyring,
+    now: u64,
 ) -> Result<HashMap<String, Arc<RemoteSessionDiagnosticRecord>>, CliError> {
     let conn = open_session_state_db(path)?;
-    let terminal_state = load_terminal_state(&conn, keyring, session_now_millis())?;
+    let terminal_state = load_terminal_state(&conn, keyring, now)?;
     let mut records = HashMap::new();
     for (session_id, tombstone) in terminal_state.tombstones {
         let Some(fence) = terminal_state.fences.get(&session_id) else {
@@ -917,10 +918,7 @@ fn parse_terminal_fence(
     Ok(fence)
 }
 
-pub(super) fn stored_capabilities_are_current(capabilities: &[CapabilityToken]) -> bool {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_secs());
+pub(super) fn stored_capabilities_are_current(capabilities: &[CapabilityToken], now: u64) -> bool {
     capabilities
         .iter()
         .all(|capability| capability.expires_at > now)
@@ -939,8 +937,8 @@ pub(super) fn prepare_terminal_session_transition(
     path: &FsPath,
     fence: &RemoteSessionTerminalFence,
     keyring: &RemoteSessionHmacKeyring,
+    now: u64,
 ) -> Result<(), CliError> {
-    let now = session_now_millis();
     validate_terminal_fence_integrity(keyring, fence, now)?;
 
     let mut conn = open_session_state_db(path)?;
@@ -1044,8 +1042,8 @@ pub(super) fn finalize_terminal_session_transition(
     path: &FsPath,
     tombstone: &RemoteSessionTombstoneRecord,
     keyring: &RemoteSessionHmacKeyring,
+    now: u64,
 ) -> Result<(), CliError> {
-    let now = session_now_millis();
     validate_terminal_tombstone_integrity(keyring, tombstone, now)?;
     let mut conn = open_session_state_db(path)?;
     let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -1143,17 +1141,18 @@ pub(super) fn persist_terminal_session_transition(
     tombstone: &RemoteSessionTombstoneRecord,
     fence: &RemoteSessionTerminalFence,
     keyring: &RemoteSessionHmacKeyring,
+    now: u64,
 ) -> Result<(), CliError> {
-    prepare_terminal_session_transition(path, fence, keyring)?;
-    finalize_terminal_session_transition(path, tombstone, keyring)
+    prepare_terminal_session_transition(path, fence, keyring, now)?;
+    finalize_terminal_session_transition(path, tombstone, keyring, now)
 }
 
 pub(super) fn persist_active_session_record(
     path: &FsPath,
     record: &RemoteSessionResumeRecord,
     keyring: &RemoteSessionHmacKeyring,
+    now: u64,
 ) -> Result<(), CliError> {
-    let now = session_now_millis();
     validate_resume_record_integrity_with_keyring(keyring, record, now)?;
     let mut conn = open_session_state_db(path)?;
     let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;

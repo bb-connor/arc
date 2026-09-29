@@ -51,7 +51,8 @@ class AcceptanceTests(unittest.TestCase):
     def test_correct_scripted_output_does_not_satisfy_live_baseline(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            db = directory / "resource.db"
+            (directory / "tool-data").mkdir()
+            db = directory / "tool-data" / "resource.db"
             store.initialize(db, json.loads((HERE / "seed.json").read_text()))
             store.execute(
                 db,

@@ -158,3 +158,8 @@ workspace = true
 name = "enforced_discovery"
 path = "tests/enforced_discovery.rs"
 required-features = ["real-linux-enforcement"]
+
+[[test]]
+name = "process_host_native"
+path = "tests/process_host_native.rs"
+required-features = ["real-linux-enforcement"]

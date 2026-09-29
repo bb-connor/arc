@@ -62,6 +62,10 @@ where
 #[derive(thiserror::Error)]
 pub(crate) enum SenderConstraintError {
     #[error("{0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
+    #[error("urn:chio:error:transport:dpop-verification-failed")]
+    Replay(#[from] chio_kernel::KernelError),
+    #[error("{0}")]
     Json(#[from] UntrustedJsonError),
     #[error("urn:chio:error:transport:invalid-request-shape")]
     Encoding(#[from] base64::DecodeError),
