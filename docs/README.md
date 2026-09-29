@@ -128,6 +128,13 @@ The primary live release documents. Auditors and operators start here.
 - [Operator runbook index](operator-runbook/index.md) - tenant-shaped operating rules layered on the bounded release runbook
 - Topics: [onboarding](operator-runbook/onboarding.md), [incidents](operator-runbook/incidents.md), [rotations](operator-runbook/rotations.md), [quota](operator-runbook/quota.md), [SLO](operator-runbook/slo.md), [topology](operator-runbook/topology.md), [PagerDuty](operator-runbook/pagerduty.md), [PHI policy](operator-runbook/phi-policy.md), [bounded profile](operator-runbook/bounded-profile.md)
 
+## Research
+
+- [NVIDIA stack research (2026-09-28)](research/nvidia/README.md) - how Chio integrates with, evolves alongside, competes with, and builds on NVIDIA's Open Agent Safety Platform (OpenShell, Sentry, DOCA), the Secure Agent Workspace design, and ODIS; nine documents plus the artifacts of a local OpenShell v0.1.2 test
+- [Iroh federation transport adapter spec](research/iroh/ADAPTER-SPEC.md) - build-validated implementation plan governed by ADR-0014
+- [Radicle evaluation](research/radicle/) - evaluation notes behind ADR-0018
+- [Agent cognition market](research/agent-cognition-market.md) - research note behind the cognition market design
+
 ## Products built on Chio
 
 - [Chio-Wall documentation suite](chio-wall/README.md) - companion product recording tool-boundary control evidence for information-domain separation
