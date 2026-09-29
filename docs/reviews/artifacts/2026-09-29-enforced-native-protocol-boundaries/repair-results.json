@@ -1,0 +1,53 @@
+[
+  {
+    "check": "adapter-final-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "adapter_no_bypass"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "adapter-final-gate",
+    "command": [
+      "cargo",
+      "xtask",
+      "check",
+      "adapter-no-bypass"
+    ],
+    "exit_code": 1
+  },
+  {
+    "check": "preflight-final-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "--test",
+      "security_preflight"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "shadow-discovery-final-test",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "--test",
+      "reference_runtime_provision",
+      "shadow_discovery_refuses_before_executing_the_target",
+      "--",
+      "--exact"
+    ],
+    "exit_code": 0
+  }
+]

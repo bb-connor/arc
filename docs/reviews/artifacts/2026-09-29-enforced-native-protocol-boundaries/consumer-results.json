@@ -1,0 +1,104 @@
+[
+  {
+    "check": "owner-final-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-mcp-adapter",
+      "-p",
+      "chio-mcp-remote",
+      "-p",
+      "chio-hosted-mcp",
+      "-p",
+      "chio-a2a-edge",
+      "--lib",
+      "--tests"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "cli-cage-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "--bin",
+      "chio",
+      "cage_policy"
+    ],
+    "exit_code": 101
+  },
+  {
+    "check": "cli-provision-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "--test",
+      "init",
+      "--test",
+      "native_mcp_demo_provision",
+      "--test",
+      "reference_runtime_provision",
+      "--test",
+      "security_preflight"
+    ],
+    "exit_code": 101
+  },
+  {
+    "check": "control-response-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-control-plane",
+      "--lib",
+      "security::active_response"
+    ],
+    "exit_code": 101
+  },
+  {
+    "check": "sqlite-budget-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-store-sqlite",
+      "--lib",
+      "budget_store::tests"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "adapter-gate",
+    "command": [
+      "cargo",
+      "xtask",
+      "check",
+      "adapter-no-bypass"
+    ],
+    "exit_code": 1
+  },
+  {
+    "check": "adapter-gate-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "adapter_no_bypass"
+    ],
+    "exit_code": 0
+  }
+]

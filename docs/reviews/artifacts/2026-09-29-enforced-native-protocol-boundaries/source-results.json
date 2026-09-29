@@ -1,0 +1,26 @@
+[
+  {
+    "check": "trust-gate",
+    "exit_code": 0
+  },
+  {
+    "check": "trust-gate-tests",
+    "exit_code": 0
+  },
+  {
+    "check": "clock-gate",
+    "exit_code": 0
+  },
+  {
+    "check": "negative-gate",
+    "exit_code": 0
+  },
+  {
+    "check": "hygiene",
+    "exit_code": 1
+  },
+  {
+    "check": "hygiene-calibration",
+    "exit_code": 0
+  }
+]

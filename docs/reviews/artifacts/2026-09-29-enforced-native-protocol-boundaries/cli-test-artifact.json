@@ -1,0 +1,7 @@
+{
+  "source": "cbd78cd8b1c05889bcaf6853f394914dd1ee6ebd",
+  "worktree_fixes": true,
+  "before_bytes": 389151936,
+  "after_bytes": 388962064,
+  "operation": "llvm-strip --strip-debug (executable code unchanged)"
+}

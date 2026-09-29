@@ -1,0 +1,13 @@
+{
+  "command": [
+    "rustfmt",
+    "--edition",
+    "2021",
+    "--check",
+    "--config",
+    "skip_children=true",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc"
+  ],
+  "exit_code": 0
+}

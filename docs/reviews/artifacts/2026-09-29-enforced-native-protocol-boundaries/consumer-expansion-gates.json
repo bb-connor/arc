@@ -1,0 +1,26 @@
+[
+  {
+    "check": "consumer-trust-gate",
+    "command": [
+      "python",
+      "scripts/check-trust-boundaries.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "consumer-negative-gate",
+    "command": [
+      "python",
+      "scripts/check-negative-assertions.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "consumer-hygiene-gate",
+    "command": [
+      "python",
+      "scripts/check-rust-file-hygiene.py"
+    ],
+    "exit_code": 0
+  }
+]

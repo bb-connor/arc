@@ -1,0 +1,39 @@
+[
+  {
+    "check": "adapter-enforced-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "xtask",
+      "adapter_no_bypass"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "adapter-enforced-gate",
+    "command": [
+      "cargo",
+      "xtask",
+      "check",
+      "adapter-no-bypass"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "xtask-final-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "xtask",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  }
+]

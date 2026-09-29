@@ -1,0 +1,88 @@
+[
+  {
+    "check": "a2a-final-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-a2a-edge",
+      "--lib"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "control-response-final",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-control-plane",
+      "--lib",
+      "security::active_response"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "review-final-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-secret-broker",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-mcp-adapter",
+      "-p",
+      "chio-mcp-remote",
+      "-p",
+      "chio-hosted-mcp",
+      "-p",
+      "chio-a2a-edge",
+      "-p",
+      "chio-cross-protocol",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "trust-final",
+    "command": [
+      "python",
+      "scripts/check-trust-boundaries.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "clock-final",
+    "command": [
+      "python",
+      "scripts/check-security-clocks.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "negative-final",
+    "command": [
+      "python",
+      "scripts/check-negative-assertions.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "hygiene-final",
+    "command": [
+      "python",
+      "scripts/check-rust-file-hygiene.py"
+    ],
+    "exit_code": 0
+  }
+]

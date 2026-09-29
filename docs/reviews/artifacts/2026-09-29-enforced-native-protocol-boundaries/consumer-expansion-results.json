@@ -1,0 +1,188 @@
+[
+  {
+    "check": "conformance-launch-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-conformance",
+      "--lib",
+      "runner::native_launch"
+    ],
+    "exit_code": 0,
+    "tests_passed": 3
+  },
+  {
+    "check": "conformance-launch-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "chio-conformance",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "docker-launch-tests",
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "examples/docker/tests",
+      "-p",
+      "test_mcp_demo_entrypoint.py"
+    ],
+    "exit_code": 0,
+    "tests_passed": 9
+  },
+  {
+    "check": "python-launch-tests",
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "sdks/python/chio-process/tests",
+      "-p",
+      "test_launch.py"
+    ],
+    "exit_code": 0,
+    "tests_passed": 3,
+    "environment": {
+      "PYTHONPATH": "sdks/python/chio-process/src"
+    }
+  },
+  {
+    "check": "shell-launch-tests",
+    "command": [
+      "python",
+      "scripts/tests/provision-mcp-launch.test.py"
+    ],
+    "exit_code": 0,
+    "tests_passed": 3
+  },
+  {
+    "check": "admin-contract-terminal",
+    "command": [
+      "python",
+      "scripts/check-mcp-admin-credential-contract.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "shell-syntax",
+    "command": [
+      "bash",
+      "-n",
+      "scripts/lib/provision-mcp-launch.sh",
+      "examples/reference-swarm/smoke.sh"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "format-complete",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2021",
+      "--check",
+      "--config",
+      "skip_children=true",
+      "crates/guards/chio-policy/src/conditions.rs",
+      "crates/guards/chio-policy/src/evaluate.rs",
+      "crates/guards/chio-policy/src/evaluate/engine.rs",
+      "crates/guards/chio-policy/src/evaluate/matchers.rs",
+      "crates/guards/chio-policy/src/evaluate/tests.rs",
+      "crates/guards/chio-policy/src/receipt.rs",
+      "crates/guards/chio-policy/tests/clock_boundary.rs",
+      "crates/guards/chio-policy/tests/conditions_match_arms.rs",
+      "crates/platform/chio-control-plane/src/security/active_response.rs",
+      "crates/platform/chio-control-plane/src/security/active_response/tests.rs",
+      "crates/platform/chio-store-sqlite/src/budget_store/tests.rs",
+      "crates/platform/chio-store-sqlite/src/budget_store/tests/support.rs",
+      "crates/products/chio-cli/src/cli/dispatch/mod.rs",
+      "crates/products/chio-cli/src/cli/mcp.rs",
+      "crates/products/chio-cli/src/cli/mcp/cage_policy.rs",
+      "crates/products/chio-cli/src/cli/mcp/cage_policy/tests.rs",
+      "crates/products/chio-cli/src/cli/mcp/cage_receipt_tests.rs",
+      "crates/products/chio-cli/src/cli/mcp/manifest.rs",
+      "crates/products/chio-cli/src/cli/mcp/provision.rs",
+      "crates/products/chio-cli/src/cli/mcp/provision/discovery.rs",
+      "crates/products/chio-cli/src/cli/mcp/provision/discovery/launch.rs",
+      "crates/products/chio-cli/src/cli/mcp/provision/reference_runtime.rs",
+      "crates/products/chio-cli/src/cli/mcp/wrap.rs",
+      "crates/products/chio-cli/src/cli/process_host/serving.rs",
+      "crates/products/chio-cli/src/cli/types.rs",
+      "crates/products/chio-cli/src/doctor/security/launch.rs",
+      "crates/products/chio-cli/src/doctor/security/mod.rs",
+      "crates/products/chio-cli/tests/enforced_discovery.rs",
+      "crates/products/chio-cli/tests/init.rs",
+      "crates/products/chio-cli/tests/native_mcp_demo_provision.rs",
+      "crates/products/chio-cli/tests/reference_runtime_provision.rs",
+      "crates/products/chio-cli/tests/security_preflight.rs",
+      "crates/protocol/chio-a2a-edge/src/bridge.rs",
+      "crates/protocol/chio-a2a-edge/src/conversion.rs",
+      "crates/protocol/chio-a2a-edge/src/edge.rs",
+      "crates/protocol/chio-a2a-edge/src/error.rs",
+      "crates/protocol/chio-a2a-edge/src/jsonrpc.rs",
+      "crates/protocol/chio-a2a-edge/src/lib.rs",
+      "crates/protocol/chio-a2a-edge/src/tests/all.rs",
+      "crates/protocol/chio-a2a-edge/src/tests/boundaries.rs",
+      "crates/protocol/chio-a2a-edge/src/tests/message_conversion.rs",
+      "crates/protocol/chio-a2a-edge/src/tests/nonce_preflight.rs",
+      "crates/protocol/chio-a2a-edge/src/types.rs",
+      "crates/protocol/chio-cross-protocol/src/error.rs",
+      "crates/protocol/chio-cross-protocol/src/lifecycle.rs",
+      "crates/protocol/chio-hosted-mcp/tests/facade.rs",
+      "crates/protocol/chio-mcp-adapter/src/adapter.rs",
+      "crates/protocol/chio-mcp-adapter/src/server.rs",
+      "crates/protocol/chio-mcp-adapter/src/transport.rs",
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio.rs",
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc",
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc",
+      "crates/protocol/chio-mcp-adapter/src/transport/stdio_test_process.rs",
+      "crates/protocol/chio-mcp-adapter/src/transport/utils.rs",
+      "crates/protocol/chio-mcp-remote/src/input.rs",
+      "crates/protocol/chio-mcp-remote/src/lib.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/auth_flows.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/cross_crate_pipeline.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/error_contract.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/mod.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/session_isolation.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/session_lifecycle.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support_config.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/jwt_support.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/local_server.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_shared_upstream.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_store.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_runtime.rs",
+      "crates/security/chio-secret-broker/src/native_mcp.rs",
+      "crates/security/chio-secret-broker/src/process_boundary_tests/native_confined.rs",
+      "crates/tooling/chio-conformance/src/runner.rs",
+      "crates/tooling/chio-conformance/src/runner/native_launch.rs",
+      "xtask/src/adapter_no_bypass.rs",
+      "xtask/src/adapter_no_bypass/constructors.rs"
+    ],
+    "exit_code": 0
+  }
+]

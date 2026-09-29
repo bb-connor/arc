@@ -1,0 +1,111 @@
+[
+  {
+    "check": "clippy-final",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-secret-broker",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-mcp-adapter",
+      "-p",
+      "chio-mcp-remote",
+      "-p",
+      "chio-hosted-mcp",
+      "-p",
+      "chio-a2a-edge",
+      "-p",
+      "chio-cross-protocol",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "a2a-review-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-a2a-edge",
+      "--lib"
+    ],
+    "exit_code": 101
+  },
+  {
+    "check": "cli-final-build",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "--bin",
+      "chio",
+      "--test",
+      "init",
+      "--test",
+      "native_mcp_demo_provision",
+      "--test",
+      "reference_runtime_provision",
+      "--test",
+      "security_preflight",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "strip-cli-debug",
+    "command": [
+      "llvm-strip",
+      "--strip-debug",
+      "target/debug/chio"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "cli-final-security_preflight",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/security_preflight-30607a27e2c4de2a"
+    ],
+    "exit_code": 101
+  },
+  {
+    "check": "cli-final-init",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/init-f607e05885b68a65"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "cli-final-native_mcp_demo_provision",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/native_mcp_demo_provision-fd302dbe5d2a9e63"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "cli-final-reference_runtime_provision",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/reference_runtime_provision-b471f1dca1f7fd64"
+    ],
+    "exit_code": 101
+  },
+  {
+    "check": "cli-final-chio",
+    "command": [
+      "/tmp/arc-security-launch/target/debug/deps/chio-24da71148a241726",
+      "cage_policy"
+    ],
+    "exit_code": 0
+  }
+]
