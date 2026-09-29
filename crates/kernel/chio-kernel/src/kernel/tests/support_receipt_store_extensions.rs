@@ -1,6 +1,8 @@
 use super::*;
 impl SqliteReceiptStore {
-    pub(in crate::kernel::tests) fn connection(&self) -> Result<MutexGuard<'_, Connection>, ReceiptStoreError> {
+    pub(in crate::kernel::tests) fn connection(
+        &self,
+    ) -> Result<MutexGuard<'_, Connection>, ReceiptStoreError> {
         self.connection.lock().map_err(|_| {
             ReceiptStoreError::Conflict("sqlite receipt store lock poisoned".to_string())
         })
@@ -30,7 +32,10 @@ impl SqliteReceiptStore {
         Self::load_checkpoint_by_seq_locked(&connection, checkpoint_seq)
     }
 
-    pub(in crate::kernel::tests) fn flip_status_on_checkpoint(&self, flag: std::sync::Arc<std::sync::atomic::AtomicBool>) {
+    pub(in crate::kernel::tests) fn flip_status_on_checkpoint(
+        &self,
+        flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) {
         *self
             .checkpoint_status_flip
             .lock()
@@ -71,7 +76,8 @@ impl SqliteReceiptStore {
         let checkpoint = Self::load_latest_checkpoint_locked(&connection)?.ok_or_else(|| {
             ReceiptStoreError::ReadBoundary("retained test receipt is not checkpointed".to_owned())
         })?;
-        if entry_seq < checkpoint.body.batch_start_seq || entry_seq > checkpoint.body.batch_end_seq {
+        if entry_seq < checkpoint.body.batch_start_seq || entry_seq > checkpoint.body.batch_end_seq
+        {
             return Err(ReceiptStoreError::ReadBoundary(
                 "retained test receipt is outside the latest checkpoint".to_owned(),
             ));

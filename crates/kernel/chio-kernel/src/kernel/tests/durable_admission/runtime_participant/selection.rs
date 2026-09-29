@@ -63,7 +63,10 @@ fn runtime_selection_panic_is_denied_before_original_admission() {
     let result = catch_unwind(AssertUnwindSafe(|| {
         kernel.begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
     }));
-    assert!(result.is_ok(), "runtime authority selection escaped admission");
+    assert!(
+        result.is_ok(),
+        "runtime authority selection escaped admission"
+    );
     assert!(result.expect("contained callback").is_err());
     assert!(store.state.lock().expect("fixture").operation.is_none());
     assert_eq!(calls.selection.load(Ordering::SeqCst), 1);
@@ -85,7 +88,10 @@ fn runtime_selection_panic_cannot_fall_back_to_legacy_evaluation() {
     let result = catch_unwind(AssertUnwindSafe(|| {
         kernel.run_runtime_admission_hook(&request, None, now / 1000, now, Some(0), None)
     }));
-    assert!(result.is_ok(), "runtime authority selection escaped evaluation");
+    assert!(
+        result.is_ok(),
+        "runtime authority selection escaped evaluation"
+    );
     assert!(!result.expect("contained callback").allowed);
     assert!(store.state.lock().expect("fixture").operation.is_none());
     assert_eq!(calls.selection.load(Ordering::SeqCst), 1);
@@ -110,7 +116,9 @@ fn retained_runtime_release_does_not_depend_on_current_hook_selection() {
             kernel.release_runtime_admission_reservations(Some(&original), None)
         }));
         assert!(result.is_ok(), "hook {hook:?} escaped retained release");
-        result.expect("contained release").expect("release retained owner");
+        result
+            .expect("contained release")
+            .expect("release retained owner");
         assert_eq!(calls.selection.load(Ordering::SeqCst), 0, "hook {hook:?}");
         assert_eq!(calls.legacy.load(Ordering::SeqCst), 0, "hook {hook:?}");
         assert_eq!(calls.diagnostics.load(Ordering::SeqCst), 0, "hook {hook:?}");
@@ -128,7 +136,12 @@ fn retained_runtime_release_does_not_depend_on_current_hook_selection() {
             .release_runtime_admission_reservations(Some(&original), None)
             .expect("exact cleanup retry");
         assert_eq!(
-            store.runtime_recovery.0.lock().expect("fixture").release_calls,
+            store
+                .runtime_recovery
+                .0
+                .lock()
+                .expect("fixture")
+                .release_calls,
             1,
             "retry must not release twice for hook {hook:?}",
         );
@@ -140,8 +153,7 @@ fn retained_runtime_release_does_not_depend_on_current_hook_selection() {
 
 #[test]
 fn absent_runtime_ledger_does_not_turn_selection_failure_into_successful_release() {
-    let (mut kernel, _, _, invocations) =
-        durable_admission_fixture("runtime-selection-release");
+    let (mut kernel, _, _, invocations) = durable_admission_fixture("runtime-selection-release");
     let calls = Arc::new(Calls::default());
     kernel.set_runtime_admission_hook(Arc::new(SelectionProbe {
         calls: calls.clone(),
@@ -150,7 +162,10 @@ fn absent_runtime_ledger_does_not_turn_selection_failure_into_successful_release
     let result = catch_unwind(AssertUnwindSafe(|| {
         kernel.release_runtime_admission_reservations(None, None)
     }));
-    assert!(result.is_ok(), "runtime authority selection escaped release");
+    assert!(
+        result.is_ok(),
+        "runtime authority selection escaped release"
+    );
     assert!(result.expect("contained callback").is_err());
     assert_eq!(calls.selection.load(Ordering::SeqCst), 1);
     assert_eq!(calls.legacy.load(Ordering::SeqCst), 0);

@@ -9,10 +9,6 @@ use super::*;
 //   * zero denies in 1000 calls -> score > 900
 //   * revoked capability        -> score < 500
 
-
-
-
-
 fn clean_report() -> ComplianceReport {
     ComplianceReport {
         matching_receipts: 1000,

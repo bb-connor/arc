@@ -12,7 +12,9 @@ fn formal_closure_receipt_count(path: &std::path::Path) -> u64 {
 fn formal_closure_kernel_with_store(prefix: &str) -> (ChioKernel, std::path::PathBuf) {
     let path = unique_receipt_db_path(prefix);
     let mut kernel = make_kernel(make_config());
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     (kernel, path)
 }
 
@@ -94,12 +96,7 @@ fn formal_receipt_totality_out_of_scope_persists_one_signed_receipt() {
     );
 
     let response = kernel
-        .evaluate_tool_call_blocking(&make_request(
-            "formal-scope",
-            &cap,
-            "write_file",
-            "srv-a",
-        ))
+        .evaluate_tool_call_blocking(&make_request("formal-scope", &cap, "write_file", "srv-a"))
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
@@ -141,7 +138,12 @@ fn formal_receipt_totality_malformed_capability_persists_one_signed_receipt() {
     cap.id.push_str("-tampered");
 
     let response = kernel
-        .evaluate_tool_call_blocking(&make_request("formal-malformed", &cap, "read_file", "srv-a"))
+        .evaluate_tool_call_blocking(&make_request(
+            "formal-malformed",
+            &cap,
+            "read_file",
+            "srv-a",
+        ))
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
@@ -176,7 +178,9 @@ fn formal_receipt_totality_dpop_failure_persists_one_signed_receipt() {
     let tool = "read_file";
     let (mut kernel, cap) = make_dpop_kernel_and_cap(&subject, server, tool);
     let path = unique_receipt_db_path("formal-totality-dpop");
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
 
     let response = kernel
         .evaluate_tool_call_blocking(&make_request("formal-dpop", &cap, tool, server))
@@ -218,7 +222,12 @@ fn formal_receipt_totality_tool_error_persists_one_signed_receipt() {
     );
 
     let response = kernel
-        .evaluate_tool_call_blocking(&make_request("formal-tool-error", &cap, "read_file", "srv-a"))
+        .evaluate_tool_call_blocking(&make_request(
+            "formal-tool-error",
+            &cap,
+            "read_file",
+            "srv-a",
+        ))
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);

@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub(super) fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig) {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -16,7 +15,10 @@ pub(super) fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionN
     (kernel, agent_kp, scope, cfg)
 }
 
-pub(super) fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> NonceBinding {
+pub(super) fn binding_for_request(
+    cap: &CapabilityToken,
+    request: &ToolCallRequest,
+) -> NonceBinding {
     let parameter_hash =
         chio_core::receipt::decision::ToolCallAction::from_parameters(request.arguments.clone())
             .unwrap()

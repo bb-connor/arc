@@ -1,9 +1,6 @@
 use super::*;
 use receipt_projection::AdmissionReceiptProjectionStore;
 
-
-
-
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
 #[path = "durable_admission/caller_budget_snapshot.rs"]
@@ -40,8 +37,6 @@ mod review_regressions;
 mod runtime_participant;
 #[path = "durable_admission/security_binding.rs"]
 mod security_binding;
-
-
 
 #[test]
 fn durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ephemeral_mode() {

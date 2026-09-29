@@ -4,10 +4,10 @@ use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-#[path = "security_binding/retention.rs"]
-mod retention;
 #[path = "security_binding/native_authority.rs"]
 mod native_authority;
+#[path = "security_binding/retention.rs"]
+mod retention;
 
 pub(super) fn matching(request: &ToolCallRequest) -> Result<Vec<MatchingGrant<'_>>, KernelError> {
     resolve_required_matching_grants(

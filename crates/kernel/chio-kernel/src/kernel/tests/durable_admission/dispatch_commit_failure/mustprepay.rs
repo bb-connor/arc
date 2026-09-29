@@ -13,8 +13,9 @@ fn no_charge_mustprepay_dispatch(nested: bool, unsafe_financial_dispatch: bool) 
     if unsafe_financial_dispatch {
         kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     }
-    kernel
-        .set_governed_approval_replay_store(Box::new(InMemoryGovernedApprovalReplayStore::new(8).expect("positive replay store test capacities")));
+    kernel.set_governed_approval_replay_store(Box::new(
+        InMemoryGovernedApprovalReplayStore::new(8).expect("positive replay store test capacities"),
+    ));
     let intent = make_mustprepay_intent(
         "no-charge-mustprepay-intent",
         "durable-server",

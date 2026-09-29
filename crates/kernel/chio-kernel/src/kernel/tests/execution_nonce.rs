@@ -930,7 +930,11 @@ fn reconcile_kernel_and_cap() -> (ChioKernel, Keypair, CapabilityToken, Executio
     (kernel, agent_kp, cap, cfg)
 }
 
-pub(super) fn reserve_request(request_id: &str, cap: &CapabilityToken, agent_kp: &Keypair) -> ToolCallRequest {
+pub(super) fn reserve_request(
+    request_id: &str,
+    cap: &CapabilityToken,
+    agent_kp: &Keypair,
+) -> ToolCallRequest {
     ToolCallRequest {
         request_id: request_id.to_string(),
         capability: cap.clone(),

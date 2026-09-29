@@ -13,20 +13,11 @@ use super::*;
 // focused test against the primitives is faster and still covers every
 // approval behaviour.
 
-
-
 // Note: `GovernedApprovalDecision`, `GovernedApprovalToken`,
 // `GovernedApprovalTokenBody`, and `Keypair` are already brought into
 // scope by `tests/all.rs`. Only pull in HITL-specific items. These
 // paths intentionally resolve through `crate::approval*` so the test
 // exercises the same type identities that downstream consumers see.
-
-
-
-
-
-
-
 
 pub(super) struct FixedThresholdRequirement(pub(super) ThresholdApprovalRequirement);
 

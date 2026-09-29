@@ -6,7 +6,9 @@ pub(in crate::kernel::tests) struct SqliteRevocationStore {
 }
 
 impl SqliteRevocationStore {
-    pub(in crate::kernel::tests) fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
+    pub(in crate::kernel::tests) fn open(
+        path: impl AsRef<Path>,
+    ) -> Result<Self, RevocationStoreError> {
         let path = path.as_ref().to_path_buf();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -27,7 +29,9 @@ impl SqliteRevocationStore {
         Ok(Self { path })
     }
 
-    pub(in crate::kernel::tests) fn connection(&self) -> Result<rusqlite::Connection, RevocationStoreError> {
+    pub(in crate::kernel::tests) fn connection(
+        &self,
+    ) -> Result<rusqlite::Connection, RevocationStoreError> {
         Ok(rusqlite::Connection::open(&self.path)?)
     }
 }
@@ -60,4 +64,3 @@ impl RevocationStore for SqliteRevocationStore {
         Ok(rows > 0)
     }
 }
-

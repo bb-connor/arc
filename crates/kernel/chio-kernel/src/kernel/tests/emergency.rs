@@ -11,9 +11,6 @@ use super::*;
 // the surrounding `tests.rs` `include!`s. Only pull in items that are not
 // already imported.
 
-
-
-
 fn kernel_with_echo() -> (ChioKernel, Keypair, ChioScope) {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));

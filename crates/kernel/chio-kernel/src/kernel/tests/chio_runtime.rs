@@ -335,7 +335,11 @@ impl FailingAfterSideEffectServer {
 }
 
 impl UrlElicitationBeforeSideEffectServer {
-    pub(super) fn new(id: &str, tools: Vec<&str>, stream_attempts: std::sync::Arc<AtomicU64>) -> Self {
+    pub(super) fn new(
+        id: &str,
+        tools: Vec<&str>,
+        stream_attempts: std::sync::Arc<AtomicU64>,
+    ) -> Self {
         Self {
             id: id.to_string(),
             tools: tools.into_iter().map(String::from).collect(),

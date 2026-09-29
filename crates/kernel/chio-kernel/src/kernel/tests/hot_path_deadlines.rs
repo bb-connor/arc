@@ -846,10 +846,9 @@ fn always_offload_runs_guards_inline_without_a_tokio_runtime(
     let scope = make_scope(vec![make_grant("srv-offload", "noop")]);
 
     // Drive the future with the futures executor: no Tokio runtime is entered.
-    let outcome =
-        futures::executor::block_on(kernel.run_guards_within_budget(
-            &request, &scope, None, None, None,
-        ));
+    let outcome = futures::executor::block_on(
+        kernel.run_guards_within_budget(&request, &scope, None, None, None),
+    );
 
     assert!(
         outcome.is_ok(),

@@ -9,8 +9,6 @@ use super::*;
 //   - pre-dispatch drop: no receipt; reservations released iff a
 //     chio_runtime admission block was present.
 
-
-
 struct CountingReleaseRuntimeAdmissionHook {
     releases: std::sync::Arc<AtomicU64>,
 }
@@ -65,10 +63,7 @@ fn drop_guard_disposition_table() -> Result<(), TestCaseError> {
         let cap = make_capability(
             &kernel,
             &agent_kp,
-            make_scope(vec![make_grant(
-                "srv-chio-runtime",
-                "destructive_update",
-            )]),
+            make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
             300,
         );
         let request = make_request_with_arguments(

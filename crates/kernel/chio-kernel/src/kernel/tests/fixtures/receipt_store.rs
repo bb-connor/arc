@@ -27,10 +27,10 @@ pub(in crate::kernel::tests) struct SqliteReceiptStore {
     checkpoint_status_flip: Mutex<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>,
 }
 
-
-
 impl SqliteReceiptStore {
-    pub(in crate::kernel::tests) fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
+    pub(in crate::kernel::tests) fn open(
+        path: impl AsRef<Path>,
+    ) -> Result<Self, ReceiptStoreError> {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -206,9 +206,8 @@ impl SqliteReceiptStore {
             });
         }
         let batch_start_seq = latest_checkpointed_entry_seq + 1;
-        let batch_end_seq = latest_committed_entry_seq.min(
-            batch_start_seq.saturating_add(max_batch.saturating_sub(1)),
-        );
+        let batch_end_seq = latest_committed_entry_seq
+            .min(batch_start_seq.saturating_add(max_batch.saturating_sub(1)));
         let receipt_bytes_with_seqs = Self::receipts_canonical_bytes_range_locked(
             connection,
             batch_start_seq,
@@ -250,13 +249,12 @@ impl SqliteReceiptStore {
         let mut prior_chain_leaf_hashes = Vec::new();
         if let Some(previous) = previous_checkpoint.as_ref() {
             for seq in 1..=previous.body.checkpoint_seq {
-                let chained = Self::load_checkpoint_by_seq_locked(connection, seq)?.ok_or_else(
-                    || {
+                let chained =
+                    Self::load_checkpoint_by_seq_locked(connection, seq)?.ok_or_else(|| {
                         ReceiptStoreError::Conflict(format!(
                             "checkpoint chain has a gap at seq {seq}"
                         ))
-                    },
-                )?;
+                    })?;
                 prior_chain_leaf_hashes.push(
                     crate::checkpoint::checkpoint_chain_leaf_hash(&chained.body).map_err(
                         |error| {
@@ -829,7 +827,6 @@ impl ReceiptStore for SqliteReceiptStore {
             })
     }
 }
-
 
 #[path = "../support_receipt_store_extensions.rs"]
 mod extensions;

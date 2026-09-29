@@ -150,4 +150,6 @@ macro_rules! reject_authority_fenced_budget_methods {
     };
 }
 
-pub(in crate::kernel::tests) use {delegate_authority_fenced_budget_methods, reject_authority_fenced_budget_methods};
+pub(in crate::kernel::tests) use {
+    delegate_authority_fenced_budget_methods, reject_authority_fenced_budget_methods,
+};

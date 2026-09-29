@@ -544,10 +544,17 @@ mod settlement_routing_tests {
     }
 
     #[test]
-    fn session_reports_never_seed_claim_route_or_invoke_settlement() -> Result<(), Box<dyn std::error::Error>> {
-        let harness = recording_harness(ClaimMode::Claim, RouteMode::Contract, HookBehavior::Accepted);
+    fn session_reports_never_seed_claim_route_or_invoke_settlement(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let harness = recording_harness(
+            ClaimMode::Claim,
+            RouteMode::Contract,
+            HookBehavior::Accepted,
+        );
         let (context, operation) = super::session_reports::report_operation(&harness.kernel)?;
-        let receipt = harness.kernel.record_session_tool_failure(&context, &operation)?;
+        let receipt = harness
+            .kernel
+            .record_session_tool_failure(&context, &operation)?;
         let state = harness.store.state();
         assert_eq!(state.legacy_appends, 1);
         assert_eq!(state.atomic_appends, 0);
@@ -793,8 +800,11 @@ mod settlement_routing_tests {
 
     #[test]
     fn durable_materialization_seeds_a_claimable_settlement_attempt() {
-        let harness =
-            recording_harness(ClaimMode::Claim, RouteMode::Contract, HookBehavior::Accepted);
+        let harness = recording_harness(
+            ClaimMode::Claim,
+            RouteMode::Contract,
+            HookBehavior::Accepted,
+        );
         let receipt = positive_receipt(&harness.keypair, 40);
 
         // A durable monetary receipt must seed its settlement attempt exactly

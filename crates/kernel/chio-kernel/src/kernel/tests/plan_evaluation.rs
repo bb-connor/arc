@@ -6,9 +6,6 @@ use super::*;
 // `make_keypair`, `make_capability`, `make_scope`, `make_grant`,
 // `EchoServer`, etc.).
 
-
-
-
 fn planned_call(
     request_id: &str,
     server: &str,
@@ -225,7 +222,9 @@ fn plan_evaluation_first_step_denied_does_not_short_circuit() {
 /// step that submitted the wrong model.
 #[test]
 fn plan_evaluation_model_metadata_scoped_per_step() {
-    use chio_core::capability::{scope::{ChioScope, Constraint, ModelMetadata, Operation, ToolGrant}};
+    use chio_core::capability::scope::{
+        ChioScope, Constraint, ModelMetadata, Operation, ToolGrant,
+    };
 
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new(

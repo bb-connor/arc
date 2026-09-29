@@ -1,22 +1,5 @@
 use super::*;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static UNIQUE_RECEIPT_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub(super) fn make_keypair() -> Keypair {
@@ -207,7 +190,9 @@ pub(super) fn session_tool_call(response: SessionOperationResponse) -> Option<To
     }
 }
 
-pub(super) fn session_capability_list(response: SessionOperationResponse) -> Option<Vec<CapabilityToken>> {
+pub(super) fn session_capability_list(
+    response: SessionOperationResponse,
+) -> Option<Vec<CapabilityToken>> {
     if let SessionOperationResponse::CapabilityList { capabilities } = response {
         Some(capabilities)
     } else {
@@ -223,7 +208,9 @@ pub(super) fn session_root_list(response: SessionOperationResponse) -> Option<Ve
     }
 }
 
-pub(super) fn session_resource_list(response: SessionOperationResponse) -> Option<Vec<ResourceDefinition>> {
+pub(super) fn session_resource_list(
+    response: SessionOperationResponse,
+) -> Option<Vec<ResourceDefinition>> {
     if let SessionOperationResponse::ResourceList { resources } = response {
         Some(resources)
     } else {
@@ -231,7 +218,9 @@ pub(super) fn session_resource_list(response: SessionOperationResponse) -> Optio
     }
 }
 
-pub(super) fn session_resource_read(response: SessionOperationResponse) -> Option<Vec<ResourceContent>> {
+pub(super) fn session_resource_read(
+    response: SessionOperationResponse,
+) -> Option<Vec<ResourceContent>> {
     if let SessionOperationResponse::ResourceRead { contents } = response {
         Some(contents)
     } else {
@@ -239,7 +228,9 @@ pub(super) fn session_resource_read(response: SessionOperationResponse) -> Optio
     }
 }
 
-pub(super) fn session_prompt_list(response: SessionOperationResponse) -> Option<Vec<PromptDefinition>> {
+pub(super) fn session_prompt_list(
+    response: SessionOperationResponse,
+) -> Option<Vec<PromptDefinition>> {
     if let SessionOperationResponse::PromptList { prompts } = response {
         Some(prompts)
     } else {
@@ -1264,7 +1255,10 @@ impl ReceiptStore for FailingRequestLineageReceiptStore {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn record_request_lineage(
         &self,
         _session_id: &str,
@@ -1280,7 +1274,6 @@ impl ReceiptStore for FailingRequestLineageReceiptStore {
         ))
     }
 }
-
 
 #[path = "support_budget_store_impls.rs"]
 pub(super) mod budget_store_impls;

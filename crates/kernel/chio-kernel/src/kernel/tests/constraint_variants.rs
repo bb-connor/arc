@@ -173,10 +173,7 @@ fn kernel_allows_tool_call_when_model_is_in_allowlist() {
             tool_name: "invoke".to_string(),
             operations: vec![Operation::Invoke],
             constraints: vec![Constraint::ModelConstraint {
-                allowed_model_ids: vec![
-                    "claude-opus-4".to_string(),
-                    "gpt-5".to_string(),
-                ],
+                allowed_model_ids: vec!["claude-opus-4".to_string(), "gpt-5".to_string()],
                 min_safety_tier: None,
             }],
             max_invocations: None,

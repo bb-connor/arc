@@ -371,7 +371,11 @@ pub(super) struct SiblingSumInvocationFixture {
     pub(super) path: PathBuf,
 }
 
-pub(super) fn make_invocation_limited_grant(server: &str, tool: &str, max_invocations: u32) -> ToolGrant {
+pub(super) fn make_invocation_limited_grant(
+    server: &str,
+    tool: &str,
+    max_invocations: u32,
+) -> ToolGrant {
     let mut grant = make_grant(server, tool);
     grant.max_invocations = Some(max_invocations);
     grant
@@ -464,7 +468,8 @@ pub(super) fn spawn_payment_test_server(
     (format!("http://{address}"), request_rx, handle)
 }
 
-pub(super) fn spawn_bound_acp_test_server() -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
+pub(super) fn spawn_bound_acp_test_server(
+) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
     let address = listener
         .local_addr()
@@ -617,14 +622,20 @@ pub(super) fn make_governed_monetary_grant(
     grant
 }
 
-pub(super) fn with_minimum_runtime_assurance(mut grant: ToolGrant, tier: RuntimeAssuranceTier) -> ToolGrant {
+pub(super) fn with_minimum_runtime_assurance(
+    mut grant: ToolGrant,
+    tier: RuntimeAssuranceTier,
+) -> ToolGrant {
     grant
         .constraints
         .push(Constraint::MinimumRuntimeAssurance(tier));
     grant
 }
 
-pub(super) fn with_minimum_autonomy_tier(mut grant: ToolGrant, tier: GovernedAutonomyTier) -> ToolGrant {
+pub(super) fn with_minimum_autonomy_tier(
+    mut grant: ToolGrant,
+    tier: GovernedAutonomyTier,
+) -> ToolGrant {
     grant
         .constraints
         .push(Constraint::MinimumAutonomyTier(tier));
@@ -696,7 +707,9 @@ pub(super) struct GovernedAcpIntentFixture<'a> {
     pub(super) currency: &'a str,
 }
 
-pub(super) fn make_governed_acp_intent(fixture: GovernedAcpIntentFixture<'_>) -> GovernedTransactionIntent {
+pub(super) fn make_governed_acp_intent(
+    fixture: GovernedAcpIntentFixture<'_>,
+) -> GovernedTransactionIntent {
     GovernedTransactionIntent {
         id: fixture.id.to_string(),
         server_id: fixture.server.to_string(),
@@ -818,7 +831,8 @@ pub(super) fn make_trusted_nitro_runtime_attestation(
     }
 }
 
-pub(super) fn make_attestation_trust_policy() -> chio_core::capability::trust_policy::AttestationTrustPolicy {
+pub(super) fn make_attestation_trust_policy(
+) -> chio_core::capability::trust_policy::AttestationTrustPolicy {
     chio_core::capability::trust_policy::AttestationTrustPolicy {
         rules: vec![
             chio_core::capability::trust_policy::AttestationTrustRule {
@@ -1262,7 +1276,8 @@ pub(super) fn make_dpop_kernel_and_cap(
     let mut kernel = make_kernel(config);
     kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
 
-    let nonce_store = dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)).expect("positive replay store test capacities");
+    let nonce_store = dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300))
+        .expect("positive replay store test capacities");
     kernel
         .set_dpop_store(nonce_store, dpop::DpopConfig::default())
         .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));

@@ -21,10 +21,7 @@ fn session_operation_rejects_nonce_bound_to_another_request(
         .execution_nonce
         .ok_or_else(|| std::io::Error::other("strict preflight nonce missing"))?;
 
-    let session_id = kernel.open_session(
-        agent.public_key().to_hex(),
-        vec![capability.clone()],
-    )?;
+    let session_id = kernel.open_session(agent.public_key().to_hex(), vec![capability.clone()])?;
     kernel.activate_session(&session_id)?;
     let context = make_operation_context(
         &session_id,

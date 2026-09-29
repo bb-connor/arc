@@ -1,6 +1,7 @@
 use super::*;
 pub(super) struct CallerContextProbe {
-    pub(super) observations: std::sync::Arc<Mutex<Vec<(String, crate::ToolInvocationContext, bool)>>>,
+    pub(super) observations:
+        std::sync::Arc<Mutex<Vec<(String, crate::ToolInvocationContext, bool)>>>,
     pub(super) stream: bool,
 }
 

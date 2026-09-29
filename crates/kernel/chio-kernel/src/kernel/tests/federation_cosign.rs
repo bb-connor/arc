@@ -13,9 +13,6 @@ use super::*;
 //     artifact behind,
 //   * missing peer pin fails closed.
 
-
-
-
 #[tokio::test(flavor = "current_thread")]
 async fn concurrent_duplicate_request_ids_keep_federation_scopes_isolated(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -77,8 +74,6 @@ impl BilateralCoSigningProtocol for CountingRejectingCosigner {
         ))
     }
 }
-
-
 
 struct ForgedTreatyMetadataAdmissionHook;
 
