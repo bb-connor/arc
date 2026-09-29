@@ -1,0 +1,179 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 10.66s
+     Running tests/receipt_retention_liveness.rs (target/debug/deps/receipt_retention_liveness-deafd7d8e2b01328)
+
+running 1 test
+held sync:
+  xSync(flags=2) on /tmp/.tmpKG6IDV/live-0.sqlite3-wal [wal] by chio-receipt-writer (ThreadId(9)), held for 87.20503ms
+  backtrace of the syncing thread:
+       0: std::backtrace::Backtrace::create
+       1: receipt_retention_liveness::sync_shim::SyncShim::before_sync
+       2: receipt_retention_liveness::sync_shim::shim_sync
+       3: sqlite3OsSync
+       4: walFrames
+       5: sqlite3WalFrames
+       6: pagerWalFrames
+       7: sqlite3PagerCommitPhaseOne
+       8: sqlite3BtreeCommitPhaseOne
+       9: vdbeCommit
+      10: sqlite3VdbeHalt
+      11: sqlite3VdbeExec
+      12: sqlite3Step
+      13: sqlite3_step
+      14: rusqlite::raw_statement::RawStatement::step
+      15: rusqlite::statement::Statement::step
+      16: rusqlite::Connection::execute_batch
+      17: rusqlite::transaction::Transaction::commit_
+      18: rusqlite::transaction::Transaction::commit
+      19: chio_store_sqlite::receipt_store::append_receipt_batch
+      20: chio_store_sqlite::receipt_store::commit_receipt_batch_with_completions
+      21: chio_store_sqlite::receipt_store::receipt_commit_actor_loop::{{closure}}
+      22: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      23: std::panicking::catch_unwind::do_call
+      24: __rust_try
+      25: std::panic::catch_unwind
+      26: chio_store_sqlite::receipt_store::receipt_commit_actor_loop
+      27: chio_store_sqlite::receipt_store::ReceiptCommitActor::start::{{closure}}
+      28: chio_supervisor::thread::supervise_loop::{{closure}}
+      29: core::ops::function::FnOnce::call_once
+      30: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      31: std::panicking::catch_unwind::do_call
+      32: __rust_try
+      33: std::panic::catch_unwind
+      34: chio_supervisor::thread::supervise_loop
+      35: chio_supervisor::thread::SupervisedThread::spawn::{{closure}}
+      36: std::sys::backtrace::__rust_begin_short_backtrace
+      37: std::thread::lifecycle::spawn_unchecked::{{closure}}::{{closure}}
+      38: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      39: std::panicking::catch_unwind::do_call
+      40: __rust_try
+      41: std::thread::lifecycle::spawn_unchecked::{{closure}}
+      42: core::ops::function::FnOnce::call_once{{vtable.shim}}
+      43: std::sys::thread::unix::Thread::new::thread_start
+      44: start_thread
+                 at ./nptl/pthread_create.c:447:8
+      45: thread_start
+                 at ./misc/../sysdeps/unix/sysv/linux/aarch64/clone3.S:76:0
+lock ledger:
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba880001990: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(7))), wal-index WRITE EXCLUSIVE by chio-receipt-writer (ThreadId(9)), wal-index READ(1) SHARED by chio-receipt-writer (ThreadId(9))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba8840019c0: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(4)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba884061270: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(4)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba8840bf8c0: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(4)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba888001df0: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(3)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba888061640: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(3)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba8880bfc20: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(3)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba88c0019c0: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(5)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba88c061190: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(5)))
+threads:
+  tid 2059965 receipt_retenti              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc0d8bfeb0488 0x89 0xffffffff 0xfffff12370d0 0x0 0xffffffff 0xfffff12370c0 0xfba895689768
+  tid 2059966 rotation_waits_              state=R (running) wchan=0 syscall=63 0x18 0xfba89559abb0 0x20 0x0 0xfba89559ab50 0xfba89559accf 0xfba89559ab80 0xfba89568124c
+  tid 2059967 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba89538f868 0x80 0x1 0xfba89538dd28 0x0 0x0 0xfba89538dc80 0xfba895689768
+  tid 2059968 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba89517f868 0x80 0x1 0xfba89517dd28 0x0 0x0 0xfba89517dc80 0xfba895689768
+  tid 2059969 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba894f6f868 0x80 0x1 0xfba894f6dd28 0x0 0x0 0xfba894f6dc80 0xfba895689768
+  tid 2059970 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba894d5f868 0x80 0x1 0xfba894d5dd28 0x0 0x0 0xfba894d5dc80 0xfba895689768
+  tid 2059971 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba894b4f868 0x80 0x1 0xfba894b4dd28 0x0 0x0 0xfba894b4dc80 0xfba895689768
+  tid 2059972 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba89493f868 0x80 0x1 0xfba89493dd28 0x0 0x0 0xfba89493dc80 0xfba895689768
+  tid 2059973 chio-receipt-wr              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc0d882e10120 0x89 0x1 0x0 0x0 0xffffffff 0xfba894726950 0xfba895689768
+  tid 2059974 caller-append                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba89002f398 0x89 0xffffffff 0x0 0x0 0xffffffff 0xfba894516e10 0xfba895689768
+  tid 2059975 caller-rotate                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba890185a78 0x89 0xffffffff 0xfba8725593c0 0x0 0xffffffff 0xfba8725593b0 0xfba895689768
+
+
+thread 'rotation_waits_behind_the_writer_commit_it_cannot_preempt' (2059966) panicked at crates/platform/chio-store-sqlite/tests/receipt_retention_liveness.rs:308:5:
+the snapshot must retain the active delegated sync owner: held sync:
+  xSync(flags=2) on /tmp/.tmpKG6IDV/live-0.sqlite3-wal [wal] by chio-receipt-writer (ThreadId(9)), held for 92.921698ms
+  backtrace of the syncing thread:
+       0: std::backtrace::Backtrace::create
+       1: receipt_retention_liveness::sync_shim::SyncShim::before_sync
+       2: receipt_retention_liveness::sync_shim::shim_sync
+       3: sqlite3OsSync
+       4: walFrames
+       5: sqlite3WalFrames
+       6: pagerWalFrames
+       7: sqlite3PagerCommitPhaseOne
+       8: sqlite3BtreeCommitPhaseOne
+       9: vdbeCommit
+      10: sqlite3VdbeHalt
+      11: sqlite3VdbeExec
+      12: sqlite3Step
+      13: sqlite3_step
+      14: rusqlite::raw_statement::RawStatement::step
+      15: rusqlite::statement::Statement::step
+      16: rusqlite::Connection::execute_batch
+      17: rusqlite::transaction::Transaction::commit_
+      18: rusqlite::transaction::Transaction::commit
+      19: chio_store_sqlite::receipt_store::append_receipt_batch
+      20: chio_store_sqlite::receipt_store::commit_receipt_batch_with_completions
+      21: chio_store_sqlite::receipt_store::receipt_commit_actor_loop::{{closure}}
+      22: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      23: std::panicking::catch_unwind::do_call
+      24: __rust_try
+      25: std::panic::catch_unwind
+      26: chio_store_sqlite::receipt_store::receipt_commit_actor_loop
+      27: chio_store_sqlite::receipt_store::ReceiptCommitActor::start::{{closure}}
+      28: chio_supervisor::thread::supervise_loop::{{closure}}
+      29: core::ops::function::FnOnce::call_once
+      30: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      31: std::panicking::catch_unwind::do_call
+      32: __rust_try
+      33: std::panic::catch_unwind
+      34: chio_supervisor::thread::supervise_loop
+      35: chio_supervisor::thread::SupervisedThread::spawn::{{closure}}
+      36: std::sys::backtrace::__rust_begin_short_backtrace
+      37: std::thread::lifecycle::spawn_unchecked::{{closure}}::{{closure}}
+      38: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      39: std::panicking::catch_unwind::do_call
+      40: __rust_try
+      41: std::thread::lifecycle::spawn_unchecked::{{closure}}
+      42: core::ops::function::FnOnce::call_once{{vtable.shim}}
+      43: std::sys::thread::unix::Thread::new::thread_start
+      44: start_thread
+                 at ./nptl/pthread_create.c:447:8
+      45: thread_start
+                 at ./misc/../sysdeps/unix/sysv/linux/aarch64/clone3.S:76:0
+lock ledger:
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba880001990: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(7))), wal-index WRITE EXCLUSIVE by chio-receipt-writer (ThreadId(9)), wal-index READ(1) SHARED by chio-receipt-writer (ThreadId(9))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba8840019c0: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(4)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba884061270: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(4)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba8840bf8c0: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(4)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba888001df0: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(3)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba888061640: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(3)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba8880bfc20: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(3)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba88c0019c0: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(5)))
+  /tmp/.tmpKG6IDV/live-0.sqlite3 handle 0xfba88c061190: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(5)))
+threads:
+  tid 2059965 receipt_retenti              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc0d8bfeb0488 0x89 0xffffffff 0xfffff12370d0 0x0 0xffffffff 0xfffff12370c0 0xfba895689768
+  tid 2059966 rotation_waits_              state=R (running) wchan=0 syscall=63 0x18 0xfba89559abb0 0x20 0x0 0xfba89559ab50 0xfba89559accf 0xfba89559ab80 0xfba89568124c
+  tid 2059967 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba89538f868 0x80 0x1 0xfba89538dd28 0x0 0x0 0xfba89538dc80 0xfba895689768
+  tid 2059968 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba89517f868 0x80 0x1 0xfba89517dd28 0x0 0x0 0xfba89517dc80 0xfba895689768
+  tid 2059969 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba894f6f868 0x80 0x1 0xfba894f6dd28 0x0 0x0 0xfba894f6dc80 0xfba895689768
+  tid 2059970 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba894d5f868 0x80 0x1 0xfba894d5dd28 0x0 0x0 0xfba894d5dc80 0xfba895689768
+  tid 2059971 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba894b4f868 0x80 0x1 0xfba894b4dd28 0x0 0x0 0xfba894b4dc80 0xfba895689768
+  tid 2059972 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba89493f868 0x80 0x1 0xfba89493dd28 0x0 0x0 0xfba89493dc80 0xfba895689768
+  tid 2059973 chio-receipt-wr              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc0d882e10120 0x89 0x1 0x0 0x0 0xffffffff 0xfba894726950 0xfba895689768
+  tid 2059974 caller-append                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba89002f398 0x89 0xffffffff 0x0 0x0 0xffffffff 0xfba894516e10 0xfba895689768
+  tid 2059975 caller-rotate                state=S (sleeping) wchan=futex_do_wait syscall=98 0xfba890185a78 0x89 0xffffffff 0xfba8725593c0 0x0 0xffffffff 0xfba8725593b0 0xfba895689768
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test rotation_waits_behind_the_writer_commit_it_cannot_preempt ... FAILED
+
+failures:
+
+failures:
+    rotation_waits_behind_the_writer_commit_it_cannot_preempt
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.27s
+
+error: test failed, to rerun pass `-p chio-store-sqlite --test receipt_retention_liveness`

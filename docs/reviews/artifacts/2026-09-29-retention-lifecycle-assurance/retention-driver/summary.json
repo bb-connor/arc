@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/tmp/arc-security-launch/target/debug/deps/receipt_retention_liveness-deafd7d8e2b01328",
+    "--exact",
+    "retention_workload_commits_are_serialized_on_writer",
+    "--nocapture"
+  ],
+  "binary_sha256": "a7f08b6f1a5f934a7b39abb677afbadb837c12f3d87e0f27d1098b9789350a7a",
+  "cases": 2,
+  "sync_delay_ms": 3,
+  "timeout_seconds": 180,
+  "timed_out": false,
+  "workload": "public-API retention operation model; ChaCha seed [7;32]",
+  "provenance": "caller-supplied executable; hash is not a source-build attestation",
+  "exit_code": 0,
+  "seconds": 6.847,
+  "completed_cases": [
+    0,
+    1
+  ],
+  "passed": true
+}

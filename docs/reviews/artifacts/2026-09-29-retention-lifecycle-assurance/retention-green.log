@@ -1,0 +1,449 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 10.70s
+     Running tests/receipt_retention_liveness.rs (target/debug/deps/receipt_retention_liveness-deafd7d8e2b01328)
+
+running 5 tests
+held sync:
+  xSync(flags=2) on /tmp/.tmpdOHlDC/archive-0.sqlite3 [main] by chio-receipt-writer (ThreadId(13)), held for 88.419555ms
+  backtrace of the syncing thread:
+       0: std::backtrace::Backtrace::create
+       1: receipt_retention_liveness::sync_shim::SyncShim::before_sync
+       2: receipt_retention_liveness::sync_shim::shim_sync
+       3: sqlite3OsSync
+       4: sqlite3PagerSync
+       5: sqlite3PagerCommitPhaseOne
+       6: sqlite3BtreeCommitPhaseOne
+       7: vdbeCommit
+       8: sqlite3VdbeHalt
+       9: sqlite3VdbeExec
+      10: sqlite3Step
+      11: sqlite3_step
+      12: rusqlite::raw_statement::RawStatement::step
+      13: rusqlite::statement::Statement::step
+      14: rusqlite::Connection::execute_batch
+      15: rusqlite::transaction::Transaction::commit_
+      16: rusqlite::transaction::Transaction::commit
+      17: chio_store_sqlite::receipt_store::evidence_retention::create_archive_schema
+      18: chio_store_sqlite::receipt_store::evidence_retention::archive_range::{{closure}}
+      19: chio_store_sqlite::receipt_store::evidence_retention::archive_range
+      20: chio_store_sqlite::receipt_store::evidence_retention::rotate_on_writer_connection
+      21: chio_store_sqlite::receipt_store::handle_non_append_command::{{closure}}
+      22: core::ops::function::FnOnce::call_once
+      23: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      24: std::panicking::catch_unwind::do_call
+      25: __rust_try
+      26: std::panic::catch_unwind
+      27: chio_store_sqlite::receipt_store::handle_non_append_command
+      28: chio_store_sqlite::receipt_store::receipt_commit_actor_loop
+      29: chio_store_sqlite::receipt_store::ReceiptCommitActor::start::{{closure}}
+      30: chio_supervisor::thread::supervise_loop::{{closure}}
+      31: core::ops::function::FnOnce::call_once
+      32: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      33: std::panicking::catch_unwind::do_call
+      34: __rust_try
+      35: std::panic::catch_unwind
+      36: chio_supervisor::thread::supervise_loop
+      37: chio_supervisor::thread::SupervisedThread::spawn::{{closure}}
+      38: std::sys::backtrace::__rust_begin_short_backtrace
+      39: std::thread::lifecycle::spawn_unchecked::{{closure}}::{{closure}}
+      40: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      41: std::panicking::catch_unwind::do_call
+      42: __rust_try
+      43: std::thread::lifecycle::spawn_unchecked::{{closure}}
+      44: core::ops::function::FnOnce::call_once{{vtable.shim}}
+      45: std::sys::thread::unix::Thread::new::thread_start
+      46: start_thread
+                 at ./nptl/pthread_create.c:447:8
+      47: thread_start
+                 at ./misc/../sysdeps/unix/sysv/linux/aarch64/clone3.S:76:0
+active syncs:
+  active owner: chio-receipt-writer (ThreadId(13))
+  xSync(flags=2) on /tmp/.tmpdOHlDC/archive-0.sqlite3 [main] by chio-receipt-writer (ThreadId(13)), elapsed 88.451156ms, WAL write=false, checkpoint=false
+  entry stack:
+   0: std::backtrace::Backtrace::create
+   1: receipt_retention_liveness::sync_shim::diagnostics::ActiveSyncs::enter
+   2: receipt_retention_liveness::sync_shim::SyncShim::before_sync
+   3: receipt_retention_liveness::sync_shim::shim_sync
+   4: sqlite3OsSync
+   5: sqlite3PagerSync
+   6: sqlite3PagerCommitPhaseOne
+   7: sqlite3BtreeCommitPhaseOne
+   8: vdbeCommit
+   9: sqlite3VdbeHalt
+  10: sqlite3VdbeExec
+  11: sqlite3Step
+  12: sqlite3_step
+  13: rusqlite::raw_statement::RawStatement::step
+  14: rusqlite::statement::Statement::step
+  15: rusqlite::Connection::execute_batch
+  16: rusqlite::transaction::Transaction::commit_
+  17: rusqlite::transaction::Transaction::commit
+  18: chio_store_sqlite::receipt_store::evidence_retention::create_archive_schema
+  19: chio_store_sqlite::receipt_store::evidence_retention::archive_range::{{closure}}
+  20: chio_store_sqlite::receipt_store::evidence_retention::archive_range
+  21: chio_store_sqlite::receipt_store::evidence_retention::rotate_on_writer_connection
+  22: chio_store_sqlite::receipt_store::handle_non_append_command::{{closure}}
+  23: core::ops::function::FnOnce::call_once
+  24: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+  25: std::panicking::catch_unwind::do_call
+  26: __rust_try
+  27: std::panic::catch_unwind
+  28: chio_store_sqlite::receipt_store::handle_non_append_command
+  29: chio_store_sqlite::receipt_store::receipt_commit_actor_loop
+  30: chio_store_sqlite::receipt_store::ReceiptCommitActor::start::{{closure}}
+  31: chio_supervisor::thread::supervise_loop::{{closure}}
+  32: core::ops::function::FnOnce::call_once
+  33: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+  34: std::panicking::catch_unwind::do_call
+  35: __rust_try
+  36: std::panic::catch_unwind
+  37: chio_supervisor::thread::supervise_loop
+  38: chio_supervisor::thread::SupervisedThread::spawn::{{closure}}
+  39: std::sys::backtrace::__rust_begin_short_backtrace
+  40: std::thread::lifecycle::spawn_unchecked::{{closure}}::{{closure}}
+  41: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+  42: std::panicking::catch_unwind::do_call
+  43: __rust_try
+  44: std::thread::lifecycle::spawn_unchecked::{{closure}}
+  45: core::ops::function::FnOnce::call_once{{vtable.shim}}
+  46: std::sys::thread::unix::Thread::new::thread_start
+  47: start_thread
+             at ./nptl/pthread_create.c:447:8
+  48: thread_start
+             at ./misc/../sysdeps/unix/sysv/linux/aarch64/clone3.S:76:0
+
+lock ledger:
+  /tmp/.tmpdOHlDC/archive-0.sqlite3 handle 0xe3c134079c90: file lock EXCLUSIVE (last changed by chio-receipt-writer (ThreadId(13)))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c138001990: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(10))), wal-index WRITE EXCLUSIVE by chio-receipt-writer (ThreadId(13)), wal-index READ(1) SHARED by chio-receipt-writer (ThreadId(13))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c140001990: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(8)))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c1400611a0: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(8)))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c144001990: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(9)))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c1440611a0: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(9)))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c1440bf810: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(9)))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c14c001df0: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(7)))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c14c061520: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(7)))
+  /tmp/.tmpdOHlDC/live-0.sqlite3 handle 0xe3c14c0bfc10: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(7)))
+threads:
+  tid 2061809 receipt_retenti              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12e01fff998 0x89 0xffffffff 0xfffffb89dc50 0x0 0xffffffff 0xfffffb89dc40 0xe3c16d5c9768
+  tid 2061810 appends_wait_be              state=R (running) wchan=0 syscall=63 0x19 0xe3c16d4dade0 0x20 0x0 0xe3c16d4dad80 0xe3c16d4daeff 0xe3c16d4dadb0 0xe3c16d5c124c
+  tid 2061811 retention_workl              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12df7356414 0x89 0x2 0x0 0x0 0xffffffff 0xe3c16d2cd2c0 0xe3c16d5c9768
+  tid 2061812 rotation_waits_              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12df7356414 0x89 0x2 0x0 0x0 0xffffffff 0xe3c16d0bb6e0 0xe3c16d5c9768
+  tid 2061813 sync_shim::fail              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12df7356414 0x89 0x2 0x0 0x0 0xffffffff 0xe3c16cead950 0xe3c16d5c9768
+  tid 2061814 workload::relea              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12df7356414 0x89 0x2 0x0 0x0 0xffffffff 0xe3c16cc9db70 0xe3c16d5c9768
+  tid 2061815 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16ca8f868 0x80 0x1 0xe3c16ca8dd28 0x0 0x0 0xe3c16ca8dc80 0xe3c16d5c9768
+  tid 2061816 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c87f868 0x80 0x1 0xe3c16c87dd28 0x0 0x0 0xe3c16c87dc80 0xe3c16d5c9768
+  tid 2061817 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c66f868 0x80 0x1 0xe3c16c66dd28 0x0 0x0 0xe3c16c66dc80 0xe3c16d5c9768
+  tid 2061818 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c45f868 0x80 0x1 0xe3c16c45dd28 0x0 0x0 0xe3c16c45dc80 0xe3c16d5c9768
+  tid 2061819 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c24f868 0x80 0x1 0xe3c16c24dd28 0x0 0x0 0xe3c16c24dc80 0xe3c16d5c9768
+  tid 2061820 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c167fff868 0x80 0x1 0xe3c167ffdd28 0x0 0x0 0xe3c167ffdc80 0xe3c16d5c9768
+  tid 2061821 chio-receipt-wr              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12df7350140 0x89 0x1 0x0 0x0 0xffffffff 0xe3c167de2150 0xe3c16d5c9768
+  tid 2061822 caller-rotate                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c168158778 0x89 0xffffffff 0xe3c167bdd3c0 0x0 0xffffffff 0xe3c167bdd3b0 0xe3c16d5c9768
+  tid 2061823 caller-append                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16802aa58 0x89 0xffffffff 0x0 0x0 0xffffffff 0xe3c165c7ce10 0xe3c16d5c9768
+
+  chio-receipt-writer (ThreadId(13)): {"archive.journal": 8, "archive.main": 4, "live.main": 1, "live.wal": 6}
+  workload-flush-after-release (ThreadId(18)): {"live.main": 1, "live.wal": 1}
+
+test appends_wait_behind_the_rotation_holding_the_archive_sync ... ok
+retention diagnostic case=0 phase=begin ops=[Rotate, AppendTool(3), Rotate, AppendTool(5), AppendTool(5), AppendTool(7), AppendTool(1), Rotate, AppendChild(1), AppendChild(6), AppendTool(7), Rotate, AppendChild(4), AppendChild(6), Rotate, AppendChild(2), Rotate, AppendChild(0), AppendChild(6)]
+retention diagnostic case=0 phase=complete
+retention diagnostic case=1 phase=begin ops=[AppendTool(0), Rotate, AppendChild(0), AppendChild(6), Rotate]
+retention diagnostic case=1 phase=complete
+2 cases, 24 ops, 8 rotations, 288 syncs in 4.17175223s (induced sync delay 3ms)
+syncs by file: {"archive.journal": 68, "archive.main": 36, "archive.wal": 6, "live.journal": 8, "live.main": 27, "live.wal": 143}
+  case  0: ops=19 rotations= 6 archived= 21 syncs= 197 {"archive.journal": 48, "archive.main": 25, "archive.wal": 3, "live.journal": 4, "live.main": 17, "live.wal": 100}
+  case  1: ops= 5 rotations= 2 archived=  4 syncs=  91 {"archive.journal": 20, "archive.main": 11, "archive.wal": 3, "live.journal": 4, "live.main": 10, "live.wal": 43}
+test retention_workload_commits_are_serialized_on_writer ... ok
+held sync:
+  xSync(flags=2) on /tmp/.tmpYDtnKW/live-0.sqlite3-wal [wal] by chio-receipt-writer (ThreadId(253)), held for 7.571997ms
+  backtrace of the syncing thread:
+       0: std::backtrace::Backtrace::create
+       1: receipt_retention_liveness::sync_shim::SyncShim::before_sync
+       2: receipt_retention_liveness::sync_shim::shim_sync
+       3: sqlite3OsSync
+       4: walFrames
+       5: sqlite3WalFrames
+       6: pagerWalFrames
+       7: sqlite3PagerCommitPhaseOne
+       8: sqlite3BtreeCommitPhaseOne
+       9: vdbeCommit
+      10: sqlite3VdbeHalt
+      11: sqlite3VdbeExec
+      12: sqlite3Step
+      13: sqlite3_step
+      14: rusqlite::raw_statement::RawStatement::step
+      15: rusqlite::statement::Statement::step
+      16: rusqlite::Connection::execute_batch
+      17: rusqlite::transaction::Transaction::commit_
+      18: rusqlite::transaction::Transaction::commit
+      19: chio_store_sqlite::receipt_store::append_receipt_batch
+      20: chio_store_sqlite::receipt_store::commit_receipt_batch_with_completions
+      21: chio_store_sqlite::receipt_store::receipt_commit_actor_loop::{{closure}}
+      22: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      23: std::panicking::catch_unwind::do_call
+      24: __rust_try
+      25: std::panic::catch_unwind
+      26: chio_store_sqlite::receipt_store::receipt_commit_actor_loop
+      27: chio_store_sqlite::receipt_store::ReceiptCommitActor::start::{{closure}}
+      28: chio_supervisor::thread::supervise_loop::{{closure}}
+      29: core::ops::function::FnOnce::call_once
+      30: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      31: std::panicking::catch_unwind::do_call
+      32: __rust_try
+      33: std::panic::catch_unwind
+      34: chio_supervisor::thread::supervise_loop
+      35: chio_supervisor::thread::SupervisedThread::spawn::{{closure}}
+      36: std::sys::backtrace::__rust_begin_short_backtrace
+      37: std::thread::lifecycle::spawn_unchecked::{{closure}}::{{closure}}
+      38: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+      39: std::panicking::catch_unwind::do_call
+      40: __rust_try
+      41: std::thread::lifecycle::spawn_unchecked::{{closure}}
+      42: core::ops::function::FnOnce::call_once{{vtable.shim}}
+      43: std::sys::thread::unix::Thread::new::thread_start
+      44: start_thread
+                 at ./nptl/pthread_create.c:447:8
+      45: thread_start
+                 at ./misc/../sysdeps/unix/sysv/linux/aarch64/clone3.S:76:0
+active syncs:
+  active owner: chio-receipt-writer (ThreadId(253))
+  xSync(flags=2) on /tmp/.tmpYDtnKW/live-0.sqlite3-wal [wal] by chio-receipt-writer (ThreadId(253)), elapsed 7.606638ms, WAL write=true, checkpoint=false
+  entry stack:
+   0: std::backtrace::Backtrace::create
+   1: receipt_retention_liveness::sync_shim::diagnostics::ActiveSyncs::enter
+   2: receipt_retention_liveness::sync_shim::SyncShim::before_sync
+   3: receipt_retention_liveness::sync_shim::shim_sync
+   4: sqlite3OsSync
+   5: walFrames
+   6: sqlite3WalFrames
+   7: pagerWalFrames
+   8: sqlite3PagerCommitPhaseOne
+   9: sqlite3BtreeCommitPhaseOne
+  10: vdbeCommit
+  11: sqlite3VdbeHalt
+  12: sqlite3VdbeExec
+  13: sqlite3Step
+  14: sqlite3_step
+  15: rusqlite::raw_statement::RawStatement::step
+  16: rusqlite::statement::Statement::step
+  17: rusqlite::Connection::execute_batch
+  18: rusqlite::transaction::Transaction::commit_
+  19: rusqlite::transaction::Transaction::commit
+  20: chio_store_sqlite::receipt_store::append_receipt_batch
+  21: chio_store_sqlite::receipt_store::commit_receipt_batch_with_completions
+  22: chio_store_sqlite::receipt_store::receipt_commit_actor_loop::{{closure}}
+  23: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+  24: std::panicking::catch_unwind::do_call
+  25: __rust_try
+  26: std::panic::catch_unwind
+  27: chio_store_sqlite::receipt_store::receipt_commit_actor_loop
+  28: chio_store_sqlite::receipt_store::ReceiptCommitActor::start::{{closure}}
+  29: chio_supervisor::thread::supervise_loop::{{closure}}
+  30: core::ops::function::FnOnce::call_once
+  31: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+  32: std::panicking::catch_unwind::do_call
+  33: __rust_try
+  34: std::panic::catch_unwind
+  35: chio_supervisor::thread::supervise_loop
+  36: chio_supervisor::thread::SupervisedThread::spawn::{{closure}}
+  37: std::sys::backtrace::__rust_begin_short_backtrace
+  38: std::thread::lifecycle::spawn_unchecked::{{closure}}::{{closure}}
+  39: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+  40: std::panicking::catch_unwind::do_call
+  41: __rust_try
+  42: std::thread::lifecycle::spawn_unchecked::{{closure}}
+  43: core::ops::function::FnOnce::call_once{{vtable.shim}}
+  44: std::sys::thread::unix::Thread::new::thread_start
+  45: start_thread
+             at ./nptl/pthread_create.c:447:8
+  46: thread_start
+             at ./misc/../sysdeps/unix/sysv/linux/aarch64/clone3.S:76:0
+
+lock ledger:
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c050001bf0: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(250))), wal-index WRITE EXCLUSIVE by chio-receipt-writer (ThreadId(253)), wal-index READ(1) SHARED by chio-receipt-writer (ThreadId(253))
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c05c00b6a0: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(248)))
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c05c043400: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(248)))
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c05c0bf590: file lock SHARED (last changed by r2d2-worker-1 (ThreadId(248)))
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c07402fd90: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(247)))
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c074057360: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(247)))
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c074062f80: file lock SHARED (last changed by r2d2-worker-0 (ThreadId(247)))
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c158002160: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(249)))
+  /tmp/.tmpYDtnKW/live-0.sqlite3 handle 0xe3c158061590: file lock SHARED (last changed by r2d2-worker-2 (ThreadId(249)))
+threads:
+  tid 2061809 receipt_retenti              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12e01fff998 0x89 0xffffffff 0xfffffb89dc50 0x0 0xffffffff 0xfffffb89dc40 0xe3c16d5c9768
+  tid 2061812 rotation_waits_              state=R (running) wchan=0 syscall=63 0x18 0xe3c16d0bab40 0x20 0x0 0xe3c16d0baae0 0xe3c16d0bac5f 0xe3c16d0bab10 0xe3c16d5c124c
+  tid 2061813 sync_shim::fail              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12df7356414 0x89 0x2 0x0 0x0 0xffffffff 0xe3c16cead950 0xe3c16d5c9768
+  tid 2061814 workload::relea              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12df7356414 0x89 0x2 0x0 0x0 0xffffffff 0xe3c16cc9db70 0xe3c16d5c9768
+  tid 2061815 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16ca8f868 0x80 0x1 0xe3c16ca8dd28 0x0 0x0 0xe3c16ca8dc80 0xe3c16d5c9768
+  tid 2061816 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c87f868 0x80 0x1 0xe3c16c87dd28 0x0 0x0 0xe3c16c87dc80 0xe3c16d5c9768
+  tid 2061817 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c66f868 0x80 0x1 0xe3c16c66dd28 0x0 0x0 0xe3c16c66dc80 0xe3c16d5c9768
+  tid 2061818 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c45f868 0x80 0x1 0xe3c16c45dd28 0x0 0x0 0xe3c16c45dc80 0xe3c16d5c9768
+  tid 2061819 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c24f868 0x80 0x1 0xe3c16c24dd28 0x0 0x0 0xe3c16c24dc80 0xe3c16d5c9768
+  tid 2061820 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c167fff868 0x80 0x1 0xe3c167ffdd28 0x0 0x0 0xe3c167ffdc80 0xe3c16d5c9768
+  tid 2061829 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c167def868 0x80 0x1 0xe3c167dedd28 0x0 0x0 0xe3c167dedc80 0xe3c16d5c9768
+  tid 2061830 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165a70868 0x80 0x1 0xe3c165a6ed28 0x0 0x0 0xe3c165a6ec80 0xe3c16d5c9768
+  tid 2061831 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165c80868 0x80 0x1 0xe3c165c7ed28 0x0 0x0 0xe3c165c7ec80 0xe3c16d5c9768
+  tid 2061832 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c167bdf868 0x80 0x1 0xe3c167bddd28 0x0 0x0 0xe3c167bddc80 0xe3c16d5c9768
+  tid 2061833 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165860868 0x80 0x1 0xe3c16585ed28 0x0 0x0 0xe3c16585ec80 0xe3c16d5c9768
+  tid 2061834 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165650868 0x80 0x1 0xe3c16564ed28 0x0 0x0 0xe3c16564ec80 0xe3c16d5c9768
+  tid 2061896 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165440868 0x80 0x1 0xe3c16543ed28 0x0 0x0 0xe3c16543ec80 0xe3c16d5c9768
+  tid 2061897 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165230868 0x80 0x1 0xe3c16522ed28 0x0 0x0 0xe3c16522ec80 0xe3c16d5c9768
+  tid 2061898 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165020868 0x80 0x1 0xe3c16501ed28 0x0 0x0 0xe3c16501ec80 0xe3c16d5c9768
+  tid 2061899 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c164e10868 0x80 0x1 0xe3c164e0ed28 0x0 0x0 0xe3c164e0ec80 0xe3c16d5c9768
+  tid 2061900 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c164c00868 0x80 0x1 0xe3c164bfed28 0x0 0x0 0xe3c164bfec80 0xe3c16d5c9768
+  tid 2061901 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1649f0868 0x80 0x1 0xe3c1649eed28 0x0 0x0 0xe3c1649eec80 0xe3c16d5c9768
+  tid 2061908 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1647e0868 0x80 0x1 0xe3c1647ded28 0x0 0x0 0xe3c1647dec80 0xe3c16d5c9768
+  tid 2061909 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1645d0868 0x80 0x1 0xe3c1645ced28 0x0 0x0 0xe3c1645cec80 0xe3c16d5c9768
+  tid 2061910 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1643c0868 0x80 0x1 0xe3c1643bed28 0x0 0x0 0xe3c1643bec80 0xe3c16d5c9768
+  tid 2061911 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ffff868 0x80 0x1 0xe3c15fffdd28 0x0 0x0 0xe3c15fffdc80 0xe3c16d5c9768
+  tid 2061912 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15fdef868 0x80 0x1 0xe3c15fdedd28 0x0 0x0 0xe3c15fdedc80 0xe3c16d5c9768
+  tid 2061913 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15fbdf868 0x80 0x1 0xe3c15fbddd28 0x0 0x0 0xe3c15fbddc80 0xe3c16d5c9768
+  tid 2061918 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f9cf868 0x80 0x1 0xe3c15f9cdd28 0x0 0x0 0xe3c15f9cdc80 0xe3c16d5c9768
+  tid 2061919 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f7bf868 0x80 0x1 0xe3c15f7bdd28 0x0 0x0 0xe3c15f7bdc80 0xe3c16d5c9768
+  tid 2061920 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f5af868 0x80 0x1 0xe3c15f5add28 0x0 0x0 0xe3c15f5adc80 0xe3c16d5c9768
+  tid 2061921 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f39f868 0x80 0x1 0xe3c15f39dd28 0x0 0x0 0xe3c15f39dc80 0xe3c16d5c9768
+  tid 2061922 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f18f868 0x80 0x1 0xe3c15f18dd28 0x0 0x0 0xe3c15f18dc80 0xe3c16d5c9768
+  tid 2061923 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ef7f868 0x80 0x1 0xe3c15ef7dd28 0x0 0x0 0xe3c15ef7dc80 0xe3c16d5c9768
+  tid 2061965 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ed6f868 0x80 0x1 0xe3c15ed6dd28 0x0 0x0 0xe3c15ed6dc80 0xe3c16d5c9768
+  tid 2061966 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15eb5f868 0x80 0x1 0xe3c15eb5dd28 0x0 0x0 0xe3c15eb5dc80 0xe3c16d5c9768
+  tid 2061967 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e94f868 0x80 0x1 0xe3c15e94dd28 0x0 0x0 0xe3c15e94dc80 0xe3c16d5c9768
+  tid 2061968 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e73f868 0x80 0x1 0xe3c15e73dd28 0x0 0x0 0xe3c15e73dc80 0xe3c16d5c9768
+  tid 2061969 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e52f868 0x80 0x1 0xe3c15e52dd28 0x0 0x0 0xe3c15e52dc80 0xe3c16d5c9768
+  tid 2061970 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e31f868 0x80 0x1 0xe3c15e31dd28 0x0 0x0 0xe3c15e31dc80 0xe3c16d5c9768
+  tid 2061977 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e10f868 0x80 0x1 0xe3c15e10dd28 0x0 0x0 0xe3c15e10dc80 0xe3c16d5c9768
+  tid 2061978 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15deff868 0x80 0x1 0xe3c15defdd28 0x0 0x0 0xe3c15defdc80 0xe3c16d5c9768
+  tid 2061979 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15dcef868 0x80 0x1 0xe3c15dcedd28 0x0 0x0 0xe3c15dcedc80 0xe3c16d5c9768
+  tid 2061980 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15dadf868 0x80 0x1 0xe3c15daddd28 0x0 0x0 0xe3c15daddc80 0xe3c16d5c9768
+  tid 2061981 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d8cf868 0x80 0x1 0xe3c15d8cdd28 0x0 0x0 0xe3c15d8cdc80 0xe3c16d5c9768
+  tid 2061982 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d6bf868 0x80 0x1 0xe3c15d6bdd28 0x0 0x0 0xe3c15d6bdc80 0xe3c16d5c9768
+  tid 2061987 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d4af868 0x80 0x1 0xe3c15d4add28 0x0 0x0 0xe3c15d4adc80 0xe3c16d5c9768
+  tid 2061988 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d29f868 0x80 0x1 0xe3c15d29dd28 0x0 0x0 0xe3c15d29dc80 0xe3c16d5c9768
+  tid 2061989 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d08f868 0x80 0x1 0xe3c15d08dd28 0x0 0x0 0xe3c15d08dc80 0xe3c16d5c9768
+  tid 2061990 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ce7f868 0x80 0x1 0xe3c15ce7dd28 0x0 0x0 0xe3c15ce7dc80 0xe3c16d5c9768
+  tid 2061991 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15cc6f868 0x80 0x1 0xe3c15cc6dd28 0x0 0x0 0xe3c15cc6dc80 0xe3c16d5c9768
+  tid 2061992 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ca5f868 0x80 0x1 0xe3c15ca5dd28 0x0 0x0 0xe3c15ca5dc80 0xe3c16d5c9768
+  tid 2062054 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15c84f868 0x80 0x1 0xe3c15c84dd28 0x0 0x0 0xe3c15c84dc80 0xe3c16d5c9768
+  tid 2062055 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15c63f868 0x80 0x1 0xe3c15c63dd28 0x0 0x0 0xe3c15c63dc80 0xe3c16d5c9768
+  tid 2062056 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15c42f868 0x80 0x1 0xe3c15c42dd28 0x0 0x0 0xe3c15c42dc80 0xe3c16d5c9768
+  tid 2062057 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15c21f868 0x80 0x1 0xe3c15c21dd28 0x0 0x0 0xe3c15c21dc80 0xe3c16d5c9768
+  tid 2062058 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c157fff868 0x80 0x1 0xe3c157ffdd28 0x0 0x0 0xe3c157ffdc80 0xe3c16d5c9768
+  tid 2062059 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c157def868 0x80 0x1 0xe3c157dedd28 0x0 0x0 0xe3c157dedc80 0xe3c16d5c9768
+  tid 2062066 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c157bdf868 0x80 0x1 0xe3c157bddd28 0x0 0x0 0xe3c157bddc80 0xe3c16d5c9768
+  tid 2062067 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1579cf868 0x80 0x1 0xe3c1579cdd28 0x0 0x0 0xe3c1579cdc80 0xe3c16d5c9768
+  tid 2062068 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1577bf868 0x80 0x1 0xe3c1577bdd28 0x0 0x0 0xe3c1577bdc80 0xe3c16d5c9768
+  tid 2062069 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1575af868 0x80 0x1 0xe3c1575add28 0x0 0x0 0xe3c1575adc80 0xe3c16d5c9768
+  tid 2062070 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15739f868 0x80 0x1 0xe3c15739dd28 0x0 0x0 0xe3c15739dc80 0xe3c16d5c9768
+  tid 2062071 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15718f868 0x80 0x1 0xe3c15718dd28 0x0 0x0 0xe3c15718dc80 0xe3c16d5c9768
+  tid 2062075 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16d2cf868 0x80 0x1 0xe3c16d2cdd28 0x0 0x0 0xe3c16d2cdc80 0xe3c16d5c9768
+  tid 2062076 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16d4df868 0x80 0x1 0xe3c16d4ddd28 0x0 0x0 0xe3c16d4ddc80 0xe3c16d5c9768
+  tid 2062077 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c156f7f868 0x80 0x1 0xe3c156f7dd28 0x0 0x0 0xe3c156f7dc80 0xe3c16d5c9768
+  tid 2062078 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c156d6f868 0x80 0x1 0xe3c156d6dd28 0x0 0x0 0xe3c156d6dc80 0xe3c16d5c9768
+  tid 2062079 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c156b5f868 0x80 0x1 0xe3c156b5dd28 0x0 0x0 0xe3c156b5dc80 0xe3c16d5c9768
+  tid 2062080 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15694f868 0x80 0x1 0xe3c15694dd28 0x0 0x0 0xe3c15694dc80 0xe3c16d5c9768
+  tid 2062081 chio-receipt-wr              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12df7350140 0x89 0x3 0x0 0x0 0xffffffff 0xe3c156736890 0xe3c16d5c9768
+  tid 2062082 caller-append                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16017f078 0x89 0xffffffff 0x0 0x0 0xffffffff 0xe3c15652be10 0xe3c16d5c9768
+  tid 2062083 caller-rotate                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16016ecd8 0x89 0xffffffff 0xe3c15631d3c0 0x0 0xffffffff 0xe3c15631d3b0 0xe3c16d5c9768
+
+  chio-receipt-writer (ThreadId(253)): {"archive.journal": 8, "archive.main": 4, "live.main": 1, "live.wal": 5}
+
+test rotation_waits_behind_the_writer_commit_it_cannot_preempt ... ok
+test sync_shim::failed_open_tests::failed_parent_open_keeps_its_required_close_callback ... ok
+
+thread '<unnamed>' (2062108) panicked at crates/platform/chio-store-sqlite/tests/receipt_retention_liveness/workload.rs:168:23:
+step released-caller made no progress within 20ms
+held sync:
+  (none)
+active syncs:
+  (none)
+lock ledger:
+  (no locks held)
+threads:
+  tid 2061809 receipt_retenti              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12e01fff998 0x89 0xffffffff 0xfffffb89dc50 0x0 0xffffffff 0xfffffb89dc40 0xe3c16d5c9768
+  tid 2061814 workload::relea              state=S (sleeping) wchan=futex_do_wait syscall=98 0xc12e01ffdf98 0x89 0xffffffff 0xe3c16cc9d780 0x0 0xffffffff 0xe3c16cc9d770 0xe3c16d5c9768
+  tid 2061815 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16ca8f868 0x80 0x1 0xe3c16ca8dd28 0x0 0x0 0xe3c16ca8dc80 0xe3c16d5c9768
+  tid 2061816 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c87f868 0x80 0x1 0xe3c16c87dd28 0x0 0x0 0xe3c16c87dc80 0xe3c16d5c9768
+  tid 2061817 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c66f868 0x80 0x1 0xe3c16c66dd28 0x0 0x0 0xe3c16c66dc80 0xe3c16d5c9768
+  tid 2061818 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c45f868 0x80 0x1 0xe3c16c45dd28 0x0 0x0 0xe3c16c45dc80 0xe3c16d5c9768
+  tid 2061819 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16c24f868 0x80 0x1 0xe3c16c24dd28 0x0 0x0 0xe3c16c24dc80 0xe3c16d5c9768
+  tid 2061820 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c167fff868 0x80 0x1 0xe3c167ffdd28 0x0 0x0 0xe3c167ffdc80 0xe3c16d5c9768
+  tid 2061829 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c167def868 0x80 0x1 0xe3c167dedd28 0x0 0x0 0xe3c167dedc80 0xe3c16d5c9768
+  tid 2061830 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165a70868 0x80 0x1 0xe3c165a6ed28 0x0 0x0 0xe3c165a6ec80 0xe3c16d5c9768
+  tid 2061831 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165c80868 0x80 0x1 0xe3c165c7ed28 0x0 0x0 0xe3c165c7ec80 0xe3c16d5c9768
+  tid 2061832 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c167bdf868 0x80 0x1 0xe3c167bddd28 0x0 0x0 0xe3c167bddc80 0xe3c16d5c9768
+  tid 2061833 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165860868 0x80 0x1 0xe3c16585ed28 0x0 0x0 0xe3c16585ec80 0xe3c16d5c9768
+  tid 2061834 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165650868 0x80 0x1 0xe3c16564ed28 0x0 0x0 0xe3c16564ec80 0xe3c16d5c9768
+  tid 2061896 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165440868 0x80 0x1 0xe3c16543ed28 0x0 0x0 0xe3c16543ec80 0xe3c16d5c9768
+  tid 2061897 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165230868 0x80 0x1 0xe3c16522ed28 0x0 0x0 0xe3c16522ec80 0xe3c16d5c9768
+  tid 2061898 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c165020868 0x80 0x1 0xe3c16501ed28 0x0 0x0 0xe3c16501ec80 0xe3c16d5c9768
+  tid 2061899 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c164e10868 0x80 0x1 0xe3c164e0ed28 0x0 0x0 0xe3c164e0ec80 0xe3c16d5c9768
+  tid 2061900 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c164c00868 0x80 0x1 0xe3c164bfed28 0x0 0x0 0xe3c164bfec80 0xe3c16d5c9768
+  tid 2061901 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1649f0868 0x80 0x1 0xe3c1649eed28 0x0 0x0 0xe3c1649eec80 0xe3c16d5c9768
+  tid 2061908 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1647e0868 0x80 0x1 0xe3c1647ded28 0x0 0x0 0xe3c1647dec80 0xe3c16d5c9768
+  tid 2061909 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1645d0868 0x80 0x1 0xe3c1645ced28 0x0 0x0 0xe3c1645cec80 0xe3c16d5c9768
+  tid 2061910 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1643c0868 0x80 0x1 0xe3c1643bed28 0x0 0x0 0xe3c1643bec80 0xe3c16d5c9768
+  tid 2061911 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ffff868 0x80 0x1 0xe3c15fffdd28 0x0 0x0 0xe3c15fffdc80 0xe3c16d5c9768
+  tid 2061912 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15fdef868 0x80 0x1 0xe3c15fdedd28 0x0 0x0 0xe3c15fdedc80 0xe3c16d5c9768
+  tid 2061913 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15fbdf868 0x80 0x1 0xe3c15fbddd28 0x0 0x0 0xe3c15fbddc80 0xe3c16d5c9768
+  tid 2061918 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f9cf868 0x80 0x1 0xe3c15f9cdd28 0x0 0x0 0xe3c15f9cdc80 0xe3c16d5c9768
+  tid 2061919 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f7bf868 0x80 0x1 0xe3c15f7bdd28 0x0 0x0 0xe3c15f7bdc80 0xe3c16d5c9768
+  tid 2061920 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f5af868 0x80 0x1 0xe3c15f5add28 0x0 0x0 0xe3c15f5adc80 0xe3c16d5c9768
+  tid 2061921 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f39f868 0x80 0x1 0xe3c15f39dd28 0x0 0x0 0xe3c15f39dc80 0xe3c16d5c9768
+  tid 2061922 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15f18f868 0x80 0x1 0xe3c15f18dd28 0x0 0x0 0xe3c15f18dc80 0xe3c16d5c9768
+  tid 2061923 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ef7f868 0x80 0x1 0xe3c15ef7dd28 0x0 0x0 0xe3c15ef7dc80 0xe3c16d5c9768
+  tid 2061965 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ed6f868 0x80 0x1 0xe3c15ed6dd28 0x0 0x0 0xe3c15ed6dc80 0xe3c16d5c9768
+  tid 2061966 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15eb5f868 0x80 0x1 0xe3c15eb5dd28 0x0 0x0 0xe3c15eb5dc80 0xe3c16d5c9768
+  tid 2061967 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e94f868 0x80 0x1 0xe3c15e94dd28 0x0 0x0 0xe3c15e94dc80 0xe3c16d5c9768
+  tid 2061968 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e73f868 0x80 0x1 0xe3c15e73dd28 0x0 0x0 0xe3c15e73dc80 0xe3c16d5c9768
+  tid 2061969 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e52f868 0x80 0x1 0xe3c15e52dd28 0x0 0x0 0xe3c15e52dc80 0xe3c16d5c9768
+  tid 2061970 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e31f868 0x80 0x1 0xe3c15e31dd28 0x0 0x0 0xe3c15e31dc80 0xe3c16d5c9768
+  tid 2061977 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15e10f868 0x80 0x1 0xe3c15e10dd28 0x0 0x0 0xe3c15e10dc80 0xe3c16d5c9768
+  tid 2061978 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15deff868 0x80 0x1 0xe3c15defdd28 0x0 0x0 0xe3c15defdc80 0xe3c16d5c9768
+  tid 2061979 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15dcef868 0x80 0x1 0xe3c15dcedd28 0x0 0x0 0xe3c15dcedc80 0xe3c16d5c9768
+  tid 2061980 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15dadf868 0x80 0x1 0xe3c15daddd28 0x0 0x0 0xe3c15daddc80 0xe3c16d5c9768
+  tid 2061981 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d8cf868 0x80 0x1 0xe3c15d8cdd28 0x0 0x0 0xe3c15d8cdc80 0xe3c16d5c9768
+  tid 2061982 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d6bf868 0x80 0x1 0xe3c15d6bdd28 0x0 0x0 0xe3c15d6bdc80 0xe3c16d5c9768
+  tid 2061987 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d4af868 0x80 0x1 0xe3c15d4add28 0x0 0x0 0xe3c15d4adc80 0xe3c16d5c9768
+  tid 2061988 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d29f868 0x80 0x1 0xe3c15d29dd28 0x0 0x0 0xe3c15d29dc80 0xe3c16d5c9768
+  tid 2061989 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15d08f868 0x80 0x1 0xe3c15d08dd28 0x0 0x0 0xe3c15d08dc80 0xe3c16d5c9768
+  tid 2061990 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ce7f868 0x80 0x1 0xe3c15ce7dd28 0x0 0x0 0xe3c15ce7dc80 0xe3c16d5c9768
+  tid 2061991 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15cc6f868 0x80 0x1 0xe3c15cc6dd28 0x0 0x0 0xe3c15cc6dc80 0xe3c16d5c9768
+  tid 2061992 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15ca5f868 0x80 0x1 0xe3c15ca5dd28 0x0 0x0 0xe3c15ca5dc80 0xe3c16d5c9768
+  tid 2062054 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15c84f868 0x80 0x1 0xe3c15c84dd28 0x0 0x0 0xe3c15c84dc80 0xe3c16d5c9768
+  tid 2062055 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15c63f868 0x80 0x1 0xe3c15c63dd28 0x0 0x0 0xe3c15c63dc80 0xe3c16d5c9768
+  tid 2062056 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15c42f868 0x80 0x1 0xe3c15c42dd28 0x0 0x0 0xe3c15c42dc80 0xe3c16d5c9768
+  tid 2062057 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15c21f868 0x80 0x1 0xe3c15c21dd28 0x0 0x0 0xe3c15c21dc80 0xe3c16d5c9768
+  tid 2062058 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c157fff868 0x80 0x1 0xe3c157ffdd28 0x0 0x0 0xe3c157ffdc80 0xe3c16d5c9768
+  tid 2062059 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c157def868 0x80 0x1 0xe3c157dedd28 0x0 0x0 0xe3c157dedc80 0xe3c16d5c9768
+  tid 2062066 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c157bdf868 0x80 0x1 0xe3c157bddd28 0x0 0x0 0xe3c157bddc80 0xe3c16d5c9768
+  tid 2062067 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1579cf868 0x80 0x1 0xe3c1579cdd28 0x0 0x0 0xe3c1579cdc80 0xe3c16d5c9768
+  tid 2062068 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1577bf868 0x80 0x1 0xe3c1577bdd28 0x0 0x0 0xe3c1577bdc80 0xe3c16d5c9768
+  tid 2062069 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c1575af868 0x80 0x1 0xe3c1575add28 0x0 0x0 0xe3c1575adc80 0xe3c16d5c9768
+  tid 2062070 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15739f868 0x80 0x1 0xe3c15739dd28 0x0 0x0 0xe3c15739dc80 0xe3c16d5c9768
+  tid 2062071 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15718f868 0x80 0x1 0xe3c15718dd28 0x0 0x0 0xe3c15718dc80 0xe3c16d5c9768
+  tid 2062075 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16d2cf868 0x80 0x1 0xe3c16d2cdd28 0x0 0x0 0xe3c16d2cdc80 0xe3c16d5c9768
+  tid 2062076 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16d4df868 0x80 0x1 0xe3c16d4ddd28 0x0 0x0 0xe3c16d4ddc80 0xe3c16d5c9768
+  tid 2062077 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c156f7f868 0x80 0x1 0xe3c156f7dd28 0x0 0x0 0xe3c156f7dc80 0xe3c16d5c9768
+  tid 2062078 r2d2-worker-0                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c156d6f868 0x80 0x1 0xe3c156d6dd28 0x0 0x0 0xe3c156d6dc80 0xe3c16d5c9768
+  tid 2062079 r2d2-worker-1                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c156b5f868 0x80 0x1 0xe3c156b5dd28 0x0 0x0 0xe3c156b5dc80 0xe3c16d5c9768
+  tid 2062080 r2d2-worker-2                state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c15694f868 0x80 0x1 0xe3c15694dd28 0x0 0x0 0xe3c15694dc80 0xe3c16d5c9768
+  tid 2062107 workload::relea              state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c150000d48 0x89 0xffffffff 0x0 0x0 0xffffffff 0xe3c16d0be030 0xe3c16d5c9768
+  tid 2062108 workload::relea              state=R (running) wchan=0 syscall=63 0x4 0xe3c16cead080 0x20 0x0 0xe3c16cead020 0xe3c16cead19f 0xe3c16cead050 0xe3c16d5c124c
+  tid 2062109 workload-releas              state=S (sleeping) wchan=futex_do_wait syscall=98 0xe3c16d0bf150 0x109 0x1f771b 0x0 0x0 0xffffffff 0xe3c15673e090 0xe3c16d561d70
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test workload::released_caller_timeout_reports_the_stalled_step ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.29s
+

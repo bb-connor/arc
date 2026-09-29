@@ -119,12 +119,21 @@ fn retention_workload_commits_are_serialized_on_writer() {
         scope: scope.clone(),
         budget: STEP_BUDGET + delay * 64,
     };
-    let sequences = operation_sequences(WORKLOAD_CASES);
+    let cases = std::env::var("CHIO_RETENTION_DIAGNOSTIC_CASES")
+        .map(|value| value.parse::<usize>().test_expect("diagnostic case count"))
+        .unwrap_or(WORKLOAD_CASES);
+    assert!(
+        (1..=256).contains(&cases),
+        "diagnostic cases must be 1..=256"
+    );
+    let sequences = operation_sequences(cases);
     let mut reports: Vec<CaseReport> = Vec::new();
     let started = Instant::now();
     for (case, ops) in sequences.iter().enumerate() {
         let files = CaseFiles::in_directory(directory.path(), case);
+        println!("retention diagnostic case={case} phase=begin ops={ops:?}");
         reports.push(workload::run_case(ops, &files, &watchdog));
+        println!("retention diagnostic case={case} phase=complete");
     }
     let elapsed = started.elapsed();
     shim.set_delay(Duration::ZERO);
@@ -175,7 +184,7 @@ fn retention_workload_commits_are_serialized_on_writer() {
 
     // The budget is a property of the operation sequence: replaying the
     // first case yields the same syncs on every file.
-    let replay_files = CaseFiles::in_directory(directory.path(), WORKLOAD_CASES);
+    let replay_files = CaseFiles::in_directory(directory.path(), cases);
     let replay = workload::run_case(&sequences[0], &replay_files, &watchdog);
     assert_eq!(
         replay.syncs, reports[0].syncs,
@@ -299,11 +308,17 @@ fn rotation_waits_behind_the_writer_commit_it_cannot_preempt() {
         "the held sync must be attributed to the writer's commit path:\n{backtrace}"
     );
 
+    let active_snapshot = shim.snapshot(&live_prefix);
     drop(release);
     let appended = watchdog
         .join("append-after-release", append)
         .test_expect("append completes after release");
     assert_eq!(appended, 3);
+    assert!(
+        active_snapshot.contains("active syncs:\n")
+            && active_snapshot.contains("active owner: chio-receipt-writer"),
+        "the snapshot must retain the active delegated sync owner: {active_snapshot}"
+    );
     let archived = watchdog
         .join("rotation-after-release", rotation)
         .test_expect("rotation completes after release");
@@ -321,6 +336,9 @@ fn rotation_waits_behind_the_writer_commit_it_cannot_preempt() {
         store.writer_liveness(Duration::ZERO),
         ReceiptWriterLiveness::Healthy
     );
+    assert!(shim
+        .snapshot(&live_prefix)
+        .contains("active syncs:\n  (none)"));
     let checking = Arc::clone(&store);
     let health = watchdog
         .step("health-after-release", move || {

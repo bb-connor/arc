@@ -283,7 +283,12 @@ pub fn run_case(ops: &[Op], files: &CaseFiles, watchdog: &Watchdog<'_>) -> CaseR
     let workload_start;
     let workload_end;
     {
-        let store = Arc::new(SqliteReceiptStore::open(&files.live).test_expect("open live store"));
+        let live = files.live.clone();
+        let store = Arc::new(
+            watchdog
+                .step("open-live", move || SqliteReceiptStore::open(&live))
+                .test_expect("open live store"),
+        );
         store
             .enable_background_checkpoints(signer(&keypair))
             .test_expect("install signer");
@@ -369,6 +374,7 @@ pub fn run_case(ops: &[Op], files: &CaseFiles, watchdog: &Watchdog<'_>) -> CaseR
             "unhealthy at the end of the run: {health:?}"
         );
         workload_end = shim.syncs_under(&watchdog.scope).len();
+        watchdog.step("teardown-original", move || drop(store));
     }
     let live = files.live.clone();
     let reopened = watchdog.step("reopen", move || SqliteReceiptStore::open(&live));
@@ -382,15 +388,18 @@ pub fn run_case(ops: &[Op], files: &CaseFiles, watchdog: &Watchdog<'_>) -> CaseR
         .step("reopen-health", move || checking.receipt_store_health())
         .test_expect("health after reopen");
     assert!(health.healthy, "unhealthy after reopen: {health:?}");
-    drop(reopened);
+    watchdog.step("teardown-reopened", move || drop(reopened));
 
-    let live_ids = receipt_ids(&files.live);
+    let live = files.live.clone();
+    let live_ids = watchdog.step("read-live-ids", move || receipt_ids(&live));
     let archived_ids = if files.archive.exists() {
         let archive = files.archive.clone();
         let archive_store =
             watchdog.step("open-archive", move || SqliteReceiptStore::open(&archive));
-        drop(archive_store.test_expect("open archive as a store"));
-        receipt_ids(&files.archive)
+        let archive_store = archive_store.test_expect("open archive as a store");
+        watchdog.step("teardown-archive", move || drop(archive_store));
+        let archive = files.archive.clone();
+        watchdog.step("read-archive-ids", move || receipt_ids(&archive))
     } else {
         BTreeSet::new()
     };

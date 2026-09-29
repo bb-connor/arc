@@ -1,0 +1,14 @@
+
+running 1 test
+retention diagnostic case=0 phase=begin ops=[Rotate, AppendTool(3), Rotate, AppendTool(5), AppendTool(5), AppendTool(7), AppendTool(1), Rotate, AppendChild(1), AppendChild(6), AppendTool(7), Rotate, AppendChild(4), AppendChild(6), Rotate, AppendChild(2), Rotate, AppendChild(0), AppendChild(6)]
+retention diagnostic case=0 phase=complete
+retention diagnostic case=1 phase=begin ops=[AppendTool(0), Rotate, AppendChild(0), AppendChild(6), Rotate]
+retention diagnostic case=1 phase=complete
+2 cases, 24 ops, 8 rotations, 288 syncs in 4.388448667s (induced sync delay 3ms)
+syncs by file: {"archive.journal": 68, "archive.main": 36, "archive.wal": 6, "live.journal": 8, "live.main": 27, "live.wal": 143}
+  case  0: ops=19 rotations= 6 archived= 21 syncs= 197 {"archive.journal": 48, "archive.main": 25, "archive.wal": 3, "live.journal": 4, "live.main": 17, "live.wal": 100}
+  case  1: ops= 5 rotations= 2 archived=  4 syncs=  91 {"archive.journal": 20, "archive.main": 11, "archive.wal": 3, "live.journal": 4, "live.main": 10, "live.wal": 43}
+test retention_workload_commits_are_serialized_on_writer ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 6.79s
+

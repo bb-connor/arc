@@ -27,6 +27,9 @@ use std::time::{Duration, Instant};
 
 use rusqlite::ffi;
 
+#[path = "sync_diagnostics.rs"]
+mod diagnostics;
+
 const SHIM_NAME: &CStr = c"chio-sync-shim";
 
 /// Identity of the thread that issued a VFS call.
@@ -170,6 +173,7 @@ struct State {
 
 /// Process-wide shim control surface.
 pub struct SyncShim {
+    active_syncs: diagnostics::ActiveSyncs,
     state: Mutex<State>,
     changed: Condvar,
 }
@@ -180,6 +184,7 @@ static REGISTRATION: OnceLock<Result<(), String>> = OnceLock::new();
 /// Register the shim as the default VFS (once) and return its control handle.
 pub fn install() -> &'static SyncShim {
     let shim = SHIM.get_or_init(|| SyncShim {
+        active_syncs: diagnostics::ActiveSyncs::default(),
         state: Mutex::new(State::default()),
         changed: Condvar::new(),
     });
@@ -375,6 +380,7 @@ impl SyncShim {
             }
             None => report.push_str("  (none)\n"),
         }
+        report.push_str(&self.active_syncs.snapshot(path_prefix));
         report.push_str("lock ledger:\n");
         report.push_str(&self.locks_under(path_prefix));
         report.push_str("threads:\n");
@@ -382,7 +388,11 @@ impl SyncShim {
         report
     }
 
-    fn before_sync(&self, mut record: SyncRecord) {
+    fn before_sync(
+        &self,
+        handle: usize,
+        mut record: SyncRecord,
+    ) -> diagnostics::SyncObservation<'_> {
         let mut state = self.state();
         if record.kind == FileKind::Wal {
             if let Some(main_path) = record.path.strip_suffix("-wal") {
@@ -400,6 +410,7 @@ impl SyncShim {
                 record.wal_checkpoint_lock = held_by_this_thread(1);
             }
         }
+        let active = self.active_syncs.enter(handle, record.clone());
         let delay = state.delay;
         let gated = match &state.armed {
             Some(spec)
@@ -435,6 +446,7 @@ impl SyncShim {
         if !delay.is_zero() {
             thread::sleep(delay);
         }
+        active
     }
 
     fn record_lock(&self, handle: usize, path: &str, level: c_int) {
@@ -975,7 +987,7 @@ unsafe extern "C" fn shim_sync(file: *mut ffi::sqlite3_file, flags: c_int) -> c_
         wal_checkpoint_lock: false,
         backtrace: None,
     };
-    shim().before_sync(record);
+    let _active_sync = shim().before_sync(file.addr(), record);
     // SAFETY: SQLite invokes I/O methods only after a method table is installed.
     let (real, methods) = unsafe { real_parts(file) };
     match methods.xSync {
