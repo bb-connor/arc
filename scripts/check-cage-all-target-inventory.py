@@ -12,14 +12,17 @@ from pathlib import Path
 
 
 EXPECTED_COUNTS = {
-    "lib": 26,
+    "lib": 20,
     "bin_chio_cage_init": 0,
+    "lib_chio_cage_plan": 5,
+    "lib_chio_cage_init": 1,
+    "entrypoint": 1,
     "enforcement_evidence": 8,
     "linux_compile": 15,
     "linux_enforcement": 29,
 }
-EXPECTED_TOTAL = 78
-EXPECTED_SHA256 = "b449d384735efc9bbd45b1ae6ecd4ee1d9ed1df3d0c70cb32b8c51096d61fe78"
+EXPECTED_TOTAL = 79
+EXPECTED_SHA256 = "42a48ab3aa04f35e4f12075c8eb73c8a7ef3da2cd4356fcdcd6efb3b0fe0a90c"
 EXPECTED_INTEGRATION_TARGETS = {
     "enforcement_evidence.rs",
     "linux_compile.rs",
@@ -30,7 +33,7 @@ TEST_DECLARATION = re.compile(
 )
 TEST_ATTRIBUTE = re.compile(r"#\[(?:tokio::)?test(?:\([^]]*\))?\]")
 TARGET_HEADER = re.compile(
-    r"Running (?:(?P<unit>unittests) |(?P<integration>tests/))" r"(?P<path>[^ ]+) \("
+    r"Running (?:(?P<unit>unittests) |(?P<integration>tests/))" r"(?P<path>[^ ]+) \((?P<exe>[^)]+)\)"
 )
 TEST_RESULT = re.compile(
     r"test (?P<name>[A-Za-z0-9_:]+) \.\.\. (?P<status>ok|ignored|FAILED)"
@@ -65,10 +68,15 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
         raise InventoryError("chio-cage source tree is incomplete")
 
     manifest = tomllib.loads((crate / "Cargo.toml").read_text(encoding="utf-8"))
-    if manifest.get("bin") != [
-        {"name": "chio-cage-init", "path": "src/bin/chio-cage-init.rs"}
-    ]:
-        raise InventoryError("chio-cage binary target inventory changed")
+    if manifest.get("bin") or (source / "bin").exists():
+        raise InventoryError("chio-cage must not package the privileged helper")
+    helper = root / "crates/security/chio-cage-init"
+    plan = root / "crates/security/chio-cage-plan"
+    helper_manifest = tomllib.loads((helper / "Cargo.toml").read_text())
+    if helper_manifest.get("package", {}).get("name") != "chio-cage-init" or not (helper / "src/main.rs").is_file():
+        raise InventoryError("standalone chio-cage-init binary target is missing")
+    if {p.name for p in (helper / "tests").glob("*.rs")} != {"entrypoint.rs"}:
+        raise InventoryError("chio-cage-init integration target inventory changed")
     if manifest.get("example") or manifest.get("bench"):
         raise InventoryError(
             "chio-cage example or benchmark target inventory is not empty"
@@ -91,20 +99,20 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
         )
 
     inventory: dict[str, list[str]] = defaultdict(list)
-    for path in sorted(source.rglob("*.rs")):
-        relative = path.relative_to(crate).as_posix()
-        target = "bin_chio_cage_init" if relative.startswith("src/bin/") else "lib"
-        for name, attributes in test_declarations(path):
-            if (
-                relative == "src/launch.rs"
-                and name == "unsupported_platform_keeps_a_fail_closed_signal_surface"
-            ):
+    for owner, target in [(crate, "lib"), (plan, "lib_chio_cage_plan"), (helper, "lib_chio_cage_init")]:
+        for path in sorted((owner / "src").rglob("*.rs")):
+            relative = path.relative_to(owner).as_posix()
+            if relative == "src/main.rs":
+                if test_declarations(path):
+                    raise InventoryError("helper main must delegate tests to its library and entrypoint target")
                 continue
-            if 'not(target_os = "linux")' in attributes:
-                continue
-            if 'feature = "enforcement-mutants"' in attributes:
-                continue
-            inventory[target].append(name)
+            for name, attributes in test_declarations(path):
+                if relative == "src/launch.rs" and name == "unsupported_platform_keeps_a_fail_closed_signal_surface":
+                    continue
+                if 'not(target_os = "linux")' in attributes or 'feature = "enforcement-mutants"' in attributes:
+                    continue
+                inventory[target].append(name)
+    inventory["entrypoint"] = [name for name, _ in test_declarations(helper / "tests/entrypoint.rs")]
 
     for file_name in sorted(EXPECTED_INTEGRATION_TARGETS):
         target = Path(file_name).stem
@@ -144,10 +152,14 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
     return dict(inventory)
 
 
-def header_target(kind: str, path: str) -> str:
+def header_target(kind: str, path: str, executable: str) -> str:
     if kind == "unittests" and path == "src/lib.rs":
-        return "lib"
-    if kind == "unittests" and path == "src/bin/chio-cage-init.rs":
+        name = Path(executable).name.split("-", 1)[0]
+        targets = {"chio_cage": "lib", "chio_cage_plan": "lib_chio_cage_plan", "chio_cage_init": "lib_chio_cage_init"}
+        if name not in targets:
+            raise InventoryError(f"unrecognized confinement library {name}")
+        return targets[name]
+    if kind == "unittests" and path == "src/main.rs" and Path(executable).name.startswith("chio_cage_init-"):
         return "bin_chio_cage_init"
     if kind == "tests/" and path.endswith(".rs"):
         return Path(path).stem
@@ -165,7 +177,7 @@ def verify_execution(output: Path, expected: dict[str, list[str]]) -> None:
         line = ANSI_ESCAPE.sub("", raw_line).strip()
         if match := TARGET_HEADER.search(line):
             kind = "unittests" if match.group("unit") is not None else "tests/"
-            current = header_target(kind, match.group("path"))
+            current = header_target(kind, match.group("path"), match.group("exe"))
             if current not in EXPECTED_COUNTS:
                 raise InventoryError(f"unexpected chio-cage test target {current}")
             headers[current] += 1

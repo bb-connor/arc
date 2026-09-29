@@ -11,6 +11,8 @@ members = [
     "crates/core/chio-supervisor",
     # Enterprise security
     "crates/security/chio-cage",
+    "crates/security/chio-cage-plan",
+    "crates/security/chio-cage-init",
     # Portable active-defense security
     "crates/security/chio-security-types",
     "crates/security/chio-flow",
@@ -476,6 +478,8 @@ chio-bedrock-converse-adapter = { path = "crates/protocol/chio-bedrock-converse-
 chio-binding-helpers = { path = "crates/sdk/chio-binding-helpers" }
 chio-bounded = { version = "=0.1.0", path = "crates/core/chio-bounded" }
 chio-cage = { path = "crates/security/chio-cage" }
+chio-cage-plan = { path = "crates/security/chio-cage-plan" }
+chio-cage-init = { path = "crates/security/chio-cage-init" }
 chio-supervisor = { version = "=0.1.0", path = "crates/core/chio-supervisor" }
 chio-signing-remote = { path = "crates/trust/chio-signing-remote" }
 chio-cohere-tools-adapter = { path = "crates/protocol/chio-cohere-tools-adapter" }

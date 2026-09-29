@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
-
 use crate::CageError;
+use serde::{Deserialize, Serialize};
 
 /// Maximum supplementary groups admitted for one target execution identity.
 pub const MAX_SUPPLEMENTARY_GIDS: usize = 64;

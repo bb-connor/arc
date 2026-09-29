@@ -1,6 +1,7 @@
 //! Closed syscall vocabulary and validating seccomp plan construction.
-use crate::{SandboxArchitecture, SeccompDefaultAction, SyscallArgumentConstraint};
-use chio_manifest::NativeSyscallProfile;
+use crate::{
+    NativeSyscallProfile, SandboxArchitecture, SeccompDefaultAction, SyscallArgumentConstraint,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -200,6 +201,43 @@ pub enum SeccompPlanError {
 }
 
 impl SeccompProfilePlan {
+    #[must_use]
+    pub const fn profile(&self) -> NativeSyscallProfile {
+        self.profile
+    }
+
+    #[cfg(feature = "enforcement-mutants")]
+    #[doc(hidden)]
+    pub fn test_allowed_syscalls_mut(&mut self) -> &mut Vec<Syscall> {
+        &mut self.allowed_syscalls
+    }
+
+    #[cfg(feature = "enforcement-mutants")]
+    #[doc(hidden)]
+    pub fn test_argument_constraints_mut(
+        &mut self,
+    ) -> &mut BTreeMap<Syscall, Vec<SyscallArgumentConstraint>> {
+        &mut self.argument_constraints
+    }
+
+    #[cfg(feature = "enforcement-mutants")]
+    #[doc(hidden)]
+    pub fn test_unchecked(
+        architecture: SandboxArchitecture,
+        profile: NativeSyscallProfile,
+        default_action: SeccompDefaultAction,
+        allowed_syscalls: Vec<Syscall>,
+        argument_constraints: BTreeMap<Syscall, Vec<SyscallArgumentConstraint>>,
+    ) -> Self {
+        Self {
+            architecture,
+            profile,
+            default_action,
+            allowed_syscalls,
+            argument_constraints,
+        }
+    }
+
     pub fn new(
         architecture: SandboxArchitecture,
         profile: NativeSyscallProfile,
@@ -234,7 +272,7 @@ impl SeccompProfilePlan {
         &self.argument_constraints
     }
 
-    pub(crate) fn validate(&self) -> Result<(), SeccompPlanError> {
+    pub fn validate(&self) -> Result<(), SeccompPlanError> {
         let mut allowed = BTreeSet::new();
         for &syscall in &self.allowed_syscalls {
             if !allowed.insert(syscall) {

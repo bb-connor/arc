@@ -9,13 +9,13 @@ use landlock::{
     Access, AccessFs, AccessNet, CompatLevel, Compatible, PathBeneath, Ruleset, RulesetAttr,
     RulesetCreatedAttr, RulesetStatus as KernelRulesetStatus, ABI,
 };
-use nono::{AccessMode, NetworkMode};
+mod abi;
 
 /// Reviewed upstream nono release.
 pub const UPSTREAM_NONO_VERSION: &str = "0.53.0";
 
 /// Version of Chio's wrapper patch semantics.
-pub const CHIO_PATCH_VERSION: &str = "chio.2";
+pub const CHIO_PATCH_VERSION: &str = "chio.3";
 
 /// Minimum ABI providing Landlock TCP connect and bind mediation.
 pub const MINIMUM_LANDLOCK_ABI: u32 = 4;
@@ -53,10 +53,9 @@ pub struct EnforcementStatus {
     pub network: RulesetStatus,
 }
 
-/// A deny-all nono capability set extended with caller-owned path descriptors.
+/// A deny-all Landlock capability set extended only with caller-owned path descriptors.
 #[derive(Debug)]
 pub struct CapabilitySet<'fd> {
-    upstream: nono::CapabilitySet,
     grants: Vec<CallerOwnedPathGrant<'fd>>,
 }
 
@@ -64,10 +63,7 @@ impl<'fd> CapabilitySet<'fd> {
     /// Construct a set whose network baseline is blocked, never `AllowAll`.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            upstream: nono::CapabilitySet::new().block_network(),
-            grants: Vec::new(),
-        }
+        Self { grants: Vec::new() }
     }
 
     /// Add a rule from a descriptor that remains owned by the caller.
@@ -81,12 +77,9 @@ impl<'fd> CapabilitySet<'fd> {
 
     /// Apply independent filesystem and deny-all TCP network Landlock layers.
     pub fn enforce(self) -> Result<EnforcementStatus, Error> {
-        if !matches!(self.upstream.network_mode(), NetworkMode::Blocked) {
-            return Err(Error::NetworkBaseline);
-        }
-
-        let detected = nono::detect_abi().map_err(|error| Error::AbiProbe(error.to_string()))?;
-        let kernel_abi = detected.abi;
+        // The adapter exposes no network grants. Its only network operation
+        // installs an independent deny-all TCP ruleset.
+        let kernel_abi = abi::detect_abi()?;
         let abi = abi_number(kernel_abi);
         if abi < MINIMUM_LANDLOCK_ABI {
             return Err(Error::UnsupportedAbi {
@@ -127,13 +120,7 @@ fn enforce_filesystem(
         .map_err(|error| Error::Filesystem(error.to_string()))?;
 
     for grant in grants {
-        let access_mode = match grant.access {
-            PathAccess::Read | PathAccess::ReadDirectory | PathAccess::ExecuteRead => {
-                AccessMode::Read
-            }
-            PathAccess::WriteExactFile => AccessMode::Write,
-        };
-        let access = filesystem_access(access_mode, grant.access, grant.is_directory)?;
+        let access = filesystem_access(grant.access, grant.is_directory)?;
         ruleset = ruleset
             .set_compatibility(CompatLevel::HardRequirement)
             .add_rule(PathBeneath::new(grant.fd, access))
@@ -166,19 +153,14 @@ fn enforce_network_blocked(kernel_abi: ABI) -> Result<RulesetStatus, Error> {
 }
 
 fn filesystem_access(
-    upstream_mode: AccessMode,
     access: PathAccess,
     is_directory: bool,
 ) -> Result<landlock::BitFlags<AccessFs>, Error> {
-    match (upstream_mode, access, is_directory) {
-        (AccessMode::Read, PathAccess::Read, false) => Ok(AccessFs::ReadFile.into()),
-        (AccessMode::Read, PathAccess::ReadDirectory, true) => Ok(AccessFs::ReadDir.into()),
-        (AccessMode::Read, PathAccess::ExecuteRead, false) => {
-            Ok(AccessFs::Execute | AccessFs::ReadFile)
-        }
-        (AccessMode::Write, PathAccess::WriteExactFile, false) => {
-            Ok(AccessFs::WriteFile | AccessFs::Truncate)
-        }
+    match (access, is_directory) {
+        (PathAccess::Read, false) => Ok(AccessFs::ReadFile.into()),
+        (PathAccess::ReadDirectory, true) => Ok(AccessFs::ReadDir.into()),
+        (PathAccess::ExecuteRead, false) => Ok(AccessFs::Execute | AccessFs::ReadFile),
+        (PathAccess::WriteExactFile, false) => Ok(AccessFs::WriteFile | AccessFs::Truncate),
         _ => Err(Error::InvalidGrant),
     }
 }
@@ -215,8 +197,6 @@ fn abi_number(abi: ABI) -> u32 {
 /// Fail-closed adapter errors.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("pinned nono capability set did not start with network blocked")]
-    NetworkBaseline,
     #[error("unable to probe Landlock through pinned nono: {0}")]
     AbiProbe(String),
     #[error("Landlock ABI {detected} is below required ABI {required}")]
@@ -242,13 +222,13 @@ mod tests {
 
     #[test]
     fn directory_read_grant_authorizes_listing_without_descendant_file_reads() {
-        let access = match filesystem_access(AccessMode::Read, PathAccess::ReadDirectory, true) {
+        let access = match filesystem_access(PathAccess::ReadDirectory, true) {
             Ok(access) => access,
             Err(error) => panic!("directory access should compile: {error}"),
         };
         assert!(access.contains(AccessFs::ReadDir));
         assert!(!access.contains(AccessFs::ReadFile));
-        assert!(filesystem_access(AccessMode::Read, PathAccess::Read, true).is_err());
-        assert!(filesystem_access(AccessMode::Read, PathAccess::ReadDirectory, false).is_err());
+        assert!(filesystem_access(PathAccess::Read, true).is_err());
+        assert!(filesystem_access(PathAccess::ReadDirectory, false).is_err());
     }
 }

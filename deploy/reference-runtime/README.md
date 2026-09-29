@@ -316,7 +316,7 @@ rustup target add x86_64-unknown-linux-musl
 cargo build --locked --release --target x86_64-unknown-linux-gnu \
   -p chio-cli -p chio-secret-broker -p chio-active-response-authority -p chio-keyring --bins
 cargo build --locked --release --target x86_64-unknown-linux-musl \
-  -p chio-cage --bin chio-cage-init --features real-linux-enforcement
+  -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement
 cargo build --locked --release --target x86_64-unknown-linux-musl \
   -p chio-secret-broker --bin chio-broker-mcp
 cargo build --locked --release --target x86_64-unknown-linux-musl \

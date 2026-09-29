@@ -1,4 +1,7 @@
 use super::*;
+use chio_cage_plan::SandboxArchitecture;
+use chio_cage_plan::SeccompArgumentComparison;
+use chio_cage_plan::SyscallArgumentConstraint;
 use chio_test_support::prelude::*;
 
 #[cfg_attr(
@@ -12,7 +15,7 @@ fn launch_revalidates_unlisted_constraint_keys() {
         chio_manifest::NativeSyscallProfile::NativeMinimalV1,
     )
     .test_unwrap();
-    plan.argument_constraints.insert(
+    plan.test_argument_constraints_mut().insert(
         crate::Syscall::Getcwd,
         vec![SyscallArgumentConstraint {
             argument_index: 0,
@@ -28,7 +31,7 @@ fn launch_revalidates_unlisted_constraint_keys() {
     );
     let error = compile_seccomp_filter(&plan).test_unwrap_err();
     assert_eq!(
-        error.record().failure.as_ref().map(|failure| failure.code),
+        Some(error.code),
         Some(CageEnforcementFailureCode::SeccompInstallFailed)
     );
 }

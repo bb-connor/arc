@@ -1,0 +1,26 @@
+[package]
+name = "chio-cage-init"
+description = "Minimal descriptor-bound Linux confinement bootstrap"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+[features]
+real-linux-enforcement = []
+enforcement-mutants = ["chio-cage-plan/enforcement-mutants"]
+[dependencies]
+chio-cage-plan = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+nono-chio = { path = "../../../third_party/nono-chio" }
+seccompiler = "=0.5.0"
+[lints]
+workspace = true
+
+[dev-dependencies]
+chio-test-support = { workspace = true }
+chio-cage-plan = { workspace = true, features = ["enforcement-mutants"] }

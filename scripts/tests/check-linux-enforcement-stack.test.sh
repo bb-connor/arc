@@ -27,7 +27,7 @@ make_fixture() {
     "$REPO_ROOT/third_party/nono-chio/PATCHES.md" \
     "$REPO_ROOT/third_party/nono-chio/LICENSE-APACHE" \
     "$root/third_party/nono-chio/"
-  cp "$REPO_ROOT/third_party/nono-chio/src/lib.rs" \
+  cp "$REPO_ROOT/third_party/nono-chio/src/abi.rs" "$REPO_ROOT/third_party/nono-chio/src/lib.rs" \
     "$root/third_party/nono-chio/src/"
   cp -R "$REPO_ROOT/third_party/seccompiler-chio" "$root/third_party/"
   cp -R "$REPO_ROOT/third_party/nono-upstream-chio" "$root/third_party/"
@@ -41,13 +41,8 @@ make_fixture() {
     "$root/crates/security/chio-cage/src/"
   cp "$REPO_ROOT/crates/security/chio-cage/src/launch/linux.rs" \
     "$root/crates/security/chio-cage/src/launch/"
-  cp "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/part_01.rs" \
-    "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/part_02.rs" \
-    "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/seccomp_validation_tests.rs" \
-    "$root/crates/security/chio-cage/src/launch/linux_parts/"
-  cp "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc" \
-    "$REPO_ROOT/crates/security/chio-cage/src/launch/linux_parts/part_01_sections/sandbox.inc" \
-    "$root/crates/security/chio-cage/src/launch/linux_parts/part_01_sections/"
+  cp -R "$REPO_ROOT/crates/security/chio-cage-init" "$root/crates/security/"
+  cp -R "$REPO_ROOT/crates/security/chio-cage-plan" "$root/crates/security/"
   cp "$REPO_ROOT/crates/security/chio-cage/scripts/check-linux-enforcement.sh" \
     "$root/crates/security/chio-cage/scripts/"
   cp "$REPO_ROOT/crates/security/chio-cage/tests/linux_enforcement.rs" \
@@ -84,6 +79,12 @@ printf '\n// provenance tamper\n' >>"$tampered_wrapper/third_party/nono-chio/src
 test "$(run_checker "$tampered_wrapper" "$work/tampered.out" "$work/tampered.err")" = 1
 grep -F 'nono-chio wrapper source digest does not match provenance' "$work/tampered.err" >/dev/null
 
+tampered_abi="$work/tampered-abi"
+cp -R "$valid" "$tampered_abi"
+printf '\n// provenance tamper\n' >>"$tampered_abi/third_party/nono-chio/src/abi.rs"
+test "$(run_checker "$tampered_abi" "$work/abi.out" "$work/abi.err")" = 1
+grep -F 'nono-chio wrapper source digest does not match provenance' "$work/abi.err" >/dev/null
+
 tampered_seccompiler="$work/tampered-seccompiler"
 cp -R "$valid" "$tampered_seccompiler"
 printf '\n// provenance tamper\n' >>"$tampered_seccompiler/third_party/seccompiler-chio/src/lib.rs"
@@ -101,12 +102,12 @@ cp -R "$valid" "$registry_nono"
 python3 - "$registry_nono" <<'PYTEST'
 from pathlib import Path
 import sys
-p = Path(sys.argv[1]) / "Cargo.toml"
+p = Path(sys.argv[1]) / "third_party/nono-chio/Cargo.toml"
 s = p.read_text()
-p.write_text(s.replace('nono = { path = "third_party/nono-upstream-chio" }', 'nono = "=0.53.0"', 1))
+p.write_text(s.replace('[dependencies]', '[dependencies]\nnono = "=0.53.0"', 1))
 PYTEST
 test "$(run_checker "$registry_nono" "$work/registry-nono.out" "$work/registry-nono.err")" = 1
-grep -F 'workspace must select the reviewed local nono source fork' "$work/registry-nono.err" >/dev/null
+grep -F 'nono-chio must not depend on the broad upstream nono package' "$work/registry-nono.err" >/dev/null
 
 registry_nono_lock="$work/registry-nono-lock"
 cp -R "$valid" "$registry_nono_lock"
@@ -117,15 +118,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1]) / "Cargo.lock"
 s = p.read_text()
-needle = 'name = "nono"\nversion = "0.53.0"\n'
-assert s.count(needle) == 1
-p.write_text(s.replace(needle, needle + 'source = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "ae7eb523cc2036e9ad6527411c3da5dc2172dc454cc3447a03b910420a39bfee"\n'))
+p.write_text(s + '\n[[package]]\nname = "nono"\nversion = "0.53.0"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "ae7eb523cc2036e9ad6527411c3da5dc2172dc454cc3447a03b910420a39bfee"\n')
 PYTEST
 if python3 "$CHECKER" --root "$registry_nono_lock" --require-lock >"$work/registry-nono-lock.out" 2>"$work/registry-nono-lock.err"; then
   echo 'registry nono lock substitution unexpectedly passed' >&2
   exit 1
 fi
-grep -F 'Cargo.lock does not contain the local nono source fork' "$work/registry-nono-lock.err" >/dev/null
+grep -F 'Cargo.lock still resolves the broad upstream nono package' "$work/registry-nono-lock.err" >/dev/null
 
 registry_seccompiler="$work/registry-seccompiler"
 cp -R "$valid" "$registry_seccompiler"
@@ -141,22 +140,22 @@ grep -F 'repository NOTICE is missing nono attribution: Luke Hinds' "$work/missi
 
 raw_bpf="$work/raw-bpf"
 cp -R "$valid" "$raw_bpf"
-printf '\n// sock_fprog bypass\n' >>"$raw_bpf/crates/security/chio-cage/src/launch/linux_parts/part_01.rs"
+printf '\n// sock_fprog bypass\n' >>"$raw_bpf/crates/security/chio-cage-init/src/seccomp.rs"
 test "$(run_checker "$raw_bpf" "$work/raw-bpf.out" "$work/raw-bpf.err")" = 1
 grep -F 'Linux launcher bypasses the reviewed compiler or adapter: sock_fprog' "$work/raw-bpf.err" >/dev/null
 
 pathname_helper="$work/pathname-helper"
 cp -R "$valid" "$pathname_helper"
-python3 -c 'from pathlib import Path; p=Path("'$pathname_helper'/crates/security/chio-cage/src/launch/linux_parts/part_01_sections/bootstrap.inc"); s=p.read_text(); p.write_text(s.replace("Command::new(helper_exec_path)", "Command::new(helper_path)", 1))'
+python3 -c 'from pathlib import Path; p=Path("'$pathname_helper'/crates/security/chio-cage/src/launch/linux.rs"); s=p.read_text(); p.write_text(s.replace("Command::new(helper_exec_path)", "Command::new(helper_path)", 1))'
 test "$(run_checker "$pathname_helper" "$work/pathname-helper.out" "$work/pathname-helper.err")" = 1
 grep -F 'Linux launcher is missing required enforcement token: Command::new(helper_exec_path)' "$work/pathname-helper.err" >/dev/null
 grep -F 'Linux launcher reopens the admitted helper by pathname' "$work/pathname-helper.err" >/dev/null
 
 missing_launcher_part="$work/missing-launcher-part"
 cp -R "$valid" "$missing_launcher_part"
-rm "$missing_launcher_part/crates/security/chio-cage/src/launch/linux_parts/part_02.rs"
+rm "$missing_launcher_part/crates/security/chio-cage-init/src/validation.rs"
 test "$(run_checker "$missing_launcher_part" "$work/missing-launcher-part.out" "$work/missing-launcher-part.err")" = 1
-grep -F 'chio-cage Linux launcher part_02.rs is missing' "$work/missing-launcher-part.err" >/dev/null
+grep -F 'Linux enforcement owner crates/security/chio-cage-init/src/validation.rs is missing' "$work/missing-launcher-part.err" >/dev/null
 
 unreviewed_arch="$work/unreviewed-arch"
 cp -R "$valid" "$unreviewed_arch"

@@ -248,7 +248,6 @@ if [[ "$args" == *" --all-targets "* ]] ||
 
   if [[ "$args" == *" --all-targets "* ]]; then
     lib_tests=(
-      accepts_bounded_canonical_non_root_identity
       acknowledged_child_reaper_handoff_reaps
       admission_consumes_nonforgeable_registry_authorization
       admission_fails_closed_on_unqualified_linux_architecture
@@ -257,23 +256,28 @@ if [[ "$args" == *" --all-targets "* ]] ||
       child_reaper_start_failure_reaps_synchronously
       child_supervisor_retries_sigkill_until_reaped
       constrained_exec_filter_fails_closed
-      construction_rejects_constraints_for_unlisted_syscalls
-      construction_rejects_unconfined_limits_and_invalid_arguments
       launch_revalidates_unlisted_constraint_keys
-      wire_decode_uses_the_same_plan_validator_and_closed_syscall_keys
       descriptor_purpose_rejects_unknown_nested_fields
       environment_is_minimal_and_credentials_fail_closed
       every_syscall_profile_is_default_deny_and_has_no_network_creation
-      exact_target_argv_is_used_and_mutation_is_rejected
       helper_identity_control_rejects_same_bytes_different_identity
       path_identity_control_rejects_changed_retained_resource_identity
-      rejects_root_zero_unsorted_duplicate_and_primary_groups
       required_enforcement_comparison_is_exact
       seccomp_control_rejects_forbidden_socket_before_default_deny
       seccomp_rejects_peer_process_authority_in_every_profile
       signature_is_verified_before_permissions_are_read
       swapped_extra_and_missing_stdio_roles_fail_plan_validation
       swapped_live_stdio_descriptors_fail_identity_verification
+    )
+    plan_tests=(
+      accepts_bounded_canonical_non_root_identity
+      rejects_root_zero_unsorted_duplicate_and_primary_groups
+      construction_rejects_constraints_for_unlisted_syscalls
+      construction_rejects_unconfined_limits_and_invalid_arguments
+      wire_decode_uses_the_same_plan_validator_and_closed_syscall_keys
+    )
+    init_tests=(
+      exact_target_argv_is_used_and_mutation_is_rejected
     )
     evidence_tests=(
       bootstrap_failure_cannot_claim_enforcement_or_exit
@@ -303,7 +307,10 @@ if [[ "$args" == *" --all-targets "* ]] ||
       zero_initialized_tls_does_not_bind_an_unused_file_offset
     )
     print_target "Running unittests src/lib.rs (/tmp/chio_cage-lib)" "${lib_tests[@]}"
-    print_target "Running unittests src/bin/chio-cage-init.rs (/tmp/chio_cage_init-bin)"
+    print_target "Running unittests src/lib.rs (/tmp/chio_cage_plan-lib)" "${plan_tests[@]}"
+    print_target "Running unittests src/lib.rs (/tmp/chio_cage_init-lib)" "${init_tests[@]}"
+    print_target "Running unittests src/main.rs (/tmp/chio_cage_init-bin)"
+    print_target "Running tests/entrypoint.rs (/tmp/entrypoint)" standalone_helper_rejects_missing_control_descriptor
     print_target "Running tests/enforcement_evidence.rs (/tmp/enforcement_evidence)" "${evidence_tests[@]}"
     print_target "Running tests/linux_compile.rs (/tmp/linux_compile)" "${compile_tests[@]}"
     printf '     Running tests/linux_enforcement.rs (/tmp/linux_enforcement)\n'
@@ -389,7 +396,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=78 probes=29 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=79 probes=29 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py

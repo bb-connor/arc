@@ -1,29 +1,19 @@
 # nono-chio
 
-`nono-chio` is Chio's narrow Linux adapter around the pinned `nono` 0.53.0
-capability model. It exists because upstream `nono::CapabilitySet::new()`
-starts with network access allowed and upstream 0.53.0 reopens filesystem
-paths when constructing Landlock rules.
+`nono-chio` is Chio's minimal descriptor-based Landlock adapter. Its ABI probe
+comes from the reviewed nono 0.53.0 Linux backend. The broad upstream nono
+package is not a runtime dependency.
 
-The adapter changes those semantics for Chio:
+- Filesystem rules take caller-owned `BorrowedFd` values and never reopen paths.
+- Directory enumeration does not grant reads to descendant files.
+- Filesystem and TCP network restrictions are separate hard-requirement layers.
+  No network grant API exists: bind and connect remain denied.
+- Success requires `FullyEnforced` for both layers and `no_new_privs`.
+- ABI 4 is the minimum; every access right known to the observed ABI is handled.
+- The probe tries ABI 6 through 1 with filesystem, network, and scope checks.
+  Its result is cached; unsupported kernels fail closed before execution.
 
-- construction immediately changes the upstream capability set to network
-  blocked;
-- filesystem rules take caller-owned `BorrowedFd` values and never reopen a
-  pathname;
-- directory listing can be granted without granting file reads to the whole
-  subtree;
-- filesystem and network are installed as separate hard-requirement Landlock
-  layers so their actual `RulesetStatus` values remain independently visible;
-- only `FullyEnforced` is returned as success;
-- Landlock ABI 4 is the minimum because network connect and bind mediation are
-  mandatory even when the policy grants no TCP port;
-- every filesystem and network right known to the detected ABI is handled, so
-  later kernel rights are not silently left outside the deny-all rulesets.
-
-The calling process retains ownership of every descriptor. This crate neither
-closes nor duplicates a supplied descriptor.
-
-Upstream source and patch provenance are recorded in
-`third_party/provenance/linux-enforcement-stack.toml`. The local change
-inventory is in `PATCHES.md`.
+The caller retains every descriptor. This adapter neither closes nor duplicates
+supplied descriptors. Provenance is in
+`third_party/provenance/linux-enforcement-stack.toml`; `PATCHES.md` records the
+extracted source and integration changes.

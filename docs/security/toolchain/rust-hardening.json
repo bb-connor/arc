@@ -11,7 +11,9 @@
     "crates/sdk/chio-guard-sdk/src/lib.rs": "Reads the WASM host request buffer through a raw pointer under the guard ABI contract.",
     "crates/sdk/chio-bindings-ffi/src/lib.rs": "C ABI entry points validate caller buffers and transfer opaque handles across the FFI boundary.",
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": "C++ kernel bridge dereferences validated ABI pointers and manages opaque kernel ownership.",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs": "UniFFI generates unsafe C ABI exports; handwritten adapter modules separately forbid unsafe."
+    "crates/kernel/chio-kernel-mobile/src/lib.rs": "UniFFI generates unsafe C ABI exports; handwritten adapter modules separately forbid unsafe.",
+    "crates/security/chio-cage-init/src/lib.rs": "Child bootstrap adopts authenticated descriptors, sets process identity, and installs Landlock and seccomp through bounded libc FFI.",
+    "crates/security/chio-cage-plan/src/lib.rs": "Shared Linux identity reads descriptor metadata through libc::fstat; no confinement effects are installed here."
   },
   "tcb_libraries": {
     "chio-core-types": "crates/core/chio-core-types/src/lib.rs",
@@ -38,7 +40,9 @@
     "chio-kernel-mobile": "crates/kernel/chio-kernel-mobile/src/lib.rs",
     "chio-process": "crates/kernel/chio-process/src/lib.rs",
     "chio-runtime-harness": "crates/kernel/chio-runtime-harness/src/lib.rs",
-    "chio-runtime": "crates/kernel/chio-runtime/src/lib.rs"
+    "chio-runtime": "crates/kernel/chio-runtime/src/lib.rs",
+    "chio-cage-init": "crates/security/chio-cage-init/src/lib.rs",
+    "chio-cage-plan": "crates/security/chio-cage-plan/src/lib.rs"
   },
   "accounting_modules": [
     "crates/kernel/chio-kernel-core/src/budget_split.rs",

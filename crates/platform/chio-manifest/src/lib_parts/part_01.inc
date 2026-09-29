@@ -513,15 +513,8 @@ impl<'de> Deserialize<'de> for EnvironmentVariableName {
         Self::new(String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
     }
 }
+pub use chio_cage_plan::NativeSyscallProfile;
 
-/// Reviewed native syscall profiles accepted by cage admission.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum NativeSyscallProfile {
-    NativeMinimalV1,
-    NativeStandardV1,
-    BrokeredNativeV1,
-}
 
 /// A manifest wrapped in its Ed25519 signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]

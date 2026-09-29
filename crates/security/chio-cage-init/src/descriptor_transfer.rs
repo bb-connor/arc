@@ -1,123 +1,12 @@
-use super::*;
+use super::{
+    BootstrapFault, CageEnforcementFailureCode, File, FromRawFd, OwnedFd, RawFd, MAX_TRANSFER_FDS,
+};
 
 #[allow(
     clippy::useless_conversion,
     reason = "libc uses usize fields on glibc and u32 fields on musl; retain checked conversions for both targets."
 )]
-pub(super) fn send_descriptors(
-    socket: RawFd,
-    descriptors: &[RawFd],
-) -> Result<(), CageLaunchError> {
-    if descriptors.is_empty() || descriptors.len() > MAX_TRANSFER_FDS {
-        return Err(CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::DescriptorCountMismatch,
-            "descriptor_send_count",
-        ));
-    }
-    let count = u32::try_from(descriptors.len()).map_err(|_| {
-        CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::DescriptorCountMismatch,
-            "descriptor_send_count",
-        )
-    })?;
-    let mut payload = count.to_le_bytes();
-    let mut io_vector = libc::iovec {
-        iov_base: payload.as_mut_ptr().cast(),
-        iov_len: payload.len(),
-    };
-    let descriptor_bytes = descriptors
-        .len()
-        .checked_mul(std::mem::size_of::<RawFd>())
-        .ok_or_else(|| {
-            CageLaunchError::bootstrap_failed(
-                CageEnforcementFailureCode::DescriptorCountMismatch,
-                "descriptor_send_size",
-            )
-        })?;
-    // SAFETY: CMSG_SPACE computes the required ancillary buffer size.
-    let control_size = usize::try_from(unsafe {
-        libc::CMSG_SPACE(u32::try_from(descriptor_bytes).map_err(|_| {
-            CageLaunchError::bootstrap_failed(
-                CageEnforcementFailureCode::DescriptorCountMismatch,
-                "descriptor_send_size",
-            )
-        })?)
-    })
-    .map_err(|_| {
-        CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::DescriptorCountMismatch,
-            "descriptor_send_size",
-        )
-    })?;
-    let control_entries = control_size.div_ceil(std::mem::size_of::<libc::cmsghdr>());
-    let mut control = Vec::<std::mem::MaybeUninit<libc::cmsghdr>>::with_capacity(control_entries);
-    control.resize_with(control_entries, std::mem::MaybeUninit::zeroed);
-    // SAFETY: msghdr is a plain C input structure whose zero value denotes no
-    // peer address or optional flags.
-    let mut message = unsafe { std::mem::zeroed::<libc::msghdr>() };
-    message.msg_iov = &mut io_vector;
-    message.msg_iovlen = 1;
-    message.msg_control = control.as_mut_ptr().cast();
-    // msg_controllen is size_t on glibc and socklen_t on musl.
-    message.msg_controllen = control_size.try_into().map_err(|_| {
-        CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::DescriptorCountMismatch,
-            "descriptor_send_size",
-        )
-    })?;
-    // SAFETY: message owns a correctly sized control buffer.
-    let header = unsafe { libc::CMSG_FIRSTHDR(&message) };
-    if header.is_null() {
-        return Err(CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::StatusProtocolViolation,
-            "descriptor_send_header",
-        ));
-    }
-    // SAFETY: header points inside control and CMSG_DATA has descriptor_bytes
-    // writable bytes after the header.
-    let header_fields = unsafe { &mut *header };
-    header_fields.cmsg_level = libc::SOL_SOCKET;
-    header_fields.cmsg_type = libc::SCM_RIGHTS;
-    // SAFETY: descriptor_bytes is bounded by MAX_TRANSFER_FDS and fits c_uint.
-    header_fields.cmsg_len = unsafe {
-        libc::CMSG_LEN(descriptor_bytes.try_into().map_err(|_| {
-            CageLaunchError::bootstrap_failed(
-                CageEnforcementFailureCode::DescriptorCountMismatch,
-                "descriptor_send_size",
-            )
-        })?)
-    }
-    .try_into()
-    .map_err(|_| {
-        CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::DescriptorCountMismatch,
-            "descriptor_send_size",
-        )
-    })?;
-    // SAFETY: header points into the allocated aligned control buffer.
-    let data = unsafe { libc::CMSG_DATA(header) };
-    // SAFETY: the descriptor array and control buffer are disjoint and both
-    // contain descriptor_bytes readable/writable bytes for this synchronous copy.
-    unsafe {
-        std::ptr::copy_nonoverlapping(descriptors.as_ptr().cast::<u8>(), data, descriptor_bytes);
-    }
-    // SAFETY: all message buffers and descriptor values remain live for the
-    // single atomic sequenced-packet send.
-    let sent = unsafe { libc::sendmsg(socket, &message, libc::MSG_NOSIGNAL) };
-    if usize::try_from(sent) != Ok(payload.len()) {
-        return Err(CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::StatusProtocolViolation,
-            "descriptor_send",
-        ));
-    }
-    Ok(())
-}
-
-#[allow(
-    clippy::useless_conversion,
-    reason = "libc uses usize fields on glibc and u32 fields on musl; retain checked conversions for both targets."
-)]
-pub(super) fn receive_descriptors(socket: RawFd) -> Result<(File, Vec<OwnedFd>), BootstrapFault> {
+pub fn receive_descriptors(socket: RawFd) -> Result<(File, Vec<OwnedFd>), BootstrapFault> {
     let mut payload = [0_u8; 4];
     let mut io_vector = libc::iovec {
         iov_base: payload.as_mut_ptr().cast(),
@@ -243,4 +132,114 @@ pub(super) fn receive_descriptors(socket: RawFd) -> Result<(File, Vec<OwnedFd>),
     }
     let plan = owned.remove(0);
     Ok((File::from(plan), owned))
+}
+
+#[allow(
+    clippy::useless_conversion,
+    reason = "libc uses usize fields on glibc and u32 fields on musl; retain checked conversions for both targets."
+)]
+pub fn send_descriptors(socket: RawFd, descriptors: &[RawFd]) -> Result<(), BootstrapFault> {
+    if descriptors.is_empty() || descriptors.len() > MAX_TRANSFER_FDS {
+        return Err(BootstrapFault::new(
+            CageEnforcementFailureCode::DescriptorCountMismatch,
+            "descriptor_send_count",
+        ));
+    }
+    let count = u32::try_from(descriptors.len()).map_err(|_| {
+        BootstrapFault::new(
+            CageEnforcementFailureCode::DescriptorCountMismatch,
+            "descriptor_send_count",
+        )
+    })?;
+    let mut payload = count.to_le_bytes();
+    let mut io_vector = libc::iovec {
+        iov_base: payload.as_mut_ptr().cast(),
+        iov_len: payload.len(),
+    };
+    let descriptor_bytes = descriptors
+        .len()
+        .checked_mul(std::mem::size_of::<RawFd>())
+        .ok_or_else(|| {
+            BootstrapFault::new(
+                CageEnforcementFailureCode::DescriptorCountMismatch,
+                "descriptor_send_size",
+            )
+        })?;
+    // SAFETY: CMSG_SPACE computes the required ancillary buffer size.
+    let control_size = usize::try_from(unsafe {
+        libc::CMSG_SPACE(u32::try_from(descriptor_bytes).map_err(|_| {
+            BootstrapFault::new(
+                CageEnforcementFailureCode::DescriptorCountMismatch,
+                "descriptor_send_size",
+            )
+        })?)
+    })
+    .map_err(|_| {
+        BootstrapFault::new(
+            CageEnforcementFailureCode::DescriptorCountMismatch,
+            "descriptor_send_size",
+        )
+    })?;
+    let control_entries = control_size.div_ceil(std::mem::size_of::<libc::cmsghdr>());
+    let mut control = Vec::<std::mem::MaybeUninit<libc::cmsghdr>>::with_capacity(control_entries);
+    control.resize_with(control_entries, std::mem::MaybeUninit::zeroed);
+    // SAFETY: msghdr is a plain C input structure whose zero value denotes no
+    // peer address or optional flags.
+    let mut message = unsafe { std::mem::zeroed::<libc::msghdr>() };
+    message.msg_iov = &mut io_vector;
+    message.msg_iovlen = 1;
+    message.msg_control = control.as_mut_ptr().cast();
+    // msg_controllen is size_t on glibc and socklen_t on musl.
+    message.msg_controllen = control_size.try_into().map_err(|_| {
+        BootstrapFault::new(
+            CageEnforcementFailureCode::DescriptorCountMismatch,
+            "descriptor_send_size",
+        )
+    })?;
+    // SAFETY: message owns a correctly sized control buffer.
+    let header = unsafe { libc::CMSG_FIRSTHDR(&message) };
+    if header.is_null() {
+        return Err(BootstrapFault::new(
+            CageEnforcementFailureCode::StatusProtocolViolation,
+            "descriptor_send_header",
+        ));
+    }
+    // SAFETY: header points inside control and CMSG_DATA has descriptor_bytes
+    // writable bytes after the header.
+    let header_fields = unsafe { &mut *header };
+    header_fields.cmsg_level = libc::SOL_SOCKET;
+    header_fields.cmsg_type = libc::SCM_RIGHTS;
+    // SAFETY: descriptor_bytes is bounded by MAX_TRANSFER_FDS and fits c_uint.
+    header_fields.cmsg_len = unsafe {
+        libc::CMSG_LEN(descriptor_bytes.try_into().map_err(|_| {
+            BootstrapFault::new(
+                CageEnforcementFailureCode::DescriptorCountMismatch,
+                "descriptor_send_size",
+            )
+        })?)
+    }
+    .try_into()
+    .map_err(|_| {
+        BootstrapFault::new(
+            CageEnforcementFailureCode::DescriptorCountMismatch,
+            "descriptor_send_size",
+        )
+    })?;
+    // SAFETY: header points into the allocated aligned control buffer.
+    let data = unsafe { libc::CMSG_DATA(header) };
+    // SAFETY: the descriptor array and control buffer are disjoint and both
+    // contain descriptor_bytes readable/writable bytes for this synchronous copy.
+    unsafe {
+        std::ptr::copy_nonoverlapping(descriptors.as_ptr().cast::<u8>(), data, descriptor_bytes);
+    }
+    // SAFETY: all message buffers and descriptor values remain live for the
+    // single atomic sequenced-packet send.
+    let sent = unsafe { libc::sendmsg(socket, &message, libc::MSG_NOSIGNAL) };
+    if usize::try_from(sent) != Ok(payload.len()) {
+        return Err(BootstrapFault::new(
+            CageEnforcementFailureCode::StatusProtocolViolation,
+            "descriptor_send",
+        ));
+    }
+    Ok(())
 }

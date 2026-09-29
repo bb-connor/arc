@@ -1,13 +1,12 @@
-use serde::{Deserialize, Serialize};
-
 use crate::{ExecutionIdentity, FileIdentity, ResourceKind, SandboxArchitecture};
+use serde::{Deserialize, Serialize};
 
 pub const ENFORCEMENT_PREPARED_SCHEMA: &str = "chio.cage.enforcement-prepared.v1";
 pub const EXEC_TRANSITION_OBSERVED_SCHEMA: &str = "chio.cage.exec-transition-observed.v1";
 pub const CAGE_ENFORCEMENT_RECORD_SCHEMA: &str = "chio.cage.enforcement-record.v1";
 pub const MINIMUM_LANDLOCK_ABI: u32 = 4;
 pub const PINNED_NONO_VERSION: &str = "0.53.0";
-pub const NONO_PATCH_VERSION: &str = "chio.2";
+pub const NONO_PATCH_VERSION: &str = "chio.3";
 pub const PINNED_SECCOMPILER_VERSION: &str = "0.5.0";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

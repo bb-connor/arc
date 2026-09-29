@@ -1,0 +1,20 @@
+[package]
+name = "chio-cage-plan"
+description = "Shared confinement plan and enforcement evidence contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+[features]
+enforcement-mutants = []
+[dependencies]
+chio-core-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+[lints]
+workspace = true

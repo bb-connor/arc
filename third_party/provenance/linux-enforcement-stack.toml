@@ -24,17 +24,17 @@ patch_required = true
 directory = "third_party/nono-chio"
 kind = "wrapper"
 package_name = "nono-chio"
-version = "0.53.0-chio.2"
+version = "0.53.0-chio.3"
 status = "required"
-source_sha256 = "82e9bbb67df62ee123353e92a7d91102837aea8bd3c5f32a508b8a4577594d95"
+source_sha256 = "785a52f2819e78f81c5833b6b34077a681d86a4dd73d14f6f20b68e00c30490f"
 changes = ["return observed Landlock ABI and RulesetStatus", "reject partially enforced filesystem and network rules", "construct PathBeneath rules from caller-owned descriptors", "retain caller ownership through ruleset application", "grant directory listing without granting descendant file reads", "handle every filesystem and network right known to the detected ABI"]
 
 [nono.source_patch]
 directory = "third_party/nono-upstream-chio"
-kind = "fork"
+kind = "source-reference"
 package_name = "nono"
 version = "0.53.0"
-status = "required"
+status = "reference-only"
 source_sha256 = "e75d976dee3658799e3705bc05ec0cefe5155bf7f86522c275410b7d99d8a106"
 changes = [
   "preserve explicit filesystem permissions across provenance tiers",

@@ -14,9 +14,10 @@ public_entrypoint = true
 
 [features]
 real-linux-enforcement = []
-enforcement-mutants = []
+enforcement-mutants = ["chio-cage-plan/enforcement-mutants", "chio-cage-init/enforcement-mutants"]
 
 [dependencies]
+chio-cage-plan = { workspace = true }
 chio-core = { workspace = true }
 chio-manifest = { workspace = true }
 serde = { workspace = true }
@@ -24,16 +25,12 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+chio-cage-init = { workspace = true }
 libc = "0.2"
-nono-chio = { path = "../../../third_party/nono-chio" }
-seccompiler = "=0.5.0"
 
 [dev-dependencies]
+chio-cage-plan = { workspace = true, features = ["enforcement-mutants"] }
 chio-test-support = { workspace = true }
-
-[[bin]]
-name = "chio-cage-init"
-path = "src/bin/chio-cage-init.rs"
 
 [lints]
 workspace = true

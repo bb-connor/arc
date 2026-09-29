@@ -89,90 +89,28 @@ def read_text(path: Path, errors: list[str], label: str) -> str:
 
 
 def read_linux_launcher(root: Path, errors: list[str]) -> str:
-    launcher_root = root / "crates/security/chio-cage/src/launch"
-    entrypoint = read_text(
-        launcher_root / "linux.rs",
-        errors,
-        "chio-cage Linux launcher entrypoint",
-    )
-    part_paths = [
-        launcher_root / "linux_parts/part_01.rs",
-        launcher_root / "linux_parts/part_02.rs",
-    ]
-    section_paths = [
-        launcher_root / "linux_parts/part_01_sections/bootstrap.inc",
-        launcher_root / "linux_parts/part_01_sections/sandbox.inc",
-    ]
-    expected_entrypoint = '''include!("linux_parts/part_01.rs");
-include!("linux_parts/part_02.rs");
+    paths = ["crates/security/chio-cage/src/launch/linux.rs"]
+    helper = root / "crates/security/chio-cage-init/src"
+    modules = ("bootstrap", "validation", "descriptors", "identity", "sandbox", "seccomp", "exec", "status", "descriptor_transfer")
+    entry = read_text(helper / "lib.rs", errors, "chio-cage-init library")
+    for name in modules:
+        if f"mod {name};" not in entry:
+            errors.append(f"chio-cage-init module is not connected: {name}")
+        paths.append(f"crates/security/chio-cage-init/src/{name}.rs")
+    return "\n".join([entry, *(read_text(root / path, errors, f"Linux enforcement owner {path}") for path in paths)])
 
-fn helper_identity_and_binding_match(
-    expected_identity: FileIdentity,
-    live_identity: FileIdentity,
-    expected_binding_digest: &str,
-    live_binding_digest: &str,
-) -> bool {
-    expected_identity == live_identity && expected_binding_digest == live_binding_digest
-}
 
-fn close_unnamed_descriptors(plan: &CageInitPlan) -> Result<(), BootstrapFault> {
-    let mut retained = vec![0_u32, 1, 2, plan.plan_fd_slot, plan.status_fd_slot];
-    retained.extend(plan.fd_table.iter().map(|entry| entry.slot));
-    retained.sort_unstable();
-    retained.dedup();
-    let mut first = 0_u32;
-    for slot in retained {
-        if first < slot {
-            close_range(first, slot - 1)?;
-        }
-        first = slot.saturating_add(1);
-    }
-    close_range(first, u32::MAX)
-}
-
-fn seccomp_profile_is_fail_closed(plan: &crate::SeccompProfilePlan) -> bool {
-    plan.validate().is_ok()
-}
-
-#[cfg(test)]
-#[path = "linux_parts/seccomp_validation_tests.rs"]
-mod seccomp_validation_tests;
-'''
-    if entrypoint and entrypoint != expected_entrypoint:
-        errors.append("chio-cage Linux launcher module inventory is invalid")
-    expected_part_01 = '''include!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/launch/linux_parts/part_01_sections/bootstrap.inc"
-));
-include!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/launch/linux_parts/part_01_sections/sandbox.inc"
-));
-'''
-    parts = [
-        read_text(path, errors, f"chio-cage Linux launcher {path.name}")
-        for path in part_paths
-    ]
-    if parts[0] and parts[0] != expected_part_01:
-        errors.append("chio-cage Linux launcher part_01 section inventory is invalid")
-    sections = [
-        read_text(
-            path,
-            errors,
-            f"chio-cage Linux launcher {path.relative_to(launcher_root)}",
-        )
-        for path in section_paths
-    ]
-    expected_files = {path.relative_to(launcher_root) for path in [*part_paths, *section_paths]}
-    expected_files.add(Path("linux_parts/seccomp_validation_tests.rs"))
-    actual_files = {
-        path.relative_to(launcher_root)
-        for path in (launcher_root / "linux_parts").rglob("*")
-        if path.is_file()
-    }
-    if actual_files != expected_files:
-        errors.append("chio-cage Linux launcher file inventory is invalid")
-    return "\n".join([entrypoint, *parts, *sections])
+def wrapper_source_sha256(root: Path) -> str:
+    package = root / "third_party/nono-chio"
+    digest = hashlib.sha256()
+    for path in sorted([package / "Cargo.toml", *package.glob("src/**/*.rs")]):
+        relative = path.relative_to(package).as_posix().encode()
+        contents = path.read_bytes()
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(len(contents).to_bytes(8, "big"))
+        digest.update(contents)
+    return digest.hexdigest()
 
 
 def sha256(path: Path) -> str:
@@ -246,10 +184,10 @@ def validate_record(data: dict) -> list[str]:
         else:
             expected = {
                 "directory": "third_party/nono-upstream-chio",
-                "kind": "fork",
+                "kind": "source-reference",
                 "package_name": "nono",
                 "version": "0.53.0",
-                "status": "required",
+                "status": "reference-only",
             }
             if any(source_patch.get(key) != value for key, value in expected.items()):
                 errors.append("the nono source fork identity is invalid")
@@ -280,7 +218,7 @@ def validate_record(data: dict) -> list[str]:
                 patch.get("directory") != "third_party/nono-chio"
                 or patch.get("kind") != "wrapper"
                 or patch.get("package_name") != "nono-chio"
-                or patch.get("version") != "0.53.0-chio.2"
+                or patch.get("version") != "0.53.0-chio.3"
                 or patch.get("status") != "required"
             ):
                 errors.append("the nono wrapper patch identity is invalid")
@@ -325,6 +263,7 @@ def validate_manifests(root: Path, errors: list[str]) -> None:
     try:
         workspace = load_toml(root / "Cargo.toml")
         cage = load_toml(root / "crates/security/chio-cage/Cargo.toml")
+        helper = load_toml(root / "crates/security/chio-cage-init/Cargo.toml")
         wrapper = load_toml(root / "third_party/nono-chio/Cargo.toml")
         nono_fork = load_toml(root / "third_party/nono-upstream-chio/Cargo.toml")
         seccompiler_fork = load_toml(root / "third_party/seccompiler-chio/Cargo.toml")
@@ -333,39 +272,32 @@ def validate_manifests(root: Path, errors: list[str]) -> None:
         return
 
     linux = (
-        cage.get("target", {})
+        helper.get("target", {})
         .get('cfg(target_os = "linux")', {})
         .get("dependencies", {})
     )
     nono_dependency = linux.get("nono-chio")
     if not isinstance(nono_dependency, dict) or nono_dependency.get("path") != "../../../third_party/nono-chio":
-        errors.append("chio-cage must depend on the reviewed local nono-chio wrapper")
+        errors.append("chio-cage-init must depend on the reviewed local nono-chio wrapper")
     if linux.get("seccompiler") != "=0.5.0":
-        errors.append("chio-cage seccompiler dependency must be pinned to =0.5.0")
+        errors.append("chio-cage-init seccompiler dependency must be pinned to =0.5.0")
     seccompiler_patch = workspace.get("patch", {}).get("crates-io", {}).get("seccompiler")
     if (
         not isinstance(seccompiler_patch, dict)
         or seccompiler_patch.get("path") != "third_party/seccompiler-chio"
     ):
         errors.append("workspace must select the reviewed local seccompiler fork")
-    if cage.get("features", {}).get("enforcement-mutants") != []:
+    if cage.get("features", {}).get("enforcement-mutants") != ["chio-cage-plan/enforcement-mutants", "chio-cage-init/enforcement-mutants"]:
         errors.append("the test-only enforcement-mutants feature is missing")
 
     package = wrapper.get("package", {})
-    if package.get("name") != "nono-chio" or package.get("version") != "0.53.0-chio.2":
+    if package.get("name") != "nono-chio" or package.get("version") != "0.53.0-chio.3":
         errors.append("nono-chio wrapper package identity is invalid")
     dependencies = wrapper.get("dependencies", {})
-    nono = dependencies.get("nono")
-    if not isinstance(nono, dict) or nono.get("version") != "=0.53.0" or nono.get("default-features") is not False:
-        errors.append("nono-chio must pin nono =0.53.0 with default features disabled")
+    if "nono" in dependencies:
+        errors.append("nono-chio must not depend on the broad upstream nono package")
     if dependencies.get("landlock") != "=0.4.4":
         errors.append("nono-chio must pin landlock =0.4.4")
-    nono_patch = workspace.get("patch", {}).get("crates-io", {}).get("nono")
-    if (
-        not isinstance(nono_patch, dict)
-        or nono_patch.get("path") != "third_party/nono-upstream-chio"
-    ):
-        errors.append("workspace must select the reviewed local nono source fork")
     # Standalone qualification is a separate Cargo workspace. Parent patches
     # do not apply when its manifest is selected directly.
     qualification_patches = nono_fork.get("patch", {}).get("crates-io", {})
@@ -406,16 +338,17 @@ def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
     wrapper_root = root / "third_party/nono-chio"
     wrapper_source_path = wrapper_root / "src/lib.rs"
     wrapper_source = read_text(wrapper_source_path, errors, "nono-chio wrapper source")
+    abi_source = read_text(wrapper_root / "src/abi.rs", errors, "nono-chio ABI probe")
     wrapper_readme = read_text(wrapper_root / "README.md", errors, "nono-chio README")
     wrapper_patches = read_text(wrapper_root / "PATCHES.md", errors, "nono-chio patch inventory")
     read_text(wrapper_root / "LICENSE-APACHE", errors, "nono-chio Apache license")
     notice = read_text(root / "NOTICE", errors, "repository NOTICE")
     if wrapper_source:
         expected_digest = data.get("nono", {}).get("patch", {}).get("source_sha256")
-        if expected_digest != sha256(wrapper_source_path):
+        if expected_digest != wrapper_source_sha256(root):
             errors.append("nono-chio wrapper source digest does not match provenance")
         for required in [
-            "nono::CapabilitySet::new().block_network()",
+            "enforce_network_blocked",
             "BorrowedFd",
             "PathBeneath::new(grant.fd",
             "CompatLevel::HardRequirement",
@@ -431,6 +364,11 @@ def validate_sources(root: Path, data: dict, errors: list[str]) -> None:
                 errors.append(f"nono-chio source is missing required enforcement token: {required}")
         if "PathFd::new" in wrapper_source:
             errors.append("nono-chio must not reopen a caller-validated pathname")
+    for required in ["ABI::V6", "ABI::V4", "CompatLevel::HardRequirement", "OnceLock", "fn probe_abi"]:
+        if required not in abi_source:
+            errors.append(f"nono-chio ABI probe is missing required token: {required}")
+    if "nono::" in wrapper_source:
+        errors.append("nono-chio retains an upstream capability container")
     if (
         "Luke Hinds" not in wrapper_patches
         or "always-further/nono" not in wrapper_patches
@@ -632,9 +570,9 @@ def validate_lock(root: Path, errors: list[str]) -> None:
         if package is None or package.get("source") != pin["source"] or package.get("checksum") != pin["checksum"]:
             errors.append(f"Cargo.lock does not contain the reviewed {pin['name']} pin")
     nono = find_locked_package(lock, "nono", "0.53.0")
-    if nono is None or nono.get("source") is not None or nono.get("checksum") is not None:
-        errors.append("Cargo.lock does not contain the local nono source fork")
-    wrapper = find_locked_package(lock, "nono-chio", "0.53.0-chio.2")
+    if nono is not None:
+        errors.append("Cargo.lock still resolves the broad upstream nono package")
+    wrapper = find_locked_package(lock, "nono-chio", "0.53.0-chio.3")
     if wrapper is None or wrapper.get("source") is not None:
         errors.append("Cargo.lock does not contain the local nono-chio wrapper")
     seccompiler = find_locked_package(lock, "seccompiler", "0.5.0")

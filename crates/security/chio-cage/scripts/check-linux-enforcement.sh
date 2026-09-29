@@ -167,7 +167,7 @@ build_static_helper() {
   # The execution image ships the musl target, which produces a static PIE
   # using its standard settings and does not alter host build-script flags.
   CARGO_TARGET_DIR="$static_target_dir" \
-    cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage --bin chio-cage-init --features "$features"
+    cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features "$features"
   static_helper="$static_target_dir/x86_64-unknown-linux-musl/debug/chio-cage-init"
   if [[ ! -x "$static_helper" ]]; then
     echo "static PIE cage-init build did not produce an executable" >&2
@@ -223,14 +223,14 @@ all_targets_output="$log_dir/all-targets.out"
 run_cargo_lane \
   "real-Linux all-target cage lane" \
   "$all_targets_output" \
-  cargo test -p chio-cage --all-targets \
+  cargo test -p chio-cage -p chio-cage-plan -p chio-cage-init --all-targets \
     --features real-linux-enforcement -- --test-threads=1
 python3 -I "$inventory_checker" \
   --root "$root" \
   --run-output "$all_targets_output"
 all_targets_passed="$(passed_total "$all_targets_output")"
-if [[ "$all_targets_passed" -ne 78 ]]; then
-  echo "real-Linux all-target cage lane did not execute exactly 78 tests" >&2
+if [[ "$all_targets_passed" -ne 79 ]]; then
+  echo "real-Linux all-target cage lane did not execute exactly 79 tests" >&2
   exit 1
 fi
 

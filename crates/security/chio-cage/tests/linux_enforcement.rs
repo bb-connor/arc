@@ -37,7 +37,15 @@ mod broker_status;
 fn cage_init_helper() -> PathBuf {
     std::env::var_os("CHIO_CAGE_TEST_HELPER")
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_BIN_EXE_chio-cage-init")))
+        .unwrap_or_else(|| {
+            std::env::current_exe()
+                .test_expect("integration test executable")
+                .parent()
+                .test_expect("Cargo deps directory")
+                .parent()
+                .test_expect("Cargo profile directory")
+                .join("chio-cage-init")
+        })
 }
 
 fn path_texts(paths: Vec<PathBuf>) -> Option<Vec<String>> {

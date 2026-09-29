@@ -20,9 +20,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 HEADERS = {
+    "lib_chio_cage_plan": "Running unittests src/lib.rs (/tmp/chio_cage_plan-lib)",
+    "lib_chio_cage_init": "Running unittests src/lib.rs (/tmp/chio_cage_init-lib)",
+    "entrypoint": "Running tests/entrypoint.rs (/tmp/entrypoint)",
     "lib": "Running unittests src/lib.rs (/tmp/chio_cage-lib)",
     "bin_chio_cage_init": (
-        "Running unittests src/bin/chio-cage-init.rs (/tmp/chio_cage_init-bin)"
+        "Running unittests src/main.rs (/tmp/chio_cage_init-bin)"
     ),
     "enforcement_evidence": (
         "Running tests/enforcement_evidence.rs (/tmp/enforcement_evidence)"
@@ -72,6 +75,9 @@ def main() -> int:
         shutil.copy2(
             ROOT / "crates/security/chio-cage/Cargo.toml", crate / "Cargo.toml"
         )
+
+        for name in ("chio-cage-plan", "chio-cage-init"):
+            shutil.copytree(ROOT / "crates/security" / name, root / "crates/security" / name)
 
         inventory = MODULE.source_inventory(root)
         valid = render(inventory)

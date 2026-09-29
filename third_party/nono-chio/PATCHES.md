@@ -6,13 +6,20 @@ Upstream repository: <https://github.com/always-further/nono>
 
 Upstream commit: `c4b25b827330640cb95f85809d88d977191b42e7`
 
-The upstream package is selected through `third_party/nono-upstream-chio`, which
-repairs filesystem grant provenance during deduplication. This directory is the
-separate wrapper patch, permitted by the enterprise hardening design, that
-changes the integration semantics. It does not call the upstream deduplicator.
+Patch version: `0.53.0-chio.3`.
 
-1. `CapabilitySet::new()` constructs upstream `nono::CapabilitySet` and calls
-   `block_network()` before it can be returned.
+The wrapper carries the reviewed ABI probe from
+`third_party/nono-upstream-chio/src/sandbox/linux/abi.rs` in `src/abi.rs`.
+The descending ABI order, hard-requirement access/scope checks, and successful
+result cache are unchanged. Error projection uses the wrapper's `AbiProbe`
+variant; logging is omitted. The vendored upstream tree remains a hashed source
+reference for this extraction. It is not selected by the runtime dependency graph.
+
+1. `CapabilitySet::new()` creates an empty descriptor grant set. The unused
+   upstream capability container and dependency are removed. There is no network
+   allow operation; `enforce_network_blocked` still installs the independent
+   deny-all TCP layer. `filesystem_access` consumes the same `PathAccess` directly
+   instead of translating it through upstream `AccessMode`.
 2. `CapabilitySet::add_path_fd()` accepts `BorrowedFd`, so Landlock
    `PathBeneath` rules use the descriptor already retained and authenticated by
    Chio. No pathname is accepted by this API.

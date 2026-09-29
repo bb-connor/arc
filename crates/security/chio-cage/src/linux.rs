@@ -3,12 +3,12 @@
 use std::collections::BTreeSet;
 use std::ffi::CString;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 use std::os::linux::fs::MetadataExt;
 use std::os::raw::{c_int, c_long, c_uint};
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
-use std::os::unix::fs::{FileExt, FileTypeExt, OpenOptionsExt};
+use std::os::unix::fs::{FileExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
 use crate::{
@@ -64,7 +64,7 @@ const SYS_OPENAT2: c_long = libc::SYS_openat2;
 const ENOENT: i32 = 2;
 const SOL_SOCKET: c_int = 1;
 const SO_PEERCRED: c_int = 17;
-const MAX_FDINFO_BYTES: u64 = 64 * 1024;
+
 const DIRECTORY_SCAN_BUFFER_BYTES: usize = 64 * 1024;
 const LINUX_DIRENT64_NAME_OFFSET: usize = 19;
 
@@ -101,15 +101,6 @@ unsafe extern "C" {
         option_value: *mut std::ffi::c_void,
         option_length: *mut c_uint,
     ) -> c_int;
-}
-
-pub(crate) fn current_process_identity() -> crate::BrokerPeerIdentity {
-    // SAFETY: these process-identity queries take no pointers and mutate no
-    // Rust-owned memory.
-    let uid = unsafe { geteuid() };
-    // SAFETY: this process-identity query has the same contract as `geteuid`.
-    let gid = unsafe { getegid() };
-    crate::BrokerPeerIdentity::new(std::process::id(), uid, gid)
 }
 
 pub(crate) fn broker_peer_identity(file: &File) -> Result<crate::BrokerPeerIdentity, CageError> {
@@ -175,12 +166,12 @@ fn retain_read_closure(
     if resources.len() >= crate::MAX_READ_GRANTS {
         return Err(CageError::ResourceLimitExceeded("read grants"));
     }
-    if resource.identity.kind != ResourceKind::Directory {
+    if resource.identity.kind() != ResourceKind::Directory {
         resources.push(resource);
         return Ok(());
     }
 
-    let directory_identity = (resource.identity.device, resource.identity.inode);
+    let directory_identity = (resource.identity.device(), resource.identity.inode());
     let first_visit = visited_directories.insert(directory_identity);
     let directory_path = resource.path.clone();
     let traversal = open_directory_for_scan(&resource)?;
@@ -395,7 +386,7 @@ fn retain_existing_from_root(
     .map_err(|source| map_open_error(path, source))?;
     let identity = descriptor_identity(&file, Some(path))?;
     if matches!(expected_access, ExpectedAccess::WriteExactFile)
-        && identity.kind != ResourceKind::RegularFile
+        && identity.kind() != ResourceKind::RegularFile
     {
         return Err(CageError::WritableDirectory(path.to_path_buf()));
     }
@@ -431,7 +422,7 @@ fn create_exact_write(root: &File, path: &Path) -> Result<RetainedResource, Cage
         .filter(|name| !name.is_empty())
         .ok_or_else(|| CageError::MissingWriteParent(path.to_path_buf()))?;
     let parent_resource = retain_existing_from_root(root, parent, ExpectedAccess::Read)?;
-    if parent_resource.identity.kind != ResourceKind::Directory {
+    if parent_resource.identity.kind() != ResourceKind::Directory {
         return Err(CageError::MissingWriteParent(path.to_path_buf()));
     }
     let created = openat2(
@@ -463,10 +454,10 @@ fn create_exact_write(root: &File, path: &Path) -> Result<RetainedResource, Cage
         });
     }
     let created_identity = descriptor_identity(&created, Some(path))?;
-    if created_identity.kind != ResourceKind::RegularFile
-        || created_identity.uid != effective_uid
-        || created_identity.gid != effective_gid
-        || created_identity.mode & 0o777 != 0o600
+    if created_identity.kind() != ResourceKind::RegularFile
+        || created_identity.uid() != effective_uid
+        || created_identity.gid() != effective_gid
+        || created_identity.mode() & 0o777 != 0o600
     {
         return Err(CageError::UnsafeCreatedFile(path.to_path_buf()));
     }
@@ -513,16 +504,17 @@ pub(crate) fn retain_runtime_artifact(
         | RuntimeArtifactRole::TargetExecutable
         | RuntimeArtifactRole::RuntimeFile => ResourceKind::RegularFile,
     };
-    if identity.kind != expected_kind {
+    if identity.kind() != expected_kind {
         return Err(CageError::UnsupportedResourceKind(path.to_path_buf()));
     }
     let required_executable = matches!(
         role,
         RuntimeArtifactRole::CageInitHelper | RuntimeArtifactRole::TargetExecutable
     );
-    let executable_runtime = role == RuntimeArtifactRole::RuntimeFile && identity.mode & 0o111 != 0;
-    if (required_executable && identity.mode & 0o111 == 0)
-        || ((required_executable || executable_runtime) && identity.mode & 0o6022 != 0)
+    let executable_runtime =
+        role == RuntimeArtifactRole::RuntimeFile && identity.mode() & 0o111 != 0;
+    if (required_executable && identity.mode() & 0o111 == 0)
+        || ((required_executable || executable_runtime) && identity.mode() & 0o6022 != 0)
     {
         return Err(CageError::InvalidExecutable(path.to_path_buf()));
     }
@@ -836,7 +828,7 @@ pub(crate) fn verify_runtime_resources(
             artifact.role,
             RuntimeArtifactRole::CageInitHelper | RuntimeArtifactRole::TargetExecutable
         ) || artifact.role == RuntimeArtifactRole::RuntimeFile
-            && artifact.resource.identity.mode & 0o111 != 0
+            && artifact.resource.identity.mode() & 0o111 != 0
         {
             reject_file_capabilities(&artifact.resource.file, &artifact.resource.path)?;
         }
@@ -891,7 +883,7 @@ pub(crate) fn verify_admitted_resources(admitted: &AdmittedManifest) -> Result<(
 
 pub(crate) fn verify_broker_ipc(broker: &BrokerIpc) -> Result<(), CageError> {
     let current = descriptor_identity(&broker.file, None)?;
-    if current != broker.identity || current.kind != ResourceKind::UnixSocket {
+    if current != broker.identity || current.kind() != ResourceKind::UnixSocket {
         return Err(CageError::InvalidBrokerDescriptor);
     }
     if broker_peer_identity(&broker.file)? != broker.peer_identity {
@@ -913,78 +905,6 @@ fn verify_resource(resource: &RetainedResource) -> Result<(), CageError> {
 
 fn retained_resource_identity_matches(expected: FileIdentity, current: FileIdentity) -> bool {
     expected == current
-}
-
-pub(crate) fn descriptor_identity(
-    file: &File,
-    path: Option<&Path>,
-) -> Result<FileIdentity, CageError> {
-    let display_path = path.unwrap_or_else(|| Path::new("<descriptor>"));
-    let metadata = file
-        .metadata()
-        .map_err(|source| CageError::DescriptorMetadata {
-            path: display_path.to_path_buf(),
-            source,
-        })?;
-    let file_type = metadata.file_type();
-    let kind = if file_type.is_file() {
-        ResourceKind::RegularFile
-    } else if file_type.is_dir() {
-        ResourceKind::Directory
-    } else if file_type.is_socket() {
-        ResourceKind::UnixSocket
-    } else if file_type.is_symlink() {
-        return Err(CageError::SymbolicLink(display_path.to_path_buf()));
-    } else {
-        return Err(CageError::UnsupportedResourceKind(
-            display_path.to_path_buf(),
-        ));
-    };
-    Ok(FileIdentity {
-        device: metadata.st_dev(),
-        inode: metadata.st_ino(),
-        mount_id: mount_id(file, display_path)?,
-        mode: metadata.st_mode(),
-        uid: metadata.st_uid(),
-        gid: metadata.st_gid(),
-        kind,
-    })
-}
-
-fn mount_id(file: &File, path: &Path) -> Result<u64, CageError> {
-    let fdinfo_path = format!("/proc/self/fdinfo/{}", file.as_raw_fd());
-    let fdinfo_file = File::open(&fdinfo_path).map_err(|source| CageError::DescriptorMetadata {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let metadata = fdinfo_file
-        .metadata()
-        .map_err(|source| CageError::DescriptorMetadata {
-            path: path.to_path_buf(),
-            source,
-        })?;
-    if metadata.len() > MAX_FDINFO_BYTES {
-        return Err(CageError::MissingMountIdentity(path.to_path_buf()));
-    }
-    let mut bytes = Vec::new();
-    fdinfo_file
-        .take(MAX_FDINFO_BYTES + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|source| CageError::DescriptorMetadata {
-            path: path.to_path_buf(),
-            source,
-        })?;
-    let byte_count = u64::try_from(bytes.len())
-        .map_err(|_| CageError::MissingMountIdentity(path.to_path_buf()))?;
-    if byte_count > MAX_FDINFO_BYTES {
-        return Err(CageError::MissingMountIdentity(path.to_path_buf()));
-    }
-    let text = std::str::from_utf8(&bytes)
-        .map_err(|_| CageError::MissingMountIdentity(path.to_path_buf()))?;
-    text.lines()
-        .find_map(|line| line.strip_prefix("mnt_id:\t"))
-        .and_then(|value| value.parse::<u64>().ok())
-        .ok_or_else(|| CageError::MissingMountIdentity(path.to_path_buf()))
 }
 
 #[allow(
@@ -1107,20 +1027,14 @@ fn map_open_error(path: &Path, source: io::Error) -> CageError {
     }
 }
 
+pub(crate) use chio_cage_plan::linux::descriptor_identity;
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn identity(inode: u64) -> FileIdentity {
-        FileIdentity {
-            device: 1,
-            inode,
-            mount_id: 2,
-            mode: 0o100600,
-            uid: 1000,
-            gid: 1000,
-            kind: ResourceKind::RegularFile,
-        }
+        FileIdentity::new(1, inode, 2, 0o100600, 1000, 1000, ResourceKind::RegularFile)
     }
 
     #[test]

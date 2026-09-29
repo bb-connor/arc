@@ -1,56 +1,22 @@
 #!/usr/bin/env python3
-"""Bound the dependency graph of the privileged helpers.
+"""Bound the normal dependency graph of each privileged binary package.
 
-`chio-cage-init` is the most privileged program in the runtime: it installs
-the seccomp and Landlock confinement that everything else relies on, and it
-runs before that confinement exists. `chio-secret-brokerd` holds credentials
-no other process may see. Every crate in their dependency graphs is code that
-can execute with that authority, and the graphs grow one convenient
-`workspace = true` line at a time, with nothing that notices.
+The standalone chio-cage-init package contains the confinement bootstrap and
+shares its plan/status codec with the parent. It carries no async runtime,
+network client, regex engine, or tracing framework. serde_json is required by
+the sealed canonical plan and status wire format; its implementation remains
+shared through chio-core-types instead of introducing another canonical codec.
 
-What this measures, exactly: the set of unique packages (name and version)
-that `cargo tree --edges normal --locked --target x86_64-unknown-linux-musl`
-reports for each budgeted package with its release feature set. That is a
-package graph. It is not what the linker kept: dead-code elimination, LTO and
-feature-gated modules mean the shipped binary contains less than the graph and
-Cargo makes no promise about how much less. A package in the graph is a
-package whose code was compiled into the build and whose maintainers are
-trusted; whether any byte of it survived linking is a separate measurement of
-the artifact, not of the graph. The musl target is the release target of the
-helper and pins the target-specific dependencies so the count is the same on
-every host.
-
-The gate refuses, per budgeted package:
-
-A graph above its ceiling. The ceiling is the count measured when the budget
-was set, so any new package is an explicit edit to this file, reviewed as such.
-Ceilings only move down without a reason recorded beside them.
-
-A denied package anywhere in the graph. The deny list is derived from the
-measurement: packages that a confinement helper or a credential broker has no
-business carrying and that the graph does not carry today (a second TLS stack,
-a dynamic loader, a JIT, C-library network clients), plus, for the helper only,
-the database and kernel crates that make a program something other than a
-helper.
-
-A pending entry whose package has left the graph. The spec's deny candidates
-for the helper (an async runtime, an HTTP stack, regex engines, a JSON codec,
-a tracing framework) are all present today through `chio-core` and
-`chio-manifest`, so they cannot be denied yet. They are recorded as pending
-with an expiry and the change that retires them: moving the helper into its
-own crate that depends only on the plan and envelope types, `seccompiler` and
-`nono-chio`. When that lands and a pending package disappears, the entry is
-stale and must be promoted to the deny list, which is how the ratchet closes.
-
-Failures name the budgeted package's manifest and, for a denied package, the
-direct dependency that carries it, found with `cargo tree --invert`.
+Measure unique name/version pairs on x86_64-unknown-linux-musl with the release
+feature set. This is the package graph, not linked artifact contents. An added
+package or forbidden transitive dependency requires an explicit reviewed change;
+artifact linkage is measured separately by the ELF packaging gate.
 """
 
 from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 import re
 import subprocess
@@ -61,12 +27,6 @@ TARGET = "x86_64-unknown-linux-musl"
 
 
 @dataclass(frozen=True)
-class Pending:
-    rationale: str
-    expires: str
-
-
-@dataclass(frozen=True)
 class Budget:
     manifest: str
     binary: str
@@ -74,11 +34,6 @@ class Budget:
     measured: str
     features: tuple[str, ...]
     deny: dict[str, str]
-    pending: dict[str, Pending]
-
-
-def pending(expires: str, rationale: str) -> Pending:
-    return Pending(rationale=rationale, expires=expires)
 
 
 # Absent from both graphs at the measurement; a privileged program has no
@@ -107,55 +62,39 @@ HELPER_DENY: dict[str, str] = {
     "ring": "a second crypto backend beside aws-lc-rs",
 }
 
-# Present in the helper's graph through chio-core and chio-manifest. Each
-# retires when the helper depends only on the plan and envelope types,
-# seccompiler and nono-chio; the entry then fails as stale and moves to
-# HELPER_DENY.
-HELPER_PENDING: dict[str, Pending] = {
-    name: pending(
-        "2026-12-31",
-        "carried by chio-core and chio-manifest; retires with the helper's own crate",
-    )
+# Retired pending entries are now unconditional denials. JSON is required by
+# the reviewed plan/status wire format; no other exception remains.
+HELPER_DENY.update({
+    name: "the confinement helper has no runtime, network, regex, or tracing role"
     for name in (
-        "tokio",
-        "hyper",
-        "hyper-util",
-        "reqwest",
-        "tower-http",
-        "rustls-webpki",
-        "aws-lc-rs",
-        "regex",
-        "fancy-regex",
-        "serde_json",
-        "tracing",
+        "tokio", "hyper", "hyper-util", "reqwest", "tower-http", "rustls-webpki",
+        "aws-lc-rs", "regex", "regex-automata", "fancy-regex", "tracing",
+        "nono", "chio-core", "chio-manifest", "chio-cage",
     )
-}
+})
 
 # Ceilings are the unique package counts measured on the release recipe:
 # `--features real-linux-enforcement` for the helper, default features for the
 # broker (`chio-broker-mcp` on musl, `chio-secret-brokerd` on glibc build the
 # same graph).
 BUDGETS: dict[str, Budget] = {
-    "chio-cage": Budget(
-        manifest="crates/security/chio-cage/Cargo.toml",
+    "chio-cage-init": Budget(
+        manifest="crates/security/chio-cage-init/Cargo.toml",
         binary="chio-cage-init",
-        ceiling=260,
-        measured="2026-09-26",
+        ceiling=72,
+        measured="2026-09-29",
         features=("real-linux-enforcement",),
         deny=HELPER_DENY,
-        pending=HELPER_PENDING,
     ),
     "chio-secret-broker": Budget(
         manifest="crates/security/chio-secret-broker/Cargo.toml",
         binary="chio-secret-brokerd",
-        # 479 -> 480: explicit broker secret ownership adds only secrecy 0.10.3.
-        # Its existing zeroize/serde dependencies add no other package. Source
-        # audit: docs/security/supply-chain/secrecy-0.10.3.md.
-        ceiling=480,
-        measured="2026-09-28",
+        # 480 -> 481: add cage-plan and cage-init, remove upstream nono.
+        # Other shared platform dependencies remain in the broker's graph.
+        ceiling=481,
+        measured="2026-09-29",
         features=(),
         deny=COMMON_DENY,
-        pending={},
     ),
 }
 
@@ -231,24 +170,6 @@ def manifest_line(root: Path, manifest: str, dependency: str | None) -> int:
     return text.count("\n", 0, match.start()) + 1 if match else 1
 
 
-def validate_pending(failures: list[str]) -> None:
-    for package, budget in sorted(BUDGETS.items()):
-        for name, entry in sorted(budget.pending.items()):
-            if name in budget.deny:
-                failures.append(f"{budget.manifest}: {name} is both denied and pending for {package}")
-            if not entry.rationale.strip():
-                failures.append(f"{budget.manifest}: pending entry {name} has an empty rationale")
-            try:
-                expires_on = date.fromisoformat(entry.expires)
-            except ValueError:
-                failures.append(
-                    f"{budget.manifest}: pending entry {name} expiry {entry.expires!r} is not an ISO date"
-                )
-                continue
-            if expires_on < date.today():
-                failures.append(f"{budget.manifest}: pending entry {name} expired on {entry.expires}")
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check the privileged helpers' dependency budgets.")
     parser.add_argument("--root", type=Path, default=repo_root(), help="workspace root")
@@ -256,7 +177,6 @@ def main() -> int:
     root = args.root.resolve()
 
     failures: list[str] = []
-    validate_pending(failures)
 
     for package, budget in sorted(BUDGETS.items()):
         try:
@@ -266,11 +186,9 @@ def main() -> int:
             continue
         count = package_count(graph)
         denied = sorted(name for name in budget.deny if name in graph)
-        present_pending = sorted(name for name in budget.pending if name in graph)
-        stale_pending = sorted(name for name in budget.pending if name not in graph)
         print(
             f"{package} ({budget.binary}) on {TARGET}: {count} packages, ceiling {budget.ceiling} "
-            f"(measured {budget.measured}); {len(denied)} denied, {len(present_pending)} pending"
+            f"(measured {budget.measured}); {len(denied)} denied"
         )
         if count > budget.ceiling:
             failures.append(
@@ -286,11 +204,6 @@ def main() -> int:
                 f"denied package {name} v{versions}"
                 + (f" through {carrier}" if carrier and carrier != name else "")
                 + f": {budget.deny[name]}"
-            )
-        for name in stale_pending:
-            failures.append(
-                f"{budget.manifest}:{manifest_line(root, budget.manifest, None)} pending entry {name} "
-                f"is no longer in the {package} graph; promote it to the deny list"
             )
 
     if failures:

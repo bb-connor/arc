@@ -1186,17 +1186,6 @@ pub fn launch(
         .map_err(|error| error.with_receipt_bindings_if_missing(receipt_bindings))
 }
 
-pub fn run_cage_init() -> Result<(), CageLaunchError> {
-    #[cfg(target_os = "linux")]
-    {
-        platform::run_cage_init()
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        Err(CageLaunchError::unsupported())
-    }
-}
-
 #[cfg(target_os = "linux")]
 pub(crate) fn enforced_child(
     child: std::process::Child,
