@@ -1,0 +1,4 @@
+
+Wire schema failures:
+- spec/wire-schemas.lock:2968 chio.manifest.v1 lists crates/platform/chio-manifest/src/lib_parts/part_01.inc, which no longer declares it (removed or bumped identifier); acknowledge it with --update in the same change
+Wire schemas: 1325 identifier constants, 1098 distinct values, 163 declared in more than one file, 1099 lock entries; 168 of 511 security-crate constants unpinned

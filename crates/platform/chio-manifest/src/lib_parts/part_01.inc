@@ -5,7 +5,6 @@ pub use chio_core::manifest::{
 };
 use serde::{Deserialize, Serialize};
 
-pub use validation::validate_manifest;
 pub use admission::{
     load_existing_verified_manifest_registry, AdmittedToolSecurity, AuthoritativeToolPolicy,
     RuntimeToolTopology, VerifiedCageManifest, VerifiedManifestAdmissionError,
@@ -15,10 +14,10 @@ pub use input_schema::{
     trusted_server_tool_input_schema, ToolInputSchemaError, ToolInputSchemaValidator,
     VerifiedManifestInvocationError, SERVER_TOOL_INPUT_SCHEMA_CATALOG_VERSION,
 };
+pub use validation::validate_manifest;
 
 /// Supported Chio tool-manifest schema identifier.
 pub const TOOL_MANIFEST_SCHEMA: &str = chio_core::signed_artifact::CHIO_TOOL_MANIFEST_V2_SCHEMA;
-const LEGACY_TOOL_MANIFEST_SCHEMA: &str = "chio.manifest.v1";
 
 fn deserialize_present_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
@@ -367,10 +366,6 @@ impl NormalizedHost {
         Self::parse(host.as_ref(), true)
     }
 
-    fn from_legacy(host: impl AsRef<str>) -> Result<Self, ManifestError> {
-        Self::parse(host.as_ref(), false)
-    }
-
     fn parse(host: &str, require_canonical: bool) -> Result<Self, ManifestError> {
         if host.is_empty()
             || host.trim() != host
@@ -515,7 +510,6 @@ impl<'de> Deserialize<'de> for EnvironmentVariableName {
 }
 pub use chio_cage_plan::NativeSyscallProfile;
 
-
 /// A manifest wrapped in its Ed25519 signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -566,317 +560,8 @@ pub enum ManifestError {
     #[error("manifest schema version is not supported: {0}")]
     UnsupportedSchema(String),
 
-    #[error("legacy manifest requires operator amendment before v2 signing: {0}")]
-    LegacyMigration(String),
-
-    #[error(
-        "legacy permission migration requires an explicit native profile and destination ports"
-    )]
-    PendingLegacyPermissionAmendment,
-
     #[error("signature verification failed")]
     VerificationFailed,
-}
-
-/// Deterministic unsigned v2 result from the private v1 parser.
-#[derive(Debug, Clone)]
-pub struct ManifestMigration {
-    manifest: ToolManifest,
-    legacy_network_hosts: Vec<NormalizedHost>,
-    requires_permission_amendment: bool,
-}
-
-impl ManifestMigration {
-    pub fn manifest(&self) -> Result<&ToolManifest, ManifestError> {
-        if self.requires_permission_amendment {
-            Err(ManifestError::PendingLegacyPermissionAmendment)
-        } else {
-            Ok(&self.manifest)
-        }
-    }
-
-    #[must_use]
-    pub const fn requires_operator_resigning(&self) -> bool {
-        true
-    }
-
-    #[must_use]
-    pub const fn requires_permission_amendment(&self) -> bool {
-        self.requires_permission_amendment
-    }
-
-    #[must_use]
-    pub fn legacy_network_hosts(&self) -> Vec<&str> {
-        self.legacy_network_hosts
-            .iter()
-            .map(NormalizedHost::as_str)
-            .collect()
-    }
-
-    pub fn into_manifest(self) -> Result<ToolManifest, ManifestError> {
-        if self.requires_permission_amendment {
-            Err(ManifestError::PendingLegacyPermissionAmendment)
-        } else {
-            Ok(self.manifest)
-        }
-    }
-
-    pub fn amend_permissions(
-        mut self,
-        native_syscall_profile: NativeSyscallProfile,
-        network_destinations: Vec<NetworkDestination>,
-    ) -> Result<ToolManifest, ManifestError> {
-        if !self.requires_permission_amendment {
-            return Err(ManifestError::LegacyMigration(
-                "legacy manifest has no permissions to amend".to_string(),
-            ));
-        }
-        let supplied_hosts = network_destinations
-            .iter()
-            .map(|destination| destination.host().clone())
-            .collect::<std::collections::BTreeSet<_>>();
-        let expected_hosts = self
-            .legacy_network_hosts
-            .iter()
-            .cloned()
-            .collect::<std::collections::BTreeSet<_>>();
-        if supplied_hosts != expected_hosts {
-            return Err(ManifestError::LegacyMigration(
-                "operator-supplied destination hosts do not exactly match legacy network hosts"
-                    .to_string(),
-            ));
-        }
-        let permissions = self.manifest.required_permissions.as_mut().ok_or_else(|| {
-            ManifestError::LegacyMigration("permission draft is missing".to_string())
-        })?;
-        permissions.native_syscall_profile = native_syscall_profile;
-        permissions.network_destinations = if network_destinations.is_empty() {
-            None
-        } else {
-            Some(network_destinations)
-        };
-        self.requires_permission_amendment = false;
-        validate_manifest(&self.manifest)?;
-        Ok(self.manifest)
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyToolManifestV1 {
-    schema: String,
-    server_id: chio_core::ServerId,
-    name: String,
-    description: Option<String>,
-    version: String,
-    tools: Vec<LegacyToolDefinitionV1>,
-    #[serde(default)]
-    server_tools: Vec<ServerTool>,
-    required_permissions: Option<LegacyRequiredPermissionsV1>,
-    public_key: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyToolDefinitionV1 {
-    name: String,
-    description: String,
-    input_schema: serde_json::Value,
-    #[serde(default)]
-    output_schema: Option<serde_json::Value>,
-    #[serde(default)]
-    pricing: Option<ToolPricing>,
-    #[serde(default)]
-    has_side_effects: Option<bool>,
-    #[serde(default)]
-    annotations: Option<LegacyToolAnnotationsV1>,
-    #[serde(default)]
-    latency_hint: Option<LatencyHint>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyToolAnnotationsV1 {
-    #[serde(default)]
-    read_only: bool,
-    #[serde(default)]
-    destructive: bool,
-    #[serde(default)]
-    idempotent: bool,
-    #[serde(default)]
-    requires_approval: bool,
-    #[serde(default)]
-    estimated_duration_ms: Option<u64>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyRequiredPermissionsV1 {
-    read_paths: Option<Vec<String>>,
-    write_paths: Option<Vec<String>>,
-    network_hosts: Option<Vec<String>>,
-    environment_variables: Option<Vec<String>>,
-}
-
-/// Convert an exact v1 platform manifest into unsigned v2 content.
-///
-/// The migrated manifest must be reviewed and signed by an operator before it
-/// can pass v2 admission.
-pub fn migrate_legacy_manifest_v1(bytes: &[u8]) -> Result<ManifestMigration, ManifestError> {
-    let legacy: LegacyToolManifestV1 = serde_json::from_slice(bytes)
-        .map_err(|error| ManifestError::LegacyMigration(format!("invalid v1 manifest: {error}")))?;
-    if legacy.schema != LEGACY_TOOL_MANIFEST_SCHEMA {
-        return Err(ManifestError::UnsupportedSchema(legacy.schema));
-    }
-    let (required_permissions, legacy_network_hosts, requires_permission_amendment) =
-        migrate_legacy_permissions(legacy.required_permissions)?;
-
-    let tools = legacy
-        .tools
-        .into_iter()
-        .map(migrate_legacy_tool)
-        .collect::<Result<Vec<_>, _>>()?;
-    let manifest = ToolManifest {
-        schema: TOOL_MANIFEST_SCHEMA.to_string(),
-        server_id: legacy.server_id,
-        name: legacy.name,
-        description: legacy.description,
-        version: legacy.version,
-        tools,
-        server_tools: legacy.server_tools,
-        required_permissions,
-        public_key: legacy.public_key,
-    };
-    validate_manifest(&manifest)?;
-    Ok(ManifestMigration {
-        manifest,
-        legacy_network_hosts,
-        requires_permission_amendment,
-    })
-}
-
-fn migrate_legacy_permissions(
-    permissions: Option<LegacyRequiredPermissionsV1>,
-) -> Result<(Option<RequiredPermissions>, Vec<NormalizedHost>, bool), ManifestError> {
-    let Some(permissions) = permissions else {
-        return Ok((None, Vec::new(), false));
-    };
-    let has_permissions = permissions
-        .read_paths
-        .as_ref()
-        .is_some_and(|values| !values.is_empty())
-        || permissions
-            .write_paths
-            .as_ref()
-            .is_some_and(|values| !values.is_empty())
-        || permissions
-            .network_hosts
-            .as_ref()
-            .is_some_and(|values| !values.is_empty())
-        || permissions
-            .environment_variables
-            .as_ref()
-            .is_some_and(|values| !values.is_empty());
-    if !has_permissions {
-        return Ok((None, Vec::new(), false));
-    }
-
-    let environment_variables = permissions
-        .environment_variables
-        .map(|names| {
-            names
-                .into_iter()
-                .map(EnvironmentVariableName::new)
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .transpose()?;
-    let mut legacy_network_hosts = Vec::new();
-    let mut seen_network_hosts = std::collections::BTreeSet::new();
-    for host in permissions.network_hosts.unwrap_or_default() {
-        let host = NormalizedHost::from_legacy(host)?;
-        if !seen_network_hosts.insert(host.clone()) {
-            return Err(ManifestError::DuplicateRequiredPermission {
-                field: "required_permissions.network_hosts",
-                value: host.as_str().to_string(),
-            });
-        }
-        legacy_network_hosts.push(host);
-    }
-    let required_permissions = RequiredPermissions {
-        read_paths: permissions.read_paths,
-        write_paths: permissions.write_paths,
-        network_destinations: None,
-        environment_variables,
-        native_syscall_profile: NativeSyscallProfile::NativeMinimalV1,
-    };
-    Ok((Some(required_permissions), legacy_network_hosts, true))
-}
-
-fn migrate_legacy_tool(tool: LegacyToolDefinitionV1) -> Result<ToolDefinition, ManifestError> {
-    let (annotations, duration) = match (tool.has_side_effects, tool.annotations) {
-        (Some(_), Some(_)) => {
-            return Err(ManifestError::LegacyMigration(
-                "legacy tool carries both side-effect and annotation authorities".to_string(),
-            ));
-        }
-        (Some(has_side_effects), None) => (
-            if has_side_effects {
-                ToolAnnotations {
-                    read_only: false,
-                    destructive: true,
-                    idempotent: false,
-                    requires_approval: true,
-                }
-            } else {
-                ToolAnnotations {
-                    read_only: true,
-                    destructive: false,
-                    idempotent: false,
-                    requires_approval: false,
-                }
-            },
-            None,
-        ),
-        (None, Some(legacy)) => (
-            ToolAnnotations {
-                read_only: legacy.read_only,
-                destructive: legacy.destructive,
-                idempotent: legacy.idempotent,
-                requires_approval: legacy.requires_approval,
-            },
-            legacy.estimated_duration_ms,
-        ),
-        (None, None) => {
-            return Err(ManifestError::LegacyMigration(
-                "legacy tool has no behavior authority".to_string(),
-            ));
-        }
-    };
-    if tool.latency_hint.is_some() && duration.is_some() {
-        return Err(ManifestError::LegacyMigration(
-            "legacy tool carries two latency authorities".to_string(),
-        ));
-    }
-    let latency_hint = tool.latency_hint.or_else(|| duration.map(migrate_duration));
-    Ok(ToolDefinition {
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.input_schema,
-        output_schema: tool.output_schema,
-        pricing: tool.pricing,
-        annotations,
-        latency_hint,
-        flow: None,
-    })
-}
-
-const fn migrate_duration(duration_ms: u64) -> LatencyHint {
-    match duration_ms {
-        0..=1 => LatencyHint::Instant,
-        2..=999 => LatencyHint::Fast,
-        1_000..=59_999 => LatencyHint::Moderate,
-        _ => LatencyHint::Slow,
-    }
 }
 
 /// Sign a manifest with an Ed25519 keypair.
@@ -894,7 +579,6 @@ pub fn sign_manifest(
         signer_key,
     })
 }
-
 
 fn ensure_embedded_public_key_matches(
     manifest: &ToolManifest,

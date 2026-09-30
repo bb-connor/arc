@@ -1,0 +1,106 @@
+{
+  "crates/products/chio-cli/src/active_defense_migration.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority."
+  },
+  "crates/products/chio-cli/src/active_response_authority.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Authority bundles and deployments require bounded regular files and exact original canonical typed JSON. The owning authority library validates contents before building custody or reporting digests; decoding alone grants nothing."
+  },
+  "crates/products/chio-cli/src/admin.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Bounded original signed documents and registry projections precede existing signing/authorization operations. Created-at observes the shared fallible fenced clock instead of converting clock failure to zero."
+  },
+  "crates/products/chio-cli/src/cert.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Certificate documents are bounded and duplicate-aware before signature verification. Existing private key custody is required. Read-only SQLite queries select exact signed session metadata independently of capability ID; SQL bounds receipt text before materialization, and count/actual-byte/checked-sequence bounds precede retaining receipts. Certificate inspection is diagnostic, not authentication."
+  },
+  "crates/products/chio-cli/src/cli/chio/dispatch/authority.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Authority profiles/requests delegate bounded original input to their validated authority-library decoders. Private key JSON is read through existing private-file custody with identity/mode/owner checks and zeroizing buffers, then exact canonical custody decoding into secret fields. Typed projection never substitutes for authority issuance checks."
+  },
+  "crates/products/chio-cli/src/cli/chio/dispatch/runtime/ops.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Bounded original runtime operation documents delegate to current runtime-core decoders; optional current time is fallible and fenced. Explicit caller-provided time remains a caller-owned input, not trusted time inferred by decoding."
+  },
+  "crates/products/chio-cli/src/cli/chio/dispatch/runtime/orchestration.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Runtime orchestration reads bounded original artifacts via shared IO and current runtime-core strict decoders; generated values are typed projections, and the existing runtime validation remains the authority owner."
+  },
+  "crates/products/chio-cli/src/cli/chio/dispatch/runtime/signing.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Signed runtime inputs use bounded original decoders and existing private signing custody, without creating missing keys. Signature and authority checks remain in runtime/attestation owners; serialization of constructed signed output is not ingress."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Original passport, graph and artifact bytes are bounded before typed selection. Graph vectors and retained artifact maps carry entry/actual-byte bounds. Schema/digest/signature/trust checks remain in their proof family owners; projection of verified report values does not itself confer authority."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/assemble.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Assembly enumerates bounded regular artifact collections and hashes original retained bytes. Bounded duplicate-aware input is selected before constructing new graphs/passports; construction alone does not claim successful verification."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/collect.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Collection walks bounded regular inputs with depth/entry/actual-byte custody. Receipt normalization writes the bytes it parsed rather than rereading source paths; existing verification and bundle signing are retained. Synchronization is bounded by tree cardinality/depth."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/doctor.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Doctor inputs are bounded original documents. Negative-case enumeration is count-capped; failed checks carry diagnostic strings and never grant authority or mint a verified-result type."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/env.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Environment trust documents retain tighter per-owner file bounds, strict original I-JSON, full typed canonical byte equality and pinned signature/authority validation. Canonical parse causes remain typed. RPC responses require original duplicate-aware decoding, protocol 2.0, request ID equality and exclusive result/error shape after existing egress-contract transport bounds."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/explain.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Explanation captures bounded private source bytes before verification and derives explanation from that same snapshot. Original path is a display label; the report does not confer admission authority. Risk report collection has count and retained-byte limits."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/export.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Export captures a private bounded regular-file snapshot, verifies it, and packages those exact captured bytes. Public redaction is signed using configured custody and verified again on the transformed snapshot before archive creation. Namespace and cumulative bounds precede snapshot writes."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Built-in fixture construction is diagnostic. Installed fixture sources use bounded original decoders and bounded traversal/copy ownership; catalog IDs are bounded unique single-component names validated before directory effects; graph-selected records keep original digest checks before regenerated artifacts. Fixture generation never grants execution authority."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/fixture_agent_web.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Installed envelope/receipt enumerations have shared count/actual-byte budgets and bounded original decoders. Generated fixture and negative-case values are diagnostic projections; production verification retains signed input bindings."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Risk command inputs use bounded original JSON before typed projection. Existing risk computation and signer verification remain separate; rendering a report does not authenticate the incoming projection."
+  },
+  "crates/products/chio-cli/src/cli/trust/credit.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Credit policies explicitly select JSON or YAML with original duplicate rejection and bounded YAML expansion; JSON rejection never retries YAML. CLI enums are literal string projections. Credit evaluation/signature checks remain the owning library contract."
+  },
+  "crates/products/chio-cli/src/cli/trust/liability.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Bounded duplicate-aware original policy documents precede typed liability evaluation; signatures and settlement authority stay with the existing signed operation owner."
+  },
+  "crates/products/chio-cli/src/cli/trust/receipt/explain.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Receipt files and candidate envelope JSON use bounded duplicate-aware original parsing. Explain heuristics and error strings are diagnostic classification, not verification or an execution grant; original full documents remain available to actual signature validation."
+  },
+  "crates/products/chio-cli/src/cli/trust/runtime_attestation.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Runtime appraisal policies use explicit bounded JSON/YAML formats and literal enum projections. Recorded appraisal time uses the fallible fenced clock. Pinned-key attestation verification remains required by the existing appraisal owner."
+  },
+  "crates/products/chio-cli/src/cli/trust/shared.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Shared trust policy loading selects explicit JSON/YAML formats, bounds original bytes and YAML expansion, and preserves typed parser causes. Read-only trust-key discovery requires existing private custody and cannot create missing signing keys."
+  },
+  "crates/products/chio-cli/src/cli/trust/underwriting.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Underwriting policy loading uses bounded explicit JSON/YAML with no parse-error fallback. Enum arguments are literal strings; typed policy projection does not replace signed underwriting/receipt verification."
+  },
+  "crates/products/chio-cli/src/passport.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Passport/JWKS/policy documents use bounded original signed JSON. Presence of signed-envelope fields commits to signed-policy verification with no fallback to unsigned policy on failure. HTTP responses have timeout/actual-byte bounds. Existing private key custody, fenced observations and checked nonzero deadlines precede signed issuance."
+  },
+  "crates/products/chio-cli/src/passport/verifier.rs": {
+    "kind": "reviewed-bounded-input",
+    "contract": "Verifier inputs use bounded original signed JSON, retain existing passport signature/revocation binding checks and literal enum contracts. Policy/token deadlines reject zero or overflow; absent explicit time observes the fallible fenced clock."
+  }
+}

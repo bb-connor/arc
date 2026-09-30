@@ -261,14 +261,9 @@ pub(crate) fn cmd_chio_runtime_orchestrate_resume(
     report: &Path,
 ) -> Result<(), CliError> {
     let profile = load_runtime_orchestration_profile(profile)?;
-    let mut resolved: chio_runtime::RuntimeOrchestrationResumePlan = serde_json::from_str(
+    let mut resolved: chio_runtime::RuntimeOrchestrationResumePlan = crate::input::text(
         &read_utf8_json_file(resume_plan, "Chio runtime orchestration resume plan")?,
-    )
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "Chio runtime orchestration resume plan parse: {error}"
-        ))
-    })?;
+    )?;
     chio_runtime::validate_runtime_orchestration_resume_plan(&resolved).map_err(|error| {
         CliError::cli_other_error(format!("Chio runtime orchestration resume plan: {error}"))
     })?;

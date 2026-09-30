@@ -1,0 +1,922 @@
+
+ATTEMPT build
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-cage v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+   Compiling chio-http-session v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-session)
+   Compiling chio-edge-metrics v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-edge-metrics)
+   Compiling chio-trace-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-trace-validate)
+   Compiling chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guards)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+   Compiling chio-mcp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-edge)
+   Compiling chio-finding-challenge v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-challenge)
+   Compiling chio-mcp-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-adapter)
+   Compiling chio-policy v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-policy)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+   Compiling chio-external-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-external-guards)
+   Compiling chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+   Compiling chio-enterprise-export v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-enterprise-export)
+   Compiling chio-trust-market-context v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-trust-market-context)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+   Compiling chio-data-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards)
+   Compiling chio-security-kernel v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-kernel)
+   Compiling chio-siem v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-siem)
+   Compiling chio-runtime-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-core)
+   Compiling chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+   Compiling chio-config v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-config)
+   Compiling chio-proof-room v0.1.0 (/tmp/arc-security-launch/crates/products/chio-proof-room)
+   Compiling chio-openapi v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi)
+   Compiling chio-wasm-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-wasm-guards)
+   Compiling chio-acp-proxy v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-proxy)
+   Compiling chio-attest-buyer v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer)
+   Compiling chio-runtime v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime)
+   Compiling chio-process v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-process)
+   Compiling chio-conformance v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-conformance)
+   Compiling chio-tee v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-tee)
+   Compiling chio-secret-broker v0.1.0 (/tmp/arc-security-launch/crates/security/chio-secret-broker)
+   Compiling chio-runtime-harness v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-harness)
+   Compiling chio-replay-corpus v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-replay-corpus)
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+   Compiling chio-arena v0.1.0 (/tmp/arc-security-launch/crates/core/chio-arena)
+   Compiling chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+   Compiling chio-api-protect v0.1.0 (/tmp/arc-security-launch/crates/products/chio-api-protect)
+   Compiling chio-active-response-authority v0.1.0 (/tmp/arc-security-launch/crates/security/chio-active-response-authority)
+   Compiling chio-hosted-mcp v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-hosted-mcp)
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+error: could not compile `chio-cli` (bin "chio" test) due to 1 previous error
+error: unexpected closing delimiter: `}`
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:1091:1
+     |
+1070 |         if source_report_path.is_file() {
+     |                                         - the nearest open delimiter
+1071 |             fs::write(verifier_report_path), crate::input::read(source_report_path)?);
+     |                                                                                     - missing open `(` for this delimiter
+...
+1091 | }
+     | ^ unexpected closing delimiter
+
+{"reason": "build-finished", "success": false}
+
+ATTEMPT build2
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+   Compiling chio-api-protect v0.1.0 (/tmp/arc-security-launch/crates/products/chio-api-protect)
+   Compiling chio-active-response-authority v0.1.0 (/tmp/arc-security-launch/crates/security/chio-active-response-authority)
+   Compiling chio-hosted-mcp v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-hosted-mcp)
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+error: could not compile `chio-cli` (bin "chio" test) due to 19 previous errors; 2 warnings emitted
+warning: unused import: `File`
+  --> crates/platform/chio-control-plane/src/lib.rs:26:21
+   |
+26 | use std::fs::{self, File};
+   |                     ^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::io::Read as _`
+  --> crates/platform/chio-control-plane/src/lib.rs:27:5
+   |
+27 | use std::io::Read as _;
+   |     ^^^^^^^^^^^^^^^^^^
+
+error[E0583]: file not found for module `collection`
+ --> crates/products/chio-cli/src/bin/../cli/input.rs:6:1
+  |
+6 | pub(crate) mod collection;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: to create the module `collection`, create file "crates/products/chio-cli/src/bin/../cli/collection.rs" or "crates/products/chio-cli/src/bin/../cli/collection/mod.rs"
+  = note: if there is a `mod collection` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0583]: file not found for module `config`
+ --> crates/products/chio-cli/src/bin/../cli/input.rs:7:1
+  |
+7 | pub(crate) mod config;
+  | ^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: to create the module `config`, create file "crates/products/chio-cli/src/bin/../cli/config.rs" or "crates/products/chio-cli/src/bin/../cli/config/mod.rs"
+  = note: if there is a `mod config` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0583]: file not found for module `snapshot`
+ --> crates/products/chio-cli/src/bin/../cli/input.rs:8:1
+  |
+8 | pub(crate) mod snapshot;
+  | ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: to create the module `snapshot`, create file "crates/products/chio-cli/src/bin/../cli/snapshot.rs" or "crates/products/chio-cli/src/bin/../cli/snapshot/mod.rs"
+  = note: if there is a `mod snapshot` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0583]: file not found for module `time`
+ --> crates/products/chio-cli/src/bin/../cli/input.rs:9:1
+  |
+9 | pub(crate) mod time;
+  | ^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: to create the module `time`, create file "crates/products/chio-cli/src/bin/../cli/time.rs" or "crates/products/chio-cli/src/bin/../cli/time/mod.rs"
+  = note: if there is a `mod time` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0433]: failed to resolve: use of undeclared type `Path`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/env.rs:426:44
+    |
+426 |     let bytes = crate::input::read_regular(Path::new(&path), FINDING_VERIFIER_PROFILE_MAX_BYTES)?;
+    |                                            ^^^^ use of undeclared type `Path`
+    |
+help: consider importing one of these structs
+    |
+  1 + use crate::Path;
+    |
+  1 + use std::path::Path;
+    |
+  1 + use axum::extract::Path;
+    |
+  1 + use jsonschema::uri::Path;
+    |
+
+error[E0433]: failed to resolve: use of undeclared type `Path`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/env.rs:443:9
+    |
+443 |         Path::new(&path),
+    |         ^^^^ use of undeclared type `Path`
+    |
+help: consider importing one of these structs
+    |
+  1 + use crate::Path;
+    |
+  1 + use std::path::Path;
+    |
+  1 + use axum::extract::Path;
+    |
+  1 + use jsonschema::uri::Path;
+    |
+
+error[E0433]: failed to resolve: use of undeclared type `Path`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/env.rs:475:44
+    |
+475 |     let bytes = crate::input::read_regular(Path::new(&path), FINDING_AUTHORITY_POLICY_MAX_BYTES)?;
+    |                                            ^^^^ use of undeclared type `Path`
+    |
+help: consider importing one of these structs
+    |
+  1 + use crate::Path;
+    |
+  1 + use std::path::Path;
+    |
+  1 + use axum::extract::Path;
+    |
+  1 + use jsonschema::uri::Path;
+    |
+
+error[E0433]: failed to resolve: use of undeclared type `Path`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/env.rs:503:9
+    |
+503 |         Path::new(&authorization_path),
+    |         ^^^^ use of undeclared type `Path`
+    |
+help: consider importing one of these structs
+    |
+  1 + use crate::Path;
+    |
+  1 + use std::path::Path;
+    |
+  1 + use axum::extract::Path;
+    |
+  1 + use jsonschema::uri::Path;
+    |
+
+warning: unused import: `fs`
+ --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/risk.rs:3:34
+  |
+3 | use std::{collections::BTreeSet, fs, path::Path};
+  |                                  ^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0282]: type annotations needed
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/assemble.rs:270:58
+    |
+270 |     crate::input::collection::walk_files(current, |path, budget| {
+    |                                                          ^^^^^^
+...
+276 |             entries.push((relative, budget.read(path)?));
+    |                                     ------ type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+270 |     crate::input::collection::walk_files(current, |path, budget: /* Type */| {
+    |                                                                ++++++++++++
+
+error[E0282]: type annotations needed
+  --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/explain.rs:65:22
+   |
+65 |     let input_path = captured_input.as_path();
+   |                      ^^^^^^^^^^^^^^ cannot infer type
+
+error[E0277]: the size for values of type `[u8]` cannot be known at compilation time
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/export.rs:849:5
+    |
+849 | /     for path in crate::input::collection::paths(directory)? {
+850 | |         members.insert(proof_archive_relative_path(root, &path)?);
+851 | |     }
+    | |_____^ doesn't have a size known at compile-time
+    |
+    = help: within `std::path::Path`, the trait `Sized` is not implemented for `[u8]`
+note: required because it appears within the type `std::path::Path`
+   --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/std/src/path.rs:2313:11
+note: required by an implicit `Sized` bound in `std::option::Option`
+   --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/option.rs:600:0
+
+error[E0282]: type annotations needed
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/export.rs:866:58
+    |
+866 |     crate::input::collection::walk_files(current, |path, budget| {
+    |                                                          ^^^^^^
+...
+869 |             bytes: budget.read(path)?,
+    |                    ------ type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+866 |     crate::input::collection::walk_files(current, |path, budget: /* Type */| {
+    |                                                                ++++++++++++
+
+error[E0282]: type annotations needed
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:542:22
+    |
+542 |             .filter(|path| path.file_name().and_then(|s| s.to_str()) == Some(file_name)),
+    |                      ^^^^  ---- type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+542 |             .filter(|path: /* Type */| path.file_name().and_then(|s| s.to_str()) == Some(file_name)),
+    |                          ++++++++++++
+
+error[E0282]: type annotations needed
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:542:55
+    |
+542 |             .filter(|path| path.file_name().and_then(|s| s.to_str()) == Some(file_name)),
+    |                                                       ^  - type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+542 |             .filter(|path| path.file_name().and_then(|s: /* Type */| s.to_str()) == Some(file_name)),
+    |                                                        ++++++++++++
+
+error[E0282]: type annotations needed
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:4541:12
+     |
+4541 |         if file
+     |            ^^^^ cannot infer type
+
+error[E0282]: type annotations needed
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:4543:24
+     |
+4543 |             .and_then(|s| s.to_str())
+     |                        ^  - type must be known at this point
+     |
+help: consider giving this closure parameter an explicit type
+     |
+4543 |             .and_then(|s: /* Type */| s.to_str())
+     |                         ++++++++++++
+
+error[E0282]: type annotations needed
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:4544:27
+     |
+4544 |             .is_some_and(|name| {
+     |                           ^^^^
+4545 |                 name.starts_with("risk-comptroller-report") && name.ends_with(".json")
+     |                 ---- type must be known at this point
+     |
+help: consider giving this closure parameter an explicit type
+     |
+4544 |             .is_some_and(|name: /* Type */| {
+     |                               ++++++++++++
+
+error[E0282]: type annotations needed
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:6191:57
+     |
+6191 |     crate::input::collection::walk_files(&source_root, |path, budget| {
+     |                                                         ^^^^
+6192 |         let relative = path.strip_prefix(&source_root).map_err(|source| {
+     |                        ---- type must be known at this point
+     |
+help: consider giving this closure parameter an explicit type
+     |
+6191 |     crate::input::collection::walk_files(&source_root, |path: /* Type */, budget| {
+     |                                                             ++++++++++++
+
+error[E0282]: type annotations needed
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:6191:63
+     |
+6191 |     crate::input::collection::walk_files(&source_root, |path, budget| {
+     |                                                               ^^^^^^
+...
+6199 |         fs::write(target, budget.read(path)?)?;
+     |                           ------ type must be known at this point
+     |
+help: consider giving this closure parameter an explicit type
+     |
+6191 |     crate::input::collection::walk_files(&source_root, |path, budget: /* Type */| {
+     |                                                                     ++++++++++++
+
+warning: unused variable: `settlement_proof_path`
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2993:5
+     |
+2993 |     settlement_proof_path: &Path,
+     |     ^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_settlement_proof_path`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0277, E0282, E0433, E0583.
+For more information about an error, try `rustc --explain E0277`.
+{"reason": "build-finished", "success": false}
+
+ATTEMPT build3
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+   Compiling chio-api-protect v0.1.0 (/tmp/arc-security-launch/crates/products/chio-api-protect)
+   Compiling chio-active-response-authority v0.1.0 (/tmp/arc-security-launch/crates/security/chio-active-response-authority)
+   Compiling chio-hosted-mcp v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-hosted-mcp)
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+error: could not compile `chio-cli` (bin "chio" test) due to 20 previous errors
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2745:17
+     |
+2738 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2745 |                 settlement_proof_path.display()
+     |                 ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2738 -     _settlement_proof_path: &Path,
+2738 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2755:13
+     |
+2738 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2755 |             settlement_proof_path.display()
+     |             ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2738 -     _settlement_proof_path: &Path,
+2738 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2776:17
+     |
+2769 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2776 |                 settlement_proof_path.display()
+     |                 ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2769 -     _settlement_proof_path: &Path,
+2769 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2783:9
+     |
+2769 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2783 |         settlement_proof_path,
+     |         ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2769 -     _settlement_proof_path: &Path,
+2769 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2788:9
+     |
+2769 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2788 |         settlement_proof_path,
+     |         ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2769 -     _settlement_proof_path: &Path,
+2769 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2793:9
+     |
+2769 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2793 |         settlement_proof_path,
+     |         ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2769 -     _settlement_proof_path: &Path,
+2769 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2853:9
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2853 |         settlement_proof_path,
+     |         ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2858:9
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2858 |         settlement_proof_path,
+     |         ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2863:9
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2863 |         settlement_proof_path,
+     |         ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2868:9
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2868 |         settlement_proof_path,
+     |         ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2879:13
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2879 |             settlement_proof_path.display()
+     |             ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2889:17
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2889 |                 settlement_proof_path.display()
+     |                 ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2901:13
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2901 |             settlement_proof_path.display()
+     |             ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2909:17
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2909 |                 settlement_proof_path.display()
+     |                 ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2916:17
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2916 |                 settlement_proof_path.display()
+     |                 ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2923:9
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2923 |         settlement_proof_path,
+     |         ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2931:17
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2931 |                 settlement_proof_path.display()
+     |                 ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2942:21
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2942 |                     settlement_proof_path.display()
+     |                     ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2967:17
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2967 |                 settlement_proof_path.display()
+     |                 ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+error[E0425]: cannot find value `settlement_proof_path` in this scope
+    --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/fixture.rs:2977:17
+     |
+2842 |     _settlement_proof_path: &Path,
+     |     ---------------------- `_settlement_proof_path` defined here
+...
+2977 |                 settlement_proof_path.display()
+     |                 ^^^^^^^^^^^^^^^^^^^^^
+     |
+help: the leading underscore in `_settlement_proof_path` marks it as unused, consider renaming it to `settlement_proof_path`
+     |
+2842 -     _settlement_proof_path: &Path,
+2842 +     settlement_proof_path: &Path,
+     |
+
+For more information about this error, try `rustc --explain E0425`.
+{"reason": "build-finished", "success": false}
+
+ATTEMPT build4
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+   Compiling chio-api-protect v0.1.0 (/tmp/arc-security-launch/crates/products/chio-api-protect)
+   Compiling chio-active-response-authority v0.1.0 (/tmp/arc-security-launch/crates/security/chio-active-response-authority)
+   Compiling chio-hosted-mcp v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-hosted-mcp)
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+error: could not compile `chio-cli` (bin "chio" test) due to 3 previous errors
+error[E0432]: unresolved imports `chio_core::receipt::ChioReceipt`, `chio_core::receipt::ChioReceiptBody`, `chio_core::receipt::ToolCallAction`
+   --> crates/products/chio-cli/src/bin/../cert.rs:311:34
+    |
+311 |         use chio_core::receipt::{ChioReceipt, ChioReceiptBody, ToolCallAction};
+    |                                  ^^^^^^^^^^^  ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^ no `ToolCallAction` in `receipt`
+    |                                  |            |
+    |                                  |            no `ChioReceiptBody` in `receipt`
+    |                                  no `ChioReceipt` in `receipt`
+    |
+    = help: consider importing one of these structs instead:
+            chio_appraisal::receipt::body::ChioReceipt
+            chio_core::receipt::body::ChioReceipt
+            chio_core_types::receipt::body::ChioReceipt
+            chio_credit::receipt::body::ChioReceipt
+            chio_federation::receipt::body::ChioReceipt
+            chio_listing::receipt::body::ChioReceipt
+            chio_open_market::receipt::body::ChioReceipt
+            chio_underwriting::receipt::body::ChioReceipt
+            chio_web3::receipt::body::ChioReceipt
+    = note: struct `crate::mcp_cli::cage_policy::evidence::tests::ChioReceipt` exists but is inaccessible
+    = help: consider importing one of these structs instead:
+            chio_appraisal::receipt::body::ChioReceiptBody
+            chio_core::receipt::body::ChioReceiptBody
+            chio_core_types::receipt::body::ChioReceiptBody
+            chio_credit::receipt::body::ChioReceiptBody
+            chio_federation::receipt::body::ChioReceiptBody
+            chio_listing::receipt::body::ChioReceiptBody
+            chio_open_market::receipt::body::ChioReceiptBody
+            chio_underwriting::receipt::body::ChioReceiptBody
+            chio_web3::receipt::body::ChioReceiptBody
+    = note: struct `crate::dispatch_cli::proof::fixture::fixture_public_settlement_runtime::ChioReceiptBody` exists but is inaccessible
+    = help: consider importing one of these structs instead:
+            chio_appraisal::receipt::decision::ToolCallAction
+            chio_core::receipt::decision::ToolCallAction
+            chio_core_types::receipt::decision::ToolCallAction
+            chio_credit::receipt::decision::ToolCallAction
+            chio_federation::receipt::decision::ToolCallAction
+            chio_listing::receipt::decision::ToolCallAction
+            chio_open_market::receipt::decision::ToolCallAction
+            chio_underwriting::receipt::decision::ToolCallAction
+            chio_web3::receipt::decision::ToolCallAction
+    = note: struct `crate::dispatch_cli::proof::fixture::fixture_public_settlement_runtime::ToolCallAction` exists but is inaccessible
+
+error[E0599]: no variant or associated item named `Observation` found for enum `chio_core::receipt::kinds::ReceiptKind` in the current scope
+   --> crates/products/chio-cli/src/bin/../cert.rs:323:44
+    |
+323 |                 receipt_kind: ReceiptKind::Observation,
+    |                                            ^^^^^^^^^^^ variant or associated item not found in `chio_core::receipt::kinds::ReceiptKind`
+
+error[E0599]: no variant or associated item named `Observe` found for enum `chio_core::receipt::kinds::BoundaryClass` in the current scope
+   --> crates/products/chio-cli/src/bin/../cert.rs:324:48
+    |
+324 |                 boundary_class: BoundaryClass::Observe,
+    |                                                ^^^^^^^ variant or associated item not found in `chio_core::receipt::kinds::BoundaryClass`
+
+Some errors have detailed explanations: E0432, E0599.
+For more information about an error, try `rustc --explain E0432`.
+{"reason": "build-finished", "success": false}
+
+ATTEMPT build5
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 1m 10s
+warning: function `read_graph_artifact` is never used
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/artifacts.rs:218:15
+    |
+218 | pub(super) fn read_graph_artifact(
+    |               ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `ensure_regular_file` is never used
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/proof/assemble.rs:171:4
+    |
+171 | fn ensure_regular_file(path: &Path, label: &str) -> Result<(), CliError> {
+    |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `read_json` is never used
+  --> crates/products/chio-cli/src/bin/../cli/input.rs:49:15
+   |
+49 | pub(crate) fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T, crate::CliError> {
+   |               ^^^^^^^^^
+
+{"reason": "build-finished", "success": true}
+
+ATTEMPT integration-build
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+   Compiling chio-active-response-authority v0.1.0 (/tmp/arc-security-launch/crates/security/chio-active-response-authority)
+   Compiling chio-api-protect v0.1.0 (/tmp/arc-security-launch/crates/products/chio-api-protect)
+   Compiling chio-hosted-mcp v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-hosted-mcp)
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+error: could not compile `chio-cli` (bin "chio") due to 2 previous errors
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `tempfile`
+  --> crates/products/chio-cli/src/bin/../cli/input/snapshot.rs:10:25
+   |
+10 |         let directory = tempfile::tempdir()?;
+   |                         ^^^^^^^^ use of unresolved module or unlinked crate `tempfile`
+   |
+   = help: if you wanted to use a crate named `tempfile`, use `cargo add tempfile` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `tempfile`
+ --> crates/products/chio-cli/src/bin/../cli/input/snapshot.rs:6:16
+  |
+6 |     directory: tempfile::TempDir,
+  |                ^^^^^^^^ use of unresolved module or unlinked crate `tempfile`
+  |
+  = help: if you wanted to use a crate named `tempfile`, use `cargo add tempfile` to add it to your `Cargo.toml`
+
+For more information about this error, try `rustc --explain E0433`.
+{"reason": "build-finished", "success": false}
+
+ATTEMPT final-build
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 2m 27s
+{"reason": "build-finished", "success": true}
+
+ATTEMPT unit-build-final
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 1m 12s
+{"reason": "build-finished", "success": true}
+
+ATTEMPT qualified-build
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+   Compiling chio-active-response-authority v0.1.0 (/tmp/arc-security-launch/crates/security/chio-active-response-authority)
+   Compiling chio-api-protect v0.1.0 (/tmp/arc-security-launch/crates/products/chio-api-protect)
+   Compiling chio-hosted-mcp v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-hosted-mcp)
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 3m 29s
+{"reason": "build-finished", "success": true}
+
+ATTEMPT terminal-build
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-proof-room v0.1.0 (/tmp/arc-security-launch/crates/products/chio-proof-room)
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 2m 32s
+{"reason": "build-finished", "success": true}

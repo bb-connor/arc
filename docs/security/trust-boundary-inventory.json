@@ -76,6 +76,8 @@
     "crates/platform/chio-control-plane/src/certify/registry.rs",
     "crates/platform/chio-control-plane/src/economic_state_anchor.rs",
     "crates/platform/chio-control-plane/src/enterprise_federation.rs",
+    "crates/platform/chio-control-plane/src/error.rs",
+    "crates/platform/chio-control-plane/src/error/registered_source.rs",
     "crates/platform/chio-control-plane/src/evidence_export.rs",
     "crates/platform/chio-control-plane/src/federation_policy.rs",
     "crates/platform/chio-control-plane/src/fiscal_state_anchor.rs",
@@ -101,6 +103,7 @@
     "crates/platform/chio-control-plane/src/security/migration_evidence.rs",
     "crates/platform/chio-control-plane/src/security/response_simulation.rs",
     "crates/platform/chio-control-plane/src/signed_input.rs",
+    "crates/platform/chio-control-plane/src/signing_custody.rs",
     "crates/platform/chio-control-plane/src/transaction_passport_risk.rs",
     "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs",
     "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs",
@@ -125,6 +128,7 @@
     "crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs",
     "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs",
     "crates/platform/chio-manifest/src/admission.rs",
+    "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
     "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_claim/records.rs",
@@ -214,7 +218,33 @@
     "crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs",
     "crates/products/chio-api-protect/src/proxy/sidecar.rs",
     "crates/products/chio-api-protect/src/proxy/state.rs",
+    "crates/products/chio-cli/src/active_defense_migration.rs",
+    "crates/products/chio-cli/src/active_response_authority.rs",
+    "crates/products/chio-cli/src/admin.rs",
+    "crates/products/chio-cli/src/cert.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/authority.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/io.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/ops.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/orchestration.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/signing.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/artifacts.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/assemble.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/collect.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/doctor.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/env.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/explain.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/export.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_agent_web.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_catalog_paths.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs",
+    "crates/products/chio-cli/src/cli/dispatch/proof/room.rs",
     "crates/products/chio-cli/src/cli/input.rs",
+    "crates/products/chio-cli/src/cli/input/collection.rs",
+    "crates/products/chio-cli/src/cli/input/config.rs",
+    "crates/products/chio-cli/src/cli/input/snapshot.rs",
+    "crates/products/chio-cli/src/cli/input/time.rs",
     "crates/products/chio-cli/src/cli/process_host/call_evidence.rs",
     "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs",
     "crates/products/chio-cli/src/cli/process_host/diagnostics.rs",
@@ -230,9 +260,19 @@
     "crates/products/chio-cli/src/cli/replay/ndjson.rs",
     "crates/products/chio-cli/src/cli/replay/reader.rs",
     "crates/products/chio-cli/src/cli/replay/validate.rs",
+    "crates/products/chio-cli/src/cli/trust/credit.rs",
+    "crates/products/chio-cli/src/cli/trust/liability.rs",
+    "crates/products/chio-cli/src/cli/trust/receipt/explain.rs",
+    "crates/products/chio-cli/src/cli/trust/runtime_attestation.rs",
+    "crates/products/chio-cli/src/cli/trust/shared.rs",
+    "crates/products/chio-cli/src/cli/trust/underwriting.rs",
+    "crates/products/chio-cli/src/passport.rs",
+    "crates/products/chio-cli/src/passport/http.rs",
+    "crates/products/chio-cli/src/passport/verifier.rs",
     "crates/products/chio-proof-room/src/bundle_a.rs",
     "crates/products/chio-proof-room/src/bundle_b.rs",
     "crates/products/chio-proof-room/src/crypto_context.rs",
+    "crates/products/chio-proof-room/src/error.rs",
     "crates/products/chio-proof-room/src/fixture_a.rs",
     "crates/products/chio-proof-room/src/fixture_b.rs",
     "crates/products/chio-proof-room/src/input.rs",
@@ -1143,7 +1183,12 @@
     "crates/products/chio-api-protect/src/proxy/input.rs::decode::from_wire",
     "crates/products/chio-api-protect/src/proxy/state.rs::append::from_wire",
     "crates/products/chio-api-protect/src/proxy/state.rs::append_tool_receipt::from_wire",
+    "crates/products/chio-cli/src/active_defense_migration.rs::parse_shadow_migration_input::from_wire",
+    "crates/products/chio-cli/src/active_defense_migration.rs::parse_shadow_migration_input::from_wire",
+    "crates/products/chio-cli/src/active_response_authority.rs::read_canonical::from_wire",
+    "crates/products/chio-cli/src/cli/input.rs::canonical_ijson::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::decode::from_wire",
+    "crates/products/chio-cli/src/cli/input/config.rs::yaml::from_wire",
     "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse::from_wire",
     "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire",
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire",
@@ -1848,6 +1893,8 @@
     "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs::serialize::custom_deserialize",
     "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs::serialize::custom_deserialize",
     "crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs::serialize::custom_deserialize",
+    "crates/platform/chio-manifest/src/lib_parts/part_01.inc::as_str::custom_deserialize",
+    "crates/platform/chio-manifest/src/lib_parts/part_01.inc::as_str::custom_deserialize",
     "crates/platform/chio-store-sqlite/src/channel_release_publisher_store/qualification.rs::qualify_root_publication_result::from_value",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_bundle::from_slice",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json::from_slice",
@@ -1867,7 +1914,11 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/state_converters.rs::parse_underwriting_lifecycle_state::from_value",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value",
+    "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value",
+    "crates/products/chio-cli/src/cli/input.rs::literal::from_value",
     "crates/products/chio-cli/src/cli/input.rs::project::from_value",
+    "crates/products/chio-cli/src/cli/input/config.rs::yaml::Deserializer::from_slice",
+    "crates/products/chio-cli/src/cli/input/config.rs::yaml::custom_deserialize",
     "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs::classify::from_value",
     "crates/products/chio-cli/src/cli/process_response_verify.rs::response_nonce::from_value",
     "crates/products/chio-cli/src/cli/process_response_verify.rs::verify_values::from_value",
@@ -4146,6 +4197,7 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::verify_terminal::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
     "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs::serialize::custom_deserialize": "Custom field deserialization and typed Value conversion after an outer original-byte reader. No authority token is constructed.",
     "crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs::serialize::custom_deserialize": "Custom field deserialization and typed Value conversion after an outer original-byte reader. No authority token is constructed.",
+    "crates/platform/chio-manifest/src/lib_parts/part_01.inc::as_str::custom_deserialize": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only.",
     "crates/platform/chio-store-sqlite/src/channel_release_publisher_store/qualification.rs::qualify_root_publication_result::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_bundle::from_slice": "Strict I-JSON canonical preflight rejects duplicate keys and aliases before the closed DTO read; identity, canonical equality, manifest and digest checks remain mandatory.",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json::from_slice": "Strict I-JSON canonical preflight rejects duplicate keys and aliases before the closed DTO read; identity, canonical equality, manifest and digest checks remain mandatory.",
@@ -4165,7 +4217,11 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/state_converters.rs::parse_underwriting_lifecycle_state::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
-    "crates/products/chio-cli/src/cli/input.rs::project::from_value": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads.",
+    "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority.",
+    "crates/products/chio-cli/src/cli/input.rs::literal::from_value": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention.",
+    "crates/products/chio-cli/src/cli/input.rs::project::from_value": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention.",
+    "crates/products/chio-cli/src/cli/input/config.rs::yaml::Deserializer::from_slice": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection.",
+    "crates/products/chio-cli/src/cli/input/config.rs::yaml::custom_deserialize": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection.",
     "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs::classify::from_value": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest.",
     "crates/products/chio-cli/src/cli/process_response_verify.rs::response_nonce::from_value": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them.",
     "crates/products/chio-cli/src/cli/process_response_verify.rs::verify_values::from_value": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them.",
@@ -5430,8 +5486,7 @@
     ],
     "crates/platform/chio-manifest/src/lib_parts/part_01.inc": [
       "as_str::custom_deserialize",
-      "as_str::custom_deserialize",
-      "migrate_legacy_manifest_v1::from_slice"
+      "as_str::custom_deserialize"
     ],
     "crates/platform/chio-risk-comptroller/src/lib.rs": [
       "validate_signed_risk_report::from_value"
@@ -5542,31 +5597,7 @@
       "parse_policy::from_slice"
     ],
     "crates/products/chio-cli/src/active_defense_migration.rs": [
-      "parse_shadow_migration_input::from_slice",
       "strict_typed_value::from_value"
-    ],
-    "crates/products/chio-cli/src/active_response_authority.rs": [
-      "read_canonical::from_slice"
-    ],
-    "crates/products/chio-cli/src/admin.rs": [
-      "cmd_certify_registry_publish::from_slice",
-      "cmd_trust_federated_issue::from_slice",
-      "cmd_trust_federated_issue::from_slice",
-      "cmd_trust_federated_issue::from_slice",
-      "cmd_trust_federated_issue::from_slice",
-      "cmd_trust_federation_policy_evaluate::from_slice",
-      "cmd_trust_federation_policy_upsert::from_slice",
-      "cmd_trust_provider_upsert::from_slice"
-    ],
-    "crates/products/chio-cli/src/cert.rs": [
-      "cmd_cert_inspect::from_str",
-      "cmd_cert_verify::from_str",
-      "load_session_receipts::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/authority.rs": [
-      "cmd_chio_federation_authority_trust_bundle_assemble::from_str",
-      "cmd_chio_federation_authority_trust_bundle_assemble::from_str",
-      "cmd_chio_federation_authority_trust_bundle_assemble::from_str"
     ],
     "crates/products/chio-cli/src/cli/chio/dispatch/buyer.rs": [
       "cmd_chio_attest_buyer_explain::from_str",
@@ -5632,20 +5663,6 @@
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/runtime.rs": [
       "cmd_chio_pheromone_receive::from_str"
     ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/ops.rs": [
-      "cmd_chio_runtime_ops_evidence_health::from_str",
-      "runtime_ops_status_evidence_sink_healthy::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/orchestration.rs": [
-      "cmd_chio_runtime_orchestrate_resume::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/signing.rs": [
-      "cmd_chio_runtime_peer_weights_hash::from_str",
-      "cmd_chio_runtime_sign_peer_weights::from_str",
-      "cmd_chio_runtime_sign_pheromone_query_report::from_str",
-      "cmd_chio_runtime_sign_policy::from_str",
-      "cmd_chio_runtime_sign_trust_input::from_str"
-    ],
     "crates/products/chio-cli/src/cli/chio/dispatch/treaty.rs": [
       "cmd_chio_attest_buyer_verify_packet::from_str",
       "cmd_chio_attest_buyer_verify_packet::from_str",
@@ -5701,106 +5718,15 @@
       "parse_purchase_result::from_str",
       "purchase_http_status_error::from_str"
     ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/assemble.rs": [
-      "assemble_transaction_passport::from_value",
-      "assembled_claim_set_bytes::from_slice",
-      "evidence_node_for_entry::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/collect.rs": [
-      "artifact_schema_from_file::from_slice",
-      "collected_receipt_coverage::from_slice",
-      "read_collected_evidence_graph::from_slice",
-      "read_collected_transaction_passport::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/doctor.rs": [
-      "check_crypto_context_fixture::from_slice",
-      "check_crypto_context_negative_fixture::from_slice",
-      "negative_verifier_context_for_fixture_dir::from_value",
-      "package_negative_expected_failure::from_value",
-      "read_enterprise_export_negative_case::from_value",
-      "read_json::from_slice",
-      "read_proof_package_catalog::from_value",
-      "read_workflow_preflight_plan::from_slice",
-      "verify_docker_quickstart_evidence::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/env.rs": [
-      "claim_set_bytes_advertise_verified::from_slice",
-      "cognition_market_status_trust_from_env::from_slice",
-      "finding_authority_policy_from_env::from_slice",
-      "finding_authority_status_trust_from_env::from_slice",
-      "finding_verifier_profile_from_env::from_slice",
-      "optional_public_settlement_independent_chain_head_from_env::from_str",
-      "public_settlement_rpc_call::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/explain.rs": [
-      "load_bound_risk_comptroller_report::from_slice",
-      "load_bound_risk_comptroller_report::from_slice",
-      "load_explain_receipt_coverage::from_slice",
-      "push_passport_support_evidence_paths::from_slice",
-      "read_transaction_passport::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/export.rs": [
-      "redact_public_bundle_signature::from_slice",
-      "redact_public_proof_archive_entries::from_slice",
-      "update_export_evidence_graph_optional_node::from_slice",
-      "update_export_signed_json_artifact::from_slice",
-      "update_export_transaction_passport::from_slice",
-      "update_export_transaction_passport::from_value",
-      "update_export_trust_roots::from_slice",
-      "update_export_ui_report::from_slice",
-      "update_export_verifier_report::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs": [
-      "add_disclosure_agent_web_crypto_context_material::from_value",
-      "add_disclosure_agent_web_crypto_context_material::from_value",
-      "crypto_context_expected_failure::from_slice",
-      "parse_fixture_catalog::from_slice",
-      "proof_fixture_negative_case::from_slice",
-      "read_json_value::from_slice",
-      "refresh_signed_lineage_subgraph_digest::from_value",
-      "reseal_public_settlement_anchor_receipt::from_value",
-      "reseal_public_settlement_anchor_receipt::from_value",
-      "sign_disclosure_crypto_report_json::from_value",
-      "sign_public_settlement_oracle_evidence::from_value",
-      "sign_public_settlement_proof_bundle::from_value",
-      "workflow_preflight_expected_failure::from_slice",
-      "write_executable_runtime_swarm_scenario::from_str",
-      "write_transaction_passport_with_keypair::from_value"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_agent_web.rs": [
-      "agent_web_passport_scope_sha256::from_value",
-      "resign_agent_web_receipts_for_policy::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs": [
-      "evidence_graph_has_any_role::from_slice",
-      "load_risk_comptroller_report_from_graph::from_slice",
-      "load_risk_comptroller_report_from_graph::from_value"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof.rs": [
-      "commerce_event_authority_receipt_refs::from_slice",
-      "ensure_graph_bound_commerce_order_passport::from_slice",
-      "enterprise_export_sidecar_paths::from_slice",
-      "failed_transaction_report::from_slice",
-      "graph_receipt_artifact_id_matches::from_slice",
-      "load_commerce_mandate_protocol_payloads::from_slice",
-      "load_graph_json_artifact::from_slice",
-      "load_manifest_claim::from_slice",
-      "load_required_graph_json_artifact::from_slice",
-      "load_runtime_proof_parity_report_from_graph::from_slice",
-      "load_runtime_proof_parity_report_from_graph::from_slice",
-      "load_standalone_evidence_graph_artifacts::from_slice",
-      "parse_graph_artifact_paths::from_slice",
-      "scoped_evidence_graph_bytes::from_slice",
-      "validate_runtime_proof_regeneration_artifacts_from_graph::from_slice",
-      "validate_runtime_proof_regeneration_artifacts_from_graph::from_slice",
-      "validate_runtime_proof_regeneration_artifacts_from_graph::from_slice",
-      "verifier_policy_claim_requirements::from_slice",
-      "verify_transaction_passport_file_with_mode::from_slice"
-    ],
     "crates/products/chio-cli/src/cli/dispatch/workflow.rs": [
       "run_workflow_preflight::from_slice"
     ],
+    "crates/products/chio-cli/src/cli/input/config.rs": [
+      "yaml::Deserializer::from_slice",
+      "yaml::custom_deserialize"
+    ],
     "crates/products/chio-cli/src/cli/input.rs": [
+      "literal::from_value",
       "project::from_value"
     ],
     "crates/products/chio-cli/src/cli/mcp/cage_policy.rs": [
@@ -5899,38 +5825,6 @@
     "crates/products/chio-cli/src/cli/session/response.rs": [
       "pending_proposal::from_value"
     ],
-    "crates/products/chio-cli/src/cli/trust/credit.rs": [
-      "load_credit_bonded_execution_control_policy::from_str",
-      "parse_credit_bond_disposition::from_str",
-      "parse_credit_bond_lifecycle_state::from_str",
-      "parse_credit_facility_disposition::from_str",
-      "parse_credit_facility_lifecycle_state::from_str",
-      "parse_credit_loss_lifecycle_event_kind::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/trust/liability.rs": [
-      "parse_liability_coverage_class::from_str",
-      "parse_liability_provider_lifecycle_state::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/trust/receipt/explain.rs": [
-      "cmd_receipt_explain::from_slice",
-      "explain_receipt_value::from_value",
-      "inspect_bilateral_envelope_trace::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/trust/runtime_attestation.rs": [
-      "load_runtime_attestation_evidence::from_str",
-      "parse_governed_autonomy_tier::from_str",
-      "parse_runtime_assurance_tier::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/trust/shared.rs": [
-      "load_json_or_yaml::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/trust/underwriting.rs": [
-      "load_underwriting_decision_policy::from_str",
-      "parse_underwriting_appeal_resolution::from_str",
-      "parse_underwriting_appeal_status::from_str",
-      "parse_underwriting_decision_outcome::from_str",
-      "parse_underwriting_lifecycle_state::from_str"
-    ],
     "crates/products/chio-cli/src/lineage.rs": [
       "cmd_roots::from_slice",
       "read_graph::from_slice"
@@ -5938,29 +5832,6 @@
     "crates/products/chio-cli/src/market.rs": [
       "read_catalog::from_slice",
       "read_install_record::from_slice"
-    ],
-    "crates/products/chio-cli/src/passport/verifier.rs": [
-      "cmd_passport_challenge_respond::from_slice",
-      "cmd_passport_challenge_respond::from_slice",
-      "cmd_passport_challenge_submit::from_slice",
-      "cmd_passport_challenge_verify::from_slice",
-      "cmd_passport_challenge_verify::from_slice",
-      "cmd_passport_status_publish::from_slice"
-    ],
-    "crates/products/chio-cli/src/passport.rs": [
-      "cmd_passport_evaluate::from_slice",
-      "cmd_passport_issuance_offer_create::from_slice",
-      "cmd_passport_present::from_slice",
-      "cmd_passport_verify::from_slice",
-      "fetch_json_url::from_reader",
-      "load_enterprise_identity_provenance::from_slice",
-      "load_oid4vci_offer::from_slice",
-      "load_oid4vci_token::from_slice",
-      "load_passport_verifier_policy::from_str",
-      "load_passport_verifier_policy::from_str",
-      "load_signed_passport_verifier_policy::from_slice",
-      "post_form_url::from_reader",
-      "post_json_url::from_reader"
     ],
     "crates/products/chio-finding-market-canary/src/main.rs": [
       "network_canary::from_slice",
@@ -7215,8 +7086,8 @@
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only."
     },
     "crates/platform/chio-risk-comptroller/src/lib.rs": {
       "kind": "typed-value-conversion",
@@ -7307,24 +7178,8 @@
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/products/chio-cli/src/active_defense_migration.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/active_response_authority.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/admin.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cert.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/authority.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority."
     },
     "crates/products/chio-cli/src/cli/chio/dispatch/buyer.rs": {
       "kind": "raw-input-baseline",
@@ -7370,18 +7225,6 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/ops.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/orchestration.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/signing.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/products/chio-cli/src/cli/chio/dispatch/treaty.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -7418,53 +7261,17 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/cli/dispatch/proof.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/assemble.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/collect.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/doctor.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/env.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/explain.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/export.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_agent_web.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/products/chio-cli/src/cli/dispatch/workflow.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/products/chio-cli/src/cli/input.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads."
+      "contract": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention."
+    },
+    "crates/products/chio-cli/src/cli/input/config.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection."
     },
     "crates/products/chio-cli/src/cli/mcp.rs": {
       "kind": "raw-input-baseline",
@@ -7562,43 +7369,11 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/products/chio-cli/src/cli/trust/credit.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/trust/liability.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/trust/receipt/explain.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/trust/runtime_attestation.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/trust/shared.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/trust/underwriting.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/products/chio-cli/src/lineage.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/products/chio-cli/src/market.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/passport.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/passport/verifier.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -11794,6 +11569,22 @@
     "contract": "Original-byte validation precedes projection. from_value is a typed programmatic constructor and carries no original-byte validation claim."
   },
   "reviewed_product_readers": {
+    "crates/platform/chio-control-plane/src/error.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "CLI error adapters preserve typed native causes and signed JSON reasons. The static public-source adapter retains actionable proof rejection and exit classification without formatting attacker-controlled source diagnostics."
+    },
+    "crates/platform/chio-control-plane/src/error/registered_source.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Registry-backed CLI causes stay downcastable locally. Public messages are either registry summaries or explicitly supplied static diagnostics, never native error text or rejected input."
+    },
+    "crates/platform/chio-control-plane/src/signing_custody.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Existing private-file signing custody rejects missing, permissive, multiply linked, wrong-owner or replaced files; nonblocking nofollow reads are bounded and zeroizing from allocation through all exits."
+    },
+    "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only."
+    },
     "crates/products/chio-api-protect/src/proxy/http.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
@@ -11818,9 +11609,113 @@
       "kind": "reviewed-bounded-input",
       "contract": "SQLite receipt text is byte-capped in SQL before materialization and decoded from original text. Writers apply the same per-receipt cap. Request-id reservations use generation ownership, bounded expiry indices, the shared fenced clock and kernel-serialized durable reuse checks."
     },
+    "crates/products/chio-cli/src/active_defense_migration.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority."
+    },
+    "crates/products/chio-cli/src/active_response_authority.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Authority bundles and deployments require bounded regular files and exact original canonical typed JSON. The owning authority library validates contents before building custody or reporting digests; decoding alone grants nothing."
+    },
+    "crates/products/chio-cli/src/admin.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original signed documents and registry projections precede existing signing/authorization operations. Created-at observes the shared fallible fenced clock instead of converting clock failure to zero."
+    },
+    "crates/products/chio-cli/src/cert.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Certificate documents are bounded and duplicate-aware before signature verification. Existing private key custody is required. Read-only SQLite queries select exact signed session metadata independently of capability ID; SQL bounds receipt text before materialization, and count/actual-byte/checked-sequence bounds precede retaining receipts. Certificate inspection is diagnostic, not authentication."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/authority.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Authority profiles/requests delegate bounded original input to their validated authority-library decoders. Private key JSON is read through existing private-file custody with identity/mode/owner checks and zeroizing buffers, then exact canonical custody decoding into secret fields. Typed projection never substitutes for authority issuance checks."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/io.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Shared bounded regular UTF-8 reader serves JSON and seed/text callers; owning current-schema decoders still establish format/signature semantics."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/ops.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original runtime operation documents delegate to current runtime-core decoders; optional current time is fallible and fenced. Explicit caller-provided time remains a caller-owned input, not trusted time inferred by decoding."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/orchestration.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Runtime orchestration reads bounded original artifacts via shared IO and current runtime-core strict decoders; generated values are typed projections, and the existing runtime validation remains the authority owner."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/signing.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Signed runtime inputs use bounded original decoders and existing private signing custody, without creating missing keys. Signature and authority checks remain in runtime/attestation owners; serialization of constructed signed output is not ingress."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Original passport, graph and artifact bytes are bounded before typed selection. Graph vectors and retained artifact maps carry entry/actual-byte bounds. Schema/digest/signature/trust checks remain in their proof family owners; projection of verified report values does not itself confer authority."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/artifacts.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Graph shape/count bounds precede original file reads, schema and original-byte digest comparison. Retained vectors/maps share actual-byte and entry budgets; swarm optional and required families share one budget."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/assemble.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Assembly enumerates bounded regular artifact collections and hashes original retained bytes. Bounded duplicate-aware input is selected before constructing new graphs/passports; construction alone does not claim successful verification."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/collect.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Collection walks bounded regular inputs with depth/entry/actual-byte custody. Receipt normalization writes the bytes it parsed rather than rereading source paths; existing verification and bundle signing are retained. Synchronization is bounded by tree cardinality/depth."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/doctor.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Doctor inputs are bounded original documents. Negative-case enumeration is count-capped; failed checks carry diagnostic strings and never grant authority or mint a verified-result type."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/env.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Environment trust documents retain tighter per-owner file bounds, strict original I-JSON, full typed canonical byte equality and pinned signature/authority validation. Canonical parse causes remain typed. RPC responses require original duplicate-aware decoding, protocol 2.0, request ID equality and exclusive result/error shape after existing egress-contract transport bounds."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/explain.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Explanation captures bounded private source bytes before verification and derives explanation from that same snapshot. Original path is a display label; the report does not confer admission authority. Risk report collection has count and retained-byte limits."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/export.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Export captures a private bounded regular-file snapshot, verifies it, and packages those exact captured bytes. Public redaction is signed using configured custody and verified again on the transformed snapshot before archive creation. Namespace and cumulative bounds precede snapshot writes."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Built-in fixture construction is diagnostic. Installed fixture sources use bounded original decoders and bounded traversal/copy ownership; catalog IDs are bounded unique single-component names validated before directory effects; graph-selected records keep original digest checks before regenerated artifacts. Fixture generation never grants execution authority."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_agent_web.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Installed envelope/receipt enumerations have shared count/actual-byte budgets and bounded original decoders. Generated fixture and negative-case values are diagnostic projections; production verification retains signed input bindings."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_catalog_paths.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Catalog identifiers are bounded unique case-folded ASCII names, never paths. Collection output owners validate identifiers and reject non-directory or symlink parent/destination entries before removal or copy."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Risk command inputs use bounded original JSON before typed projection. Existing risk computation and signer verification remain separate; rendering a report does not authenticate the incoming projection."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/proof/room.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "CLI verification adapts the sealed proof-room verifier result without flattening causes; captured input custody binds subsequent output readers to private bounded bytes."
+    },
     "crates/products/chio-cli/src/cli/input.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads."
+      "contract": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention."
+    },
+    "crates/products/chio-cli/src/cli/input/collection.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Count/depth and actual-byte budget shared across each artifact collection. File retention is bounded by remaining capacity before the read; nonregular entries reject."
+    },
+    "crates/products/chio-cli/src/cli/input/config.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection."
+    },
+    "crates/products/chio-cli/src/cli/input/snapshot.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Private bounded snapshot retains bytes across verification and output. Archive paths, all parent-directory entries, collisions and bytes are validated before writing transformed collections. Concurrent hostile ancestor mutation outside captured custody remains a separate limitation."
+    },
+    "crates/products/chio-cli/src/cli/input/time.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Process-local clock fence locks before observing wall and monotonic time. Fault or regression rejects; explicit deadline addition rejects zero and overflow."
     },
     "crates/products/chio-cli/src/cli/process_host/call_evidence.rs": {
       "kind": "reviewed-bounded-input",
@@ -11882,6 +11777,42 @@
       "kind": "reviewed-bounded-input",
       "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
     },
+    "crates/products/chio-cli/src/cli/trust/credit.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Credit policies explicitly select JSON or YAML with original duplicate rejection and bounded YAML expansion; JSON rejection never retries YAML. CLI enums are literal string projections. Credit evaluation/signature checks remain the owning library contract."
+    },
+    "crates/products/chio-cli/src/cli/trust/liability.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded duplicate-aware original policy documents precede typed liability evaluation; signatures and settlement authority stay with the existing signed operation owner."
+    },
+    "crates/products/chio-cli/src/cli/trust/receipt/explain.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Receipt files and candidate envelope JSON use bounded duplicate-aware original parsing. Explain heuristics and error strings are diagnostic classification, not verification or an execution grant; original full documents remain available to actual signature validation."
+    },
+    "crates/products/chio-cli/src/cli/trust/runtime_attestation.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Runtime appraisal policies use explicit bounded JSON/YAML formats and literal enum projections. Recorded appraisal time uses the fallible fenced clock. Pinned-key attestation verification remains required by the existing appraisal owner."
+    },
+    "crates/products/chio-cli/src/cli/trust/shared.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Shared trust policy loading selects explicit JSON/YAML formats, bounds original bytes and YAML expansion, and preserves typed parser causes. Read-only trust-key discovery requires existing private custody and cannot create missing signing keys."
+    },
+    "crates/products/chio-cli/src/cli/trust/underwriting.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Underwriting policy loading uses bounded explicit JSON/YAML with no parse-error fallback. Enum arguments are literal strings; typed policy projection does not replace signed underwriting/receipt verification."
+    },
+    "crates/products/chio-cli/src/passport.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Passport/JWKS/policy documents use bounded original signed JSON. Presence of signed-envelope fields commits to signed-policy verification with no fallback to unsigned policy on failure. HTTP responses have timeout/actual-byte bounds. Existing private key custody, fenced observations and checked nonzero deadlines precede signed issuance."
+    },
+    "crates/products/chio-cli/src/passport/http.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Timeout and actual response-byte bounds precede original duplicate-aware JSON decoding. HTTP error bodies are not read into public diagnostics; causes are retained behind stable redacted codes."
+    },
+    "crates/products/chio-cli/src/passport/verifier.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Verifier inputs use bounded original signed JSON, retain existing passport signature/revocation binding checks and literal enum contracts. Policy/token deadlines reject zero or overflow; absent explicit time observes the fallible fenced clock."
+    },
     "crates/products/chio-proof-room/src/bundle_a.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
@@ -11893,6 +11824,10 @@
     "crates/products/chio-proof-room/src/crypto_context.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Embedded fixture construction decodes bounded original JSON and grants no execution authority. Installed fixture collection has shared entry/depth and actual-byte budgets; installed documents and disclosure inputs reject duplicate or lossy original JSON before any field selection. Fixture report errors are diagnostic projections."
+    },
+    "crates/products/chio-proof-room/src/error.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Proof validation and original input errors retain their types. Commerce, risk, runtime regeneration and local-family verification failures retain downcastable native causes; public reasons are selected static literals, never native diagnostic text."
     },
     "crates/products/chio-proof-room/src/fixture_a.rs": {
       "kind": "reviewed-bounded-input",
@@ -11919,8 +11854,8 @@
       "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
     },
     "crates/products/chio-proof-room/src/source_verifier.rs": {
-      "kind": "reviewed-bounded-input",
-      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+      "kind": "parser-internal-or-typed",
+      "contract": "Existing bounded original artifacts, signature/digest checks and collection ownership remain. Selected family verification and runtime-regeneration adapters now preserve native error causes through proof-room; typed public reason selection cannot grant a verified result."
     }
   }
 }

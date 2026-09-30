@@ -1,6 +1,6 @@
 use super::*;
 use chrono::{DateTime, Utc};
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{collections::BTreeSet, path::Path};
 
 const CLAIM_RISK_COMPTROLLER_REPORT_BOUND: &str = "claim.risk.comptroller_report_bound";
 const RISK_COMPTROLLER_REPORT_SCHEMA: &str = "chio.risk.comptroller-report.v1";
@@ -306,7 +306,7 @@ fn evidence_graph_has_any_role(
     evidence_graph_bytes: &[u8],
     predicate: fn(&str) -> bool,
 ) -> Result<bool, CliError> {
-    let graph: EvidenceGraphRoleIndex = serde_json::from_slice(evidence_graph_bytes)?;
+    let graph: EvidenceGraphRoleIndex = crate::input::json(evidence_graph_bytes)?;
     Ok(graph.nodes.iter().any(|node| predicate(&node.role)))
 }
 
@@ -366,7 +366,7 @@ fn load_risk_comptroller_report_from_graph(
     }
 
     let artifact_path = resolve_bundle_artifact_path(bundle_dir, &risk_report_node.path)?;
-    let bytes = fs::read(artifact_path)?;
+    let bytes = crate::input::read(artifact_path)?;
     let actual_digest = chio_core::sha256_hex(&bytes);
     let expected_digest = graph_node_sha256(risk_report_node, "risk comptroller report")?;
     if actual_digest != expected_digest {
@@ -376,11 +376,11 @@ fn load_risk_comptroller_report_from_graph(
         )));
     }
 
-    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+    let value: serde_json::Value = crate::input::json(&bytes)?;
     chio_control_plane::risk_comptroller::validate_risk_report_signature(
         &value,
         trusted_authority_keys,
     )
     .map_err(map_proof_error)?;
-    serde_json::from_value(value).map_err(CliError::from)
+    crate::input::project(value).map_err(CliError::from)
 }

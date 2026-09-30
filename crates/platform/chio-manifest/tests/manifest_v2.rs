@@ -1,11 +1,10 @@
 use chio_core::crypto::Keypair;
 use chio_manifest::{
-    load_existing_verified_manifest_registry, migrate_legacy_manifest_v1, sign_manifest,
-    verify_manifest, AuthoritativeToolPolicy, DeclassificationPurpose, EnvironmentVariableName,
-    LatencyHint, NativeSyscallProfile, NetworkDestination, RequiredPermissions,
-    RuntimeToolTopology, ServerTool, ToolAnnotations, ToolDefinition, ToolManifest,
-    VerifiedManifestAdmissionError, VerifiedManifestInvocationError, VerifiedManifestRegistry,
-    TOOL_MANIFEST_SCHEMA,
+    load_existing_verified_manifest_registry, sign_manifest, verify_manifest,
+    AuthoritativeToolPolicy, DeclassificationPurpose, EnvironmentVariableName, LatencyHint,
+    NativeSyscallProfile, NetworkDestination, RequiredPermissions, RuntimeToolTopology, ServerTool,
+    ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestAdmissionError,
+    VerifiedManifestInvocationError, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
 };
 use chio_security_types::{Compartment, InformationLabel};
 use std::collections::{BTreeMap, BTreeSet};
@@ -788,147 +787,6 @@ fn verified_registry_rejects_tampering_and_remote_tools_without_policy_clearance
             &topologies,
         )
         .is_err());
-}
-
-#[test]
-fn legacy_v1_migration_is_deterministic_and_unsigned() {
-    let legacy = serde_json::json!({
-        "schema": "chio.manifest.v1",
-        "server_id": "legacy",
-        "name": "Legacy",
-        "description": null,
-        "version": "1.0.0",
-        "tools": [{
-            "name": "write",
-            "description": "Write",
-            "input_schema": {"type": "object"},
-            "output_schema": null,
-            "pricing": null,
-            "has_side_effects": true,
-            "latency_hint": "moderate"
-        }],
-        "server_tools": [],
-        "required_permissions": null,
-        "public_key": Keypair::from_seed(&[9; 32]).public_key().to_hex()
-    });
-    let bytes = serde_json::to_vec(&legacy).unwrap_or_else(|error| panic!("legacy bytes: {error}"));
-    let first = migrate_legacy_manifest_v1(&bytes)
-        .unwrap_or_else(|error| panic!("migrate legacy: {error}"));
-    let second = migrate_legacy_manifest_v1(&bytes)
-        .unwrap_or_else(|error| panic!("migrate legacy: {error}"));
-    let first_manifest = first
-        .manifest()
-        .unwrap_or_else(|error| panic!("first manifest: {error}"));
-    let second_manifest = second
-        .manifest()
-        .unwrap_or_else(|error| panic!("second manifest: {error}"));
-    assert_eq!(
-        serde_json::to_value(first_manifest).unwrap_or_else(|error| panic!("first: {error}")),
-        serde_json::to_value(second_manifest).unwrap_or_else(|error| panic!("second: {error}"))
-    );
-    assert!(first.requires_operator_resigning());
-    assert!(!first.requires_permission_amendment());
-    assert_eq!(first_manifest.schema, "chio.manifest.v2");
-    let tool = &first_manifest.tools[0];
-    assert!(!tool.annotations.read_only);
-    assert!(tool.annotations.destructive);
-    assert!(tool.annotations.requires_approval);
-    assert_eq!(tool.latency_hint, Some(LatencyHint::Moderate));
-}
-
-#[test]
-fn legacy_duration_thresholds_and_dual_latency_rejection_are_exact() {
-    for (millis, expected) in [
-        (0, LatencyHint::Instant),
-        (1, LatencyHint::Instant),
-        (2, LatencyHint::Fast),
-        (999, LatencyHint::Fast),
-        (1_000, LatencyHint::Moderate),
-        (59_999, LatencyHint::Moderate),
-        (60_000, LatencyHint::Slow),
-    ] {
-        let legacy = format!(
-            r#"{{"schema":"chio.manifest.v1","server_id":"legacy","name":"Legacy","description":null,"version":"1","tools":[{{"name":"read","description":"Read","input_schema":{{"type":"object"}},"output_schema":null,"pricing":null,"annotations":{{"read_only":true,"destructive":false,"idempotent":true,"requires_approval":false,"estimated_duration_ms":{millis}}}}}],"server_tools":[],"required_permissions":null,"public_key":"{}"}}"#,
-            Keypair::from_seed(&[8; 32]).public_key().to_hex()
-        );
-        let migrated = migrate_legacy_manifest_v1(legacy.as_bytes())
-            .unwrap_or_else(|error| panic!("duration {millis}: {error}"));
-        assert_eq!(
-            migrated
-                .manifest()
-                .unwrap_or_else(|error| panic!("duration manifest: {error}"))
-                .tools[0]
-                .latency_hint,
-            Some(expected)
-        );
-    }
-
-    let dual = r#"{"schema":"chio.manifest.v1","server_id":"legacy","name":"Legacy","description":null,"version":"1","tools":[{"name":"read","description":"Read","input_schema":{"type":"object"},"output_schema":null,"pricing":null,"latency_hint":"fast","annotations":{"read_only":true,"destructive":false,"idempotent":true,"requires_approval":false,"estimated_duration_ms":10}}],"server_tools":[],"required_permissions":null,"public_key":"00"}"#;
-    assert!(migrate_legacy_manifest_v1(dual.as_bytes()).is_err());
-}
-
-#[test]
-fn legacy_permissions_require_operator_profile_and_port_amendment() {
-    let legacy = serde_json::json!({
-        "schema": "chio.manifest.v1",
-        "server_id": "legacy",
-        "name": "Legacy",
-        "description": null,
-        "version": "1.0.0",
-        "tools": [{
-            "name": "read",
-            "description": "Read",
-            "input_schema": {"type": "object"},
-            "output_schema": null,
-            "pricing": null,
-            "has_side_effects": false
-        }],
-        "server_tools": [],
-        "required_permissions": {
-            "read_paths": ["/srv/data"],
-            "write_paths": null,
-            "network_hosts": ["API.Example.COM"],
-            "environment_variables": ["CHIO_MODE"]
-        },
-        "public_key": Keypair::from_seed(&[24; 32]).public_key().to_hex()
-    });
-    let migration = migrate_legacy_manifest_v1(
-        &serde_json::to_vec(&legacy).unwrap_or_else(|error| panic!("legacy: {error}")),
-    )
-    .unwrap_or_else(|error| panic!("migrate: {error}"));
-    assert!(migration.requires_permission_amendment());
-    assert!(migration.manifest().is_err());
-    assert_eq!(migration.legacy_network_hosts(), ["api.example.com"]);
-
-    let amended = migration
-        .amend_permissions(
-            NativeSyscallProfile::BrokeredNativeV1,
-            vec![NetworkDestination::new("api.example.com", 443)
-                .unwrap_or_else(|error| panic!("destination: {error}"))],
-        )
-        .unwrap_or_else(|error| panic!("amend: {error}"));
-    let permissions = amended
-        .required_permissions
-        .unwrap_or_else(|| panic!("amended permissions"));
-    assert_eq!(
-        permissions.native_syscall_profile,
-        NativeSyscallProfile::BrokeredNativeV1
-    );
-    assert_eq!(
-        permissions
-            .read_paths
-            .as_deref()
-            .and_then(|paths| paths.first())
-            .map(String::as_str),
-        Some("/srv/data")
-    );
-    assert_eq!(
-        permissions
-            .network_destinations
-            .as_deref()
-            .map(|v| v[0].port()),
-        Some(443)
-    );
 }
 
 #[test]

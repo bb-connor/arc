@@ -17,7 +17,7 @@ pub(crate) fn trusted_kernel_keys_from_authority(
     let Some(path) = authority_seed_path else {
         return Ok(Vec::new());
     };
-    let keypair = load_or_create_authority_keypair(path)?;
+    let keypair = crate::load_existing_authority_keypair(path)?;
     Ok(vec![keypair.public_key().to_hex()])
 }
 
@@ -41,16 +41,5 @@ pub(crate) struct SignedQueryBackend<'a> {
 }
 
 pub(crate) fn load_json_or_yaml<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
-    let contents = fs::read_to_string(path)?;
-    if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
-    {
-        Ok(serde_yml::from_str(&contents)?)
-    } else if let Ok(value) = serde_json::from_str(&contents) {
-        Ok(value)
-    } else {
-        Ok(serde_yml::from_str(&contents)?)
-    }
+    crate::input::config::load(path)
 }

@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::{Keypair, PublicKey};
 use chio_credentials::{
@@ -45,11 +44,8 @@ use crate::trust_control::{
 };
 use crate::{load_or_create_authority_keypair, CliError};
 
-fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
+fn unix_now() -> Result<u64, CliError> {
+    crate::input::time::seconds()
 }
 
 fn ensure_parent_dir(path: &Path) -> Result<(), CliError> {
@@ -128,101 +124,23 @@ fn load_passport_issuance_registry_for_admin(
 fn load_signed_passport_verifier_policy(
     path: &Path,
 ) -> Result<SignedPassportVerifierPolicy, CliError> {
-    Ok(serde_json::from_slice(&fs::read(path)?)?)
+    Ok(crate::input::json(&crate::input::read(path)?)?)
 }
 
 fn load_oid4vci_offer(path: &Path) -> Result<Oid4vciCredentialOffer, CliError> {
-    Ok(serde_json::from_slice(&fs::read(path)?)?)
+    Ok(crate::input::json(&crate::input::read(path)?)?)
 }
 
 fn load_oid4vci_token(path: &Path) -> Result<Oid4vciTokenResponse, CliError> {
-    Ok(serde_json::from_slice(&fs::read(path)?)?)
+    Ok(crate::input::json(&crate::input::read(path)?)?)
 }
 
-fn fetch_json_url<T: for<'de> serde::Deserialize<'de>>(url: &str) -> Result<T, CliError> {
-    match ureq::get(url).call() {
-        Ok(response) => Ok(serde_json::from_reader(response.into_reader())?),
-        Err(ureq::Error::Status(status, response)) => {
-            let message = response
-                .into_string()
-                .ok()
-                .filter(|body| !body.trim().is_empty())
-                .unwrap_or_else(|| format!("request failed with status {status}"));
-            Err(CliError::transport_error(message))
-        }
-        Err(ureq::Error::Transport(error)) => Err(CliError::transport_error(format!(
-            "transport request failed: {error}"
-        ))),
-    }
-}
-
-fn fetch_text_url(url: &str) -> Result<String, CliError> {
-    match ureq::get(url).call() {
-        Ok(response) => response.into_string().map_err(|error| {
-            CliError::transport_error(format!("failed to read response body: {error}"))
-        }),
-        Err(ureq::Error::Status(status, response)) => {
-            let message = response
-                .into_string()
-                .ok()
-                .filter(|body| !body.trim().is_empty())
-                .unwrap_or_else(|| format!("request failed with status {status}"));
-            Err(CliError::transport_error(message))
-        }
-        Err(ureq::Error::Transport(error)) => Err(CliError::transport_error(format!(
-            "transport request failed: {error}"
-        ))),
-    }
-}
-
-fn post_json_url<B: serde::Serialize, T: for<'de> serde::Deserialize<'de>>(
-    url: &str,
-    body: &B,
-) -> Result<T, CliError> {
-    match ureq::post(url).send_json(serde_json::to_value(body)?) {
-        Ok(response) => Ok(serde_json::from_reader(response.into_reader())?),
-        Err(ureq::Error::Status(status, response)) => {
-            let message = response
-                .into_string()
-                .ok()
-                .filter(|body| !body.trim().is_empty())
-                .unwrap_or_else(|| format!("request failed with status {status}"));
-            Err(CliError::transport_error(message))
-        }
-        Err(ureq::Error::Transport(error)) => Err(CliError::transport_error(format!(
-            "transport request failed: {error}"
-        ))),
-    }
-}
-
-fn post_form_url<T: for<'de> serde::Deserialize<'de>>(
-    url: &str,
-    fields: &[(&str, &str)],
-) -> Result<T, CliError> {
-    let body = serde_urlencoded::to_string(fields).map_err(|error| {
-        CliError::transport_shape_error(format!("failed to encode form body: {error}"))
-    })?;
-    match ureq::post(url)
-        .set("Content-Type", "application/x-www-form-urlencoded")
-        .send_string(&body)
-    {
-        Ok(response) => Ok(serde_json::from_reader(response.into_reader())?),
-        Err(ureq::Error::Status(status, response)) => {
-            let message = response
-                .into_string()
-                .ok()
-                .filter(|value| !value.trim().is_empty())
-                .unwrap_or_else(|| format!("request failed with status {status}"));
-            Err(CliError::transport_error(message))
-        }
-        Err(ureq::Error::Transport(error)) => Err(CliError::transport_error(format!(
-            "transport request failed: {error}"
-        ))),
-    }
-}
+#[path = "passport/http.rs"]
+mod http;
+use http::{fetch_json_url, fetch_text_url, post_form_url, post_json_url};
 
 fn load_text_file(path: &Path) -> Result<String, CliError> {
-    let bytes = fs::read(path)?;
+    let bytes = crate::input::read(path)?;
     let value = String::from_utf8(bytes).map_err(|error| {
         CliError::cli_other_error(format!("{} is not valid UTF-8: {error}", path.display()))
     })?;
@@ -294,14 +212,7 @@ fn verifier_public_keys_from_jwks(jwks: &PortableJwkSet) -> Result<Vec<PublicKey
 }
 
 fn load_existing_keypair(path: &Path) -> Result<Keypair, CliError> {
-    let seed_hex = fs::read_to_string(path).map_err(|error| {
-        if error.kind() == std::io::ErrorKind::NotFound {
-            CliError::cli_other_error(format!("required seed file not found: {}", path.display()))
-        } else {
-            CliError::Io(error)
-        }
-    })?;
-    Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+    crate::load_existing_authority_keypair(path)
 }
 
 pub(crate) struct PassportPolicyCreateArgs<'a> {
@@ -369,7 +280,7 @@ fn load_enterprise_identity_provenance(
 ) -> Result<Option<EnterpriseIdentityProvenance>, CliError> {
     path.map(|path| {
         let context: chio_core::EnterpriseIdentityContext =
-            serde_json::from_slice(&fs::read(path)?)?;
+            crate::input::json(&crate::input::read(path)?)?;
         Ok(EnterpriseIdentityProvenance::from(&context))
     })
     .transpose()
@@ -409,7 +320,7 @@ fn local_passport_issuer_metadata(
         })
         .unwrap_or_default();
     let portable_signing_public_key = signing_seed_file
-        .map(load_or_create_authority_keypair)
+        .map(crate::load_existing_authority_keypair)
         .transpose()?
         .map(|keypair| keypair.public_key());
     default_oid4vci_passport_issuer_metadata_with_signing_key(
@@ -618,7 +529,7 @@ fn build_attestation_evidence(
     Ok(ChioCredentialEvidence {
         query: AttestationWindow {
             since,
-            until: until.unwrap_or_else(unix_now),
+            until: crate::input::time::seconds_or(until)?,
         },
         receipt_count: bundle.tool_receipts.len(),
         receipt_ids: bundle
@@ -710,8 +621,8 @@ pub(crate) fn cmd_passport_generate(
             "`chio passport generate` requires a non-empty --agent".to_string(),
         ));
     }
-    let now = unix_now();
-    let valid_until = now.saturating_add(validity_seconds(validity_days));
+    let now = unix_now()?;
+    let valid_until = crate::input::time::deadline(now, validity_seconds(validity_days))?;
 
     let (score, anomaly, tier) =
         compute_generate_trust_tier(agent, compliance_score_override, behavioral_anomaly, now);
@@ -781,7 +692,7 @@ pub(crate) fn cmd_passport_create(
 ) -> Result<(), CliError> {
     let subject_public_key = PublicKey::from_hex(subject_public_key)?;
     let subject_key = subject_public_key.to_hex();
-    let now = unix_now();
+    let now = unix_now()?;
     let attestation_until = until.unwrap_or(now);
     let corpus = build_local_reputation_corpus(
         &subject_key,
@@ -820,7 +731,7 @@ pub(crate) fn cmd_passport_create(
         evidence,
         load_enterprise_identity_provenance(enterprise_identity_path)?,
         now,
-        now + validity_seconds(validity_days),
+        crate::input::time::deadline(now, validity_seconds(validity_days))?,
     )?;
     let subject_did = DidChio::from_public_key(subject_public_key).map_err(CredentialError::Did)?;
     let passport = build_agent_passport(&subject_did.to_string(), vec![credential])?;
@@ -868,8 +779,8 @@ pub(crate) fn cmd_passport_verify(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let passport: AgentPassport = serde_json::from_slice(&fs::read(input)?)?;
-    let now = at.unwrap_or_else(unix_now);
+    let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
+    let now = crate::input::time::seconds_or(at)?;
     let mut verification = verify_agent_passport(&passport, now)
         .map_err(|error| CliError::policy_error(error.to_string()))?;
     verification.passport_lifecycle = resolve_passport_lifecycle(
@@ -933,9 +844,9 @@ pub(crate) fn cmd_passport_evaluate(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let passport: AgentPassport = serde_json::from_slice(&fs::read(input)?)?;
+    let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let policy = load_passport_verifier_policy(policy_path)?;
-    let now = at.unwrap_or_else(unix_now);
+    let now = crate::input::time::seconds_or(at)?;
     require_passport_lifecycle_source(
         policy.require_active_lifecycle,
         passport_statuses_file,
@@ -1039,8 +950,8 @@ pub(crate) fn cmd_passport_present(
     max_credentials: Option<usize>,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let passport: AgentPassport = serde_json::from_slice(&fs::read(input)?)?;
-    verify_agent_passport(&passport, unix_now())?;
+    let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
+    verify_agent_passport(&passport, unix_now()?)?;
 
     let presented = present_agent_passport(
         &passport,
@@ -1125,7 +1036,7 @@ pub(crate) fn cmd_passport_issuance_offer_create(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let passport: AgentPassport = serde_json::from_slice(&fs::read(input)?)?;
+    let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let record = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
         crate::trust_control::service_runtime::client::build_client(url, token)?
@@ -1146,14 +1057,14 @@ pub(crate) fn cmd_passport_issuance_offer_create(
             None,
         )?;
         if passport_statuses_file.is_some() {
-            portable_passport_status_reference(&passport, unix_now(), passport_statuses_file)?;
+            portable_passport_status_reference(&passport, unix_now()?, passport_statuses_file)?;
         }
         let record = registry.issue_offer(
             &metadata,
             passport,
             credential_configuration_id,
             ttl_secs,
-            unix_now(),
+            unix_now()?,
         )?;
         registry.save(path)?;
         record
@@ -1206,7 +1117,7 @@ pub(crate) fn cmd_passport_issuance_token_redeem(
         )?;
         let path = require_passport_issuance_registry_path(passport_issuance_offers_file)?;
         let mut registry = load_passport_issuance_registry_for_admin(path)?;
-        let token = registry.redeem_pre_authorized_code(&metadata, &request, unix_now(), 300)?;
+        let token = registry.redeem_pre_authorized_code(&metadata, &request, unix_now()?, 300)?;
         registry.save(path)?;
         token
     };
@@ -1279,7 +1190,7 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
         let path = require_passport_issuance_registry_path(passport_issuance_offers_file)?;
         let mut registry = load_passport_issuance_registry_for_admin(path)?;
         let portable_signing_keypair = signing_seed_file
-            .map(load_or_create_authority_keypair)
+            .map(crate::load_existing_authority_keypair)
             .transpose()?;
         let portable_status_registry = passport_statuses_file
             .map(load_passport_status_registry_for_admin)
@@ -1288,7 +1199,7 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
             &metadata,
             &token.access_token,
             &request,
-            unix_now(),
+            unix_now()?,
             portable_signing_keypair.as_ref(),
             portable_status_registry.as_ref(),
         )?;
@@ -1323,21 +1234,17 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
 pub(crate) mod verifier;
 
 fn load_passport_verifier_policy(path: &Path) -> Result<PassportVerifierPolicy, CliError> {
-    let contents = fs::read_to_string(path)?;
-    let policy = if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
+    let value: serde_json::Value = crate::input::config::load(path)?;
+    if ["body", "signature", "signer_key"]
+        .iter()
+        .any(|key| value.get(key).is_some())
     {
-        serde_yml::from_str(&contents)?
-    } else if let Ok(document) = serde_json::from_str::<SignedPassportVerifierPolicy>(&contents) {
-        verify_signed_passport_verifier_policy(&document)
-            .map_err(|error| CliError::policy_error(error.to_string()))?;
-        document.body.policy
+        let document: SignedPassportVerifierPolicy = crate::input::project(value)?;
+        verify_signed_passport_verifier_policy(&document)?;
+        Ok(document.body.policy)
     } else {
-        serde_json::from_str(&contents).or_else(|_| serde_yml::from_str(&contents))?
-    };
-    Ok(policy)
+        crate::input::project(value)
+    }
 }
 
 fn resolve_challenge_policy_local(
@@ -1370,6 +1277,46 @@ fn resolve_challenge_policy_local(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod passport_error_classification_tests {
     use super::*;
+
+    #[test]
+    fn issuer_metadata_never_creates_signing_custody() {
+        let dir = tempfile::tempdir().unwrap();
+        let seed = dir.path().join("missing-seed");
+        assert!(
+            local_passport_issuer_metadata("https://issuer.example", Some(&seed), None, None)
+                .is_err()
+        );
+        assert!(!seed.exists());
+    }
+
+    #[test]
+    fn signed_policy_failures_never_fall_back_to_bare_policy() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("policy.json");
+        let policy = PassportVerifierPolicy::default();
+        std::fs::write(&path, serde_json::to_vec(&policy).unwrap()).unwrap();
+        assert_eq!(load_passport_verifier_policy(&path).unwrap(), policy);
+        let signer = Keypair::from_seed(&[43; 32]);
+        let mut signed = create_signed_passport_verifier_policy(
+            &signer,
+            "test-policy",
+            "test-verifier",
+            10,
+            20,
+            policy.clone(),
+        )
+        .unwrap();
+        std::fs::write(&path, serde_json::to_vec(&signed).unwrap()).unwrap();
+        assert_eq!(load_passport_verifier_policy(&path).unwrap(), policy);
+        signed.body.expires_at = 21;
+        std::fs::write(&path, serde_json::to_vec(&signed).unwrap()).unwrap();
+        assert!(matches!(
+            load_passport_verifier_policy(&path),
+            Err(CliError::Credential(
+                CredentialError::InvalidSignedVerifierPolicySignature
+            ))
+        ));
+    }
 
     const CLI_CREDENTIAL_CODE: &str = "CHIO-CLI-CREDENTIAL";
     const CLI_OTHER_CODE: &str = "urn:chio:error:cli:other";

@@ -27,10 +27,10 @@ use chio_core::{
     receipt::kinds::ToolOrigin,
     receipt::kinds::TrustLevel,
     receipt::metadata::GuardEvidence,
-    sha256_hex, Keypair, PublicKey, Signature,
+    sha256_hex, Keypair,
 };
 use chio_manifest::{
-    migrate_legacy_manifest_v1, sign_manifest, LatencyHint, RequiredPermissions, SignedManifest,
+    sign_manifest, LatencyHint, RequiredPermissions, SignedManifest,
     ToolDefinition as SignedManifestToolDefinition, ToolManifest as SignedToolManifest,
 };
 use serde_json::{json, Value};
@@ -1529,44 +1529,16 @@ fn capability_fixture_cases_round_trip_through_public_api() {
 }
 
 #[test]
-fn manifest_fixture_cases_round_trip_through_public_api() {
-    // The on-disk corpus is the legacy v1 cross-language contract. V1 must
-    // remain verifiable as a signed historical artifact, but it must only
-    // enter the current manifest model through the explicit unsigned migration
-    // path and operator re-signing.
-    let raw = std::fs::read_to_string(manifest_fixture_path()).test_unwrap("read manifest fixture");
-    let fixture: Value = serde_json::from_str(&raw).test_unwrap("parse manifest fixture");
+fn obsolete_manifest_fixture_cases_reject_current_admission() {
+    let raw = std::fs::read_to_string(manifest_fixture_path())
+        .test_unwrap("read negative manifest fixtures");
+    let fixture: Value = serde_json::from_str(&raw).test_unwrap("parse negative manifest fixtures");
     for case in fixture["cases"].as_array().test_unwrap("cases array") {
-        let envelope = &case["signed_manifest"];
         assert!(
-            serde_json::from_value::<SignedManifest>(envelope.clone()).is_err(),
-            "legacy manifest case {} must not deserialize as strict v2",
+            serde_json::from_value::<SignedManifest>(case["signed_manifest"].clone()).is_err(),
+            "unsupported manifest case {} must reject",
             case["id"]
         );
-
-        let manifest = envelope["manifest"].clone();
-        let manifest_bytes = serde_json::to_vec(&manifest).test_unwrap("serialize legacy manifest");
-        let signer_key: PublicKey = serde_json::from_value(envelope["signer_key"].clone())
-            .test_unwrap("parse legacy manifest signer");
-        let signature: Signature = serde_json::from_value(envelope["signature"].clone())
-            .test_unwrap("parse legacy manifest signature");
-        let embedded_public_key = manifest["public_key"]
-            .as_str()
-            .and_then(|value| PublicKey::from_hex(value).ok());
-
-        let expected: ManifestVerification = serde_json::from_value(case["expected"].clone())
-            .test_unwrap("parse manifest expectation");
-        let actual = ManifestVerification {
-            structure_valid: migrate_legacy_manifest_v1(&manifest_bytes).is_ok(),
-            signature_valid: signer_key
-                .verify_canonical(&manifest, &signature)
-                .test_unwrap("verify legacy manifest signature"),
-            embedded_public_key_valid: embedded_public_key.is_some(),
-            embedded_public_key_matches_signer: embedded_public_key
-                .as_ref()
-                .is_some_and(|key| key == &signer_key),
-        };
-        assert_eq!(actual, expected, "manifest case {}", case["id"]);
     }
 }
 

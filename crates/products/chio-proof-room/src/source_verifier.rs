@@ -1,4 +1,5 @@
 use super::*;
+use crate::error::source_runtime_regeneration_error;
 
 const STANDALONE_TRANSACTION_VERIFIED_CLAIMS: [&str; 6] = [
     "claim.transaction.passport_root_verified",
@@ -583,9 +584,11 @@ pub(crate) fn push_source_local_family_result<T, E>(
 ) -> Result<(), ProofRoomError>
 where
     T: serde::Serialize,
-    E: std::fmt::Display,
+    E: std::error::Error + Send + Sync + 'static,
 {
-    let report = result.map_err(|error| format!("proof-room.source-verifier.failed: {error}"))?;
+    let report = result.map_err(|error| {
+        ProofRoomError::verification("proof-room.source-verifier.failed", error)
+    })?;
     push_verified_source_family_report(family_reports, required_claims, route, report)
 }
 
@@ -917,7 +920,7 @@ pub(crate) fn verify_source_standalone_risk_report_with_keys(
         &risk_report_value,
         trusted_risk_comptroller_signer_keys,
     )
-    .map_err(|error| format!("proof-room.source-verifier.failed: {error}"))?;
+    .map_err(|error| ProofRoomError::verification("proof-room.source-verifier.failed", error))?;
     let risk_evidence_graph =
         parse_embedded_evidence_graph(&context.evidence_graph_bytes, "evidence graph")
             .map_err(|error| format!("proof-room.evidence-graph-invalid: {error}"))?;
@@ -929,7 +932,7 @@ pub(crate) fn verify_source_standalone_risk_report_with_keys(
             kind,
         )
     })
-    .map_err(|error| format!("proof-room.source-verifier.failed: {error}"))?;
+    .map_err(|error| ProofRoomError::verification("proof-room.source-verifier.failed", error))?;
     let verified_claims = vec![CLAIM_RISK_COMPTROLLER_REPORT_BOUND.to_string()];
     let report = serde_json::json!({
         "schema": "chio.transaction.verifier-report.v1",
@@ -1463,18 +1466,6 @@ pub(crate) fn validate_source_runtime_proof_regeneration_artifacts(
         proof_package_sha256: source_runtime_artifact_canonical_sha256(proof_package)?,
         verifier_report_sha256: source_runtime_artifact_canonical_sha256(verifier_report)?,
     })
-}
-
-fn source_runtime_regeneration_error(
-    error: chio_runtime_proof_parity::RuntimeProofParityError,
-) -> String {
-    if error.code() == "runtime_proof_regeneration_workflow_step_evidence_mismatch" {
-        return format!(
-            "proof-room.runtime-regeneration.source-record-workflow-step-mismatch: {}",
-            error.detail()
-        );
-    }
-    format!("proof-room.runtime-regeneration.invalid: {error}")
 }
 
 fn ensure_source_runtime_regeneration_records_bind_workflow_steps(

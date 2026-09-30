@@ -1,0 +1,20 @@
+{
+  "base_commit": "943482d2cb82a1cf466584b47aee6b509c921d90",
+  "platform": "Linux-6.17.0-1020-oracle-aarch64-with-glibc2.39",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+  "scope": "local focused owner qualification; no hosted, merge or release claim",
+  "executables": {
+    "proof_cli_contract-tests": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/deps/proof_cli_contract-45c63a008610ade5",
+      "sha256": "e48a19f742c6a3014c2c3c810cef755eadf7988b7ad24fbc31848aee62b84c0e"
+    },
+    "chio-tests": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/deps/chio-697ebcd59e62c6dd",
+      "sha256": "541be8f6c7c651624fb6308354e0205fc6d788c024dd43b257923f7dd84a5ba8"
+    },
+    "chio": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/chio",
+      "sha256": "80576c906d38e8987c3a1cad63940f99ca42f9b251a009cdb08fcc7fc20e1753"
+    }
+  }
+}

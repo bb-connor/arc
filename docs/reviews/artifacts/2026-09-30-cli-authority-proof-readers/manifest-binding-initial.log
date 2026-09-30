@@ -1,0 +1,78 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-binding-helpers v0.1.0 (/tmp/arc-security-launch/crates/sdk/chio-binding-helpers)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+warning: unused imports: `PublicKey` and `Signature`
+  --> crates/sdk/chio-binding-helpers/tests/vector_fixtures.rs:30:26
+   |
+30 |     sha256_hex, Keypair, PublicKey, Signature,
+   |                          ^^^^^^^^^  ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-binding-helpers` (test "vector_fixtures") generated 1 warning (run `cargo fix --test "vector_fixtures" -p chio-binding-helpers` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 1m 00s
+     Running tests/vector_fixtures.rs (/home/connor/chio-security-target-6d-final/debug/deps/vector_fixtures-59e089c99d28e543)
+
+running 16 tests
+test canonical_vector_fixture_matches_checked_in_json ... ignored, on-disk canonical corpus is the source of truth; run to regenerate after editing the fixture builder
+test capability_vector_fixture_matches_checked_in_json ... ignored, on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper
+test hashing_vector_fixture_matches_checked_in_json ... ignored, on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper
+test manifest_vector_fixture_matches_checked_in_json ... ignored, on-disk JSON is the source of truth; manifest_vector_fixture() is a regenerator helper for a subset of cases
+test print_vector_fixtures_for_bootstrap ... ignored, helper for regenerating checked-in vector fixtures during development
+test rebless_capability_vector_signatures ... ignored, regenerator: re-sign capability vectors after a signing-schema change; run with --ignored
+test receipt_vector_fixture_matches_checked_in_json ... ignored, on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper
+test signing_vector_fixture_matches_checked_in_json ... ignored, on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper
+test canonical_fixture_cases_round_trip_through_public_api ... ok
+test hashing_fixture_cases_round_trip_through_public_api ... ok
+test receipt_fixture_allow_case_passes_with_trusted_signer ... ok
+test obsolete_manifest_fixture_cases_reject_current_admission ... ok
+test receipt_fixture_allow_case_passes_with_json_trusted_signer_hex ... ok
+test receipt_fixture_cases_round_trip_through_public_api ... ok
+test signing_fixture_cases_round_trip_through_public_api ... ok
+test capability_fixture_cases_round_trip_through_public_api ... ok
+
+test result: ok. 8 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/manifest_v2.rs (/home/connor/chio-security-target-6d-final/debug/deps/manifest_v2-325ea00ecfd0aefc)
+
+running 25 tests
+test existing_signed_manifest_loader_never_creates_missing_paths ... ok
+test environment_variable_names_reject_injection_and_credential_names ... ok
+test required_permissions_reject_implicit_ports_and_loader_environment ... ok
+test flow_rejects_null_and_explicit_empty_aliases ... ok
+test environment_variable_names_accept_non_sensitive_operational_names ... ok
+test v2_manifest_signs_and_verifies_with_normalized_permissions ... ok
+test changing_flow_metadata_invalidates_manifest_signature ... ok
+test v2_rejects_alternate_json_spellings_of_signed_fields ... ok
+test v2_rejects_noncanonical_permission_spellings ... ok
+test current_manifest_consumer_corpus_preserves_wire_and_registered_signature ... ok
+test existing_signed_manifest_loader_rejects_symlinks ... ok
+test verified_registry_composes_registered_key_policy_and_runtime_topology ... ok
+test verified_registry_rejects_manifest_clearance_that_widens_policy ... ok
+test json_boundary::signed_file_rejects_fractional_precision_aliases ... ok
+test verified_registry_rejects_tampering_and_remote_tools_without_policy_clearance ... ok
+test existing_signed_manifest_loader_requires_out_of_band_key_and_server_identity ... ok
+test json_boundary::signed_file_rejects_shadowed_nested_schema_keywords ... ok
+test cage_authorization_requires_profile_matched_runtime_topology ... ok
+test verified_registry_merge_preserves_security_and_rejects_duplicates_atomically ... ok
+test cage_authorization_binds_registry_manifest_and_every_tool_topology ... ok
+test verified_registry_admits_provider_server_tools_only_as_remote_egress ... ok
+test json_boundary::signed_file_preserves_existing_numeric_schema_contract ... ok
+test verified_registry_runtime_requirement_includes_derived_remote_topology ... ok
+test verified_registry_requires_an_exact_live_bridge_security_value ... ok
+test v2_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s

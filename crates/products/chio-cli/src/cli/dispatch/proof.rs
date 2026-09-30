@@ -1,6 +1,9 @@
+#[path = "proof/artifacts.rs"]
+mod artifacts;
 #[path = "proof/room.rs"]
 mod room;
 use super::*;
+use artifacts::*;
 use chio_errors::_generated::error_codes::{
     TRANSACTION_ARTIFACT_HASH_MISMATCH, TRANSACTION_AUTHORIZATION_NOT_BOUND,
     TRANSACTION_DISPUTE_UNBOUND, TRANSACTION_GRAPH_CYCLE, TRANSACTION_GRAPH_NOT_CLOSED,
@@ -390,6 +393,7 @@ fn proof_verify_integrity_failed(code: &str, message: &str) -> bool {
 
 fn proof_verify_parse_or_schema_failed(code: &str, message: &str) -> bool {
     code == TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED.urn
+        || code.starts_with("urn:chio:error:attest:signed-json-")
         || code == TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED.string_code
         || code == "CHIO-CLI-JSON"
         || message.contains("unsupported transaction passport schema")
@@ -499,8 +503,8 @@ fn load_manifest_claim(
     let Some(manifest_path) = proof_room_bundle_manifest_path_for_input(bundle) else {
         return Ok(None);
     };
-    let manifest_bytes = fs::read(&manifest_path)?;
-    let manifest: ProofBundleManifestClaims = serde_json::from_slice(&manifest_bytes)?;
+    let manifest_bytes = crate::input::read(&manifest_path)?;
+    let manifest: ProofBundleManifestClaims = crate::input::json(&manifest_bytes)?;
     Ok(manifest
         .claims
         .into_iter()
@@ -615,11 +619,11 @@ fn failed_transaction_report(
     passport_path: &Path,
     error: &CliError,
 ) -> Result<Option<serde_json::Value>, CliError> {
-    let passport_bytes = match fs::read(passport_path) {
+    let passport_bytes = match crate::input::read(passport_path) {
         Ok(passport_bytes) => passport_bytes,
         Err(_) => return Ok(None),
     };
-    let passport = match serde_json::from_slice::<
+    let passport = match crate::input::json::<
         chio_control_plane::transaction_passport::TransactionPassport,
     >(&passport_bytes)
     {
@@ -934,9 +938,9 @@ fn verify_transaction_passport_file_with_mode(
     path: &Path,
     verification_mode: TransactionPassportVerificationMode<'_>,
 ) -> Result<serde_json::Value, CliError> {
-    let passport_bytes = fs::read(path)?;
+    let passport_bytes = crate::input::read(path)?;
     let passport: chio_control_plane::transaction_passport::TransactionPassport =
-        serde_json::from_slice(&passport_bytes)?;
+        crate::input::json(&passport_bytes)?;
 
     chio_control_plane::transaction_passport::verify_minimal_passport_schema(&passport)
         .map_err(map_proof_error)?;
@@ -959,8 +963,8 @@ fn verify_transaction_passport_file_with_mode(
         resolve_bundle_artifact_path(bundle_dir, &passport.evidence_graph_path)?;
     let verifier_policy_path =
         resolve_bundle_artifact_path(bundle_dir, &passport.verifier_policy_path)?;
-    let evidence_graph_bytes = fs::read(&evidence_graph_path)?;
-    let verifier_policy_bytes = fs::read(&verifier_policy_path)?;
+    let evidence_graph_bytes = crate::input::read(&evidence_graph_path)?;
+    let verifier_policy_bytes = crate::input::read(&verifier_policy_path)?;
     let transparency_artifacts =
         load_standalone_evidence_graph_artifacts(bundle_dir, &evidence_graph_bytes)?;
     let passport_report_path = path
@@ -1152,7 +1156,7 @@ fn verify_transaction_passport_file_with_mode(
     }
     let finding_claim_set_path =
         resolve_bundle_artifact_path(bundle_dir, &passport.claim_set_path)?;
-    let finding_claim_set = fs::read(finding_claim_set_path)?;
+    let finding_claim_set = crate::input::read(finding_claim_set_path)?;
     let finding_claims_advertised =
         claim_set_bytes_advertise_verified_prefix(&finding_claim_set, CLAIM_PREFIX_FINDING)?;
     if claim_requirements.requires(CLAIM_PREFIX_FINDING) || finding_claims_advertised {
@@ -1370,7 +1374,7 @@ fn ensure_graph_bound_commerce_order_passport(
         "commerce order passport",
     )?;
     let graph_bound_passport: chio_commerce_order::CommerceOrderPassportReport =
-        serde_json::from_slice(&order_passport_bytes).map_err(CliError::from)?;
+        crate::input::json(&order_passport_bytes).map_err(CliError::from)?;
     if &graph_bound_passport != report {
         return Err(CliError::cli_other_error(
             "proof verify: commerce order passport artifact mismatch".to_string(),
@@ -1669,7 +1673,7 @@ fn load_runtime_proof_parity_report_from_graph(
     bundle_dir: &Path,
     evidence_graph_bytes: &[u8],
 ) -> Result<Option<serde_json::Value>, CliError> {
-    let graph: RuntimeParityEvidenceGraph = serde_json::from_slice(evidence_graph_bytes)?;
+    let graph: RuntimeParityEvidenceGraph = crate::input::json(evidence_graph_bytes)?;
     let parity_nodes = graph
         .nodes
         .into_iter()
@@ -1694,7 +1698,7 @@ fn load_runtime_proof_parity_report_from_graph(
         )));
     }
     let parity_path = resolve_bundle_artifact_path(bundle_dir, &node.path)?;
-    let parity_bytes = fs::read(&parity_path)?;
+    let parity_bytes = crate::input::read(&parity_path)?;
     let actual_sha256 = chio_core::sha256_hex(&parity_bytes);
     if actual_sha256 != node.sha256 {
         return Err(CliError::cli_other_error(format!(
@@ -1703,7 +1707,7 @@ fn load_runtime_proof_parity_report_from_graph(
         )));
     }
     let parity_report: chio_runtime_core::RuntimeProofParityReport =
-        serde_json::from_slice(&parity_bytes)?;
+        crate::input::json(&parity_bytes)?;
     chio_runtime_core::validate_runtime_proof_parity_report(&parity_report)
         .map_err(|error| CliError::cli_other_error(format!("proof verify: {error}")))?;
     serde_json::to_value(parity_report)
@@ -1715,7 +1719,7 @@ fn validate_runtime_proof_regeneration_artifacts_from_graph(
     bundle_dir: &Path,
     evidence_graph_bytes: &[u8],
 ) -> Result<RuntimeProofRegenerationHashes, CliError> {
-    let graph: RuntimeParityEvidenceGraph = serde_json::from_slice(evidence_graph_bytes)?;
+    let graph: RuntimeParityEvidenceGraph = crate::input::json(evidence_graph_bytes)?;
     let proof_regeneration_report = runtime_graph_artifact_bytes(
         bundle_dir,
         &graph.nodes,
@@ -1760,12 +1764,12 @@ fn validate_runtime_proof_regeneration_artifacts_from_graph(
     )
     .map_err(|error| CliError::cli_other_error(format!("proof verify: {error}")))?;
     Ok(RuntimeProofRegenerationHashes {
-        proof_package_sha256: chio_core_types::canonical_json_bytes(&serde_json::from_slice::<
+        proof_package_sha256: chio_core_types::canonical_json_bytes(&crate::input::json::<
             serde_json::Value,
         >(&proof_package)?)
         .map(|bytes| chio_core::sha256_hex(&bytes))
         .map_err(CliError::from)?,
-        verifier_report_sha256: chio_core_types::canonical_json_bytes(&serde_json::from_slice::<
+        verifier_report_sha256: chio_core_types::canonical_json_bytes(&crate::input::json::<
             serde_json::Value,
         >(&verifier_report)?)
         .map(|bytes| chio_core::sha256_hex(&bytes))
@@ -1851,7 +1855,7 @@ fn runtime_graph_artifact_bytes(
         }
     }
     let artifact_path = resolve_bundle_artifact_path(bundle_dir, &node.path)?;
-    let bytes = fs::read(&artifact_path)?;
+    let bytes = crate::input::read(&artifact_path)?;
     let actual_sha256 = chio_core::sha256_hex(&bytes);
     if actual_sha256 != node.sha256 {
         return Err(CliError::cli_other_error(format!(
@@ -1866,13 +1870,16 @@ fn load_standalone_evidence_graph_artifacts(
     bundle_dir: &Path,
     evidence_graph_bytes: &[u8],
 ) -> Result<BTreeMap<String, Vec<u8>>, CliError> {
-    let graph: StandaloneEvidenceGraphArtifactIndex = serde_json::from_slice(evidence_graph_bytes)?;
+    let graph: StandaloneEvidenceGraphArtifactIndex = crate::input::json(evidence_graph_bytes)?;
+    let mut budget = crate::input::collection::Budget::default();
+    budget.charge(evidence_graph_bytes.len())?;
     let mut artifacts = BTreeMap::new();
     for node in graph.nodes {
         let Some(artifact_path) = try_resolve_bundle_artifact_path(bundle_dir, &node.path)? else {
             continue;
         };
-        let bytes = fs::read(&artifact_path)?;
+        budget.enter(0)?;
+        let bytes = budget.read(&artifact_path)?;
         artifacts.insert(node.path.clone(), bytes);
     }
     Ok(artifacts)
@@ -1971,7 +1978,7 @@ impl VerifierPolicyClaimRequirements {
 fn verifier_policy_claim_requirements(
     policy_bytes: &[u8],
 ) -> Result<VerifierPolicyClaimRequirements, CliError> {
-    let policy: serde_json::Value = serde_json::from_slice(policy_bytes)?;
+    let policy: serde_json::Value = crate::input::json(policy_bytes)?;
     let mut requirements = VerifierPolicyClaimRequirements::default();
     if let Some(claims) = policy
         .get("required_claims")
@@ -2018,192 +2025,6 @@ struct GraphArtifactNode {
     schema: Option<String>,
 }
 
-fn parse_graph_artifact_paths(evidence_graph_bytes: &[u8]) -> Result<GraphArtifactPaths, CliError> {
-    serde_json::from_slice(evidence_graph_bytes).map_err(CliError::from)
-}
-
-fn select_required_graph_node<'a>(
-    nodes: &'a [GraphArtifactNode],
-    role: &str,
-    label: &str,
-) -> Result<&'a GraphArtifactNode, CliError> {
-    let matches = graph_nodes_by_role(nodes, role);
-    match matches.as_slice() {
-        [node] => Ok(node),
-        [] => Err(CliError::cli_other_error(format!(
-            "proof verify: missing {label} artifact role: {role}",
-        ))),
-        _ => Err(CliError::cli_other_error(format!(
-            "proof verify: multiple {label} artifact roles: {role}",
-        ))),
-    }
-}
-
-fn graph_nodes_by_role<'a>(
-    nodes: &'a [GraphArtifactNode],
-    role: &str,
-) -> Vec<&'a GraphArtifactNode> {
-    nodes.iter().filter(|node| node.role == role).collect()
-}
-
-fn select_required_graph_node_by_path<'a>(
-    nodes: &'a [GraphArtifactNode],
-    path: &str,
-    label: &str,
-) -> Result<&'a GraphArtifactNode, CliError> {
-    let matches: Vec<&GraphArtifactNode> = nodes.iter().filter(|node| node.path == path).collect();
-    match matches.as_slice() {
-        [node] => Ok(node),
-        [] => Err(CliError::cli_other_error(format!(
-            "proof verify: missing {label} artifact path: {path}",
-        ))),
-        _ => Err(CliError::cli_other_error(format!(
-            "proof verify: multiple {label} artifact paths: {path}",
-        ))),
-    }
-}
-
-fn load_required_graph_json_artifact<T: for<'de> serde::Deserialize<'de>>(
-    bundle_dir: &Path,
-    nodes: &[GraphArtifactNode],
-    role: &str,
-    expected_schema: &str,
-    label: &str,
-) -> Result<T, CliError> {
-    let bytes =
-        load_required_graph_bytes_artifact(bundle_dir, nodes, role, expected_schema, label)?;
-    serde_json::from_slice(&bytes).map_err(CliError::from)
-}
-
-fn load_required_graph_bytes_artifact(
-    bundle_dir: &Path,
-    nodes: &[GraphArtifactNode],
-    role: &str,
-    expected_schema: &str,
-    label: &str,
-) -> Result<Vec<u8>, CliError> {
-    let node = select_required_graph_node(nodes, role, label)?;
-    load_graph_bytes_artifact(bundle_dir, node, expected_schema, label)
-}
-
-fn load_required_graph_bytes_artifact_by_path(
-    bundle_dir: &Path,
-    nodes: &[GraphArtifactNode],
-    path: &str,
-    expected_schema: &str,
-    label: &str,
-) -> Result<Vec<u8>, CliError> {
-    let node = select_required_graph_node_by_path(nodes, path, label)?;
-    load_graph_bytes_artifact(bundle_dir, node, expected_schema, label)
-}
-
-fn load_optional_graph_json_artifact<T: for<'de> serde::Deserialize<'de>>(
-    bundle_dir: &Path,
-    nodes: &[GraphArtifactNode],
-    role: &str,
-    expected_schema: &str,
-    label: &str,
-) -> Result<Option<T>, CliError> {
-    let matches = graph_nodes_by_role(nodes, role);
-    match matches.as_slice() {
-        [node] => load_graph_json_artifact(bundle_dir, node, expected_schema, label).map(Some),
-        [] => Ok(None),
-        _ => Err(CliError::cli_other_error(format!(
-            "proof verify: multiple {label} artifact roles: {role}",
-        ))),
-    }
-}
-
-fn load_optional_graph_json_artifacts<T: for<'de> serde::Deserialize<'de>>(
-    bundle_dir: &Path,
-    nodes: &[GraphArtifactNode],
-    role: &str,
-    expected_schema: &str,
-    label: &str,
-) -> Result<Vec<T>, CliError> {
-    let mut artifacts = Vec::new();
-    for node in graph_nodes_by_role(nodes, role) {
-        artifacts.push(load_graph_json_artifact(
-            bundle_dir,
-            node,
-            expected_schema,
-            label,
-        )?);
-    }
-    Ok(artifacts)
-}
-
-fn load_graph_json_artifact<T: for<'de> serde::Deserialize<'de>>(
-    bundle_dir: &Path,
-    node: &GraphArtifactNode,
-    expected_schema: &str,
-    label: &str,
-) -> Result<T, CliError> {
-    let bytes = load_graph_bytes_artifact(bundle_dir, node, expected_schema, label)?;
-    serde_json::from_slice(&bytes).map_err(CliError::from)
-}
-
-fn load_graph_bytes_artifact(
-    bundle_dir: &Path,
-    node: &GraphArtifactNode,
-    expected_schema: &str,
-    label: &str,
-) -> Result<Vec<u8>, CliError> {
-    let schema = graph_node_schema(node, label)?;
-    if schema != expected_schema {
-        return Err(CliError::cli_other_error(format!(
-            "proof verify: unsupported {label} artifact schema for {}: {schema}",
-            node.path,
-        )));
-    }
-    let bytes = read_graph_artifact(bundle_dir, node)?;
-    let actual_digest = chio_core::sha256_hex(&bytes);
-    let expected_digest = graph_node_sha256(node, label)?;
-    if actual_digest != expected_digest {
-        return Err(CliError::cli_other_error(format!(
-            "proof verify: {label} artifact digest mismatch for {}: expected {}, got {}",
-            node.path, expected_digest, actual_digest,
-        )));
-    }
-    Ok(bytes)
-}
-
-fn graph_node_schema<'a>(node: &'a GraphArtifactNode, label: &str) -> Result<&'a str, CliError> {
-    node.schema.as_deref().ok_or_else(|| {
-        CliError::cli_other_error(format!(
-            "proof verify: missing {label} artifact schema for {}",
-            node.path,
-        ))
-    })
-}
-
-fn graph_node_sha256<'a>(node: &'a GraphArtifactNode, label: &str) -> Result<&'a str, CliError> {
-    node.sha256.as_deref().ok_or_else(|| {
-        CliError::cli_other_error(format!(
-            "proof verify: missing {label} artifact digest for {}",
-            node.path,
-        ))
-    })
-}
-
-fn load_graph_artifacts_matching(
-    bundle_dir: &Path,
-    evidence_graph_bytes: &[u8],
-    include_node: impl Fn(&GraphArtifactNode) -> bool,
-) -> Result<BTreeMap<String, Vec<u8>>, CliError> {
-    let graph = parse_graph_artifact_paths(evidence_graph_bytes)?;
-    let mut artifacts = BTreeMap::new();
-    for node in graph.nodes.iter().filter(|node| include_node(node)) {
-        artifacts.insert(node.path.clone(), read_graph_artifact(bundle_dir, node)?);
-    }
-    Ok(artifacts)
-}
-
-fn read_graph_artifact(bundle_dir: &Path, node: &GraphArtifactNode) -> Result<Vec<u8>, CliError> {
-    let artifact_path = resolve_bundle_artifact_path(bundle_dir, &node.path)?;
-    fs::read(artifact_path).map_err(CliError::from)
-}
-
 #[derive(serde::Deserialize)]
 struct CommerceMandateProtocolPayloadRefs {
     protocol_projections: Vec<CommerceMandateProtocolPayloadRef>,
@@ -2218,15 +2039,22 @@ struct CommerceMandateProtocolPayloadRef {
 
 fn load_commerce_mandate_protocol_payloads(
     bundle_dir: &Path,
+    budget: &mut crate::input::collection::Budget,
     nodes: &[GraphArtifactNode],
     mandate_ledger_bytes: &[u8],
 ) -> Result<Vec<chio_commerce_order::CommerceMandateProtocolPayload>, CliError> {
     let refs: CommerceMandateProtocolPayloadRefs =
-        serde_json::from_slice(mandate_ledger_bytes).map_err(CliError::from)?;
-    let mut payloads = Vec::with_capacity(refs.protocol_projections.len());
+        crate::input::json(mandate_ledger_bytes).map_err(CliError::from)?;
+    if refs.protocol_projections.len() > crate::input::collection::MAX_ENTRIES {
+        return Err(CliError::cli_other_error(
+            "commerce projection entry limit exceeded",
+        ));
+    }
+    let mut payloads = Vec::new();
     for projection in refs.protocol_projections {
         let payload_bytes = load_required_graph_bytes_artifact_by_path(
             bundle_dir,
+            budget,
             nodes,
             &projection.payload_path,
             chio_commerce_order::COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID,
@@ -2250,9 +2078,12 @@ fn load_commerce_order_bundle_from_graph(
     verified_trust_market_context: Option<&chio_commerce_order::CommerceVerifiedTrustMarketContext>,
 ) -> Result<chio_commerce_order::CommerceOrderVerificationBundle, CliError> {
     let graph = parse_graph_artifact_paths(evidence_graph_bytes)?;
+    let mut budget = crate::input::collection::Budget::default();
+    budget.charge(evidence_graph_bytes.len())?;
     let order_context: chio_commerce_order::CommerceOrderContext =
-        load_required_graph_json_artifact(
+        load_required_graph_json_artifact_bounded(
             bundle_dir,
+            &mut budget,
             &graph.nodes,
             "commerce-order-context",
             chio_commerce_order::COMMERCE_ORDER_CONTEXT_SCHEMA_ID,
@@ -2260,15 +2091,21 @@ fn load_commerce_order_bundle_from_graph(
         )?;
     let event_log_bytes = load_required_graph_bytes_artifact_by_path(
         bundle_dir,
+        &mut budget,
         &graph.nodes,
         &order_context.event_log_path,
         chio_commerce_order::COMMERCE_EVENT_LOG_SCHEMA_ID,
         "commerce",
     )?;
-    let event_authority_receipts =
-        load_commerce_event_authority_receipts(bundle_dir, &graph.nodes, &event_log_bytes)?;
+    let event_authority_receipts = load_commerce_event_authority_receipts(
+        bundle_dir,
+        &mut budget,
+        &graph.nodes,
+        &event_log_bytes,
+    )?;
     let payment_lifecycle_bytes = load_required_graph_bytes_artifact_by_path(
         bundle_dir,
+        &mut budget,
         &graph.nodes,
         &order_context.payment_lifecycle_path,
         chio_commerce_order::COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID,
@@ -2276,15 +2113,21 @@ fn load_commerce_order_bundle_from_graph(
     )?;
     let mandate_ledger_bytes = load_required_graph_bytes_artifact_by_path(
         bundle_dir,
+        &mut budget,
         &graph.nodes,
         &order_context.mandate_ledger_path,
         chio_commerce_order::COMMERCE_MANDATE_ALLOWANCE_LEDGER_SCHEMA_ID,
         "commerce",
     )?;
-    let mandate_protocol_payloads =
-        load_commerce_mandate_protocol_payloads(bundle_dir, &graph.nodes, &mandate_ledger_bytes)?;
+    let mandate_protocol_payloads = load_commerce_mandate_protocol_payloads(
+        bundle_dir,
+        &mut budget,
+        &graph.nodes,
+        &mandate_ledger_bytes,
+    )?;
     let provider_passport_bytes = load_required_graph_bytes_artifact_by_path(
         bundle_dir,
+        &mut budget,
         &graph.nodes,
         &order_context.provider_passport_path,
         chio_commerce_order::COMMERCE_PROVIDER_PASSPORT_SCHEMA_ID,
@@ -2292,6 +2135,7 @@ fn load_commerce_order_bundle_from_graph(
     )?;
     let reputation_snapshot_bytes = load_required_graph_bytes_artifact_by_path(
         bundle_dir,
+        &mut budget,
         &graph.nodes,
         &order_context.reputation_snapshot_path,
         chio_commerce_order::COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID,
@@ -2299,6 +2143,7 @@ fn load_commerce_order_bundle_from_graph(
     )?;
     let federation_trust_bundle_bytes = load_required_graph_bytes_artifact_by_path(
         bundle_dir,
+        &mut budget,
         &graph.nodes,
         &order_context.federation_trust_bundle_path,
         chio_commerce_order::COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID,
@@ -2306,6 +2151,7 @@ fn load_commerce_order_bundle_from_graph(
     )?;
     let settlement_packet_bytes = load_required_graph_bytes_artifact_by_path(
         bundle_dir,
+        &mut budget,
         &graph.nodes,
         &order_context.settlement_packet_path,
         chio_commerce_order::COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
@@ -2318,6 +2164,7 @@ fn load_commerce_order_bundle_from_graph(
     {
         Some(load_required_graph_bytes_artifact_by_path(
             bundle_dir,
+            &mut budget,
             &graph.nodes,
             &requirement.risk_comptroller_report_path,
             "chio.risk.comptroller-report.v1",
@@ -2351,29 +2198,57 @@ fn load_commerce_order_bundle_from_graph(
 
 fn load_commerce_event_authority_receipts(
     bundle_dir: &Path,
+    budget: &mut crate::input::collection::Budget,
     nodes: &[GraphArtifactNode],
     event_log_bytes: &[u8],
 ) -> Result<Vec<chio_commerce_order::CommerceEventAuthorityReceiptArtifact>, CliError> {
-    commerce_event_authority_receipt_refs(event_log_bytes)?
-        .into_iter()
-        .map(|receipt_ref| {
-            let node = select_required_graph_receipt_node(bundle_dir, nodes, &receipt_ref)?;
-            let receipt_bytes = load_graph_bytes_artifact(
-                bundle_dir,
-                node,
-                chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
-                "commerce authority receipt",
-            )?;
-            Ok(chio_commerce_order::CommerceEventAuthorityReceiptArtifact {
-                receipt_ref,
-                receipt_bytes,
-            })
-        })
-        .collect()
+    let refs = commerce_event_authority_receipt_refs(event_log_bytes)?;
+    // Scan each candidate once. Both the index and every retained copy consume
+    // the bundle budget, so repeated references cannot multiply retained bytes.
+    let mut candidates = Vec::new();
+    for node in nodes.iter().filter(|node| {
+        node.schema.as_deref() == Some(chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA)
+    }) {
+        let bytes = load_graph_bytes_artifact_bounded(
+            bundle_dir,
+            node,
+            chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+            "commerce authority receipt",
+            budget,
+        )?;
+        let receipt: serde_json::Value = crate::input::json(&bytes)?;
+        let id = receipt
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
+        candidates.push((node, id, bytes));
+    }
+    let mut receipts = Vec::new();
+    for receipt_ref in refs {
+        let path = format!("authority-receipts/{receipt_ref}.json");
+        let mut matches = candidates
+            .iter()
+            .filter(|(node, id, _)| node.path == path || id.as_deref() == Some(&receipt_ref));
+        let (_, _, bytes) = matches.next().ok_or_else(|| {
+            CliError::cli_other_error("proof verify: missing commerce authority receipt artifact")
+        })?;
+        if matches.next().is_some() {
+            return Err(CliError::cli_other_error(
+                "proof verify: multiple commerce authority receipt artifacts",
+            ));
+        }
+        budget.enter(0)?;
+        budget.charge(bytes.len())?;
+        receipts.push(chio_commerce_order::CommerceEventAuthorityReceiptArtifact {
+            receipt_ref,
+            receipt_bytes: bytes.clone(),
+        });
+    }
+    Ok(receipts)
 }
 
 fn commerce_event_authority_receipt_refs(event_log_bytes: &[u8]) -> Result<Vec<String>, CliError> {
-    let event_log: serde_json::Value = serde_json::from_slice(event_log_bytes)?;
+    let event_log: serde_json::Value = crate::input::json(event_log_bytes)?;
     let events = event_log
         .get("events")
         .and_then(serde_json::Value::as_array)
@@ -2382,6 +2257,11 @@ fn commerce_event_authority_receipt_refs(event_log_bytes: &[u8]) -> Result<Vec<S
                 "proof verify: commerce event log events must be an array".to_string(),
             )
         })?;
+    if events.len() > crate::input::collection::MAX_ENTRIES {
+        return Err(CliError::cli_other_error(
+            "commerce event entry limit exceeded",
+        ));
+    }
     events
         .iter()
         .map(|event| {
@@ -2397,45 +2277,6 @@ fn commerce_event_authority_receipt_refs(event_log_bytes: &[u8]) -> Result<Vec<S
                 })
         })
         .collect()
-}
-
-fn select_required_graph_receipt_node<'a>(
-    bundle_dir: &Path,
-    nodes: &'a [GraphArtifactNode],
-    receipt_ref: &str,
-) -> Result<&'a GraphArtifactNode, CliError> {
-    let receipt_path = format!("authority-receipts/{receipt_ref}.json");
-    let matches: Vec<&GraphArtifactNode> = nodes
-        .iter()
-        .filter(|node| {
-            node.schema.as_deref() == Some(chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA)
-                && (node.path == receipt_path
-                    || graph_receipt_artifact_id_matches(bundle_dir, node, receipt_ref)
-                        .unwrap_or(false))
-        })
-        .collect();
-    match matches.as_slice() {
-        [node] => Ok(node),
-        [] => Err(CliError::cli_other_error(format!(
-            "proof verify: missing commerce authority receipt artifact: {receipt_ref}",
-        ))),
-        _ => Err(CliError::cli_other_error(format!(
-            "proof verify: multiple commerce authority receipt artifacts: {receipt_ref}",
-        ))),
-    }
-}
-
-fn graph_receipt_artifact_id_matches(
-    bundle_dir: &Path,
-    node: &GraphArtifactNode,
-    receipt_ref: &str,
-) -> Result<bool, CliError> {
-    let bytes = read_graph_artifact(bundle_dir, node)?;
-    let receipt: serde_json::Value = serde_json::from_slice(&bytes).map_err(CliError::from)?;
-    Ok(receipt
-        .get("id")
-        .and_then(serde_json::Value::as_str)
-        .is_some_and(|id| id == receipt_ref))
 }
 
 fn ensure_required_claims_verified(
@@ -2902,23 +2743,30 @@ fn load_swarm_authority_bundle_from_graph(
     evidence_graph_bytes: &[u8],
 ) -> Result<chio_swarm_authority::SwarmAuthorityBundle, CliError> {
     let graph = parse_graph_artifact_paths(evidence_graph_bytes)?;
-    let task_graph: chio_swarm_authority::SwarmTaskGraph = load_required_graph_json_artifact(
-        bundle_dir,
-        &graph.nodes,
-        "swarm-task-graph",
-        chio_swarm_authority::CHIO_SWARM_TASK_GRAPH_SCHEMA,
-        "swarm",
-    )?;
-    let budget_pool: chio_swarm_authority::SwarmBudgetPool = load_required_graph_json_artifact(
-        bundle_dir,
-        &graph.nodes,
-        "swarm-budget-pool",
-        chio_swarm_authority::CHIO_SWARM_BUDGET_POOL_SCHEMA,
-        "swarm",
-    )?;
-    let revocation_epoch: chio_swarm_authority::SwarmRevocationEpoch =
-        load_required_graph_json_artifact(
+    let mut budget = crate::input::collection::Budget::default();
+    budget.charge(evidence_graph_bytes.len())?;
+    let task_graph: chio_swarm_authority::SwarmTaskGraph =
+        load_required_graph_json_artifact_bounded(
             bundle_dir,
+            &mut budget,
+            &graph.nodes,
+            "swarm-task-graph",
+            chio_swarm_authority::CHIO_SWARM_TASK_GRAPH_SCHEMA,
+            "swarm",
+        )?;
+    let budget_pool: chio_swarm_authority::SwarmBudgetPool =
+        load_required_graph_json_artifact_bounded(
+            bundle_dir,
+            &mut budget,
+            &graph.nodes,
+            "swarm-budget-pool",
+            chio_swarm_authority::CHIO_SWARM_BUDGET_POOL_SCHEMA,
+            "swarm",
+        )?;
+    let revocation_epoch: chio_swarm_authority::SwarmRevocationEpoch =
+        load_required_graph_json_artifact_bounded(
+            bundle_dir,
+            &mut budget,
             &graph.nodes,
             "swarm-revocation-epoch",
             chio_swarm_authority::CHIO_SWARM_REVOCATION_EPOCH_SCHEMA,
@@ -2927,6 +2775,7 @@ fn load_swarm_authority_bundle_from_graph(
     let continuation_tokens: Vec<chio_swarm_authority::SwarmContinuationToken> =
         load_optional_graph_json_artifacts(
             bundle_dir,
+            &mut budget,
             &graph.nodes,
             "swarm-continuation-token",
             chio_swarm_authority::CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA,
@@ -2935,6 +2784,7 @@ fn load_swarm_authority_bundle_from_graph(
     let witness_chains: Vec<chio_swarm_authority::SwarmDelegationWitnessChain> =
         load_optional_graph_json_artifacts(
             bundle_dir,
+            &mut budget,
             &graph.nodes,
             "swarm-delegation-witness-chain",
             chio_swarm_authority::CHIO_SWARM_DELEGATION_WITNESS_CHAIN_SCHEMA,
@@ -2943,6 +2793,7 @@ fn load_swarm_authority_bundle_from_graph(
     let join_receipts: Vec<chio_swarm_authority::SwarmJoinReceipt> =
         load_optional_graph_json_artifacts(
             bundle_dir,
+            &mut budget,
             &graph.nodes,
             "swarm-join-receipt",
             chio_swarm_authority::CHIO_SWARM_JOIN_RECEIPT_SCHEMA,
@@ -2951,6 +2802,7 @@ fn load_swarm_authority_bundle_from_graph(
     let route_plan_receipts: Vec<chio_swarm_authority::SwarmRoutePlanReceipt> =
         load_optional_graph_json_artifacts(
             bundle_dir,
+            &mut budget,
             &graph.nodes,
             "swarm-route-plan-receipt",
             chio_swarm_authority::CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA,
@@ -2959,6 +2811,7 @@ fn load_swarm_authority_bundle_from_graph(
     let terminal_receipts: Vec<chio_swarm_authority::SwarmTerminalGraphReceipt> =
         load_optional_graph_json_artifacts(
             bundle_dir,
+            &mut budget,
             &graph.nodes,
             "swarm-terminal-graph-receipt",
             chio_swarm_authority::CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA,
@@ -2980,16 +2833,7 @@ fn load_swarm_authority_bundle_from_graph(
 }
 
 fn swarm_authority_verification_time() -> Result<u64, CliError> {
-    let duration = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "proof verify: system clock before Unix epoch: {error}"
-            ))
-        })?;
-    u64::try_from(duration.as_millis()).map_err(|_| {
-        CliError::cli_other_error("proof verify: system clock milliseconds overflow".to_string())
-    })
+    crate::input::time::millis()
 }
 
 fn load_public_settlement_proof_bundle_from_graph(
@@ -3098,6 +2942,8 @@ fn load_enterprise_artifacts_from_graph(
     evidence_graph_bytes: &[u8],
 ) -> Result<BTreeMap<String, Vec<u8>>, CliError> {
     let graph = parse_graph_artifact_paths(evidence_graph_bytes)?;
+    let mut budget = crate::input::collection::Budget::default();
+    budget.charge(evidence_graph_bytes.len())?;
     let mut artifacts = BTreeMap::new();
     let mut export_bundle_paths = Vec::new();
     for node in graph
@@ -3105,7 +2951,9 @@ fn load_enterprise_artifacts_from_graph(
         .iter()
         .filter(|node| is_enterprise_artifact_role(&node.role))
     {
-        let bytes = read_graph_artifact(bundle_dir, node)?;
+        budget.enter(0)?;
+        let path = resolve_bundle_artifact_path(bundle_dir, &node.path)?;
+        let bytes = budget.read(&path)?;
         if node.role == "evidence-export-bundle" {
             export_bundle_paths.push(node.path.clone());
         }
@@ -3122,7 +2970,8 @@ fn load_enterprise_artifacts_from_graph(
                 continue;
             }
             let artifact_path = resolve_bundle_artifact_path(bundle_dir, &sidecar_path)?;
-            artifacts.insert(sidecar_path, fs::read(artifact_path)?);
+            budget.enter(0)?;
+            artifacts.insert(sidecar_path, budget.read(&artifact_path)?);
         }
     }
     Ok(artifacts)
@@ -3139,7 +2988,7 @@ fn enterprise_export_sidecar_paths(export_bundle_bytes: &[u8]) -> Result<Vec<Str
         path: String,
     }
 
-    let export_bundle: ExportBundlePaths = serde_json::from_slice(export_bundle_bytes)?;
+    let export_bundle: ExportBundlePaths = crate::input::json(export_bundle_bytes)?;
     Ok(export_bundle
         .artifacts
         .into_iter()
@@ -3223,7 +3072,7 @@ fn scoped_evidence_graph_bytes(
     evidence_graph_bytes: &[u8],
     include_node: fn(&serde_json::Value) -> bool,
 ) -> Result<Vec<u8>, CliError> {
-    let mut graph: serde_json::Value = serde_json::from_slice(evidence_graph_bytes)?;
+    let mut graph: serde_json::Value = crate::input::json(evidence_graph_bytes)?;
     let Some(nodes) = graph
         .get_mut("nodes")
         .and_then(serde_json::Value::as_array_mut)

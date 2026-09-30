@@ -62,7 +62,7 @@ fn load_federation_policy_registry_local(
 pub(crate) fn load_admission_policy(
     path: &Path,
 ) -> Result<Option<chio_policy::HushSpec>, CliError> {
-    let contents = fs::read_to_string(path)?;
+    let contents = crate::input::read_text(path)?;
     if chio_policy::is_hushspec_format(&contents) {
         return chio_policy::resolve_from_path(path)
             .map(Some)
@@ -163,7 +163,7 @@ pub(crate) fn cmd_trust_provider_upsert(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let provider: EnterpriseProviderRecord = serde_json::from_slice(&fs::read(input_path)?)?;
+    let provider: EnterpriseProviderRecord = crate::input::json(&crate::input::read(input_path)?)?;
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token)?
@@ -312,7 +312,8 @@ pub(crate) fn cmd_trust_federation_policy_upsert(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let record: FederationAdmissionPolicyRecord = serde_json::from_slice(&fs::read(input_path)?)?;
+    let record: FederationAdmissionPolicyRecord =
+        crate::input::json(&crate::input::read(input_path)?)?;
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token)?
@@ -390,7 +391,7 @@ pub(crate) fn cmd_trust_federation_policy_evaluate(
     })?;
     let token = require_control_token(control_token)?;
     let request: FederationAdmissionEvaluationRequest =
-        serde_json::from_slice(&fs::read(input_path)?)?;
+        crate::input::json(&crate::input::read(input_path)?)?;
     let response = trust_control::service_runtime::client::build_client(control_url, token)?
         .evaluate_federation_policy(&request)?;
 
@@ -430,7 +431,7 @@ pub(crate) fn cmd_certify_registry_publish(
     if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         let artifact: certify::SignedCertificationCheck =
-            serde_json::from_slice(&fs::read(input_path)?)?;
+            crate::input::json(&crate::input::read(input_path)?)?;
         let entry = trust_control::service_runtime::client::build_client(url, token)?
             .publish_certification(&artifact)?;
         if json_output {
@@ -605,22 +606,22 @@ pub(crate) fn cmd_trust_federated_issue(
     })?;
     let token = require_control_token(control_token)?;
     let presentation: chio_credentials::PassportPresentationResponse =
-        serde_json::from_slice(&fs::read(presentation_response_path)?)?;
+        crate::input::json(&crate::input::read(presentation_response_path)?)?;
     let expected_challenge: chio_credentials::PassportPresentationChallenge =
-        serde_json::from_slice(&fs::read(challenge_path)?)?;
+        crate::input::json(&crate::input::read(challenge_path)?)?;
     let capability = load_single_default_capability(capability_policy_path)?;
     let admission_policy = load_admission_policy(capability_policy_path)?;
     let enterprise_identity = enterprise_identity_path
         .map(|path| {
-            serde_json::from_slice::<chio_core::EnterpriseIdentityContext>(&fs::read(path)?)
+            crate::input::json::<chio_core::EnterpriseIdentityContext>(&crate::input::read(path)?)
                 .map_err(CliError::from)
         })
         .transpose()?;
     let delegation_policy = delegation_policy_path
         .map(|path| {
-            serde_json::from_slice::<trust_control::FederatedDelegationPolicyDocument>(&fs::read(
-                path,
-            )?)
+            crate::input::json::<trust_control::FederatedDelegationPolicyDocument>(
+                &crate::input::read(path)?,
+            )
             .map_err(CliError::from)
         })
         .transpose()?;
@@ -690,10 +691,7 @@ pub(crate) fn cmd_trust_federated_delegation_policy_create(
 ) -> Result<(), CliError> {
     let capability = load_single_default_capability(capability_policy_path)?;
     let keypair = load_or_create_authority_keypair(signing_seed_file)?;
-    let created_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0);
+    let created_at = crate::input::time::seconds()?;
     let body = trust_control::FederatedDelegationPolicyBody {
         schema: trust_control::FEDERATED_DELEGATION_POLICY_SCHEMA.to_string(),
         issuer: issuer.to_string(),

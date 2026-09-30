@@ -13,7 +13,6 @@ pub(super) fn export_proof_bundle(
     json_output: bool,
 ) -> Result<(), CliError> {
     let archive_format = proof_export_archive_format(out)?;
-    verify_static_proof_bundle(bundle)?;
     let entries = collect_proof_archive_entries(bundle, redaction_profile)?;
     if let Some(parent) = out.parent() {
         if !parent.as_os_str().is_empty() {
@@ -110,11 +109,19 @@ fn collect_proof_archive_entries(
     bundle: &Path,
     redaction_profile: Option<ProofExportRedactProfile>,
 ) -> Result<Vec<ProofArchiveEntry>, CliError> {
-    let root = fs::canonicalize(bundle)?;
+    let snapshot = crate::input::snapshot::Snapshot::capture(bundle)?;
+    let root = snapshot.path();
+    verify_static_proof_bundle(root)?;
     let mut entries = Vec::new();
     collect_proof_archive_entries_from(&root, &root, &mut entries)?;
     if matches!(redaction_profile, Some(ProofExportRedactProfile::Public)) {
-        entries = redact_public_proof_archive_entries(&root, entries)?;
+        entries = redact_public_proof_archive_entries(root, entries)?;
+        let redacted = crate::input::snapshot::Snapshot::from_entries(
+            entries
+                .iter()
+                .map(|entry| (entry.path.as_str(), entry.bytes.as_slice())),
+        )?;
+        verify_static_proof_bundle(redacted.path())?;
     }
     entries.sort_by(|left, right| left.path.cmp(&right.path));
     validate_proof_archive_entries(&entries)?;
@@ -126,7 +133,7 @@ fn redact_public_proof_archive_entries(
     mut entries: Vec<ProofArchiveEntry>,
 ) -> Result<Vec<ProofArchiveEntry>, CliError> {
     let manifest_path = root.join("manifest.json");
-    let mut manifest: serde_json::Value = serde_json::from_slice(&fs::read(&manifest_path)?)?;
+    let mut manifest: serde_json::Value = crate::input::json(&crate::input::read(&manifest_path)?)?;
     let signature_path = proof_room_signature_ref_path(&manifest)?;
     let redacted_paths = redact_public_manifest_artifacts(&mut manifest)?;
     let export_signer = prepare_public_bundle_export_signer(
@@ -464,7 +471,7 @@ fn update_export_trust_roots(
     keypair: &chio_core::Keypair,
 ) -> Result<String, CliError> {
     let bytes = archive_entry_bytes_mut(entries, PROOF_ROOM_TRUST_ROOTS_PATH)?;
-    let mut trust_roots: serde_json::Value = serde_json::from_slice(bytes)?;
+    let mut trust_roots: serde_json::Value = crate::input::json(bytes)?;
     let public_key = keypair.public_key().to_hex();
     let roots = trust_roots
         .get_mut("roots")
@@ -500,7 +507,7 @@ fn update_export_signed_json_artifact(
     let Some(bytes) = archive_entry_bytes_mut_optional(entries, artifact_path) else {
         return Ok(None);
     };
-    let mut artifact: serde_json::Value = serde_json::from_slice(bytes)?;
+    let mut artifact: serde_json::Value = crate::input::json(bytes)?;
     sign_export_json_artifact(&mut artifact, keypair)?;
     *bytes = pretty_json_line(&artifact)?;
     Ok(Some(chio_core::sha256_hex(bytes)))
@@ -528,7 +535,7 @@ fn update_export_evidence_graph_optional_node(
     sha256: &str,
 ) -> Result<String, CliError> {
     let bytes = archive_entry_bytes_mut(entries, evidence_graph_path)?;
-    let mut evidence_graph: serde_json::Value = serde_json::from_slice(bytes)?;
+    let mut evidence_graph: serde_json::Value = crate::input::json(bytes)?;
     let mut previous_refs = BTreeSet::new();
     let nodes = evidence_graph
         .get_mut("nodes")
@@ -576,14 +583,14 @@ fn update_export_transaction_passport(
     keypair: &chio_core::Keypair,
 ) -> Result<String, CliError> {
     let bytes = archive_entry_bytes_mut(entries, transaction_passport_path)?;
-    let mut passport: serde_json::Value = serde_json::from_slice(bytes)?;
+    let mut passport: serde_json::Value = crate::input::json(bytes)?;
     passport["evidence_graph_sha256"] =
         serde_json::Value::String(evidence_graph_sha256.to_string());
     passport["issuer"] =
         serde_json::Value::String(format!("did:chio:{}", keypair.public_key().to_hex()));
     passport["signature"] = serde_json::Value::String(String::new());
     let typed_passport: chio_control_plane::transaction_passport::TransactionPassport =
-        serde_json::from_value(passport.clone())?;
+        crate::input::project(passport.clone())?;
     passport["signature"] = serde_json::Value::String(
         chio_control_plane::transaction_passport::sign_transaction_passport(
             &typed_passport,
@@ -601,7 +608,7 @@ fn update_export_verifier_report(
     evidence_graph_sha256: &str,
 ) -> Result<String, CliError> {
     let bytes = archive_entry_bytes_mut(entries, verifier_report_path)?;
-    let mut report: serde_json::Value = serde_json::from_slice(bytes)?;
+    let mut report: serde_json::Value = crate::input::json(bytes)?;
     report["evidence_graph_sha256"] = serde_json::Value::String(evidence_graph_sha256.to_string());
     *bytes = pretty_json_line(&report)?;
     Ok(chio_core::sha256_hex(bytes))
@@ -613,7 +620,7 @@ fn update_export_ui_report(
     verifier_report_sha256: &str,
 ) -> Result<String, CliError> {
     let bytes = archive_entry_bytes_mut(entries, ui_report_path)?;
-    let mut report: serde_json::Value = serde_json::from_slice(bytes)?;
+    let mut report: serde_json::Value = crate::input::json(bytes)?;
     report["source_verifier_report_ref"]["sha256"] =
         serde_json::Value::String(verifier_report_sha256.to_string());
     *bytes = pretty_json_line(&report)?;
@@ -687,7 +694,7 @@ fn redact_public_bundle_signature(
     signer: Option<chio_core::Keypair>,
 ) -> Result<Vec<u8>, CliError> {
     let mut signature: serde_json::Value =
-        serde_json::from_slice(archive_entry_bytes(entries, signature_path)?)?;
+        crate::input::json(archive_entry_bytes(entries, signature_path)?)?;
     if signature
         .get("payloadRef")
         .and_then(|payload_ref| payload_ref.get("path"))
@@ -839,22 +846,8 @@ fn insert_allowed_members_under(
     directory: &Path,
     members: &mut BTreeSet<String>,
 ) -> Result<(), CliError> {
-    let mut children = fs::read_dir(directory)?.collect::<Result<Vec<_>, _>>()?;
-    children.sort_by_key(|child| child.file_name());
-    for child in children {
-        let path = child.path();
-        let file_type = fs::symlink_metadata(&path)?.file_type();
-        if file_type.is_dir() {
-            insert_allowed_members_under(root, &path, members)?;
-        } else if file_type.is_file() {
-            let relative_path = proof_archive_relative_path(root, &path)?;
-            members.insert(relative_path);
-        } else {
-            return Err(CliError::cli_other_error(format!(
-                "unsupported proof bundle file type: {}",
-                path.display()
-            )));
-        }
+    for path in crate::input::collection::paths(directory)? {
+        members.insert(proof_archive_relative_path(root, &path)?);
     }
     Ok(())
 }
@@ -870,28 +863,13 @@ fn collect_proof_archive_entries_from(
     current: &Path,
     entries: &mut Vec<ProofArchiveEntry>,
 ) -> Result<(), CliError> {
-    let mut children = fs::read_dir(current)?.collect::<Result<Vec<_>, _>>()?;
-    children.sort_by_key(|child| child.file_name());
-    for child in children {
-        let path = child.path();
-        let file_type = fs::symlink_metadata(&path)?.file_type();
-        if file_type.is_dir() {
-            collect_proof_archive_entries_from(root, &path, entries)?;
-        } else if file_type.is_file() {
-            let relative_path = proof_archive_relative_path(root, &path)?;
-            let bytes = fs::read(&path)?;
-            entries.push(ProofArchiveEntry {
-                path: relative_path,
-                bytes,
-            });
-        } else {
-            return Err(CliError::cli_other_error(format!(
-                "unsupported proof bundle file type: {}",
-                path.display()
-            )));
-        }
-    }
-    Ok(())
+    crate::input::collection::walk_files(current, |path, budget| {
+        entries.push(ProofArchiveEntry {
+            path: proof_archive_relative_path(root, path)?,
+            bytes: budget.read(path)?,
+        });
+        Ok(())
+    })
 }
 
 fn proof_archive_relative_path(root: &Path, path: &Path) -> Result<String, CliError> {

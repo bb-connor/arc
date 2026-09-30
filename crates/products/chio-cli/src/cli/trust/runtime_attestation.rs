@@ -1,13 +1,13 @@
 use super::*;
 
 pub(crate) fn parse_governed_autonomy_tier(value: &str) -> Result<GovernedAutonomyTier, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid governed autonomy tier `{value}`"))
     })
 }
 
 pub(crate) fn parse_runtime_assurance_tier(value: &str) -> Result<RuntimeAssuranceTier, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid runtime assurance tier `{value}`"))
     })
 }
@@ -15,18 +15,7 @@ pub(crate) fn parse_runtime_assurance_tier(value: &str) -> Result<RuntimeAssuran
 pub(crate) fn load_runtime_attestation_evidence(
     path: &Path,
 ) -> Result<RuntimeAttestationEvidence, CliError> {
-    let contents = fs::read_to_string(path)?;
-    if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
-    {
-        Ok(serde_yml::from_str(&contents)?)
-    } else if let Ok(evidence) = serde_json::from_str(&contents) {
-        Ok(evidence)
-    } else {
-        Ok(serde_yml::from_str(&contents)?)
-    }
+    crate::input::config::load(path)
 }
 
 pub(crate) fn load_signed_runtime_attestation_appraisal_result(
@@ -192,10 +181,7 @@ pub(crate) fn cmd_trust_runtime_attestation_appraisal_import(
     } else {
         trust_control::reports::build_runtime_attestation_appraisal_import_report(
             &request,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|error| CliError::cli_other_error(error.to_string()))?
-                .as_secs(),
+            crate::input::time::seconds()?,
         )
     };
 

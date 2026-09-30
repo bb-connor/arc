@@ -5,10 +5,9 @@ use std::path::Path;
 
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::{canonical_json_bytes, sha256_hex, PublicKey, Signature, SigningAlgorithm};
-use chio_core_types::canonical_json_bytes_from_str;
 use chio_manifest::{
-    migrate_legacy_manifest_v1, verify_manifest, DeclassificationPurpose, NativeSyscallProfile,
-    NetworkDestination, SignedManifest, ToolManifest, TOOL_MANIFEST_SCHEMA,
+    verify_manifest, DeclassificationPurpose, NativeSyscallProfile, NetworkDestination,
+    SignedManifest, ToolManifest, TOOL_MANIFEST_SCHEMA,
 };
 use chio_security_types::InformationLabel;
 use serde::de::DeserializeOwned;
@@ -25,6 +24,12 @@ const MAX_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 enum ShadowMigrationError {
+    #[error("{0}")]
+    Input(#[from] chio_core::canonical::UntrustedJsonError),
+    #[error("manifest verification rejected")]
+    Manifest(#[source] chio_manifest::ManifestError),
+    #[error("input read failed")]
+    Read(#[source] std::io::Error),
     #[error("invalid active-defense migration input: {0}")]
     Invalid(String),
     #[error("active-defense migration I/O failed: {0}")]
@@ -66,16 +71,8 @@ pub(crate) struct ManifestRegistration {
     pub(crate) registry_id: String,
     pub(crate) registered_key_id: String,
     pub(crate) signed_envelope: ManifestEnvelope,
-    pub(crate) legacy_permission_amendment: Option<LegacyPermissionAmendment>,
     pub(crate) tools: Vec<ToolDeploymentInventory>,
     pub(crate) server_runtime: ServerRuntimeInventory,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct LegacyPermissionAmendment {
-    pub(crate) native_syscall_profile: NativeSyscallProfile,
-    pub(crate) network_destinations: Vec<NetworkDestination>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -224,7 +221,6 @@ pub(crate) struct ShadowObservation {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ManifestOutcome {
     VerifiedV2,
-    VerifiedV1ConvertedToUnsignedV2,
 }
 
 #[derive(Debug, Serialize)]
@@ -233,7 +229,6 @@ pub(crate) struct ShadowMigrationReport {
     schema: &'static str,
     input_digest: String,
     pub(crate) manifests: Vec<ManifestInventoryReport>,
-    pub(crate) unsigned_v2_artifacts: Vec<UnsignedV2Artifact>,
     pub(crate) egress_clearance_findings: Vec<EgressClearanceFinding>,
     pub(crate) unknown_output_declarations: Vec<ToolReference>,
     pub(crate) invalid_purpose_sets: Vec<InvalidPurposeFinding>,
@@ -256,18 +251,6 @@ pub(crate) struct ManifestInventoryReport {
     canonical_manifest_digest: String,
     signed_envelope_digest: String,
     pub(crate) outcome: ManifestOutcome,
-    operator_resigning_required: bool,
-    unsigned_v2_digest: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct UnsignedV2Artifact {
-    registry_id: String,
-    source_manifest_digest: String,
-    canonical_v2_digest: String,
-    pub(crate) operator_resigning_required: bool,
-    pub(crate) manifest: ToolManifest,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -421,8 +404,6 @@ struct VerifiedManifest {
     source_schema: String,
     source_manifest_digest: String,
     signed_envelope_digest: String,
-    signed_v2: bool,
-    unsigned_v2_digest: Option<String>,
 }
 
 #[derive(Debug)]
@@ -435,8 +416,9 @@ struct VerifiedBackfillEvidence {
 }
 
 pub(crate) fn cmd_shadow_migrate(input_path: &Path, output_path: &Path) -> Result<(), CliError> {
-    let report = load_and_build_report(input_path)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let report = load_and_build_report(input_path).map_err(|source| {
+        CliError::with_source(&chio_errors::_generated::error_codes::CLI_OTHER, source)
+    })?;
     let bytes = canonical_json_bytes(&report).map_err(|error| {
         CliError::cli_other_error(format!("failed to encode active-defense report: {error}"))
     })?;
@@ -444,33 +426,19 @@ pub(crate) fn cmd_shadow_migrate(input_path: &Path, output_path: &Path) -> Resul
 }
 
 fn load_and_build_report(path: &Path) -> MigrationResult<ShadowMigrationReport> {
-    let metadata = fs::metadata(path).map_err(|error| {
-        ShadowMigrationError::Io(format!("failed to inspect {}: {error}", path.display()))
-    })?;
-    if metadata.len() > MAX_INPUT_BYTES {
-        return Err(ShadowMigrationError::Invalid(format!(
-            "{} exceeds the {} byte input ceiling",
-            path.display(),
-            MAX_INPUT_BYTES
-        )));
-    }
-    let bytes = fs::read(path).map_err(|error| {
-        ShadowMigrationError::Io(format!("failed to read {}: {error}", path.display()))
-    })?;
+    let bytes = crate::input::read_regular(path, MAX_INPUT_BYTES as usize)
+        .map_err(ShadowMigrationError::Read)?;
     let input = parse_shadow_migration_input(&bytes)?;
     build_shadow_migration_report(input)
 }
 
 fn parse_shadow_migration_input(bytes: &[u8]) -> MigrationResult<ShadowMigrationInput> {
-    let text = std::str::from_utf8(bytes).map_err(|error| {
-        ShadowMigrationError::Invalid(format!("input is not UTF-8 JSON: {error}"))
-    })?;
-    let canonical = canonical_json_bytes_from_str(text).map_err(|error| {
-        ShadowMigrationError::Invalid(format!("input is not strict canonicalizable JSON: {error}"))
-    })?;
-    serde_json::from_slice(&canonical).map_err(|error| {
-        ShadowMigrationError::Invalid(format!("input does not match the closed schema: {error}"))
-    })
+    let canonical =
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_INPUT_BYTES as usize)?
+            .canonicalize()?;
+    chio_core::canonical::UntrustedJsonText::from_wire(&canonical, MAX_INPUT_BYTES as usize)?
+        .decode_signed()
+        .map_err(ShadowMigrationError::Input)
 }
 
 fn build_shadow_migration_report(
@@ -536,7 +504,6 @@ fn build_shadow_migration_report(
     let shadow_metrics = aggregate_shadow_metrics(input.shadow_observations)?;
 
     let mut manifests = Vec::new();
-    let mut unsigned_v2_artifacts = Vec::new();
     let mut egress_clearance_findings = Vec::new();
     let mut unknown_output_declarations = Vec::new();
     let mut invalid_purpose_sets = Vec::new();
@@ -556,11 +523,6 @@ fn build_shadow_migration_report(
                 cage_inventory: &mut native_cage_inventory,
             },
         )?;
-        let outcome = if verified.signed_v2 {
-            ManifestOutcome::VerifiedV2
-        } else {
-            ManifestOutcome::VerifiedV1ConvertedToUnsignedV2
-        };
         manifests.push(ManifestInventoryReport {
             registry_id: verified.registration.registry_id.clone(),
             server_id: verified.manifest.server_id.clone(),
@@ -569,19 +531,8 @@ fn build_shadow_migration_report(
             signer_public_key: verified.registration.signed_envelope.signer_key.to_hex(),
             canonical_manifest_digest: verified.source_manifest_digest.clone(),
             signed_envelope_digest: verified.signed_envelope_digest.clone(),
-            outcome,
-            operator_resigning_required: !verified.signed_v2,
-            unsigned_v2_digest: verified.unsigned_v2_digest.clone(),
+            outcome: ManifestOutcome::VerifiedV2,
         });
-        if let Some(canonical_v2_digest) = &verified.unsigned_v2_digest {
-            unsigned_v2_artifacts.push(UnsignedV2Artifact {
-                registry_id: verified.registration.registry_id.clone(),
-                source_manifest_digest: verified.source_manifest_digest.clone(),
-                canonical_v2_digest: canonical_v2_digest.clone(),
-                operator_resigning_required: true,
-                manifest: verified.manifest.clone(),
-            });
-        }
     }
 
     egress_clearance_findings.sort();
@@ -610,7 +561,6 @@ fn build_shadow_migration_report(
         schema: SHADOW_MIGRATION_REPORT_SCHEMA,
         input_digest,
         manifests,
-        unsigned_v2_artifacts,
         egress_clearance_findings,
         unknown_output_declarations,
         invalid_purpose_sets,
@@ -709,112 +659,20 @@ fn verify_registered_manifest(
     )?;
     let signed_envelope_digest = digest(&registration.signed_envelope, "manifest envelope")?;
 
-    let (manifest, signed_v2, unsigned_v2_digest) = match source_schema.as_str() {
-        TOOL_MANIFEST_SCHEMA => {
-            if registration.legacy_permission_amendment.is_some() {
-                return Err(ShadowMigrationError::Invalid(format!(
-                    "v2 manifest {} supplies a legacy permission amendment",
-                    registration.registry_id
-                )));
-            }
-            let manifest: ToolManifest =
-                strict_typed_value(&registration.signed_envelope.manifest, "v2 manifest body")?;
-            let signed = SignedManifest {
-                manifest: manifest.clone(),
-                signature: registration.signed_envelope.signature.clone(),
-                signer_key: registration.signed_envelope.signer_key.clone(),
-            };
-            verify_manifest(&signed, registered_key).map_err(|error| {
-                ShadowMigrationError::Invalid(format!(
-                    "v2 manifest {} failed verification: {error}",
-                    registration.registry_id
-                ))
-            })?;
-            (manifest, true, None)
-        }
-        "chio.manifest.v1" => {
-            let canonical =
-                canonical_json_bytes(&registration.signed_envelope.manifest).map_err(|error| {
-                    ShadowMigrationError::Invalid(format!(
-                        "v1 manifest {} canonicalization failed: {error}",
-                        registration.registry_id
-                    ))
-                })?;
-            let embedded_key = registration
-                .signed_envelope
-                .manifest
-                .as_object()
-                .and_then(|object| object.get("public_key"))
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| {
-                    ShadowMigrationError::Invalid(format!(
-                        "v1 manifest {} has no embedded public key",
-                        registration.registry_id
-                    ))
-                })?;
-            if embedded_key != registered_key.to_hex() {
-                return Err(ShadowMigrationError::Invalid(format!(
-                    "v1 manifest {} embedded key does not match its registered signer",
-                    registration.registry_id
-                )));
-            }
-            let migration = migrate_legacy_manifest_v1(&canonical).map_err(|error| {
-                ShadowMigrationError::Invalid(format!(
-                    "v1 manifest {} cannot migrate: {error}",
-                    registration.registry_id
-                ))
-            })?;
-            let manifest = if migration.requires_permission_amendment() {
-                let amendment = registration
-                    .legacy_permission_amendment
-                    .as_ref()
-                    .ok_or_else(|| {
-                        ShadowMigrationError::Invalid(format!(
-                            "v1 manifest {} requires explicit destination ports and a native syscall profile",
-                            registration.registry_id
-                        ))
-                    })?;
-                migration
-                    .amend_permissions(
-                        amendment.native_syscall_profile,
-                        amendment.network_destinations.clone(),
-                    )
-                    .map_err(|error| {
-                        ShadowMigrationError::Invalid(format!(
-                            "v1 manifest {} permission amendment is invalid: {error}",
-                            registration.registry_id
-                        ))
-                    })?
-            } else {
-                if registration.legacy_permission_amendment.is_some() {
-                    return Err(ShadowMigrationError::Invalid(format!(
-                        "v1 manifest {} supplies an unnecessary permission amendment",
-                        registration.registry_id
-                    )));
-                }
-                migration.into_manifest().map_err(|error| {
-                    ShadowMigrationError::Invalid(format!(
-                        "v1 manifest {} conversion failed: {error}",
-                        registration.registry_id
-                    ))
-                })?
-            };
-            if manifest.public_key != registered_key.to_hex() {
-                return Err(ShadowMigrationError::Invalid(format!(
-                    "converted manifest {} changed its embedded signer",
-                    registration.registry_id
-                )));
-            }
-            let unsigned_digest = digest(&manifest, "unsigned v2 manifest")?;
-            (manifest, false, Some(unsigned_digest))
-        }
-        _ => {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "manifest {} uses unsupported schema {}",
-                registration.registry_id, source_schema
-            )));
-        }
+    if source_schema != TOOL_MANIFEST_SCHEMA {
+        return Err(ShadowMigrationError::Invalid(format!(
+            "manifest schema is unsupported: {source_schema}"
+        )));
+    }
+    let manifest: ToolManifest =
+        strict_typed_value(&registration.signed_envelope.manifest, "manifest body")?;
+    let signed = SignedManifest {
+        manifest: manifest.clone(),
+        signature: registration.signed_envelope.signature.clone(),
+        signer_key: registration.signed_envelope.signer_key.clone(),
     };
+    verify_manifest(&signed, registered_key)
+        .map_err(|source| ShadowMigrationError::Manifest(source))?;
 
     validate_deployment_inventory(&registration, &manifest)?;
     validate_server_runtime(&registration.server_runtime)?;
@@ -825,8 +683,6 @@ fn verify_registered_manifest(
         source_schema,
         source_manifest_digest,
         signed_envelope_digest,
-        signed_v2,
-        unsigned_v2_digest,
     })
 }
 
@@ -1245,12 +1101,7 @@ fn verify_backfill_receipts(
                     receipt.id, evidence.manifest_registry_id
                 ))
             })?;
-        if !source_manifest.signed_v2 {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} references an unsigned migrated v2 manifest",
-                receipt.id
-            )));
-        }
+
         if evidence.manifest_digest != source_manifest.source_manifest_digest {
             return Err(ShadowMigrationError::Invalid(format!(
                 "receipt {} manifest digest does not match the verified registry entry",
@@ -1499,13 +1350,11 @@ where
     T: DeserializeOwned + Serialize,
 {
     let typed = serde_json::from_value::<T>(value.clone())
-        .map_err(|error| ShadowMigrationError::Invalid(format!("{label} is invalid: {error}")))?;
-    let source = canonical_json_bytes(value).map_err(|error| {
-        ShadowMigrationError::Invalid(format!("{label} canonicalization failed: {error}"))
-    })?;
-    let typed_bytes = canonical_json_bytes(&typed).map_err(|error| {
-        ShadowMigrationError::Invalid(format!("typed {label} canonicalization failed: {error}"))
-    })?;
+        .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
+    let source = canonical_json_bytes(value)
+        .map_err(chio_core::canonical::UntrustedJsonError::Canonicalization)?;
+    let typed_bytes = canonical_json_bytes(&typed)
+        .map_err(chio_core::canonical::UntrustedJsonError::Canonicalization)?;
     if source != typed_bytes {
         return Err(ShadowMigrationError::Invalid(format!(
             "{label} contains unknown, explicit-default, or noncanonical fields"

@@ -1,0 +1,66 @@
+{
+  "crates/products/chio-proof-room/src/error.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Proof validation and original input errors retain their types. Commerce, risk, runtime regeneration and local-family verification failures retain downcastable native causes; public reasons are selected static literals, never native diagnostic text."
+  },
+  "crates/products/chio-proof-room/src/source_verifier.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Existing bounded original artifacts, signature/digest checks and collection ownership remain. Selected family verification and runtime-regeneration adapters now preserve native error causes through proof-room; typed public reason selection cannot grant a verified result."
+  },
+  "crates/platform/chio-control-plane/src/error/registered_source.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Registry-backed CLI causes stay downcastable locally. Public messages are either registry summaries or explicitly supplied static diagnostics, never native error text or rejected input."
+  },
+  "crates/platform/chio-control-plane/src/error.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "CLI error adapters preserve typed native causes and signed JSON reasons. The static public-source adapter retains actionable proof rejection and exit classification without formatting attacker-controlled source diagnostics."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/fixture_catalog_paths.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Catalog identifiers are bounded unique case-folded ASCII names, never paths. Collection output owners validate identifiers and reject non-directory or symlink parent/destination entries before removal or copy."
+  },
+  "crates/products/chio-cli/src/cli/input.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention."
+  },
+  "crates/products/chio-cli/src/cli/input/config.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection."
+  },
+  "crates/products/chio-cli/src/cli/input/collection.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Count/depth and actual-byte budget shared across each artifact collection. File retention is bounded by remaining capacity before the read; nonregular entries reject."
+  },
+  "crates/products/chio-cli/src/cli/input/snapshot.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Private bounded snapshot retains bytes across verification and output. Archive paths, all parent-directory entries, collisions and bytes are validated before writing transformed collections. Concurrent hostile ancestor mutation outside captured custody remains a separate limitation."
+  },
+  "crates/products/chio-cli/src/cli/input/time.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Process-local clock fence locks before observing wall and monotonic time. Fault or regression rejects; explicit deadline addition rejects zero and overflow."
+  },
+  "crates/products/chio-cli/src/passport/http.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Timeout and actual response-byte bounds precede original duplicate-aware JSON decoding. HTTP error bodies are not read into public diagnostics; causes are retained behind stable redacted codes."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/artifacts.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Graph shape/count bounds precede original file reads, schema and original-byte digest comparison. Retained vectors/maps share actual-byte and entry budgets; swarm optional and required families share one budget."
+  },
+  "crates/products/chio-cli/src/cli/dispatch/proof/room.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "CLI verification adapts the sealed proof-room verifier result without flattening causes; captured input custody binds subsequent output readers to private bounded bytes."
+  },
+  "crates/products/chio-cli/src/cli/chio/dispatch/io.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Shared bounded regular UTF-8 reader serves JSON and seed/text callers; owning current-schema decoders still establish format/signature semantics."
+  },
+  "crates/platform/chio-control-plane/src/signing_custody.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Existing private-file signing custody rejects missing, permissive, multiply linked, wrong-owner or replaced files; nonblocking nofollow reads are bounded and zeroizing from allocation through all exits."
+  },
+  "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only."
+  }
+}

@@ -22,12 +22,14 @@ pub fn cmd_cert_generate(
 ) -> Result<(), CliError> {
     let default_seed_path = std::path::PathBuf::from(".chio-authority-seed");
     let seed_path = authority_seed_file.unwrap_or(&default_seed_path);
-    let keypair = crate::load_or_create_authority_keypair(seed_path)?;
+    let keypair = crate::load_existing_authority_keypair(seed_path)?;
 
     let db_path = receipt_db.to_string_lossy();
-    let conn = rusqlite::Connection::open(receipt_db).map_err(|e| {
-        CliError::cli_other_error(format!("failed to open receipt db {db_path}: {e}"))
-    })?;
+    let conn = rusqlite::Connection::open_with_flags(
+        receipt_db,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .map_err(|e| CliError::cli_other_error(format!("failed to open receipt db {db_path}: {e}")))?;
 
     let receipts = load_session_receipts(&conn, session_id)?;
 
@@ -83,11 +85,10 @@ pub fn cmd_cert_verify(
     trusted_kernel_pubkey: &Path,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let cert_text = std::fs::read_to_string(certificate_path)
+    let cert_text = crate::input::read_text(certificate_path)
         .map_err(|e| CliError::cli_other_error(format!("failed to read certificate: {e}")))?;
 
-    let cert: ComplianceCertificate = serde_json::from_str(&cert_text)
-        .map_err(|e| CliError::cli_other_error(format!("failed to parse certificate: {e}")))?;
+    let cert: ComplianceCertificate = crate::input::text(&cert_text).map_err(CliError::from)?;
 
     let mode = if full {
         VerificationMode::FullBundle
@@ -97,9 +98,11 @@ pub fn cmd_cert_verify(
 
     let receipts = if full {
         if let Some(db_path) = receipt_db {
-            let conn = rusqlite::Connection::open(db_path).map_err(|e| {
-                CliError::cli_other_error(format!("failed to open receipt db: {e}"))
-            })?;
+            let conn = rusqlite::Connection::open_with_flags(
+                db_path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )
+            .map_err(|e| CliError::cli_other_error(format!("failed to open receipt db: {e}")))?;
             let entries = load_session_receipts(&conn, &cert.body.session_id)?;
             Some(entries)
         } else {
@@ -144,11 +147,10 @@ pub fn cmd_cert_verify(
 
 /// `chio cert inspect` -- display certificate contents.
 pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<(), CliError> {
-    let cert_text = std::fs::read_to_string(certificate_path)
+    let cert_text = crate::input::read_text(certificate_path)
         .map_err(|e| CliError::cli_other_error(format!("failed to read certificate: {e}")))?;
 
-    let cert: ComplianceCertificate = serde_json::from_str(&cert_text)
-        .map_err(|e| CliError::cli_other_error(format!("failed to parse certificate: {e}")))?;
+    let cert: ComplianceCertificate = crate::input::text(&cert_text).map_err(CliError::from)?;
 
     if json_output {
         println!(
@@ -219,43 +221,153 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
 /// Load Chio receipts for a given session from the SQLite receipt store.
 ///
 /// This queries the `chio_receipts` table for receipts whose
-/// `capability_id` starts with `acp-session:{session_id}`.
+/// signed metadata names the exact session, independent of capability ID.
 fn load_session_receipts(
     conn: &rusqlite::Connection,
     session_id: &str,
 ) -> Result<Vec<ComplianceReceiptEntry>, CliError> {
     let table_exists: bool = conn
         .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chio_receipts'")
-        .and_then(|mut stmt| stmt.exists([]))
-        .unwrap_or(false);
-
+        .and_then(|mut statement| statement.exists([]))
+        .map_err(|source| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
+        })?;
     if !table_exists {
-        return Ok(Vec::new());
+        return Err(CliError::cli_other_error(
+            "receipt store has no chio_receipts table",
+        ));
     }
-
-    let capability_prefix = format!("acp-session:{session_id}");
-    let mut stmt = conn
-        .prepare(
-            "SELECT rowid, json_data FROM chio_receipts WHERE capability_id LIKE ?1 ORDER BY rowid",
+    let mut statement = conn.prepare(
+        "SELECT rowid, CASE WHEN typeof(json_data) = 'text' AND length(CAST(json_data AS BLOB)) <= ?2 THEN json_data ELSE NULL END FROM chio_receipts WHERE CASE WHEN typeof(json_data) = 'text' AND length(CAST(json_data AS BLOB)) <= ?2 AND json_valid(json_data) THEN COALESCE(CASE WHEN json_type(json_data, '$.metadata.acp.sessionId') = 'text' THEN json_extract(json_data, '$.metadata.acp.sessionId') END, CASE WHEN json_type(json_data, '$.metadata.receipt_context.session_id') = 'text' THEN json_extract(json_data, '$.metadata.receipt_context.session_id') END) = ?1 ELSE 1 END ORDER BY rowid LIMIT ?3"
+    ).map_err(|source| CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source))?;
+    let rows = statement
+        .query_map(
+            rusqlite::params![
+                session_id,
+                1024 * 1024,
+                crate::input::collection::MAX_ENTRIES as i64 + 1
+            ],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )
-        .map_err(|e| CliError::cli_other_error(format!("SQL prepare failed: {e}")))?;
-
-    let rows = stmt
-        .query_map([format!("{capability_prefix}%")], |row| {
-            let seq: i64 = row.get(0)?;
-            let json_data: String = row.get(1)?;
-            Ok((seq as u64, json_data))
-        })
-        .map_err(|e| CliError::cli_other_error(format!("SQL query failed: {e}")))?;
-
+        .map_err(|source| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
+        })?;
+    let mut budget = crate::input::collection::Budget::default();
     let mut entries = Vec::new();
     for row in rows {
-        let (seq, json_data) =
-            row.map_err(|e| CliError::cli_other_error(format!("row read failed: {e}")))?;
-        let receipt: chio_core::receipt::body::ChioReceipt = serde_json::from_str(&json_data)
-            .map_err(|e| CliError::cli_other_error(format!("receipt parse failed: {e}")))?;
+        let (seq, json_data) = row.map_err(|source| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
+        })?;
+        budget.enter(0)?;
+        budget.charge(json_data.len())?;
+        let seq = u64::try_from(seq).map_err(|source| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
+        })?;
+        let receipt = crate::input::json(json_data.as_bytes())?;
         entries.push(ComplianceReceiptEntry { receipt, seq });
     }
-
     Ok(entries)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    #[test]
+    fn session_selection_is_exact_and_row_decoding_fails_closed() {
+        let db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute(
+            "CREATE TABLE chio_receipts (capability_id TEXT, json_data TEXT)",
+            [],
+        )
+        .unwrap();
+        for session in ["target-extra", "targetX", "target_", "target%"] {
+            db.execute(
+                "INSERT INTO chio_receipts VALUES (?1, ?2)",
+                rusqlite::params![
+                    format!("acp-session:{session}"),
+                    serde_json::json!({"metadata":{"acp":{"sessionId":session}}}).to_string()
+                ],
+            )
+            .unwrap();
+        }
+        assert!(load_session_receipts(&db, "target").unwrap().is_empty());
+        for exact in ["target-extra", "targetX", "target_", "target%"] {
+            let error = load_session_receipts(&db, exact).unwrap_err();
+            assert!(std::error::Error::source(&error).is_some());
+        }
+        db.execute(
+            "INSERT INTO chio_receipts VALUES ('acp-session:large', ?1)",
+            ["x".repeat(1024 * 1024 + 1)],
+        )
+        .unwrap();
+        let error = load_session_receipts(&db, "large").unwrap_err();
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!error.to_string().contains("xxxxx"));
+    }
+    #[test]
+    fn session_query_includes_signed_enforced_receipts_with_real_capability_ids() {
+        use chio_core::receipt::kinds::*;
+        use chio_core::receipt::{
+            body::{ChioReceipt, ChioReceiptBody},
+            decision::ToolCallAction,
+        };
+        let signer = chio_core::Keypair::from_seed(&[42; 32]);
+        let receipt = ChioReceipt::sign(
+            ChioReceiptBody {
+                id: String::new(),
+                timestamp: 1,
+                capability_id: "real-enforced-capability".into(),
+                tool_server: "acp-proxy".into(),
+                tool_name: "read".into(),
+                action: ToolCallAction::from_parameters(serde_json::json!({"path":"/example"}))
+                    .unwrap(),
+                decision: None,
+                receipt_kind: ReceiptKind::TraceObservation,
+                boundary_class: BoundaryClass::DetectOnly,
+                observation_outcome: Some(ObservationOutcome::Observed),
+                tool_origin: ToolOrigin::CallerExecuted,
+                redaction_mode: RedactionMode::None,
+                actor_chain: Vec::new(),
+                content_hash: "content".into(),
+                policy_hash: "policy".into(),
+                evidence: Vec::new(),
+                metadata: Some(serde_json::json!({"acp":{"sessionId":"target_%"}})),
+                trust_level: TrustLevel::Verified,
+                kernel_key: signer.public_key(),
+                bbs_projection_version: None,
+                tenant_id: None,
+            },
+            &signer,
+        )
+        .unwrap();
+        let db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute(
+            "CREATE TABLE chio_receipts (capability_id TEXT, json_data TEXT)",
+            [],
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO chio_receipts VALUES (?1, ?2)",
+            rusqlite::params![
+                receipt.capability_id,
+                serde_json::to_string(&receipt).unwrap()
+            ],
+        )
+        .unwrap();
+        let loaded = load_session_receipts(&db, "target_%").unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].receipt.id, receipt.id);
+        assert!(loaded[0].receipt.verify_signature().unwrap());
+        assert!(load_session_receipts(&db, "target").unwrap().is_empty());
+    }
+
+    #[test]
+    fn missing_receipt_table_is_not_an_empty_success() {
+        let db = rusqlite::Connection::open_in_memory().unwrap();
+        assert!(load_session_receipts(&db, "target")
+            .unwrap_err()
+            .to_string()
+            .contains("no chio_receipts"));
+    }
 }

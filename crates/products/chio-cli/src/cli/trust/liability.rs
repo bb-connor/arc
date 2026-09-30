@@ -1201,7 +1201,7 @@ pub(crate) fn load_liability_claim_settlement_receipt_issue_request(
 pub(crate) fn parse_liability_coverage_class(
     value: &str,
 ) -> Result<chio_kernel::LiabilityCoverageClass, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid liability coverage class `{value}`"))
     })
 }
@@ -1209,7 +1209,7 @@ pub(crate) fn parse_liability_coverage_class(
 pub(crate) fn parse_liability_provider_lifecycle_state(
     value: &str,
 ) -> Result<chio_kernel::LiabilityProviderLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!(
             "invalid liability provider lifecycle state `{value}`"
         ))

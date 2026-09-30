@@ -3,18 +3,8 @@ use std::fs;
 use std::path::Path;
 
 pub(crate) fn read_utf8_json_file(path: &Path, label: &str) -> Result<String, CliError> {
-    let bytes = fs::read(path).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to read {label} {}: {error}",
-            path.display()
-        ))
-    })?;
-    String::from_utf8(bytes).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{label} {} is not UTF-8 JSON: {error}",
-            path.display()
-        ))
-    })
+    let _ = label;
+    crate::input::read_text(path)
 }
 
 pub(crate) fn write_json_string(path: &Path, json: &str) -> Result<(), CliError> {

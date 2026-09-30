@@ -245,7 +245,7 @@ pub(crate) fn cmd_trust_underwriting_decision_simulate(
 pub(crate) fn parse_underwriting_decision_outcome(
     value: &str,
 ) -> Result<chio_kernel::UnderwritingDecisionOutcome, CliError> {
-    serde_json::from_str(&format!("\"{value}\""))
+    crate::input::literal(value)
         .map_err(|_| CliError::cli_other_error(format!("invalid underwriting outcome `{value}`")))
 }
 
@@ -274,7 +274,7 @@ mod trust_command_error_classification_tests {
 pub(crate) fn parse_underwriting_lifecycle_state(
     value: &str,
 ) -> Result<chio_kernel::UnderwritingDecisionLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid underwriting lifecycle state `{value}`"))
     })
 }
@@ -282,7 +282,7 @@ pub(crate) fn parse_underwriting_lifecycle_state(
 pub(crate) fn parse_underwriting_appeal_status(
     value: &str,
 ) -> Result<chio_kernel::UnderwritingAppealStatus, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid underwriting appeal status `{value}`"))
     })
 }
@@ -290,7 +290,7 @@ pub(crate) fn parse_underwriting_appeal_status(
 pub(crate) fn parse_underwriting_appeal_resolution(
     value: &str,
 ) -> Result<chio_kernel::UnderwritingAppealResolution, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!(
             "invalid underwriting appeal resolution `{value}`"
         ))
@@ -300,18 +300,7 @@ pub(crate) fn parse_underwriting_appeal_resolution(
 pub(crate) fn load_underwriting_decision_policy(
     path: &Path,
 ) -> Result<chio_kernel::UnderwritingDecisionPolicy, CliError> {
-    let contents = fs::read_to_string(path)?;
-    if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
-    {
-        Ok(serde_yml::from_str(&contents)?)
-    } else if let Ok(policy) = serde_json::from_str(&contents) {
-        Ok(policy)
-    } else {
-        Ok(serde_yml::from_str(&contents)?)
-    }
+    crate::input::config::load(path)
 }
 
 pub(crate) fn cmd_trust_underwriting_decision_issue(

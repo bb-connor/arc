@@ -1,4 +1,7 @@
+#[path = "fixture_catalog_paths.rs"]
+mod catalog_paths;
 use super::*;
+pub(super) use catalog_paths::negative_destination;
 use chio_core_types::{
     receipt::body::{ChioReceipt, ChioReceiptBody},
     receipt::decision::{Decision, ToolCallAction},
@@ -449,22 +452,7 @@ fn evidence_graph_artifact_root(evidence_graph_path: &Path) -> Result<PathBuf, C
 }
 
 fn collect_evidence_graph_paths(root: &Path, paths: &mut Vec<PathBuf>) -> Result<(), CliError> {
-    if !root.is_dir() {
-        return Ok(());
-    }
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            collect_evidence_graph_paths(&path, paths)?;
-        } else if file_type.is_file()
-            && path.file_name().and_then(|name| name.to_str()) == Some("evidence-graph.json")
-        {
-            paths.push(path);
-        }
-    }
-    Ok(())
+    collect_named_file_paths(root, "evidence-graph.json", paths)
 }
 
 fn preserves_evidence_graph_digest_mismatch(
@@ -551,18 +539,11 @@ fn collect_named_file_paths(
     if !root.is_dir() {
         return Ok(());
     }
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            collect_named_file_paths(&path, file_name, paths)?;
-        } else if file_type.is_file()
-            && path.file_name().and_then(|name| name.to_str()) == Some(file_name)
-        {
-            paths.push(path);
-        }
-    }
+    paths.extend(
+        crate::input::collection::paths(root)?
+            .into_iter()
+            .filter(|path| path.file_name().and_then(|s| s.to_str()) == Some(file_name)),
+    );
     Ok(())
 }
 
@@ -902,12 +883,7 @@ fn proof_fixture_negative_case(
         read_embedded_negative_fixture_metadata(&metadata_path, descriptor)?
     };
     let negative_case: ProofFixtureNegativeCase =
-        serde_json::from_slice(&raw).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "invalid negative proof fixture metadata for {}: {}",
-                descriptor.id, error
-            ))
-        })?;
+        crate::input::json(&raw).map_err(CliError::from)?;
     Ok(negative_case)
 }
 
@@ -966,7 +942,7 @@ fn read_installed_negative_fixture_metadata(
             descriptor.path
         )));
     }
-    Ok(fs::read(metadata_path)?)
+    Ok(crate::input::read(metadata_path)?)
 }
 
 fn read_embedded_negative_fixture_metadata(
@@ -1003,7 +979,7 @@ fn proof_fixture_expected_verdict(
 }
 
 fn crypto_context_expected_failure(path: &Path) -> Result<Option<String>, CliError> {
-    let report: serde_json::Value = serde_json::from_slice(&fs::read(path)?)?;
+    let report: serde_json::Value = crate::input::json(&crate::input::read(path)?)?;
     let Some(check) = report
         .get("rejected_checks")
         .and_then(serde_json::Value::as_array)
@@ -1026,8 +1002,8 @@ fn crypto_context_expected_failure(path: &Path) -> Result<Option<String>, CliErr
 }
 
 fn workflow_preflight_expected_failure(path: &Path) -> Result<Option<String>, CliError> {
-    let bytes = fs::read(path)?;
-    let plan: chio_workflow::WorkflowPreflightPlan = serde_json::from_slice(&bytes)?;
+    let bytes = crate::input::read(path)?;
+    let plan: chio_workflow::WorkflowPreflightPlan = crate::input::json(&bytes)?;
     let report = chio_workflow::evaluate_workflow_preflight(&plan)
         .map_err(|error| CliError::cli_other_error(format!("workflow preflight: {error}")))?;
 
@@ -1095,7 +1071,10 @@ fn write_generated_verifier_report(
     if descriptor.kind == "proof-room" {
         let source_report_path = out.join("proof-room-bundle/verifier/report.json");
         if source_report_path.is_file() {
-            fs::copy(source_report_path, verifier_report_path)?;
+            fs::write(
+                verifier_report_path,
+                crate::input::read(source_report_path)?,
+            )?;
         }
         return Ok(());
     }
@@ -1103,9 +1082,9 @@ fn write_generated_verifier_report(
         return Ok(());
     }
     let context_path = out.join("verification-context.json");
-    let context_bytes = fs::read(&context_path)?;
-    let proof_bytes = fs::read(out.join("selective-disclosure-proof.json"))?;
-    let privacy_profile_bytes = fs::read(out.join("verifier-privacy-profile.json"))?;
+    let context_bytes = crate::input::read(&context_path)?;
+    let proof_bytes = crate::input::read(out.join("selective-disclosure-proof.json"))?;
+    let privacy_profile_bytes = crate::input::read(out.join("verifier-privacy-profile.json"))?;
     let report_bytes = chio_proof_room::crypto_context_rejected_report_bytes_with_bbs(
         &context_bytes,
         &proof_bytes,
@@ -1374,11 +1353,7 @@ fn refresh_disclosure_negative_graph_and_passport(bundle: &Path) -> Result<(), C
 fn sign_disclosure_crypto_report_json(report: &mut serde_json::Value) -> Result<(), CliError> {
     report["signature"] = serde_json::Value::Null;
     let mut typed_report: chio_selective_disclosure::DisclosureCryptoContextReport =
-        serde_json::from_value(report.clone()).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "proof fixture crypto context report parse failed: {error}"
-            ))
-        })?;
+        crate::input::project(report.clone()).map_err(CliError::from)?;
     typed_report.signature = Some(
         chio_selective_disclosure::sign_crypto_context_report(
             &typed_report,
@@ -1504,9 +1479,9 @@ fn generate_commerce_transaction_passport_fixture(out: &Path) -> Result<(), CliE
         &bundle,
         COMMERCE_TRANSACTION_PASSPORT_FIXTURE_ID,
     )?;
-    fs::copy(
-        bundle.join("verifier/report.json"),
+    fs::write(
         out.join("verifier-report.json"),
+        crate::input::read(bundle.join("verifier/report.json"))?,
     )?;
     Ok(())
 }
@@ -1666,7 +1641,7 @@ fn refresh_commerce_negative_order_passport_binding(bundle: &Path) -> Result<(),
         let source = proof_fixture_source_root()
             .join("commerce-payments/offline-psp-valid/order-passport.json");
         if source.is_file() {
-            fs::copy(source, &order_passport_path)?;
+            fs::write(&order_passport_path, crate::input::read(source)?)?;
         } else {
             return Ok(());
         }
@@ -1700,9 +1675,12 @@ fn refresh_commerce_order_passport_graph_binding(
 ) -> Result<(), CliError> {
     let evidence_graph_bytes = serde_json::to_vec(evidence_graph)?;
     let graph = parse_graph_artifact_paths(&evidence_graph_bytes)?;
+    let mut budget = crate::input::collection::Budget::default();
+    budget.charge(evidence_graph_bytes.len())?;
     let order_context: chio_commerce_order::CommerceOrderContext =
-        load_required_graph_json_artifact(
+        load_required_graph_json_artifact_bounded(
             bundle,
+            &mut budget,
             &graph.nodes,
             "commerce-order-context",
             chio_commerce_order::COMMERCE_ORDER_CONTEXT_SCHEMA_ID,
@@ -1710,15 +1688,21 @@ fn refresh_commerce_order_passport_graph_binding(
         )?;
     let event_log_bytes = load_required_graph_bytes_artifact_by_path(
         bundle,
+        &mut budget,
         &graph.nodes,
         &order_context.event_log_path,
         chio_commerce_order::COMMERCE_EVENT_LOG_SCHEMA_ID,
         "commerce fixture",
     )?;
-    let event_authority_receipts =
-        load_commerce_event_authority_receipts(bundle, &graph.nodes, &event_log_bytes)?;
+    let event_authority_receipts = load_commerce_event_authority_receipts(
+        bundle,
+        &mut budget,
+        &graph.nodes,
+        &event_log_bytes,
+    )?;
     let payment_lifecycle_bytes = load_required_graph_bytes_artifact_by_path(
         bundle,
+        &mut budget,
         &graph.nodes,
         &order_context.payment_lifecycle_path,
         chio_commerce_order::COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID,
@@ -1726,15 +1710,21 @@ fn refresh_commerce_order_passport_graph_binding(
     )?;
     let mandate_ledger_bytes = load_required_graph_bytes_artifact_by_path(
         bundle,
+        &mut budget,
         &graph.nodes,
         &order_context.mandate_ledger_path,
         chio_commerce_order::COMMERCE_MANDATE_ALLOWANCE_LEDGER_SCHEMA_ID,
         "commerce fixture",
     )?;
-    let mandate_protocol_payloads =
-        load_commerce_mandate_protocol_payloads(bundle, &graph.nodes, &mandate_ledger_bytes)?;
+    let mandate_protocol_payloads = load_commerce_mandate_protocol_payloads(
+        bundle,
+        &mut budget,
+        &graph.nodes,
+        &mandate_ledger_bytes,
+    )?;
     let provider_passport_bytes = load_required_graph_bytes_artifact_by_path(
         bundle,
+        &mut budget,
         &graph.nodes,
         &order_context.provider_passport_path,
         chio_commerce_order::COMMERCE_PROVIDER_PASSPORT_SCHEMA_ID,
@@ -1742,6 +1732,7 @@ fn refresh_commerce_order_passport_graph_binding(
     )?;
     let reputation_snapshot_bytes = load_required_graph_bytes_artifact_by_path(
         bundle,
+        &mut budget,
         &graph.nodes,
         &order_context.reputation_snapshot_path,
         chio_commerce_order::COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID,
@@ -1749,6 +1740,7 @@ fn refresh_commerce_order_passport_graph_binding(
     )?;
     let federation_trust_bundle_bytes = load_required_graph_bytes_artifact_by_path(
         bundle,
+        &mut budget,
         &graph.nodes,
         &order_context.federation_trust_bundle_path,
         chio_commerce_order::COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID,
@@ -1756,6 +1748,7 @@ fn refresh_commerce_order_passport_graph_binding(
     )?;
     let settlement_packet_bytes = load_required_graph_bytes_artifact_by_path(
         bundle,
+        &mut budget,
         &graph.nodes,
         &order_context.settlement_packet_path,
         chio_commerce_order::COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
@@ -1768,6 +1761,7 @@ fn refresh_commerce_order_passport_graph_binding(
     {
         Some(load_required_graph_bytes_artifact_by_path(
             bundle,
+            &mut budget,
             &graph.nodes,
             &requirement.risk_comptroller_report_path,
             "chio.risk.comptroller-report.v1",
@@ -2180,9 +2174,9 @@ fn generate_disclosure_agent_web_fixture(out: &Path) -> Result<(), CliError> {
         &bundle,
         DISCLOSURE_AGENT_WEB_FIXTURE_ID,
     )?;
-    fs::copy(
-        bundle.join("verifier/report.json"),
+    fs::write(
         out.join("verifier-report.json"),
+        crate::input::read(bundle.join("verifier/report.json"))?,
     )?;
     Ok(())
 }
@@ -2206,9 +2200,9 @@ fn generate_recursive_runtime_swarm_fixture(out: &Path) -> Result<(), CliError> 
         &bundle,
         RECURSIVE_RUNTIME_SWARM_FIXTURE_ID,
     )?;
-    fs::copy(
-        bundle.join("verifier/report.json"),
+    fs::write(
         out.join("verifier-report.json"),
+        crate::input::read(bundle.join("verifier/report.json"))?,
     )?;
     Ok(())
 }
@@ -2235,8 +2229,8 @@ fn add_runtime_swarm_loopback_evidence(bundle: &Path, temp_root: &Path) -> Resul
     write_executable_runtime_swarm_scenario(&scenario_path)?;
     let store_dir = temp_root.join("store");
     let out_dir = temp_root.join("out");
-    let static_package_json = fs::read_to_string(bundle.join("proof-package.json"))?;
-    let static_report_json = fs::read_to_string(bundle.join("verifier-report.json"))?;
+    let static_package_json = crate::input::read_text(bundle.join("proof-package.json"))?;
+    let static_report_json = crate::input::read_text(bundle.join("verifier-report.json"))?;
     chio_runtime_harness::run_runtime_loopback_scenario_with_static_artifacts(
         &scenario_path,
         &store_dir,
@@ -2255,7 +2249,7 @@ fn add_runtime_swarm_loopback_evidence(bundle: &Path, temp_root: &Path) -> Resul
     for (file_name, role) in RUNTIME_SWARM_LOOPBACK_ARTIFACTS {
         let source = out_dir.join(file_name);
         let destination = bundle.join(file_name);
-        fs::copy(&source, &destination)?;
+        fs::write(&destination, crate::input::read(&source)?)?;
         let artifact = read_json_value(&destination)?;
         let schema = required_json_string(&artifact, "schema", &destination)?;
         let artifact_sha256 = sha256_file(&destination)?;
@@ -2300,7 +2294,7 @@ fn runtime_swarm_loopback_temp_root() -> Result<PathBuf, CliError> {
 }
 
 fn write_executable_runtime_swarm_scenario(destination: &Path) -> Result<(), CliError> {
-    let mut scenario: serde_json::Value = serde_json::from_str(RUNTIME_SWARM_LOOPBACK_SCENARIO)?;
+    let mut scenario: serde_json::Value = crate::input::text(RUNTIME_SWARM_LOOPBACK_SCENARIO)?;
     let arguments = [
         serde_json::json!({
             "caseRef": "refund-250",
@@ -2776,12 +2770,7 @@ fn sign_public_settlement_proof_bundle(
         .remove("bundle_signature");
     let keypair = Keypair::from_seed(&PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_SEED);
     let typed_bundle: chio_web3::settlement_proof::PublicSettlementProofBundle =
-        serde_json::from_value(settlement_proof.clone()).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "public settlement proof bundle invalid before signing: {}: {error}",
-                settlement_proof_path.display()
-            ))
-        })?;
+        crate::input::project(settlement_proof.clone()).map_err(CliError::from)?;
     let (signature, _) = keypair.sign_canonical(&typed_bundle).map_err(|error| {
         CliError::cli_other_error(format!(
             "public settlement proof bundle signing failed: {}: {error}",
@@ -2923,12 +2912,7 @@ fn reseal_public_settlement_anchor_receipt(
             ))
         })?
         .clone();
-    let receipt: ChioReceipt = serde_json::from_value(receipt_value).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "public settlement anchor receipt invalid: {}: {error}",
-            settlement_proof_path.display()
-        ))
-    })?;
+    let receipt: ChioReceipt = crate::input::project(receipt_value).map_err(CliError::from)?;
     let mut receipt_body = receipt.body();
     receipt_body.id = governed_receipt_id.clone();
     receipt_body.content_hash = content_hash;
@@ -2971,7 +2955,7 @@ fn reseal_public_settlement_anchor_receipt(
         })?,
     };
     let statement_pointer = "/settlement_receipt/reconciled_anchor_proof/checkpoint_statement";
-    let mut statement: chio_web3::anchors::Web3CheckpointStatement = serde_json::from_value(
+    let mut statement: chio_web3::anchors::Web3CheckpointStatement = crate::input::project(
         settlement_proof
             .pointer(statement_pointer)
             .ok_or_else(|| {
@@ -2982,12 +2966,7 @@ fn reseal_public_settlement_anchor_receipt(
             })?
             .clone(),
     )
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "public settlement checkpoint statement invalid: {}: {error}",
-            settlement_proof_path.display()
-        ))
-    })?;
+    .map_err(CliError::from)?;
     statement.tree_size = 1;
     statement.merkle_root = merkle_root;
     statement.kernel_key = anchor_keypair.public_key();
@@ -3033,7 +3012,7 @@ fn reseal_public_settlement_anchor_receipt(
 
 fn sign_public_settlement_oracle_evidence(
     settlement_proof: &mut serde_json::Value,
-    settlement_proof_path: &Path,
+    _settlement_proof_path: &Path,
 ) -> Result<(), CliError> {
     let Some(oracle_evidence) = settlement_proof
         .pointer_mut("/settlement_receipt/oracle_evidence")
@@ -3042,12 +3021,7 @@ fn sign_public_settlement_oracle_evidence(
         return Ok(());
     };
     let mut evidence: chio_web3::anchors::OracleConversionEvidence =
-        serde_json::from_value(oracle_evidence.clone()).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "public settlement oracle evidence invalid: {}: {error}",
-                settlement_proof_path.display()
-            ))
-        })?;
+        crate::input::project(oracle_evidence.clone()).map_err(CliError::from)?;
     chio_web3::anchors::sign_oracle_conversion_evidence(
         &mut evidence,
         &Keypair::from_seed(&PUBLIC_SETTLEMENT_ORACLE_SIGNATURE_SEED),
@@ -3510,11 +3484,7 @@ fn add_disclosure_agent_web_crypto_context_material(
         disclosure_sensitivity_classes_json(&disclosed_fields, &hidden_predicates);
     write_json_line_file(&privacy_profile_path, &privacy_profile)?;
     let typed_privacy_profile: chio_selective_disclosure::DisclosureVerifierPrivacyProfile =
-        serde_json::from_value(privacy_profile).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "proof fixture privacy profile parse failed: {error}"
-            ))
-        })?;
+        crate::input::project(privacy_profile).map_err(CliError::from)?;
     normalize_disclosure_leakage_ledger(
         bundle,
         &capsule_id,
@@ -3562,11 +3532,7 @@ fn add_disclosure_agent_web_crypto_context_material(
     let context_path = bundle.join("verification-context.json");
     write_json_line_file(&context_path, &context)?;
     let typed_context: chio_selective_disclosure::CryptoVerificationContext =
-        serde_json::from_value(context).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "proof fixture crypto context parse failed: {error}"
-            ))
-        })?;
+        crate::input::project(context).map_err(CliError::from)?;
 
     let mut registry = chio_selective_disclosure::InMemoryIssuerRegistry::default();
     registry.insert(
@@ -4117,7 +4083,7 @@ fn sync_transaction_root_artifacts(bundle: &Path) -> Result<(), CliError> {
     ] {
         let source = bundle.join(artifact);
         if source.is_file() {
-            fs::copy(&source, roots.join(artifact))?;
+            fs::write(roots.join(artifact), crate::input::read(&source)?)?;
         }
     }
     Ok(())
@@ -4492,7 +4458,7 @@ fn write_transaction_passport_with_keypair(
         serde_json::Value::String(format!("did:chio:{}", keypair.public_key().to_hex()));
     passport["signature"] = serde_json::Value::String(String::new());
     let typed_passport: chio_control_plane::transaction_passport::TransactionPassport =
-        serde_json::from_value(passport.clone())?;
+        crate::input::project(passport.clone())?;
     passport["signature"] = serde_json::Value::String(
         chio_control_plane::transaction_passport::sign_transaction_passport(
             &typed_passport,
@@ -4593,20 +4559,16 @@ fn collect_enterprise_risk_report_paths(
     path: &Path,
     paths: &mut Vec<std::path::PathBuf>,
 ) -> Result<(), CliError> {
-    if path.is_dir() {
-        for entry in std::fs::read_dir(path)? {
-            collect_enterprise_risk_report_paths(&entry?.path(), paths)?;
+    for file in crate::input::collection::paths(path)? {
+        if file
+            .file_name()
+            .and_then(|s| s.to_str())
+            .is_some_and(|name| {
+                name.starts_with("risk-comptroller-report") && name.ends_with(".json")
+            })
+        {
+            paths.push(file);
         }
-        return Ok(());
-    }
-    if !path.is_file() {
-        return Ok(());
-    }
-    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
-        return Ok(());
-    };
-    if file_name.starts_with("risk-comptroller-report") && file_name.ends_with(".json") {
-        paths.push(path.to_path_buf());
     }
     Ok(())
 }
@@ -5445,9 +5407,7 @@ fn refresh_signed_lineage_subgraph_digest(bundle: &Path) -> Result<(), CliError>
     let mut value = read_json_value(&path)?;
     normalize_signed_lineage_subgraph_metadata(bundle, &path, &mut value)?;
     let mut lineage: chio_selective_disclosure::SignedLineageSubgraph =
-        serde_json::from_value(value).map_err(|error| {
-            CliError::cli_other_error(format!("signed lineage subgraph parse failed: {error}"))
-        })?;
+        crate::input::project(value).map_err(CliError::from)?;
     lineage.subgraph_sha256 =
         chio_selective_disclosure::compute_signed_lineage_subgraph_digest(&lineage)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
@@ -5846,7 +5806,7 @@ fn append_graph_artifacts_from_fixture(
             fs::create_dir_all(parent)?;
         }
         if replacements.is_empty() {
-            fs::copy(source.join(&path), &destination_path)?;
+            fs::write(&destination_path, crate::input::read(source.join(&path))?)?;
         } else {
             let mut artifact = read_json_value(&source.join(&path))?;
             for (from, to) in replacements {
@@ -6008,8 +5968,8 @@ fn replace_json_string(value: &mut serde_json::Value, from: &str, to: &str) {
 }
 
 fn read_json_value(path: &Path) -> Result<serde_json::Value, CliError> {
-    let bytes = fs::read(path)?;
-    serde_json::from_slice(&bytes).map_err(CliError::from)
+    let bytes = crate::input::read(path)?;
+    crate::input::json(&bytes).map_err(CliError::from)
 }
 
 fn required_json_string(
@@ -6118,7 +6078,7 @@ fn json_array_mut<'a>(
 }
 
 fn sha256_file(path: &Path) -> Result<String, CliError> {
-    let bytes = fs::read(path)?;
+    let bytes = crate::input::read(path)?;
     Ok(chio_core::sha256_hex(&bytes))
 }
 
@@ -6137,20 +6097,19 @@ fn installed_fixture_catalog() -> Result<Option<ProofFixtureCatalog>, CliError> 
 }
 
 fn read_fixture_catalog_file(catalog_path: &Path) -> Result<ProofFixtureCatalog, CliError> {
-    let raw = fs::read(catalog_path)?;
+    let raw = crate::input::read(catalog_path)?;
     parse_fixture_catalog(&raw, &catalog_path.display().to_string())
 }
 
 fn parse_fixture_catalog(raw: &[u8], source: &str) -> Result<ProofFixtureCatalog, CliError> {
-    let catalog: ProofFixtureCatalog = serde_json::from_slice(raw).map_err(|error| {
-        CliError::cli_other_error(format!("invalid proof fixture catalog {source}: {error}"))
-    })?;
+    let catalog: ProofFixtureCatalog = crate::input::json(raw).map_err(CliError::from)?;
     if catalog.schema != PROOF_FIXTURE_CATALOG_SCHEMA {
         return Err(CliError::cli_other_error(format!(
             "unsupported proof fixture catalog schema {} in {}",
             catalog.schema, source
         )));
     }
+    catalog_paths::validate(&catalog)?;
     Ok(catalog)
 }
 
@@ -6252,12 +6211,17 @@ pub(super) fn copy_dir_contents(source: &Path, destination: &Path) -> Result<(),
         fs::create_dir_all(parent)?;
     }
     fs::create_dir(&destination_root)?;
-    for entry in fs::read_dir(&source_root)? {
-        let entry = entry?;
-        let source_path = entry.path();
-        let destination_path = destination_root.join(entry.file_name());
-        copy_dir_entry(&source_path, &destination_path)?;
-    }
+    crate::input::collection::walk_files(&source_root, |path, budget| {
+        let relative = path.strip_prefix(&source_root).map_err(|source| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
+        })?;
+        let target = destination_root.join(relative);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(target, budget.read(path)?)?;
+        Ok(())
+    })?;
     Ok(())
 }
 
@@ -6297,24 +6261,4 @@ fn new_destination_root(destination: &Path) -> Result<PathBuf, CliError> {
         destination_root.push(component);
     }
     Ok(destination_root)
-}
-
-fn copy_dir_entry(source: &Path, destination: &Path) -> Result<(), CliError> {
-    let file_type = fs::symlink_metadata(source)?.file_type();
-    if file_type.is_dir() {
-        fs::create_dir_all(destination)?;
-        for entry in fs::read_dir(source)? {
-            let entry = entry?;
-            copy_dir_entry(&entry.path(), &destination.join(entry.file_name()))?;
-        }
-        Ok(())
-    } else if file_type.is_file() {
-        fs::copy(source, destination)?;
-        Ok(())
-    } else {
-        Err(CliError::cli_other_error(format!(
-            "unsupported proof fixture file type: {}",
-            source.display()
-        )))
-    }
 }

@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, io::Read, sync::Arc, time::Duration};
+use std::{collections::BTreeSet, path::Path, sync::Arc, time::Duration};
 
 use super::CliError;
 use chio_egress_contract::HttpEgressContract;
@@ -13,8 +13,7 @@ const AGENT_WEB_TRUSTED_KERNEL_KEYS_ENV: &str = "CHIO_AGENT_WEB_TRUSTED_KERNEL_K
 const AGENT_WEB_TRUSTED_ENVELOPE_SIDECAR_KEYS_ENV: &str =
     "CHIO_AGENT_WEB_TRUSTED_ENVELOPE_SIDECAR_KEYS";
 const TRANSACTION_TRUSTED_ROOT_KEYS_ENV: &str = "CHIO_TRANSACTION_TRUSTED_ROOT_KEYS";
-const TRANSACTION_TRUSTED_CHECKPOINT_KEYS_ENV: &str =
-    "CHIO_TRANSACTION_TRUSTED_CHECKPOINT_KEYS";
+const TRANSACTION_TRUSTED_CHECKPOINT_KEYS_ENV: &str = "CHIO_TRANSACTION_TRUSTED_CHECKPOINT_KEYS";
 const FINDING_VERIFIER_AUTHORITY_KEY_ENV: &str = "CHIO_FINDING_VERIFIER_AUTHORITY_KEY";
 const FINDING_PURCHASE_AUTHORITY_KEY_ENV: &str = "CHIO_FINDING_PURCHASE_AUTHORITY_KEY";
 const FINDING_PURCHASE_AUTHORITY_STATUS_PATH_ENV: &str =
@@ -28,11 +27,9 @@ const FINDING_PROFILE_GOVERNANCE_AUTHORITY_STATUS_PATH_ENV: &str =
 const FINDING_VERIFIER_PROFILE_ENVELOPE_SHA256_ENV: &str =
     "CHIO_FINDING_VERIFIER_PROFILE_ENVELOPE_SHA256";
 const FINDING_VERIFIER_PROFILE_PATH_ENV: &str = "CHIO_FINDING_VERIFIER_PROFILE_PATH";
-const FINDING_TRUST_ROOT_SNAPSHOT_SHA256_ENV: &str =
-    "CHIO_FINDING_TRUST_ROOT_SNAPSHOT_SHA256";
+const FINDING_TRUST_ROOT_SNAPSHOT_SHA256_ENV: &str = "CHIO_FINDING_TRUST_ROOT_SNAPSHOT_SHA256";
 const FINDING_RESOLVER_POLICY_SHA256_ENV: &str = "CHIO_FINDING_RESOLVER_POLICY_SHA256";
-const FINDING_TRUSTED_TIME_INPUT_SHA256_ENV: &str =
-    "CHIO_FINDING_TRUSTED_TIME_INPUT_SHA256";
+const FINDING_TRUSTED_TIME_INPUT_SHA256_ENV: &str = "CHIO_FINDING_TRUSTED_TIME_INPUT_SHA256";
 const FINDING_VERIFIER_AUTHORITY_STATUS_PATH_ENV: &str =
     "CHIO_FINDING_VERIFIER_AUTHORITY_STATUS_PATH";
 const FINDING_VERIFIER_STATUS_AUTHORITY_POLICY_PATH_ENV: &str =
@@ -337,10 +334,8 @@ pub(super) fn cognition_market_proof_trust_from_env(
         required_sha256_env(FINDING_VERIFIER_PROFILE_ENVELOPE_SHA256_ENV)?;
     let trusted_trust_root_snapshot_sha256 =
         required_sha256_env(FINDING_TRUST_ROOT_SNAPSHOT_SHA256_ENV)?;
-    let trusted_resolver_policy_sha256 =
-        required_sha256_env(FINDING_RESOLVER_POLICY_SHA256_ENV)?;
-    let trusted_time_input_sha256 =
-        required_sha256_env(FINDING_TRUSTED_TIME_INPUT_SHA256_ENV)?;
+    let trusted_resolver_policy_sha256 = required_sha256_env(FINDING_RESOLVER_POLICY_SHA256_ENV)?;
+    let trusted_time_input_sha256 = required_sha256_env(FINDING_TRUSTED_TIME_INPUT_SHA256_ENV)?;
     let status_authority = finding_authority_policy_from_env(
         FINDING_VERIFIER_STATUS_AUTHORITY_POLICY_PATH_ENV,
         "Finding authority-status signer",
@@ -354,12 +349,9 @@ pub(super) fn cognition_market_proof_trust_from_env(
             "{FINDING_VERIFIER_STATUS_AUTHORITY_POLICY_PATH_ENV} key must differ from {FINDING_PROFILE_GOVERNANCE_AUTHORITY_KEY_ENV}"
         )));
     }
-    let checked_at = required_positive_u64_env(
-        FINDING_VERIFIER_AUTHORITY_STATUS_CHECKED_AT_ENV,
-    )?;
-    let max_age_secs = required_positive_u64_env(
-        FINDING_VERIFIER_AUTHORITY_STATUS_MAX_AGE_SECONDS_ENV,
-    )?;
+    let checked_at = required_positive_u64_env(FINDING_VERIFIER_AUTHORITY_STATUS_CHECKED_AT_ENV)?;
+    let max_age_secs =
+        required_positive_u64_env(FINDING_VERIFIER_AUTHORITY_STATUS_MAX_AGE_SECONDS_ENV)?;
     let profile_governance_authority_status = finding_authority_status_trust_from_env(
         FINDING_PROFILE_GOVERNANCE_AUTHORITY_STATUS_PATH_ENV,
         &profile_governance_authority,
@@ -431,46 +423,8 @@ pub(super) fn cognition_market_proof_trust_from_env(
 fn finding_verifier_profile_from_env(
 ) -> Result<chio_finding::SignedFindingChallengeVerifierProfile, CliError> {
     let path = required_utf8_env(FINDING_VERIFIER_PROFILE_PATH_ENV)?;
-    let mut reader = std::fs::File::open(&path)?
-        .take((FINDING_VERIFIER_PROFILE_MAX_BYTES as u64).saturating_add(1));
-    let mut bytes = Vec::with_capacity(FINDING_VERIFIER_PROFILE_MAX_BYTES.saturating_add(1));
-    reader.read_to_end(&mut bytes)?;
-    if bytes.len() > FINDING_VERIFIER_PROFILE_MAX_BYTES {
-        return Err(CliError::cli_other_error(format!(
-            "{FINDING_VERIFIER_PROFILE_PATH_ENV} exceeds {FINDING_VERIFIER_PROFILE_MAX_BYTES} bytes"
-        )));
-    }
-    let raw = std::str::from_utf8(&bytes).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{FINDING_VERIFIER_PROFILE_PATH_ENV} must be valid UTF-8: {error}"
-        ))
-    })?;
-    let canonical = chio_core_types::canonical_json_bytes_from_str(raw).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{FINDING_VERIFIER_PROFILE_PATH_ENV} must contain canonical JSON: {error}"
-        ))
-    })?;
-    if canonical != bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{FINDING_VERIFIER_PROFILE_PATH_ENV} must contain exact canonical JSON bytes"
-        )));
-    }
-    let profile: chio_finding::SignedFindingChallengeVerifierProfile =
-        serde_json::from_slice(&bytes).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "{FINDING_VERIFIER_PROFILE_PATH_ENV} is not a signed Finding verifier profile: {error}"
-            ))
-        })?;
-    let typed = chio_core_types::canonical_json_bytes(&profile).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{FINDING_VERIFIER_PROFILE_PATH_ENV} could not be canonicalized: {error}"
-        ))
-    })?;
-    if typed != bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{FINDING_VERIFIER_PROFILE_PATH_ENV} typed profile does not preserve the exact canonical bytes"
-        )));
-    }
+    let bytes = crate::input::read_regular(Path::new(&path), FINDING_VERIFIER_PROFILE_MAX_BYTES)?;
+    let profile = crate::input::canonical_ijson(&bytes)?;
     Ok(profile)
 }
 
@@ -485,47 +439,12 @@ fn finding_authority_status_trust_from_env(
     CliError,
 > {
     let path = required_utf8_env(status_path_env)?;
-    let mut reader = std::fs::File::open(&path)?
-        .take((FINDING_VERIFIER_AUTHORITY_STATUS_MAX_BYTES as u64).saturating_add(1));
-    let mut bytes =
-        Vec::with_capacity(FINDING_VERIFIER_AUTHORITY_STATUS_MAX_BYTES.saturating_add(1));
-    reader.read_to_end(&mut bytes)?;
-    if bytes.len() > FINDING_VERIFIER_AUTHORITY_STATUS_MAX_BYTES {
-        return Err(CliError::cli_other_error(format!(
-            "{status_path_env} exceeds the authority-status size bound"
-        )));
-    }
-    let text = std::str::from_utf8(&bytes).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{status_path_env} is not valid UTF-8: {error}"
-        ))
-    })?;
-    let canonical = chio_core_types::canonical_json_bytes_from_str(text).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{status_path_env} is not strict canonical I-JSON: {error}"
-        ))
-    })?;
-    if canonical != bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{status_path_env} is not the canonical authority-status serialization"
-        )));
-    }
+    let bytes = crate::input::read_regular(
+        Path::new(&path),
+        FINDING_VERIFIER_AUTHORITY_STATUS_MAX_BYTES,
+    )?;
     let signed_status: chio_finding::SignedFindingAuthorityStatus =
-        serde_json::from_slice(&bytes).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "{status_path_env} is not a signed Finding authority status: {error}"
-            ))
-        })?;
-    let typed = chio_core_types::canonical_json_bytes(&signed_status).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{status_path_env} could not be canonicalized: {error}"
-        ))
-    })?;
-    if typed != bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{status_path_env} typed status does not preserve the exact canonical bytes"
-        )));
-    }
+        crate::input::canonical_ijson(&bytes)?;
     chio_finding::verify_signed_authority_status(&signed_status, &status_authority.key).map_err(
         |error| {
             CliError::cli_other_error(format!(
@@ -553,40 +472,10 @@ fn finding_authority_policy_from_env(
     subject: &'static str,
 ) -> Result<chio_finding::FindingAuthorityKeyPolicy, CliError> {
     let path = required_utf8_env(policy_path_env)?;
-    let mut reader = std::fs::File::open(&path)?
-        .take((FINDING_AUTHORITY_POLICY_MAX_BYTES as u64).saturating_add(1));
-    let mut bytes = Vec::with_capacity(FINDING_AUTHORITY_POLICY_MAX_BYTES.saturating_add(1));
-    reader.read_to_end(&mut bytes)?;
-    if bytes.len() > FINDING_AUTHORITY_POLICY_MAX_BYTES {
-        return Err(CliError::cli_other_error(format!(
-            "{policy_path_env} exceeds the authority-policy size bound"
-        )));
-    }
-    let text = std::str::from_utf8(&bytes).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{policy_path_env} is not valid UTF-8: {error}"
-        ))
-    })?;
-    let canonical = chio_core_types::canonical_json_bytes_from_str(text).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{policy_path_env} is not strict canonical I-JSON: {error}"
-        ))
-    })?;
-    if canonical != bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{policy_path_env} is not the canonical authority-policy serialization"
-        )));
-    }
-    let policy: chio_finding::FindingAuthorityKeyPolicy = serde_json::from_slice(&bytes)
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "{policy_path_env} is not a Finding authority policy: {error}"
-            ))
-        })?;
+    let bytes = crate::input::read_regular(Path::new(&path), FINDING_AUTHORITY_POLICY_MAX_BYTES)?;
+    let policy: chio_finding::FindingAuthorityKeyPolicy = crate::input::canonical_ijson(&bytes)?;
     policy.validate(subject).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{policy_path_env} is invalid: {error}"
-        ))
+        CliError::cli_other_error(format!("{policy_path_env} is invalid: {error}"))
     })?;
     Ok(policy)
 }
@@ -610,36 +499,13 @@ fn cognition_market_status_trust_from_env(
     max_age_secs: u64,
 ) -> Result<chio_control_plane::transaction_passport::CognitionMarketStatusTrust, CliError> {
     let authorization_path = required_utf8_env(FINDING_STATUS_OPERATOR_AUTHORIZATION_PATH_ENV)?;
-    let mut reader = std::fs::File::open(&authorization_path)?
-        .take((FINDING_STATUS_AUTHORIZATION_MAX_BYTES as u64).saturating_add(1));
-    let mut authorization_bytes =
-        Vec::with_capacity(FINDING_STATUS_AUTHORIZATION_MAX_BYTES.saturating_add(1));
-    reader.read_to_end(&mut authorization_bytes)?;
-    if authorization_bytes.len() > FINDING_STATUS_AUTHORIZATION_MAX_BYTES {
-        return Err(CliError::cli_other_error(format!(
-            "{FINDING_STATUS_OPERATOR_AUTHORIZATION_PATH_ENV} exceeds the authorization size bound"
-        )));
-    }
-    let authorization_text = std::str::from_utf8(&authorization_bytes).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{FINDING_STATUS_OPERATOR_AUTHORIZATION_PATH_ENV} is not valid UTF-8: {error}"
-        ))
-    })?;
-    let canonical = chio_core_types::canonical_json_bytes_from_str(authorization_text).map_err(
-        |error| {
-            CliError::cli_other_error(format!(
-                "{FINDING_STATUS_OPERATOR_AUTHORIZATION_PATH_ENV} is not strict canonical I-JSON: {error}"
-            ))
-        },
+    let authorization_bytes = crate::input::read_regular(
+        Path::new(&authorization_path),
+        FINDING_STATUS_AUTHORIZATION_MAX_BYTES,
     )?;
-    if canonical != authorization_bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{FINDING_STATUS_OPERATOR_AUTHORIZATION_PATH_ENV} is not the canonical authorization serialization"
-        )));
-    }
     let signed_status_operator_authorization: chio_core_types::receipt::lineage::SignedExportEnvelope<
         chio_finding::FindingStatusOperatorAuthorization,
-    > = serde_json::from_slice(&authorization_bytes)?;
+    > = crate::input::canonical_ijson(&authorization_bytes)?;
     signed_status_operator_authorization
         .body
         .validate()
@@ -719,7 +585,7 @@ fn claim_set_bytes_advertise_verified(
     bytes: &[u8],
     matches_claim: impl Fn(&str) -> bool,
 ) -> Result<bool, CliError> {
-    let claim_set: serde_json::Value = serde_json::from_slice(bytes)?;
+    let claim_set: serde_json::Value = crate::input::json(bytes)?;
     let claims = claim_set
         .get("claims")
         .and_then(serde_json::Value::as_array)
@@ -750,9 +616,9 @@ fn required_utf8_env(env_name: &str) -> Result<String, CliError> {
         Ok(_) => Err(CliError::cli_other_error(format!(
             "{env_name} must be non-empty"
         ))),
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
-            "{env_name} must be set"
-        ))),
+        Err(std::env::VarError::NotPresent) => {
+            Err(CliError::cli_other_error(format!("{env_name} must be set")))
+        }
         Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
             "{env_name} must be valid UTF-8"
         ))),
@@ -946,13 +812,11 @@ fn optional_public_settlement_independent_chain_head_from_env(
     proof_bundle: &chio_web3::settlement_proof::PublicSettlementProofBundle,
 ) -> Result<Option<chio_web3::settlement_proof::PublicSettlementIndependentChainHead>, CliError> {
     let head_from_json = match std::env::var(PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV) {
-        Ok(value) => serde_json::from_str(value.trim())
-            .map(Some)
-            .map_err(|error| {
-                CliError::cli_other_error(format!(
+        Ok(value) => crate::input::text(value.trim()).map(Some).map_err(|error| {
+            CliError::cli_other_error(format!(
                 "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV} must be valid JSON: {error}"
             ))
-            }),
+        }),
         Err(std::env::VarError::NotPresent) => Ok(None),
         Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV} must be valid UTF-8"
@@ -1080,21 +944,41 @@ fn public_settlement_rpc_call(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} returned HTTP {status}"
         )));
     }
-    let body = serde_json::from_slice::<serde_json::Value>(response.body()).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} returned invalid JSON: {error}"
-        ))
-    })?;
-    if let Some(error) = body.get("error") {
-        return Err(CliError::cli_other_error(format!(
-            "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} returned JSON-RPC error: {error}"
-        )));
+    settlement_rpc_result(response.body())
+}
+
+fn settlement_rpc_result(bytes: &[u8]) -> Result<serde_json::Value, CliError> {
+    let body: serde_json::Value = crate::input::json(bytes)?;
+    let object = body
+        .as_object()
+        .ok_or_else(|| CliError::cli_other_error("settlement RPC response is not an object"))?;
+    if object.get("jsonrpc").and_then(serde_json::Value::as_str) != Some("2.0")
+        || object.get("id").and_then(serde_json::Value::as_u64) != Some(1)
+    {
+        return Err(CliError::cli_other_error(
+            "settlement RPC response binding mismatch",
+        ));
     }
-    body.get("result").cloned().ok_or_else(|| {
-        CliError::cli_other_error(format!(
-            "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} response missing result"
-        ))
-    })
+    match (object.get("result"), object.get("error")) {
+        (Some(result), None) => Ok(result.clone()),
+        (None, Some(error))
+            if error
+                .get("code")
+                .and_then(serde_json::Value::as_i64)
+                .is_some()
+                && error
+                    .get("message")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some() =>
+        {
+            Err(CliError::cli_other_error(
+                "settlement RPC returned an error",
+            ))
+        }
+        _ => Err(CliError::cli_other_error(
+            "settlement RPC response envelope is invalid",
+        )),
+    }
 }
 
 /// Dispatch one settlement JSON-RPC POST through the pinned-DNS egress helper.
@@ -1375,9 +1259,9 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
             "../../../fixtures/proof-room/finding/cognition-market-qualified-profile/deployment/verifier-profile.json",
         );
-        let bytes = std::fs::read(path).unwrap_or_default();
+        let bytes = crate::input::read(path).unwrap_or_default();
         let mut profile: chio_finding::SignedFindingChallengeVerifierProfile =
-            serde_json::from_slice(&bytes).unwrap_or_else(|error| {
+            crate::input::json(&bytes).unwrap_or_else(|error| {
                 panic!("parse qualified verifier profile fixture: {error}")
             });
         profile
@@ -1386,5 +1270,28 @@ mod tests {
             .push(chio_finding::FindingFacetKind::IntentBinding);
 
         assert!(validate_cli_finding_verifier_profile(&profile.body).is_err());
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod rpc_tests {
+    use super::*;
+    #[test]
+    fn rpc_result_requires_protocol_request_identity_and_unambiguous_envelope() {
+        assert_eq!(
+            settlement_rpc_result(br#"{"jsonrpc":"2.0","id":1,"result":"0x100"}"#).unwrap(),
+            "0x100"
+        );
+        for bytes in [
+            br#"{"jsonrpc":"1.0","id":1,"result":"0x100"}"#.as_slice(),
+            br#"{"jsonrpc":"2.0","id":999,"result":"0x100"}"#,
+            br#"{"jsonrpc":"2.0","id":1,"result":"0x100","error":null}"#,
+            br#"{"jsonrpc":"2.0","id":1,"result":1,"result":2}"#,
+            br#"{"jsonrpc":"2.0","id":1,"error":{"code":-1,"message":"private-marker"}}"#,
+        ] {
+            let error = settlement_rpc_result(bytes).unwrap_err();
+            assert!(!error.to_string().contains("private-marker"));
+        }
     }
 }

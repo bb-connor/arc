@@ -383,7 +383,7 @@ pub(crate) fn cmd_trust_provider_risk_package_export(
 pub(crate) fn parse_credit_facility_disposition(
     value: &str,
 ) -> Result<chio_kernel::CreditFacilityDisposition, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid credit facility disposition `{value}`"))
     })
 }
@@ -391,7 +391,7 @@ pub(crate) fn parse_credit_facility_disposition(
 pub(crate) fn parse_credit_facility_lifecycle_state(
     value: &str,
 ) -> Result<chio_kernel::CreditFacilityLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!(
             "invalid credit facility lifecycle state `{value}`"
         ))
@@ -401,7 +401,7 @@ pub(crate) fn parse_credit_facility_lifecycle_state(
 pub(crate) fn parse_credit_bond_disposition(
     value: &str,
 ) -> Result<chio_kernel::CreditBondDisposition, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid credit bond disposition `{value}`"))
     })
 }
@@ -409,7 +409,7 @@ pub(crate) fn parse_credit_bond_disposition(
 pub(crate) fn parse_credit_bond_lifecycle_state(
     value: &str,
 ) -> Result<chio_kernel::CreditBondLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!("invalid credit bond lifecycle state `{value}`"))
     })
 }
@@ -417,7 +417,7 @@ pub(crate) fn parse_credit_bond_lifecycle_state(
 pub(crate) fn parse_credit_loss_lifecycle_event_kind(
     value: &str,
 ) -> Result<chio_kernel::CreditLossLifecycleEventKind, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+    crate::input::literal(value).map_err(|_| {
         CliError::policy_constraint_error(format!(
             "invalid credit loss lifecycle event kind `{value}`"
         ))
@@ -427,16 +427,5 @@ pub(crate) fn parse_credit_loss_lifecycle_event_kind(
 pub(crate) fn load_credit_bonded_execution_control_policy(
     path: &Path,
 ) -> Result<chio_kernel::CreditBondedExecutionControlPolicy, CliError> {
-    let contents = fs::read_to_string(path)?;
-    if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
-    {
-        Ok(serde_yml::from_str(&contents)?)
-    } else if let Ok(policy) = serde_json::from_str(&contents) {
-        Ok(policy)
-    } else {
-        Ok(serde_yml::from_str(&contents)?)
-    }
+    crate::input::config::load(path)
 }

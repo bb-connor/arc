@@ -6,6 +6,7 @@ use std::{error::Error, fmt};
 
 pub struct RegisteredSourceError {
     spec: &'static ErrorCodeSpec,
+    public_message: Option<&'static str>,
     source: Box<dyn Error + Send + Sync>,
 }
 
@@ -16,14 +17,20 @@ impl RegisteredSourceError {
     ) -> Self {
         Self {
             spec,
+            public_message: None,
             source: Box::new(source),
         }
+    }
+
+    pub(super) fn with_public_message(mut self, message: &'static str) -> Self {
+        self.public_message = Some(message);
+        self
     }
 
     pub(super) fn report(&self) -> StructuredErrorReport {
         StructuredErrorReport::new(
             self.spec.urn,
-            self.spec.summary,
+            self.public_message.unwrap_or(self.spec.summary),
             serde_json::json!({
                 "domain": self.spec.domain.as_str(),
                 "severity": self.spec.severity.as_str(),

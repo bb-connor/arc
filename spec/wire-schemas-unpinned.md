@@ -85,10 +85,10 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/tool_outcome.rs:29` `RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA` = `chio.raw-invocation-outcome-with-federation-context.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome.rs:31` `RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA` = `chio.raw-invocation-outcome-with-security-release.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome.rs:35` `RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA` = `chio.raw-invocation-outcome-with-caller-delivery.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:41` `TOOL_OUTCOME_SCHEMA` = `chio.tool-outcome.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:42` `POST_RETURN_EVALUATION_SCHEMA` = `chio.post-return-evaluation.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:43` `POST_RETURN_EXACT_INPUTS_SCHEMA` = `chio.post-return-exact-inputs.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:86` `MONETARY_RELEASE_EVIDENCE_SCHEMA` = `chio.monetary-release-evidence.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:42` `TOOL_OUTCOME_SCHEMA` = `chio.tool-outcome.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:43` `POST_RETURN_EVALUATION_SCHEMA` = `chio.post-return-evaluation.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:44` `POST_RETURN_EXACT_INPUTS_SCHEMA` = `chio.post-return-exact-inputs.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:87` `MONETARY_RELEASE_EVIDENCE_SCHEMA` = `chio.monetary-release-evidence.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome/security_release.rs:34` `SCHEMA` = `chio.security-release-checkpoint.v1`
 
 ## crates/kernel/chio-kernel-core (1)

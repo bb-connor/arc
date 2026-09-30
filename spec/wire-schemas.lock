@@ -2965,11 +2965,6 @@ files = ["crates/economy/chio-link/src/monitor.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.manifest.v1"
-files = ["crates/platform/chio-manifest/src/lib_parts/part_01.inc"]
-first_seen = "11e573d2d7"
-
-[[schema]]
 value = "chio.manifest.v2"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "3d3e4b4d9d"

@@ -121,6 +121,7 @@ tar = "0.4"
 zstd = "0.13"
 libc = "0.2"
 zeroize = { workspace = true }
+tempfile = "3"
 chio-keyring = { workspace = true }
 rand_core = { workspace = true }
 semver = "1"
@@ -138,7 +139,6 @@ insta = { version = "1.42", features = ["json", "redactions"] }
 jsonschema = { workspace = true }
 rand_core = { workspace = true }
 rsa = { version = "0.9", features = ["sha2"] }
-tempfile = "3"
 wiremock = "0.6"
 
 [features]

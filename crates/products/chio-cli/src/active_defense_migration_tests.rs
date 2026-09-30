@@ -62,7 +62,7 @@ fn signed_v2_registration(
             signature: signed.signature,
             signer_key: signed.signer_key,
         },
-        legacy_permission_amendment: None,
+
         tools: vec![ToolDeploymentInventory {
             tool_name: "send".to_string(),
             runtime_egress: true,
@@ -135,7 +135,8 @@ fn signed_backfill_receipt(
         capability_id: "cap.one".to_string(),
         tool_server: "server.one".to_string(),
         tool_name: "send".to_string(),
-        action: ToolCallAction::from_parameters(serde_json::json!({"value": 1})).test_expect("action"),
+        action: ToolCallAction::from_parameters(serde_json::json!({"value": 1}))
+            .test_expect("action"),
         decision: Some(Decision::Allow),
         receipt_kind: ReceiptKind::MediatedDecision,
         boundary_class: BoundaryClass::Prevent,
@@ -174,7 +175,7 @@ fn verifies_v2_against_the_registered_key_and_rejects_a_tampered_body() {
 }
 
 #[test]
-fn verifies_the_original_v1_body_before_emitting_an_unsigned_v2_artifact() {
+fn rejects_manifest_v1_even_with_an_authentic_signature() {
     let signer = key(2);
     let v1 = serde_json::json!({
         "schema": "chio.manifest.v1",
@@ -215,7 +216,7 @@ fn verifies_the_original_v1_body_before_emitting_an_unsigned_v2_artifact() {
                 signature,
                 signer_key: signer.public_key(),
             },
-            legacy_permission_amendment: None,
+
             tools: vec![ToolDeploymentInventory {
                 tool_name: "read".to_string(),
                 runtime_egress: false,
@@ -231,17 +232,8 @@ fn verifies_the_original_v1_body_before_emitting_an_unsigned_v2_artifact() {
         shadow_observations: Vec::new(),
     };
 
-    let report = build_shadow_migration_report(input.clone()).test_expect("v1 migration");
-    assert_eq!(report.unsigned_v2_artifacts.len(), 1);
-    assert!(report.unsigned_v2_artifacts[0].operator_resigning_required);
-    assert_eq!(
-        report.unsigned_v2_artifacts[0].manifest.schema,
-        TOOL_MANIFEST_SCHEMA
-    );
-    assert_eq!(
-        report.unsigned_v2_artifacts[0].manifest.tools[0].latency_hint,
-        Some(LatencyHint::Fast)
-    );
+    assert!(matches!(build_shadow_migration_report(input.clone()),
+        Err(ShadowMigrationError::Invalid(message)) if message == "manifest schema is unsupported: chio.manifest.v1"));
 
     let mut forged = input;
     forged.manifests[0].signed_envelope.manifest["version"] =

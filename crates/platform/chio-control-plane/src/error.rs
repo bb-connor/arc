@@ -105,6 +105,18 @@ impl CliError {
         RegisteredSourceError::new(spec, source).into()
     }
 
+    /// Preserve a native cause with a caller-selected static public diagnostic.
+    /// Input-derived messages cannot be supplied through this API.
+    pub fn with_public_source(
+        spec: &'static ErrorCodeSpec,
+        message: &'static str,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        RegisteredSourceError::new(spec, source)
+            .with_public_message(message)
+            .into()
+    }
+
     pub fn registry_error(spec: &'static ErrorCodeSpec, message: impl Into<String>) -> Self {
         Self::Chio(ChioError::from_spec(spec, message))
     }

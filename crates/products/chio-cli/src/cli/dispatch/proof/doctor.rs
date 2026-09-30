@@ -821,7 +821,7 @@ fn proof_package_catalog_checks(root: &Path) -> Vec<ProofDoctorCheck> {
 
 fn read_proof_package_catalog(path: &Path) -> Result<ProofPackageCatalog, String> {
     let value = read_json(path)?;
-    let catalog: ProofPackageCatalog = serde_json::from_value(value)
+    let catalog: ProofPackageCatalog = crate::input::project(value)
         .map_err(|error| format!("invalid fixture catalog: {error}"))?;
     if catalog.schema != PROOF_FIXTURE_ROOT_CATALOG_SCHEMA {
         return Err(format!(
@@ -914,7 +914,7 @@ fn package_negative_expected_failure(
         return Ok(None);
     }
     let value = read_json(&negative_case_path)?;
-    let negative_case: ProofPackageNegativeCase = serde_json::from_value(value)
+    let negative_case: ProofPackageNegativeCase = crate::input::project(value)
         .map_err(|error| format!("invalid negative fixture metadata: {error}"))?;
     Ok(Some(negative_case.expected_failure_code))
 }
@@ -945,7 +945,14 @@ fn enterprise_export_negative_checks(enterprise_root: &Path) -> Vec<ProofDoctorC
     };
 
     let mut negative_paths = Vec::new();
-    for entry in entries {
+    for (index, entry) in entries.enumerate() {
+        if index >= crate::input::collection::MAX_ENTRIES {
+            return vec![failed(
+                "enterprise_export_negative_fixtures",
+                &negatives_root,
+                "negative fixture entry limit exceeded".to_owned(),
+            )];
+        }
         let entry = match entry {
             Ok(entry) => entry,
             Err(error) => {
@@ -1009,7 +1016,7 @@ fn read_enterprise_export_negative_case(
     path: &Path,
 ) -> Result<EnterpriseExportNegativeCase, String> {
     let value = read_json(path)?;
-    let negative_case: EnterpriseExportNegativeCase = serde_json::from_value(value)
+    let negative_case: EnterpriseExportNegativeCase = crate::input::project(value)
         .map_err(|error| format!("invalid enterprise negative fixture metadata: {error}"))?;
     if negative_case.schema != "chio.enterprise-export.negative-fixture.v1" {
         return Err(format!(
@@ -1136,7 +1143,7 @@ fn negative_verifier_context_for_fixture_dir(
         return Ok(ProofPackageVerifierContext::default());
     }
     let value = read_json(&metadata_path)?;
-    let negative_case: ProofPackageNegativeCase = serde_json::from_value(value)
+    let negative_case: ProofPackageNegativeCase = crate::input::project(value)
         .map_err(|error| format!("invalid negative fixture metadata: {error}"))?;
     Ok(negative_case.verifier_context)
 }
@@ -1253,21 +1260,21 @@ fn check_crypto_context_fixture(id: impl Into<String>, dir: &Path) -> ProofDocto
     let id = id.into();
     let path = dir.join("crypto-context-report.json");
     let context_path = dir.join("verification-context.json");
-    let context_bytes = match fs::read(&context_path) {
+    let context_bytes = match crate::input::read(&context_path) {
         Ok(bytes) => bytes,
         Err(error) => return failed(id, &context_path, format!("missing or unreadable: {error}")),
     };
-    let report_bytes = match fs::read(&path) {
+    let report_bytes = match crate::input::read(&path) {
         Ok(bytes) => bytes,
         Err(error) => return failed(id, &path, format!("missing or unreadable: {error}")),
     };
     let proof_path = dir.join("selective-disclosure-proof.json");
-    let proof_bytes = match fs::read(&proof_path) {
+    let proof_bytes = match crate::input::read(&proof_path) {
         Ok(bytes) => bytes,
         Err(error) => return failed(id, &proof_path, format!("missing or unreadable: {error}")),
     };
     let profile_path = dir.join("verifier-privacy-profile.json");
-    let profile_bytes = match fs::read(&profile_path) {
+    let profile_bytes = match crate::input::read(&profile_path) {
         Ok(bytes) => bytes,
         Err(error) => return failed(id, &profile_path, format!("missing or unreadable: {error}")),
     };
@@ -1287,7 +1294,7 @@ fn check_crypto_context_fixture(id: impl Into<String>, dir: &Path) -> ProofDocto
             );
         }
     };
-    let report: serde_json::Value = match serde_json::from_slice(&verified_report_bytes) {
+    let report: serde_json::Value = match crate::input::json(&verified_report_bytes) {
         Ok(report) => report,
         Err(error) => return failed(id, &path, format!("invalid JSON: {error}")),
     };
@@ -1333,17 +1340,17 @@ fn check_crypto_context_negative_fixture(
 ) -> ProofDoctorCheck {
     let id = id.into();
     let path = dir.join("verification-context.json");
-    let context_bytes = match fs::read(&path) {
+    let context_bytes = match crate::input::read(&path) {
         Ok(bytes) => bytes,
         Err(error) => return failed(id, &path, format!("missing or unreadable: {error}")),
     };
     let proof_path = dir.join("selective-disclosure-proof.json");
-    let proof_bytes = match fs::read(&proof_path) {
+    let proof_bytes = match crate::input::read(&proof_path) {
         Ok(bytes) => bytes,
         Err(error) => return failed(id, &proof_path, format!("missing or unreadable: {error}")),
     };
     let profile_path = dir.join("verifier-privacy-profile.json");
-    let profile_bytes = match fs::read(&profile_path) {
+    let profile_bytes = match crate::input::read(&profile_path) {
         Ok(bytes) => bytes,
         Err(error) => return failed(id, &profile_path, format!("missing or unreadable: {error}")),
     };
@@ -1354,7 +1361,7 @@ fn check_crypto_context_negative_fixture(
         fixture_id,
     ) {
         Ok(report_bytes) => {
-            let report: serde_json::Value = match serde_json::from_slice(&report_bytes) {
+            let report: serde_json::Value = match crate::input::json(&report_bytes) {
                 Ok(report) => report,
                 Err(error) => {
                     return failed(
@@ -1380,8 +1387,9 @@ fn check_crypto_context_negative_fixture(
 fn read_workflow_preflight_plan(
     path: &Path,
 ) -> Result<chio_workflow::WorkflowPreflightPlan, String> {
-    let bytes = fs::read(path).map_err(|error| format!("missing or unreadable: {error}"))?;
-    serde_json::from_slice(&bytes).map_err(|error| format!("invalid JSON: {error}"))
+    let bytes =
+        crate::input::read(path).map_err(|error| format!("missing or unreadable: {error}"))?;
+    crate::input::json(&bytes).map_err(|error| format!("invalid JSON: {error}"))
 }
 
 fn check_valid_passport(path: &Path) -> ProofDoctorCheck {
@@ -1577,13 +1585,13 @@ fn verify_docker_quickstart_evidence(
         .ok_or_else(|| "Proof Room bundle manifest has no parent".to_string())?;
     let evidence_path = resolve_bundle_artifact_path(bundle_dir, DOCKER_QUICKSTART_EVIDENCE_PATH)
         .map_err(|error| error.to_string())?;
-    let evidence_bytes = fs::read(&evidence_path)
+    let evidence_bytes = crate::input::read(&evidence_path)
         .map_err(|error| format!("Docker quickstart evidence missing or unreadable: {error}"))?;
     let actual_sha256 = chio_core::sha256_hex(&evidence_bytes);
     if actual_sha256 != expected_sha256 {
         return Err("Docker quickstart evidence digest mismatch".to_string());
     }
-    let evidence: serde_json::Value = serde_json::from_slice(&evidence_bytes)
+    let evidence: serde_json::Value = crate::input::json(&evidence_bytes)
         .map_err(|error| format!("Docker quickstart evidence invalid JSON: {error}"))?;
     if evidence.get("schema").and_then(serde_json::Value::as_str)
         != Some(DOCKER_QUICKSTART_EVIDENCE_SCHEMA)
@@ -1650,8 +1658,9 @@ fn require_docker_quickstart_evidence_field(
 }
 
 fn read_json(path: &Path) -> Result<serde_json::Value, String> {
-    let bytes = fs::read(path).map_err(|error| format!("missing or unreadable: {error}"))?;
-    serde_json::from_slice(&bytes).map_err(|error| format!("invalid JSON: {error}"))
+    let bytes =
+        crate::input::read(path).map_err(|error| format!("missing or unreadable: {error}"))?;
+    crate::input::json(&bytes).map_err(|error| format!("invalid JSON: {error}"))
 }
 
 fn passed(id: impl Into<String>, path: &Path, message: &str) -> ProofDoctorCheck {
