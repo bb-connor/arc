@@ -20,7 +20,11 @@ pub(super) fn require_original(
             "native output requires original kernel-owned capture",
         ));
     }
-    super::super::dispatch_ledger::verify_capture_attachment(connection, operation)?;
+    super::super::dispatch_ledger::verify_capture_attachment_initialized(
+        connection,
+        operation,
+        Some(initialized),
+    )?;
     let original =
         super::super::super::retained_request::load_retained_request_tx(connection, operation)?
             .ok_or_else(|| invalid("native output lacks its original retained request"))?;

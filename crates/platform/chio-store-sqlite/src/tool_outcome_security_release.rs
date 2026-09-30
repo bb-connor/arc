@@ -146,20 +146,14 @@ pub(super) fn verify_projection(
     operation: &AdmissionOperationV1,
     outcome: &ToolOutcomeRecordV1,
     evaluation: Option<&PostReturnEvaluationRecordV1>,
+    raw: Option<&RawInvocationOutcomeV1>,
 ) -> Result<Option<String>, ToolOutcomeStoreError> {
+    // This payload was decoded and bound by the enclosing projection verifier.
     let record = load(connection, operation.binding().operation_id().as_str())?;
-    let raw = match load_blob_state_connection(connection, outcome.raw_output_digest())? {
-        Some(StoredInvocationBlob::Present(blob)) => Some(
-            RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())
-                .map_err(|error| invariant(error.to_string()))?,
-        ),
-        Some(StoredInvocationBlob::Compacted) => None,
-        None => return Err(invariant("security release lost its raw-outcome identity")),
-    };
     if let Some(record) = record {
         let evaluation =
             evaluation.ok_or_else(|| invariant("release checkpoint has no terminal evaluation"))?;
-        match raw.as_ref() {
+        match raw {
             Some(raw) => record.validate_against(operation, raw, outcome, evaluation),
             None => record.validate_retained_against(operation, outcome, evaluation),
         }
@@ -169,9 +163,7 @@ pub(super) fn verify_projection(
     // Historical records retain their bytes; runtime recovery rejects an
     // unknown legacy requirement instead of inventing a successful release.
     if operation.state().is_terminal()
-        && raw
-            .as_ref()
-            .is_some_and(|raw| raw.requires_security_release() == Ok(true))
+        && raw.is_some_and(|raw| raw.requires_security_release() == Ok(true))
     {
         return Err(invariant(
             "terminal operation is missing its required security release",

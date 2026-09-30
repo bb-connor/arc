@@ -1123,3 +1123,80 @@ fn missing_write_parent_and_runtime_aliases_fail_closed() {
         Err(CageError::RuntimeDescriptorAlias { .. })
     ));
 }
+
+#[test]
+fn explicit_read_write_file_shares_one_retained_descriptor_and_requires_both_ceilings() {
+    let tree = TestTree::new();
+    let key = Keypair::from_seed(&[94; 32]);
+    let signed = signed_manifest(
+        &key,
+        vec![tree.writable.clone()],
+        vec![tree.writable.clone()],
+        NativeSyscallProfile::NativeMinimalV1,
+        vec![],
+    );
+    let combined = OperatorCeilings::new(
+        [tree.writable.clone()].into_iter().collect(),
+        [tree.writable.clone()].into_iter().collect(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        [NativeSyscallProfile::NativeMinimalV1]
+            .into_iter()
+            .collect(),
+    )
+    .with_forbidden_paths([tree.forbidden.clone()].into_iter().collect());
+    let compiled = compile(
+        admit(&signed, &key.public_key(), &combined).test_unwrap(),
+        retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
+        &BTreeMap::new(),
+        None,
+    )
+    .test_unwrap();
+    let entries = compiled
+        .plan()
+        .fd_table
+        .iter()
+        .filter(|entry| entry.path.as_deref() == tree.writable.to_str())
+        .collect::<Vec<_>>();
+    assert_eq!(entries.len(), 1);
+    let grants = compiled
+        .plan()
+        .landlock
+        .grants
+        .iter()
+        .filter(|grant| grant.fd_slot == entries[0].slot)
+        .map(|grant| grant.access)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        grants,
+        vec![
+            FilesystemGrantAccess::Read,
+            FilesystemGrantAccess::WriteExactFile
+        ]
+    );
+    assert_eq!(compiled.admitted().write_resources().len(), 1);
+    assert!(compiled.admitted().read_resources().is_empty());
+    let missing_read = ceilings(
+        &tree,
+        NativeSyscallProfile::NativeMinimalV1,
+        BTreeSet::new(),
+    );
+    assert!(matches!(
+        admit(&signed, &key.public_key(), &missing_read),
+        Err(CageError::OperatorCeilingExceeded)
+    ));
+    let missing_write = OperatorCeilings::new(
+        [tree.writable.clone()].into_iter().collect(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        [NativeSyscallProfile::NativeMinimalV1]
+            .into_iter()
+            .collect(),
+    )
+    .with_forbidden_paths([tree.forbidden.clone()].into_iter().collect());
+    assert!(matches!(
+        admit(&signed, &key.public_key(), &missing_write),
+        Err(CageError::OperatorCeilingExceeded)
+    ));
+}

@@ -1,0 +1,70 @@
+{
+  "inventory": {
+    "receipts_verified": 9,
+    "publications": 1,
+    "worker_attempts": [
+      {
+        "attempts": 2,
+        "cpu_ms": 2627,
+        "outcome": "exit_0",
+        "peak_resident_bytes": 88657920,
+        "process": "changes",
+        "state": "completed",
+        "suspensions": 0
+      },
+      {
+        "attempts": 2,
+        "cpu_ms": 2629,
+        "outcome": "exit_0",
+        "peak_resident_bytes": 88805376,
+        "process": "publisher",
+        "state": "completed",
+        "suspensions": 0
+      },
+      {
+        "attempts": 1,
+        "cpu_ms": 1823,
+        "outcome": "exit_0",
+        "peak_resident_bytes": 88473600,
+        "process": "tests",
+        "state": "completed",
+        "suspensions": 0
+      }
+    ],
+    "application_seconds": 9.769461347999822
+  },
+  "scripted-model": {
+    "receipts_verified": 13,
+    "publications": 1,
+    "worker_attempts": [
+      {
+        "attempts": 2,
+        "cpu_ms": 2883,
+        "outcome": "exit_0",
+        "peak_resident_bytes": 88752128,
+        "process": "changes",
+        "state": "completed",
+        "suspensions": 0
+      },
+      {
+        "attempts": 2,
+        "cpu_ms": 2297,
+        "outcome": "exit_0",
+        "peak_resident_bytes": 88780800,
+        "process": "publisher",
+        "state": "completed",
+        "suspensions": 0
+      },
+      {
+        "attempts": 1,
+        "cpu_ms": 1634,
+        "outcome": "exit_0",
+        "peak_resident_bytes": 88649728,
+        "process": "tests",
+        "state": "completed",
+        "suspensions": 0
+      }
+    ],
+    "application_seconds": 10.251742620000186
+  }
+}

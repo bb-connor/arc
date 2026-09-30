@@ -160,6 +160,7 @@ def export_result(client):
         "model_cost": snapshot["cost"],
         "messages": snapshot["messages"],
         "command_receipts": snapshot["receipts"],
+        "command_outputs": snapshot["command_outputs"],
         "model_receipts": snapshot.get("model_receipts", []),
     }
 

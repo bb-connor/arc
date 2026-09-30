@@ -102,6 +102,11 @@ pub(super) fn build_seccomp_plan(
             // This reads bounded metadata without opening resources. Keep it
             // specific to the operator-selected standard interpreter profile.
             allowed.insert(Syscall::Uname);
+            // SQLite persists its preopened database and rollback journal.
+            // These operations do not create paths or acquire descriptors.
+            // SQLite checks whether its already selected execution UID is root
+            // before considering journal ownership. This cannot change identity.
+            allowed.extend([Syscall::Pwrite64, Syscall::Fdatasync, Syscall::Geteuid]);
         }
         NativeSyscallProfile::BrokeredNativeV1 => {
             allowed.extend(STANDARD.iter().copied());
@@ -198,6 +203,21 @@ pub(super) fn build_seccomp_plan(
                 comparison: SeccompArgumentComparison::Equal,
                 value: 1, // Linux F_GETFD.
             }]);
+    }
+    if profile == NativeSyscallProfile::NativeStandardV1 {
+        // POSIX advisory locks on existing descriptors. Exclude descriptor
+        // duplication, flag changes and blocking F_SETLKW acquisition.
+        for command in [5, 6] {
+            // Linux F_GETLK and F_SETLK on both architectures.
+            argument_constraints
+                .entry(Syscall::Fcntl)
+                .or_default()
+                .push(vec![SyscallArgumentConstraint {
+                    argument_index: 1,
+                    comparison: SeccompArgumentComparison::Equal,
+                    value: command,
+                }]);
+        }
     }
     Ok(SeccompProfilePlan::new(
         architecture,

@@ -13,6 +13,7 @@ mod record;
 mod storage;
 mod write;
 pub(in crate::admission_operation_store) use capture::verify_capture_attachment;
+pub(super) use capture::verify_capture_attachment_initialized;
 pub(crate) use capture::{NativeCaptureBinding, VerifiedNativeCapture};
 use record::Record;
 pub(in crate::admission_operation_store) use storage::verify_all;

@@ -54,6 +54,40 @@ output directory may be removed after deploying the signed artifacts; it is not
 a retained runtime dependency. Read grants must fit the 64-resource policy bound;
 a recursive `/usr` grant is not a qualified interpreter dependency closure.
 
+## Bounded Python applications and SQLite
+
+`scripts/prepare-native-python-runtime.py` captures the selected standard-library
+archive, isolated import path, extensions and ELF libraries. Set
+`CHIO_CAGE_RUNTIME_FILES_FILE` to its runtime-file manifest,
+`CHIO_CAGE_READ_PATHS_FILE` to its exact read inventory and
+`CHIO_CAGE_SYSCALL_PROFILE=native-standard-v1`. Do not replace that inventory
+with a recursive system or checkout grant.
+
+`chio_process.python_application` captures explicitly named application modules
+in a deterministic archive. Provision the returned isolated Python command and
+content-bound runtime file. Capture rejects writable, aliased and replaced
+inputs. SQLite consumers initialize their database and PERSIST journal outside
+the cage, then request read and write access to those two exact files. Serving
+opens an existing database; no containing-directory write is granted. The
+standard profile allows the audited positioned-write, synchronization, effective
+UID and SQLite lock operations; it continues to deny network creation and
+unbounded descriptor manipulation.
+
+## Prepared provider and repository consumers
+
+The `prepared-native-broker` CI action builds `chio-docker-adapter`,
+`chio-repository-adapter`, the static `chio-broker-mcp` proxy and the native
+qualification service helper. The mini-SWE campaigns require their absolute
+paths in `CHIO_DOCKER_ADAPTER`, `CHIO_REPOSITORY_ADAPTER`,
+`CHIO_BROKER_MCP_TOOL` and `CHIO_BROKER_TEST_BINARY`, respectively.
+The last binary provisions disposable qualification identities; production
+operators supply their own retained authority and independently pinned policies.
+
+Only prepared proxy streams enter cages. Host-owned TLS transports retain
+provider secrets and Docker authority. Repository exports retain original
+command envelopes and bind them to signed requests and receipt content hashes.
+See the [session contract](../../sdks/python/chio-mini-swe/SESSION.md).
+
 ## Native qualification fixtures
 
 Build the helper for the static musl target and install an executable copy with

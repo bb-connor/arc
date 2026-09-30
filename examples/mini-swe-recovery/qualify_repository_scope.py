@@ -34,15 +34,15 @@ def main():
     print("Private scoped repository state: " + str(root), file=sys.stderr, flush=True)
     os.environ["MSWEA_GLOBAL_CONFIG_DIR"] = str(root / "mini-config")
     os.environ["MSWEA_SILENT_STARTUP"] = "1"
-    from chio_process import ProcessClient
-    from chio_process.launch import provision_native_demo
+    from broker_campaign import BrokerCampaign
+    from chio_process.broker import BrokerProcessClient, decode_broker_output
     from qualify import command, serving
 
     from chio_mini_swe.repository import export
     from chio_mini_swe.repository_archive import entries, git, import_revision
     from chio_mini_swe.repository_proof import verified_receipts, verify
     from chio_mini_swe.repository_review import verify_export
-    from chio_mini_swe.repository_store import Workspace, initialize
+    from chio_mini_swe.repository_store import Workspace, configuration_digest, initialize
     from chio_mini_swe.repository_transport import docker
 
     binary = args.chio.resolve(strict=True)
@@ -70,48 +70,21 @@ def main():
     )
     assert config["schema"] == "chio.repository.workspace.v3"
     initialization_seconds = time.monotonic() - started
-    entrypoint = Path(sys.executable).parent / "chio-mini-swe-repository"
-    # Explicit fixture authority, with no model gateway or provider credential.
-    server = provision_native_demo(
-        binary,
-        "sandbox",
-        [str(entrypoint), "serve", "--state", str(root / "repository")],
-        root / "launch",
-        root,
+    services = BrokerCampaign(
+        binary, root, None, "repository-scope", workspace=root / "repository", repository_only=True
     )
-    server["request_timeout_seconds"] = 150
-    (root / "policy.yaml").write_text("""kernel:
-  max_capability_ttl: 3600
-  delegation_depth_limit: 1
-  durable_admission_mode: all
-capabilities:
-  default:
-    tools:
-      - server: sandbox
-        tool: execute
-        operations: [invoke, delegate]
-        ttl: 3600
-""")
-    write(
-        root / "config.json",
-        {
-            "schema": "chio.process.host.v1",
-            "policy": str(root / "policy.yaml"),
-            "servers": [server],
-            "limits": {"max_calls": 8, "max_processes": 2, "max_depth": 1},
-            "children": [
-                {
-                    "id": "coder",
-                    "parent": "root",
-                    "budget_share_bps": 10000,
-                    "tools": [{"server_id": "sandbox", "tool_name": "execute"}],
-                }
-            ],
-        },
-    )
+    binding = configuration_digest(json.loads((root / "repository/workspace.json").read_text()))
     initialized = json.loads(
         command(
-            binary, "process", "init", "--config", root / "config.json", "--state", root / "host"
+            binary,
+            "process",
+            "init",
+            "--config",
+            root / "config.json",
+            "--state",
+            root / "host",
+            "--aggregate-invocations",
+            "24",
         )
     )
     (root / "kernel.pub").write_text(initialized["kernel_key"])
@@ -129,13 +102,15 @@ capabilities:
         root / "connection.json",
     )
     connection = json.loads((root / "connection.json").read_text())
-    client = ProcessClient(connection["socket_path"], connection["credential"], timeout=180)
+    client = BrokerProcessClient(connection["socket_path"], connection["credential"], timeout=180)
+    services.start(binary)
     commands = [
         "test ! -e crates && test ! -e sdks/python/chio-mini-swe && git status --porcelain",
         "cd sdks/python/chio-process && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src "
         "python -m unittest discover -s tests -v",
     ]
     receipts, outputs, elapsed = [], [], []
+    envelopes = {}
     with serving(binary, root):
         for index, text in enumerate(commands):
             started = time.monotonic()
@@ -143,15 +118,15 @@ capabilities:
                 f"sdk-command-{index}",
                 "sandbox",
                 "execute",
-                {"command": text},
+                {"command": text, "configuration_sha256": binding},
                 known_outcome_only=True,
             )
             elapsed.append(time.monotonic() - started)
             assert result["verdict"] == "allow"
             assert result["terminal_state"]["state"] == "completed"
             envelope = result["output"]["value"]
-            assert envelope.get("isError", False) is False
-            output = envelope["structuredContent"]
+            envelopes[json.loads(result["receipt_json"])["id"]] = envelope
+            output = decode_broker_output(envelope)
             assert output["returncode"] == 0 and output["exception_info"] == ""
             receipts.append(result["receipt_json"])
             outputs.append(output)
@@ -162,11 +137,16 @@ capabilities:
     (root / "worker.sock").unlink(missing_ok=True)
     with serving(binary, root):
         replayed = client.invoke(
-            "sdk-command-0", "sandbox", "execute", {"command": commands[0]}, known_outcome_only=True
+            "sdk-command-0",
+            "sandbox",
+            "execute",
+            {"command": commands[0], "configuration_sha256": binding},
+            known_outcome_only=True,
         )
         assert replayed["receipt_json"] == receipts[0]
         assert client.inspect()["tree_calls"] == 2
     (root / "receipts.ndjson").write_text("\n".join(receipts) + "\n")
+    write(root / "command-outputs.json", envelopes)
     with Workspace(root / "repository") as workspace:
         before_violation = workspace.status()
         assert before_violation["revision"] == 2 and not before_violation["interrupted"]
@@ -176,6 +156,7 @@ capabilities:
             receipts_path=root / "receipts.ndjson",
             key_path=root / "kernel.pub",
             server_id="sandbox",
+            command_outputs_path=root / "command-outputs.json",
         )
         export(workspace, bundle)
     (bundle / "receipts.ndjson").write_bytes(raw)
@@ -205,10 +186,12 @@ capabilities:
             "scope-violation",
             "sandbox",
             "execute",
-            {"command": "printf outside > scope-violation.txt"},
+            {"command": "printf outside > scope-violation.txt", "configuration_sha256": binding},
         )
-        assert refused["output"]["value"]["isError"] is True
+        assert refused.get("terminal_state", {}).get("state") != "completed"
+        assert refused["output"] is None
         assert client.inspect()["tree_calls"] == 3
+    services.close()
     refusal = (refused["receipt_json"] + "\n").encode()
     _, refusal_verification = verified_receipts(binary, refusal, key)
     (args.output / "scope-refusal-receipt.ndjson").write_bytes(refusal)
@@ -255,7 +238,7 @@ capabilities:
         },
         "limits": [
             "Real committed SDK test suite; no model or coding-quality qualification",
-            "Explicit fixture launch authority; no production-containment claim",
+            "Fixture authority with production native broker and repository adapter",
             "Successful two-command prefix exported before deliberate third-command refusal",
         ],
     }

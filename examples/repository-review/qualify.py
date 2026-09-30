@@ -266,7 +266,8 @@ def exercise(binary, output, temporary):
     command(
         sys.executable, HERE / "review.py", "run", "--run-dir", limited, success=False
     )
-    assert not (limited / "tool-data" / "publications.db").exists()
+    with sqlite3.connect(limited / "tool-data" / "publications.db") as db:
+        assert db.execute("SELECT count(*) FROM reports").fetchone()[0] == 0
     assert "limit_reached" in (limited / "publisher/worker.log").read_text()
     summary = {
         "profiles": reports,

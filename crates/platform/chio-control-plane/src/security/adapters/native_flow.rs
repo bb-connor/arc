@@ -2,16 +2,15 @@
 //! No legacy flow, declassification or receipt store is installed by this resolver.
 
 use super::{
-    active_defense_receipt_request, canonical_body, declassification_consumption_body,
-    declassification_grant_hash, digest, flow_dispatch, flow_policy, prepare_pre_invocation,
-    ActiveDefensePolicyBinding, AdmittedToolSecurity, Arc, BTreeMap, BridgeSecurityMetadata,
-    ClassificationPort, ClassificationRequest, ClassificationResult, Clock,
-    DeclassificationConsume, DeclassificationConsumeRequest,
-    DeclassificationConsumptionEvidenceCommit, DeclassificationOutcomeRequest,
-    DeclassificationTransitionBinding, DeclassificationUseStore, DestinationId, Digest32,
-    FlowAdmission, FlowDenial, FlowJoinRequest, FlowPreInvocationInput, FlowResolverConfig,
-    FlowStateSnapshot, InformationFlowLattice, InformationLabel, PortError, PortResult, RecordId,
-    RequestId, VerifiedManifestRegistry,
+    active_defense_receipt_request, declassification_consumption_body, declassification_grant_hash,
+    digest, flow_dispatch, flow_policy, prepare_pre_invocation, ActiveDefensePolicyBinding,
+    AdmittedToolSecurity, Arc, BTreeMap, BridgeSecurityMetadata, ClassificationPort,
+    ClassificationRequest, ClassificationResult, Clock, DeclassificationConsume,
+    DeclassificationConsumeRequest, DeclassificationConsumptionEvidenceCommit,
+    DeclassificationOutcomeRequest, DeclassificationTransitionBinding, DeclassificationUseStore,
+    DestinationId, Digest32, FlowAdmission, FlowDenial, FlowJoinRequest, FlowPreInvocationInput,
+    FlowResolverConfig, FlowStateSnapshot, InformationFlowLattice, InformationLabel, PortError,
+    PortResult, RecordId, RequestId, VerifiedManifestRegistry,
 };
 use chio_kernel::admission_operation::{
     AdmissionOperationId, NativeSecurityAuthorityBindingV1, NativeSecurityEgressHistoryV1,

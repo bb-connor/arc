@@ -11,7 +11,6 @@ import uuid
 from chio_mini_swe.operator import private_directory, write
 from chio_mini_swe.provider_config import read_json
 from chio_mini_swe.repository_archive import (
-    MAX_ARCHIVE,
     canonical,
     contents,
     digest,
@@ -29,8 +28,6 @@ from chio_mini_swe.repository_snapshots import (
 )
 from chio_mini_swe.repository_transport import check_deadline, operation_budget
 from chio_mini_swe.repository_wire import validate_result
-
-SCHEMA = "chio.repository.workspace.v1"
 
 
 def configuration_digest(config):
@@ -119,7 +116,7 @@ class Workspace:
                 }
                 | ({"source_paths"} if scoped else set())
             )
-            or self.config["schema"] not in (SCHEMA, STORAGE_SCHEMA, SCOPED_SCHEMA)
+            or self.config["schema"] not in (STORAGE_SCHEMA, SCOPED_SCHEMA)
         ):
             raise ValueError("Unsupported repository workspace")
         if scoped and self.config["source_paths"] != normalize_source_paths(
@@ -160,11 +157,7 @@ class Workspace:
             if self.db.execute("PRAGMA user_version").fetchone()[0] != 1:
                 raise ValueError("Unsupported repository journal version")
             self.db.execute("PRAGMA synchronous=FULL")
-            self.snapshot_store = (
-                SnapshotStore(self.state / "snapshots", atomic_bytes)
-                if self.config["schema"] in (STORAGE_SCHEMA, SCOPED_SCHEMA)
-                else None
-            )
+            self.snapshot_store = SnapshotStore(self.state / "snapshots", atomic_bytes)
         except BaseException:
             self.close()
             raise
@@ -181,28 +174,9 @@ class Workspace:
         self.close()
 
     def snapshot(self, sha256):
-        if self.snapshot_store is not None:
-            data = self.snapshot_store.load(sha256)
-            if self.config["schema"] == SCOPED_SCHEMA:
-                require_scope(data, self.config["source_paths"], allow_git=True)
-            return data
-        if not isinstance(sha256, str) or re.fullmatch(r"[0-9a-f]{64}", sha256) is None:
-            raise ValueError("Invalid repository snapshot digest")
-        path = self.state / "snapshots" / sha256
-        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-        with os.fdopen(descriptor, "rb") as stream:
-            metadata = os.fstat(stream.fileno())
-            if (
-                not stat.S_ISREG(metadata.st_mode)
-                or metadata.st_uid != os.getuid()
-                or metadata.st_nlink != 1
-                or metadata.st_mode & 0o077
-                or metadata.st_size > MAX_ARCHIVE
-            ):
-                raise ValueError("Repository snapshot must be a bounded private regular file")
-            data = stream.read(MAX_ARCHIVE + 1)
-        if len(data) > MAX_ARCHIVE or digest(data) != sha256:
-            raise ValueError("Repository snapshot is missing or corrupt")
+        data = self.snapshot_store.load(sha256)
+        if self.config["schema"] == SCOPED_SCHEMA:
+            require_scope(data, self.config["source_paths"], allow_git=True)
         return data
 
     def containers(self, row):
@@ -259,13 +233,7 @@ class Workspace:
         status = self.status()
         if status["interrupted"] or len(status["commands"]) >= MAX_COMMANDS:
             raise ValueError("Repository execution stopped; inspect its retained state")
-        if self.snapshot_store is None:
-            storage = sum(path.stat().st_size for path in (self.state / "snapshots").iterdir())
-            reservation = MAX_ARCHIVE
-        else:
-            storage = self.snapshot_store.usage()
-            reservation = MAX_RESERVATION
-        if storage + reservation > MAX_STORAGE:
+        if self.snapshot_store.usage() + MAX_RESERVATION > MAX_STORAGE:
             raise ValueError("Repository snapshot storage budget is exhausted")
         snapshot = self.snapshot(status["snapshot"])
         with self.db:
@@ -309,10 +277,7 @@ class Workspace:
         }
         validate_result(result)
         check_deadline()
-        if self.snapshot_store is None:
-            atomic_bytes(self.state / "snapshots" / sha256, data)
-        else:
-            self.snapshot_store.put(data, MAX_STORAGE)
+        self.snapshot_store.put(data, MAX_STORAGE)
         containers.cleanup()
         check_deadline()
         with self.db:

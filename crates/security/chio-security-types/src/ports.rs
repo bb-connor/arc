@@ -44,8 +44,9 @@ use canonical::{issuance_freeze_domain_hash, sort_json_object_keys};
 
 mod classification;
 pub use classification::{
-    ByteRange, ClassificationFinding, ClassificationFindings, ClassificationRequest,
-    ClassificationResult, TripwireDecision, TripwireInput, TripwireKind,
+    ByteRange, ClassificationFinding, ClassificationFindings, ClassificationPayload,
+    ClassificationRequest, ClassificationResult, TripwireDecision, TripwireInput, TripwireKind,
+    MAX_CLASSIFICATION_PAYLOAD_BYTES,
 };
 #[cfg(feature = "std")]
 pub use classification::{ClassificationPort, TripwireDetectorPort};

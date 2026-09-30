@@ -13,8 +13,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-from chio_process.launch import demo_python, provision_native_demo
-
 HERE = Path(__file__).resolve().parent
 
 
@@ -64,6 +62,7 @@ def serving(binary, directory):
 
 
 def exercise(binary, directory, image, worker_image=None):
+    from broker_campaign import BrokerCampaign
     from minisweagent.agents.default import DefaultAgent
 
     upstream_sha256 = hashlib.sha256(Path(inspect.getfile(DefaultAgent)).read_bytes()).hexdigest()
@@ -124,43 +123,9 @@ def exercise(binary, directory, image, worker_image=None):
         )
         assert initial.returncode == 1 and "FAILED (failures=2)" in initial.stderr
         (directory / "tests-before.txt").write_text(initial.stderr)
-        policy = directory / "policy.yaml"
-        policy.write_text("""kernel:
-  max_capability_ttl: 3600
-  delegation_depth_limit: 8
-  durable_admission_mode: all
-capabilities:
-  default:
-    tools:
-      - server: sandbox
-        tool: execute
-        operations: [invoke, delegate]
-        ttl: 3600
-""")
-        server = provision_native_demo(
-            binary,
-            "sandbox",
-            [demo_python(), str(HERE / "sandbox.py"), "--container", container],
-            directory / "launch",
-            directory,
-            read_paths=[HERE / "sandbox.py"],
+        services = BrokerCampaign(
+            binary, directory, container, "saved-commands", repository_only=True
         )
-        config = {
-            "schema": "chio.process.host.v1",
-            "policy": str(policy),
-            "servers": [server],
-            "mailboxes": [{"id": "authorization_probe"}],
-            "limits": {"max_calls": 8, "max_processes": 2, "max_depth": 1},
-            "children": [
-                {
-                    "id": "coder",
-                    "parent": "root",
-                    "budget_share_bps": 9000,
-                    "tools": [{"server_id": "sandbox", "tool_name": "execute"}],
-                }
-            ],
-        }
-        (directory / "config.json").write_text(json.dumps(config))
         initialized = json.loads(
             command(
                 binary,
@@ -170,6 +135,8 @@ capabilities:
                 directory / "config.json",
                 "--state",
                 directory / "host",
+                "--aggregate-invocations",
+                "24",
             )
         )
         command(
@@ -185,14 +152,26 @@ capabilities:
             "--out",
             directory / "connection.json",
         )
+        services.start(binary)
         attempts = None
         if worker_image:
+            from check_authorization import prepare, verify
             from container_attempts import ContainerAttempts
 
+            probe_directory = directory / "authorization-probe"
+            probe_identity = prepare(binary, probe_directory)
+            probe = ContainerAttempts(worker_image, probe_directory)
+            with serving(binary, probe_directory):
+                probe.probe()
+            probe.evidence["denial_verification"] = verify(
+                binary,
+                probe_directory,
+                probe_identity,
+                probe.evidence["probe"]["ungranted_invoke_receipt"],
+            )
             attempts = ContainerAttempts(worker_image, directory)
+            attempts.evidence = probe.evidence
         with serving(binary, directory) as host:
-            if attempts:
-                attempts.probe()
             crashed = (
                 attempts.run(crash=True)
                 if attempts
@@ -275,6 +254,8 @@ capabilities:
             "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
         }
     finally:
+        if "services" in locals():
+            services.close()
         command("docker", "rm", "-f", container)
 
 
@@ -309,6 +290,13 @@ def main():
             "provider-calls.jsonl",
         ]:
             (args.output / name).write_bytes((directory / name).read_bytes())
+        if worker_image:
+            probe_output = args.output / "authorization-probe"
+            probe_output.mkdir()
+            for name in ("denial.ndjson", "kernel.pub"):
+                (probe_output / name).write_bytes(
+                    (directory / "authorization-probe" / name).read_bytes()
+                )
         print(json.dumps(result))
     finally:
         print(f"Private qualification state: {directory}", file=sys.stderr)

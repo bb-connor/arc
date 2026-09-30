@@ -164,14 +164,20 @@ def main():
     setup.add_argument("--source-path", action="append", help="Literal committed path to include")
     for command in [
         setup,
-        *(commands.add_parser(name) for name in ("serve", "status", "recover", "export", "verify")),
+        *(
+            commands.add_parser(name)
+            for name in ("serve", "adapter", "status", "recover", "export", "verify")
+        ),
     ]:
         command.add_argument("--state", required=True)
+        if command.prog.endswith(" adapter"):
+            command.add_argument("--configuration-sha256", required=True)
         if command.prog.endswith((" export", " verify")):
             command.add_argument("--out", required=True)
         if command.prog.endswith(" verify"):
             command.add_argument("--chio", required=True)
             command.add_argument("--receipts", required=True)
+            command.add_argument("--command-outputs", required=True)
             command.add_argument("--kernel-key", required=True)
             command.add_argument("--server-id", required=True)
     review = commands.add_parser("verify-export")
@@ -213,6 +219,11 @@ def main():
             args.timeout_seconds,
             source_paths=args.source_path,
         )
+    elif args.command == "adapter":
+        from chio_mini_swe.repository_adapter import serve as serve_adapter
+
+        serve_adapter(lambda: Workspace(args.state), args.configuration_sha256)
+        return 0
     else:
         with Workspace(args.state) as workspace:
             if args.command == "serve":
@@ -227,6 +238,7 @@ def main():
                     receipts_path=args.receipts,
                     key_path=args.kernel_key,
                     server_id=args.server_id,
+                    command_outputs_path=args.command_outputs,
                 )
                 value = export(workspace, args.out)
                 atomic_bytes(private_directory(args.out) / "receipts.ndjson", receipts)

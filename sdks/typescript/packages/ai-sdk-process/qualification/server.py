@@ -5,24 +5,42 @@ import json
 import os
 import sqlite3
 import sys
+from contextlib import closing
 from pathlib import Path
+
+
+def connect(database):
+    db = sqlite3.connect(Path(database).resolve().as_uri() + "?mode=rw", uri=True)
+    if db.execute("PRAGMA journal_mode=PERSIST").fetchone()[0] != "persist":
+        db.close()
+        raise ValueError("Publication store requires a persistent rollback journal")
+    db.execute("PRAGMA synchronous=FULL")
+    db.execute("PRAGMA temp_store=MEMORY")
+    return db
+
+
+def prepare_store(database):
+    database = Path(database)
+    with database.open("xb"):
+        pass
+    with closing(connect(database)) as db, db:
+        db.execute("CREATE TABLE reports(id INTEGER PRIMARY KEY, report TEXT NOT NULL)")
+        db.execute("CREATE TABLE reads(id INTEGER PRIMARY KEY, file_index INTEGER)")
+    fixture = database.parent / "fixtures"
+    fixture.mkdir(mode=0o700)
+    for index in range(1, 33):
+        (fixture / f"file-{index:02}.txt").write_text("a" * 8192)
 
 
 def publish(database, report):
     if not isinstance(report, str) or not 1 <= len(report.encode()) <= 1024:
         raise ValueError("report must contain 1-1024 UTF-8 bytes")
-    with sqlite3.connect(database) as db:
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA synchronous=FULL")
-        db.execute(
-            "CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, report TEXT NOT NULL)"
-        )
+    with closing(connect(database)) as db, db:
         cursor = db.execute("INSERT INTO reports(report) VALUES(?)", (report,))
         return {"report_id": cursor.lastrowid}
 
 
 def main():
-    os.umask(0o077)
     parser = argparse.ArgumentParser()
     parser.add_argument("--database", required=True)
     parser.add_argument("--publish")
@@ -32,11 +50,7 @@ def main():
         print(json.dumps(publish(args.database, args.publish)))
         return
     fixture = Path(args.database).parent / "fixtures"
-    fixture.mkdir(exist_ok=True)
     files = [fixture / f"file-{index:02}.txt" for index in range(1, 33)]
-    for file in files:
-        if not file.exists():
-            file.write_text("a" * 8192)
     tools = [
         {
             "name": "publish",
@@ -102,16 +116,11 @@ def main():
                     content = files[index - 1].read_text()
                     if len(content.encode()) != 8192:
                         raise ValueError("fixture content changed")
-                    with sqlite3.connect(args.database) as db:
-                        db.execute("PRAGMA synchronous=FULL")
-                        db.execute(
-                            "CREATE TABLE IF NOT EXISTS reads("
-                            "id INTEGER PRIMARY KEY, file_index INTEGER)"
-                        )
+                    with closing(connect(args.database)) as db, db:
                         db.execute("INSERT INTO reads(file_index) VALUES(?)", (index,))
                     value = {"index": index}
                 elif params["name"] == "count":
-                    with sqlite3.connect(args.database) as db:
+                    with closing(connect(args.database)) as db:
                         value = {"count": db.execute("SELECT count(*) FROM reports").fetchone()[0]}
                 else:
                     raise ValueError("unknown tool")

@@ -257,9 +257,8 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
     use chio_security_types::ports::{
-        BoundedVec, ByteRange, CanonicalBody, ClassificationFinding, ClassificationRequest,
-        ClassificationResult, ClassifierId, ClassifierVersion, Digest32, RecordId, RequestId,
-        TenantId,
+        BoundedVec, ByteRange, ClassificationFinding, ClassificationRequest, ClassificationResult,
+        ClassifierId, ClassifierVersion, Digest32, RecordId, RequestId, TenantId,
     };
     use chio_security_types::{Compartment, InformationLabel, PrincipalId};
     use sha2::{Digest as _, Sha256};
@@ -312,7 +311,7 @@ mod tests {
             tenant_id: TenantId::new("tenant-a").unwrap_or_else(|error| panic!("tenant: {error}")),
             request_id: RequestId::new("classification-a")
                 .unwrap_or_else(|error| panic!("request id: {error}")),
-            payload: CanonicalBody::new(payload.to_vec())
+            payload: chio_security_types::ports::ClassificationPayload::new(payload.to_vec())
                 .unwrap_or_else(|error| panic!("payload: {error}")),
             payload_digest: Digest32::new(digest),
         }

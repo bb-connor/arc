@@ -1,0 +1,66 @@
+{
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-4": {
+    "sha256": "622b555b8f0bb25ca6bda7fefc92ec3a444a9d3f4af8573bac0c6f0462c10cd8",
+    "bytes": 186761424
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-6": {
+    "sha256": "cef8bbefb61f4d1e05dcd47685c6511e72fdad337154251edcd4bd05980d6e0a",
+    "bytes": 186927152
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-3": {
+    "sha256": "b57217c45d579406f4a9f2c597b13c7d0df0450c02f265a7bf2aedd957ac5406",
+    "bytes": 186904240
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-7": {
+    "sha256": "ccd15694e2f0ba3b99d773d83aead60d85ad28457955d1cc600e0d7f299f8619",
+    "bytes": 186971856
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-9": {
+    "sha256": "3ce221e6180263fd4eadad597da1ac19781260fbabc2bfa6d5536269d7c59d14",
+    "bytes": 187028944
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-5": {
+    "sha256": "f18287e65a31c107d97eb8df3a56701c1d381745f5540549e49014d502b3439c",
+    "bytes": 186761616
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-2": {
+    "sha256": "8e9503d6dcefd63a42620ac4552205ac634a9549d777f16e9dfc9102e7311190",
+    "bytes": 186903056
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-8": {
+    "sha256": "e45faa62ff0ae48648bfc8cd1b2e7df33516348e371e1571935a63ba6c415bed",
+    "bytes": 186984400
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-followup-1": {
+    "sha256": "1326f6cbd07c6494e7f3fe52aa3beff593e8242c0cd6aac22ad68d5df7fd8189",
+    "bytes": 234683264
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-cage-init-final": {
+    "sha256": "115e095069f00f180bd68263e7c1d86cc3786b91b747eaea1034b5e501140a7a",
+    "bytes": 3271656
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/chio-broker-mcp-final": {
+    "sha256": "67a78b0bc3abb73ce895dff82ca6809f0cbe403686eacc8d3d0aba2ee56019eb",
+    "bytes": 3611232
+  },
+  "/home/ubuntu/chio-x86-cage-c38ea127ed-target/docker-release/chio-docker-adapter": {
+    "sha256": "dbb427d9880844dab4a466bf573a5174e1d760f4ffc7a2f24ff94d3ffa60fbf2",
+    "bytes": 2111136
+  },
+  "/home/ubuntu/chio-x86-cage-c38ea127ed-target/docker-release/chio-repository-adapter": {
+    "sha256": "67d5d6b4d54c244923b52038cfb42396519cf7e62351947b10e03b71ddee908c",
+    "bytes": 2101472
+  },
+  "/home/ubuntu/chio-x86-cage-c38ea127ed-target/docker-release/deps/chio_secret_broker-f19910e1488492a1": {
+    "sha256": "19159e229edcd83ef575233b030cf17a5aed19c1dacb2925b34b0a9f0ceae742",
+    "bytes": 50410360
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/final-wheels/chio_mini_swe-0.1.0-py3-none-any.whl": {
+    "sha256": "5c0d7a7a32c22e7a921346a5f4a33db151d46b051d6e0ec91c48b56567f9130a",
+    "bytes": 65262
+  },
+  "/home/ubuntu/native-multiroute-evidence-20260929/final-wheels/chio_process-0.1.0-py3-none-any.whl": {
+    "sha256": "9da83e0424f60131c72d25ca6d263f16659b035195e529b1472d8af84a10418f",
+    "bytes": 24816
+  }
+}

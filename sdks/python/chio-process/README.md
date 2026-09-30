@@ -39,9 +39,9 @@ the process host never infers authorization from discovery alone.
 MCP tool from explicit `tools_fixture` and `broker_binding` inputs. It grants no
 filesystem access and does not inherit provider credentials. Dispatch still
 requires the process host's original signed broker request and durable
-admission. See the [native launch guide](../../../docs/security/native-launch-examples.md)
-for the helper, storage and qualification contracts. Docker/provider integration
-for mini-SWE remains separate work.
+admission. See the [native launch guide](https://github.com/bb-connor/arc/blob/main/docs/security/native-launch-examples.md)
+for the helper, storage and qualification contracts. Mini-SWE uses exact
+prepared routes to host-owned provider and repository/Docker adapters.
 
 ```python
 from chio_process import ProcessClient

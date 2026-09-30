@@ -11,8 +11,6 @@ pub enum CageError {
     OperatorCeilingExceeded,
     #[error("operator policy must explicitly configure the complete forbidden-path set")]
     MissingForbiddenPathPolicy,
-    #[error("a path cannot request both read and write access")]
-    AmbiguousFilesystemAccess,
     #[error("native cage admission is unsupported on this platform")]
     UnsupportedPlatform,
     #[error("unsupported seccomp architecture: {0}")]

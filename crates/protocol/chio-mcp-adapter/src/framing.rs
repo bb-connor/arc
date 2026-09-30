@@ -5,6 +5,9 @@ use serde_json::Value;
 use crate::edge::AdapterError;
 
 pub(crate) const MAX_STDIO_MCP_FRAME_BYTES: usize = 1024 * 1024;
+// Broker structured responses encode admitted upstream bytes as JSON arrays.
+// Keep the outgoing request bound independent of this response envelope budget.
+pub(crate) const MAX_STDIO_MCP_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 
 /// Read one newline-delimited JSON-RPC frame.
 ///
@@ -14,7 +17,7 @@ pub(crate) const MAX_STDIO_MCP_FRAME_BYTES: usize = 1024 * 1024;
 /// stdio framing is line-delimited.
 pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Value>, AdapterError> {
     loop {
-        let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_FRAME_BYTES)? else {
+        let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_RESPONSE_BYTES)? else {
             return Ok(None);
         };
 
@@ -25,7 +28,7 @@ pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Val
 
         return chio_core::canonical::UntrustedJsonText::from_wire(
             trimmed.as_bytes(),
-            MAX_STDIO_MCP_FRAME_BYTES,
+            MAX_STDIO_MCP_RESPONSE_BYTES,
         )?
         .decode_signed()
         .map(Some)
@@ -133,7 +136,7 @@ mod tests {
 
     #[test]
     fn frame_reader_rejects_oversized_frame() {
-        let input = format!("{}\n", "x".repeat(MAX_STDIO_MCP_FRAME_BYTES + 1));
+        let input = format!("{}\n", "x".repeat(MAX_STDIO_MCP_RESPONSE_BYTES + 1));
         let mut reader = BufReader::new(input.as_bytes());
         let err = read_jsonrpc_frame(&mut reader).unwrap_err();
         assert!(
@@ -144,6 +147,25 @@ mod tests {
                 )
             ),
             "expected ParseError, got: {err}"
+        );
+    }
+
+    #[test]
+    fn structured_response_can_exceed_the_request_budget() {
+        let body = vec![255_u8; 524_288];
+        let input = serde_json::to_string(&serde_json::json!({
+            "jsonrpc":"2.0", "id":1, "result":{"structuredContent":{"body":body}}
+        }))
+        .unwrap()
+            + "\n";
+        assert!(input.len() > MAX_STDIO_MCP_FRAME_BYTES);
+        let frame = read_jsonrpc_frame(&mut input.as_bytes()).unwrap().unwrap();
+        assert_eq!(
+            frame["result"]["structuredContent"]["body"]
+                .as_array()
+                .unwrap()
+                .len(),
+            524_288
         );
     }
 }

@@ -16,8 +16,10 @@ import uuid
 from pathlib import Path
 
 import native
-from chio_process.launch import demo_python, provision_native_demo
+from chio_process.python_application import provision_native_python_demo
 from snapshot import capture, digest, encoded, load
+
+from tools import prepare_database
 
 HERE = Path(__file__).resolve().parent
 ROLES = ("changes", "tests", "publisher")
@@ -63,6 +65,7 @@ def prepare(args):
     snapshot = capture(args.repo, args.base, args.head)
     snapshot_hash = digest(snapshot)
     (directory / "tool-data").mkdir(exist_ok=True)
+    database_files = prepare_database(directory / "tool-data" / "publications.db")
     write(directory / "snapshot.json", snapshot)
     for child in ("sockets", "connections", *ROLES):
         (directory / child).mkdir(mode=0o700)
@@ -114,12 +117,12 @@ capabilities:
             "schema": "chio.process.host.v1",
             "policy": "policy.yaml",
             "servers": [
-                provision_native_demo(
+                provision_native_python_demo(
                     binary,
                     "repo",
+                    "tools",
+                    {name: HERE / name for name in ("tools.py", "snapshot.py")},
                     [
-                        demo_python(),
-                        str(HERE / "tools.py"),
                         "--snapshot",
                         str(directory / "snapshot.json"),
                         "--snapshot-hash",
@@ -130,12 +133,10 @@ capabilities:
                     directory / "launch-repo",
                     directory,
                     read_paths=[
-                        HERE / "tools.py",
-                        HERE / "snapshot.py",
                         directory / "snapshot.json",
-                        directory / "tool-data",
+                        *database_files,
                     ],
-                    write_paths=[directory / "tool-data"],
+                    write_paths=database_files,
                 )
             ],
             "limits": {"max_processes": 5, "max_depth": 2, "max_calls": args.max_calls},

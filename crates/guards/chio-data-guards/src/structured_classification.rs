@@ -1,3 +1,4 @@
+use chio_security_types::ports::MAX_CLASSIFICATION_PAYLOAD_BYTES;
 use regex::bytes::{Regex, RegexBuilder};
 use thiserror::Error;
 
@@ -7,7 +8,6 @@ const MAX_FINDINGS: usize = 256;
 const MAX_RULES: usize = 256;
 const MAX_PATTERN_BYTES: usize = 4_096;
 const MAX_COMPILED_RULE_BYTES: usize = 65_536;
-const MAX_PAYLOAD_BYTES: usize = 1_048_576;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClassifierIdentity {
@@ -158,7 +158,7 @@ impl StructuredClassificationResult {
         payload: &[u8],
         findings: Vec<StructuredClassificationFinding>,
     ) -> Result<Self, StructuredClassificationError> {
-        if payload.len() > MAX_PAYLOAD_BYTES {
+        if payload.len() > MAX_CLASSIFICATION_PAYLOAD_BYTES {
             return Err(StructuredClassificationError::PayloadTooLarge);
         }
         if findings.len() > MAX_FINDINGS {
@@ -171,7 +171,7 @@ impl StructuredClassificationResult {
             return Err(StructuredClassificationError::IdentityMismatch);
         }
         // All field findings bind this one payload. Decode it once instead of
-        // repeating a potentially 1 MiB JSON allocation for each of 256 findings.
+        // repeating a potentially 4 MiB JSON allocation for each of 256 findings.
         let document = findings
             .iter()
             .any(|finding| matches!(finding.location, FindingLocation::FieldPath(_)))
@@ -290,7 +290,7 @@ impl StructuredClassifier for RegexStructuredClassifier {
         &self,
         payload: &[u8],
     ) -> Result<StructuredClassificationResult, StructuredClassificationError> {
-        if payload.len() > MAX_PAYLOAD_BYTES {
+        if payload.len() > MAX_CLASSIFICATION_PAYLOAD_BYTES {
             return Err(StructuredClassificationError::PayloadTooLarge);
         }
         let mut findings = Vec::new();

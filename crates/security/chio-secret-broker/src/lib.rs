@@ -23,6 +23,8 @@ pub mod daemon_runtime;
 #[cfg(target_os = "linux")]
 pub mod docker_adapter;
 pub mod generic_https;
+#[cfg(target_os = "linux")]
+mod host_https;
 pub mod inherited_fd;
 pub mod ipc_client;
 #[cfg(feature = "kernel-admission")]
@@ -40,6 +42,8 @@ pub mod provision;
 pub mod receipt;
 pub mod reconcile;
 pub mod registration;
+#[cfg(target_os = "linux")]
+pub mod repository_adapter;
 pub mod revocation;
 pub mod service;
 pub mod sqlite;

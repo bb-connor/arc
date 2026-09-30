@@ -238,7 +238,7 @@ impl UnixBrokerEndpoint {
         let encoded = canonical_json_bytes(&response)
             .map_err(|error| BrokerError::Invariant(format!("IPC response failed: {error}")))
             .map_err(BrokerIpcServeFailure::Internal)?;
-        write_broker_ipc_response(&mut stream, &encoded)
+        write_broker_ipc_response(&mut stream, &encoded, operation)
     }
 }
 

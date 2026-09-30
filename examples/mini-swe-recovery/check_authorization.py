@@ -12,13 +12,8 @@ from probe_worker import authorization_probe
 from qualify import serving
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--chio", type=Path, required=True)
-    parser.add_argument("--work-dir", type=Path, required=True)
-    args = parser.parse_args()
-    os.umask(0o077)
-    directory = args.work_dir.resolve()
+def prepare(binary, directory):
+    """Create an independent mailbox-only host for the ungranted-effect probe."""
     directory.mkdir(mode=0o700)
     policy = directory / "policy.yaml"
     policy.write_text("""kernel:
@@ -52,7 +47,7 @@ capabilities:
 
     def command(*arguments):
         result = subprocess.run(
-            [str(args.chio), *map(str, arguments)],
+            [str(binary), *map(str, arguments)],
             capture_output=True,
             text=True,
             timeout=60,
@@ -75,36 +70,49 @@ capabilities:
         "--out",
         directory / "connection.json",
     )
-    connection = json.loads((directory / "connection.json").read_text())
-    with serving(args.chio, directory):
-        client = ProcessClient(connection["socket_path"], connection["credential"])
-        receipt = authorization_probe(client)
+    return initialized
+
+
+def verify(binary, directory, initialized, receipt):
+    """Verify the original denial and prove the mailbox remained untouched."""
     with sqlite3.connect(directory / "host/mailboxes.db") as db:
         assert db.execute("SELECT count(*) FROM mailbox_messages").fetchone()[0] == 0
         assert db.execute("SELECT last_sequence FROM mailboxes").fetchall() == [(0,)]
     (directory / "denial.ndjson").write_text(receipt + "\n")
     (directory / "kernel.pub").write_text(initialized["kernel_key"])
     verified = json.loads(
-        command(
-            "--json",
-            "receipt",
-            "verify",
-            "--input",
-            directory / "denial.ndjson",
-            "--trusted-kernel-pubkey",
-            directory / "kernel.pub",
+        subprocess.check_output(
+            [
+                str(binary),
+                "--json",
+                "receipt",
+                "verify",
+                "--input",
+                str(directory / "denial.ndjson"),
+                "--trusted-kernel-pubkey",
+                str(directory / "kernel.pub"),
+            ],
+            text=True,
+            timeout=60,
         )
     )
     assert verified["receipts_verified"] == 1
-    print(
-        json.dumps(
-            {
-                "ungranted_invoke_denied": True,
-                "dispatches": 0,
-                "receipts_verified": 1,
-            }
-        )
-    )
+    return {"ungranted_invoke_denied": True, "dispatches": 0, "receipts_verified": 1}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--chio", type=Path, required=True)
+    parser.add_argument("--work-dir", type=Path, required=True)
+    args = parser.parse_args()
+    os.umask(0o077)
+    directory = args.work_dir.resolve()
+    initialized = prepare(args.chio, directory)
+    connection = json.loads((directory / "connection.json").read_text())
+    with serving(args.chio, directory):
+        client = ProcessClient(connection["socket_path"], connection["credential"])
+        receipt = authorization_probe(client)
+    print(json.dumps(verify(args.chio, directory, initialized, receipt)))
 
 
 if __name__ == "__main__":

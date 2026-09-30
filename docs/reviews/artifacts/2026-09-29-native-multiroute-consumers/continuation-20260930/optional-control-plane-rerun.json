@@ -1,0 +1,6 @@
+{
+  "status": "interrupted",
+  "reason": "Stopped the optional 195-case control-plane rerun after more than eight minutes; existing native history suite and focused classification, broker and end-to-end campaigns own this change. No full-suite passing claim.",
+  "passed_before_interrupt": 85,
+  "selected": 195
+}

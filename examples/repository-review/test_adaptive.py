@@ -3,12 +3,10 @@
 import json
 
 import pytest
-from langchain_core.messages import ToolMessage
-
 from adaptive import cli, configuration
-from adaptive.common import SCHEMA, persist
-from adaptive.common import plan_payload, report_text
+from adaptive.common import SCHEMA, persist, plan_payload, report_text
 from adaptive.planning import inventory_plan, parse_plan, validate_plan
+from langchain_core.messages import ToolMessage
 from snapshot import digest
 
 

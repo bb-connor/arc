@@ -151,45 +151,15 @@ def initialized(repository, tmp_path):
     return state
 
 
-def legacy_snapshots(state):
-    """Build the prior on-disk layout without using its new write path."""
-    with store.Workspace(state) as workspace:
-        key = workspace.config["baseline"]
-        data = workspace.snapshot(key)
-        config = dict(workspace.config, schema=store.SCHEMA)
-    shutil.rmtree(state / "snapshots")
-    (state / "snapshots").mkdir(mode=0o700)
-    store.atomic_bytes(state / "snapshots" / key, data)
-    store.atomic_bytes(state / "workspace.json", json.dumps(config).encode())
-
-
-def test_legacy_workspace_still_reads_writes_and_exports_full_archives(
-    repository, tmp_path, monkeypatch
-):
+def test_obsolete_workspace_schema_is_refused_before_opening_journal(repository, tmp_path):
     state = initialized(repository, tmp_path)
-    legacy_snapshots(state)
-    changed = canonical(archive(("file", tarfile.REGTYPE, b"changed\n")))
-
-    class Completed:
-        def execute(self, *_):
-            return changed, {"output": "", "returncode": 0, "exception_info": ""}
-
-        def cleanup(self):
-            pass
-
-    monkeypatch.setattr(store.Workspace, "containers", lambda *_: Completed())
-    with store.Workspace(state) as workspace:
-        baseline = workspace.snapshot(workspace.config["baseline"])
-        workspace.execute("change")
-    with store.Workspace(state) as workspace:
-        assert workspace.config["schema"] == store.SCHEMA
-        assert workspace.status()["schema"] == "chio.repository.workspace.v1"
-        assert workspace.snapshot(workspace.config["baseline"]) == baseline
-        key = workspace.status()["snapshot"]
-        assert (state / "snapshots" / key).read_bytes() == changed
-        export(workspace, tmp_path / "legacy-export")
-    assert (tmp_path / "legacy-export/workspace.tar").read_bytes() == changed
-    assert not (state / "snapshots/objects").exists()
+    config = json.loads((state / "workspace.json").read_text())
+    config["schema"] = "chio.repository.workspace.v1"
+    store.atomic_bytes(state / "workspace.json", json.dumps(config).encode())
+    journal = (state / "journal.db").read_bytes()
+    with pytest.raises(ValueError, match="Unsupported repository workspace"):
+        store.Workspace(state)
+    assert (state / "journal.db").read_bytes() == journal
 
 
 @pytest.mark.parametrize("failure", ["admission_budget", "object_write", "index_write"])
@@ -470,7 +440,7 @@ def test_snapshot_fifo_and_configuration_drift_fail_closed(repository, tmp_path)
 def test_receipt_binding_refuses_mismatched_evidence(repository, tmp_path, monkeypatch, mutation):
     import copy
 
-    from chio_mini_swe.repository_proof import bindings, output_digest
+    from chio_mini_swe.repository_proof import bindings
 
     class Completed:
         def execute(self, snapshot, _command):
@@ -483,21 +453,16 @@ def test_receipt_binding_refuses_mismatched_evidence(repository, tmp_path, monke
     monkeypatch.setattr(store.Workspace, "containers", lambda *_: Completed())
     with store.Workspace(state) as workspace:
         output = workspace.execute("print result")
-        receipt = {
-            "id": "receipt",
-            "tool_server": "sandbox",
-            "tool_name": "execute",
-            "content_hash": output_digest(output),
-            "action": {"parameters": {"command": "print result"}},
-            "decision": {"verdict": "allow"},
-            "metadata": {"admission_operation": {"projected_state": "completed"}},
-        }
-        assert len(bindings(workspace, [receipt], "sandbox")) == 1
+        receipt, envelope = broker_receipt(output, "print result", "receipt")
+        outputs = {"receipt": envelope}
+        assert len(bindings(workspace, [receipt], "sandbox", outputs)) == 1
         changed = copy.deepcopy(receipt)
         if mutation == "output":
             changed["content_hash"] = "0" * 64
         elif mutation == "command":
-            changed["action"]["parameters"]["command"] = "another command"
+            changed["action"]["parameters"]["request"]["body"] = list(
+                b'{"command":"another command"}'
+            )
         elif mutation == "server":
             changed["tool_server"] = "other"
         elif mutation == "unknown":
@@ -506,4 +471,34 @@ def test_receipt_binding_refuses_mismatched_evidence(repository, tmp_path, monke
             workspace.config["timeout_seconds"] += 1
         receipts = [changed, changed] if mutation == "duplicate" else [changed]
         with pytest.raises(ValueError):
-            bindings(workspace, receipts, "sandbox")
+            bindings(workspace, receipts, "sandbox", outputs)
+
+
+def broker_receipt(output, command, identifier):
+    """Unit evidence only. Native campaigns separately exercise signatures."""
+    from chio_mini_swe.repository_proof import output_digest
+
+    envelope = {
+        "status": 200,
+        "headers": [],
+        "body": list(json.dumps(output, ensure_ascii=False).encode()),
+        "evidence": {"schema": "chio.broker-execution-evidence.v2"},
+        "receiptReference": "fixture",
+        "receipt": {},
+    }
+    body = {"command": command, "configuration_sha256": output["workspace"]["configuration_sha256"]}
+    receipt = {
+        "id": identifier,
+        "tool_server": "sandbox",
+        "tool_name": "execute",
+        "content_hash": output_digest(envelope),
+        "action": {
+            "parameters": {
+                "schema": "chio.broker-execute.v1",
+                "request": {"body": list(json.dumps(body).encode())},
+            }
+        },
+        "decision": {"verdict": "allow"},
+        "metadata": {"admission_operation": {"projected_state": "completed"}},
+    }
+    return receipt, envelope

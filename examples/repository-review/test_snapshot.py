@@ -5,6 +5,7 @@ import subprocess
 
 import pytest
 from snapshot import capture, digest, load
+
 from tools import call
 
 

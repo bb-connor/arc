@@ -14,8 +14,11 @@ import socket
 import ssl
 import struct
 import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
+from urllib.parse import urlsplit
 
 from worker import decisions
 
@@ -26,6 +29,12 @@ POLICY = {
     "input_usd_per_million": 10000,
     "output_usd_per_million": 0,
 }
+
+
+def provider_endpoint():
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        return f"https://{HOST}:{listener.getsockname()[1]}/v1"
 
 
 def canonical(value):
@@ -108,8 +117,32 @@ def certificate(root):
 
 
 class BrokerCampaign:
-    def __init__(self, binary, directory, container, profile):
+    def __init__(
+        self,
+        binary,
+        directory,
+        container,
+        profile,
+        *,
+        session=False,
+        host_state=None,
+        provider=None,
+        workspace=None,
+        slow_command=False,
+        repository_only=False,
+        response_limit_bytes=16384,
+    ):
         self.directory = directory
+        self.session = session
+        self.provisioning_directory = directory / "adapters" if session else directory
+        self.config_path = self.provisioning_directory / "config.json"
+        self.host_state = host_state or (directory / "run/host" if session else directory / "host")
+        self.provider_config = provider
+        self.workspace = directory / "repository" if session else workspace
+        self.slow_command = slow_command
+        self.repository_only = repository_only
+        self.response_limit_bytes = response_limit_bytes
+        self.failed = threading.Event()
         self.children = []
         self.logs = []
         self.provider = None
@@ -121,8 +154,29 @@ class BrokerCampaign:
             self.close()
             raise
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
     def _prepare(self, binary, container, profile):
         from minisweagent.models.utils.actions_toolcall import BASH_TOOL
+
+        from chio_mini_swe.provider_config import identity
+
+        provider = (
+            json.loads((self.directory / "provider.json").read_text())
+            if self.session
+            else self.provider_config
+        )
+        model = provider["model"] if provider else "saved-native-model"
+        model_id = identity(provider) if provider else "saved-native-decisions-v1"
+        selected = (
+            json.loads((self.directory / "configuration.json").read_text()).get("source_paths")
+            if self.session
+            else None
+        )
 
         root = self.directory / "adapters"
         root.mkdir(mode=0o700)
@@ -132,6 +186,8 @@ class BrokerCampaign:
         record = self.directory / "queries.jsonl"
         record.touch(mode=0o600)
         release = self.release_provider
+        failed = self.failed
+        slow_command = self.slow_command
 
         class Provider(http.server.BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
@@ -146,19 +202,22 @@ class BrokerCampaign:
                 assert 0 < size <= 131072
                 body = self.rfile.read(size)
                 data = json.loads(body)
-                assert data["model"] == "saved-native-model"
+                assert data["model"] == model
                 assert data["stream"] is False and data["max_completion_tokens"] == 1024
                 assert data["tools"] == [BASH_TOOL]
                 assert token.encode() not in body
-                turn = sum(
-                    message["role"] == "assistant" for message in data["messages"]
-                )
+                turn = sum(message["role"] == "assistant" for message in data["messages"])
                 with record.open("a") as stream:
                     stream.write(
                         json.dumps(
                             {
                                 "turn": turn,
-                                "messages_sha256": hashlib.sha256(body).hexdigest(),
+                                "request_sha256": hashlib.sha256(body).hexdigest(),
+                                "prompt": data["messages"][:2],
+                                "actions": [
+                                    json.loads(call["function"]["arguments"])["command"]
+                                    for call in decisions()[turn]["tool_calls"]
+                                ],
                             }
                         )
                         + "\n"
@@ -169,16 +228,34 @@ class BrokerCampaign:
                     release.wait(90)
                     self.close_connection = True
                     return
+                if profile == "session-slow" and turn == 0:
+                    time.sleep(65)
                 message = decisions()[turn]
+                if selected:
+                    assert selected == ["package"]
+                    assert any(
+                        "Selected paths:" in m.get("content", "") and "package" in m["content"]
+                        for m in data["messages"]
+                        if m["role"] == "user"
+                    )
+                    for call in message["tool_calls"]:
+                        action = json.loads(call["function"]["arguments"])
+                        action["command"] = (
+                            "test ! -e unselected.txt && cd package && " + action["command"]
+                        )
+                        call["function"]["arguments"] = json.dumps(action)
                 message.pop("extra")
+                if slow_command and turn == 0:
+                    call = message["tool_calls"][0]["function"]
+                    action = json.loads(call["arguments"])
+                    action["command"] = "sleep 65; " + action["command"]
+                    call["arguments"] = json.dumps(action)
                 result = {
                     "id": f"chatcmpl-{turn}",
                     "object": "chat.completion",
                     "created": 1,
-                    "model": "saved-native-model",
-                    "choices": [
-                        {"index": 0, "finish_reason": "tool_calls", "message": message}
-                    ],
+                    "model": model,
+                    "choices": [{"index": 0, "finish_reason": "tool_calls", "message": message}],
                     "usage": {
                         "prompt_tokens": 100,
                         "completion_tokens": 20,
@@ -186,7 +263,7 @@ class BrokerCampaign:
                     },
                 }
                 encoded = canonical(result)
-                self.send_response(200)
+                self.send_response(500 if failed.is_set() else 200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(encoded)))
                 self.send_header("Connection", "close")
@@ -199,57 +276,71 @@ class BrokerCampaign:
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(root / "cert.pem", root / "key.pem")
         context.set_alpn_protocols(["http/1.1"])
-        self.provider = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Provider)
-        self.provider.socket = context.wrap_socket(
-            self.provider.socket, server_side=True
-        )
+        provider_port = urlsplit(provider["endpoint"]).port if provider else 0
+        self.provider = http.server.ThreadingHTTPServer(("127.0.0.1", provider_port), Provider)
+        self.provider.socket = context.wrap_socket(self.provider.socket, server_side=True)
         threading.Thread(target=self.provider.serve_forever, daemon=True).start()
-        with socket.socket(socket.AF_UNIX) as sock:
-            sock.connect("/var/run/docker.sock")
-            pid, uid, gid = struct.unpack(
-                "3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12)
-            )
-        info = json.loads(docker("info", "--format", "{{json .}}"))
-        spec = json.loads(docker("inspect", container))[0]
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             docker_port = listener.getsockname()[1]
         cert = list((root / "cert.der").read_bytes())
-        config = {
-            "schema": "chio.docker-https-adapter.v1",
+        endpoint = {
             "bind": f"127.0.0.1:{docker_port}",
             "certificate_der": cert,
             "private_key_file": str(root / "key.der"),
             "bearer_file": str(root / "credential"),
-            "docker": {
-                "socket_path": "/var/run/docker.sock",
-                "peer": {"processId": pid, "userId": uid, "groupId": gid},
-                "api_version": "v"
-                + docker("version", "--format", "{{.Server.APIVersion}}"),
-                "daemon_id": info["ID"],
-                "container_id": container,
-                "container_configuration_sha256": hashlib.sha256(
-                    canonical(
-                        {
-                            key: spec[key]
-                            for key in ("Config", "HostConfig", "Mounts", "Image")
-                        }
-                    )
-                ).hexdigest(),
-                "container_started_at": spec["State"]["StartedAt"],
-                "timeout_ms": 15000,
-                "maximum_output_bytes": 4096,
-            },
         }
-        write(root / "docker.json", config)
-        self._spawn(
-            [os.environ["CHIO_DOCKER_ADAPTER"], "--config", str(root / "docker.json")],
-            "docker-adapter",
-        )
+        if self.workspace is not None:
+            from chio_mini_swe.repository_store import configuration_digest
+
+            workspace_config = json.loads((self.workspace / "workspace.json").read_text())
+            executable = Path(sys.executable).parent / "chio-mini-swe-repository"
+            config = dict(
+                endpoint,
+                schema="chio.repository-https-adapter.v1",
+                repository={
+                    "executable": str(executable),
+                    "executable_sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
+                    "state": str(self.workspace),
+                    "configuration_sha256": configuration_digest(workspace_config),
+                    "timeout_ms": 120000,
+                },
+            )
+            adapter = os.environ["CHIO_REPOSITORY_ADAPTER"]
+        else:
+            with socket.socket(socket.AF_UNIX) as sock:
+                sock.connect("/var/run/docker.sock")
+                pid, uid, gid = struct.unpack(
+                    "3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12)
+                )
+            info = json.loads(docker("info", "--format", "{{json .}}"))
+            spec = json.loads(docker("inspect", container))[0]
+            config = dict(
+                endpoint,
+                schema="chio.docker-https-adapter.v1",
+                docker={
+                    "socket_path": "/var/run/docker.sock",
+                    "peer": {"processId": pid, "userId": uid, "groupId": gid},
+                    "api_version": "v" + docker("version", "--format", "{{.Server.APIVersion}}"),
+                    "daemon_id": info["ID"],
+                    "container_id": container,
+                    "container_configuration_sha256": hashlib.sha256(
+                        canonical(
+                            {key: spec[key] for key in ("Config", "HostConfig", "Mounts", "Image")}
+                        )
+                    ).hexdigest(),
+                    "container_started_at": spec["State"]["StartedAt"],
+                    "timeout_ms": 15000,
+                    "maximum_output_bytes": 4096,
+                },
+            )
+            adapter = os.environ["CHIO_DOCKER_ADAPTER"]
+        write(root / "adapter.json", config)
+        self._spawn([adapter, "--config", str(root / "adapter.json")], "command-adapter")
         deadline = time.monotonic() + 10
         while True:
             if self.children[-1].poll() is not None:
-                raise RuntimeError("Docker adapter exited before readiness")
+                raise RuntimeError("Command adapter exited before readiness")
             try:
                 with socket.create_connection(("127.0.0.1", docker_port), timeout=0.2):
                     break
@@ -267,17 +358,34 @@ class BrokerCampaign:
                 "/v1/chat/completions",
                 {
                     "kind": "mini_swe_chat",
-                    "model_id": "saved-native-decisions-v1",
-                    "model": "saved-native-model",
+                    "model_id": model_id,
+                    "model": model,
                     "tools": [BASH_TOOL],
                     "max_completion_tokens": 1024,
-                    "temperature": None,
+                    "temperature": provider.get("temperature") if provider else None,
                 },
             ),
         ]:
+            if self.repository_only and server != "sandbox":
+                continue
             routes.append(
                 {
                     "server": server,
+                    "request_timeout_seconds": (
+                        provider["timeout_seconds"] + 30 if provider else 30
+                    )
+                    if server == "model"
+                    else (
+                        workspace_config["timeout_seconds"] + 120
+                        if self.workspace is not None
+                        else 30
+                    ),
+                    "timeout_ms": (
+                        (provider["timeout_seconds"] * 1000 if provider else 20000)
+                        if server == "model"
+                        else (120000 if self.workspace is not None else 20000)
+                    ),
+                    "response_limit_bytes": self.response_limit_bytes,
                     "tool": tool,
                     "path": path,
                     "payload": payload,
@@ -293,7 +401,9 @@ class BrokerCampaign:
         write(
             root / "campaign.json",
             {
-                "directory": str(self.directory),
+                "directory": str(self.provisioning_directory),
+                "authority_state_directory": str(self.host_state),
+                "working_directory": str(self.directory),
                 "binary": str(binary),
                 "routes": routes,
                 "broker_tool": os.environ["CHIO_BROKER_MCP_TOOL"],
@@ -335,9 +445,7 @@ class BrokerCampaign:
                 continue
             line = self.services.stdout.readline()
             if not line:
-                raise RuntimeError(
-                    "Native fixture exited; inspect broker-services.stderr"
-                )
+                raise RuntimeError("Native fixture exited; inspect broker-services.stderr")
             if marker.encode() in line:
                 return
         raise TimeoutError("Native broker fixture readiness expired")
@@ -345,10 +453,18 @@ class BrokerCampaign:
     def start(self, binary):
         from qualify import serving
 
-        with serving(binary, self.directory):
+        with serving(binary, self.host_state.parent):
             self.services.stdin.write(b"\x01")
             self.services.stdin.flush()
             self._wait("CHIO_BROKERS_READY")
+
+    def release_repository(self):
+        if self.workspace is None:
+            raise ValueError("Campaign has no repository child")
+        child = self.children[0]
+        if child.poll() is None:
+            child.terminate()
+            child.wait(timeout=10)
 
     def stop_provider(self):
         self.release_provider.set()

@@ -5,7 +5,7 @@ import shutil
 import sqlite3
 
 from journal_profiles import provider, requests
-from qualify import command, demo_python, host_death, provision_native_demo, verify, write
+from qualify import command, host_death, prepare_store, provision_reports, verify, write
 from swarm_server import outputs
 
 
@@ -15,6 +15,7 @@ def route(server, tool):
 
 def prepare(binary, directory, consumer, mode, endpoint):
     (directory / "tool-data").mkdir(mode=0o700)
+    prepare_store(directory / "tool-data" / "publications.db")
     (directory / "policy.yaml").write_text("""kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 2
@@ -40,22 +41,7 @@ capabilities:
         {
             "schema": "chio.process.host.v1",
             "policy": "policy.yaml",
-            "servers": [
-                provision_native_demo(
-                    binary,
-                    "reports",
-                    [
-                        demo_python(),
-                        str(consumer / "server.py"),
-                        "--database",
-                        str(directory / "tool-data" / "publications.db"),
-                    ],
-                    directory / "launch-reports",
-                    directory,
-                    read_paths=[consumer / "server.py", directory / "tool-data"],
-                    write_paths=[directory / "tool-data"],
-                )
-            ],
+            "servers": [provision_reports(binary, directory, consumer)],
             "mailboxes": [
                 {
                     "id": "results",

@@ -1,0 +1,31 @@
+{
+  "binary_sha256": "1326f6cbd07c6494e7f3fe52aa3beff593e8242c0cd6aac22ad68d5df7fd8189",
+  "worker_image": "sha256:f593aa276220204e9cb2a6abad3004c8459a4a8bff42cfe9fff00dd9c84fe569",
+  "private_state": "/tmp/chio-native-mini-grl5ca16",
+  "provider": "saved HTTPS completions through two native broker routes",
+  "baseline": {
+    "provider_dispatches": 3,
+    "patch_effects": 1,
+    "audit_effects": 2,
+    "original_model_and_command_receipts": 8,
+    "attempts": 1,
+    "completed_replay": true,
+    "verified_receipts": 8
+  },
+  "known": {
+    "provider_dispatches": 3,
+    "patch_effects": 1,
+    "audit_effects": 2,
+    "original_model_and_command_receipts": 8,
+    "attempts": 3,
+    "completed_replay": true,
+    "verified_receipts": 8
+  },
+  "unknown": {
+    "provider_dispatches": 1,
+    "command_effects": 0,
+    "unknown_outcome_stopped": true,
+    "attempts": 2,
+    "verified_receipts": 1
+  }
+}

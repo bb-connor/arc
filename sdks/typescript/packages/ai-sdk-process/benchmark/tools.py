@@ -2,10 +2,10 @@
 
 import argparse
 import json
-import os
 import sqlite3
 import sys
 import time
+from contextlib import closing
 from pathlib import Path
 
 SOURCES = 16
@@ -14,18 +14,27 @@ MAX_REPORT_BYTES = 16384
 
 
 def connect(database):
-    db = sqlite3.connect(database, timeout=30)
-    db.execute("PRAGMA journal_mode=WAL")
+    db = sqlite3.connect(Path(database).resolve().as_uri() + "?mode=rw", uri=True, timeout=30)
+    if db.execute("PRAGMA journal_mode=PERSIST").fetchone()[0] != "persist":
+        db.close()
+        raise ValueError("Benchmark store requires a persistent rollback journal")
     db.execute("PRAGMA synchronous=FULL")
-    db.executescript(
-        "CREATE TABLE IF NOT EXISTS reads(id INTEGER PRIMARY KEY, file_index INTEGER NOT NULL);"
-        "CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, report TEXT NOT NULL);"
-        "CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, channel TEXT NOT NULL,"
-        " message_key TEXT NOT NULL, payload TEXT NOT NULL, acked INTEGER NOT NULL DEFAULT 0);"
-        "CREATE TABLE IF NOT EXISTS timings(id INTEGER PRIMARY KEY, path TEXT NOT NULL,"
-        " tool TEXT NOT NULL, duration_ms REAL NOT NULL);"
-    )
+    db.execute("PRAGMA temp_store=MEMORY")
     return db
+
+
+def prepare_store(database):
+    with Path(database).open("xb"):
+        pass
+    with closing(connect(database)) as db, db:
+        db.executescript(
+            "CREATE TABLE IF NOT EXISTS reads(id INTEGER PRIMARY KEY, file_index INTEGER NOT NULL);"
+            "CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, report TEXT NOT NULL);"
+            "CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, channel TEXT NOT NULL,"
+            " message_key TEXT NOT NULL, payload TEXT NOT NULL, acked INTEGER NOT NULL DEFAULT 0);"
+            "CREATE TABLE IF NOT EXISTS timings(id INTEGER PRIMARY KEY, path TEXT NOT NULL,"
+            " tool TEXT NOT NULL, duration_ms REAL NOT NULL);"
+        )
 
 
 def corpus(directory):
@@ -74,13 +83,12 @@ def read(db, files, index, path):
 
 
 def main():
-    os.umask(0o077)
     parser = argparse.ArgumentParser()
     parser.add_argument("--server", choices=("sources", "report"), required=True)
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--corpus", type=Path, required=True)
     args = parser.parse_args()
-    files = corpus(args.corpus)
+    files = [args.corpus / f"source-{index:02}.txt" for index in range(1, SOURCES + 1)]
     if args.server == "sources":
         tools = [
             {
@@ -128,7 +136,7 @@ def main():
             params = request["params"]
             started = time.perf_counter()
             try:
-                with connect(args.database) as db:
+                with closing(connect(args.database)) as db, db:
                     if params["name"] == "read" and args.server == "sources":
                         text = read(
                             db, files, params["arguments"]["index"], params["arguments"]["path"]

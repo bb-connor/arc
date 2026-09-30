@@ -8,7 +8,7 @@ from chio_process import MAX_STATE_BLOB_BYTES, ProcessClient
 from chio_process.snapshot import SCHEMA as SNAPSHOT_SCHEMA
 from chio_process.snapshot import JsonSnapshot
 
-SCHEMA = "chio.mini-swe.v1"
+SCHEMA = "chio.mini-swe.v2"
 MAX_SNAPSHOT_BYTES = 8 * MAX_STATE_BLOB_BYTES
 
 
@@ -32,30 +32,13 @@ class Journal:
         if self.reference is None:
             return None
         ref = self.reference
-        if isinstance(ref, dict) and ref.get("schema") == SNAPSHOT_SCHEMA:
-            try:
-                value = self.snapshots.read(ref)
-            except (ValueError, UnicodeError, RecursionError) as error:
-                raise RuntimeError("Invalid mini-SWE snapshot") from error
-        else:
-            value = self._read_legacy(ref)
-        return self._validate(value)
-
-    def _read_legacy(self, ref):
-        if (
-            not isinstance(ref, dict)
-            or ref.get("schema") != SCHEMA
-            or not isinstance(ref.get("blobs"), list)
-            or not 1 <= len(ref["blobs"]) <= 8
-            or type(ref.get("bytes")) is not int
-            or not 0 < ref["bytes"] <= MAX_SNAPSHOT_BYTES
-        ):
+        if not isinstance(ref, dict) or ref.get("schema") != SNAPSHOT_SCHEMA:
             raise RuntimeError("Invalid mini-SWE checkpoint")
-        data = b"".join(self.client.read_blob(key) for key in ref["blobs"])
-        if len(data) != ref["bytes"] or hashlib.sha256(data).hexdigest() != ref.get("sha256"):
-            raise RuntimeError("Invalid mini-SWE snapshot")
-        value = json.loads(data)
-        return value
+        try:
+            value = self.snapshots.read(ref)
+        except (ValueError, UnicodeError, RecursionError) as error:
+            raise RuntimeError("Invalid mini-SWE snapshot") from error
+        return self._validate(value)
 
     @staticmethod
     def _validate(value):
@@ -85,6 +68,22 @@ class Journal:
             )
         ):
             raise RuntimeError("Invalid mini-SWE snapshot state")
+        outputs = value.get("command_outputs")
+        if not isinstance(outputs, dict) or len(outputs) > len(value["receipts"]):
+            raise RuntimeError("Invalid mini-SWE command outputs")
+        if outputs:
+            try:
+                ids = {json.loads(receipt).get("id") for receipt in value["receipts"]}
+            except (ValueError, TypeError, AttributeError) as error:
+                raise RuntimeError("Invalid mini-SWE command receipts") from error
+            if any(
+                not isinstance(key, str)
+                or not key
+                or key not in ids
+                or not isinstance(output, dict)
+                for key, output in outputs.items()
+            ):
+                raise RuntimeError("Invalid mini-SWE command output binding")
         return value
 
     def write(self, value):

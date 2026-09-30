@@ -52,6 +52,28 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn large_broker_body_preserves_complete_classification_and_original_digest(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let classifier = BrokerBodyClassifier(RegexStructuredClassifier::new(
+            "broker-body", "1", vec![RegexClassificationRule::new("private", "PRIVATE_INPUT", 10000)?],
+        )?);
+        for output in ["x".repeat(500_000), "\0".repeat(79_000)] {
+            let body = serde_json::to_vec(&json!({"output": output, "marker": "PRIVATE_INPUT"}))?;
+            let envelope = chio_core_types::canonical_json_bytes(&json!({"body": body}))?;
+            assert!(envelope.len() > 1_048_576);
+            let payload = chio_security_types::ports::ClassificationPayload::new(envelope)?;
+            let result = classifier.classify(payload.as_bytes())?;
+            assert_eq!(result.payload_digest(), chio_core_types::sha256(payload.as_bytes()).as_bytes());
+            assert_eq!(result.payload_len(), payload.as_bytes().len() as u64);
+            assert_eq!(result.findings().len(), 1);
+            assert_eq!(result.findings()[0].location(), &FindingLocation::FieldPath("/body".into()));
+        }
+        let oversized = vec![b'x'; chio_security_types::ports::MAX_CLASSIFICATION_PAYLOAD_BYTES + 1];
+        assert!(matches!(classifier.classify(&oversized), Err(StructuredClassificationError::PayloadTooLarge)));
+        Ok(())
+    }
+
+    #[test]
     fn request_and_response_body_findings_bind_the_original_envelope(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let classifier = BrokerBodyClassifier(RegexStructuredClassifier::new(

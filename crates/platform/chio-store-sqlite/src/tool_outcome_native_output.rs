@@ -11,24 +11,19 @@ pub(crate) fn verify_native_output_artifacts(
 ) -> Result<Option<PersistedRawInvocationOutcomeV1>, AdmissionOperationStoreError> {
     let verify = || -> Result<_, ToolOutcomeStoreError> {
         let id = operation.binding().operation_id().as_str();
-        let outcome = load_outcome_connection(connection, id)?
-            .ok_or_else(|| invariant("native output has no physical outcome"))?;
-        let evaluation = load_evaluation_connection(connection, id)?
+        let projection = projection::load_verified_projection(connection, id)?;
+        let evaluation = projection
+            .evaluation
+            .as_ref()
             .ok_or_else(|| invariant("native output has no physical evaluation"))?;
         intent
-            .validate_artifacts(operation, &outcome, &evaluation)
+            .validate_artifacts(operation, &projection.outcome, evaluation)
             .map_err(admission_error)?;
-        verify_outcome_projection(connection, id)?;
-        if load_resolved_blob_connection(connection, &outcome)?.is_none() {
+        if !projection.has_resolved_output {
             return Err(invariant("native output has no physical signing preimage"));
         }
-        match load_blob_state_connection(connection, outcome.raw_output_digest())? {
-            Some(StoredInvocationBlob::Present(blob)) => {
-                outcome
-                    .validate_canonical_blob(operation, &blob)
-                    .map_err(|error| invariant(error.to_string()))?;
-                let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())
-                    .map_err(|error| invariant(error.to_string()))?;
+        match projection.raw {
+            Some(raw) => {
                 if raw.requires_security_release() != Ok(true) {
                     return Err(invariant(
                         "native output lacks its frozen release requirement",
@@ -36,7 +31,7 @@ pub(crate) fn verify_native_output_artifacts(
                 }
                 Ok(Some(raw.to_persisted()))
             }
-            Some(StoredInvocationBlob::Compacted) if !require_payload => Ok(None),
+            None if !require_payload => Ok(None),
             _ => Err(invariant("native output lost its original return payload")),
         }
     };

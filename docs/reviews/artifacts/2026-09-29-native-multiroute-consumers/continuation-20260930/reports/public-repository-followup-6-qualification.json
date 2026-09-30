@@ -1,0 +1,15 @@
+{
+  "private_state": "/tmp/chio-public-repository-jcz5k24n",
+  "source_commit": "0e322af87745eff34caffe4df68456ebc20d9068",
+  "source_archive_sha256": "02db3918a45a7707a9eba6e240a7d3cde2ad5be23fc293dbe218d263662453dd",
+  "binary_sha256": "3ce221e6180263fd4eadad597da1ac19781260fbabc2bfa6d5536269d7c59d14",
+  "execution_image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+  "source_compiles": true,
+  "command_exceeds_default_host_timeout": true,
+  "large_ascii_and_escaped_output_verified": true,
+  "host_restart_replay": true,
+  "verified_transitions": 2,
+  "patch_applies_to_source": true,
+  "source_unchanged": true,
+  "provider": "none; explicit qualification commands"
+}

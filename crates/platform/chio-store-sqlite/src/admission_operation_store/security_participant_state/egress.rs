@@ -12,12 +12,14 @@ pub(super) use contract::live_request_hash;
 mod integrity;
 mod readback;
 mod record;
-pub(super) use readback::load_history;
 pub use readback::SecurityParticipantEgressHistory;
+pub(super) use readback::{load_history, load_history_initialized};
 mod schema;
 mod write;
 pub(super) use integrity::verify_coverage;
-pub(super) use record::{head, load, load_initialized, load_operation, Record};
+pub(super) use record::{
+    head, load, load_initialized, load_operation, load_operation_inner, Record,
+};
 pub(in crate::admission_operation_store) use schema::{exists, sql, verify_catalog};
 
 pub(super) const PROJECTION: &str = "security_participant_egress";

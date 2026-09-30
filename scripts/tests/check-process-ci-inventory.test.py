@@ -8,6 +8,12 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 workflow = yaml.safe_load((ROOT / ".github/workflows/process-workers.yml").read_text())
+triggers = workflow.get("on", workflow.get(True))
+for event in ("push", "pull_request"):
+    for owner in ("chio-secret-broker", "chio-cage", "chio-cage-plan", "chio-cage-init"):
+        assert f"crates/security/{owner}/**" in triggers[event]["paths"], (
+            f"{owner} changes must trigger native consumer qualification"
+        )
 steps = workflow["jobs"]["host"]["steps"]
 commands = [
     shlex.split(line) for step in steps for line in step.get("run", "").splitlines()
@@ -71,4 +77,20 @@ assert "prepare-enforced-native-fixture.py" in fixture["runs"]["steps"][2]["run"
 assert '--read-path "$GITHUB_WORKSPACE"' not in fixture["runs"]["steps"][2]["run"], (
     "native fixture must not expose checkout metadata through a workspace-wide grant"
 )
+runtime = fixture["runs"]["steps"][2]["run"]
+assert "prepare-native-python-runtime.py" in runtime
+assert "CHIO_CAGE_RUNTIME_FILES_FILE" in runtime
+for broad in ("/usr", "/opt/hostedtoolcache", "$GITHUB_WORKSPACE"):
+    assert f'--read-path "{broad}"' not in runtime
+for job in ("host", "optimized-comparison"):
+    job_steps = workflow["jobs"][job]["steps"]
+    assert any(step.get("uses") == "./.github/actions/prepared-native-broker" for step in job_steps)
+    assert any(step.get("uses") == "./.github/actions/enforced-native-fixture" for step in job_steps)
+broker = yaml.safe_load((ROOT / ".github/actions/prepared-native-broker/action.yml").read_text())
+broker_build = broker["runs"]["steps"][0]["run"]
+for name in ("CHIO_BROKER_TEST_BINARY", "CHIO_BROKER_MCP_TOOL", "CHIO_DOCKER_ADAPTER", "CHIO_REPOSITORY_ADAPTER"):
+    assert name in broker_build
+installed = next(step["run"] for step in steps if step.get("name") == "Repository review through the public process host")
+assert "--reinstall --no-deps" in installed and "chio_process-0.1.0-py3-none-any.whl" in installed
+assert "--no-sync" in installed, "qualification must retain the freshly built SDK wheel"
 print("process CI inventory passed")

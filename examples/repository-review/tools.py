@@ -5,6 +5,8 @@ import hashlib
 import json
 import sqlite3
 import sys
+from contextlib import closing
+from pathlib import Path
 
 from snapshot import inventory, load
 
@@ -54,6 +56,29 @@ TOOLS = [
 ]
 
 
+def connect(database):
+    db = sqlite3.connect(Path(database).resolve().as_uri() + "?mode=rw", uri=True)
+    if db.execute("PRAGMA journal_mode=PERSIST").fetchone()[0] != "persist":
+        db.close()
+        raise ValueError("Publication store requires a persistent rollback journal")
+    db.execute("PRAGMA synchronous=FULL")
+    db.execute("PRAGMA temp_store=MEMORY")
+    return db
+
+
+def prepare_database(database):
+    # Initialization occurs before native launch. The cage receives just these
+    # two retained files. PERSIST keeps the rollback journal inode across calls.
+    with Path(database).open("xb"):
+        pass
+    with closing(connect(database)) as db, db:
+        db.execute(
+            "CREATE TABLE reports (id INTEGER PRIMARY KEY, "
+            "snapshot_hash TEXT NOT NULL, report_hash TEXT NOT NULL, report TEXT NOT NULL)"
+        )
+    return [Path(database), Path(str(database) + "-journal")]
+
+
 def call(snapshot, snapshot_hash, database, name, args):
     if not isinstance(args, dict):
         raise ValueError("arguments must be an object")
@@ -89,12 +114,7 @@ def call(snapshot, snapshot_hash, database, name, args):
         ):
             raise ValueError("report must contain between 1 and 65536 UTF-8 bytes")
         report_hash = hashlib.sha256(report.encode()).hexdigest()
-        with sqlite3.connect(database) as db:
-            db.execute("PRAGMA synchronous=FULL")
-            db.execute(
-                "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY, "
-                "snapshot_hash TEXT NOT NULL, report_hash TEXT NOT NULL, report TEXT NOT NULL)"
-            )
+        with closing(connect(database)) as db, db:
             row = db.execute(
                 "INSERT INTO reports(snapshot_hash, report_hash, report) VALUES(?, ?, ?)",
                 (snapshot_hash, report_hash, report),
@@ -140,9 +160,15 @@ def main():
                     "structuredContent": value,
                     "isError": False,
                 }
-            except (ValueError, sqlite3.Error):
+            except (ValueError, sqlite3.Error) as error:
                 result = {
-                    "content": [{"type": "text", "text": "Repository tool failed"}],
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Repository tool failed: "
+                            + getattr(error, "sqlite_errorname", "invalid_request"),
+                        }
+                    ],
                     "isError": True,
                 }
         else:

@@ -33,9 +33,11 @@ use crate::registration::{
     PrepareDispatchAcknowledgement, RegisterAttemptAcknowledgement, RegisterAttemptAction,
     ReleaseAttemptAcknowledgement,
 };
+#[cfg(test)]
+use crate::service::read_bounded_frame;
 use crate::service::{
-    broker_request_digest, canonical_ipc_request_bytes, read_bounded_frame, write_bounded_frame,
-    AuthenticatedIpcRequest, IpcOperation, IpcResponse,
+    broker_request_digest, canonical_ipc_request_bytes, read_frame_with_limit, response_wire_limit,
+    write_bounded_frame, AuthenticatedIpcRequest, IpcOperation, IpcResponse,
 };
 use crate::store::{derive_attempt_ids, AttemptRegistration};
 use crate::{validate_identifier, BrokerError, Result};
@@ -196,6 +198,19 @@ impl BrokerIpcClient {
         let acknowledgement: PrepareDispatchAcknowledgement =
             decode_canonical_response(&response.response)?;
         acknowledgement.validate_for(registration, request)?;
+        // Authentication and registration use the short control timeout. Once
+        // admitted, this exact connection must also wait for the signed upstream
+        // request deadline. Set it before transfer; the cage cannot change it.
+        request.validate_bounds()?;
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_millis(
+                request.request.options.timeout_ms + self.config.timeout_ms,
+            )))
+            .map_err(|error| {
+                BrokerError::AuthorityUnavailable(format!(
+                    "prepared execution timeout setup failed: {error}"
+                ))
+            })?;
         Ok(stream)
     }
 
@@ -525,16 +540,18 @@ fn exchange_ipc_envelope(
     write_bounded_frame(stream, request_frame).map_err(|error| {
         BrokerError::AuthorityUnavailable(format!("broker IPC write failed: {error}"))
     })?;
-    let response_frame = read_bounded_frame(stream).map_err(|error| {
-        BrokerError::AuthorityUnavailable(format!("broker IPC read failed: {error}"))
-    })?;
+    let response_frame =
+        read_frame_with_limit(stream, response_wire_limit(operation)).map_err(|error| {
+            BrokerError::AuthorityUnavailable(format!("broker IPC read failed: {error}"))
+        })?;
     let response = decode_ipc_response_envelope(&response_frame, operation)?;
     Ok((response, response_frame))
 }
 
 #[cfg(unix)]
 fn decode_ipc_response_envelope(bytes: &[u8], operation: IpcOperation) -> Result<IpcResponse> {
-    let response: IpcResponse = decode_canonical_response(bytes)?;
+    let response: IpcResponse =
+        decode_canonical_response_with_limit(bytes, response_wire_limit(operation))?;
     let valid = response.operation == operation
         && if response.accepted {
             !response.response.is_empty() && response.error_code.is_none()
@@ -580,7 +597,10 @@ fn decode_execute_outcome(
     trusted_receipt_signer: &PublicKey,
 ) -> Result<BrokerIpcExecutionOutcome> {
     if response.accepted {
-        let execution: BrokerExecuteResponse = decode_canonical_response(&response.response)?;
+        let execution: BrokerExecuteResponse = decode_canonical_response_with_limit(
+            &response.response,
+            crate::protocol::MAX_EXECUTE_RESPONSE_PAYLOAD_BYTES,
+        )?;
         validate_execute_response(request, &execution, trusted_receipt_signer)?;
         Ok(BrokerIpcExecutionOutcome::Success(Box::new(execution)))
     } else {
@@ -709,11 +729,16 @@ fn validate_execute_failure(
 }
 
 fn decode_canonical_response<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T> {
-    let value: serde_json::Value = chio_core_types::canonical::UntrustedJsonText::from_wire(
-        bytes,
-        chio_secure_ipc::DEFAULT_MAX_FRAME_BYTES,
-    )?
-    .decode_canonical()?;
+    decode_canonical_response_with_limit(bytes, crate::protocol::MAX_WIRE_BYTES)
+}
+
+fn decode_canonical_response_with_limit<T: for<'de> Deserialize<'de>>(
+    bytes: &[u8],
+    maximum: usize,
+) -> Result<T> {
+    let value: serde_json::Value =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, maximum)?
+            .decode_canonical()?;
     serde_json::from_value(value).map_err(|error| {
         BrokerError::UntrustedInput(chio_core_types::canonical::UntrustedJsonError::Decode(
             error,
@@ -723,6 +748,10 @@ fn decode_canonical_response<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Resu
 
 #[cfg(test)]
 mod vector_semantics_tests;
+
+#[cfg(all(test, unix))]
+#[path = "ipc_client/response_budget_tests.rs"]
+mod response_budget_tests;
 
 #[cfg(all(test, unix))]
 mod preconnected_execution_tests {

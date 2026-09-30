@@ -120,7 +120,6 @@ def respond(database, request, connection_caller=None, *, operator=False):
 
 
 def main():
-    os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument(
@@ -138,6 +137,7 @@ def main():
     mode.add_argument("--inspect", action="store_true")
     args = parser.parse_args()
     if args.initialize:
+        os.umask(0o077)
         store.initialize(args.database, json.loads(args.initialize.read_text()))
         return
     if args.inspect:

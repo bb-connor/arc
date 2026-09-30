@@ -155,7 +155,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
     let mut observed_at = initialization.initialized_at;
     let mut initialized = false;
     let mut joined = BTreeSet::new();
-    let mut statement = connection.prepare("SELECT projection_kind, projection_sequence FROM authority_global_commits WHERE projection_key = ?1
+    let mut statement = connection.prepare("SELECT projection_kind, projection_sequence, mutation_kind, projection_reference_digest, store_uuid, store_lease_id, store_owner_epoch FROM authority_global_commits WHERE projection_key = ?1
         AND projection_kind IN ('security_participant_state','security_participant_egress','security_participant_output','security_participant_nonce_preflight') ORDER BY commit_sequence").map_err(sqlite_error)?;
     let mut rows = statement.query([authority]).map_err(sqlite_error)?;
     while let Some(row) = rows.next().map_err(sqlite_error)? {
@@ -263,6 +263,29 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
             }
             _ => return Err(invalid("unknown native journal family")),
         };
+        let (mutation, digest, fence) = match &event {
+            Event::Join(record) => (super::MUTATION, record.digest()?, &record.lease.fence),
+            Event::Egress(record) => (record.mutation(), record.digest()?, &record.lease.fence),
+            Event::Output(record) => (output::MUTATION, record.digest()?, &record.lease.fence),
+            Event::NoncePreflight(record) => (
+                nonce_preflight::MUTATION,
+                record.digest()?,
+                &record.lease.fence,
+            ),
+        };
+        if row.get::<_, String>(2).map_err(sqlite_error)? != mutation
+            || row.get::<_, String>(3).map_err(sqlite_error)? != digest
+            || row.get::<_, String>(4).map_err(sqlite_error)? != fence.store_uuid
+            || row
+                .get::<_, Option<String>>(5)
+                .map_err(sqlite_error)?
+                .as_deref()
+                != Some(fence.lease_id.as_str())
+            || row.get::<_, i64>(6).map_err(sqlite_error)?
+                != i64::try_from(fence.owner_epoch).map_err(invalid)?
+        {
+            return Err(invalid("native event differs from its exact global commit"));
+        }
         apply(&event)?;
     }
     if !initialized

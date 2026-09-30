@@ -1,0 +1,400 @@
+{
+  "schema": "chio.native-consumer-continuation.v1",
+  "local_parent": "2a4c2fbe4fd164cd05a2f77da1971ab0ebccc834",
+  "tasks": {
+    "1": "complete in preceding commit",
+    "2": "complete in preceding commit",
+    "3": "complete",
+    "4": "complete for focused local/native acceptance and CI wiring"
+  },
+  "checks": [
+    {
+      "name": "broker-library",
+      "status": "passed",
+      "passed": 173,
+      "log": "local/chio-broker-consumers-final.log.gz"
+    },
+    {
+      "name": "mcp-library",
+      "status": "passed",
+      "passed": 122,
+      "log": "local/chio-mcp-final-response-after-2.log.gz"
+    },
+    {
+      "name": "mcp-exit-regressions-after-module-move",
+      "status": "passed",
+      "passed": 2,
+      "log": "local/chio-mcp-final-response-moved-2.log.gz"
+    },
+    {
+      "name": "classification-payload-bounds",
+      "status": "passed",
+      "passed": 2,
+      "log": "local/chio-classification-payload-tests.log.gz"
+    },
+    {
+      "name": "classification-complete-envelope",
+      "status": "passed",
+      "passed": 1,
+      "log": "local/chio-classification-envelope-tests.log.gz"
+    },
+    {
+      "name": "classification-real-broker-body",
+      "status": "passed",
+      "passed": 1,
+      "log": "local/chio-large-broker-classification-tests.log.gz"
+    },
+    {
+      "name": "classification-regex-result-bounds",
+      "status": "passed",
+      "passed": 1,
+      "log": "local/chio-classifier-limit-tests.log.gz"
+    },
+    {
+      "name": "sqlite-output-projection-contracts",
+      "status": "passed",
+      "passed": 26,
+      "log": "local/chio-projection-store-tests.log.gz"
+    },
+    {
+      "name": "kernel-retained-output-contracts",
+      "status": "passed",
+      "passed": 17,
+      "log": "local/chio-native-output-contract-tests.log.gz"
+    },
+    {
+      "name": "kernel-original-output-substitution",
+      "status": "passed",
+      "passed": 1,
+      "log": "local/chio-native-output-decode-tests.log.gz"
+    },
+    {
+      "name": "classification-flow-contracts",
+      "status": "passed",
+      "passed": 11,
+      "log": "local/chio-classification-flow-tests.log.gz"
+    },
+    {
+      "name": "chio-consumers-python-final",
+      "status": "passed",
+      "passed": 441,
+      "log": "local/chio-consumers-python-final.log.gz"
+    },
+    {
+      "name": "chio-review-python-final",
+      "status": "passed",
+      "passed": 38,
+      "log": "local/chio-review-python-final.log.gz"
+    },
+    {
+      "name": "chio-shared-python-final",
+      "status": "passed",
+      "passed": 12,
+      "log": "local/chio-shared-python-final.log.gz"
+    },
+    {
+      "name": "chio-repository-current-schema-tests-2",
+      "status": "passed",
+      "passed": 123,
+      "log": "local/chio-repository-current-schema-tests-2.log.gz"
+    },
+    {
+      "name": "chio-consumers-clippy-2",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-consumers-clippy-2.log.gz"
+    },
+    {
+      "name": "chio-mcp-exit-clippy",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-mcp-exit-clippy.log.gz"
+    },
+    {
+      "name": "chio-continuation-ruff",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-continuation-ruff.log.gz"
+    },
+    {
+      "name": "chio-continuation-python-format",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-continuation-python-format.log.gz"
+    },
+    {
+      "name": "chio-continuation-process-ci",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-continuation-process-ci.log.gz"
+    },
+    {
+      "name": "chio-classification-clippy-3",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-classification-clippy-3.log.gz"
+    },
+    {
+      "name": "chio-output-closeout-format",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-output-closeout-format.log.gz"
+    },
+    {
+      "name": "chio-output-closeout-hygiene",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-output-closeout-hygiene.log.gz"
+    },
+    {
+      "name": "chio-output-closeout-negative",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-output-closeout-negative.log.gz"
+    },
+    {
+      "name": "chio-closeout-wire",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-closeout-wire.log.gz"
+    },
+    {
+      "name": "chio-closeout-ci",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-closeout-ci.log.gz"
+    },
+    {
+      "name": "chio-continuation-trust-3",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-continuation-trust-3.log.gz"
+    },
+    {
+      "name": "chio-continuation-negative-assertions-2",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-continuation-negative-assertions-2.log.gz"
+    },
+    {
+      "name": "chio-comparison-ruff",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-comparison-ruff.log.gz"
+    },
+    {
+      "name": "chio-comparison-format",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-comparison-format.log.gz"
+    },
+    {
+      "name": "chio-graphify-closeout",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-graphify-closeout.log.gz"
+    },
+    {
+      "name": "chio-native-output-read-clippy",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-native-output-read-clippy.log.gz"
+    },
+    {
+      "name": "chio-native-output-read-trust",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-native-output-read-trust.log.gz"
+    },
+    {
+      "name": "chio-projection-clippy",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-projection-clippy.log.gz"
+    },
+    {
+      "name": "chio-projection-hygiene",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-projection-hygiene.log.gz"
+    },
+    {
+      "name": "chio-projection-negative",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-projection-negative.log.gz"
+    },
+    {
+      "name": "chio-projection-trust",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-projection-trust.log.gz"
+    },
+    {
+      "name": "chio-projection-format-final",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-projection-format-final.log.gz"
+    },
+    {
+      "name": "chio-projection-format-check",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-projection-format-check.log.gz"
+    },
+    {
+      "name": "chio-native-worker-stop",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "local/chio-native-worker-stop.log.gz"
+    },
+    {
+      "name": "optional-control-plane-adapters",
+      "status": "interrupted",
+      "log": "local/chio-classification-adapters-tests.log.gz",
+      "disposition": "optional-control-plane-rerun.json"
+    },
+    {
+      "name": "history-followup-2",
+      "status": "passed",
+      "passed": 96,
+      "log": "native/history-followup-2.log.gz"
+    },
+    {
+      "name": "repository-adapter-final-tests",
+      "status": "passed",
+      "passed": 4,
+      "log": "native/repository-adapter-final-tests.log.gz"
+    },
+    {
+      "name": "exact-read-write-tests",
+      "status": "passed",
+      "passed": 17,
+      "log": "native/exact-read-write-tests.log.gz"
+    },
+    {
+      "name": "sqlite-final-profile-tests",
+      "status": "passed",
+      "passed": 1,
+      "log": "native/sqlite-final-profile-tests.log.gz"
+    },
+    {
+      "name": "response-budget-tests",
+      "status": "passed",
+      "passed": 2,
+      "log": "native/response-budget-tests.log.gz"
+    },
+    {
+      "name": "final-installed-schema-tests",
+      "status": "passed",
+      "passed": 123,
+      "log": "native/final-installed-schema-tests.log.gz"
+    },
+    {
+      "name": "ai-sdk-benchmark-followup-1-benchmark.json",
+      "status": "passed",
+      "report": "reports/ai-sdk-benchmark-followup-1-benchmark.json"
+    },
+    {
+      "name": "ai-sdk-native-followup-1-qualification.json",
+      "status": "passed",
+      "report": "reports/ai-sdk-native-followup-1-qualification.json"
+    },
+    {
+      "name": "comparison-followup-6-comparison.json",
+      "status": "passed",
+      "report": "reports/comparison-followup-6-comparison.json"
+    },
+    {
+      "name": "mini-native-14-qualification.json",
+      "status": "passed",
+      "report": "reports/mini-native-14-qualification.json"
+    },
+    {
+      "name": "offline-review-followup-2-evidence-qualification.json",
+      "status": "passed",
+      "report": "reports/offline-review-followup-2-evidence-qualification.json"
+    },
+    {
+      "name": "operator-followup-2-qualification.json",
+      "status": "passed",
+      "report": "reports/operator-followup-2-qualification.json"
+    },
+    {
+      "name": "process-packages-followup-2-evidence-qualification.json",
+      "status": "passed",
+      "report": "reports/process-packages-followup-2-evidence-qualification.json"
+    },
+    {
+      "name": "public-repository-followup-6-qualification.json",
+      "status": "passed",
+      "report": "reports/public-repository-followup-6-qualification.json"
+    },
+    {
+      "name": "repository-operator-followup-1-qualification.json",
+      "status": "passed",
+      "report": "reports/repository-operator-followup-1-qualification.json"
+    },
+    {
+      "name": "review-adaptive-followup-1-qualification.json",
+      "status": "passed",
+      "report": "reports/review-adaptive-followup-1-qualification.json"
+    },
+    {
+      "name": "review-full-followup-1-qualification.json",
+      "status": "passed",
+      "report": "reports/review-full-followup-1-qualification.json"
+    },
+    {
+      "name": "review-native-followup-10-qualification.json",
+      "status": "passed",
+      "report": "reports/review-native-followup-10-qualification.json"
+    },
+    {
+      "name": "saved-followup-2-qualification.json",
+      "status": "passed",
+      "report": "reports/saved-followup-2-qualification.json"
+    },
+    {
+      "name": "scope-followup-2-qualification.json",
+      "status": "passed",
+      "report": "reports/scope-followup-2-qualification.json"
+    },
+    {
+      "name": "scoped-session-final-2-qualification.json",
+      "status": "passed",
+      "report": "reports/scoped-session-final-2-qualification.json"
+    },
+    {
+      "name": "scoped-session-followup-1-qualification.json",
+      "status": "passed",
+      "report": "reports/scoped-session-followup-1-qualification.json"
+    },
+    {
+      "name": "session-followup-7-qualification.json",
+      "status": "passed",
+      "report": "reports/session-followup-7-qualification.json"
+    },
+    {
+      "name": "shared-native-followup-10-qualification.json",
+      "status": "passed",
+      "report": "reports/shared-native-followup-10-qualification.json"
+    },
+    {
+      "name": "shared-ownership-followup-1-qualification.json",
+      "status": "passed",
+      "report": "reports/shared-ownership-followup-1-qualification.json"
+    },
+    {
+      "name": "state-followup-2-qualification.json",
+      "status": "passed",
+      "report": "reports/state-followup-2-qualification.json"
+    }
+  ],
+  "limits": [
+    "Native source is a common base plus recorded overlays, not an exact final local commit.",
+    "Provider decisions use controlled HTTPS fixtures; no live-model quality, pricing or external production claim.",
+    "Historical failed attempts remain failed; uncertain operations were not redispatched.",
+    "No hosted CI, M5, merge, publication or complete roadmap claim."
+  ]
+}

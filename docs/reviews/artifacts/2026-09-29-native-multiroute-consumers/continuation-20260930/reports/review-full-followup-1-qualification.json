@@ -1,0 +1,19 @@
+{
+  "profiles": {
+    "inventory": {
+      "publications": 1,
+      "receipts_verified": 9,
+      "host_init_seconds": 1.5654158900006223,
+      "recovery_attempt_seconds": 7.748698681999485
+    },
+    "scripted-model": {
+      "publications": 1,
+      "receipts_verified": 13,
+      "host_init_seconds": 1.4317191740001363,
+      "recovery_attempt_seconds": 8.623827276000156
+    }
+  },
+  "live_model": false,
+  "handoffs_replayed_without_duplicate_messages": true,
+  "shared_call_limit_rejected_publication": true
+}

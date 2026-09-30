@@ -11,6 +11,9 @@ type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[serde(deny_unknown_fields)]
 struct ConsumerRoute {
     server: String,
+    request_timeout_seconds: u64,
+    timeout_ms: u64,
+    response_limit_bytes: u64,
     tool: String,
     adapter: crate::generic_https::LocalHttpsAdapterConfig,
     path: String,
@@ -22,6 +25,8 @@ struct ConsumerRoute {
 #[serde(deny_unknown_fields)]
 struct Campaign {
     directory: PathBuf,
+    authority_state_directory: PathBuf,
+    working_directory: PathBuf,
     binary: PathBuf,
     broker_tool: PathBuf,
     cage_init: PathBuf,
@@ -97,6 +102,10 @@ fn provision(
     .collect();
     for (flag, value) in [
         ("--output-dir", policy.display().to_string()),
+        (
+            "--working-directory",
+            campaign.working_directory.display().to_string(),
+        ),
         ("--tools-fixture", tools.display().to_string()),
         ("--target", command[0].clone()),
         ("--cage-init", campaign.cage_init.display().to_string()),
@@ -132,7 +141,7 @@ fn provision(
     }
     let result = cli(&campaign.binary, &args)?;
     Ok(
-        json!({"id":route.server,"command":command,"request_timeout_seconds":30,
+        json!({"id":route.server,"command":command,"request_timeout_seconds":route.request_timeout_seconds,
         "launch_policy":policy.join("cage-launch-policy.json"),"launch_policy_signer":result["cagePolicyPublicKey"]}),
     )
 }
@@ -175,7 +184,8 @@ fn native_consumer_services_helper_process() -> TestResult {
             rustix::process::geteuid().as_raw(),
         );
         let socket_name = format!("authority-{index}.sock");
-        fixture.config.authority_socket_path = campaign.directory.join("host").join(&socket_name);
+        fixture.config.authority_socket_path =
+            campaign.authority_state_directory.join(&socket_name);
         fixture.config.broker_audience = format!("consumer-broker-{index}");
         fixture.config.parent_audience = fixture.config.broker_audience.clone();
         fixture.config.broker_instance_id = format!("consumer-broker-{index}");
@@ -203,7 +213,7 @@ fn native_consumer_services_helper_process() -> TestResult {
             "broker_identity":key.public_key(),"revocation_authority_domain":AUTHORITY_DOMAIN,"ipc_timeout_ms":3000,"authority_socket_name":socket_name,
             "preparation":{"issuer_seed_file":issuer_seed,"credential":{"provider":CREDENTIAL_PROVIDER,"credentialId":CREDENTIAL_ID,"version":1},
                 "destination":{"scheme":"https","normalizedHost":route.adapter.server_name,"explicitPort":route.adapter.port,"method":"POST","exactPathAndQuery":route.path},
-                "maximum_body_bytes":131072,"response_limit_bytes":16384,"timeout_ms":20000,"lifetime_seconds":300,"payload":route.payload}
+                "maximum_body_bytes":131072,"response_limit_bytes":route.response_limit_bytes,"timeout_ms":route.timeout_ms,"lifetime_seconds":300,"payload":route.payload}
         }));
         grants.push(json!({"server_id":route.server,"tool_name":route.tool}));
         policy.push_str(&format!("      - server: {}\n        tool: {}\n        operations: [invoke, delegate]\n        max_invocations: 24\n        ttl: 3600\n",route.server,route.tool));

@@ -43,8 +43,9 @@ pub(in crate::service) fn validate_broker_ipc_response_envelope(
     operation: IpcOperation,
     response: &IpcResponse,
 ) -> Result<()> {
+    let maximum = crate::service::response_payload_limit(operation);
     let valid = response.operation == operation
-        && response.response.len() <= MAX_WIRE_BYTES
+        && response.response.len() <= maximum
         && if response.accepted {
             !response.response.is_empty() && response.error_code.is_none()
         } else if operation == IpcOperation::Execute {
@@ -122,8 +123,9 @@ pub(in crate::service) fn validate_signed_broker_execute_failure(response: &IpcR
 pub(in crate::service) fn write_broker_ipc_response(
     stream: &mut BrokerIpcDeadlineIo<UnixStream>,
     frame: &[u8],
+    operation: IpcOperation,
 ) -> std::result::Result<(), BrokerIpcServeFailure> {
-    if frame.is_empty() || frame.len() > MAX_WIRE_BYTES {
+    if frame.is_empty() || frame.len() > crate::service::response_wire_limit(operation) {
         return Err(BrokerIpcServeFailure::Internal(BrokerError::Invariant(
             "encoded IPC response frame is empty or oversized".to_string(),
         )));

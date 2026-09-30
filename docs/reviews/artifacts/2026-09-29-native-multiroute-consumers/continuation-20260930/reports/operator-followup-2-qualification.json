@@ -1,0 +1,16 @@
+{
+  "binary_sha256": "622b555b8f0bb25ca6bda7fefc92ec3a444a9d3f4af8573bac0c6f0462c10cd8",
+  "worker_image": "sha256:7c66a244d27cbb8737bb84ac460d6c0049d249d0e4da871e6e0e73f82e4e0deb",
+  "private_state": "/tmp/chio-coding-ch923hen",
+  "provider": "saved HTTPS completions through native prepared broker routes",
+  "model_id": "mini-provider:e7af2ad848035235175fa2ef967bf77b7b21e26f0032abe4989b49741b4028c9",
+  "successful_http_requests": 3,
+  "failed_http_requests": 1,
+  "failure_attempts": 2,
+  "command_exceeds_default_client_and_host_timeout": false,
+  "verified_receipts": 8,
+  "configuration_change_refused": true,
+  "completed_replay": true,
+  "offline_cancelled_export_without_host_writes": true,
+  "provider_error_stopped": true
+}

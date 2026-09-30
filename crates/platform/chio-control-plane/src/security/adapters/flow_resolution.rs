@@ -235,7 +235,10 @@ impl FlowPostInvocationResolver for PersistentFlowResolver {
                 &ClassificationRequest {
                     tenant_id: key.tenant_id.clone(),
                     request_id: request_id.clone(),
-                    payload: canonical_response,
+                    payload: chio_security_types::ports::ClassificationPayload::new(
+                        canonical_response.into_bytes(),
+                    )
+                    .map_err(|_| FlowDenial::ClassifierFailure)?,
                     payload_digest,
                 },
             )

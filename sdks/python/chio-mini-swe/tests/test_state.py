@@ -2,7 +2,6 @@ import hashlib
 
 import pytest
 from chio_process import WorkerError
-from chio_process.snapshot import SCHEMA as SNAPSHOT_SCHEMA
 from test_recovery import MemoryProcess
 
 from chio_mini_swe.state import SCHEMA, Journal, encode
@@ -20,10 +19,11 @@ def state():
         "n_consecutive_format_errors": 0,
         "receipts": [],
         "model_receipts": [],
+        "command_outputs": {},
     }
 
 
-def test_legacy_checkpoint_can_be_read_and_advanced_without_changing_task_state():
+def test_unversioned_blob_checkpoint_is_refused():
     client = MemoryProcess()
     value = state()
     data = encode(value)
@@ -38,12 +38,18 @@ def test_legacy_checkpoint_can_be_read_and_advanced_without_changing_task_state(
         },
     )
     journal = Journal(client)
-    assert journal.read() == value
-    journal.write(value)
-    assert journal.reference["schema"] == SNAPSHOT_SCHEMA
-    assert journal.revision == "2"
-    assert Journal(client).read() == value
-    assert client.blobs[key] == data
+    with pytest.raises(RuntimeError, match="Invalid mini-SWE checkpoint"):
+        journal.read()
+
+
+def test_command_output_must_name_a_retained_receipt():
+    value = state()
+    value["receipts"] = ['{"id":"original"}']
+    value["command_outputs"] = {"substituted": {"kind": "value"}}
+    with pytest.raises(RuntimeError, match="output binding"):
+        Journal._validate(value)
+    value["command_outputs"] = {"original": {"kind": "value"}}
+    assert Journal._validate(value) is value
 
 
 def test_lost_checkpoint_reply_does_not_rewrite_the_committed_document():

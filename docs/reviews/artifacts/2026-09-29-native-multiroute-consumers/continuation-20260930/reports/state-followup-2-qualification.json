@@ -1,0 +1,38 @@
+{
+  "schema": "chio.mini-swe.state-qualification.v1",
+  "private_state": "/tmp/chio-json-state-9v24b_93",
+  "synthetic_turns": 120,
+  "observation_bytes": 4096,
+  "retained_document_bytes": 509502,
+  "modeled_query_bytes": 504066,
+  "storage": {
+    "limits": {
+      "max_blobs": 4096,
+      "max_bytes": 67108864
+    },
+    "max_blob_bytes": 1048576,
+    "process_blobs": 907,
+    "process_bytes": 6522972,
+    "protocol": "chio.process.blobs.v1",
+    "tree_blobs": 907,
+    "tree_bytes": 6522972
+  },
+  "native_seconds": 5.561012707000373,
+  "offline_seconds": 0.4320763639998404,
+  "offline_blob_reads": 42,
+  "lost_checkpoint_reply": true,
+  "fresh_host_recovered_full_document": true,
+  "offline_read_without_credential": true,
+  "database_pages_and_wal_bytes_unchanged": true,
+  "native_tool_calls": 0,
+  "binary_sha256": "b57217c45d579406f4a9f2c597b13c7d0df0450c02f265a7bf2aedd957ac5406",
+  "sources_sha256": {
+    "chio_mini_swe.state": "fced898257f969f3efd1fe58276dd091640e1d62bb0f733aa990ebe7573f2151",
+    "chio_process.snapshot": "07f2bd935f5faf6efa45f68326d2e217da2e18fb3a0b07f10122d2aa53c7d706",
+    "chio_process": "93a6e0db164ad04cf6fc3eaa5a3af4a202715ece3e0db5df01db0add37882d8a"
+  },
+  "limits": [
+    "Synthetic transcript and cost counters; no model, agent or tool invocation",
+    "Explicit fixture launch authority; no production-containment claim"
+  ]
+}

@@ -60,6 +60,9 @@ impl<'a> FlowPolicyView<'a> {
             },
             classified,
         ) = self.classify_arguments(input)?;
+        let canonical_request =
+            chio_security_types::ports::CanonicalBody::new(canonical_request.into_bytes())
+                .map_err(|_| FlowDenial::ClassifierFailure)?;
         let complete_source = classified
             .label()
             .join(&self.config.operator_input_floor)
@@ -184,7 +187,8 @@ impl<'a> FlowPolicyView<'a> {
             request_id: RequestId::new(input.request.request_id.clone())
                 .map_err(|_| FlowDenial::InvalidManifest)?,
             payload_digest: digest(payload.as_bytes()),
-            payload,
+            payload: chio_security_types::ports::ClassificationPayload::new(payload.into_bytes())
+                .map_err(|_| FlowDenial::ClassifierFailure)?,
         };
         let classified = self
             .config

@@ -90,3 +90,30 @@ fn locally_rehashed_egress_history_cannot_replace_anchored_operation_custody() -
     }
     Ok(())
 }
+
+#[test]
+fn ordered_history_checks_every_global_reference_field_in_the_same_snapshot() -> AnchoredTestResult
+{
+    let fixture = fixture();
+    hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let pending = pending(&fixture, "egress-global-reference", None)?;
+    let acquired = pending.acquire(&fixture)?;
+    pending.commit(&fixture, &commitment(&acquired)?)?;
+    let mut connection = fixture.store.connection()?;
+    for mutation in [
+        "mutation_kind = 'another_mutation'",
+        "projection_reference_digest = lower(hex(zeroblob(32)))",
+        "store_uuid = 'another_store'",
+        "store_lease_id = 'another_lease'",
+        "store_owner_epoch = store_owner_epoch + 1",
+        "projection_sequence = projection_sequence + 1",
+    ] {
+        let tx = connection.transaction()?;
+        tx.execute_batch("DROP TRIGGER authority_global_commits_immutable")?;
+        assert_eq!(tx.execute(&format!("UPDATE authority_global_commits SET {mutation} WHERE projection_kind = 'security_participant_egress' AND projection_sequence = 2"), [])?, 1);
+        assert!(native::verify_coverage(&tx).is_err(), "{mutation}");
+        tx.rollback()?;
+        native::verify_coverage(&connection)?;
+    }
+    Ok(())
+}

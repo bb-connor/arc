@@ -43,3 +43,6 @@ use writer::{run_stdio_writer, BoundedStdioWriter, WriterCommand};
 #[cfg(test)]
 #[path = "stdio_test_process.rs"]
 mod test_process;
+
+#[cfg(test)]
+mod final_response_tests;

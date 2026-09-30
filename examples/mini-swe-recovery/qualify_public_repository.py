@@ -12,12 +12,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-from chio_process import ProcessClient
-from chio_process.launch import provision_native_demo
+from broker_campaign import BrokerCampaign
+from chio_process.broker import BrokerProcessClient, decode_broker_output
 from qualify_repository import command
 
 from chio_mini_swe.repository_archive import git
-from chio_mini_swe.repository_store import Workspace
+from chio_mini_swe.repository_store import Workspace, configuration_digest
 
 
 @contextlib.contextmanager
@@ -104,40 +104,16 @@ def main():
             cwd=root,
         )
     )
-    server = provision_native_demo(
+    services = BrokerCampaign(
         binary,
-        "sandbox",
-        [str(entrypoint), "serve", "--state", str(root / "repository")],
-        root / "launch",
         root,
+        None,
+        "public-repository",
+        workspace=root / "repository",
+        repository_only=True,
+        response_limit_bytes=524288,
     )
-    server["request_timeout_seconds"] = initialized["timeout_seconds"] + 120
-    (root / "policy.yaml").write_text("""kernel:
-  max_capability_ttl: 3600
-  durable_admission_mode: all
-capabilities:
-  default:
-    tools:
-      - server: sandbox
-        tool: execute
-        operations: [invoke, delegate]
-        ttl: 3600
-""")
-    config = {
-        "schema": "chio.process.host.v1",
-        "policy": str(root / "policy.yaml"),
-        "servers": [server],
-        "limits": {"max_processes": 2, "max_depth": 1, "max_calls": 8},
-        "children": [
-            {
-                "id": "coder",
-                "parent": "root",
-                "budget_share_bps": 9000,
-                "tools": [{"server_id": "sandbox", "tool_name": "execute"}],
-            }
-        ],
-    }
-    (root / "config.json").write_text(json.dumps(config))
+    binding = configuration_digest(json.loads((root / "repository/workspace.json").read_text()))
     host = json.loads(
         command(
             binary,
@@ -147,6 +123,8 @@ capabilities:
             root / "config.json",
             "--state",
             root / "host",
+            "--aggregate-invocations",
+            "24",
             cwd=root,
         )
     )
@@ -165,7 +143,7 @@ capabilities:
         cwd=root,
     )
     connection = json.loads((root / "connection.json").read_text())
-    client = ProcessClient(connection["socket_path"], connection["credential"], timeout=240)
+    client = BrokerProcessClient(connection["socket_path"], connection["credential"], timeout=240)
     compile_arguments = {
         "command": "sleep 65; python -m compileall -q src && git diff --exit-code "
         "&& python -c \"print('x'*500000)\""
@@ -174,24 +152,35 @@ capabilities:
         "command": "printf '\\nChio repository execution qualification.\\n' >> README.md; "
         'git diff --check && python -c "print(chr(0)*79000)"'
     }
+    compile_arguments["configuration_sha256"] = binding
+    patch_arguments["configuration_sha256"] = binding
+    services.start(binary)
     print("Private public-repository qualification state: " + str(root), flush=True)
     try:
         with serving(binary, root):
             first = client.invoke("compile-source", "sandbox", "execute", compile_arguments)
             assert first["verdict"] == "allow" and first["terminal_state"]["state"] == "completed"
-            assert first["output"]["value"]["structuredContent"]["returncode"] == 0
-            assert first["output"]["value"]["structuredContent"]["output"] == "x" * 500000 + "\n"
+            assert decode_broker_output(first["output"]["value"])["returncode"] == 0
+            assert decode_broker_output(first["output"]["value"])["output"] == "x" * 500000 + "\n"
         with serving(binary, root):
             replay = client.invoke("compile-source", "sandbox", "execute", compile_arguments)
             assert replay == first
             second = client.invoke("edit-readme", "sandbox", "execute", patch_arguments)
             assert second["verdict"] == "allow" and second["terminal_state"]["state"] == "completed"
-            assert second["output"]["value"]["structuredContent"]["returncode"] == 0
-            assert second["output"]["value"]["structuredContent"]["output"] == "\0" * 79000 + "\n"
+            assert decode_broker_output(second["output"]["value"])["returncode"] == 0
+            assert decode_broker_output(second["output"]["value"])["output"] == "\0" * 79000 + "\n"
         (root / "receipts.ndjson").write_text(
             first["receipt_json"] + "\n" + second["receipt_json"] + "\n"
         )
         (root / "kernel.pub").write_text(host["kernel_key"])
+        (root / "command-outputs.json").write_text(
+            json.dumps(
+                {
+                    json.loads(result["receipt_json"])["id"]: result["output"]["value"]
+                    for result in (first, second)
+                }
+            )
+        )
         verified = json.loads(
             command(
                 entrypoint,
@@ -202,6 +191,8 @@ capabilities:
                 binary,
                 "--receipts",
                 root / "receipts.ndjson",
+                "--command-outputs",
+                root / "command-outputs.json",
                 "--kernel-key",
                 root / "kernel.pub",
                 "--server-id",
@@ -247,6 +238,7 @@ capabilities:
         (args.output / "qualification.json").write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps(report))
     finally:
+        services.close()
         with Workspace(root / "repository") as workspace:
             workspace.recover()
 

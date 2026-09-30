@@ -1,18 +1,44 @@
 #[cfg(feature = "std")]
 use super::PortResult;
 use super::{
-    BoundedVec, CanonicalBody, ClassifierId, ClassifierVersion, Deserialize, Digest32, RecordId,
-    RequestId, Serialize, TenantId,
+    BodyError, BoundedVec, CanonicalBody, ClassifierId, ClassifierVersion, Deserialize, Digest32,
+    RecordId, RequestId, Serialize, TenantId, Vec,
 };
 
 pub type ClassificationFindings = BoundedVec<ClassificationFinding, 256>;
+
+/// Delivered data may contain encoded broker envelopes larger than authority
+/// messages. Keep its allocation ceiling separate from `CanonicalBody`.
+pub const MAX_CLASSIFICATION_PAYLOAD_BYTES: usize = 4 * 1024 * 1024;
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(transparent)]
+pub struct ClassificationPayload(BoundedVec<u8, MAX_CLASSIFICATION_PAYLOAD_BYTES>);
+
+impl ClassificationPayload {
+    pub fn new(bytes: Vec<u8>) -> Result<Self, BodyError> {
+        BoundedVec::new(bytes)
+            .map(Self)
+            .map_err(|_| BodyError::TooLarge)
+    }
+
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+
+    #[must_use]
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0.into_vec()
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClassificationRequest {
     pub tenant_id: TenantId,
     pub request_id: RequestId,
-    pub payload: CanonicalBody,
+    pub payload: ClassificationPayload,
     pub payload_digest: Digest32,
 }
 

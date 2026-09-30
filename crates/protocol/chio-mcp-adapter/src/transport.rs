@@ -42,7 +42,6 @@ use utils::{
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::framing::MAX_STDIO_MCP_FRAME_BYTES;
     use chio_core::session::ElicitationAction;
     use chio_core::RequestId;
 
@@ -185,7 +184,10 @@ mod tests {
 
     #[test]
     fn read_line_rejects_oversized_frame() {
-        let input = format!("{}\n", "x".repeat(MAX_STDIO_MCP_FRAME_BYTES + 1));
+        let input = format!(
+            "{}\n",
+            "x".repeat(crate::framing::MAX_STDIO_MCP_RESPONSE_BYTES + 1)
+        );
         let mut reader = BufReader::new(input.as_bytes());
         let err = match read_line(&mut reader) {
             Ok(value) => panic!("oversized frame must fail closed, got: {value}"),

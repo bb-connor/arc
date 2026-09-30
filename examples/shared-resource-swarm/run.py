@@ -38,7 +38,7 @@ def command(arguments, directory):
 
 
 def prepare_host(args, directory, roles=ROLES, *, operator=False):
-    from chio_process.launch import demo_python, provision_native_demo
+    from chio_process.python_application import provision_native_python_demo
 
     binary = args.chio.resolve(strict=True)
     policy = """kernel:
@@ -61,37 +61,42 @@ capabilities:
 """
     (directory / "policy.yaml").write_text(policy)
     (directory / "tool-data").mkdir(exist_ok=True)
-    server = provision_native_demo(
+    database_files = [
+        directory / "tool-data/resource.db",
+        directory / "tool-data/resource.db-journal",
+    ]
+    modules = {name: HERE / name for name in ("server.py", "store.py")}
+    server = provision_native_python_demo(
         binary,
         "board",
+        "server",
+        modules,
         [
-            demo_python(),
-            str(HERE / "server.py"),
             "--database",
             str(directory / "tool-data" / "resource.db"),
         ],
         directory / "launch",
         directory,
-        read_paths=[directory / "tool-data"],
-        write_paths=[directory / "tool-data"],
+        read_paths=database_files,
+        write_paths=database_files,
     )
     servers = [server]
     if operator:
         servers.append(
-            provision_native_demo(
+            provision_native_python_demo(
                 binary,
                 "board-admin",
+                "server",
+                modules,
                 [
-                    demo_python(),
-                    str(HERE / "server.py"),
                     "--database",
                     str(directory / "tool-data" / "resource.db"),
                     "--operator",
                 ],
                 directory / "launch-operator",
                 directory,
-                read_paths=[directory / "tool-data"],
-                write_paths=[directory / "tool-data"],
+                read_paths=database_files,
+                write_paths=database_files,
             )
         )
     config = {

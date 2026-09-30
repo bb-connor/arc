@@ -25,7 +25,8 @@ performance, maintainer acceptance or independent adoption.
 ## Run
 
 Linux, Docker and a Chio binary with the process host and signed native MCP
-launch support are required. The caller must already have Docker access.
+launch support are required. The caller must already have Docker access. Export the prepared broker and
+adapter paths listed in the [native launch guide](../../docs/security/native-launch-examples.md#prepared-provider-and-repository-consumers).
 
 ```sh
 uv sync --project sdks/python/chio-mini-swe --locked --extra dev
@@ -93,7 +94,10 @@ The isolated profile runs the same agent and recovery assertions in fresh
 worker containers. Runtime probes check that the worker cannot reach host
 authority files or Docker's socket, cannot modify its RPC inputs or root
 filesystem, has no external network route and cannot invoke an administrative
-Chio method. It also checks actual capabilities, seccomp and scratch capacity.
+Chio method. The ungranted-effect probe uses a separate mailbox-only host,
+exports its original denial and public key, and proves zero mailbox writes.
+The coding host retains only its prepared broker routes. The probe also checks
+actual capabilities, seccomp and scratch capacity.
 Separate hostile programs prove timeout and output-limit cleanup, and an image
 declaring an extra writable volume is refused before its worker starts.
 

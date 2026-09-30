@@ -18,7 +18,7 @@ import time
 import uuid
 from pathlib import Path
 
-from chio_process.launch import provision_native_demo
+from broker_campaign import BrokerCampaign, provider_endpoint
 from compare_cleanup import cleanup as cleanup_upstream
 
 from chio_mini_swe.operator import protected_executable
@@ -27,6 +27,7 @@ from chio_mini_swe.repository_transport import DOCKER, docker
 
 HERE = Path(__file__).resolve().parent
 HARNESS = (
+    "broker_campaign.py",
     "compare.py",
     "compare_upstream.py",
     "compare_cleanup.py",
@@ -244,7 +245,7 @@ def clean_environment(root):
     }
 
 
-def native(directory, source, revision, image, binary, binary_digest, endpoint, requests, scenario):
+def native(directory, source, revision, image, binary, binary_digest, scenario):
     operator = Path(sys.executable).parent / "chio-mini-swe"
     reviewer = Path(sys.executable).parent / "chio-mini-swe-repository"
     environment = clean_environment(directory)
@@ -252,6 +253,7 @@ def native(directory, source, revision, image, binary, binary_digest, endpoint, 
     configuration = {
         "schema": "chio.mini-swe.session-config.v1",
         "chio": str(binary),
+        "broker_tool": os.environ["CHIO_BROKER_MCP_TOOL"],
         "repository": str(source),
         "revision": revision,
         "provider_config": "provider.json",
@@ -270,10 +272,10 @@ def native(directory, source, revision, image, binary, binary_digest, endpoint, 
         directory / "provider.json",
         {
             "schema": "chio.mini-swe.provider.v1",
-            "endpoint": endpoint,
+            "endpoint": provider_endpoint(),
             "model": "comparison-fixture",
             "credential_env": "CHIO_COMPARISON_FIXTURE_KEY",
-            "allow_loopback_http": True,
+            "allow_loopback_http": False,
             "max_output_tokens": 1024,
             "temperature": 0,
             "timeout_seconds": 30,
@@ -300,143 +302,152 @@ def native(directory, source, revision, image, binary, binary_digest, endpoint, 
     request = json.loads((state / "provisioning-request.json").read_text())
     assert request["binary_sha256"] == binary_digest
     started = time.monotonic()
-    bindings = {}
-    # Explicit comparison authority is issued outside the installed product.
-    for name, launch in request["servers"].items():
-        selected = provision_native_demo(
-            binary,
-            name,
-            launch["command"],
-            directory / ("launch-" + name),
-            launch["working_directory"],
+    services = BrokerCampaign(binary, state, None, "comparison", session=True)
+    try:
+        authorized = json.loads(services.config_path.read_text())
+        authority_seconds = time.monotonic() - started
+        write(
+            directory / "authorization.json",
+            {
+                "schema": "chio.mini-swe.session-authorization.v2",
+                "servers": {
+                    entry["id"]: {
+                        key: entry[key]
+                        for key in ("command", "launch_policy", "launch_policy_signer")
+                    }
+                    for entry in authorized["servers"]
+                },
+                "native_broker": authorized["native_broker"],
+            },
         )
-        bindings[name] = {k: selected[k] for k in ("launch_policy", "launch_policy_signer")}
-    authority_seconds = time.monotonic() - started
-    write(
-        directory / "authorization.json",
-        {"schema": "chio.mini-swe.session-authorization.v1", "servers": bindings},
-    )
-    _, prepared = command(
-        directory,
-        "prepare",
-        operator,
-        "session",
-        "prepare",
-        "--state",
-        state,
-        "--authorization",
-        directory / "authorization.json",
-        env=environment,
-    )
-    before_bytes = directory_bytes(state)
-    assert not requests
-    environment["CHIO_COMPARISON_FIXTURE_KEY"] = CREDENTIAL
-    completed, executed = command(
-        directory,
-        "execute",
-        operator,
-        "session",
-        "run",
-        "--state",
-        state,
-        timeout=540,
-        env=environment,
-    )
-    assert completed["complete"]
-    assert completed["pending_container_records"] == 0
-    assert completed["abandoned_socket_intents"] == 0
-    attempts = completed["workers"][0]["attempts"]
-    assert attempts == (2 if scenario == "patch-return-crash" else 1)
-    fault = None
-    if scenario == "patch-return-crash":
-        lines = (state / "run/host/run-logs/coder-1.stdout").read_text().splitlines()
-        events = [json.loads(line) for line in lines if line.startswith("{")]
-        faults = [e for e in events if e.get("event") == "comparison_patch_return_crash"]
-        assert len(faults) == 1 and faults[0]["attempt"] == 1
-        fault = faults[0]
-    environment.pop("CHIO_COMPARISON_FIXTURE_KEY")
-    # The native result and recipient verification run with no provider key.
-    (state / "provider.json").unlink()
-    exported, exported_metric = command(
-        directory,
-        "export",
-        operator,
-        "session",
-        "result",
-        "--state",
-        state,
-        "--out",
-        directory / "result",
-        env=environment,
-    )
-    kernel = directory / "result/operator/kernel.pub"
-    review, review_metric = command(
-        directory,
-        "review",
-        reviewer,
-        "verify-export",
-        "--bundle",
-        directory / "result/repository",
-        "--repository",
-        source,
-        "--revision",
-        revision,
-        "--kernel-key",
-        kernel,
-        "--server-id",
-        "sandbox",
-        "--chio",
-        binary,
-        env=environment,
-    )
-    manifest = json.loads((directory / "result/repository/manifest.json").read_text())
-    final_files = {}
-    with tarfile.open(
-        fileobj=io.BytesIO((directory / "result/repository/workspace.tar").read_bytes())
-    ) as archive:
-        for entry in archive:
-            name = entry.name.removeprefix("./")
-            if name in {"calculator.py", "test_calculator.py", "effects.txt", "test-output.txt"}:
-                if not entry.isfile() or entry.size > 65536 or name in final_files:
-                    raise ValueError("Invalid final comparison fixture file")
-                final_files[name] = archive.extractfile(entry).read().decode()
-    assert len(final_files) == 4
-    assert "return a + b" in final_files["calculator.py"]
-    assert final_files["test-output.txt"].rstrip().endswith("OK")
-    assert final_files["effects.txt"].splitlines() == ["patched", "audit", "audit"]
-    assert review["verified_transitions"] == 5
-    assert review["verification"]["receipts_verified"] == 8
-    assert [r["turn"] for r in requests] == [0, 1, 2]
-    if fault is not None:
-        receipts = [
-            json.loads(line)
-            for line in (directory / "result/operator/receipts.ndjson").read_text().splitlines()
-        ]
-        assert json.loads(fault["receipt_json"]) in receipts
-    return {
-        "mode": "chio",
-        "initialization": initialized,
-        "preparation": prepared,
-        "fixture_authority_seconds": authority_seconds,
-        "execution": executed,
-        "export": exported_metric,
-        "recipient_verification": review_metric,
-        "completed": completed,
-        "exported": exported,
-        "review": review,
-        "manifest": manifest,
-        "final_files": final_files,
-        "effects": final_files["effects.txt"].splitlines(),
-        "fault": fault,
-        "state_bytes_before_execution": before_bytes,
-        "state_bytes_after_execution": directory_bytes(state),
-        "model_requests": list(requests),
-        "execution_image": image["execution_image"],
-        "worker_image": image["image"],
-        "container_resource_accounting": (
-            "unavailable: driver child usage excludes Docker daemon and container cgroups"
-        ),
-    }
+        _, prepared = command(
+            directory,
+            "prepare",
+            operator,
+            "session",
+            "prepare",
+            "--state",
+            state,
+            "--authorization",
+            directory / "authorization.json",
+            env=environment,
+        )
+        before_bytes = directory_bytes(state)
+        assert not (state / "queries.jsonl").read_text()
+        services.start(binary)
+        completed, executed = command(
+            directory,
+            "execute",
+            operator,
+            "session",
+            "run",
+            "--state",
+            state,
+            timeout=540,
+            env=environment,
+        )
+        assert completed["complete"]
+        assert completed["pending_container_records"] == 0
+        assert completed["abandoned_socket_intents"] == 0
+        attempts = completed["workers"][0]["attempts"]
+        assert attempts == (2 if scenario == "patch-return-crash" else 1)
+        fault = None
+        if scenario == "patch-return-crash":
+            lines = (state / "run/host/run-logs/coder-1.stdout").read_text().splitlines()
+            events = [json.loads(line) for line in lines if line.startswith("{")]
+            faults = [e for e in events if e.get("event") == "comparison_patch_return_crash"]
+            assert len(faults) == 1 and faults[0]["attempt"] == 1
+            fault = faults[0]
+        requests = [json.loads(line) for line in (state / "queries.jsonl").read_text().splitlines()]
+        # The native result and recipient verification run with no provider key.
+        (state / "provider.json").unlink()
+        exported, exported_metric = command(
+            directory,
+            "export",
+            operator,
+            "session",
+            "result",
+            "--state",
+            state,
+            "--out",
+            directory / "result",
+            env=environment,
+        )
+        kernel = directory / "result/operator/kernel.pub"
+        review, review_metric = command(
+            directory,
+            "review",
+            reviewer,
+            "verify-export",
+            "--bundle",
+            directory / "result/repository",
+            "--repository",
+            source,
+            "--revision",
+            revision,
+            "--kernel-key",
+            kernel,
+            "--server-id",
+            "sandbox",
+            "--chio",
+            binary,
+            env=environment,
+        )
+        manifest = json.loads((directory / "result/repository/manifest.json").read_text())
+        final_files = {}
+        with tarfile.open(
+            fileobj=io.BytesIO((directory / "result/repository/workspace.tar").read_bytes())
+        ) as archive:
+            for entry in archive:
+                name = entry.name.removeprefix("./")
+                if name in {
+                    "calculator.py",
+                    "test_calculator.py",
+                    "effects.txt",
+                    "test-output.txt",
+                }:
+                    if not entry.isfile() or entry.size > 65536 or name in final_files:
+                        raise ValueError("Invalid final comparison fixture file")
+                    final_files[name] = archive.extractfile(entry).read().decode()
+        assert len(final_files) == 4
+        assert "return a + b" in final_files["calculator.py"]
+        assert final_files["test-output.txt"].rstrip().endswith("OK")
+        assert final_files["effects.txt"].splitlines() == ["patched", "audit", "audit"]
+        assert review["verified_transitions"] == 5
+        assert review["verification"]["receipts_verified"] == 8
+        assert [r["turn"] for r in requests] == [0, 1, 2]
+        if fault is not None:
+            receipts = [
+                json.loads(line)
+                for line in (directory / "result/operator/receipts.ndjson").read_text().splitlines()
+            ]
+            assert json.loads(fault["receipt_json"]) in receipts
+        return {
+            "mode": "chio",
+            "initialization": initialized,
+            "preparation": prepared,
+            "fixture_authority_seconds": authority_seconds,
+            "execution": executed,
+            "export": exported_metric,
+            "recipient_verification": review_metric,
+            "completed": completed,
+            "exported": exported,
+            "review": review,
+            "manifest": manifest,
+            "final_files": final_files,
+            "effects": final_files["effects.txt"].splitlines(),
+            "fault": fault,
+            "state_bytes_before_execution": before_bytes,
+            "state_bytes_after_execution": directory_bytes(state),
+            "model_requests": list(requests),
+            "execution_image": image["execution_image"],
+            "worker_image": image["image"],
+            "container_resource_accounting": (
+                "unavailable: driver child usage excludes Docker daemon and container cgroups"
+            ),
+        }
+    finally:
+        services.close()
 
 
 def main():
@@ -448,7 +459,7 @@ def main():
     args = parser.parse_args()
     os.umask(0o077)
     args.output.mkdir(parents=True, exist_ok=False)
-    root = Path(tempfile.mkdtemp(prefix="chio-upstream-comparison-"))
+    root = Path(tempfile.mkdtemp(prefix="chio-cmp-"))
     os.environ["MSWEA_GLOBAL_CONFIG_DIR"] = str(root / "mini-config")
     os.environ["MSWEA_SILENT_STARTUP"] = "1"
     print("Private comparison state: " + str(root), flush=True)
@@ -478,7 +489,9 @@ def main():
             )
             for mode in order:
                 case = f"{trial + 1}-{scenario}-{mode}"
-                directory = root / case
+                # Socket paths include several authority-owner subdirectories.
+                # Keep private storage names bounded independently of case labels.
+                directory = root / f"case-{len(results):02d}"
                 directory.mkdir()
                 write(
                     args.output / "progress.json",
@@ -499,8 +512,6 @@ def main():
                             selected,
                             binary,
                             binary_digest,
-                            endpoint,
-                            requests,
                             scenario,
                         )
                     else:

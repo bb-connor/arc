@@ -38,6 +38,7 @@ class ChioEnvironment:
         self.tool_name = tool_name
         self.config = json.loads(encode(template_vars))
         self.receipts: list[str] = []
+        self.outputs: dict[str, dict] = {}
         self._batch: tuple[str, int, list[dict]] | None = None
         self._index = 0
 
@@ -74,7 +75,10 @@ class ChioEnvironment:
         key = "mini-swe:" + digest(["chio.mini-swe.command.v1", run_id, turn, index])
         # Broker preparation retains the original command body. Shell guards
         # classify those exact bytes before capture and again before dispatch.
-        result = self.client.invoke(key, self.server_id, self.tool_name, action)
+        arguments = dict(action)
+        if "repository_configuration_sha256" in self.config:
+            arguments["configuration_sha256"] = self.config["repository_configuration_sha256"]
+        result = self.client.invoke(key, self.server_id, self.tool_name, arguments)
         receipt = result.get("receipt_json")
         if not isinstance(receipt, str) or not receipt:
             raise ChioExecutionError("missing receipt")
@@ -90,6 +94,9 @@ class ChioEnvironment:
         if not isinstance(output, dict) or output.get("kind") != "value":
             raise ChioExecutionError("invalid output", receipt)
         value = output.get("value")
+        if isinstance(self.client, BrokerProcessClient):
+            receipt_id = json.loads(receipt)["id"]
+            self.outputs[receipt_id] = json.loads(encode(value))
         if isinstance(value, dict) and ("content" in value or "isError" in value):
             if value.get("isError", False) is not False:
                 raise ChioExecutionError("MCP execution failed", receipt)

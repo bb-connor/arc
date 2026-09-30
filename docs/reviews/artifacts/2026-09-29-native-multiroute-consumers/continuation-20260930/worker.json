@@ -1,0 +1,24 @@
+{
+  "name": "chio-security-qualification-20260929",
+  "instance_id": "ocid1.instance.oc1.iad.anuwcljrm7fixficqtd4bvcr5ravvj5qxdyipfcddyseiodmcz2zdf4qsoiq",
+  "region": "us-ashburn-1",
+  "shape": "VM.Standard.E4.Flex",
+  "ocpus": 8.0,
+  "memory_gib": 64.0,
+  "private_ip": "10.20.10.101",
+  "state": "STOPPED",
+  "observed_at": "2026-09-30T17:00:24.192404+00:00",
+  "boot_volume_id": "ocid1.bootvolume.oc1.iad.abuwcljrnlyskb7omb3ebrfzwmocxgzoaz5npxgkbnwkm4g33deex57ahera",
+  "anchor_volume_id": "ocid1.volume.oc1.iad.abuwcljrrjnazce6ixguvleb5eaiby2ukx6c4i5se5q5xz74qtaeckysxy2a",
+  "anchor_mount": "/mnt/chio-anchor",
+  "volumes": "retained, never formatted",
+  "checkout": "/home/ubuntu/arc-native-consumers-20260929",
+  "evidence": "/home/ubuntu/native-multiroute-evidence-20260929",
+  "next_action": "Use the Mac OCI CLI compute instance action --action START with this instance_id, then reconnect at the private address and verify /mnt/chio-anchor before qualification.",
+  "private_state_archive": {
+    "path": "/home/ubuntu/native-multiroute-evidence-20260929/private-original-states-20260930.tgz",
+    "bytes": 445987978,
+    "sha256": "78193636120daaa8d260c1ff5bbead6ed34a9c503cdd4528edf4df14384674c2",
+    "visibility": "private; signing and original recovery material remain on retained boot volume"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "chio.process.package-qualification.v1",
+  "python": "3.12.3",
+  "node": "v22.23.3",
+  "elapsed_seconds": 12.86,
+  "checks": [
+    "offline_local_artifact_install",
+    "external_python_and_node_imports",
+    "python_to_node_mailbox",
+    "known_handoff_replays_original_receipts",
+    "five_verified_receipts_including_two_scope_denials",
+    "one_acknowledged_message",
+    "completed_run_does_not_respawn_workers",
+    "native_operator_status_and_attempt_logs",
+    "installed_wheel_and_tarball_protocol_tests",
+    "rebuilt_sdist_protocol_tests",
+    "artifact_drift_rejected"
+  ]
+}

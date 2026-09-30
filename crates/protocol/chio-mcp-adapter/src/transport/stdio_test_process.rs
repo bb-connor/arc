@@ -13,6 +13,17 @@ impl StdioMcpTransport {
         args: &[&str],
         request_timeouts: StdioRequestTimeouts,
     ) -> Result<Self, AdapterError> {
+        Self::spawn_test_process_with_stdout(command, args, request_timeouts, |stdout| {
+            Box::new(stdout)
+        })
+    }
+
+    pub(super) fn spawn_test_process_with_stdout(
+        command: &str,
+        args: &[&str],
+        request_timeouts: StdioRequestTimeouts,
+        wrap: impl FnOnce(std::process::ChildStdout) -> Box<dyn Read + Send>,
+    ) -> Result<Self, AdapterError> {
         let mut child_command = Command::new(command);
         child_command
             .args(args)
@@ -42,7 +53,7 @@ impl StdioMcpTransport {
         Self::from_launched_process(
             ManagedChild::TestProcess(child),
             Box::new(stdin),
-            Box::new(stdout),
+            wrap(stdout),
             Box::new(stderr),
             None,
             None,

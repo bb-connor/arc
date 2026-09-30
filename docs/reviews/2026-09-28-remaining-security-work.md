@@ -9,10 +9,10 @@ The current batch has its own implementation and verification record below; this
 
 | Work | Current recorded scope | Interpretation |
 | --- | --- | --- |
-| Decoder classification | 279 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite and the selected native/remote/A2A protocol owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
+| Decoder classification | 278 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite and the selected native/remote/A2A protocol owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
 | Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
-| Negative assertions | Baseline contains 1,260 assertions at 1,177 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
+| Negative assertions | Baseline contains 1,257 assertions at 1,175 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
 | Schema/domain duplication | Wire lock records 163 identifiers declared in multiple files; domain gate has 32 shape exceptions and zero duplicate byte domains | Six duplicated byte domains and 37 schema duplicates retired with 43 canonical identity pins. Remaining schema consolidation and domain-shape repairs stay queued. |
 
@@ -101,24 +101,22 @@ pass on the restored OCI worker. Full mini-SWE and the other native consumers
 are not qualified by those fixtures.
 
 The [multi-route consumer batch](2026-09-29-native-multiroute-consumers-execution.md)
-implements bounded per-route broker authority, host-owned Docker/provider
-adapters, durable prepared requests and mini-SWE model/execution callers. Native
-broker tests and a fresh four-worker budget-contention/crash/recovery campaign
-pass. Those results do not close native task 1. The remaining substantial work is:
+now implements bounded broker routes, host-owned Docker/provider/repository
+adapters, prepared session/operator/repository consumers, scalable retained-history
+validation, exact Python/SQLite resources and current-only proof/state readers.
+The native baseline, known/unknown crash campaigns and installed consumer matrix
+pass. Final large-output/restart/offline-proof acceptance and the eight-case
+comparison pass. Its execution record pins source/binary identities and OCI
+lifecycle. Do not repeat the already completed
+consumer migration or treat these focused campaigns as hosted qualification.
 
-1. Finish scalable retained-history verification in the hot native lifecycle.
-   The optimized mini-SWE baseline completes four calls, then its fifth handoff
-   fails under the existing deadline. Preserve original custody and fail-closed
-   corruption/rollback checks while removing repeated transaction-local work.
-2. Migrate operator/session/public repository launchers to host-owned broker
-   authority with their complete repository/scope/receipt proof chain. The
-   explicit CPython closure is implemented; remaining interpreter consumers
-   still need exact application reads and writes, not broad directory grants.
-3. Complete mini-SWE baseline, crash/restart and unknown-effect campaigns, then
-   provider/operator/session/public repository and packaged SDK/example/
-   conformance campaigns. Wire the bounded runtime and migrated callers into
-   native CI without skipping existing discovery and recovery gates. Preserve
-   every terminal result and separate source/binary identities.
+Next execute 13 CLI process/evidence baseline files: the seven readers under
+`process_host/`, `process_response_verify/json.rs`, `receipt_verify.rs`, and the
+four `replay/` readers. Include all six `chio-api-protect` baseline files and the
+nine `chio-proof-room` baseline files. Close their original-byte,
+proof-result and typed rejection contracts, then their clock/deadline/accounting
+owners and concrete negative controls. Record semantic dispositions in the
+inventories. The 278-file lexical baseline is not a count of known vulnerabilities.
 
 Broader semantic error taxonomy, other product/protocol readers, and the
 remaining structural/declaration/assurance queues below remain open.

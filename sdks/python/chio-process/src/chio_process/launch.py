@@ -43,6 +43,7 @@ def provision_native_demo(
     environment: Mapping[str, str] | None = None,
     read_paths: Sequence[str | Path] = (),
     write_paths: Sequence[str | Path] = (),
+    runtime_files: Sequence[str | Path] = (),
 ) -> dict:
     """Provision a fresh policy and return one process-host server configuration.
 
@@ -97,7 +98,11 @@ def provision_native_demo(
             raise ValueError("native execution cannot retain root supplementary group")
         arguments.extend(["--execution-supplementary-gid", str(group)])
     anchor = Path(os.environ["CHIO_RECEIPT_ANCHOR_ROOT"]).resolve()
-    for flag, paths in (("--read-path", read_paths), ("--write-path", write_paths)):
+    for flag, paths in (
+        ("--read-path", read_paths),
+        ("--write-path", write_paths),
+        ("--runtime-file", runtime_files),
+    ):
         for path in paths:
             grant = Path(path).resolve(strict=True)
             if grant == Path("/") or any(
@@ -108,14 +113,18 @@ def provision_native_demo(
             arguments.extend([flag, str(grant)])
     for argument in bound_command[1:]:
         arguments.extend(["--target-arg", argument])
-    subprocess.run(
-        arguments,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=90,
-        env=environment,
-    )
+    try:
+        subprocess.run(
+            arguments,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=90,
+            env=environment,
+        )
+    except subprocess.CalledProcessError as error:
+        error.add_note("Native provisioner stderr: " + (error.stderr or "")[:8192])
+        raise
     return {
         "id": server_id,
         "command": bound_command,

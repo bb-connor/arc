@@ -52,6 +52,14 @@ impl Record {
     }
 
     pub(super) fn validate(&self, tx: &Connection) -> Result<(), AdmissionOperationStoreError> {
+        self.validate_initialized(tx, None)
+    }
+
+    pub(super) fn validate_initialized(
+        &self,
+        tx: &Connection,
+        initialized: Option<&SecurityParticipantStateInitialization>,
+    ) -> Result<(), AdmissionOperationStoreError> {
         let operation = AdmissionOperationV1::from_persisted(self.operation.clone())?;
         require_operation(&operation)?;
         if self.schema != SCHEMA {
@@ -77,6 +85,11 @@ impl Record {
             &self.context,
             &self.live_request_digest,
         )?;
+        if initialized.is_some_and(|value| {
+            value.admission_binding().as_ref().ok() != Some(&policy.inputs.native_authority)
+        }) {
+            return Err(invalid("native dispatch ledger initialization differs"));
+        }
         policy.validate_at(self.observed_at.max(self.decision_at))?;
         policy.validate_owned_declassification(tx, &operation, &self.policy)?;
         if self.observed_at < policy.inputs.observed_at_unix_ms
@@ -100,7 +113,11 @@ impl Record {
         {
             return Err(invalid("native dispatch ledger differs from original join"));
         }
-        let history = super::super::egress::load_history(tx, operation.binding().operation_id())?;
+        let history = super::super::egress::load_history_initialized(
+            tx,
+            operation.binding().operation_id(),
+            initialized,
+        )?;
         match (policy.decision.effective_egress, history) {
             (false, None)
                 if self.egress_acquisition.is_none() && self.egress_commitment.is_none() => {}

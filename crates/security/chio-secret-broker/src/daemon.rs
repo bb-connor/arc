@@ -37,7 +37,7 @@ pub const CAPABILITY_STATUS_SCHEMA: &str = "chio.broker-capability-status.v1";
 pub const CREDENTIAL_MUTATION_SCHEMA: &str = "chio.broker-credential-mutation.v1";
 const DAEMON_ADMIN_INTENT_DOMAIN: &[u8] = b"chio.broker-daemon-admin-intent.v1\0";
 /// Bound used by every daemon-backed route before capture.
-pub const MAX_DAEMON_COMBINED_RESPONSE_BYTES: u64 = 16_384;
+pub const MAX_DAEMON_COMBINED_RESPONSE_BYTES: u64 = 524_288;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 
 pub use chio_security_types::clock::{Clock, SystemClock};
@@ -844,7 +844,7 @@ fn accepted_response<T: Serialize>(operation: IpcOperation, response: &T) -> Res
 }
 
 fn accepted_bytes(operation: IpcOperation, response: Vec<u8>) -> Result<IpcResponse> {
-    if response.is_empty() || response.len() > crate::protocol::MAX_WIRE_BYTES {
+    if response.is_empty() || response.len() > crate::service::response_payload_limit(operation) {
         return Err(BrokerError::Invariant(
             "IPC success response is empty or oversized".to_string(),
         ));

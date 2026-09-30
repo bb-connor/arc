@@ -5,16 +5,16 @@ import json
 import os
 
 import pytest
-from test_repository import commit, legacy_snapshots
+from test_repository import broker_receipt, commit
 
 from chio_mini_swe import repository_review as review
 from chio_mini_swe import repository_store as store
 from chio_mini_swe.repository import export
 from chio_mini_swe.repository_archive import digest, encode_entries, entries, git
-from chio_mini_swe.repository_proof import bindings, output_digest
+from chio_mini_swe.repository_proof import bindings
 
 
-@pytest.fixture(params=["v1", "v2", "v3"])
+@pytest.fixture(params=["v2", "v3"])
 def bundle(tmp_path, monkeypatch, request):
     source = tmp_path / "source"
     source.mkdir()
@@ -38,8 +38,6 @@ def bundle(tmp_path, monkeypatch, request):
         1,
         source_paths=["binary", "file", "link"] if scoped else None,
     )
-    if request.param == "v1":
-        legacy_snapshots(state)
 
     class Completed:
         def execute(self, snapshot, command):
@@ -56,29 +54,22 @@ def bundle(tmp_path, monkeypatch, request):
     output = tmp_path / "bundle"
     key = tmp_path / "trusted-key"
     key.write_bytes(b"fixture-key")
-    receipts = []
+    receipts, outputs = [], {}
     with store.Workspace(state) as workspace:
         for command in ("first change", "second change"):
             result = workspace.execute(command)
-            receipts.append(
-                {
-                    "id": str(len(receipts)),
-                    "tool_server": "sandbox",
-                    "tool_name": "execute",
-                    "content_hash": output_digest(result),
-                    "action": {"parameters": {"command": command}},
-                    "decision": {"verdict": "allow"},
-                    "metadata": {"admission_operation": {"projected_state": "completed"}},
-                }
-            )
+            receipt, envelope = broker_receipt(result, command, str(len(receipts)))
+            receipts.append(receipt)
+            outputs[receipt["id"]] = envelope
         export(workspace, output)
         raw = b"\n".join(json.dumps(r).encode() for r in receipts) + b"\n"
         verification = {"receipts_verified": len(receipts), "trusted_kernel_key": "fixture-key"}
         proof = {
-            "schema": "chio.repository.receipt-binding.v1",
+            "schema": "chio.repository.receipt-binding.v2",
             "server_id": "sandbox",
             "verification": verification,
-            "transitions": bindings(workspace, receipts, "sandbox"),
+            "transitions": bindings(workspace, receipts, "sandbox", outputs),
+            "outputs": outputs,
             "receipts_sha256": digest(raw),
             "kernel_key_sha256": digest(key.read_bytes()),
         }

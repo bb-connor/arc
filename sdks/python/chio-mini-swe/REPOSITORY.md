@@ -107,12 +107,19 @@ image contains Git.
 
 ## Connect the service to the native host
 
-Use this installed command in the execution server's signed launch policy and
-native host configuration:
+Run the host-owned `chio-repository-adapter` with a protected configuration
+that pins the workspace configuration digest and launcher SHA-256. The launcher
+runs `python -I -m chio_mini_swe.repository_adapter --state PATH` through bounded
+framed pipes. The Rust adapter captures the launcher in a sealed executable
+before spawning it; uncertainty retires the child without retrying the command.
 
-```json
-["/private/coding-venv/bin/chio-mini-swe-repository", "serve", "--state", "/tmp/project-repository"]
-```
+The signed native tool command is `chio-broker-mcp` with the provisioned
+`--tenant-scope`, `--tool-name execute` and `--receipt-signer` pins. Configure its
+prepared route to the adapter's pinned loopback TLS `/execute` endpoint. The
+broker retains the transport credential. The cage receives the prepared stream
+and no Docker socket. The [session contract](SESSION.md) describes the complete
+authorization document; the qualification helper demonstrates its construction
+with local fixture identities.
 
 Set `request_timeout_seconds` on this server in the native host configuration
 to the repository command deadline plus 120 seconds. For the 60-second command
@@ -182,11 +189,9 @@ the command journal unchanged. A write failure after execution stops the workspa
 and retains the previous committed revision.
 
 The private configuration identifies this storage layout as
-`chio.repository.workspace.v2`. The current package continues to read and write
-existing v1 workspaces using their original full archives; it does not migrate
-them. Older packages reject v2 workspaces. Existing v1 configuration stays
-unchanged; package updates still require the usual installation and launch-policy
-identity checks.
+`chio.repository.workspace.v2`; selected-source workspaces use v3 with the same
+shared snapshot store. The obsolete full-archive v1 layout is rejected. All
+new and reopened workspaces use the bounded content-addressed store.
 
 Containers use read-only root filesystems, no network, no capabilities and
 no-new-privileges. They receive the temporary volume, without host source
@@ -247,6 +252,7 @@ chio-mini-swe-repository verify \
   --state /tmp/project-repository \
   --chio /private/bin/chio \
   --receipts /tmp/coding-result/receipts.ndjson \
+  --command-outputs /tmp/coding-result/command-outputs.json \
   --kernel-key /tmp/coding-result/kernel.pub \
   --server-id sandbox \
   --out /tmp/project-verified
@@ -256,7 +262,9 @@ Use the kernel key pinned during task preparation. This command independently
 verifies every supplied receipt with Chio, matches each execution command and
 its complete output hash, and checks the ordered snapshot transitions against
 retained archives. The output adds the original receipts, public key and
-`receipt-binding.json`. The configuration and content digests in successful tool
+`receipt-binding.json` and `command-outputs.json`. Binding v2 recomputes the
+original broker envelope hash, then matches the command and configuration
+against the signed prepared request. The configuration and content digests in successful tool
 results are covered by the signed output hash.
 
 Verification refuses missing, duplicate, unrelated, incomplete or mismatched

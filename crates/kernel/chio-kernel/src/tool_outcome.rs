@@ -37,6 +37,7 @@ pub const RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA: &str =
 
 mod caller_delivery;
 mod receipt_signing;
+mod record_binding;
 pub use receipt_signing::FrozenReceiptSigningIdentityV1;
 pub const TOOL_OUTCOME_SCHEMA: &str = "chio.tool-outcome.v1";
 pub const POST_RETURN_EVALUATION_SCHEMA: &str = "chio.post-return-evaluation.v1";
@@ -634,6 +635,16 @@ impl RawInvocationOutcomeV1 {
     pub fn from_persisted(
         value: PersistedRawInvocationOutcomeV1,
     ) -> Result<Self, ToolOutcomeError> {
+        let raw = Self::from_persisted_fields(value)?;
+        raw.canonical_blob()?;
+        Ok(raw)
+    }
+
+    // Both callers must validate the complete canonical blob before returning.
+    // Keep field reconstruction separate to avoid serializing large output twice.
+    fn from_persisted_fields(
+        value: PersistedRawInvocationOutcomeV1,
+    ) -> Result<Self, ToolOutcomeError> {
         let caller_schema = value.schema == RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA;
         if caller_schema != value.caller_delivery_evidence.is_some() {
             return Err(ToolOutcomeError::Invalid("raw.caller_delivery_schema"));
@@ -716,7 +727,6 @@ impl RawInvocationOutcomeV1 {
             receipt_signing_identity: value.receipt_signing_identity,
             caller_delivery_evidence: value.caller_delivery_evidence,
         };
-        raw.canonical_blob()?;
         Ok(raw)
     }
 
@@ -735,7 +745,7 @@ impl RawInvocationOutcomeV1 {
             )
             .and_then(|input| input.decode_signed())
             .map_err(ToolOutcomeError::from)?;
-        let raw = Self::from_persisted(persisted)?;
+        let raw = Self::from_persisted_fields(persisted)?;
         if raw.canonical_blob()?.bytes() != bytes {
             return Err(ToolOutcomeError::Invalid("raw.noncanonical_bytes"));
         }
@@ -1379,32 +1389,6 @@ impl ToolOutcomeRecordV1 {
         positive("outcome.store_trusted_now", trusted_now_unix_ms)?;
         if active_fence != &self.recording_fence || trusted_now_unix_ms < self.recorded_at_unix_ms {
             return Err(ToolOutcomeError::Binding("outcome.store_mutation_context"));
-        }
-        Ok(())
-    }
-
-    pub fn validate_canonical_blob(
-        &self,
-        operation: &AdmissionOperationV1,
-        blob: &CanonicalInvocationBlobV1,
-    ) -> Result<(), ToolOutcomeError> {
-        self.validate_against(operation)?;
-        let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?;
-        blob.verify(&raw)?;
-        let raw = raw.to_persisted();
-        if raw.operation_id != self.operation_id
-            || raw.request_id != self.request_id
-            || raw.dispatch_operation_version != self.dispatch_operation_version
-            || raw.dispatch_fence != self.dispatch_fence
-            || raw.tool_server != self.tool_server
-            || raw.tool_name != self.tool_name
-            || raw.provider_attempt != self.provider_attempt
-            || raw.transport_terminal_evidence_digest != self.transport_terminal_evidence_digest
-            || raw.reported_cost != self.reported_cost
-            || blob.blob_ref() != &self.raw_output
-            || u64::try_from(blob.bytes().len()).ok() != Some(self.raw_output_size_bytes)
-        {
-            return Err(ToolOutcomeError::Binding("outcome.raw_invocation_blob"));
         }
         Ok(())
     }

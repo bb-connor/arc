@@ -13,6 +13,11 @@ pub const BROKER_PROOF_SCHEMA: &str = "chio.broker-request-proof.v1";
 pub const BROKER_EXECUTE_SCHEMA: &str = "chio.broker-execute.v1";
 pub const BROKER_EVIDENCE_SCHEMA: &str = "chio.broker-execution-evidence.v2";
 pub const MAX_WIRE_BYTES: usize = 1_048_576;
+// Request and administrative limits remain 1 MiB. Execute responses include a
+// byte array inside another JSON byte array: reserve bounded encoding space
+// separately from the admitted upstream body and headers.
+pub const MAX_EXECUTE_RESPONSE_PAYLOAD_BYTES: usize = 4 * 1_048_576;
+pub const MAX_EXECUTE_RESPONSE_WIRE_BYTES: usize = 16 * 1_048_576;
 pub const MAX_BODY_BYTES: usize = 524_288;
 pub const MAX_RESPONSE_BYTES: usize = 2_097_152;
 pub const MAX_HEADER_COUNT: usize = 64;

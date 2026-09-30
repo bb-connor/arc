@@ -74,17 +74,14 @@ it does not attest which model a remote provider actually executed.
 ## Provision tools once
 
 Follow the [native host configuration contract](../../../crates/products/chio-cli/PROCESS_HOST.md).
-The model server's command is:
-
-```json
-["/private/coding-venv/bin/chio-mini-swe-model", "--config", "/private/provider.json"]
-```
-
-It advertises `model_infer`. Keep the installed environment, provider file and
-signed launch policy under operator control. The native host requires a signed
-launch policy and pinned signer for this server and the repository execution
-server. The operator command never creates a policy, authorizes a new tool or
-changes its migration stage. Existing grants and guards remain authoritative.
+Native model and execution tools use `chio-broker-mcp` under signed launch
+policies with exact server, tool and issuer pins. The host's `native_broker`
+configuration binds both prepared routes and their verifier/registration peers.
+Provider HTTPS and repository/Docker effects run through host-owned adapters;
+provider credentials and Docker handles never enter the caged proxy or worker.
+See [session provisioning](SESSION.md#supply-authorization-and-prepare-the-host)
+for the authorization contract. The operator command validates the supplied
+host and route configuration before initializing authority.
 
 Declare a child such as `coder` with both `model/model_infer` and
 `sandbox/execute` in its concrete tool scope. Give the host explicit call,
@@ -152,7 +149,7 @@ chio-mini-swe result --state /tmp/coding-task --out /tmp/coding-result
 ```
 
 The new private output directory receives `result.json`, `receipts.ndjson`,
-`kernel.pub` and `verification.json`. The command verifies every exported receipt
+`kernel.pub`, `verification.json` and `command-outputs.json`. The command verifies every exported receipt
 against the key pinned during initialization. Verification proves receipt
 signatures and bound actions; a model's submitted result still needs application
 validation and code review.

@@ -76,6 +76,7 @@ Create `session-config.json`, replacing the image and revision placeholders:
 {
   "schema": "chio.mini-swe.session-config.v1",
   "chio": "/private/bin/chio",
+  "broker_tool": "/private/bin/chio-broker-mcp",
   "repository": "/code/project",
   "revision": "<selected-commit-or-ref>",
   "provider_config": "provider.json",
@@ -135,7 +136,7 @@ installed Chio code are bound to this session; changing them requires a new
 session and deliberate provisioning.
 
 `provisioning-request.json` is a versioned **unsigned request**, with schema
-`chio.mini-swe.provisioning-request.v1`. It is suitable for an operator's
+`chio.mini-swe.provisioning-request.v2`. It is suitable for an operator's
 provisioning automation:
 
 | Field | Meaning |
@@ -146,7 +147,7 @@ provisioning automation:
 | `environment` | Installed paths, launcher digests and Chio Python source inventory. |
 | `servers.model`, `servers.sandbox` | Exact launch requests for the two tool servers. |
 
-Each server entry contains `id`, `command` as an argv array,
+Each server entry contains `id`, `executable`, `executable_sha256`, `tool_name`,
 `working_directory`, `execution_uid`, `execution_gid`, `tools` and
 `request_timeout_seconds`. The `tools` entries are the expected unsigned MCP
 tool definitions. The model definition binds its provider identity; the
@@ -162,23 +163,21 @@ tool authority.
 
 ## Supply authorization and prepare the host
 
-Provide an authorization document with exactly these two server entries:
+Provide a `chio.mini-swe.session-authorization.v2` document with exactly three
+fields: `schema`, `servers` and `native_broker`.
 
-```json
-{
-  "schema": "chio.mini-swe.session-authorization.v1",
-  "servers": {
-    "model": {
-      "launch_policy": "/private/policies/model.json",
-      "launch_policy_signer": "<64 lowercase hexadecimal digits>"
-    },
-    "sandbox": {
-      "launch_policy": "/private/policies/sandbox.json",
-      "launch_policy_signer": "<64 lowercase hexadecimal digits>"
-    }
-  }
-}
-```
+- `servers` contains exactly `model` and `sandbox`. Each entry contains the
+  provisioned `command` argv, `launch_policy` path and independently pinned
+  `launch_policy_signer` public key. Commands must use the captured broker
+  executable and exact tenant scope, tool and broker receipt signer identities.
+- `native_broker` is the fully provisioned native broker host configuration,
+  including its `security` identity and exactly two authorized `routes`:
+  `model/model_infer` and `sandbox/execute`. The host validates the route set,
+  quota ownership, registration peers and tenant before accepting authority.
+
+The provisioning system supplies actual adapter endpoints, retained authority
+stores and credentials. Credentials stay in the host-owned broker. The session
+request is unsigned input to that system and cannot mint its own authority.
 
 Pin signer public keys through your operator trust configuration. Policy paths
 resolve relative to the authorization file. Policies must bind the requested
@@ -279,7 +278,7 @@ With the host stopped and a completed trajectory available:
 The new private output contains:
 
 - `operator/`: retained task result, original receipts, pinned kernel public
-  key and native signature verification report.
+  key, original `command-outputs.json` envelopes and native signature verification report.
 - `repository/`: baseline and final workspace archives, `changes.patch`,
   configuration, command history, original receipts, public key and verified
   receipt bindings for the ordered workspace transitions.

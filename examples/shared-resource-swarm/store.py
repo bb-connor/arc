@@ -29,6 +29,10 @@ def identifier(value):
 def connect(path):
     # Serving must never silently initialize missing state.
     db = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=rw", uri=True)
+    if db.execute("PRAGMA journal_mode=PERSIST").fetchone()[0] != "persist":
+        db.close()
+        raise ValueError("Resource requires a persistent rollback journal")
+    db.execute("PRAGMA temp_store=MEMORY")
     db.execute("PRAGMA synchronous=FULL")
     db.execute("PRAGMA busy_timeout=5000")
     return db
@@ -51,7 +55,6 @@ def initialize(path, seed):
     with Path(path).open("xb"):
         pass
     with closing(connect(path)) as db, db:
-        db.execute("PRAGMA journal_mode=WAL")
         db.executescript("""
             CREATE TABLE seed (singleton INTEGER PRIMARY KEY CHECK(singleton=1),
                                body TEXT NOT NULL, digest TEXT NOT NULL);

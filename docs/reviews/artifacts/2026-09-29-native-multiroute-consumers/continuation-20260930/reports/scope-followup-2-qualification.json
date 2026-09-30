@@ -1,0 +1,68 @@
+{
+  "schema": "chio.repository.scope-qualification.v1",
+  "private_state": "/tmp/chio-repository-scope-1eykcpzk",
+  "source_commit": "cacaf69fc9d4b709ebe30fd9c549fc0eeffc12f9",
+  "source_paths": [
+    "sdks/python/chio-process"
+  ],
+  "source_file_count": 15,
+  "source_file_bytes": 115574,
+  "imported_archive_bytes": 133120,
+  "sdk_tests_passed": 40,
+  "initialization_seconds": 0.8011923550002393,
+  "command_seconds": [
+    4.417834548000428,
+    7.2735476379994
+  ],
+  "review": {
+    "schema": "chio.repository.review.v1",
+    "server_id": "sandbox",
+    "source_commit": "cacaf69fc9d4b709ebe30fd9c549fc0eeffc12f9",
+    "workspace_id": "39a65276ce004f689225f3ac11abc4cd",
+    "configuration_sha256": "d3aaaa3a73e56e5aec297f891dfdafaba3826b06d947f72639d8966a9e397183",
+    "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "contents_sha256": "6ecb3f0dda0865f7a6ea6bd772a7febffbd336d7727259b4324b8a54e47089d5",
+    "verified_transitions": 2,
+    "verification": {
+      "checks": [
+        "signature",
+        "signer_pin",
+        "action_parameter_hash"
+      ],
+      "receipts_verified": 2,
+      "schema": "chio.receipt.signatures.v1",
+      "trusted_kernel_key": "bb9a9e494e92dc4cd86fa57ed103900580242feecc75e8e950ff3047c32a79e8"
+    },
+    "source_paths": [
+      "sdks/python/chio-process"
+    ]
+  },
+  "fresh_host_replay_returned_original_receipt": true,
+  "unexpected_scope_refused_by_recipient": true,
+  "outside_output_refused_without_revision_promotion": true,
+  "scope_refusal_verification": {
+    "checks": [
+      "signature",
+      "signer_pin",
+      "action_parameter_hash"
+    ],
+    "receipts_verified": 1,
+    "schema": "chio.receipt.signatures.v1",
+    "trusted_kernel_key": "bb9a9e494e92dc4cd86fa57ed103900580242feecc75e8e950ff3047c32a79e8"
+  },
+  "owned_containers_and_volumes_remaining": 0,
+  "source_unchanged": true,
+  "binary_sha256": "622b555b8f0bb25ca6bda7fefc92ec3a444a9d3f4af8573bac0c6f0462c10cd8",
+  "installed_sources_sha256": {
+    "repository_scope": "62d2e8fb41bc67e69afc95d261ea361194b944207db9c8f022df126ff92dfd6c",
+    "repository_archive": "cf81ed69ba6deb4f38c85373495118bccecd3e36e33a270c5dea1c9c00e39a4f",
+    "repository_store": "629abdd858f3158500d022002627e4ff07708059ddd35156151534258656f686",
+    "repository_review": "d2857eca2acb4a5dde730dd5d933bf7afb640faea8642cd9a2fd9ee8bb3f34d7",
+    "repository": "1abc51ac1aef299ba57be311ef3f693b42afac8e12b4faf46bc73f78ca3267db"
+  },
+  "limits": [
+    "Real committed SDK test suite; no model or coding-quality qualification",
+    "Fixture authority with production native broker and repository adapter",
+    "Successful two-command prefix exported before deliberate third-command refusal"
+  ]
+}

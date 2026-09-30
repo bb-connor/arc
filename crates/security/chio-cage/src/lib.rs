@@ -224,6 +224,7 @@ pub struct AdmittedManifest {
     operator_ceiling_digest: String,
     read_resources: Vec<RetainedResource>,
     write_resources: Vec<RetainedResource>,
+    read_write_paths: BTreeSet<PathBuf>,
     forbidden_resources: Vec<RetainedResource>,
     network_destinations: BTreeSet<NetworkDestination>,
     environment_variables: BTreeSet<EnvironmentVariableName>,
@@ -768,9 +769,6 @@ fn admit_with_architecture(
         .into_iter()
         .collect::<BTreeSet<_>>();
 
-    if !read_paths.is_disjoint(&write_paths) {
-        return Err(CageError::AmbiguousFilesystemAccess);
-    }
     if !read_paths.is_subset(&ceilings.read_paths)
         || !write_paths.is_subset(&ceilings.write_paths)
         || !network_destinations.is_subset(&ceilings.network_destinations)
@@ -809,7 +807,12 @@ fn admit_with_architecture(
     {
         architecture?;
         let forbidden_resources = linux::retain_forbidden(forbidden_paths)?;
-        let read_resources = linux::retain_read_grants(&read_paths)?;
+        // Explicit read and write authority for the same literal path shares
+        // one retained descriptor. Distinct hardlink paths remain forbidden.
+        // Write retention still requires an exact regular file, never a tree.
+        let read_write_paths = read_paths.intersection(&write_paths).cloned().collect();
+        let read_only_paths = read_paths.difference(&write_paths).cloned().collect();
+        let read_resources = linux::retain_read_grants(&read_only_paths)?;
         let write_resources = linux::retain_write_grants(&write_paths)?;
         reject_descriptor_aliases(&forbidden_resources, &read_resources, &write_resources)?;
         Ok(AdmittedManifest {
@@ -820,6 +823,7 @@ fn admit_with_architecture(
             operator_ceiling_digest,
             read_resources,
             write_resources,
+            read_write_paths,
             forbidden_resources,
             network_destinations,
             environment_variables,
@@ -1394,6 +1398,18 @@ fn build_landlock_plan(
             | FdPurpose::TargetStderr
             | FdPurpose::BrokerIpc => None,
         };
+        if matches!(entry.purpose, FdPurpose::WriteGrant { .. })
+            && entry
+                .path
+                .as_ref()
+                .is_some_and(|path| admitted.read_write_paths.contains(Path::new(path)))
+        {
+            grants.push(FilesystemGrant {
+                fd_slot: entry.slot,
+                access: FilesystemGrantAccess::Read,
+                identity: entry.identity,
+            });
+        }
         if let Some(access) = access {
             grants.push(FilesystemGrant {
                 fd_slot: entry.slot,
@@ -1720,6 +1736,23 @@ mod tests {
                 plan.allowed_syscalls().contains(&Syscall::Uname),
                 profile == NativeSyscallProfile::NativeStandardV1,
             );
+            for syscall in [Syscall::Pwrite64, Syscall::Fdatasync, Syscall::Geteuid] {
+                assert_eq!(
+                    plan.allowed_syscalls().contains(&syscall),
+                    profile == NativeSyscallProfile::NativeStandardV1,
+                );
+            }
+            let commands = &plan.argument_constraints()[&Syscall::Fcntl];
+            for command in [5, 6] {
+                assert_eq!(
+                    commands
+                        .iter()
+                        .any(|alternative| alternative.iter().any(|constraint| {
+                            constraint.argument_index == 1 && constraint.value == command
+                        })),
+                    profile == NativeSyscallProfile::NativeStandardV1,
+                );
+            }
             for forbidden in [
                 "socket",
                 "socketpair",

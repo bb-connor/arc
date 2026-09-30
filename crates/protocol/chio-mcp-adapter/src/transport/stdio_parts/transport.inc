@@ -854,11 +854,9 @@ impl StdioMcpTransport {
                     }
                     NaturalExitPoll::Stopped => break,
                     NaturalExitPoll::Exited => {
-                        notify_active_request_after_terminal(
-                            supervisor_active_request.as_ref(),
-                            supervisor_shutdown_requested.load(Ordering::Acquire),
-                            None,
-                        );
+                        // The final response may still be buffered or decoding.
+                        // Stdout owns ordered delivery through EOF; the request
+                        // deadline still bounds a pipe held open by descendants.
                         break;
                     }
                     NaturalExitPoll::Failed(error) => {
@@ -1074,6 +1072,9 @@ impl StdioMcpTransport {
                     }
                 };
 
+                if let Some(error) = self.request_interruption_error()? {
+                    return Err(error);
+                }
                 if self.shutdown_requested.load(Ordering::Acquire) {
                     continue;
                 }
@@ -1258,9 +1259,7 @@ impl StdioMcpTransport {
                     "upstream MCP request cancelled by shutdown".to_string(),
                 )))
             }
-            ChildTerminalState::Exited => Ok(Some(AdapterError::ConnectionFailed(
-                "upstream MCP process exited before responding".to_string(),
-            ))),
+            ChildTerminalState::Exited => Ok(None),
             ChildTerminalState::Failed(error) => Ok(Some(AdapterError::ConnectionFailed(format!(
                 "upstream MCP terminal receipt persistence failed: {error}"
             )))),

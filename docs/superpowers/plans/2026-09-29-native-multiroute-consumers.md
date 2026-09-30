@@ -26,8 +26,8 @@
 
 - [x] 1. Add bounded broker verifier/participant route owners in `chio-secret-broker/src/kernel_admission/routes.rs`. Update process-host composition, authority RPC endpoints, security profile routing and completion verification. Exercise cross-route substitution, duplicates, reordering and changed peer/configuration.
 - [x] 2. Implement host-owned Docker/provider transport adapters with bounded request/response handling, pinned resource identity, no automatic retry and durable original capture. Keep privileged transports out of native target permissions.
-- [ ] 3. Migrate mini-SWE request preparation, tool callers, retained recovery state and campaign provisioning. Complete required dependency closure and explicit configuration for the remaining packaged consumers.
-- [ ] 4. Execute native mini-SWE and packaged-consumer campaigns on the retained OCI worker, repair demonstrated faults, preserve terminal evidence and update CI inputs. Keep native discovery/recovery regressions.
+- [x] 3. Migrate mini-SWE request preparation, tool callers, retained recovery state and campaign provisioning. Complete required dependency closure and explicit configuration for the remaining packaged consumers.
+- [x] 4. Execute native mini-SWE and packaged-consumer campaigns on the retained OCI worker, repair demonstrated faults, preserve terminal evidence and update CI inputs. Keep native discovery/recovery regressions.
 
 ## Review focus
 
@@ -40,8 +40,12 @@ Finish each implementation contract and verify its boundary. Archive source/bina
 ## Execution state
 
 The [execution record](../../reviews/2026-09-29-native-multiroute-consumers-execution.md)
-records completed tasks 1 and 2 and partial tasks 3 and 4. Prepared request
-custody, mini-SWE callers and the explicit runtime package are implemented.
-The native budget recovery campaign passes. Mini-SWE's fifth-call lifecycle
-handoff still fails as retained history grows; session/repository, packaged
-consumers and complete native CI acceptance remain required.
+records all four tasks complete for their focused implementation and local/native
+acceptance boundaries. The September 30 continuation delivers consumer migration,
+host-owned repository execution, bounded Python/SQLite resources and native CI
+inputs. Baseline, crash/unknown, session, operator, repository scope and packaged
+consumer campaigns pass. Comparison passes eight cases across two trials; the
+final large-output campaign passes exact ASCII/escaped output, restart replay and
+offline patch proof. Source overlays and binary generations are explicitly pinned.
+Historical failed operations remain retained without redispatch. Hosted exact-
+candidate, M5 and the broader roadmap remain separate open gates.

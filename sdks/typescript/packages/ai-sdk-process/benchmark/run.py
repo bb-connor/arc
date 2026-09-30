@@ -31,14 +31,13 @@ sys.path.insert(0, str(HERE))
 from journal_profiles import provider, requests  # noqa: E402
 from qualify import (  # noqa: E402
     command,
-    demo_python,
     installed_consumer,
-    provision_native_demo,
+    provision_native_python_demo,
     verify,
     write,
 )
 
-from tools import SOURCES, corpus  # noqa: E402
+from tools import SOURCES, corpus, prepare_store  # noqa: E402
 
 BENCHMARK_FILES = ("planner.py", "tools.py", "chio_worker.mjs", "baseline_worker.mjs")
 ROLES = ["coordinator"] + [f"researcher-{index}" for index in range(1, 5)]
@@ -202,6 +201,9 @@ def summarize(
 
 def chio_trial(binary, consumer, directory, scenario, spec, endpoint):
     (directory / "tool-data").mkdir(mode=0o700)
+    database = directory / "tool-data" / "effects.db"
+    prepare_store(database)
+    database_files = [database, Path(str(database) + "-journal")]
     files = corpus(directory / "corpus")
     (directory / "policy.yaml").write_text("""kernel:
   max_capability_ttl: 3600
@@ -229,23 +231,23 @@ capabilities:
 """)
 
     def server(name):
-        return provision_native_demo(
+        return provision_native_python_demo(
             binary,
             name,
+            "tools",
+            {"tools.py": consumer / "tools.py"},
             [
-                demo_python(),
-                str(consumer / "tools.py"),
                 "--server",
                 name,
                 "--database",
-                str(directory / "tool-data" / "effects.db"),
+                str(database),
                 "--corpus",
                 str(directory / "corpus"),
             ],
             directory / ("launch-" + name),
             directory,
-            read_paths=[consumer / "tools.py", directory / "corpus", directory / "tool-data"],
-            write_paths=[directory / "tool-data"],
+            read_paths=[directory / "corpus", *database_files],
+            write_paths=database_files,
         )
 
     write(
@@ -531,6 +533,7 @@ def exercise(binary, output, temporary, packages, majors, trials, seed, only=Non
         consumer = installed_consumer(major, temporary, packages)
         for name in BENCHMARK_FILES:
             shutil.copyfile(HERE / name, consumer / name)
+            (consumer / name).chmod(0o600)
         destination = output / major
         destination.mkdir()
         shutil.copyfile(consumer / "package-lock.json", destination / "consumer-lock.json")

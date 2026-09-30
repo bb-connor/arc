@@ -6,7 +6,7 @@ import os
 import signal
 from pathlib import Path
 
-from chio_process import ProcessClient
+from chio_process.broker import BrokerProcessClient
 from minisweagent.models.test_models import DeterministicToolcallModel, make_toolcall_output
 
 from chio_mini_swe import ChioAgent, ChioEnvironment
@@ -46,7 +46,7 @@ def decisions():
     ]
 
 
-class CrashClient(ProcessClient):
+class CrashClient(BrokerProcessClient):
     def invoke(self, operation_key, server_id, tool_name, arguments):
         result = super().invoke(operation_key, server_id, tool_name, arguments)
         if self.crash and "checkpoint-gap" in arguments["command"] and not self.marker.exists():

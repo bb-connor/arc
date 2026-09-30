@@ -1,0 +1,2390 @@
+{
+  "schema": "chio.mini-swe.upstream-comparison.v1",
+  "private_state": "/tmp/chio-cmp-6kpvxpqi",
+  "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+  "binary_sha256": "ccd15694e2f0ba3b99d773d83aead60d85ad28457955d1cc600e0d7f299f8619",
+  "images": {
+    "local_tag": "chio-mini-worker:0d835a84de6e168693b21bcc",
+    "image": "sha256:5b6a180b375f39135ad4689693e98b1465faab97a0ce24d997c78244b26e9a4e",
+    "base": "python@sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e",
+    "requirements_sha256": "4eae20c0e474a2af3844474ccb2884967366e6b5f024e57536fccaaa59738664",
+    "wheels": {
+      "chio_mini_swe-0.1.0-py3-none-any.whl": "5c0d7a7a32c22e7a921346a5f4a33db151d46b051d6e0ec91c48b56567f9130a",
+      "chio_process-0.1.0-py3-none-any.whl": "9da83e0424f60131c72d25ca6d263f16659b035195e529b1472d8af84a10418f"
+    },
+    "execution_image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+    "execution_dockerfile_sha256": "221c6f18cf8f3627b538610175b691f83f2919467f1e7dce7bb406a33782e716",
+    "execution_git_version": "git version 2.47.3",
+    "helper_image": "sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e"
+  },
+  "fault_worker_image": "sha256:eda43b7a5a5757ea23aebe8757d4be11905c7fd0a2ca7ca0f2a52e084510e8f1",
+  "comparison_sources_sha256": {
+    "broker_campaign.py": "9abde15cb127afa01c7ab29f9c865c53f12bea37b0385171555be1a4571a08b4",
+    "compare.py": "bb41b2bfc551e14bccbca2839f4c150a8617629da54bf784a40471486e14977b",
+    "compare_upstream.py": "c009def83a78edb5094fd02ce3811f05e8abd5efc2cb8fba39b9aa164d6c1952",
+    "compare_cleanup.py": "11ab511a3b41a2c9a67c923d75b43104ab0c2f7fe737361b52f811f299cb7e69",
+    "compare_paths.py": "5ea56ff3bdfddd0535d4cb286e8a0c3835e3a5e292b57e761b6dc957a540410f",
+    "compare_fault_worker.py": "5ffa1818487b18111792fefc968b3abfbfefa864fa02a3eb09fc7dafad69d10f",
+    "worker.py": "e2fae9b2b4550204523f5313bab49bdcd9bcaa1ffcf88b97bae70d8f0b3affed"
+  },
+  "cases": [
+    {
+      "schema": "chio.mini-swe.upstream-comparison.v1",
+      "scenario": "clean",
+      "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+      "configuration": {
+        "source": "/tmp/chio-cmp-6kpvxpqi/source",
+        "revision": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "endpoint": "http://127.0.0.1:42219/v1",
+        "output": "/tmp/chio-cmp-6kpvxpqi/case-00/upstream",
+        "scenario": "clean",
+        "owner": "079f3b5c1e9e4486896ecfb23105268b"
+      },
+      "mini_swe_agent_version": "2.4.6",
+      "litellm_version": "1.100.0",
+      "upstream_module_sha256": {
+        "agents/default.py": "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2",
+        "environments/docker.py": "21d389122b008e7b743d1e640207fda0b08d9010cf6323ddd02f0742b33b96a6",
+        "models/litellm_model.py": "6df4483bcdc9620b2f9d7f8bb1027a7fb9729b739976cbcf1a9d18fb58c48227"
+      },
+      "architecture": "one retained upstream DockerEnvironment; no per-command container lease",
+      "rerun_policy": "explicit parent rerun with a fresh DefaultAgent and LitellmModel; no trajectory restore",
+      "upstream_automatic_recovery": false,
+      "completed": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "returncode": 0,
+          "watchdog_expired": false,
+          "wall_seconds": 5.726847722000457,
+          "driver_child_user_cpu_seconds": 4.763327,
+          "driver_child_system_cpu_seconds": 0.381841,
+          "driver_child_max_rss_kib": 227076,
+          "accounting_scope": "wait4 child usage; excludes Docker daemon and container cgroup usage",
+          "trajectory_exists": true,
+          "crash_boundary_exists": false,
+          "trajectory": {
+            "path": "/tmp/chio-cmp-6kpvxpqi/case-00/upstream/attempt-1/trajectory.json",
+            "sha256": "21809ff4dca01e765303d52bfbd9cedfb76280b4fc5c36d34a546084d975a1ac",
+            "saved_model_calls": 3,
+            "saved_message_count": 10,
+            "saved_exit_status": "Submitted"
+          },
+          "agent_result": {
+            "exit_status": "Submitted",
+            "submission": "Addition repaired and tests pass.\n"
+          }
+        }
+      ],
+      "source_archive_sha256": "5808e993c4773732d3b9a6acdd3c45fb7ecc153f2cef8df9c035a2e24a854052",
+      "container": {
+        "id": "d372c70ce5966a752e7a888b841156e88c517bcdf116c3dbdab8ea5b329b612b",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "owner": "079f3b5c1e9e4486896ecfb23105268b",
+        "user": "65534:65534",
+        "host_config": {
+          "Binds": null,
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "none",
+            "Config": {}
+          },
+          "NetworkMode": "none",
+          "PortBindings": {},
+          "RestartPolicy": {
+            "Name": "no",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": [
+            "ALL"
+          ],
+          "CgroupnsMode": "private",
+          "Dns": null,
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": null,
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": true,
+          "SecurityOpt": [
+            "no-new-privileges:true"
+          ],
+          "Tmpfs": {
+            "/tmp": "rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "/workspace": "rw,nosuid,nodev,size=64m,mode=0700,uid=65534,gid=65534"
+          },
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 8388608,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 536870912,
+          "NanoCpus": 1000000000,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": [],
+          "BlkioDeviceReadBps": [],
+          "BlkioDeviceWriteBps": [],
+          "BlkioDeviceReadIOps": [],
+          "BlkioDeviceWriteIOps": [],
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": [],
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 536870912,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": 64,
+          "Ulimits": [
+            {
+              "Name": "core",
+              "Hard": 0,
+              "Soft": 0
+            },
+            {
+              "Name": "fsize",
+              "Hard": 16777216,
+              "Soft": 16777216
+            },
+            {
+              "Name": "nofile",
+              "Hard": 128,
+              "Soft": 128
+            }
+          ],
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/acpi",
+            "/proc/asound",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/sys/devices/virtual/powercap",
+            "/sys/firmware"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ],
+          "Init": true
+        },
+        "environment_configuration": {
+          "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+          "cwd": "/workspace",
+          "env": {
+            "HOME": "/workspace",
+            "TMPDIR": "/tmp",
+            "PYTHONDONTWRITEBYTECODE": "1"
+          },
+          "forward_env": [],
+          "timeout": 20,
+          "executable": "/usr/bin/docker",
+          "run_args": [
+            "--pull=never",
+            "--label=chio.comparison.owner=079f3b5c1e9e4486896ecfb23105268b",
+            "--network=none",
+            "--ipc=private",
+            "--cgroupns=private",
+            "--read-only",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges:true",
+            "--user=65534:65534",
+            "--memory=512m",
+            "--memory-swap=512m",
+            "--cpus=1",
+            "--pids-limit=64",
+            "--shm-size=8m",
+            "--init",
+            "--restart=no",
+            "--log-driver=none",
+            "--no-healthcheck",
+            "--ulimit=core=0",
+            "--ulimit=nofile=128:128",
+            "--ulimit=fsize=16777216:16777216",
+            "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "--tmpfs=/workspace:rw,nosuid,nodev,size=64m,mode=0700,uid=65534,gid=65534",
+            "--env=HOME=/workspace",
+            "--env=TMPDIR=/tmp",
+            "--env=PYTHONDONTWRITEBYTECODE=1",
+            "--entrypoint=/usr/bin/env"
+          ],
+          "container_timeout": "600s",
+          "pull_timeout": 60,
+          "interpreter": [
+            "/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c"
+          ]
+        }
+      },
+      "setup_seconds": 0.5857422680001036,
+      "execution_seconds": 5.727712720001364,
+      "agent_submitted": true,
+      "files": {
+        "calculator.py": {
+          "bytes": 32,
+          "sha256": "ba1a531f581d2e6094e978ed6f7aca7a8d92eeb62c6e7ad73ee692f7f18bc772"
+        },
+        "test_calculator.py": {
+          "bytes": 217,
+          "sha256": "fae7e3b5944f2d66f723d44208dc5032902871f165ab72bbc773eacba8fbd181"
+        },
+        "effects.txt": {
+          "bytes": 20,
+          "sha256": "f7b2dea69938af01eafcf530c1a433d2f53bd5c6ea7f93b7163e9c197f161fc1"
+        },
+        "test-output.txt": {
+          "bytes": 222,
+          "sha256": "d02da958c44204327822a0c623f1a34639a7c8cd52d717fff708230ba064545e"
+        }
+      },
+      "patch_sha256": "074fe587f87cf1220fe9361d5250aa6e992a6e3175f12a2f588224fabfd488d0",
+      "effects": [
+        "patched",
+        "audit",
+        "audit"
+      ],
+      "test_output": "test_negative (test_calculator.Addition.test_negative) ... ok\ntest_positive (test_calculator.Addition.test_positive) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+      "export_seconds": 0.22765395600072225,
+      "cleanup": {
+        "removed_container_ids": [
+          "d372c70ce5966a752e7a888b841156e88c517bcdf116c3dbdab8ea5b329b612b"
+        ],
+        "owned_containers_remaining": 0,
+        "original_container_absence_verified": true
+      },
+      "total_seconds": 6.718316463999145,
+      "driver": {
+        "wall_seconds": 6.825618549000865,
+        "driver_children_user_seconds": 5.247999,
+        "driver_children_system_seconds": 0.618749,
+        "returncode": 0
+      },
+      "model_requests": [
+        {
+          "turn": 0,
+          "request_sha256": "ff8fbb7e21d98a552939419676c80130ab369338482e606ec89874396110f55e",
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "4a02b915ce03313d05aa1c48e12b6c5f3e25eac37c930b932c17902dc6da10f5",
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "request_sha256": "8526ca4fb79329eebae3c266cdbcc0853cbbe11b838ce4a3bbf88bbe7ecb7e5e",
+          "actions": [
+            "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        }
+      ],
+      "trial": 1,
+      "mode": "upstream",
+      "effect_oracle": {
+        "patch_effects": 1,
+        "audit_effects": 2,
+        "matches_requested_effects": true
+      }
+    },
+    {
+      "mode": "chio",
+      "initialization": {
+        "wall_seconds": 1.866888642000049,
+        "driver_children_user_seconds": 1.2268440000000007,
+        "driver_children_system_seconds": 0.3949680000000001,
+        "returncode": 0
+      },
+      "preparation": {
+        "wall_seconds": 2.9188965110006393,
+        "driver_children_user_seconds": 2.130318999999999,
+        "driver_children_system_seconds": 0.47482099999999994,
+        "returncode": 0
+      },
+      "fixture_authority_seconds": 0.8665924809993157,
+      "execution": {
+        "wall_seconds": 84.1013192499995,
+        "driver_children_user_seconds": 73.348257,
+        "driver_children_system_seconds": 1.327267,
+        "returncode": 0
+      },
+      "export": {
+        "wall_seconds": 1.5662085399999341,
+        "driver_children_user_seconds": 1.1640709999999928,
+        "driver_children_system_seconds": 0.3259430000000001,
+        "returncode": 0
+      },
+      "recipient_verification": {
+        "wall_seconds": 0.1641453169995657,
+        "driver_children_user_seconds": 0.08377099999999871,
+        "driver_children_system_seconds": 0.03334799999999971,
+        "returncode": 0
+      },
+      "completed": {
+        "abandoned_socket_intents": 0,
+        "complete": true,
+        "pending_container_records": 0,
+        "schema": "chio.process.run-report.v1",
+        "workers": [
+          {
+            "attempts": 1,
+            "cpu_ms": 0,
+            "outcome": "exit_0",
+            "peak_resident_bytes": 0,
+            "process": "coder",
+            "resource_accounting": "unavailable_container_cgroup",
+            "state": "completed",
+            "suspensions": 0
+          }
+        ]
+      },
+      "exported": {
+        "schema": "chio.mini-swe.session-result.v1",
+        "output": "/tmp/chio-cmp-6kpvxpqi/case-01/result",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "model_id": "mini-provider:0571e76f596a12d647937e059a7eb78a7795816662b8b41332df49daf0d4d471",
+        "operator": {
+          "output": "/tmp/chio-cmp-6kpvxpqi/case-01/result/operator",
+          "exit_status": "Submitted",
+          "submission_preview": "Addition repaired and tests pass.\n",
+          "submission_truncated": false,
+          "model_calls": 3,
+          "model_cost": 0.00108,
+          "verified_receipts": 8
+        },
+        "repository": {
+          "output": "/tmp/chio-cmp-6kpvxpqi/case-01/result/repository",
+          "revision": 5,
+          "interrupted": false,
+          "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+          "verified_transitions": 5
+        },
+        "kernel_key_sha256": "6e684e3155fddb535106af07b52b57fc07274b68d5e75aa8ab05a8a6d4bae0ef"
+      },
+      "review": {
+        "schema": "chio.repository.review.v1",
+        "server_id": "sandbox",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "workspace_id": "ce412016c09b42f3bcdfd38d35ff3ee0",
+        "configuration_sha256": "8ab6572ca11a6bda8e1ec7901f16ef0fd47a1a5d34b41faa00142892492c9320",
+        "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+        "contents_sha256": "013161730e9044c924889d9da985fd386939cd5a7f822cae34f0b725e1f1a5c6",
+        "verified_transitions": 5,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 8,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "96a0dd941adfed79f24b6196a002e71a1197385594c409e2609a9fc4b26e3db4"
+        }
+      },
+      "manifest": {
+        "schema": "chio.repository.export.v1",
+        "id": "ce412016c09b42f3bcdfd38d35ff3ee0",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "revision": 5,
+        "snapshot": "90ac9eea0dee59e041db9465b4458fb3d44a3b880f34edccf6201f1699f9770d",
+        "commands": [
+          {
+            "sequence": 1,
+            "status": "completed",
+            "before_sha256": "302137657ed091c48db6dd381738653ed7b45696d57e109fec3cc2cf07213301",
+            "after_sha256": "302137657ed091c48db6dd381738653ed7b45696d57e109fec3cc2cf07213301"
+          },
+          {
+            "sequence": 2,
+            "status": "completed",
+            "before_sha256": "302137657ed091c48db6dd381738653ed7b45696d57e109fec3cc2cf07213301",
+            "after_sha256": "5017163e780d11f47638804da3b1b28a65b082b437f37676e1a352732eb2ceca"
+          },
+          {
+            "sequence": 3,
+            "status": "completed",
+            "before_sha256": "5017163e780d11f47638804da3b1b28a65b082b437f37676e1a352732eb2ceca",
+            "after_sha256": "9d53780bc2dd3cfc156b8c3b146db4ef25b2480a6486950b0fdf5a946af666b3"
+          },
+          {
+            "sequence": 4,
+            "status": "completed",
+            "before_sha256": "9d53780bc2dd3cfc156b8c3b146db4ef25b2480a6486950b0fdf5a946af666b3",
+            "after_sha256": "e754e34dd72298808b318c9cef24a939bd30784c3db374bc5bafd443922bdd6d"
+          },
+          {
+            "sequence": 5,
+            "status": "completed",
+            "before_sha256": "e754e34dd72298808b318c9cef24a939bd30784c3db374bc5bafd443922bdd6d",
+            "after_sha256": "90ac9eea0dee59e041db9465b4458fb3d44a3b880f34edccf6201f1699f9770d"
+          }
+        ],
+        "interrupted": false,
+        "baseline": "302137657ed091c48db6dd381738653ed7b45696d57e109fec3cc2cf07213301",
+        "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+        "baseline_contents_sha256": "0959b823ad9666ac4fdec4d796da19f7979c76766a70fe46ad744847283e729e",
+        "contents_sha256": "013161730e9044c924889d9da985fd386939cd5a7f822cae34f0b725e1f1a5c6",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "helper_image": "sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e"
+      },
+      "final_files": {
+        "calculator.py": "def add(a, b):\n    return a + b\n",
+        "effects.txt": "patched\naudit\naudit\n",
+        "test-output.txt": "test_negative (test_calculator.Addition.test_negative) ... ok\ntest_positive (test_calculator.Addition.test_positive) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+        "test_calculator.py": "import unittest\nfrom calculator import add\nclass Addition(unittest.TestCase):\n    def test_positive(self):\n        self.assertEqual(add(2, 3), 5)\n    def test_negative(self):\n        self.assertEqual(add(-2, -3), -5)\n"
+      },
+      "effects": [
+        "patched",
+        "audit",
+        "audit"
+      ],
+      "fault": null,
+      "state_bytes_before_execution": 4910717,
+      "state_bytes_after_execution": 12271716,
+      "model_requests": [
+        {
+          "turn": 0,
+          "request_sha256": "51b1d24238168d2dca6740c17e4138cf8d933b1710ef98650e76b8ba9a587084",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "b88c59bc831848206591973863357f78a1e668dd39618dbf6180c1393733fe84",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "request_sha256": "a944ae1052a734195023647d62d9b5ee836f3f2ee330f5d7912ca45a247fc16d",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+          ]
+        }
+      ],
+      "execution_image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+      "worker_image": "sha256:5b6a180b375f39135ad4689693e98b1465faab97a0ce24d997c78244b26e9a4e",
+      "container_resource_accounting": "unavailable: driver child usage excludes Docker daemon and container cgroups",
+      "trial": 1,
+      "scenario": "clean",
+      "effect_oracle": {
+        "patch_effects": 1,
+        "audit_effects": 2,
+        "matches_requested_effects": true
+      }
+    },
+    {
+      "mode": "chio",
+      "initialization": {
+        "wall_seconds": 1.9170608570002514,
+        "driver_children_user_seconds": 1.2824460000000073,
+        "driver_children_system_seconds": 0.37253699999999945,
+        "returncode": 0
+      },
+      "preparation": {
+        "wall_seconds": 2.9687399529993854,
+        "driver_children_user_seconds": 2.1750430000000023,
+        "driver_children_system_seconds": 0.45288400000000006,
+        "returncode": 0
+      },
+      "fixture_authority_seconds": 0.9128542450016539,
+      "execution": {
+        "wall_seconds": 87.41386917599993,
+        "driver_children_user_seconds": 74.46127299999999,
+        "driver_children_system_seconds": 1.5564229999999997,
+        "returncode": 0
+      },
+      "export": {
+        "wall_seconds": 1.5661905300003127,
+        "driver_children_user_seconds": 1.1634290000000078,
+        "driver_children_system_seconds": 0.316434000000001,
+        "returncode": 0
+      },
+      "recipient_verification": {
+        "wall_seconds": 0.16403348699896014,
+        "driver_children_user_seconds": 0.06924000000000774,
+        "driver_children_system_seconds": 0.04295799999999872,
+        "returncode": 0
+      },
+      "completed": {
+        "abandoned_socket_intents": 0,
+        "complete": true,
+        "pending_container_records": 0,
+        "schema": "chio.process.run-report.v1",
+        "workers": [
+          {
+            "attempts": 2,
+            "cpu_ms": 0,
+            "outcome": "exit_0",
+            "peak_resident_bytes": 0,
+            "process": "coder",
+            "resource_accounting": "unavailable_container_cgroup",
+            "state": "completed",
+            "suspensions": 0
+          }
+        ]
+      },
+      "exported": {
+        "schema": "chio.mini-swe.session-result.v1",
+        "output": "/tmp/chio-cmp-6kpvxpqi/case-02/result",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "model_id": "mini-provider:5fca16f75a910d00efd8f7f7d5634ab91cc83174212dcd46be4a8c344ae011f3",
+        "operator": {
+          "output": "/tmp/chio-cmp-6kpvxpqi/case-02/result/operator",
+          "exit_status": "Submitted",
+          "submission_preview": "Addition repaired and tests pass.\n",
+          "submission_truncated": false,
+          "model_calls": 3,
+          "model_cost": 0.00108,
+          "verified_receipts": 8
+        },
+        "repository": {
+          "output": "/tmp/chio-cmp-6kpvxpqi/case-02/result/repository",
+          "revision": 5,
+          "interrupted": false,
+          "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+          "verified_transitions": 5
+        },
+        "kernel_key_sha256": "519e5ed229e352a9e4e855e646be913a6b1e699adb8a59159fdeab46d607a112"
+      },
+      "review": {
+        "schema": "chio.repository.review.v1",
+        "server_id": "sandbox",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "workspace_id": "20d740da70da4a2086eaee6f7b947b4d",
+        "configuration_sha256": "8f27d4597d0dbbf184430646da34760be82baf66ada52658fac2992ad348b094",
+        "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+        "contents_sha256": "013161730e9044c924889d9da985fd386939cd5a7f822cae34f0b725e1f1a5c6",
+        "verified_transitions": 5,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 8,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "e7fde79e544c4ff195189599b73f1c79d8b8c2099d1dad1d2cb7d78da2545249"
+        }
+      },
+      "manifest": {
+        "schema": "chio.repository.export.v1",
+        "id": "20d740da70da4a2086eaee6f7b947b4d",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "revision": 5,
+        "snapshot": "610e90a87cfe9280c73c259189ca1041e546d606263a283b1505a88e69761569",
+        "commands": [
+          {
+            "sequence": 1,
+            "status": "completed",
+            "before_sha256": "75723ffd977a62037e2c680f8760b61863d60ba3752567291a91882cdaf32439",
+            "after_sha256": "75723ffd977a62037e2c680f8760b61863d60ba3752567291a91882cdaf32439"
+          },
+          {
+            "sequence": 2,
+            "status": "completed",
+            "before_sha256": "75723ffd977a62037e2c680f8760b61863d60ba3752567291a91882cdaf32439",
+            "after_sha256": "6a7ce4289642aed360c62028e9ff7b702a67cf7a25456df6138c926d65d1c5d2"
+          },
+          {
+            "sequence": 3,
+            "status": "completed",
+            "before_sha256": "6a7ce4289642aed360c62028e9ff7b702a67cf7a25456df6138c926d65d1c5d2",
+            "after_sha256": "4d0e67e4493a6b3a9f084ccd3bbb1a5bf10728ec7b588de26a7e682e454a9b35"
+          },
+          {
+            "sequence": 4,
+            "status": "completed",
+            "before_sha256": "4d0e67e4493a6b3a9f084ccd3bbb1a5bf10728ec7b588de26a7e682e454a9b35",
+            "after_sha256": "c06d10383dede8c4104606f73c05afef90a62ff98ebdc65a7173077d4990b2c0"
+          },
+          {
+            "sequence": 5,
+            "status": "completed",
+            "before_sha256": "c06d10383dede8c4104606f73c05afef90a62ff98ebdc65a7173077d4990b2c0",
+            "after_sha256": "610e90a87cfe9280c73c259189ca1041e546d606263a283b1505a88e69761569"
+          }
+        ],
+        "interrupted": false,
+        "baseline": "75723ffd977a62037e2c680f8760b61863d60ba3752567291a91882cdaf32439",
+        "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+        "baseline_contents_sha256": "0959b823ad9666ac4fdec4d796da19f7979c76766a70fe46ad744847283e729e",
+        "contents_sha256": "013161730e9044c924889d9da985fd386939cd5a7f822cae34f0b725e1f1a5c6",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "helper_image": "sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e"
+      },
+      "final_files": {
+        "calculator.py": "def add(a, b):\n    return a + b\n",
+        "effects.txt": "patched\naudit\naudit\n",
+        "test-output.txt": "test_negative (test_calculator.Addition.test_negative) ... ok\ntest_positive (test_calculator.Addition.test_positive) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+        "test_calculator.py": "import unittest\nfrom calculator import add\nclass Addition(unittest.TestCase):\n    def test_positive(self):\n        self.assertEqual(add(2, 3), 5)\n    def test_negative(self):\n        self.assertEqual(add(-2, -3), -5)\n"
+      },
+      "effects": [
+        "patched",
+        "audit",
+        "audit"
+      ],
+      "fault": {
+        "event": "comparison_patch_return_crash",
+        "attempt": 1,
+        "receipt_json": "{\"action\":{\"parameter_hash\":\"06b1e46d16fbd8dd50ef50738074b14a77082076d0b07250e8d5673ad0a3a55e\",\"parameters\":{\"capability\":{\"algorithm\":\"ed25519\",\"body\":{\"audience\":\"consumer-broker-0\",\"brokerQuotaKeyId\":\"prepared-quota-c32b102bf0e8ccc1cb8330c6034dafb8a24af68bdba9c2a620d0bb21d9d022af\",\"capabilityId\":\"prepared-c32b102bf0e8ccc1cb8330c6034dafb8a24af68bdba9c2a620d0bb21d9d022af\",\"constraints\":{\"allowedCallerHeaders\":[\"content-type\"],\"maximumBodyBytes\":131072,\"maximumResponseBytes\":16384,\"maximumTimeoutMs\":120000,\"providerOwnedHeaders\":[\"authorization\"],\"redirectPolicy\":\"disabled\",\"requiredBodySha256\":\"2633ac271649259f702d444688433f489ac7f2d14887834e20b95290292c8e16\",\"requiredPreviewSha256\":null,\"streamingAllowed\":false},\"consumption\":\"capture_before_dispatch\",\"credential\":{\"credentialId\":\"credential-process-boundary\",\"provider\":\"generic-https\",\"version\":1},\"destination\":{\"exactPathAndQuery\":\"/execute\",\"explicitPort\":55427,\"method\":\"POST\",\"normalizedHost\":\"boundary-upstream.test\",\"scheme\":\"https\"},\"expiresAtUnixSeconds\":1790785853,\"issuedAtUnixSeconds\":1790785553,\"issuer\":\"97f7135a9a2690e73beb26556f1cb163bea2532affa1e7782430be98c0e56812\",\"maximumExecutions\":1,\"notBeforeUnixSeconds\":1790785553,\"parentCapabilityId\":\"881d98dd-5cd5-411e-95de-4d4e26fcdc52\",\"proof\":{\"callerPublicKey\":\"ef4fc7d25d9605293d982fde859d2c05d62d50ee16f96fbf77346b4ced3bc67f\",\"mode\":\"public_key\",\"nonceTtlSeconds\":300},\"providerAdapterId\":\"generic-bearer\",\"providerAdapterVersion\":1,\"revocationId\":\"prepared-revocation-c32b102bf0e8ccc1cb8330c6034dafb8a24af68bdba9c2a620d0bb21d9d022af\",\"schema\":\"chio.broker-capability.v1\",\"subject\":\"ef4fc7d25d9605293d982fde859d2c05d62d50ee16f96fbf77346b4ced3bc67f\"},\"signature\":\"4f8a08abc0a9865ca62d6b521b50de393232075bc36a02776028737561ae11f46d76799614c6fdbaba66a53d471069159cd636cefb52bc483274e52601a97307\"},\"invocationId\":\"process:0942f7e2a0907a99065537c04c4c91b972405db05c32d1a32b3ac95fae5cc44a\",\"proof\":{\"algorithm\":\"ed25519\",\"body\":{\"authorityKey\":\"ef4fc7d25d9605293d982fde859d2c05d62d50ee16f96fbf77346b4ced3bc67f\",\"bodySha256\":\"2633ac271649259f702d444688433f489ac7f2d14887834e20b95290292c8e16\",\"brokerCapabilityId\":\"prepared-c32b102bf0e8ccc1cb8330c6034dafb8a24af68bdba9c2a620d0bb21d9d022af\",\"callerHeadersSha256\":\"265e7b877c8e1768b9488972380d00a9601aac5e72d0e060cc1c3b951f3a1a13\",\"callerOptionsSha256\":\"d4d790153c0b8f6e44f6fcdcfa1f0ec785972fbdcc4f433782a9d9d522bebfe1\",\"capabilityExpiresAtUnixSeconds\":1790785853,\"credential\":{\"credentialId\":\"credential-process-boundary\",\"provider\":\"generic-https\",\"version\":1},\"destination\":{\"exactPathAndQuery\":\"/execute\",\"explicitPort\":55427,\"method\":\"POST\",\"normalizedHost\":\"boundary-upstream.test\",\"scheme\":\"https\"},\"issuedAtUnixSeconds\":1790785553,\"nonce\":\"15cb0422-8401-4896-8a8c-f0a089445d2a\",\"parentCapabilityId\":\"881d98dd-5cd5-411e-95de-4d4e26fcdc52\",\"schema\":\"chio.broker-request-proof.v1\"},\"signature\":\"91ebb2720caace4ff54f2d2bace61b4aa48bfe05d80ef9fe4d4c49fcc0628e7b0f450d3af8036c46698db513c97b3dc58360d46d8d0ca62bd083020bd5ec0b00\"},\"request\":{\"approvedPreviewSha256\":null,\"body\":[123,34,99,111,109,109,97,110,100,34,58,34,115,101,100,32,45,105,32,39,115,47,114,101,116,117,114,110,32,97,32,45,32,98,47,114,101,116,117,114,110,32,97,32,43,32,98,47,39,32,99,97,108,99,117,108,97,116,111,114,46,112,121,59,32,112,114,105,110,116,102,32,39,112,97,116,99,104,101,100,92,92,110,39,32,62,62,32,101,102,102,101,99,116,115,46,116,120,116,32,35,32,99,104,101,99,107,112,111,105,110,116,45,103,97,112,34,44,34,99,111,110,102,105,103,117,114,97,116,105,111,110,95,115,104,97,50,53,54,34,58,34,56,102,50,55,100,52,53,57,55,100,48,100,98,98,102,49,56,52,52,51,48,54,52,54,100,97,51,52,55,54,48,98,101,56,50,98,97,102,54,54,97,100,97,53,50,54,53,56,102,97,99,50,57,57,50,97,100,51,52,56,98,48,57,52,34,44,34,116,111,111,108,95,99,97,108,108,95,105,100,34,58,34,99,97,108,108,45,49,45,48,34,125],\"destination\":{\"exactPathAndQuery\":\"/execute\",\"explicitPort\":55427,\"method\":\"POST\",\"normalizedHost\":\"boundary-upstream.test\",\"scheme\":\"https\"},\"headers\":[{\"name\":\"content-type\",\"value\":[97,112,112,108,105,99,97,116,105,111,110,47,106,115,111,110]}],\"options\":{\"responseLimitBytes\":16384,\"streaming\":false,\"timeoutMs\":120000}},\"schema\":\"chio.broker-execute.v1\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"881d98dd-5cd5-411e-95de-4d4e26fcdc52\",\"content_hash\":\"f4e51f3a3eda9e30d8a90a186e69f30c054b21094ade2dcf0306e7aaf2fa98d5\",\"decision\":{\"verdict\":\"allow\"},\"id\":\"dbcf5169f3949254ee83a2ee5aa157fda0153d2e7340b4bd5c82eb824aa7ea6f\",\"kernel_key\":\"e7fde79e544c4ff195189599b73f1c79d8b8c2099d1dad1d2cb7d78da2545249\",\"metadata\":{\"admission_operation\":{\"compensation_status\":\"not_compensated\",\"coordinator_lease_epoch\":3,\"coordinator_lease_id\":\"01a0f322-bdbd-71d2-a67a-9a98b7dc4bc5\",\"operation_id\":\"a08b6e4814eb165e06b2e60b66ba0f199195b8d45239175aeb979a950206bd99\",\"projected_dispatch_state\":\"terminal\",\"projected_operation_version\":11,\"projected_state\":\"completed\",\"request_binding_hash\":\"3fbbc33270c0b1bb895661badc4139a8feea13a41f4310127a6bbe07af3b3fdf\",\"request_id\":\"process:0942f7e2a0907a99065537c04c4c91b972405db05c32d1a32b3ac95fae5cc44a\",\"request_namespace_digest\":\"6f900bcff367bdd4cc9c9e5bd2c6e3cdc748ab5be94ed4c0fdafade5f4283fa8\",\"retained_dispatch_commit\":{\"committed_version\":9,\"coordinator_lease_epoch\":3,\"coordinator_lease_id\":\"01a0f322-bdbd-71d2-a67a-9a98b7dc4bc5\",\"provider_attempt\":{\"attempt_id\":\"attempt:a08b6e4814eb165e06b2e60b66ba0f199195b8d45239175aeb979a950206bd99\",\"operation_id\":\"a08b6e4814eb165e06b2e60b66ba0f199195b8d45239175aeb979a950206bd99\",\"transport_id\":\"kernel-tool-server:sandbox\",\"transport_key_epoch\":3},\"store_fence\":{\"lease_id\":\"01a0f322-bdbd-71d2-a67a-9a98b7dc4bc5\",\"owner_epoch\":3,\"store_uuid\":\"01a0f322-afac-7a23-9511-4586b04f45fb\"}},\"schema\":\"chio.admission-receipt.v1\",\"store_fence\":{\"lease_id\":\"01a0f322-bdbd-71d2-a67a-9a98b7dc4bc5\",\"owner_epoch\":3,\"store_uuid\":\"01a0f322-afac-7a23-9511-4586b04f45fb\"},\"tool_outcome_id\":\"8bb98a41a1eb7480ade54545bec2b8b605da88e1aadda159b7a276e73b9eda72\",\"tool_outcome_version\":2,\"trusted_time_unix_ms\":1790785563234},\"attribution\":{\"delegation_depth\":1,\"grant_index\":1,\"issuer_key\":\"e7fde79e544c4ff195189599b73f1c79d8b8c2099d1dad1d2cb7d78da2545249\",\"subject_key\":\"ef4fc7d25d9605293d982fde859d2c05d62d50ee16f96fbf77346b4ced3bc67f\"},\"chio_process\":{\"attempt\":1,\"operation_key\":\"mini-swe:4aa4654223b4b96626d1afbe7f5b4de34e0b4ade2eb2ac093ef6f361fab6faba\",\"process_id\":\"coder\",\"request_sha256\":\"b9dc678d690bc50cbe08a21abbd7d4f7fccf1b5346724659c92bf96a21df00cb\",\"runtime_id\":\"2ebf4f77-76dd-41ee-8c4c-aaf2e518cd32\"},\"chio_receipt_signing_nonce\":\"rcpt-01a0f323-2a63-7c22-8de7-8ab937757dbe\",\"native_launch\":{\"receipt_id\":\"d1ec3718ace245cea24c9f78b41017ee68e4f06b8133f4643f3dc2b51170acf5\",\"receipt_sha256\":\"5a703db926fde6557e2679139415487196f6dcaf92032dd7486873374df75f3f\"},\"receipt_context\":{\"request_id\":\"process:0942f7e2a0907a99065537c04c4c91b972405db05c32d1a32b3ac95fae5cc44a\"}},\"policy_hash\":\"c6bbf0e6946f6201822389287245838a3e223aec8fabaa2b4afedbc6da641745\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"signature\":\"3e9f69c40dd90bf5be65840435c353b98fb557664cb5098ae756875f9740d7476d374d50a3cbe0c65ba50d5812256b3020408f2e34c22bc6c70397f00ba4cd02\",\"timestamp\":1790785563,\"tool_name\":\"execute\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"sandbox\",\"trust_level\":\"mediated\"}",
+        "upstream_agent_sha256": "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2"
+      },
+      "state_bytes_before_execution": 4910874,
+      "state_bytes_after_execution": 12304406,
+      "model_requests": [
+        {
+          "turn": 0,
+          "request_sha256": "51b1d24238168d2dca6740c17e4138cf8d933b1710ef98650e76b8ba9a587084",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "b88c59bc831848206591973863357f78a1e668dd39618dbf6180c1393733fe84",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "request_sha256": "a944ae1052a734195023647d62d9b5ee836f3f2ee330f5d7912ca45a247fc16d",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+          ]
+        }
+      ],
+      "execution_image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+      "worker_image": "sha256:eda43b7a5a5757ea23aebe8757d4be11905c7fd0a2ca7ca0f2a52e084510e8f1",
+      "container_resource_accounting": "unavailable: driver child usage excludes Docker daemon and container cgroups",
+      "trial": 1,
+      "scenario": "patch-return-crash",
+      "effect_oracle": {
+        "patch_effects": 1,
+        "audit_effects": 2,
+        "matches_requested_effects": true
+      }
+    },
+    {
+      "schema": "chio.mini-swe.upstream-comparison.v1",
+      "scenario": "patch-return-crash",
+      "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+      "configuration": {
+        "source": "/tmp/chio-cmp-6kpvxpqi/source",
+        "revision": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "endpoint": "http://127.0.0.1:46439/v1",
+        "output": "/tmp/chio-cmp-6kpvxpqi/case-03/upstream",
+        "scenario": "patch-return-crash",
+        "owner": "44cace880c5e44ce9462c4e571975f3a"
+      },
+      "mini_swe_agent_version": "2.4.6",
+      "litellm_version": "1.100.0",
+      "upstream_module_sha256": {
+        "agents/default.py": "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2",
+        "environments/docker.py": "21d389122b008e7b743d1e640207fda0b08d9010cf6323ddd02f0742b33b96a6",
+        "models/litellm_model.py": "6df4483bcdc9620b2f9d7f8bb1027a7fb9729b739976cbcf1a9d18fb58c48227"
+      },
+      "architecture": "one retained upstream DockerEnvironment; no per-command container lease",
+      "rerun_policy": "explicit parent rerun with a fresh DefaultAgent and LitellmModel; no trajectory restore",
+      "upstream_automatic_recovery": false,
+      "completed": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "returncode": -9,
+          "watchdog_expired": false,
+          "wall_seconds": 5.373469821999606,
+          "driver_child_user_cpu_seconds": 4.739931,
+          "driver_child_system_cpu_seconds": 0.341066,
+          "driver_child_max_rss_kib": 227268,
+          "accounting_scope": "wait4 child usage; excludes Docker daemon and container cgroup usage",
+          "trajectory_exists": true,
+          "crash_boundary_exists": true,
+          "trajectory": {
+            "path": "/tmp/chio-cmp-6kpvxpqi/case-03/upstream/attempt-1/trajectory.json",
+            "sha256": "7a2138e3960ef06dcd6fb27ce282a554e6cd0d9a76da8f604bd5f5486fc88e0b",
+            "saved_model_calls": 1,
+            "saved_message_count": 4,
+            "saved_exit_status": ""
+          }
+        },
+        {
+          "attempt": 2,
+          "returncode": 0,
+          "watchdog_expired": false,
+          "wall_seconds": 5.876129250998929,
+          "driver_child_user_cpu_seconds": 4.891719,
+          "driver_child_system_cpu_seconds": 0.40311199999999997,
+          "driver_child_max_rss_kib": 226992,
+          "accounting_scope": "wait4 child usage; excludes Docker daemon and container cgroup usage",
+          "trajectory_exists": true,
+          "crash_boundary_exists": false,
+          "trajectory": {
+            "path": "/tmp/chio-cmp-6kpvxpqi/case-03/upstream/attempt-2/trajectory.json",
+            "sha256": "6f9b95efe9131888bc6e8bf35a9512d702ac6f6d7c5e3f091ecc585c94fa7cec",
+            "saved_model_calls": 3,
+            "saved_message_count": 10,
+            "saved_exit_status": "Submitted"
+          },
+          "agent_result": {
+            "exit_status": "Submitted",
+            "submission": "Addition repaired and tests pass.\n"
+          }
+        }
+      ],
+      "source_archive_sha256": "5808e993c4773732d3b9a6acdd3c45fb7ecc153f2cef8df9c035a2e24a854052",
+      "container": {
+        "id": "fc6b68e5d1d8efa9906d6aac4c48fd2261b2a313734b6c687b6166b13c8a199e",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "owner": "44cace880c5e44ce9462c4e571975f3a",
+        "user": "65534:65534",
+        "host_config": {
+          "Binds": null,
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "none",
+            "Config": {}
+          },
+          "NetworkMode": "none",
+          "PortBindings": {},
+          "RestartPolicy": {
+            "Name": "no",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": [
+            "ALL"
+          ],
+          "CgroupnsMode": "private",
+          "Dns": null,
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": null,
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": true,
+          "SecurityOpt": [
+            "no-new-privileges:true"
+          ],
+          "Tmpfs": {
+            "/tmp": "rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "/workspace": "rw,nosuid,nodev,size=64m,mode=0700,uid=65534,gid=65534"
+          },
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 8388608,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 536870912,
+          "NanoCpus": 1000000000,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": [],
+          "BlkioDeviceReadBps": [],
+          "BlkioDeviceWriteBps": [],
+          "BlkioDeviceReadIOps": [],
+          "BlkioDeviceWriteIOps": [],
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": [],
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 536870912,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": 64,
+          "Ulimits": [
+            {
+              "Name": "core",
+              "Hard": 0,
+              "Soft": 0
+            },
+            {
+              "Name": "fsize",
+              "Hard": 16777216,
+              "Soft": 16777216
+            },
+            {
+              "Name": "nofile",
+              "Hard": 128,
+              "Soft": 128
+            }
+          ],
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/acpi",
+            "/proc/asound",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/sys/devices/virtual/powercap",
+            "/sys/firmware"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ],
+          "Init": true
+        },
+        "environment_configuration": {
+          "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+          "cwd": "/workspace",
+          "env": {
+            "HOME": "/workspace",
+            "TMPDIR": "/tmp",
+            "PYTHONDONTWRITEBYTECODE": "1"
+          },
+          "forward_env": [],
+          "timeout": 20,
+          "executable": "/usr/bin/docker",
+          "run_args": [
+            "--pull=never",
+            "--label=chio.comparison.owner=44cace880c5e44ce9462c4e571975f3a",
+            "--network=none",
+            "--ipc=private",
+            "--cgroupns=private",
+            "--read-only",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges:true",
+            "--user=65534:65534",
+            "--memory=512m",
+            "--memory-swap=512m",
+            "--cpus=1",
+            "--pids-limit=64",
+            "--shm-size=8m",
+            "--init",
+            "--restart=no",
+            "--log-driver=none",
+            "--no-healthcheck",
+            "--ulimit=core=0",
+            "--ulimit=nofile=128:128",
+            "--ulimit=fsize=16777216:16777216",
+            "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "--tmpfs=/workspace:rw,nosuid,nodev,size=64m,mode=0700,uid=65534,gid=65534",
+            "--env=HOME=/workspace",
+            "--env=TMPDIR=/tmp",
+            "--env=PYTHONDONTWRITEBYTECODE=1",
+            "--entrypoint=/usr/bin/env"
+          ],
+          "container_timeout": "600s",
+          "pull_timeout": 60,
+          "interpreter": [
+            "/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c"
+          ]
+        }
+      },
+      "setup_seconds": 0.5780872859995725,
+      "stopped_process_outcome": {
+        "returncode": -9,
+        "upstream_resumed": false,
+        "saved_trajectory": {
+          "path": "/tmp/chio-cmp-6kpvxpqi/case-03/upstream/attempt-1/trajectory.json",
+          "sha256": "7a2138e3960ef06dcd6fb27ce282a554e6cd0d9a76da8f604bd5f5486fc88e0b",
+          "saved_model_calls": 1,
+          "saved_message_count": 4,
+          "saved_exit_status": ""
+        },
+        "workspace_retained_by": "comparison parent retaining DockerEnvironment",
+        "effects_after_stop": [
+          "patched"
+        ],
+        "calculator_sha256_after_stop": "ba1a531f581d2e6094e978ed6f7aca7a8d92eeb62c6e7ad73ee692f7f18bc772"
+      },
+      "execution_seconds": 11.359883818000526,
+      "agent_submitted": true,
+      "files": {
+        "calculator.py": {
+          "bytes": 32,
+          "sha256": "ba1a531f581d2e6094e978ed6f7aca7a8d92eeb62c6e7ad73ee692f7f18bc772"
+        },
+        "test_calculator.py": {
+          "bytes": 217,
+          "sha256": "fae7e3b5944f2d66f723d44208dc5032902871f165ab72bbc773eacba8fbd181"
+        },
+        "effects.txt": {
+          "bytes": 28,
+          "sha256": "9f265ecf409d22b4e188fb6002d489d57cbb780dee73f7749200890fdc49ed4d"
+        },
+        "test-output.txt": {
+          "bytes": 222,
+          "sha256": "d02da958c44204327822a0c623f1a34639a7c8cd52d717fff708230ba064545e"
+        }
+      },
+      "patch_sha256": "074fe587f87cf1220fe9361d5250aa6e992a6e3175f12a2f588224fabfd488d0",
+      "effects": [
+        "patched",
+        "patched",
+        "audit",
+        "audit"
+      ],
+      "test_output": "test_negative (test_calculator.Addition.test_negative) ... ok\ntest_positive (test_calculator.Addition.test_positive) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+      "export_seconds": 0.2334591859998909,
+      "cleanup": {
+        "removed_container_ids": [
+          "fc6b68e5d1d8efa9906d6aac4c48fd2261b2a313734b6c687b6166b13c8a199e"
+        ],
+        "owned_containers_remaining": 0,
+        "original_container_absence_verified": true
+      },
+      "total_seconds": 12.348658320999675,
+      "driver": {
+        "wall_seconds": 12.485630498000319,
+        "driver_children_user_seconds": 10.159906000000007,
+        "driver_children_system_seconds": 0.9833970000000001,
+        "returncode": 0
+      },
+      "model_requests": [
+        {
+          "turn": 0,
+          "request_sha256": "ff8fbb7e21d98a552939419676c80130ab369338482e606ec89874396110f55e",
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "4a02b915ce03313d05aa1c48e12b6c5f3e25eac37c930b932c17902dc6da10f5",
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 0,
+          "request_sha256": "ff8fbb7e21d98a552939419676c80130ab369338482e606ec89874396110f55e",
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "81c9c00309e14ed6c184faf1535a1815b815ffa5cbd2e5642d6f567f3d7ccda8",
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "request_sha256": "cba1799b5400617d0174148a332a8a69536bd31c2069716c1cc6d24704b9d3f2",
+          "actions": [
+            "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        }
+      ],
+      "trial": 1,
+      "mode": "upstream",
+      "effect_oracle": {
+        "patch_effects": 2,
+        "audit_effects": 2,
+        "matches_requested_effects": false
+      }
+    },
+    {
+      "mode": "chio",
+      "initialization": {
+        "wall_seconds": 1.8672386360012752,
+        "driver_children_user_seconds": 1.2734629999999925,
+        "driver_children_system_seconds": 0.35771899999999945,
+        "returncode": 0
+      },
+      "preparation": {
+        "wall_seconds": 2.9185737520001567,
+        "driver_children_user_seconds": 2.1341520000000003,
+        "driver_children_system_seconds": 0.477742000000001,
+        "returncode": 0
+      },
+      "fixture_authority_seconds": 0.7160906239987526,
+      "execution": {
+        "wall_seconds": 85.11203661200125,
+        "driver_children_user_seconds": 74.30851200000001,
+        "driver_children_system_seconds": 1.2884130000000003,
+        "returncode": 0
+      },
+      "export": {
+        "wall_seconds": 1.566454480000175,
+        "driver_children_user_seconds": 1.1952639999999803,
+        "driver_children_system_seconds": 0.3170319999999993,
+        "returncode": 0
+      },
+      "recipient_verification": {
+        "wall_seconds": 0.1640100379991054,
+        "driver_children_user_seconds": 0.07198600000000965,
+        "driver_children_system_seconds": 0.038147000000000375,
+        "returncode": 0
+      },
+      "completed": {
+        "abandoned_socket_intents": 0,
+        "complete": true,
+        "pending_container_records": 0,
+        "schema": "chio.process.run-report.v1",
+        "workers": [
+          {
+            "attempts": 1,
+            "cpu_ms": 0,
+            "outcome": "exit_0",
+            "peak_resident_bytes": 0,
+            "process": "coder",
+            "resource_accounting": "unavailable_container_cgroup",
+            "state": "completed",
+            "suspensions": 0
+          }
+        ]
+      },
+      "exported": {
+        "schema": "chio.mini-swe.session-result.v1",
+        "output": "/tmp/chio-cmp-6kpvxpqi/case-04/result",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "model_id": "mini-provider:833074f39b2e0196ca6ecb9fbc7f7c6e264a5e3b7a8fea31761ec5916929fbfa",
+        "operator": {
+          "output": "/tmp/chio-cmp-6kpvxpqi/case-04/result/operator",
+          "exit_status": "Submitted",
+          "submission_preview": "Addition repaired and tests pass.\n",
+          "submission_truncated": false,
+          "model_calls": 3,
+          "model_cost": 0.00108,
+          "verified_receipts": 8
+        },
+        "repository": {
+          "output": "/tmp/chio-cmp-6kpvxpqi/case-04/result/repository",
+          "revision": 5,
+          "interrupted": false,
+          "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+          "verified_transitions": 5
+        },
+        "kernel_key_sha256": "7364a00f0719823988a8c190ba56789a1feb92b123c063a972b26a96fbd7d576"
+      },
+      "review": {
+        "schema": "chio.repository.review.v1",
+        "server_id": "sandbox",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "workspace_id": "c4fb408d338443f9b61968d16c2a03d0",
+        "configuration_sha256": "0c2e51b9224f082c7a06f99613608486aabcce7584e0d8072734842dcb607bd2",
+        "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+        "contents_sha256": "013161730e9044c924889d9da985fd386939cd5a7f822cae34f0b725e1f1a5c6",
+        "verified_transitions": 5,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 8,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "72bca0d7452ce1c555acae4e707d10240eb220d6371f717d11ab85d0e84c94ab"
+        }
+      },
+      "manifest": {
+        "schema": "chio.repository.export.v1",
+        "id": "c4fb408d338443f9b61968d16c2a03d0",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "revision": 5,
+        "snapshot": "0100ee1df5c00bff624451f6bb18a2d2ca73af287de843a5260cc4f1945d2ca1",
+        "commands": [
+          {
+            "sequence": 1,
+            "status": "completed",
+            "before_sha256": "c70c0ce2141872ddf65b38f14417773d5a85fb045399a542ed1542250ab2139c",
+            "after_sha256": "c70c0ce2141872ddf65b38f14417773d5a85fb045399a542ed1542250ab2139c"
+          },
+          {
+            "sequence": 2,
+            "status": "completed",
+            "before_sha256": "c70c0ce2141872ddf65b38f14417773d5a85fb045399a542ed1542250ab2139c",
+            "after_sha256": "34518e0f21ca2f383990921fb9e8bf9910f9c356bce25b8594a2b277466f3b98"
+          },
+          {
+            "sequence": 3,
+            "status": "completed",
+            "before_sha256": "34518e0f21ca2f383990921fb9e8bf9910f9c356bce25b8594a2b277466f3b98",
+            "after_sha256": "49800c120e997dff6df2c14367e2767130f331a4c62c79bba41300789bd8dabe"
+          },
+          {
+            "sequence": 4,
+            "status": "completed",
+            "before_sha256": "49800c120e997dff6df2c14367e2767130f331a4c62c79bba41300789bd8dabe",
+            "after_sha256": "a49fdbebfa82c02ebd8df7724d6b54ef8ea26f8392a4dc0554c92eb6f8eafcec"
+          },
+          {
+            "sequence": 5,
+            "status": "completed",
+            "before_sha256": "a49fdbebfa82c02ebd8df7724d6b54ef8ea26f8392a4dc0554c92eb6f8eafcec",
+            "after_sha256": "0100ee1df5c00bff624451f6bb18a2d2ca73af287de843a5260cc4f1945d2ca1"
+          }
+        ],
+        "interrupted": false,
+        "baseline": "c70c0ce2141872ddf65b38f14417773d5a85fb045399a542ed1542250ab2139c",
+        "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+        "baseline_contents_sha256": "0959b823ad9666ac4fdec4d796da19f7979c76766a70fe46ad744847283e729e",
+        "contents_sha256": "013161730e9044c924889d9da985fd386939cd5a7f822cae34f0b725e1f1a5c6",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "helper_image": "sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e"
+      },
+      "final_files": {
+        "calculator.py": "def add(a, b):\n    return a + b\n",
+        "effects.txt": "patched\naudit\naudit\n",
+        "test-output.txt": "test_negative (test_calculator.Addition.test_negative) ... ok\ntest_positive (test_calculator.Addition.test_positive) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+        "test_calculator.py": "import unittest\nfrom calculator import add\nclass Addition(unittest.TestCase):\n    def test_positive(self):\n        self.assertEqual(add(2, 3), 5)\n    def test_negative(self):\n        self.assertEqual(add(-2, -3), -5)\n"
+      },
+      "effects": [
+        "patched",
+        "audit",
+        "audit"
+      ],
+      "fault": null,
+      "state_bytes_before_execution": 4910742,
+      "state_bytes_after_execution": 12288125,
+      "model_requests": [
+        {
+          "turn": 0,
+          "request_sha256": "51b1d24238168d2dca6740c17e4138cf8d933b1710ef98650e76b8ba9a587084",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "b88c59bc831848206591973863357f78a1e668dd39618dbf6180c1393733fe84",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "request_sha256": "a944ae1052a734195023647d62d9b5ee836f3f2ee330f5d7912ca45a247fc16d",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+          ]
+        }
+      ],
+      "execution_image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+      "worker_image": "sha256:5b6a180b375f39135ad4689693e98b1465faab97a0ce24d997c78244b26e9a4e",
+      "container_resource_accounting": "unavailable: driver child usage excludes Docker daemon and container cgroups",
+      "trial": 2,
+      "scenario": "clean",
+      "effect_oracle": {
+        "patch_effects": 1,
+        "audit_effects": 2,
+        "matches_requested_effects": true
+      }
+    },
+    {
+      "schema": "chio.mini-swe.upstream-comparison.v1",
+      "scenario": "clean",
+      "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+      "configuration": {
+        "source": "/tmp/chio-cmp-6kpvxpqi/source",
+        "revision": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "endpoint": "http://127.0.0.1:42751/v1",
+        "output": "/tmp/chio-cmp-6kpvxpqi/case-05/upstream",
+        "scenario": "clean",
+        "owner": "a71d15ed97ba47469e8783ceb96edf92"
+      },
+      "mini_swe_agent_version": "2.4.6",
+      "litellm_version": "1.100.0",
+      "upstream_module_sha256": {
+        "agents/default.py": "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2",
+        "environments/docker.py": "21d389122b008e7b743d1e640207fda0b08d9010cf6323ddd02f0742b33b96a6",
+        "models/litellm_model.py": "6df4483bcdc9620b2f9d7f8bb1027a7fb9729b739976cbcf1a9d18fb58c48227"
+      },
+      "architecture": "one retained upstream DockerEnvironment; no per-command container lease",
+      "rerun_policy": "explicit parent rerun with a fresh DefaultAgent and LitellmModel; no trajectory restore",
+      "upstream_automatic_recovery": false,
+      "completed": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "returncode": 0,
+          "watchdog_expired": false,
+          "wall_seconds": 5.674725675000445,
+          "driver_child_user_cpu_seconds": 4.699813,
+          "driver_child_system_cpu_seconds": 0.396013,
+          "driver_child_max_rss_kib": 227032,
+          "accounting_scope": "wait4 child usage; excludes Docker daemon and container cgroup usage",
+          "trajectory_exists": true,
+          "crash_boundary_exists": false,
+          "trajectory": {
+            "path": "/tmp/chio-cmp-6kpvxpqi/case-05/upstream/attempt-1/trajectory.json",
+            "sha256": "6949ac7b52db749a841002c181bcbbbae95607c060a8512ec2b5d79563ebceeb",
+            "saved_model_calls": 3,
+            "saved_message_count": 10,
+            "saved_exit_status": "Submitted"
+          },
+          "agent_result": {
+            "exit_status": "Submitted",
+            "submission": "Addition repaired and tests pass.\n"
+          }
+        }
+      ],
+      "source_archive_sha256": "5808e993c4773732d3b9a6acdd3c45fb7ecc153f2cef8df9c035a2e24a854052",
+      "container": {
+        "id": "f13fb9eead43283d50d6a7f4f2c015a2995bfb4065a3ab0f4e209098b20c86c7",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "owner": "a71d15ed97ba47469e8783ceb96edf92",
+        "user": "65534:65534",
+        "host_config": {
+          "Binds": null,
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "none",
+            "Config": {}
+          },
+          "NetworkMode": "none",
+          "PortBindings": {},
+          "RestartPolicy": {
+            "Name": "no",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": [
+            "ALL"
+          ],
+          "CgroupnsMode": "private",
+          "Dns": null,
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": null,
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": true,
+          "SecurityOpt": [
+            "no-new-privileges:true"
+          ],
+          "Tmpfs": {
+            "/tmp": "rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "/workspace": "rw,nosuid,nodev,size=64m,mode=0700,uid=65534,gid=65534"
+          },
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 8388608,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 536870912,
+          "NanoCpus": 1000000000,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": [],
+          "BlkioDeviceReadBps": [],
+          "BlkioDeviceWriteBps": [],
+          "BlkioDeviceReadIOps": [],
+          "BlkioDeviceWriteIOps": [],
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": [],
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 536870912,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": 64,
+          "Ulimits": [
+            {
+              "Name": "core",
+              "Hard": 0,
+              "Soft": 0
+            },
+            {
+              "Name": "fsize",
+              "Hard": 16777216,
+              "Soft": 16777216
+            },
+            {
+              "Name": "nofile",
+              "Hard": 128,
+              "Soft": 128
+            }
+          ],
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/acpi",
+            "/proc/asound",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/sys/devices/virtual/powercap",
+            "/sys/firmware"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ],
+          "Init": true
+        },
+        "environment_configuration": {
+          "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+          "cwd": "/workspace",
+          "env": {
+            "HOME": "/workspace",
+            "TMPDIR": "/tmp",
+            "PYTHONDONTWRITEBYTECODE": "1"
+          },
+          "forward_env": [],
+          "timeout": 20,
+          "executable": "/usr/bin/docker",
+          "run_args": [
+            "--pull=never",
+            "--label=chio.comparison.owner=a71d15ed97ba47469e8783ceb96edf92",
+            "--network=none",
+            "--ipc=private",
+            "--cgroupns=private",
+            "--read-only",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges:true",
+            "--user=65534:65534",
+            "--memory=512m",
+            "--memory-swap=512m",
+            "--cpus=1",
+            "--pids-limit=64",
+            "--shm-size=8m",
+            "--init",
+            "--restart=no",
+            "--log-driver=none",
+            "--no-healthcheck",
+            "--ulimit=core=0",
+            "--ulimit=nofile=128:128",
+            "--ulimit=fsize=16777216:16777216",
+            "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "--tmpfs=/workspace:rw,nosuid,nodev,size=64m,mode=0700,uid=65534,gid=65534",
+            "--env=HOME=/workspace",
+            "--env=TMPDIR=/tmp",
+            "--env=PYTHONDONTWRITEBYTECODE=1",
+            "--entrypoint=/usr/bin/env"
+          ],
+          "container_timeout": "600s",
+          "pull_timeout": 60,
+          "interpreter": [
+            "/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c"
+          ]
+        }
+      },
+      "setup_seconds": 0.5790847549997125,
+      "execution_seconds": 5.675527665000118,
+      "agent_submitted": true,
+      "files": {
+        "calculator.py": {
+          "bytes": 32,
+          "sha256": "ba1a531f581d2e6094e978ed6f7aca7a8d92eeb62c6e7ad73ee692f7f18bc772"
+        },
+        "test_calculator.py": {
+          "bytes": 217,
+          "sha256": "fae7e3b5944f2d66f723d44208dc5032902871f165ab72bbc773eacba8fbd181"
+        },
+        "effects.txt": {
+          "bytes": 20,
+          "sha256": "f7b2dea69938af01eafcf530c1a433d2f53bd5c6ea7f93b7163e9c197f161fc1"
+        },
+        "test-output.txt": {
+          "bytes": 222,
+          "sha256": "d02da958c44204327822a0c623f1a34639a7c8cd52d717fff708230ba064545e"
+        }
+      },
+      "patch_sha256": "074fe587f87cf1220fe9361d5250aa6e992a6e3175f12a2f588224fabfd488d0",
+      "effects": [
+        "patched",
+        "audit",
+        "audit"
+      ],
+      "test_output": "test_negative (test_calculator.Addition.test_negative) ... ok\ntest_positive (test_calculator.Addition.test_positive) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+      "export_seconds": 0.22223190300064743,
+      "cleanup": {
+        "removed_container_ids": [
+          "f13fb9eead43283d50d6a7f4f2c015a2995bfb4065a3ab0f4e209098b20c86c7"
+        ],
+        "owned_containers_remaining": 0,
+        "original_container_absence_verified": true
+      },
+      "total_seconds": 6.650533009998981,
+      "driver": {
+        "wall_seconds": 6.775504101000479,
+        "driver_children_user_seconds": 5.190027999999984,
+        "driver_children_system_seconds": 0.6200539999999997,
+        "returncode": 0
+      },
+      "model_requests": [
+        {
+          "turn": 0,
+          "request_sha256": "ff8fbb7e21d98a552939419676c80130ab369338482e606ec89874396110f55e",
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "0b09496ceae51dce8647c04d2a571cae859a763f12d6eb817542bf61b822ddaf",
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "request_sha256": "2df0e8e642490861e1979d8e87d2de26f1e7887e3f48dcf77218dbafe47ad84a",
+          "actions": [
+            "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        }
+      ],
+      "trial": 2,
+      "mode": "upstream",
+      "effect_oracle": {
+        "patch_effects": 1,
+        "audit_effects": 2,
+        "matches_requested_effects": true
+      }
+    },
+    {
+      "schema": "chio.mini-swe.upstream-comparison.v1",
+      "scenario": "patch-return-crash",
+      "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+      "configuration": {
+        "source": "/tmp/chio-cmp-6kpvxpqi/source",
+        "revision": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "endpoint": "http://127.0.0.1:33075/v1",
+        "output": "/tmp/chio-cmp-6kpvxpqi/case-06/upstream",
+        "scenario": "patch-return-crash",
+        "owner": "2c1b6dd722294e64832a461d4bda81e7"
+      },
+      "mini_swe_agent_version": "2.4.6",
+      "litellm_version": "1.100.0",
+      "upstream_module_sha256": {
+        "agents/default.py": "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2",
+        "environments/docker.py": "21d389122b008e7b743d1e640207fda0b08d9010cf6323ddd02f0742b33b96a6",
+        "models/litellm_model.py": "6df4483bcdc9620b2f9d7f8bb1027a7fb9729b739976cbcf1a9d18fb58c48227"
+      },
+      "architecture": "one retained upstream DockerEnvironment; no per-command container lease",
+      "rerun_policy": "explicit parent rerun with a fresh DefaultAgent and LitellmModel; no trajectory restore",
+      "upstream_automatic_recovery": false,
+      "completed": true,
+      "attempts": [
+        {
+          "attempt": 1,
+          "returncode": -9,
+          "watchdog_expired": false,
+          "wall_seconds": 5.424261762998867,
+          "driver_child_user_cpu_seconds": 4.7570879999999995,
+          "driver_child_system_cpu_seconds": 0.363896,
+          "driver_child_max_rss_kib": 227168,
+          "accounting_scope": "wait4 child usage; excludes Docker daemon and container cgroup usage",
+          "trajectory_exists": true,
+          "crash_boundary_exists": true,
+          "trajectory": {
+            "path": "/tmp/chio-cmp-6kpvxpqi/case-06/upstream/attempt-1/trajectory.json",
+            "sha256": "2039b53613b1ebd2d7651b25b007eb65038c056a50b80b7be54e878be097565d",
+            "saved_model_calls": 1,
+            "saved_message_count": 4,
+            "saved_exit_status": ""
+          }
+        },
+        {
+          "attempt": 2,
+          "returncode": 0,
+          "watchdog_expired": false,
+          "wall_seconds": 5.776160722998611,
+          "driver_child_user_cpu_seconds": 4.775627,
+          "driver_child_system_cpu_seconds": 0.41048399999999996,
+          "driver_child_max_rss_kib": 227108,
+          "accounting_scope": "wait4 child usage; excludes Docker daemon and container cgroup usage",
+          "trajectory_exists": true,
+          "crash_boundary_exists": false,
+          "trajectory": {
+            "path": "/tmp/chio-cmp-6kpvxpqi/case-06/upstream/attempt-2/trajectory.json",
+            "sha256": "44ba5cb60a1de0574c81297c78ca85e2bc75291db92a105f284d0a87fe591755",
+            "saved_model_calls": 3,
+            "saved_message_count": 10,
+            "saved_exit_status": "Submitted"
+          },
+          "agent_result": {
+            "exit_status": "Submitted",
+            "submission": "Addition repaired and tests pass.\n"
+          }
+        }
+      ],
+      "source_archive_sha256": "5808e993c4773732d3b9a6acdd3c45fb7ecc153f2cef8df9c035a2e24a854052",
+      "container": {
+        "id": "986081456a899b2ace6d31761baa940d77f0b4aa871377bb51f11d4a1b2d01c4",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "owner": "2c1b6dd722294e64832a461d4bda81e7",
+        "user": "65534:65534",
+        "host_config": {
+          "Binds": null,
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "none",
+            "Config": {}
+          },
+          "NetworkMode": "none",
+          "PortBindings": {},
+          "RestartPolicy": {
+            "Name": "no",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": [
+            "ALL"
+          ],
+          "CgroupnsMode": "private",
+          "Dns": null,
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": null,
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": true,
+          "SecurityOpt": [
+            "no-new-privileges:true"
+          ],
+          "Tmpfs": {
+            "/tmp": "rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "/workspace": "rw,nosuid,nodev,size=64m,mode=0700,uid=65534,gid=65534"
+          },
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 8388608,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 536870912,
+          "NanoCpus": 1000000000,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": [],
+          "BlkioDeviceReadBps": [],
+          "BlkioDeviceWriteBps": [],
+          "BlkioDeviceReadIOps": [],
+          "BlkioDeviceWriteIOps": [],
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": [],
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 536870912,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": 64,
+          "Ulimits": [
+            {
+              "Name": "core",
+              "Hard": 0,
+              "Soft": 0
+            },
+            {
+              "Name": "fsize",
+              "Hard": 16777216,
+              "Soft": 16777216
+            },
+            {
+              "Name": "nofile",
+              "Hard": 128,
+              "Soft": 128
+            }
+          ],
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/acpi",
+            "/proc/asound",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/sys/devices/virtual/powercap",
+            "/sys/firmware"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ],
+          "Init": true
+        },
+        "environment_configuration": {
+          "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+          "cwd": "/workspace",
+          "env": {
+            "HOME": "/workspace",
+            "TMPDIR": "/tmp",
+            "PYTHONDONTWRITEBYTECODE": "1"
+          },
+          "forward_env": [],
+          "timeout": 20,
+          "executable": "/usr/bin/docker",
+          "run_args": [
+            "--pull=never",
+            "--label=chio.comparison.owner=2c1b6dd722294e64832a461d4bda81e7",
+            "--network=none",
+            "--ipc=private",
+            "--cgroupns=private",
+            "--read-only",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges:true",
+            "--user=65534:65534",
+            "--memory=512m",
+            "--memory-swap=512m",
+            "--cpus=1",
+            "--pids-limit=64",
+            "--shm-size=8m",
+            "--init",
+            "--restart=no",
+            "--log-driver=none",
+            "--no-healthcheck",
+            "--ulimit=core=0",
+            "--ulimit=nofile=128:128",
+            "--ulimit=fsize=16777216:16777216",
+            "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "--tmpfs=/workspace:rw,nosuid,nodev,size=64m,mode=0700,uid=65534,gid=65534",
+            "--env=HOME=/workspace",
+            "--env=TMPDIR=/tmp",
+            "--env=PYTHONDONTWRITEBYTECODE=1",
+            "--entrypoint=/usr/bin/env"
+          ],
+          "container_timeout": "600s",
+          "pull_timeout": 60,
+          "interpreter": [
+            "/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c"
+          ]
+        }
+      },
+      "setup_seconds": 0.5845638259997941,
+      "stopped_process_outcome": {
+        "returncode": -9,
+        "upstream_resumed": false,
+        "saved_trajectory": {
+          "path": "/tmp/chio-cmp-6kpvxpqi/case-06/upstream/attempt-1/trajectory.json",
+          "sha256": "2039b53613b1ebd2d7651b25b007eb65038c056a50b80b7be54e878be097565d",
+          "saved_model_calls": 1,
+          "saved_message_count": 4,
+          "saved_exit_status": ""
+        },
+        "workspace_retained_by": "comparison parent retaining DockerEnvironment",
+        "effects_after_stop": [
+          "patched"
+        ],
+        "calculator_sha256_after_stop": "ba1a531f581d2e6094e978ed6f7aca7a8d92eeb62c6e7ad73ee692f7f18bc772"
+      },
+      "execution_seconds": 11.312786356000288,
+      "agent_submitted": true,
+      "files": {
+        "calculator.py": {
+          "bytes": 32,
+          "sha256": "ba1a531f581d2e6094e978ed6f7aca7a8d92eeb62c6e7ad73ee692f7f18bc772"
+        },
+        "test_calculator.py": {
+          "bytes": 217,
+          "sha256": "fae7e3b5944f2d66f723d44208dc5032902871f165ab72bbc773eacba8fbd181"
+        },
+        "effects.txt": {
+          "bytes": 28,
+          "sha256": "9f265ecf409d22b4e188fb6002d489d57cbb780dee73f7749200890fdc49ed4d"
+        },
+        "test-output.txt": {
+          "bytes": 222,
+          "sha256": "d02da958c44204327822a0c623f1a34639a7c8cd52d717fff708230ba064545e"
+        }
+      },
+      "patch_sha256": "074fe587f87cf1220fe9361d5250aa6e992a6e3175f12a2f588224fabfd488d0",
+      "effects": [
+        "patched",
+        "patched",
+        "audit",
+        "audit"
+      ],
+      "test_output": "test_negative (test_calculator.Addition.test_negative) ... ok\ntest_positive (test_calculator.Addition.test_positive) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+      "export_seconds": 0.22799625500010734,
+      "cleanup": {
+        "removed_container_ids": [
+          "986081456a899b2ace6d31761baa940d77f0b4aa871377bb51f11d4a1b2d01c4"
+        ],
+        "owned_containers_remaining": 0,
+        "original_container_absence_verified": true
+      },
+      "total_seconds": 12.301710826999624,
+      "driver": {
+        "wall_seconds": 12.434552149999945,
+        "driver_children_user_seconds": 10.035192999999992,
+        "driver_children_system_seconds": 1.047512000000001,
+        "returncode": 0
+      },
+      "model_requests": [
+        {
+          "turn": 0,
+          "request_sha256": "ff8fbb7e21d98a552939419676c80130ab369338482e606ec89874396110f55e",
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "0b09496ceae51dce8647c04d2a571cae859a763f12d6eb817542bf61b822ddaf",
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 0,
+          "request_sha256": "ff8fbb7e21d98a552939419676c80130ab369338482e606ec89874396110f55e",
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "81c9c00309e14ed6c184faf1535a1815b815ffa5cbd2e5642d6f567f3d7ccda8",
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "request_sha256": "cba1799b5400617d0174148a332a8a69536bd31c2069716c1cc6d24704b9d3f2",
+          "actions": [
+            "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+          ],
+          "prompt": [
+            {
+              "role": "system",
+              "content": "Repair the Python repository using bash commands."
+            },
+            {
+              "role": "user",
+              "content": "Fix addition and verify the existing unit tests."
+            }
+          ]
+        }
+      ],
+      "trial": 2,
+      "mode": "upstream",
+      "effect_oracle": {
+        "patch_effects": 2,
+        "audit_effects": 2,
+        "matches_requested_effects": false
+      }
+    },
+    {
+      "mode": "chio",
+      "initialization": {
+        "wall_seconds": 1.8668699219997507,
+        "driver_children_user_seconds": 1.2166760000000068,
+        "driver_children_system_seconds": 0.397278,
+        "returncode": 0
+      },
+      "preparation": {
+        "wall_seconds": 2.9687223860000813,
+        "driver_children_user_seconds": 2.1791089999999826,
+        "driver_children_system_seconds": 0.4760789999999986,
+        "returncode": 0
+      },
+      "fixture_authority_seconds": 0.880563949000134,
+      "execution": {
+        "wall_seconds": 87.30485327300084,
+        "driver_children_user_seconds": 74.433784,
+        "driver_children_system_seconds": 1.524284999999999,
+        "returncode": 0
+      },
+      "export": {
+        "wall_seconds": 1.566285056000197,
+        "driver_children_user_seconds": 1.162725000000023,
+        "driver_children_system_seconds": 0.3291789999999999,
+        "returncode": 0
+      },
+      "recipient_verification": {
+        "wall_seconds": 0.1640603870000632,
+        "driver_children_user_seconds": 0.07912199999998393,
+        "driver_children_system_seconds": 0.03236800000000173,
+        "returncode": 0
+      },
+      "completed": {
+        "abandoned_socket_intents": 0,
+        "complete": true,
+        "pending_container_records": 0,
+        "schema": "chio.process.run-report.v1",
+        "workers": [
+          {
+            "attempts": 2,
+            "cpu_ms": 0,
+            "outcome": "exit_0",
+            "peak_resident_bytes": 0,
+            "process": "coder",
+            "resource_accounting": "unavailable_container_cgroup",
+            "state": "completed",
+            "suspensions": 0
+          }
+        ]
+      },
+      "exported": {
+        "schema": "chio.mini-swe.session-result.v1",
+        "output": "/tmp/chio-cmp-6kpvxpqi/case-07/result",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "model_id": "mini-provider:dbb4f994ec38e84bf8426f37bc366ef7b49df245e323bc56e8d0d3a46cbfa3cf",
+        "operator": {
+          "output": "/tmp/chio-cmp-6kpvxpqi/case-07/result/operator",
+          "exit_status": "Submitted",
+          "submission_preview": "Addition repaired and tests pass.\n",
+          "submission_truncated": false,
+          "model_calls": 3,
+          "model_cost": 0.00108,
+          "verified_receipts": 8
+        },
+        "repository": {
+          "output": "/tmp/chio-cmp-6kpvxpqi/case-07/result/repository",
+          "revision": 5,
+          "interrupted": false,
+          "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+          "verified_transitions": 5
+        },
+        "kernel_key_sha256": "d29eba90fda2b56990cec3d42146fbbee1b2bc712d55ab8b14dff9566115a030"
+      },
+      "review": {
+        "schema": "chio.repository.review.v1",
+        "server_id": "sandbox",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "workspace_id": "f33c377d0b4c4828b107b76240cb6923",
+        "configuration_sha256": "674a3f5e8a59358d1b9a2b1e3af1045abfa91061525b8ee6b905da3025996fd0",
+        "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+        "contents_sha256": "013161730e9044c924889d9da985fd386939cd5a7f822cae34f0b725e1f1a5c6",
+        "verified_transitions": 5,
+        "verification": {
+          "checks": [
+            "signature",
+            "signer_pin",
+            "action_parameter_hash"
+          ],
+          "receipts_verified": 8,
+          "schema": "chio.receipt.signatures.v1",
+          "trusted_kernel_key": "38e462b7841809963c75c4a207965fcba9637f38a110e089ca540b46b91eeeed"
+        }
+      },
+      "manifest": {
+        "schema": "chio.repository.export.v1",
+        "id": "f33c377d0b4c4828b107b76240cb6923",
+        "source_commit": "94bea2d982f58c4cee599a0897a0dc138c63503b",
+        "revision": 5,
+        "snapshot": "fcc4eec07605e443fcbd15438a5fa06a51a07b83303684e8a12ddfd8bb9294d5",
+        "commands": [
+          {
+            "sequence": 1,
+            "status": "completed",
+            "before_sha256": "41b305f6f4c79767d3321e156ac93f2dfefe7a6cca9b2a5f7d0eb820f8bff876",
+            "after_sha256": "41b305f6f4c79767d3321e156ac93f2dfefe7a6cca9b2a5f7d0eb820f8bff876"
+          },
+          {
+            "sequence": 2,
+            "status": "completed",
+            "before_sha256": "41b305f6f4c79767d3321e156ac93f2dfefe7a6cca9b2a5f7d0eb820f8bff876",
+            "after_sha256": "cf96aa45eb719d6cda29eedf8d8c6b5a4c88e526a2cdef91b7662733c544b39f"
+          },
+          {
+            "sequence": 3,
+            "status": "completed",
+            "before_sha256": "cf96aa45eb719d6cda29eedf8d8c6b5a4c88e526a2cdef91b7662733c544b39f",
+            "after_sha256": "529ad6487ffe03c0ed3acc8215a51752dbba563b02a5e99532934be5aa95ffce"
+          },
+          {
+            "sequence": 4,
+            "status": "completed",
+            "before_sha256": "529ad6487ffe03c0ed3acc8215a51752dbba563b02a5e99532934be5aa95ffce",
+            "after_sha256": "0bb1f8f184c3e6f018cb45bbaf8186cc8890dc71b30c49c459e26077e25b3fee"
+          },
+          {
+            "sequence": 5,
+            "status": "completed",
+            "before_sha256": "0bb1f8f184c3e6f018cb45bbaf8186cc8890dc71b30c49c459e26077e25b3fee",
+            "after_sha256": "fcc4eec07605e443fcbd15438a5fa06a51a07b83303684e8a12ddfd8bb9294d5"
+          }
+        ],
+        "interrupted": false,
+        "baseline": "41b305f6f4c79767d3321e156ac93f2dfefe7a6cca9b2a5f7d0eb820f8bff876",
+        "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+        "baseline_contents_sha256": "0959b823ad9666ac4fdec4d796da19f7979c76766a70fe46ad744847283e729e",
+        "contents_sha256": "013161730e9044c924889d9da985fd386939cd5a7f822cae34f0b725e1f1a5c6",
+        "image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+        "helper_image": "sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e"
+      },
+      "final_files": {
+        "calculator.py": "def add(a, b):\n    return a + b\n",
+        "effects.txt": "patched\naudit\naudit\n",
+        "test-output.txt": "test_negative (test_calculator.Addition.test_negative) ... ok\ntest_positive (test_calculator.Addition.test_positive) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+        "test_calculator.py": "import unittest\nfrom calculator import add\nclass Addition(unittest.TestCase):\n    def test_positive(self):\n        self.assertEqual(add(2, 3), 5)\n    def test_negative(self):\n        self.assertEqual(add(-2, -3), -5)\n"
+      },
+      "effects": [
+        "patched",
+        "audit",
+        "audit"
+      ],
+      "fault": {
+        "event": "comparison_patch_return_crash",
+        "attempt": 1,
+        "receipt_json": "{\"action\":{\"parameter_hash\":\"32d437a1d9d874f7597dc0e8640d7115a2e9a9fe33ed5b30b50c6bc2532fa843\",\"parameters\":{\"capability\":{\"algorithm\":\"ed25519\",\"body\":{\"audience\":\"consumer-broker-0\",\"brokerQuotaKeyId\":\"prepared-quota-b2e6c79ae420700bde9a9a4b6d41471ba01ace4db531ca2d8128b3ef7a5a00a7\",\"capabilityId\":\"prepared-b2e6c79ae420700bde9a9a4b6d41471ba01ace4db531ca2d8128b3ef7a5a00a7\",\"constraints\":{\"allowedCallerHeaders\":[\"content-type\"],\"maximumBodyBytes\":131072,\"maximumResponseBytes\":16384,\"maximumTimeoutMs\":120000,\"providerOwnedHeaders\":[\"authorization\"],\"redirectPolicy\":\"disabled\",\"requiredBodySha256\":\"dd130011eda5f46dd3336fe536cbca72d766e51a464d3dfbed7d47426d430267\",\"requiredPreviewSha256\":null,\"streamingAllowed\":false},\"consumption\":\"capture_before_dispatch\",\"credential\":{\"credentialId\":\"credential-process-boundary\",\"provider\":\"generic-https\",\"version\":1},\"destination\":{\"exactPathAndQuery\":\"/execute\",\"explicitPort\":36939,\"method\":\"POST\",\"normalizedHost\":\"boundary-upstream.test\",\"scheme\":\"https\"},\"expiresAtUnixSeconds\":1790786076,\"issuedAtUnixSeconds\":1790785776,\"issuer\":\"97f7135a9a2690e73beb26556f1cb163bea2532affa1e7782430be98c0e56812\",\"maximumExecutions\":1,\"notBeforeUnixSeconds\":1790785776,\"parentCapabilityId\":\"40d3ed11-f6a4-4e91-bc52-ae0363741706\",\"proof\":{\"callerPublicKey\":\"65663e4d9c3087a2f48dae3d938ef0ee72e4b0697ff5cd06daf5ecc2e51523b2\",\"mode\":\"public_key\",\"nonceTtlSeconds\":300},\"providerAdapterId\":\"generic-bearer\",\"providerAdapterVersion\":1,\"revocationId\":\"prepared-revocation-b2e6c79ae420700bde9a9a4b6d41471ba01ace4db531ca2d8128b3ef7a5a00a7\",\"schema\":\"chio.broker-capability.v1\",\"subject\":\"65663e4d9c3087a2f48dae3d938ef0ee72e4b0697ff5cd06daf5ecc2e51523b2\"},\"signature\":\"2470d86cd8dce874252e25dfed44a1ea66eab21233c101d74f8fe6c8bb377ba1933687219dbcbd6f0d24a4ddfacee2888e01e49994d20c9f5611e623c434e300\"},\"invocationId\":\"process:e953b4bc59506b6ab80f23e556f68c91baaa28a6eb368a771d2deb49c7dd3b1d\",\"proof\":{\"algorithm\":\"ed25519\",\"body\":{\"authorityKey\":\"65663e4d9c3087a2f48dae3d938ef0ee72e4b0697ff5cd06daf5ecc2e51523b2\",\"bodySha256\":\"dd130011eda5f46dd3336fe536cbca72d766e51a464d3dfbed7d47426d430267\",\"brokerCapabilityId\":\"prepared-b2e6c79ae420700bde9a9a4b6d41471ba01ace4db531ca2d8128b3ef7a5a00a7\",\"callerHeadersSha256\":\"265e7b877c8e1768b9488972380d00a9601aac5e72d0e060cc1c3b951f3a1a13\",\"callerOptionsSha256\":\"d4d790153c0b8f6e44f6fcdcfa1f0ec785972fbdcc4f433782a9d9d522bebfe1\",\"capabilityExpiresAtUnixSeconds\":1790786076,\"credential\":{\"credentialId\":\"credential-process-boundary\",\"provider\":\"generic-https\",\"version\":1},\"destination\":{\"exactPathAndQuery\":\"/execute\",\"explicitPort\":36939,\"method\":\"POST\",\"normalizedHost\":\"boundary-upstream.test\",\"scheme\":\"https\"},\"issuedAtUnixSeconds\":1790785776,\"nonce\":\"d7f90ee5-d70f-484b-ae09-b7ac1e5ecf19\",\"parentCapabilityId\":\"40d3ed11-f6a4-4e91-bc52-ae0363741706\",\"schema\":\"chio.broker-request-proof.v1\"},\"signature\":\"a05365b05e9637742ae786b4a96af340392097962ca30dc44cf41f953add55bcfc13c103865c1966882eb72c6271f43d4023f69fb5e7ff6d7407cdbe5bccf802\"},\"request\":{\"approvedPreviewSha256\":null,\"body\":[123,34,99,111,109,109,97,110,100,34,58,34,115,101,100,32,45,105,32,39,115,47,114,101,116,117,114,110,32,97,32,45,32,98,47,114,101,116,117,114,110,32,97,32,43,32,98,47,39,32,99,97,108,99,117,108,97,116,111,114,46,112,121,59,32,112,114,105,110,116,102,32,39,112,97,116,99,104,101,100,92,92,110,39,32,62,62,32,101,102,102,101,99,116,115,46,116,120,116,32,35,32,99,104,101,99,107,112,111,105,110,116,45,103,97,112,34,44,34,99,111,110,102,105,103,117,114,97,116,105,111,110,95,115,104,97,50,53,54,34,58,34,54,55,52,97,51,102,53,101,56,97,53,57,51,53,56,100,49,98,57,97,50,98,49,101,51,97,102,49,48,52,53,97,98,102,97,57,49,48,54,49,53,50,53,98,56,101,101,54,98,57,48,53,100,97,51,48,50,53,57,57,54,102,100,48,34,44,34,116,111,111,108,95,99,97,108,108,95,105,100,34,58,34,99,97,108,108,45,49,45,48,34,125],\"destination\":{\"exactPathAndQuery\":\"/execute\",\"explicitPort\":36939,\"method\":\"POST\",\"normalizedHost\":\"boundary-upstream.test\",\"scheme\":\"https\"},\"headers\":[{\"name\":\"content-type\",\"value\":[97,112,112,108,105,99,97,116,105,111,110,47,106,115,111,110]}],\"options\":{\"responseLimitBytes\":16384,\"streaming\":false,\"timeoutMs\":120000}},\"schema\":\"chio.broker-execute.v1\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"40d3ed11-f6a4-4e91-bc52-ae0363741706\",\"content_hash\":\"fb6fa9a4579273a34ec96861c5bd216350e1f396f02d577560f3fb14a9dd5293\",\"decision\":{\"verdict\":\"allow\"},\"id\":\"a68b534054c11bd613a3696918a894a0ecb68c16a3ebe2e172eab8a35dab4499\",\"kernel_key\":\"38e462b7841809963c75c4a207965fcba9637f38a110e089ca540b46b91eeeed\",\"metadata\":{\"admission_operation\":{\"compensation_status\":\"not_compensated\",\"coordinator_lease_epoch\":3,\"coordinator_lease_id\":\"01a0f326-2585-7f81-b125-7dbdb803cb50\",\"operation_id\":\"2cd793b27d2515283ce0ec0ddd2f39ad0880410e81c1d6594daedda77d40020e\",\"projected_dispatch_state\":\"terminal\",\"projected_operation_version\":11,\"projected_state\":\"completed\",\"request_binding_hash\":\"f9917a4c257bc72694685abfd087c7c4e8c542169b10d7cd2edf447b717ef3b8\",\"request_id\":\"process:e953b4bc59506b6ab80f23e556f68c91baaa28a6eb368a771d2deb49c7dd3b1d\",\"request_namespace_digest\":\"abd457d6b1c8b259b52c1008fe506e1f3775be7a2011751f04542acd7dbaf4ca\",\"retained_dispatch_commit\":{\"committed_version\":9,\"coordinator_lease_epoch\":3,\"coordinator_lease_id\":\"01a0f326-2585-7f81-b125-7dbdb803cb50\",\"provider_attempt\":{\"attempt_id\":\"attempt:2cd793b27d2515283ce0ec0ddd2f39ad0880410e81c1d6594daedda77d40020e\",\"operation_id\":\"2cd793b27d2515283ce0ec0ddd2f39ad0880410e81c1d6594daedda77d40020e\",\"transport_id\":\"kernel-tool-server:sandbox\",\"transport_key_epoch\":3},\"store_fence\":{\"lease_id\":\"01a0f326-2585-7f81-b125-7dbdb803cb50\",\"owner_epoch\":3,\"store_uuid\":\"01a0f326-177a-7680-a8d4-c3c53fbe5a51\"}},\"schema\":\"chio.admission-receipt.v1\",\"store_fence\":{\"lease_id\":\"01a0f326-2585-7f81-b125-7dbdb803cb50\",\"owner_epoch\":3,\"store_uuid\":\"01a0f326-177a-7680-a8d4-c3c53fbe5a51\"},\"tool_outcome_id\":\"5ece2216f8694453dab7f97dcb95fe265fc07d5d8afd31d898c04d6dcd4a741e\",\"tool_outcome_version\":2,\"trusted_time_unix_ms\":1790785786291},\"attribution\":{\"delegation_depth\":1,\"grant_index\":1,\"issuer_key\":\"38e462b7841809963c75c4a207965fcba9637f38a110e089ca540b46b91eeeed\",\"subject_key\":\"65663e4d9c3087a2f48dae3d938ef0ee72e4b0697ff5cd06daf5ecc2e51523b2\"},\"chio_process\":{\"attempt\":1,\"operation_key\":\"mini-swe:c1ef566e336c278d7edd14d01ee0fb44237a6a3226436d3dcea9cd362f887971\",\"process_id\":\"coder\",\"request_sha256\":\"6508252bb0e3345b3ebc792670c46015a546b42e68f0801e79d9df93c1523c6e\",\"runtime_id\":\"47d35aba-62db-42ef-b43f-d416de9d3886\"},\"chio_receipt_signing_nonce\":\"rcpt-01a0f326-91b4-7c71-b399-f41863b7bc23\",\"native_launch\":{\"receipt_id\":\"5f79cf9a0287df113a3ea4fe2bb4aec2a28e8d8a9efed0f6b6e63e9e85aa54c8\",\"receipt_sha256\":\"a7bf5d5148d6410a763d4ae08e406b2385b0969a6eb70f6ee8afc2998bacd932\"},\"receipt_context\":{\"request_id\":\"process:e953b4bc59506b6ab80f23e556f68c91baaa28a6eb368a771d2deb49c7dd3b1d\"}},\"policy_hash\":\"c6bbf0e6946f6201822389287245838a3e223aec8fabaa2b4afedbc6da641745\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"signature\":\"c6fb832fc84a1a823e6b3a84d7bc7352dfd39668470bf232a9cce32c0dc95e7ce5cf60f5f64d24c6c21f98d36a5c9f18fe5268f3f7595204e3a8c92e7354c00b\",\"timestamp\":1790785786,\"tool_name\":\"execute\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"sandbox\",\"trust_level\":\"mediated\"}",
+        "upstream_agent_sha256": "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2"
+      },
+      "state_bytes_before_execution": 4910840,
+      "state_bytes_after_execution": 12283892,
+      "model_requests": [
+        {
+          "turn": 0,
+          "request_sha256": "51b1d24238168d2dca6740c17e4138cf8d933b1710ef98650e76b8ba9a587084",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "cat calculator.py; python -m unittest -v"
+          ]
+        },
+        {
+          "turn": 1,
+          "request_sha256": "b88c59bc831848206591973863357f78a1e668dd39618dbf6180c1393733fe84",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+            "printf 'audit\\n' >> effects.txt",
+            "printf 'audit\\n' >> effects.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "request_sha256": "a944ae1052a734195023647d62d9b5ee836f3f2ee330f5d7912ca45a247fc16d",
+          "prompt": [
+            {
+              "content": "Repair the Python repository using bash commands.",
+              "role": "system"
+            },
+            {
+              "content": "Fix addition and verify the existing unit tests.",
+              "role": "user"
+            }
+          ],
+          "actions": [
+            "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+          ]
+        }
+      ],
+      "execution_image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+      "worker_image": "sha256:eda43b7a5a5757ea23aebe8757d4be11905c7fd0a2ca7ca0f2a52e084510e8f1",
+      "container_resource_accounting": "unavailable: driver child usage excludes Docker daemon and container cgroups",
+      "trial": 2,
+      "scenario": "patch-return-crash",
+      "effect_oracle": {
+        "patch_effects": 1,
+        "audit_effects": 2,
+        "matches_requested_effects": true
+      }
+    }
+  ],
+  "limits": [
+    "controlled model decisions; no coding-quality or billing conclusion",
+    "explicit upstream operator rerun; no claimed upstream automatic recovery",
+    "complete native-session architecture cost, not bare kernel overhead",
+    "whole-system CPU and container memory accounting unavailable",
+    "fixed decisions ignore observations; no prediction of live-model rerun behavior"
+  ],
+  "source_unchanged": true
+}

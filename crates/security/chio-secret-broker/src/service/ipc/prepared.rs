@@ -98,7 +98,7 @@ impl UnixBrokerEndpoint {
         };
         let encoded = canonical_json_bytes(&response)
             .map_err(|_| prepared_internal_fault("prepared connection response encoding failed"))?;
-        write_broker_ipc_response(&mut stream, &encoded)?;
+        write_broker_ipc_response(&mut stream, &encoded, IpcOperation::PrepareConnection)?;
         if let Some((expected_frame_sha256, deadline)) = binding {
             let permit = permit.map_err(BrokerIpcServeFailure::Internal)?;
             let stream = stream.into_inner();
@@ -238,7 +238,7 @@ impl UnixBrokerEndpoint {
             .map_err(BrokerIpcServeFailure::Internal)?;
         let encoded = canonical_json_bytes(&response)
             .map_err(|_| prepared_internal_fault("prepared execution response encoding failed"))?;
-        write_broker_ipc_response(&mut stream, &encoded)
+        write_broker_ipc_response(&mut stream, &encoded, IpcOperation::Execute)
     }
 }
 

@@ -3,7 +3,6 @@
 import hashlib
 import json
 import os
-import subprocess
 from pathlib import Path
 
 MAX_FILES = 128
@@ -22,6 +21,8 @@ def digest(value):
 
 
 def git(repo, *args):
+    import subprocess
+
     environment = {
         key: value for key, value in os.environ.items() if not key.startswith("GIT_")
     }

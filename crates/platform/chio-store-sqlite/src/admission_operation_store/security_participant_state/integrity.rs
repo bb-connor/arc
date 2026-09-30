@@ -50,26 +50,6 @@ pub(in crate::admission_operation_store) fn verify_coverage(
             "native initialization and global reference counts differ",
         ));
     }
-    for initialized in &records {
-        for sequence in
-            2..=super::history::head(connection, initialized.authority.as_str()).map_err(invalid)?
-        {
-            let record = super::history::load(connection, initialized.authority.as_str(), sequence)
-                .map_err(invalid)?
-                .ok_or_else(|| invalid("native mutation disappeared"))?;
-            let count: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM authority_global_commits WHERE projection_kind = ?1 AND projection_key = ?2
-                 AND projection_sequence = ?3 AND mutation_kind = ?4 AND projection_reference_digest = ?5
-                 AND store_uuid = ?6 AND store_lease_id = ?7 AND store_owner_epoch = ?8",
-                params![PROJECTION_KIND, record.authority.as_str(), i64::try_from(sequence).map_err(invalid)?,
-                    super::history::MUTATION, record.digest().map_err(invalid)?, record.lease.fence.store_uuid,
-                    record.lease.fence.lease_id, i64::try_from(record.lease.fence.owner_epoch).map_err(invalid)?], |row| row.get(0),
-            ).map_err(invalid)?;
-            if count != 1 {
-                return Err(invalid("native mutation lacks its exact global commit"));
-            }
-        }
-    }
     let orphans: bool = connection
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM security_participant_state_mutations AS mutation
@@ -82,9 +62,9 @@ pub(in crate::admission_operation_store) fn verify_coverage(
     if orphans {
         return Err(invalid("native mutation has no initialization"));
     }
-    super::egress::verify_coverage(connection, &records)?;
-    super::output::verify_coverage(connection, &records)?;
-    super::nonce_preflight::verify_coverage(connection, &records)?;
+    super::egress::verify_coverage(connection)?;
+    super::output::verify_coverage(connection)?;
+    super::nonce_preflight::verify_coverage(connection)?;
     Ok(())
 }
 

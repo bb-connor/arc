@@ -174,9 +174,7 @@ def model_returned(directory):
     if not path.exists():
         return None
     with sqlite3.connect(path) as db:
-        if not db.execute(
-            "SELECT 1 FROM sqlite_master WHERE name='run_containers'"
-        ).fetchone():
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE name='run_containers'").fetchone():
             return None
         row = db.execute(
             "SELECT container_id FROM run_containers WHERE process='coder' AND attempt=1"
@@ -194,11 +192,7 @@ def model_returned(directory):
 
 def queries(directory):
     path = directory / "queries.jsonl"
-    return (
-        [json.loads(line) for line in path.read_text().splitlines()]
-        if path.exists()
-        else []
-    )
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
 
 def finish(process, success=True):
@@ -243,17 +237,13 @@ def read_state(binary, directory, unknown=False):
             assert error.receipt_json
             receipt = json.loads(error.receipt_json)
             assert (
-                receipt["metadata"]["admission_operation"]["schema"]
-                == "chio.admission-receipt.v1"
+                receipt["metadata"]["admission_operation"]["schema"] == "chio.admission-receipt.v1"
             )
             assert (
                 receipt["metadata"]["admission_operation"]["projected_state"]
                 == "outcome_unknown_after_dispatch"
             )
-            assert (
-                receipt["metadata"]["chio_process"]["recovery_policy"]
-                == "known_outcome_only"
-            )
+            assert receipt["metadata"]["chio_process"]["recovery_policy"] == "known_outcome_only"
             return {"unknown_receipt": error.receipt_json}
         raise AssertionError("Unknown model outcome was accepted")
 
@@ -321,20 +311,13 @@ def exercise(binary, directory, base, image, profile):
             (directory / "tests-after.txt").write_text(after)
             receipts = exported["model_receipts"] + exported["command_receipts"]
             assert len(receipts) == len(set(receipts)) == 8
-            assert (
-                len(exported["model_receipts"]) == 3
-                and len(exported["command_receipts"]) == 5
-            )
+            assert len(exported["model_receipts"]) == 3 and len(exported["command_receipts"]) == 5
             if first:
                 assert first["receipt_json"] == exported["model_receipts"][0]
-                assert not docker(
-                    "ps", "--all", "--quiet", "--filter", "id=" + old_id
-                ).strip()
+                assert not docker("ps", "--all", "--quiet", "--filter", "id=" + old_id).strip()
                 patch_log = (directory / "host/run-logs/coder-2.stdout").read_text()
                 patch = next(
-                    json.loads(line)
-                    for line in patch_log.splitlines()
-                    if '"event"' in line
+                    json.loads(line) for line in patch_log.splitlines() if '"event"' in line
                 )
                 assert patch["receipt_json"] in exported["command_receipts"]
             before = (directory / "queries.jsonl").read_bytes()
@@ -374,12 +357,8 @@ def exercise(binary, directory, base, image, profile):
         path = directory / "host/runner.db"
         if path.exists():
             with sqlite3.connect(path) as db:
-                if db.execute(
-                    "SELECT 1 FROM sqlite_master WHERE name='run_containers'"
-                ).fetchone():
-                    for (identifier,) in db.execute(
-                        "SELECT container_id FROM run_containers"
-                    ):
+                if db.execute("SELECT 1 FROM sqlite_master WHERE name='run_containers'").fetchone():
+                    for (identifier,) in db.execute("SELECT container_id FROM run_containers"):
                         if identifier:
                             subprocess.run(
                                 [*DOCKER, "rm", "--force", "--volumes", identifier],
@@ -409,12 +388,8 @@ def main():
     }
     print("Private native mini-SWE state: " + str(root), file=sys.stderr, flush=True)
     for profile in ("baseline", "known", "unknown"):
-        print(
-            f"Starting native mini-SWE profile: {profile}", file=sys.stderr, flush=True
-        )
-        result[profile] = exercise(
-            binary, root / profile, image["base"], image["image"], profile
-        )
+        print(f"Starting native mini-SWE profile: {profile}", file=sys.stderr, flush=True)
+        result[profile] = exercise(binary, root / profile, image["base"], image["image"], profile)
         print(f"Passed native mini-SWE profile: {profile}", file=sys.stderr, flush=True)
         target = args.output / profile
         target.mkdir()

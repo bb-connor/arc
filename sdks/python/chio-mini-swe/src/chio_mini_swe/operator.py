@@ -320,6 +320,7 @@ def result(state, output):
     exported = export_result(AdministrativeState(state, record))
     output = private_directory(output, create=True)
     write(output / "result.json", exported)
+    write(output / "command-outputs.json", exported["command_outputs"])
     receipts = exported["model_receipts"] + exported["command_receipts"]
     for name, content in [
         ("kernel.pub", record["kernel_key"]),

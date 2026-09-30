@@ -257,7 +257,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_ope
     load_operation_inner(connection, operation, phase, None)
 }
 
-fn load_operation_inner(
+pub(in crate::admission_operation_store::security_participant_state) fn load_operation_inner(
     connection: &Connection,
     operation: &AdmissionOperationId,
     phase: &str,

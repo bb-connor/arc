@@ -7,7 +7,7 @@ import stat
 
 from chio_mini_swe.provider_config import reject_constant, unique_object
 from chio_mini_swe.repository_archive import MAX_ARCHIVE, canonical, digest, import_revision, patch
-from chio_mini_swe.repository_proof import MAX_RECEIPTS, output_digest, verified_receipts
+from chio_mini_swe.repository_proof import MAX_RECEIPTS, bound_output, verified_receipts
 from chio_mini_swe.repository_scope import SCOPED_SCHEMA, normalize_source_paths, require_scope
 from chio_mini_swe.repository_store import MAX_COMMANDS, configuration_digest
 from chio_mini_swe.repository_wire import validate_result
@@ -57,7 +57,7 @@ def capture(bundle):
                 "manifest.json": 65536,
                 "configuration.json": 65536,
                 "commands.json": MAX_ARCHIVE,
-                "receipt-binding.json": 1024 * 1024,
+                "receipt-binding.json": MAX_RECEIPTS,
                 "receipts.ndjson": MAX_RECEIPTS,
                 "kernel.pub": 1024,
                 "baseline.tar": MAX_ARCHIVE,
@@ -95,11 +95,7 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id, 
     )
     if (
         config["schema"]
-        not in (
-            (SCOPED_SCHEMA,)
-            if selected is not None
-            else ("chio.repository.workspace.v1", "chio.repository.workspace.v2")
-        )
+        not in ((SCOPED_SCHEMA,) if selected is not None else ("chio.repository.workspace.v2",))
         or config["source_commit"] != revision
     ):
         raise ValueError("Workspace configuration does not match the selected source commit")
@@ -128,6 +124,9 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id, 
     ]
     if len(candidates) != len(commands) or len({r["id"] for r in candidates}) != len(commands):
         raise ValueError("Receipts do not cover exactly the repository commands")
+    outputs = proof.get("outputs")
+    if not isinstance(outputs, dict) or set(outputs) != {receipt["id"] for receipt in candidates}:
+        raise ValueError("Original broker outputs must cover exactly the repository receipts")
     transitions, statuses = [], []
     previous = config["baseline"]
     for sequence, row in enumerate(commands, 1):
@@ -173,22 +172,23 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id, 
                 "configuration_sha256": configuration_digest(config),
             },
         )
-        content_hash = output_digest(output)
         matching = [
             receipt
             for receipt in candidates
-            if receipt.get("content_hash") == content_hash
-            and receipt.get("action", {}).get("parameters", {}).get("command") == row["command"]
-            and receipt.get("decision", {}).get("verdict") == "allow"
-            and receipt.get("metadata", {}).get("admission_operation", {}).get("projected_state")
-            == "completed"
+            if bound_output(
+                receipt,
+                outputs[receipt["id"]],
+                output,
+                row["command"],
+                configuration_digest(config),
+            )
         ]
         if len(matching) != 1:
             raise ValueError("Command or workspace output is not bound to one verified receipt")
         receipt = matching[0]
         candidates.remove(receipt)
         transitions.append(
-            {"receipt_id": receipt["id"], "content_hash": content_hash, **transition}
+            {"receipt_id": receipt["id"], "content_hash": receipt["content_hash"], **transition}
         )
         statuses.append(
             {key: row[key] for key in ("sequence", "status", "before_sha256", "after_sha256")}
@@ -230,7 +230,8 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id, 
     matches(
         proof,
         {
-            "schema": "chio.repository.receipt-binding.v1",
+            "schema": "chio.repository.receipt-binding.v2",
+            "outputs": outputs,
             "server_id": server_id,
             "verification": verification,
             "transitions": transitions,

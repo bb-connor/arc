@@ -25,7 +25,6 @@ def main():
     os.environ["MSWEA_SILENT_STARTUP"] = "1"
     # Configure the fixture before importing upstream's global configuration.
     from chio_process import ProcessClient, WorkerError
-    from chio_process.launch import demo_python, provision_native_demo
     from qualify import command, serving
 
     from chio_mini_swe.operator import AdministrativeState
@@ -40,32 +39,23 @@ def main():
 capabilities:
   default:
     tools:
-      - server: sandbox
-        tool: execute
+      - server: chio-ipc
+        tool: receive_unused
         operations: [invoke, delegate]
         ttl: 3600
 """)
-    # Discovery supplies a manifest only. No container exists or is executed;
-    # the final native call count must remain zero throughout this profile.
-    server = provision_native_demo(
-        binary,
-        "sandbox",
-        [demo_python(), str(HERE / "sandbox.py"), "--container", "0" * 64],
-        root / "launch",
-        root,
-        read_paths=[HERE / "sandbox.py"],
-    )
     config = {
         "schema": "chio.process.host.v1",
         "policy": str(policy),
-        "servers": [server],
+        "servers": [],
+        "mailboxes": [{"id": "unused"}],
         "limits": {"max_calls": 1, "max_processes": 2, "max_depth": 1},
         "children": [
             {
                 "id": "coder",
                 "parent": "root",
                 "budget_share_bps": 9000,
-                "tools": [{"server_id": "sandbox", "tool_name": "execute"}],
+                "tools": [{"server_id": "chio-ipc", "tool_name": "receive_unused"}],
             }
         ],
     }
@@ -96,6 +86,7 @@ capabilities:
         "n_consecutive_format_errors": 0,
         "start_time": 1,
         "receipts": [],
+        "command_outputs": {},
         "model_receipts": [],
     }
     started = time.monotonic()

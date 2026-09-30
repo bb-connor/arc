@@ -731,13 +731,33 @@ pub(super) fn read_sensitive_frame_body(
 }
 
 pub fn read_bounded_frame(reader: &mut impl Read) -> Result<Vec<u8>> {
+    read_frame_with_limit(reader, MAX_WIRE_BYTES)
+}
+
+pub(crate) fn response_wire_limit(operation: IpcOperation) -> usize {
+    if operation == IpcOperation::Execute {
+        crate::protocol::MAX_EXECUTE_RESPONSE_WIRE_BYTES
+    } else {
+        MAX_WIRE_BYTES
+    }
+}
+
+pub(crate) fn response_payload_limit(operation: IpcOperation) -> usize {
+    if operation == IpcOperation::Execute {
+        crate::protocol::MAX_EXECUTE_RESPONSE_PAYLOAD_BYTES
+    } else {
+        MAX_WIRE_BYTES
+    }
+}
+
+pub(crate) fn read_frame_with_limit(reader: &mut impl Read, maximum: usize) -> Result<Vec<u8>> {
     let mut prefix = [0_u8; 4];
     reader.read_exact(&mut prefix).map_err(|error| {
         BrokerError::InvalidRequest(format!("IPC frame prefix failed: {error}"))
     })?;
     let length = usize::try_from(u32::from_be_bytes(prefix))
         .map_err(|_| BrokerError::InvalidRequest("IPC frame length overflow".to_string()))?;
-    if length == 0 || length > MAX_WIRE_BYTES {
+    if length == 0 || length > maximum {
         return Err(BrokerError::InvalidRequest(
             "IPC frame is empty or oversized".to_string(),
         ));

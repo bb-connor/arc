@@ -3487,6 +3487,7 @@ dependencies = [
  "chio-guards",
  "chio-kernel",
  "chio-metering",
+ "chio-security-types",
  "regex",
  "regex-syntax",
  "serde",

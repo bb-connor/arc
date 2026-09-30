@@ -1,0 +1,501 @@
+{
+  "schema": "chio.ai-sdk.process-qualification.v1",
+  "inputs": {
+    "qualification_checkout": {
+      "commit": "cacaf69fc9d4b709ebe30fd9c549fc0eeffc12f9",
+      "dirty": true
+    },
+    "platform": {
+      "system": "Linux",
+      "machine": "x86_64"
+    },
+    "node": "v22.23.3",
+    "npm": "10.9.9",
+    "python": "3.12.3",
+    "binary": "bin/chio",
+    "sha256": {
+      "chio": "622b555b8f0bb25ca6bda7fefc92ec3a444a9d3f4af8573bac0c6f0462c10cd8",
+      "chio-protocol-process-0.1.0.tgz": "4afd434f466cb50a96884a23a8447b07aed99caa8b4c5dba862b62fabf37bb0d",
+      "chio-protocol-ai-sdk-process-0.1.0.tgz": "9df754d6eff70dd4141d7335dc3c366c843273c9a166e1bfd91b0bd473df5391"
+    }
+  },
+  "profiles": {
+    "ai6": {
+      "unmediated-callback": {
+        "publications": 2,
+        "completed": true
+      },
+      "worker-death": {
+        "publications": 1,
+        "completed": true,
+        "receipts_verified": 1
+      },
+      "host-death": {
+        "publications": 1,
+        "completed": true,
+        "receipts_verified": 1
+      },
+      "denied": {
+        "publications": 0,
+        "completed": false,
+        "receipts_verified": 1
+      },
+      "lost-output": {
+        "publications": 1,
+        "completed": false,
+        "receipts_verified": 1
+      },
+      "conflict": {
+        "publications": 1,
+        "completed": false,
+        "receipts_verified": 1
+      },
+      "model-journal": {
+        "callback-baseline": {
+          "completed": true,
+          "publications": 2,
+          "provider_requests": 3
+        },
+        "worker-death": {
+          "completed": true,
+          "publications": 1,
+          "provider_requests": 2,
+          "receipts_verified": 1
+        },
+        "host-death": {
+          "completed": true,
+          "publications": 1,
+          "provider_requests": 2,
+          "receipts_verified": 1
+        },
+        "model-checkpoint-death": {
+          "completed": true,
+          "publications": 1,
+          "provider_requests": 2,
+          "receipts_verified": 1
+        },
+        "provider-death": {
+          "completed": false,
+          "publications": 0,
+          "provider_requests": 1,
+          "receipts_verified": 0
+        },
+        "truncated-stream": {
+          "completed": false,
+          "publications": 0,
+          "provider_requests": 1,
+          "receipts_verified": 0
+        },
+        "prompt-drift": {
+          "completed": false,
+          "publications": 1,
+          "provider_requests": 1,
+          "receipts_verified": 1
+        }
+      },
+      "state-pressure": {
+        "pressure-inline": {
+          "completed": false,
+          "reads": 15,
+          "provider_requests": 16,
+          "receipts_verified": 15,
+          "checkpoint": {
+            "writes": 31,
+            "bytesWritten": 11110338,
+            "maxBytes": 999696
+          },
+          "storage": {
+            "limits": {
+              "max_blobs": 4096,
+              "max_bytes": 67108864
+            },
+            "max_blob_bytes": 1048576,
+            "process_blobs": 0,
+            "process_bytes": 0,
+            "protocol": "chio.process.blobs.v1",
+            "tree_blobs": 0,
+            "tree_bytes": 0
+          }
+        },
+        "pressure-worker-death": {
+          "completed": true,
+          "reads": 32,
+          "provider_requests": 33,
+          "receipts_verified": 32,
+          "checkpoint": {
+            "writes": 66,
+            "bytesWritten": 556585,
+            "maxBytes": 16461
+          },
+          "storage": {
+            "limits": {
+              "max_blobs": 4096,
+              "max_bytes": 67108864
+            },
+            "max_blob_bytes": 1048576,
+            "process_blobs": 33,
+            "process_bytes": 4790340,
+            "protocol": "chio.process.blobs.v1",
+            "tree_blobs": 33,
+            "tree_bytes": 4790340
+          }
+        },
+        "pressure-host-death": {
+          "completed": true,
+          "reads": 32,
+          "provider_requests": 33,
+          "receipts_verified": 32,
+          "checkpoint": {
+            "writes": 66,
+            "bytesWritten": 554341,
+            "maxBytes": 16395
+          },
+          "storage": {
+            "limits": {
+              "max_blobs": 4096,
+              "max_bytes": 67108864
+            },
+            "max_blob_bytes": 1048576,
+            "process_blobs": 33,
+            "process_bytes": 4890018,
+            "protocol": "chio.process.blobs.v1",
+            "tree_blobs": 33,
+            "tree_bytes": 4890018
+          }
+        },
+        "pressure-quota": {
+          "completed": false,
+          "reads": 0,
+          "provider_requests": 1,
+          "receipts_verified": 0,
+          "checkpoint": {
+            "writes": 1,
+            "bytesWritten": 384,
+            "maxBytes": 384
+          },
+          "storage": {
+            "limits": {
+              "max_blobs": 1,
+              "max_bytes": 1
+            },
+            "max_blob_bytes": 1048576,
+            "process_blobs": 0,
+            "process_bytes": 0,
+            "protocol": "chio.process.blobs.v1",
+            "tree_blobs": 0,
+            "tree_bytes": 0
+          }
+        }
+      },
+      "cooperative-swarm": {
+        "swarm-baseline": {
+          "completed": false,
+          "children": 2,
+          "reads": 2,
+          "publications": 0,
+          "provider_requests": 14,
+          "root_attempts": 4,
+          "receipts_verified": 13
+        },
+        "swarm-single-slot": {
+          "completed": true,
+          "children": 2,
+          "reads": 2,
+          "publications": 1,
+          "provider_requests": 12,
+          "root_attempts": 2,
+          "receipts_verified": 11
+        },
+        "swarm-parallel": {
+          "completed": true,
+          "children": 2,
+          "reads": 2,
+          "publications": 1,
+          "provider_requests": 12,
+          "root_attempts": 2,
+          "receipts_verified": 11
+        },
+        "swarm-host-death": {
+          "completed": true,
+          "children": 2,
+          "reads": 2,
+          "publications": 1,
+          "provider_requests": 12,
+          "root_attempts": 2,
+          "receipts_verified": 11
+        },
+        "swarm-publication-death": {
+          "completed": true,
+          "children": 2,
+          "reads": 2,
+          "publications": 1,
+          "provider_requests": 12,
+          "root_attempts": 3,
+          "receipts_verified": 11
+        }
+      },
+      "supervised-children": {
+        "baseline": {
+          "completed": true,
+          "handled_failures": 1,
+          "provider_requests": 9,
+          "fallback_publications": 1,
+          "receipts_verified": 9
+        },
+        "worker-death": {
+          "completed": true,
+          "handled_failures": 1,
+          "provider_requests": 9,
+          "fallback_publications": 1,
+          "receipts_verified": 9
+        },
+        "host-death": {
+          "completed": true,
+          "handled_failures": 1,
+          "provider_requests": 9,
+          "fallback_publications": 1,
+          "receipts_verified": 9
+        }
+      }
+    },
+    "ai7": {
+      "unmediated-callback": {
+        "publications": 2,
+        "completed": true
+      },
+      "worker-death": {
+        "publications": 1,
+        "completed": true,
+        "receipts_verified": 1
+      },
+      "host-death": {
+        "publications": 1,
+        "completed": true,
+        "receipts_verified": 1
+      },
+      "denied": {
+        "publications": 0,
+        "completed": false,
+        "receipts_verified": 1
+      },
+      "lost-output": {
+        "publications": 1,
+        "completed": false,
+        "receipts_verified": 1
+      },
+      "conflict": {
+        "publications": 1,
+        "completed": false,
+        "receipts_verified": 1
+      },
+      "model-journal": {
+        "callback-baseline": {
+          "completed": true,
+          "publications": 2,
+          "provider_requests": 3
+        },
+        "worker-death": {
+          "completed": true,
+          "publications": 1,
+          "provider_requests": 2,
+          "receipts_verified": 1
+        },
+        "host-death": {
+          "completed": true,
+          "publications": 1,
+          "provider_requests": 2,
+          "receipts_verified": 1
+        },
+        "model-checkpoint-death": {
+          "completed": true,
+          "publications": 1,
+          "provider_requests": 2,
+          "receipts_verified": 1
+        },
+        "provider-death": {
+          "completed": false,
+          "publications": 0,
+          "provider_requests": 1,
+          "receipts_verified": 0
+        },
+        "truncated-stream": {
+          "completed": false,
+          "publications": 0,
+          "provider_requests": 1,
+          "receipts_verified": 0
+        },
+        "prompt-drift": {
+          "completed": false,
+          "publications": 1,
+          "provider_requests": 1,
+          "receipts_verified": 1
+        }
+      },
+      "state-pressure": {
+        "pressure-inline": {
+          "completed": false,
+          "reads": 15,
+          "provider_requests": 16,
+          "receipts_verified": 15,
+          "checkpoint": {
+            "writes": 31,
+            "bytesWritten": 11110338,
+            "maxBytes": 999696
+          },
+          "storage": {
+            "limits": {
+              "max_blobs": 4096,
+              "max_bytes": 67108864
+            },
+            "max_blob_bytes": 1048576,
+            "process_blobs": 0,
+            "process_bytes": 0,
+            "protocol": "chio.process.blobs.v1",
+            "tree_blobs": 0,
+            "tree_bytes": 0
+          }
+        },
+        "pressure-worker-death": {
+          "completed": true,
+          "reads": 32,
+          "provider_requests": 33,
+          "receipts_verified": 32,
+          "checkpoint": {
+            "writes": 66,
+            "bytesWritten": 556585,
+            "maxBytes": 16461
+          },
+          "storage": {
+            "limits": {
+              "max_blobs": 4096,
+              "max_bytes": 67108864
+            },
+            "max_blob_bytes": 1048576,
+            "process_blobs": 33,
+            "process_bytes": 4790340,
+            "protocol": "chio.process.blobs.v1",
+            "tree_blobs": 33,
+            "tree_bytes": 4790340
+          }
+        },
+        "pressure-host-death": {
+          "completed": true,
+          "reads": 32,
+          "provider_requests": 33,
+          "receipts_verified": 32,
+          "checkpoint": {
+            "writes": 66,
+            "bytesWritten": 554341,
+            "maxBytes": 16395
+          },
+          "storage": {
+            "limits": {
+              "max_blobs": 4096,
+              "max_bytes": 67108864
+            },
+            "max_blob_bytes": 1048576,
+            "process_blobs": 33,
+            "process_bytes": 4890018,
+            "protocol": "chio.process.blobs.v1",
+            "tree_blobs": 33,
+            "tree_bytes": 4890018
+          }
+        },
+        "pressure-quota": {
+          "completed": false,
+          "reads": 0,
+          "provider_requests": 1,
+          "receipts_verified": 0,
+          "checkpoint": {
+            "writes": 1,
+            "bytesWritten": 384,
+            "maxBytes": 384
+          },
+          "storage": {
+            "limits": {
+              "max_blobs": 1,
+              "max_bytes": 1
+            },
+            "max_blob_bytes": 1048576,
+            "process_blobs": 0,
+            "process_bytes": 0,
+            "protocol": "chio.process.blobs.v1",
+            "tree_blobs": 0,
+            "tree_bytes": 0
+          }
+        }
+      },
+      "cooperative-swarm": {
+        "swarm-baseline": {
+          "completed": false,
+          "children": 2,
+          "reads": 2,
+          "publications": 0,
+          "provider_requests": 14,
+          "root_attempts": 4,
+          "receipts_verified": 13
+        },
+        "swarm-single-slot": {
+          "completed": true,
+          "children": 2,
+          "reads": 2,
+          "publications": 1,
+          "provider_requests": 12,
+          "root_attempts": 2,
+          "receipts_verified": 11
+        },
+        "swarm-parallel": {
+          "completed": true,
+          "children": 2,
+          "reads": 2,
+          "publications": 1,
+          "provider_requests": 12,
+          "root_attempts": 2,
+          "receipts_verified": 11
+        },
+        "swarm-host-death": {
+          "completed": true,
+          "children": 2,
+          "reads": 2,
+          "publications": 1,
+          "provider_requests": 12,
+          "root_attempts": 2,
+          "receipts_verified": 11
+        },
+        "swarm-publication-death": {
+          "completed": true,
+          "children": 2,
+          "reads": 2,
+          "publications": 1,
+          "provider_requests": 12,
+          "root_attempts": 3,
+          "receipts_verified": 11
+        }
+      },
+      "supervised-children": {
+        "baseline": {
+          "completed": true,
+          "handled_failures": 1,
+          "provider_requests": 9,
+          "fallback_publications": 1,
+          "receipts_verified": 9
+        },
+        "worker-death": {
+          "completed": true,
+          "handled_failures": 1,
+          "provider_requests": 9,
+          "fallback_publications": 1,
+          "receipts_verified": 9
+        },
+        "host-death": {
+          "completed": true,
+          "handled_failures": 1,
+          "provider_requests": 9,
+          "fallback_publications": 1,
+          "receipts_verified": 9
+        }
+      }
+    }
+  },
+  "live_model_called": false
+}

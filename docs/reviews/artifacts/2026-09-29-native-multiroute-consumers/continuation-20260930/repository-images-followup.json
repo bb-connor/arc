@@ -1,0 +1,13 @@
+{
+  "local_tag": "chio-mini-worker:7d6ea84e56c583c9e3bee338",
+  "image": "sha256:7c66a244d27cbb8737bb84ac460d6c0049d249d0e4da871e6e0e73f82e4e0deb",
+  "base": "python@sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e",
+  "requirements_sha256": "4eae20c0e474a2af3844474ccb2884967366e6b5f024e57536fccaaa59738664",
+  "wheels": {
+    "chio_mini_swe-0.1.0-py3-none-any.whl": "25dd1f4a6fc283036018fe877aa230429970db1a76e5a8cda3a68ac6d84de0a5",
+    "chio_process-0.1.0-py3-none-any.whl": "ce9b20e7964dc35f51221571eb415c0ac1263e84630a06591afc340648064ed7"
+  },
+  "execution_image": "sha256:ad3c5698d1bf11f5ca7a773b5269a5ca703fa2fbdb4dbe6d79eb570c0a7360dc",
+  "execution_dockerfile_sha256": "221c6f18cf8f3627b538610175b691f83f2919467f1e7dce7bb406a33782e716",
+  "execution_git_version": "git version 2.47.3"
+}

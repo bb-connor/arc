@@ -102,10 +102,11 @@ impl Record {
             return Err(invalid("native output history is inconsistent"));
         }
         if self.declassification
-            != declassification::expected(
+            != declassification::expected_initialized(
                 connection,
                 &operation,
                 self.observed_at.max(self.decision_at),
+                Some(initialized),
             )?
         {
             return Err(invalid(

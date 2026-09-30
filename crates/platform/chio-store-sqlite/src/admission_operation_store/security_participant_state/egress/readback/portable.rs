@@ -33,16 +33,31 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_his
     tx: &Connection,
     operation: &AdmissionOperationId,
 ) -> Result<Option<NativeSecurityEgressHistoryV1>, AdmissionOperationStoreError> {
-    let acquired = load_operation(tx, operation, "acquired")?;
-    let committed = load_operation(tx, operation, "committed")?;
+    load_history_initialized(tx, operation, None)
+}
+
+pub(in crate::admission_operation_store::security_participant_state) fn load_history_initialized(
+    tx: &Connection,
+    operation: &AdmissionOperationId,
+    initialized: Option<&SecurityParticipantStateInitialization>,
+) -> Result<Option<NativeSecurityEgressHistoryV1>, AdmissionOperationStoreError> {
+    let acquired = load_operation_inner(tx, operation, "acquired", initialized)?;
+    let committed = load_operation_inner(tx, operation, "committed", initialized)?;
     let Some(acquired) = acquired else {
         if committed.is_some() {
             return Err(invalid("native egress commitment has no acquisition"));
         }
         return Ok(None);
     };
-    let initialized = super::super::super::records::load_metadata(tx, acquired.authority.as_str())?
-        .ok_or_else(|| invalid("native egress initialization is absent"))?;
+    let loaded;
+    let initialized = match initialized {
+        Some(initialized) => initialized,
+        None => {
+            loaded = super::super::super::records::load_metadata(tx, acquired.authority.as_str())?
+                .ok_or_else(|| invalid("native egress initialization is absent"))?;
+            &loaded
+        }
+    };
     let acquisition_digest = AdmissionDigest::try_new("native_egress_event", acquired.digest()?)?;
     let fence = match acquired.result {
         NativeEgressResult::Acquired(fence) => fence,

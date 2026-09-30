@@ -20,7 +20,7 @@ pub(super) use record::{head, load, load_initialized, load_operation, Record};
 pub(in crate::admission_operation_store) use schema::{exists, sql, verify_catalog};
 
 const PROJECTION: &str = "security_participant_output";
-const MUTATION: &str = "join_security_participant_output";
+pub(super) const MUTATION: &str = "join_security_participant_output";
 
 /// Minted only after validating finalization custody inside the writer's
 /// transaction. It enables the closed monotone row policy and, when selected,

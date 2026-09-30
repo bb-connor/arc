@@ -45,6 +45,7 @@ def setup(tmp_path, monkeypatch):
     value = {
         "schema": session.CONFIG,
         "chio": str(binary),
+        "broker_tool": str(binary),
         "repository": "source",
         "revision": "HEAD",
         "provider_config": "provider.json",
@@ -94,7 +95,26 @@ def initialize(setup):
 def authorization(state):
     request = json.loads((state / "provisioning-request.json").read_text())
     bindings = {}
+    broker = {
+        "security": {"tenant_id": "session-test"},
+        "routes": [
+            {
+                "quota": {"server_id": name, "tool_name": route["tool_name"]},
+                "broker_identity": "b" * 64,
+            }
+            for name, route in request["servers"].items()
+        ],
+    }
     for name, server in request["servers"].items():
+        server["command"] = [
+            server["executable"],
+            "--tenant-scope",
+            "session-test",
+            "--tool-name",
+            server["tool_name"],
+            "--receipt-signer",
+            "b" * 64,
+        ]
         path = state.parent / (name + "-supplied-policy.json")
         path.write_text(
             json.dumps(
@@ -113,9 +133,15 @@ def authorization(state):
                 }
             )
         )
-        bindings[name] = {"launch_policy": str(path), "launch_policy_signer": "a" * 64}
+        bindings[name] = {
+            "command": server["command"],
+            "launch_policy": str(path),
+            "launch_policy_signer": "a" * 64,
+        }
     path = state.parent / "authorization.json"
-    path.write_text(json.dumps({"schema": session.AUTHORIZATION, "servers": bindings}))
+    path.write_text(
+        json.dumps({"schema": session.AUTHORIZATION, "servers": bindings, "native_broker": broker})
+    )
     return path
 
 
@@ -154,7 +180,11 @@ def test_scoped_session_binds_selection_into_workspace_and_worker_templates(setu
     assert session.inspect(state)["source_paths"] == ["file"]
     session.prepare(state, authorization(state))
     profile = json.loads((state / "operator.json").read_text())
-    assert profile["environment"] == {"cwd": "/workspace", "source_paths": ["file"]}
+    assert profile["environment"] == {
+        "cwd": "/workspace",
+        "source_paths": ["file"],
+        "repository_configuration_sha256": request["configuration_sha256"],
+    }
     assert len(calls) == 1
 
 
@@ -184,6 +214,10 @@ def test_prepare_captures_explicit_policy_and_delegates_in_requested_directory(s
     host = json.loads((state / "host.json").read_text())
     assert host["limits"] == {"max_calls": 16, "max_depth": 1, "max_processes": 2}
     assert host["children"][0]["tools"] == session.ROUTES
+    import yaml
+
+    grants = yaml.safe_load((state / "policy.yaml").read_text())["capabilities"]["default"]["tools"]
+    assert {grant["max_invocations"] for grant in grants} == {16}
     for server in host["servers"]:
         assert Path(server["launch_policy"]).parent == state
         assert server["launch_policy_signer"] == "a" * 64

@@ -1,0 +1,72 @@
+{
+  "profiles": {
+    "inventory": {
+      "reviews": 2,
+      "publications": 1,
+      "receipts_verified": 17,
+      "attempts": {
+        "coordinator": 2,
+        "dyn_1": 1,
+        "dyn_2": 1,
+        "publisher": 1
+      }
+    },
+    "inventory-expanded": {
+      "reviews": 3,
+      "publications": 1,
+      "receipts_verified": 22,
+      "attempts": {
+        "coordinator": 2,
+        "dyn_1": 1,
+        "dyn_2": 1,
+        "dyn_3": 1,
+        "publisher": 1
+      }
+    },
+    "scripted-recovery": {
+      "reviews": 3,
+      "publications": 1,
+      "receipts_verified": 26,
+      "attempts": {
+        "coordinator": 3,
+        "dyn_1": 2,
+        "dyn_2": 2,
+        "dyn_3": 2,
+        "publisher": 2
+      }
+    },
+    "scripted-host-death": {
+      "reviews": 4,
+      "publications": 1,
+      "receipts_verified": 32,
+      "attempts": {
+        "coordinator": 3,
+        "dyn_1": 1,
+        "dyn_2": 1,
+        "dyn_3": 1,
+        "dyn_4": 1,
+        "publisher": 1
+      }
+    }
+  },
+  "rejected": {
+    "invalid-plan": {
+      "children": 0,
+      "publications": 0,
+      "model_calls": 2
+    },
+    "round-limit": {
+      "children": 0,
+      "publications": 0,
+      "model_calls": 1
+    }
+  },
+  "live_model": false,
+  "initial_workers": [
+    "coordinator",
+    "publisher"
+  ],
+  "known_spawn_handoff_and_publication_receipts_replayed": true,
+  "host_death_after_known_spawn_recovered": true,
+  "scope_and_corruption_checks_passed": true
+}

@@ -1,0 +1,48 @@
+{
+  "binary_sha256": "b57217c45d579406f4a9f2c597b13c7d0df0450c02f265a7bf2aedd957ac5406",
+  "worker_image": "sha256:7c66a244d27cbb8737bb84ac460d6c0049d249d0e4da871e6e0e73f82e4e0deb",
+  "private_state": "/tmp/chio-coding-5idslx1e",
+  "provider": "saved HTTPS completions through native prepared broker routes",
+  "model_id": "mini-provider:60723d5f4f9e046745328dbdca5c2b42530fce47e71f84c7b8f93e0bd0da0c67",
+  "successful_http_requests": 3,
+  "failed_http_requests": 1,
+  "failure_attempts": 2,
+  "command_exceeds_default_client_and_host_timeout": true,
+  "verified_receipts": 8,
+  "configuration_change_refused": true,
+  "completed_replay": true,
+  "offline_cancelled_export_without_host_writes": true,
+  "provider_error_stopped": true,
+  "repository": {
+    "source_commit": "c6b9829e43dd564dde9dc3c12173dd2dcdec11bb",
+    "workspace": "1024e22b214f4b7d9ef0bfdcd72b6171",
+    "revision": 5,
+    "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+    "source_untouched": true,
+    "dirty_and_untracked_excluded": true,
+    "binary_and_symlink_preserved": true,
+    "patch_applies": true,
+    "verified_workspace_transitions": 5,
+    "forged_receipt_refused_before_export": true,
+    "recipient_verified_export": {
+      "schema": "chio.repository.review.v1",
+      "server_id": "sandbox",
+      "source_commit": "c6b9829e43dd564dde9dc3c12173dd2dcdec11bb",
+      "workspace_id": "1024e22b214f4b7d9ef0bfdcd72b6171",
+      "configuration_sha256": "de4ea970dfd357fd1e00d921531c5064801004063209b76ffafeeebee1b8dc42",
+      "patch_sha256": "7d127c8d373e9be5c888160cc67753b833dc949065a75161eeca40c36b928dd2",
+      "contents_sha256": "af8291e8824bc13079d18dec79d8aa0b9cfaf0fbf6a4140cf431f2589285d915",
+      "verified_transitions": 5,
+      "verification": {
+        "checks": [
+          "signature",
+          "signer_pin",
+          "action_parameter_hash"
+        ],
+        "receipts_verified": 8,
+        "schema": "chio.receipt.signatures.v1",
+        "trusted_kernel_key": "7786c67a397597f9d3acd8d49795ead3985c1a2c5d941ebaefc69d92047772d7"
+      }
+    }
+  }
+}

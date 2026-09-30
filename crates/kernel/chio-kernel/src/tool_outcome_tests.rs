@@ -714,6 +714,22 @@ fn canonical_blob_and_admission_bindings_reject_substitution() {
     assert!(blob.verify(&raw).is_err());
 
     let outcome = returned(&operation, json!({"ok": true}));
+    let canonical = raw.canonical_blob().unwrap();
+    let decoded = outcome
+        .decode_canonical_bytes(&operation, canonical.bytes())
+        .unwrap();
+    assert_eq!(decoded.canonical_blob().unwrap(), canonical);
+    assert!(matches!(
+        outcome.decode_canonical_bytes(&operation, blob.bytes()),
+        Err(ToolOutcomeError::Invalid("raw.noncanonical_bytes"))
+    ));
+    let substituted = raw_for(&operation, json!({"ok": false}))
+        .canonical_blob()
+        .unwrap();
+    assert!(matches!(
+        outcome.decode_canonical_bytes(&operation, substituted.bytes()),
+        Err(ToolOutcomeError::Binding("outcome.raw_invocation_blob"))
+    ));
     assert!(outcome.validate_against(&operation).is_ok());
     assert!(outcome.validate_against(&other).is_err());
     for mutation in ["dispatch_version", "dispatch_fence", "request"] {

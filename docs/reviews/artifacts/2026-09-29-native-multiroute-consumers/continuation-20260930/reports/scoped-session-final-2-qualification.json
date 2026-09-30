@@ -1,0 +1,269 @@
+{
+  "schema": "chio.mini-swe.session-qualification.v1",
+  "private_state": "/tmp/chio-session-siqccm5d",
+  "initialized": {
+    "schema": "chio.mini-swe.session-initialized.v1",
+    "state": "/tmp/chio-session-siqccm5d/session",
+    "source_commit": "1f7029b7302e7a3a243a6b1e0125743036500b94",
+    "model_id": "mini-provider:a7a86da02648c88155ac4497a04817bfc6392e39f43080bdd735f3c8a4bcc7f0",
+    "provisioning_request": "/tmp/chio-session-siqccm5d/session/provisioning-request.json"
+  },
+  "prepared": {
+    "schema": "chio.mini-swe.session-prepared.v1",
+    "state": "/tmp/chio-session-siqccm5d/session",
+    "operator": {
+      "state": "/tmp/chio-session-siqccm5d/session/run",
+      "model_id": "mini-provider:a7a86da02648c88155ac4497a04817bfc6392e39f43080bdd735f3c8a4bcc7f0",
+      "process": "coder"
+    }
+  },
+  "completed": {
+    "abandoned_socket_intents": 0,
+    "complete": true,
+    "pending_container_records": 0,
+    "schema": "chio.process.run-report.v1",
+    "workers": [
+      {
+        "attempts": 1,
+        "cpu_ms": 0,
+        "outcome": "exit_0",
+        "peak_resident_bytes": 0,
+        "process": "coder",
+        "resource_accounting": "unavailable_container_cgroup",
+        "state": "completed",
+        "suspensions": 0
+      }
+    ]
+  },
+  "repeated": {
+    "abandoned_socket_intents": 0,
+    "complete": true,
+    "pending_container_records": 0,
+    "schema": "chio.process.run-report.v1",
+    "workers": [
+      {
+        "attempts": 1,
+        "cpu_ms": 0,
+        "outcome": "exit_0",
+        "peak_resident_bytes": 0,
+        "process": "coder",
+        "resource_accounting": "unavailable_container_cgroup",
+        "state": "completed",
+        "suspensions": 0
+      }
+    ]
+  },
+  "observed": {
+    "schema": "chio.mini-swe.session-status.v1",
+    "state": "/tmp/chio-session-siqccm5d/session",
+    "phase": "prepared",
+    "model_id": "mini-provider:a7a86da02648c88155ac4497a04817bfc6392e39f43080bdd735f3c8a4bcc7f0",
+    "source_commit": "1f7029b7302e7a3a243a6b1e0125743036500b94",
+    "source_paths": [
+      "package"
+    ],
+    "host": {
+      "abi": {
+        "host": "chio.process.abi.v3",
+        "serving": "chio.process.abi.v3",
+        "written_by": "chio-cli 0.1.0"
+      },
+      "host_lock_held": false,
+      "run": {
+        "max_parallel": 1,
+        "observed_at_ms": 1790783981059,
+        "plan_binding": "2092fd8ed13f57c9ac8b1389e7752ff270163c1892749366eaf02a4b6b37a186",
+        "run_id": "a98592e0-bc23-4234-924d-733ef2048c25",
+        "schema": "chio.process.run-status.v1",
+        "workers": [
+          {
+            "attempts": 1,
+            "cpu_ms": 0,
+            "max_attempts": 2,
+            "max_suspensions": 64,
+            "outcome": "exit_0",
+            "peak_resident_bytes": 0,
+            "process": "coder",
+            "resource_accounting": "unavailable_container_cgroup",
+            "state": "completed",
+            "suspensions": 0,
+            "waiting_on": []
+          }
+        ]
+      },
+      "schema": "chio.process.status.v1"
+    },
+    "repository": {
+      "schema": "chio.repository.workspace.v3",
+      "id": "5b199e28eda246bca440f6337efd861f",
+      "source_commit": "1f7029b7302e7a3a243a6b1e0125743036500b94",
+      "revision": 5,
+      "snapshot": "e502a3c46de242a4334c1a4ab3952e939ac4e8ec86abae65b32ab1e4242e4069",
+      "commands": [
+        {
+          "sequence": 1,
+          "status": "completed",
+          "before_sha256": "6973593fae3a2a418fe02665b360e552ceffc1cfe3b6823f72d0728f62cdc3f0",
+          "after_sha256": "6973593fae3a2a418fe02665b360e552ceffc1cfe3b6823f72d0728f62cdc3f0"
+        },
+        {
+          "sequence": 2,
+          "status": "completed",
+          "before_sha256": "6973593fae3a2a418fe02665b360e552ceffc1cfe3b6823f72d0728f62cdc3f0",
+          "after_sha256": "42bf93db6cf8cb185887318926fb74fc4a92796efff55d9b1343a1c35ce0a8c3"
+        },
+        {
+          "sequence": 3,
+          "status": "completed",
+          "before_sha256": "42bf93db6cf8cb185887318926fb74fc4a92796efff55d9b1343a1c35ce0a8c3",
+          "after_sha256": "d36233e07e0ad4d088520357e807506053e30ae39b9cc3ef7dc3f16fbc2860f7"
+        },
+        {
+          "sequence": 4,
+          "status": "completed",
+          "before_sha256": "d36233e07e0ad4d088520357e807506053e30ae39b9cc3ef7dc3f16fbc2860f7",
+          "after_sha256": "459439981311f1f237d27efbe5bb04626446f3a9f0863aa9b2170ddb3dd98fde"
+        },
+        {
+          "sequence": 5,
+          "status": "completed",
+          "before_sha256": "459439981311f1f237d27efbe5bb04626446f3a9f0863aa9b2170ddb3dd98fde",
+          "after_sha256": "e502a3c46de242a4334c1a4ab3952e939ac4e8ec86abae65b32ab1e4242e4069"
+        }
+      ],
+      "interrupted": false
+    }
+  },
+  "exported": {
+    "schema": "chio.mini-swe.session-result.v1",
+    "output": "/tmp/chio-session-siqccm5d/result",
+    "source_commit": "1f7029b7302e7a3a243a6b1e0125743036500b94",
+    "source_paths": [
+      "package"
+    ],
+    "model_id": "mini-provider:a7a86da02648c88155ac4497a04817bfc6392e39f43080bdd735f3c8a4bcc7f0",
+    "operator": {
+      "output": "/tmp/chio-session-siqccm5d/result/operator",
+      "exit_status": "Submitted",
+      "submission_preview": "Addition repaired and tests pass.\n",
+      "submission_truncated": false,
+      "model_calls": 3,
+      "model_cost": 0.00108,
+      "verified_receipts": 8
+    },
+    "repository": {
+      "output": "/tmp/chio-session-siqccm5d/result/repository",
+      "revision": 5,
+      "interrupted": false,
+      "patch_sha256": "c1af77cc66b2297657f286a7d82a6449c4e9941eccd02e4f1951aa4f130b04ec",
+      "verified_transitions": 5
+    },
+    "kernel_key_sha256": "0c3b1ef16a35938d469b00e17efc5af70a2f9edbe0061d60cdb536f4990d64eb"
+  },
+  "review": {
+    "schema": "chio.repository.review.v1",
+    "server_id": "sandbox",
+    "source_commit": "1f7029b7302e7a3a243a6b1e0125743036500b94",
+    "workspace_id": "5b199e28eda246bca440f6337efd861f",
+    "configuration_sha256": "fde8ec1b918ccfcbbf2867e104a88c9493216759a8a853f0d3fea1bee2118f1d",
+    "patch_sha256": "c1af77cc66b2297657f286a7d82a6449c4e9941eccd02e4f1951aa4f130b04ec",
+    "contents_sha256": "d90679650a1867a3386f3a33a7f7a2b66a16f1edf7eb368b43c5e5c690fa60cf",
+    "verified_transitions": 5,
+    "verification": {
+      "checks": [
+        "signature",
+        "signer_pin",
+        "action_parameter_hash"
+      ],
+      "receipts_verified": 8,
+      "schema": "chio.receipt.signatures.v1",
+      "trusted_kernel_key": "d976bda3e3b7de62e56672b0cb628eae9030d60cbc560eb0d1866af5a1bf3685"
+    },
+    "source_paths": [
+      "package"
+    ]
+  },
+  "model_requests": [
+    {
+      "turn": 0,
+      "request_sha256": "3b99bbae8b9bbdb07bbf6c9cd0fd03924599c2ec14854033e896c439e9248981",
+      "prompt": [
+        {
+          "content": "Repair the Python repository using bash commands.",
+          "role": "system"
+        },
+        {
+          "content": "Fix addition and verify the existing unit tests. Selected paths: ['package']",
+          "role": "user"
+        }
+      ],
+      "actions": [
+        "cat calculator.py; python -m unittest -v"
+      ]
+    },
+    {
+      "turn": 1,
+      "request_sha256": "807103f56d59b346006c84b54ad03a85cbaaa50daf31cb679278a582904c1057",
+      "prompt": [
+        {
+          "content": "Repair the Python repository using bash commands.",
+          "role": "system"
+        },
+        {
+          "content": "Fix addition and verify the existing unit tests. Selected paths: ['package']",
+          "role": "user"
+        }
+      ],
+      "actions": [
+        "sed -i 's/return a - b/return a + b/' calculator.py; printf 'patched\\n' >> effects.txt # checkpoint-gap",
+        "printf 'audit\\n' >> effects.txt",
+        "printf 'audit\\n' >> effects.txt"
+      ]
+    },
+    {
+      "turn": 2,
+      "request_sha256": "721bc1cb1f68d41727272e923ae5bf480882a190c3e2d10b591293d02eb609a5",
+      "prompt": [
+        {
+          "content": "Repair the Python repository using bash commands.",
+          "role": "system"
+        },
+        {
+          "content": "Fix addition and verify the existing unit tests. Selected paths: ['package']",
+          "role": "user"
+        }
+      ],
+      "actions": [
+        "python -m unittest -v > test-output.txt 2>&1 && printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nAddition repaired and tests pass.\\n'"
+      ]
+    }
+  ],
+  "request_timeouts": {
+    "model": 120,
+    "sandbox": 140
+  },
+  "slow_model_crossed_default_deadline": true,
+  "prepare_without_provider_credential_or_inference": true,
+  "separate_explicit_fixture_authority": true,
+  "held_native_host_lock_refused_recovery_and_export": true,
+  "completed_replay_did_no_new_model_work": true,
+  "offline_combined_export": true,
+  "source_unchanged": true,
+  "source_paths": [
+    "package"
+  ],
+  "binary_sha256": "f18287e65a31c107d97eb8df3a56701c1d381745f5540549e49014d502b3439c",
+  "image_record": {
+    "local_tag": "chio-mini-worker:0d835a84de6e168693b21bcc",
+    "image": "sha256:5b6a180b375f39135ad4689693e98b1465faab97a0ce24d997c78244b26e9a4e",
+    "base": "python@sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e",
+    "requirements_sha256": "4eae20c0e474a2af3844474ccb2884967366e6b5f024e57536fccaaa59738664",
+    "wheels": {
+      "chio_mini_swe-0.1.0-py3-none-any.whl": "5c0d7a7a32c22e7a921346a5f4a33db151d46b051d6e0ec91c48b56567f9130a",
+      "chio_process-0.1.0-py3-none-any.whl": "9da83e0424f60131c72d25ca6d263f16659b035195e529b1472d8af84a10418f"
+    },
+    "execution_image": "sha256:243bdcc7c2679e9335e8a4e5b180765ed4773de5995b8e84e63b45712842e552",
+    "execution_dockerfile_sha256": "221c6f18cf8f3627b538610175b691f83f2919467f1e7dce7bb406a33782e716",
+    "execution_git_version": "git version 2.47.3"
+  }
+}

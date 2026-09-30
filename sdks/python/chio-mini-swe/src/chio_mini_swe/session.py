@@ -15,8 +15,8 @@ CONFIG = "chio.mini-swe.session-config.v1"
 SCOPED_CONFIG = "chio.mini-swe.session-config.v2"
 INITIALIZED = "chio.mini-swe.session-initialized.v1"
 PREPARED = "chio.mini-swe.session-prepared.v1"
-AUTHORIZATION = "chio.mini-swe.session-authorization.v1"
-REQUEST = "chio.mini-swe.provisioning-request.v1"
+AUTHORIZATION = "chio.mini-swe.session-authorization.v2"
+REQUEST = "chio.mini-swe.provisioning-request.v2"
 ROUTES = [
     {"server_id": "model", "tool_name": "model_infer"},
     {"server_id": "sandbox", "tool_name": "execute"},
@@ -24,6 +24,7 @@ ROUTES = [
 CONFIG_FIELDS = {
     "schema",
     "chio",
+    "broker_tool",
     "repository",
     "revision",
     "provider_config",
@@ -144,6 +145,8 @@ def initialize(config_path, task_path, state):
     binary_hash = operator.digest_file(binary)
     if not operator.supports_state_reader(binary):
         raise ValueError("The selected Chio binary lacks administrative process state reads")
+    broker_tool = _path(path.parent, config["broker_tool"])
+    operator.protected_executable(broker_tool)
     repository = _path(path.parent, config["repository"])
     environment = session_security.environment_identity()
     qualify_image(config["worker_image"])
@@ -181,33 +184,28 @@ def initialize(config_path, task_path, state):
         configuration = dict(
             config,
             chio=str(binary),
+            broker_tool=str(broker_tool),
             repository=str(repository),
             revision=workspace["source_commit"],
             provider_config=str(state / "provider.json"),
         )
         operator.write(state / "configuration.json", configuration)
         workspace_config = {key: value for key, value in workspace.items() if key != "state"}
-        launchers = environment["launchers"]
         servers = {}
-        for server, executable, arguments, tools, timeout in [
-            (
-                "model",
-                "chio-mini-swe-model",
-                ["--config", str(state / "provider.json")],
-                [model_tool(model_id)],
-                provider["timeout_seconds"] + 30,
-            ),
+        for server, name, tools, timeout in [
+            ("model", "model_infer", [model_tool(model_id)], provider["timeout_seconds"] + 30),
             (
                 "sandbox",
-                "chio-mini-swe-repository",
-                ["serve", "--state", str(state / "repository")],
+                "execute",
                 [repository_tool(workspace_config)],
                 config["command_timeout_seconds"] + 120,
             ),
         ]:
             servers[server] = {
                 "id": server,
-                "command": [launchers[executable]["path"], *arguments],
+                "executable": str(broker_tool),
+                "executable_sha256": operator.digest_file(broker_tool),
+                "tool_name": name,
                 "working_directory": str(state),
                 "execution_uid": os.getuid(),
                 "execution_gid": os.getgid(),
@@ -309,14 +307,16 @@ def _prepared(state, *, online=False):
     return state, initialized, config
 
 
-def _policy(ttl):
+def _policy(ttl, max_calls):
     return (
         f"kernel:\n  max_capability_ttl: {ttl}\n  delegation_depth_limit: 1\n"
         "  durable_admission_mode: all\ncapabilities:\n  default:\n    tools:\n"
         "      - server: model\n        tool: model_infer\n"
         f"        operations: [invoke, delegate]\n        ttl: {ttl}\n"
+        f"        max_invocations: {max_calls}\n"
         "      - server: sandbox\n        tool: execute\n"
         f"        operations: [invoke, delegate]\n        ttl: {ttl}\n"
+        f"        max_invocations: {max_calls}\n"
     ).encode()
 
 
@@ -361,15 +361,28 @@ def prepare(state, authorization_path):
             )
         authorization_path = Path(authorization_path).resolve(strict=True)
         authorization = session_security.read_document(authorization_path)
-        _fields(authorization, {"schema", "servers"})
+        _fields(authorization, {"schema", "servers", "native_broker"})
         _fields(authorization["servers"], {"model", "sandbox"})
         if authorization["schema"] != AUTHORIZATION:
             raise ValueError("Unsupported session authorization document")
         request = session_security.read_document(state / "provisioning-request.json", private=True)
+        broker = authorization["native_broker"]
+        if not isinstance(broker, dict) or not isinstance(broker.get("routes"), list):
+            raise ValueError("Session authorization requires native broker routes")
+        indexed = {}
+        for route in broker["routes"]:
+            if not isinstance(route, dict) or not isinstance(route.get("quota"), dict):
+                raise ValueError("Invalid authorized native broker route")
+            key = (route["quota"].get("server_id"), route["quota"].get("tool_name"))
+            if key in indexed:
+                raise ValueError("Duplicate authorized native broker route")
+            indexed[key] = route
+        if set(indexed) != {(route["server_id"], route["tool_name"]) for route in ROUTES}:
+            raise ValueError("Session authorization must contain exactly its two routes")
         policies, servers, pinned = {}, [], {}
         for name in ("model", "sandbox"):
             supplied = authorization["servers"][name]
-            _fields(supplied, {"launch_policy", "launch_policy_signer"})
+            _fields(supplied, {"command", "launch_policy", "launch_policy_signer"})
             signer = supplied["launch_policy_signer"]
             if not isinstance(signer, str) or re.fullmatch(r"[0-9a-f]{64}", signer) is None:
                 raise ValueError("Each launch policy needs an independently pinned signer key")
@@ -377,13 +390,29 @@ def prepare(state, authorization_path):
             policies[name] = session_security.read_file(path, 4 * 1024 * 1024)
             if not policies[name]:
                 raise ValueError("Empty signed launch policy")
-            _policy_matches(policies[name], request["servers"][name])
+            expected = request["servers"][name]
+            selected = indexed[(name, expected["tool_name"])]
+            command = [
+                expected["executable"],
+                "--tenant-scope",
+                broker["security"]["tenant_id"],
+                "--tool-name",
+                expected["tool_name"],
+                "--receipt-signer",
+                selected["broker_identity"],
+            ]
+            if (
+                supplied["command"] != command
+                or operator.digest_file(expected["executable"]) != expected["executable_sha256"]
+            ):
+                raise ValueError("Authorized command differs from the pinned broker proxy")
+            _policy_matches(policies[name], {**expected, "command": command})
             policy = str(state / f"{name}-launch-policy.json")
             pinned[name] = {"launch_policy": policy, "launch_policy_signer": signer}
             servers.append(
                 {
                     "id": name,
-                    "command": request["servers"][name]["command"],
+                    "command": command,
                     "request_timeout_seconds": request["servers"][name]["request_timeout_seconds"],
                     **pinned[name],
                 }
@@ -392,11 +421,18 @@ def prepare(state, authorization_path):
         # authority. Native launch validation remains the authorization gate.
         for name, data in policies.items():
             atomic_bytes(state / f"{name}-launch-policy.json", data)
-        operator.write(state / "authorization.json", {"schema": AUTHORIZATION, "servers": pinned})
-        atomic_bytes(state / "policy.yaml", _policy(config["capability_ttl_seconds"]))
+        operator.write(
+            state / "authorization.json",
+            {"schema": AUTHORIZATION, "servers": pinned, "native_broker": broker},
+        )
+        atomic_bytes(
+            state / "policy.yaml", _policy(config["capability_ttl_seconds"], config["max_calls"])
+        )
         host = {
             "schema": "chio.process.host.v1",
             "policy": str(state / "policy.yaml"),
+            "native_broker": broker,
+            "execution_nonces": True,
             "servers": servers,
             "limits": {"max_processes": 2, "max_depth": 1, "max_calls": config["max_calls"]},
             "children": [
@@ -412,7 +448,10 @@ def prepare(state, authorization_path):
             "worker_image": config["worker_image"],
             "model_server": "model",
             "execution": ROUTES[1],
-            "environment": _environment(config),
+            "environment": {
+                **_environment(config),
+                "repository_configuration_sha256": request["configuration_sha256"],
+            },
             "agent": config["agent"],
             "max_attempts": config["max_attempts"],
             "timeout_seconds": config["timeout_seconds"],
@@ -512,6 +551,7 @@ def result(state, output):
                 receipts_path=output / "operator" / "receipts.ndjson",
                 key_path=output / "operator" / "kernel.pub",
                 server_id="sandbox",
+                command_outputs_path=output / "operator" / "command-outputs.json",
             )
             repository = export(workspace, output / "repository")
             atomic_bytes(output / "repository" / "receipts.ndjson", receipts)

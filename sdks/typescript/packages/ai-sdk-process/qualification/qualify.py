@@ -19,7 +19,8 @@ PACKAGE = HERE.parent
 TYPESCRIPT = PACKAGE.parent.parent
 # Only operator provisioning is loaded from the checkout; workers use installed TS packages.
 sys.path.insert(0, str(TYPESCRIPT.parent / "python/chio-process/src"))
-from chio_process.launch import demo_python, provision_native_demo  # noqa: E402
+from chio_process.python_application import provision_native_python_demo  # noqa: E402
+from server import prepare_store  # noqa: E402
 
 
 def command(args, directory, *, success=True):
@@ -65,6 +66,7 @@ def count(directory):
 def settings(directory, consumer, mode):
     directory.mkdir(mode=0o700)
     (directory / "tool-data").mkdir(mode=0o700)
+    prepare_store(directory / "tool-data" / "publications.db")
     return {
         "directory": str(directory),
         "mode": mode,
@@ -73,6 +75,26 @@ def settings(directory, consumer, mode):
         "python": sys.executable,
         "server": str(consumer / "server.py"),
     }
+
+
+def provision_reports(binary, directory, consumer, *, exit_after_publication=False):
+    database = directory / "tool-data" / "publications.db"
+    files = [database, Path(str(database) + "-journal")]
+    return provision_native_python_demo(
+        binary,
+        "reports",
+        "server",
+        {"server.py": consumer / "server.py"},
+        [
+            "--database",
+            str(database),
+            *(["--exit-after-publication"] if exit_after_publication else []),
+        ],
+        directory / "launch-reports",
+        directory,
+        read_paths=[*files, database.parent / "fixtures"],
+        write_paths=files,
+    )
 
 
 def prepare(binary, directory, consumer, mode):
@@ -90,28 +112,14 @@ capabilities:
         operations: [invoke, delegate]
         ttl: 3600
 """)
-    server = [
-        demo_python(),
-        str(consumer / "server.py"),
-        "--database",
-        data["database"],
-    ]
-    if mode == "lost-output":
-        server.append("--exit-after-publication")
     write(
         directory / "host-config.json",
         {
             "schema": "chio.process.host.v1",
             "policy": "policy.yaml",
             "servers": [
-                provision_native_demo(
-                    binary,
-                    "reports",
-                    server,
-                    directory / "launch-reports",
-                    directory,
-                    read_paths=[consumer / "server.py", directory / "tool-data"],
-                    write_paths=[directory / "tool-data"],
+                provision_reports(
+                    binary, directory, consumer, exit_after_publication=mode == "lost-output"
                 )
             ],
             "limits": {
@@ -290,6 +298,7 @@ def installed_consumer(major, temporary, packages):
         "supervision_worker.mjs",
     ):
         shutil.copyfile(HERE / name, consumer / name)
+        (consumer / name).chmod(0o600)
     command(
         [
             consumer / "node_modules/.bin/tsc",

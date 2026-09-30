@@ -3,7 +3,9 @@ use super::*;
 use chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1;
 
 mod portable;
-pub(in crate::admission_operation_store::security_participant_state) use portable::load_history;
+pub(in crate::admission_operation_store::security_participant_state) use portable::{
+    load_history, load_history_initialized,
+};
 
 pub struct SecurityParticipantEgressHistory {
     binding: NativeSecurityAuthorityBindingV1,

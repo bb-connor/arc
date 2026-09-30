@@ -1,5 +1,10 @@
 # Native multi-route evidence
 
+The records below describe the preceding partial qualification. The
+[September 30 continuation](continuation-20260930/README.md) carries the consumer
+migration, later native acceptance, final source/binary identities and current
+worker lifecycle. Historical failures below remain evidence of those attempts.
+
 See the [execution record](../../2026-09-29-native-multiroute-consumers-execution.md)
 for task states and acceptance limits. Local and native logs are separate gzip
 streams; `gzip -dc PATH` reads them. Earlier failures, interrupted disk-full

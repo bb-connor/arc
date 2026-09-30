@@ -17,7 +17,7 @@ pub(super) use record::{head, load, load_initialized, load_operation, Record};
 pub(in crate::admission_operation_store) use schema::{exists, sql, verify_catalog};
 
 const PROJECTION: &str = "security_participant_nonce_preflight";
-const MUTATION: &str = "join_security_participant_nonce_preflight";
+pub(super) const MUTATION: &str = "join_security_participant_nonce_preflight";
 
 /// Minted only after validating strict nonce preflight custody inside the writer's
 /// transaction. It enables the same closed monotone row policy as an input

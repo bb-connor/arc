@@ -1,0 +1,92 @@
+{
+  "upstream": "mini-swe-agent==2.4.6",
+  "worker_boundary": {
+    "probe": {
+      "unprivileged_uid": 1001,
+      "upstream_agent_sha256": "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2",
+      "launcher_sha256": "4a974bab6d29e67f128f36e24a4eb982363321c7db368e550f18c736119f8ca8",
+      "zero_capabilities": true,
+      "no_new_privileges": true,
+      "seccomp_filter": true,
+      "host_files_absent": true,
+      "docker_socket_absent": true,
+      "readonly_inputs": true,
+      "network_none": true,
+      "unknown_operation_parser_rejected": true,
+      "ungranted_invoke_denied": true,
+      "ungranted_invoke_receipt": "{\"action\":{\"parameter_hash\":\"be575bcf07e8f09448e85131828c0ce1ed0fd352780ec0d2fc9fb0d821272650\",\"parameters\":{\"message_key\":\"must-not-dispatch\",\"payload\":{\"probe\":true}}},\"boundary_class\":\"prevent\",\"capability_id\":\"9cf51485-fb8c-4d85-99c5-a9ff1d640bff\",\"content_hash\":\"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b\",\"decision\":{\"guard\":\"kernel\",\"reason\":\"requested tool send_authorization_probe on server chio-ipc is not in capability scope\",\"verdict\":\"deny\"},\"id\":\"b667a6583dd8af999a32cb32df624647c8d40514edd3e023e052d69e25800659\",\"kernel_key\":\"f572950c3dd35f30e77d988ba3988afe9f2ec67d21b021438b9d9ba2a19dc54c\",\"metadata\":{\"attribution\":{\"delegation_depth\":1,\"issuer_key\":\"f572950c3dd35f30e77d988ba3988afe9f2ec67d21b021438b9d9ba2a19dc54c\",\"subject_key\":\"d31a3ea53868cfa62d0d5e69cc36e2f75188baacc751dc1e7b300facfa60abf4\"},\"chio_process\":{\"attempt\":1,\"operation_key\":\"ungranted-mailbox-probe\",\"process_id\":\"coder\",\"request_sha256\":\"117c6bcd6415c3131757ded49f74b86cc7589735a506ce8a84965281cd78ece4\",\"runtime_id\":\"e77d57f0-5fb0-41cf-bf4b-9e402f3eee72\"},\"chio_receipt_signing_nonce\":\"rcpt-01a0f2f0-47e0-7ca1-8e52-a7e30c027db9\",\"receipt_context\":{\"request_id\":\"process:ba858d2e481bd32d0e033d57224f7f3335db672cb86398b8ed6a166214fc62aa\"}},\"policy_hash\":\"23f3ceebfbfceaaa471ab826958b2d87db0d5f7d602a9b6fdde23b754c0127d3\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"signature\":\"d094394f0a0425269ac2fc6ec2cbdbe90ef49a5a556433c326b08ad3135fafd616a0a146ac9797d5d0eab1814e889a0e612a5598c44ce4e5d3732af44660420b\",\"timestamp\":1790782228,\"tool_name\":\"send_authorization_probe\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"chio-ipc\",\"trust_level\":\"mediated\"}",
+      "scratch_bytes": 67108864
+    },
+    "profile": {
+      "image": "sha256:7c66a244d27cbb8737bb84ac460d6c0049d249d0e4da871e6e0e73f82e4e0deb",
+      "user": "1001:1001",
+      "network": "none",
+      "readonly_rootfs": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges"
+      ],
+      "memory_bytes": 536870912,
+      "pids_limit": 64,
+      "mounts": [
+        {
+          "type": "bind",
+          "destination": "/app/worker.py",
+          "writable": false
+        },
+        {
+          "type": "bind",
+          "destination": "/run/chio/process.sock",
+          "writable": false
+        },
+        {
+          "type": "bind",
+          "destination": "/run/chio/connection.json",
+          "writable": false
+        }
+      ]
+    },
+    "ungranted_tool_not_dispatched": true,
+    "timeout_and_output_cleanup": true,
+    "image_volume_refused": true,
+    "denial_verification": {
+      "ungranted_invoke_denied": true,
+      "dispatches": 0,
+      "receipts_verified": 1
+    },
+    "attempts": [
+      {
+        "exit_code": 137,
+        "container_id": "c0716e81c7c51f90260f6ea2fb0945f8aea1ce9da9994e7182798e7e9bfa18c4",
+        "image": "sha256:7c66a244d27cbb8737bb84ac460d6c0049d249d0e4da871e6e0e73f82e4e0deb"
+      },
+      {
+        "exit_code": 0,
+        "container_id": "c6c0e2f1ccbd307f694db0fd89f4fdfb42e511b7d45f4334b3d34e7dffc844e3",
+        "image": "sha256:7c66a244d27cbb8737bb84ac460d6c0049d249d0e4da871e6e0e73f82e4e0deb"
+      },
+      {
+        "exit_code": 0,
+        "container_id": "ce6e8bb874925e56a1bcccff67ef721ac6dfac508adecdd8553d4d72286f0751",
+        "image": "sha256:7c66a244d27cbb8737bb84ac460d6c0049d249d0e4da871e6e0e73f82e4e0deb"
+      }
+    ]
+  },
+  "upstream_agent_sha256": "e8ef8aa365942d739c2ec5cb0879f60f377d2dc2de8ec670aaedf3bafb45a4c2",
+  "provider": "saved tool-call fixture",
+  "worker_sigkill": true,
+  "host_sigkill": true,
+  "provider_calls": 3,
+  "distinct_receipts": 5,
+  "verified_receipts": 5,
+  "patch_effects": 1,
+  "identical_audit_effects": 2,
+  "tests_before": "2 failed",
+  "tests_after": "2 passed",
+  "completed_replay": true,
+  "container_image": "sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e",
+  "binary_sha256": "622b555b8f0bb25ca6bda7fefc92ec3a444a9d3f4af8573bac0c6f0462c10cd8",
+  "private_state": "/tmp/chio-mini-ayqx0q3v"
+}

@@ -72,6 +72,7 @@ class ChioAgent(DefaultAgent):
             self.n_consecutive_format_errors = saved["n_consecutive_format_errors"]
             self._start_time = saved["start_time"]
             self.env.receipts = saved["receipts"]
+            self.env.outputs = saved["command_outputs"]
             if isinstance(self.model, ChioModel):
                 self.model.receipts = saved.get("model_receipts", [])
             self._phase = phase
@@ -88,6 +89,7 @@ class ChioAgent(DefaultAgent):
             "n_consecutive_format_errors": self.n_consecutive_format_errors,
             "start_time": self._start_time,
             "receipts": self.env.receipts,
+            "command_outputs": self.env.outputs,
         }
         if isinstance(self.model, ChioModel):
             value["model_receipts"] = self.model.receipts

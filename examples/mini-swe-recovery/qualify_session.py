@@ -3,18 +3,15 @@
 import argparse
 import fcntl
 import hashlib
-import http.server
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-import threading
-import time
 from pathlib import Path
 
-from chio_process.launch import provision_native_demo
+from broker_campaign import BrokerCampaign, provider_endpoint
 
 from chio_mini_swe.repository_archive import git
 from chio_mini_swe.repository_transport import docker
@@ -61,7 +58,6 @@ def main():
     DIAGNOSTICS = root
     os.environ["MSWEA_GLOBAL_CONFIG_DIR"] = str(root / "mini-config")
     os.environ["MSWEA_SILENT_STARTUP"] = "1"
-    from worker import decisions
 
     print("Private session qualification state: " + str(root), file=sys.stderr, flush=True)
     binary = args.chio.resolve(strict=True)
@@ -106,68 +102,23 @@ def main():
         }
 
     source_before = source_hashes()
-    calls = []
+    services = None
     credential_name = "CHIO_SESSION_FIXTURE_KEY"
-    credential = "session-http-fixture-value"
     os.environ.pop(credential_name, None)
 
-    class Provider(http.server.BaseHTTPRequestHandler):
-        def log_message(self, *_):
-            pass
+    def calls():
+        if services is None:
+            return []
+        return [json.loads(line) for line in (session / "queries.jsonl").read_text().splitlines()]
 
-        def do_POST(self):
-            body = self.rfile.read(int(self.headers["Content-Length"]))
-            assert self.path == "/v1/chat/completions"
-            assert self.headers["Authorization"] == "Bearer " + credential
-            assert credential not in body.decode()
-            value = json.loads(body)
-            turn = sum(message["role"] == "assistant" for message in value["messages"])
-            calls.append({"turn": turn, "request_sha256": hashlib.sha256(body).hexdigest()})
-            if turn == 0:
-                # This crosses the native host's default 60-second request
-                # deadline and proves the session's derived model timeout.
-                time.sleep(65)
-            message = decisions()[turn]
-            message.pop("extra")
-            if args.scoped:
-                assert any(
-                    "Selected paths:" in item.get("content", "") and "package" in item["content"]
-                    for item in value["messages"]
-                    if item["role"] == "user"
-                )
-                for call in message["tool_calls"]:
-                    action = json.loads(call["function"]["arguments"])
-                    action["command"] = (
-                        "test ! -e unselected.txt && cd package && " + action["command"]
-                    )
-                    call["function"]["arguments"] = json.dumps(action)
-            response = {
-                "id": f"session-{len(calls)}",
-                "object": "chat.completion",
-                "created": 1,
-                "model": "session-fixture",
-                "choices": [{"index": 0, "finish_reason": "tool_calls", "message": message}],
-                "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120},
-            }
-            encoded = json.dumps(response).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(encoded)))
-            self.end_headers()
-            self.wfile.write(encoded)
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Provider)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    closed = False
     session = root / "session"
     try:
         write(
             root / "provider.json",
             {
                 "schema": "chio.mini-swe.provider.v1",
-                "endpoint": f"http://127.0.0.1:{server.server_port}/v1",
-                "allow_loopback_http": True,
+                "endpoint": provider_endpoint(),
+                "allow_loopback_http": False,
                 "model": "session-fixture",
                 "credential_env": credential_name,
                 "max_output_tokens": 1024,
@@ -184,6 +135,7 @@ def main():
                 else "chio.mini-swe.session-config.v1",
                 **({"source_paths": ["package"]} if args.scoped else {}),
                 "chio": str(binary),
+                "broker_tool": os.environ["CHIO_BROKER_MCP_TOOL"],
                 "repository": str(source),
                 "revision": revision,
                 "provider_config": "provider.json",
@@ -220,35 +172,31 @@ def main():
             "--state",
             session,
         )
-        assert not calls and credential_name not in os.environ
+        assert not calls() and credential_name not in os.environ
         request = json.loads((session / "provisioning-request.json").read_text())
         assert request["source_commit"] == revision and set(request["servers"]) == {
             "model",
             "sandbox",
         }
-        assert credential not in (session / "provisioning-request.json").read_text()
         assert not (session / "run").exists()
         command(operator, "session", "run", "--state", session, expected=1)
-        assert not (session / "run").exists() and not calls
+        assert not (session / "run").exists() and not calls()
         # Authority is deliberately issued by this separate test harness.
         # Production session commands never call this explicit fixture provisioner.
-        bindings = {}
-        for name, expected in request["servers"].items():
-            configured = provision_native_demo(
-                binary,
-                name,
-                expected["command"],
-                root / ("launch-" + name),
-                expected["working_directory"],
-            )
-            bindings[name] = {
-                key: configured[key] for key in ("launch_policy", "launch_policy_signer")
-            }
+        services = BrokerCampaign(binary, session, None, "session-slow", session=True)
+        authorized = json.loads(services.config_path.read_text())
         write(
             root / "authorization.json",
             {
-                "schema": "chio.mini-swe.session-authorization.v1",
-                "servers": bindings,
+                "schema": "chio.mini-swe.session-authorization.v2",
+                "servers": {
+                    entry["id"]: {
+                        key: entry[key]
+                        for key in ("command", "launch_policy", "launch_policy_signer")
+                    }
+                    for entry in authorized["servers"]
+                },
+                "native_broker": authorized["native_broker"],
             },
         )
         prepared = command(
@@ -260,7 +208,7 @@ def main():
             "--authorization",
             root / "authorization.json",
         )
-        assert not calls and credential_name not in os.environ
+        assert not calls() and credential_name not in os.environ
         host = json.loads((session / "host.json").read_text())
         deadlines = {s["id"]: s["request_timeout_seconds"] for s in host["servers"]}
         assert deadlines == {"model": 120, "sandbox": 140}
@@ -278,16 +226,14 @@ def main():
                 expected=1,
             )
             assert not (root / "locked-export").exists()
-        os.environ[credential_name] = credential
+        services.start(binary)
         completed = command(operator, "session", "run", "--state", session, timeout=540)
-        assert len(calls) == 3
+        assert len(calls()) == 3
         repeated = command(operator, "session", "run", "--state", session, timeout=540)
-        assert len(calls) == 3
-        os.environ.pop(credential_name, None)
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=10)
-        closed = True
+        assert len(calls()) == 3
+        saved_calls = calls()
+        services.close()
+        services = None
         # Removing original inputs must not affect the prepared session snapshot.
         (root / "provider.json").unlink()
         (root / "task.md").unlink()
@@ -324,7 +270,7 @@ def main():
                 == ["package"]
             )
         command(operator, "session", "recover", "--state", session)
-        assert len(calls) == 3
+        assert len(saved_calls) == 3
         record = {
             "schema": "chio.mini-swe.session-qualification.v1",
             "private_state": str(root),
@@ -335,7 +281,7 @@ def main():
             "observed": observed,
             "exported": exported,
             "review": review,
-            "model_requests": calls,
+            "model_requests": saved_calls,
             "request_timeouts": deadlines,
             "slow_model_crossed_default_deadline": True,
             "prepare_without_provider_credential_or_inference": True,
@@ -353,10 +299,8 @@ def main():
         print(json.dumps({"output": str(args.output), "verified_transitions": 5, "model_calls": 3}))
     finally:
         os.environ.pop(credential_name, None)
-        if not closed:
-            server.shutdown()
-            server.server_close()
-            thread.join(timeout=10)
+        if services is not None:
+            services.close()
 
 
 if __name__ == "__main__":

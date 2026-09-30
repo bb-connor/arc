@@ -1,0 +1,140 @@
+[
+  {
+    "path": ".github/workflows/process-workers.yml",
+    "local": "c728a05bdb99849bdfbc54eacaf59fd3136ab04c389499b736ef46d9cba39735",
+    "native": "b263eb459ad5035774296a7b21fc4feefc12eb25adb3c6ac23326a36ff1ab79b",
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/broker.rs",
+    "local": "849846e86eeb7e77bfdfb9423751228c63b071eff5f6b14597f48a68c4eb15e6",
+    "native": "f3050c68cb4d0679ec561e4ffcdff592c874498b1d3168b796d622e4f91fc32a",
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "crates/products/chio-cli/PROCESS_HOST.md",
+    "local": "4c6cb59781838472506c7a9aa38bf3fa3d401d69b4a64c5e3eef48fa5ab9457f",
+    "native": "8b10fd298694c15ac0ead053a65f21f90ed7f10e4871b77f483cf08133686364",
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/cage_policy/evidence.rs",
+    "local": "9b2675831726188d78654da28f65970ba3b03c982a38be83a6a99d684f715cfb",
+    "native": "b20e15dd8ef1b187c649fb0f4cd77ccce18605dfb8356a64ad038748a3ff5250",
+    "disposition": "Verified production difference is Rust import ordering only."
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/cage_policy/evidence_tests.rs",
+    "local": "b6ab5c1d5cd4819aa4b63a7befb04ae40224d7031a8ac88cfcccd603e0d01e53",
+    "native": "19fea1e279447066ba130d2ac175d4364d458359b0e5b2c0d33872c03e2e6b95",
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/cage_policy/tests.rs",
+    "local": "4f65b9677ee44dfd4d4b649bd25679644b0292ed9c76eed4152a28a63d597f2f",
+    "native": "3dd1936b6399b7b5e7d8c20c3ee05d8bc6fb4cf8648615194a217f9d776482af",
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/cage_receipt_tests.rs",
+    "local": "e819aa48d5b4df20fa811ed462038bc78f1f9b39e979217124b2437258901395",
+    "native": "865d01c4a2fbb02935a8188444898bc9a2dbacd99754b8b1bd9305a41b8a4be3",
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/provision/artifact_io.rs",
+    "local": "7a6b7dd95d48c9b6afafe8967af7b7b104afaac661bfe392c26021a98d239cbf",
+    "native": "c8c8e021b0b0126a6b0dde976d31ee3dba2eafe7f64822ffec32a89312d7382b",
+    "disposition": "Final EOF whitespace cleanup only; production tokens unchanged."
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs",
+    "local": "131c9a6b24487465b5d6974ed7dcdcf0340ef91ccd95de88e8dcdf13a3707716",
+    "native": "361241953da20499d9d31111e013d02bd09a906023a26aaa71eddd742b32bc49",
+    "disposition": "Verified difference is confined to cfg(test) evidence assertions and fixture pins."
+  },
+  {
+    "path": "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/current-native-budget-kernel.pub",
+    "local": "6981e8375009b978c1d7de897128205d09148a7a625cae1f19fc01ba81a5a784",
+    "native": null,
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/current-native-budget-pins.json",
+    "local": "6f69527b3b470978538f8f253152ea31499d1d00316f87224f4b269de818f327",
+    "native": null,
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/current-native-budget.json",
+    "local": "a7226862742a02e1c0a1715199edd6f295be0a59aa6fec9373ce12ff45e2bf1b",
+    "native": null,
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/provenance.json",
+    "local": "58bbef13ae19b0426dce49f0276b200f52ff1b04670911e75e7dce6a44b69434",
+    "native": "0cbf15a84f98f96e266cbb93ed8f75e8b5abeb7959a74565ade80090fca46a30",
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "crates/security/chio-cage/src/linux.rs",
+    "local": "fc6aaea1038d15202705769f22c364f681fc16da3663816b223759db750d32d6",
+    "native": "8e1943a06cbf364cacd59a0b577d74ce604ec59a3a2896d1801cabaed4e1a4e4",
+    "disposition": "Verified production difference is Rust import ordering only."
+  },
+  {
+    "path": "docs/security/active-defense-rollout.md",
+    "local": "39e9aa56918f6c53d4b94467b65208d033b03fb9ca64a3f5fafd80fb9c892000",
+    "native": "b9fca31929e0557e0c0595dc6ceb3608ad467891822b3537b603daa15b22173d",
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "docs/security/native-launch-examples.md",
+    "local": "143996f7b82c5c4591a07614b26947c812a2bb5c2073ec6764a126728edfc24d",
+    "native": "453589df4be3eae021c8104144be7473cd07dc8ade1ddba27d12132d2d240110",
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "docs/security/trust-boundary-inventory.json",
+    "local": "46defe7945dfdf60be57525d11f906edcba9da38ebda4406d4500c298a0be26e",
+    "native": "6fde4557f80eab1cc6f2b34e36cc28d041e65583e9db04984a045e9cec4e2bd1",
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "docs/superpowers/plans/2026-09-29-native-consumers-acp-errors-openapi.md",
+    "local": "808dad692c43a46bf172f0373ec092d6be1fb877414ea9dcbf0ca6ad460c729f",
+    "native": null,
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "docs/superpowers/plans/2026-09-29-native-multiroute-consumers.md",
+    "local": "826ddaafa3bd74bf29432b57c1ff229ae6b22ec2bdf42315793e53d7889f6f09",
+    "native": null,
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "examples/mini-swe-recovery/README.md",
+    "local": "e88c199c21dbfe6725b5f5b10d7e0b0bded7c115016718367816d99571c4f9c4",
+    "native": "12d23119790170bb21607d48db1989e76c5f59f85a9b7635afefc4b7c281926c",
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "scripts/tests/check-process-ci-inventory.test.py",
+    "local": "806563bf4d6a3429701134d3f42a5304c34646aa31e09257ff8809f3d0f6c8b5",
+    "native": "9308aa4267df578edf391909d1ef413b67258b8fc854ac4865d50f44b58bf12d",
+    "disposition": "Test code or fixture; not part of the production native binary."
+  },
+  {
+    "path": "sdks/python/chio-mini-swe/REPOSITORY.md",
+    "local": "ffd021e2ebcc849d5baac8985f47f845bf587035a6e4441e9a7464cfac935c8c",
+    "native": "7a1889998b5667419715482ca313f5eb675f886bd34f81720b8f5ffa786c66d6",
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  },
+  {
+    "path": "sdks/python/chio-mini-swe/SESSION.md",
+    "local": "1c288582655e92af7a8438eb2ce35f0101df6f30f6e51dbf1e1c17f8a2ca6403",
+    "native": "c33452ec14d048f6b579e2f85b121ecc39e8745f2e86e754b3d872e043b77584",
+    "disposition": "CI, inventory, plan or documentation; not part of the production native binary."
+  }
+]

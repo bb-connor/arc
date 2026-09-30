@@ -2,7 +2,6 @@
 
 import argparse
 import hashlib
-import http.server
 import json
 import os
 import re
@@ -12,14 +11,13 @@ import stat
 import subprocess
 import sys
 import tempfile
-import threading
 from pathlib import Path
 
-from chio_process.launch import demo_python, provision_native_demo
+from broker_campaign import BrokerCampaign, provider_endpoint
 from qualify import command
-from worker import decisions
 
 from chio_mini_swe.provider_config import SCHEMA, identity
+from chio_mini_swe.repository_store import configuration_digest
 
 HERE = Path(__file__).resolve().parent
 DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]
@@ -181,49 +179,17 @@ def main():
         == hashlib.sha256(source_binary.read_bytes()).digest()
     )
     operator = Path(sys.executable).parent / "chio-mini-swe"
-    gateway = Path(sys.executable).parent / "chio-mini-swe-model"
     image = json.loads(args.worker_image_file.read_text())
-    calls = []
-    failed = threading.Event()
+    services = None
+    failed_services = None
 
-    class Provider(http.server.BaseHTTPRequestHandler):
-        def log_message(self, *_):
-            pass
+    def calls():
+        return (
+            [json.loads(line) for line in (root / "queries.jsonl").read_text().splitlines()]
+            if (root / "queries.jsonl").exists()
+            else []
+        )
 
-        def do_POST(self):
-            body = self.rfile.read(int(self.headers["Content-Length"]))
-            assert self.path == "/v1/chat/completions"
-            assert self.headers["Authorization"] == "Bearer local-http-fixture-value"
-            data = json.loads(body)
-            assert data["model"] == "local-coding-fixture" and data["max_completion_tokens"] == 1024
-            assert "local-http-fixture-value" not in body.decode()
-            turn = sum(message["role"] == "assistant" for message in data["messages"])
-            calls.append({"turn": turn, "request_sha256": hashlib.sha256(body).hexdigest()})
-            message = decisions()[turn]
-            message.pop("extra")
-            if args.repository_service and turn == 0:
-                function = message["tool_calls"][0]["function"]
-                arguments = json.loads(function["arguments"])
-                arguments["command"] = "sleep 65; " + arguments["command"]
-                function["arguments"] = json.dumps(arguments)
-            result = {
-                "id": f"chatcmpl-{len(calls)}",
-                "object": "chat.completion",
-                "created": 1,
-                "model": "local-coding-fixture",
-                "choices": [{"index": 0, "finish_reason": "tool_calls", "message": message}],
-                "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120},
-            }
-            encoded = json.dumps(result).encode()
-            self.send_response(500 if failed.is_set() else 200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(encoded)))
-            self.end_headers()
-            self.wfile.write(encoded)
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Provider)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
     repository = None
     workspace_fixture = None
     print("Private operator qualification state: " + str(root), file=sys.stderr, flush=True)
@@ -272,11 +238,10 @@ def main():
                     "        self.assertEqual(add(-2, -3), -5)\\n')\n"
                 ),
             )
-        shutil.copyfile(HERE / "sandbox.py", root / "sandbox.py")
         provider = {
             "schema": SCHEMA,
-            "endpoint": f"http://127.0.0.1:{server.server_port}/v1",
-            "allow_loopback_http": True,
+            "endpoint": provider_endpoint(),
+            "allow_loopback_http": False,
             "model": "local-coding-fixture",
             "credential_env": "CHIO_OPERATOR_FIXTURE_KEY",
             "max_output_tokens": 1024,
@@ -285,61 +250,17 @@ def main():
             "output_usd_per_million": 8,
         }
         (root / "provider.json").write_text(json.dumps(provider))
-        servers = [
-            provision_native_demo(
-                binary,
-                "sandbox",
-                workspace_fixture.server_command
-                if workspace_fixture
-                else [demo_python(), str(root / "sandbox.py"), "--container", repository],
-                root / "launch-sandbox",
-                root,
-            ),
-            provision_native_demo(
-                binary,
-                "model",
-                [str(gateway), "--config", str(root / "provider.json")],
-                root / "launch-model",
-                root,
-            ),
-        ]
-        if workspace_fixture:
-            servers[0]["request_timeout_seconds"] = (
-                workspace_fixture.initialized["timeout_seconds"] + 120
-            )
-        (root / "policy.yaml").write_text("""kernel:
-  max_capability_ttl: 3600
-  delegation_depth_limit: 8
-  durable_admission_mode: all
-capabilities:
-  default:
-    tools:
-      - server: sandbox
-        tool: execute
-        operations: [invoke, delegate]
-        ttl: 3600
-      - server: model
-        tool: model_infer
-        operations: [invoke, delegate]
-        ttl: 3600
-""")
-        host = {
-            "schema": "chio.process.host.v1",
-            "policy": "policy.yaml",
-            "servers": servers,
-            "limits": {"max_processes": 2, "max_depth": 1, "max_calls": 12},
-            "children": [
-                {
-                    "id": "coder",
-                    "parent": "root",
-                    "budget_share_bps": 9000,
-                    "tools": [
-                        {"server_id": "model", "tool_name": "model_infer"},
-                        {"server_id": "sandbox", "tool_name": "execute"},
-                    ],
-                }
-            ],
-        }
+        services = BrokerCampaign(
+            binary,
+            root,
+            repository,
+            "operator",
+            provider=provider,
+            host_state=root / "run/host",
+            workspace=workspace_fixture.state if workspace_fixture else None,
+            slow_command=bool(workspace_fixture),
+        )
+        host = json.loads((root / "config.json").read_text())
         (root / "host.json").write_text(json.dumps(host))
         profile = {
             "schema": "chio.mini-swe.operator.v1",
@@ -350,7 +271,18 @@ capabilities:
             "worker_image": image["image"],
             "model_server": "model",
             "execution": {"server_id": "sandbox", "tool_name": "execute"},
-            "environment": {"cwd": "/workspace"},
+            "environment": {
+                "cwd": "/workspace",
+                **(
+                    {
+                        "repository_configuration_sha256": configuration_digest(
+                            json.loads((workspace_fixture.state / "workspace.json").read_text())
+                        )
+                    }
+                    if workspace_fixture
+                    else {}
+                ),
+            },
             "agent": {
                 "system_template": "Repair the Python repository using bash commands.",
                 "instance_template": "{{task}}",
@@ -376,7 +308,7 @@ capabilities:
                 cwd=root,
             )
         )
-        assert prepared["model_id"] == identity(provider) and not calls
+        assert prepared["model_id"] == identity(provider) and not calls()
         changed = dict(provider, model="different-model")
         (root / "provider.json").write_text(json.dumps(changed))
         rejected = subprocess.run(
@@ -389,9 +321,10 @@ capabilities:
         assert (
             rejected.returncode
             and "Provider configuration changed" in rejected.stderr
-            and not calls
+            and not calls()
         )
         (root / "provider.json").write_text(json.dumps(provider))
+        services.start(binary)
         try:
             report = json.loads(
                 subprocess.run(
@@ -406,7 +339,10 @@ capabilities:
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as failure:
             save_failure_diagnostics(root, args.output, failure)
             raise
-        assert report["complete"] and report["workers"][0]["attempts"] == 1 and len(calls) == 3
+        assert report["complete"] and report["workers"][0]["attempts"] == 1 and len(calls()) == 3
+
+        if workspace_fixture:
+            services.release_repository()
 
         def repository_file(name):
             if workspace_fixture:
@@ -416,7 +352,7 @@ capabilities:
         assert repository_file("effects.txt") == "patched\naudit\naudit\n"
         assert "\nOK\n" in repository_file("test-output.txt")
         again = json.loads(command(operator, "run", "--state", root / "run", cwd=root))
-        assert again == report and len(calls) == 3
+        assert again == report and len(calls()) == 3
         command(binary, "process", "cancel", "--state", root / "run/host", "--process", "coder")
         # Starting this model server would now fail. Administrative result export
         # must still work, including after cancellation and without a credential.
@@ -429,22 +365,42 @@ capabilities:
             command(operator, "result", "--state", root / "run", "--out", root / "result", cwd=root)
         )
         after = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in tracked}
-        assert before == after and exported["verified_receipts"] == 8 and len(calls) == 3
+        assert before == after and exported["verified_receipts"] == 8 and len(calls()) == 3
         assert exported["exit_status"] == "Submitted"
         assert abs(exported["model_cost"] - 0.00108) < 1e-12
         (root / "provider-disabled.json").rename(root / "provider.json")
-        failed.set()
+        failure_root = root / "failure-services"
+        failure_root.mkdir(mode=0o700)
+        failure_provider = dict(provider, endpoint=provider_endpoint())
+        (root / "failure-provider.json").write_text(json.dumps(failure_provider))
+        failed_services = BrokerCampaign(
+            binary,
+            failure_root,
+            repository,
+            "operator-error",
+            provider=failure_provider,
+            host_state=root / "failed/host",
+            workspace=workspace_fixture.state if workspace_fixture else None,
+        )
+        failed_services.failed.set()
+        failed_host = json.loads((failure_root / "config.json").read_text())
+        (root / "failed-host.json").write_text(json.dumps(failed_host))
+        failed_profile = dict(
+            profile, host_config="failed-host.json", provider_config="failure-provider.json"
+        )
+        (root / "failed-profile.json").write_text(json.dumps(failed_profile))
         command(
             operator,
             "prepare",
             "--profile",
-            root / "profile.json",
+            root / "failed-profile.json",
             "--task-file",
             root / "task.md",
             "--state",
             root / "failed",
             cwd=root,
         )
+        failed_services.start(binary)
         stopped = subprocess.run(
             [str(operator), "run", "--state", str(root / "failed")],
             capture_output=True,
@@ -452,7 +408,12 @@ capabilities:
             timeout=180,
             cwd=root,
         )
-        assert stopped.returncode and len(calls) == 4
+        failure_calls = [
+            json.loads(line) for line in (failure_root / "queries.jsonl").read_text().splitlines()
+        ]
+        assert stopped.returncode and len(calls()) == 3 and len(failure_calls) == 1
+        failed_services.close()
+        failed_services = None
         stop_report = json.loads(stopped.stdout)
         assert not stop_report["complete"] and stop_report["workers"][0]["attempts"] == 2
         assert repository_file("effects.txt") == "patched\naudit\naudit\n"
@@ -460,7 +421,7 @@ capabilities:
             "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
             "worker_image": image["image"],
             "private_state": str(root),
-            "provider": "controlled loopback HTTP fixture",
+            "provider": "saved HTTPS completions through native prepared broker routes",
             "model_id": prepared["model_id"],
             "successful_http_requests": 3,
             "failed_http_requests": 1,
@@ -477,17 +438,20 @@ capabilities:
         for path in (root / "result").iterdir():
             shutil.copyfile(path, args.output / path.name)
         (args.output / "qualification.json").write_text(json.dumps(evidence, indent=2) + "\n")
-        (args.output / "http-requests.json").write_text(json.dumps(calls, indent=2) + "\n")
+        (args.output / "http-requests.json").write_text(
+            json.dumps(calls() + failure_calls, indent=2) + "\n"
+        )
         print(json.dumps(evidence))
     finally:
+        if failed_services is not None:
+            failed_services.close()
+        if services is not None:
+            services.close()
         cleanup_workers(root)
         if repository is not None:
             command(*DOCKER, "rm", "--force", "--volumes", repository)
         if workspace_fixture:
             workspace_fixture.cleanup()
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=3)
 
 
 if __name__ == "__main__":

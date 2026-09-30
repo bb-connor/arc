@@ -1,0 +1,47 @@
+{
+  "schema": "chio.native-consumer-attempt-dispositions.v1",
+  "retained_private_states": [
+    {
+      "attempt": "public-repository-followup-1",
+      "state": "/tmp/chio-public-repository-sxb0vn8n",
+      "result": "failed",
+      "cause": "MCP natural-exit response-drain race"
+    },
+    {
+      "attempt": "public-repository-followup-2",
+      "state": "/tmp/chio-public-repository-hbkjw0vv",
+      "result": "failed",
+      "cause": "classification envelope used control-body size bound"
+    },
+    {
+      "attempt": "public-repository-followup-3",
+      "state": "/tmp/chio-public-repository-dvtf9oim",
+      "result": "failed",
+      "cause": "regex classification and result validation still imposed old control-body size bound"
+    },
+    {
+      "attempt": "public-repository-followup-4",
+      "state": "/tmp/chio-public-repository-lsyzamem",
+      "result": "failed",
+      "cause": "second command capture refused after large output and restart replay; repeated history decoding"
+    },
+    {
+      "attempt": "public-repository-followup-5",
+      "state": "/tmp/chio-public-repository-z3z91fu3",
+      "result": "failed",
+      "cause": "second command capture still refused; enclosing projection and release verification repeatedly decoded retained output"
+    },
+    {
+      "attempt": "comparison-followup-4",
+      "state": "/tmp/chio-cmp-05dxhe_4",
+      "result": "failed",
+      "cause": "sixth operation handoff expired while concurrent optimized compilation consumed worker CPU"
+    }
+  ],
+  "comparison-followup-5": {
+    "result": "not_run",
+    "cause": "wrapper waited on failed public3; stopped only that waiting wrapper"
+  },
+  "recovery_rule": "Failed or uncertain operations were retained without redispatch. Each acceptance campaign used fresh state.",
+  "other_failures": "Earlier interpreter, syscall, file-ownership, package prerequisite, protected-venv and socket-path failures remain in native logs and the historical artifact set."
+}

@@ -105,6 +105,6 @@ def graph(settings, saver, tools):
         "acknowledge",
         END,
     ]
-    for before, after in zip(chain, chain[1:]):
+    for before, after in zip(chain, chain[1:], strict=False):
         builder.add_edge(before, after)
     return builder.compile(checkpointer=saver)

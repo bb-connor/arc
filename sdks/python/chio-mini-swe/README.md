@@ -41,11 +41,10 @@ verify all segments before restoring the document. Long trajectories can still
 exhaust the host's cumulative byte or record quota and then stop; no history is
 discarded and storage reclamation is not implemented.
 
-Existing `chio.mini-swe.v1` checkpoint references remain readable. Subsequent
-writes use `chio.process.json-snapshot.v1` references while preserving the
-application document and task binding. Older workers reject the new reference
-format. Package or worker-image updates still require the existing installation
-and launch-policy identity checks; retained legacy blobs are not removed.
+The current `chio.mini-swe.v2` document retains original broker command-output
+envelopes alongside receipt references. Older checkpoint documents are rejected.
+Snapshot references use `chio.process.json-snapshot.v1`; every restored segment
+is validated before the agent resumes.
 
 Completed provider responses are saved before any command runs. Recovery uses
 the original turn and command ordinal, so identical commands in different turns
@@ -66,9 +65,9 @@ Keep the application's existing model instance and default-agent configuration:
 
 ```python
 from chio_mini_swe import ChioAgent, ChioEnvironment
-from chio_process import ProcessClient
+from chio_process.broker import BrokerProcessClient
 
-client = ProcessClient(connection["socket_path"], connection["credential"])
+client = BrokerProcessClient(connection["socket_path"], connection["credential"])
 environment = ChioEnvironment(
     client,
     server_id="sandbox",
@@ -91,12 +90,12 @@ equivalent native worker launch. Keep it out of model prompts and trajectories.
 `DefaultAgent`. Resume with the same values; the output trajectory path may
 change. The original start time and accrued model costs survive restart.
 
-The host-selected tool accepts mini's action fields directly, including
-`command` and optional `tool_call_id`. It returns `output` (string), `returncode`
-(integer), and `exception_info` (string), directly or as MCP `structuredContent`.
-An MCP `isError` flag stops execution even if structured output is present.
-The usual `COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` marker retains mini's
-submission behavior.
+The host prepares and signs the command body before broker dispatch. The worker
+receives the retained broker envelope and extracts `output`, `returncode` and
+`exception_info` only after the invocation completes. Original envelopes remain
+available for receipt-bound repository verification. An MCP error or uncertain
+effect stops execution. The usual `COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
+marker retains mini's submission behavior.
 
 The [Docker qualification](../../../examples/mini-swe-recovery/README.md) includes
 a bounded operator-side bridge and real worker/host crash recovery. Its README
@@ -155,24 +154,13 @@ remain byte-for-byte unchanged. Unrecognized or legacy thin denial markers
 remain fail-closed denials; neither classification permits regeneration or a
 new operation key.
 
-On the operator side, wrap one configured upstream tool-call model instance:
-
-```python
-from chio_mini_swe.gateway import serve
-
-# model is the operator's existing, configured upstream mini-SWE model.
-serve(model, model_id="operator-pinned-provider-configuration")
-```
-
-Provision this gateway under a signed native MCP launch policy. Keep its
-provider access outside the worker, and use a stable identity for the exact
-provider/model/options configuration. Replacing that configuration under the
-same identity is not verified by the adapter. The worker receives no API key,
-network route or provider-selection callback. The gateway accepts only the
-bound model identity, logical turn and conversation, and adds no provider
-retries. Configure retries and billing limits on the underlying model/provider:
-Chio's replay guarantee does not control their internal retry behavior, and
-upstream cost limits are checked between queries, not before provider billing.
+Native deployments configure host-owned provider transport and repository or
+Docker adapters. Each caged `chio-broker-mcp` process receives only its prepared
+stream. Provider credentials, Docker administration and ambient network access
+stay outside the cage. Use the [session provisioning contract](SESSION.md) to
+bind both routes and their signed manifests. The Python gateway's formatting
+helpers remain available to applications; native launch authority uses the
+prepared broker contract.
 
 The gateway contract uses `chio.mini-swe.model-query.v1` requests and
 `chio.mini-swe.model-result.v1` responses. This profile accepts upstream

@@ -344,6 +344,14 @@ pub(in crate::admission_operation_store) fn verify_capture_attachment(
     connection: &Connection,
     operation: &AdmissionOperationV1,
 ) -> Result<(), AdmissionOperationStoreError> {
+    verify_capture_attachment_initialized(connection, operation, None)
+}
+
+pub(in crate::admission_operation_store::security_participant_state) fn verify_capture_attachment_initialized(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+    initialized: Option<&SecurityParticipantStateInitialization>,
+) -> Result<(), AdmissionOperationStoreError> {
     let Some(digest) = operation.native_dispatch_ledger_digest() else {
         return Ok(());
     };
@@ -364,6 +372,6 @@ pub(in crate::admission_operation_store) fn verify_capture_attachment(
             "native capture attachment differs from its preparation",
         ));
     }
-    record.validate(connection)?;
+    record.validate_initialized(connection, initialized)?;
     storage::verify_reference(connection, &record)
 }

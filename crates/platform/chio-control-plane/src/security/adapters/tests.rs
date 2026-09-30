@@ -64,7 +64,7 @@ fn request(payload: &[u8]) -> ClassificationRequest {
         tenant_id: TenantId::new("tenant-a").unwrap_or_else(|error| panic!("tenant: {error}")),
         request_id: RequestId::new("classification-a")
             .unwrap_or_else(|error| panic!("request: {error}")),
-        payload: CanonicalBody::new(payload.to_vec())
+        payload: chio_security_types::ports::ClassificationPayload::new(payload.to_vec())
             .unwrap_or_else(|error| panic!("payload: {error}")),
         payload_digest: Digest32::new(*chio_core::sha256(payload).as_bytes()),
     }

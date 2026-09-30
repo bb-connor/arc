@@ -740,7 +740,7 @@ mod tests {
             tenant_id: TenantId::new("tenant-a").unwrap_or_else(|error| panic!("tenant: {error}")),
             request_id: RequestId::new(request_id_value)
                 .unwrap_or_else(|error| panic!("request: {error}")),
-            payload: CanonicalBody::new(vec![b'x'])
+            payload: chio_security_types::ports::ClassificationPayload::new(vec![b'x'])
                 .unwrap_or_else(|error| panic!("payload: {error}")),
             payload_digest: digest,
         };

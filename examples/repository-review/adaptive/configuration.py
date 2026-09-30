@@ -3,8 +3,10 @@
 import hashlib
 import sys
 
-from chio_process.launch import demo_python, provision_native_demo
+from chio_process.python_application import provision_native_python_demo
 from snapshot import digest
+
+from tools import prepare_database
 
 from .common import HERE
 
@@ -39,12 +41,13 @@ def route(server, tool):
 
 def provision_server(config, directory):
     (directory / "tool-data").mkdir(exist_ok=True)
-    return provision_native_demo(
+    database_files = prepare_database(directory / "tool-data" / "publications.db")
+    return provision_native_python_demo(
         config["chio"],
         "repo",
+        "tools",
+        {name: HERE / name for name in ("tools.py", "snapshot.py")},
         [
-            demo_python(),
-            str(HERE / "tools.py"),
             "--snapshot",
             str(directory / "snapshot.json"),
             "--snapshot-hash",
@@ -55,12 +58,10 @@ def provision_server(config, directory):
         directory / "launch-repo",
         directory,
         read_paths=[
-            HERE / "tools.py",
-            HERE / "snapshot.py",
             directory / "snapshot.json",
-            directory / "tool-data",
+            *database_files,
         ],
-        write_paths=[directory / "tool-data"],
+        write_paths=database_files,
     )
 
 
