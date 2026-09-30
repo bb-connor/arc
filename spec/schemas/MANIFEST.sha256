@@ -1,4 +1,4 @@
-d87e545bb004b66a423c820ce0f85d621305936eb31062dfaa1b9bca51090c90  spec/schemas/MANIFEST.sha256
+55caa433adf50da1b57105dcbd8db97a44696e2e39e32a43770f4b76a5e91648  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -486,7 +486,7 @@ fb23c4ac6bd6b764ec08e761fac94296dcc3a96151852ea45f7eeef6698bc876  spec/schemas/c
 16242b528f954908c5a8e6498f26d700537476b2dd406ae7100ee4abb0930d63  spec/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json
 fc3aef4a4c751c6e39b7fda6d5ea0513812b506ce7d87494e48def9b545cbd0c  spec/schemas/chio-wire/v1/security/cage-exec-transition-observed-v1.schema.json
 cf0a29e92204cc16fd74dafc4cc3870f676d94d9d0ec218b7e988a6c1c06608b  spec/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json
-0961d8d411935de937608bfb473ac981921eb4dcc194374b5eb81dc68d2f03a1  spec/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json
+e131036e2146eea83988a92e67c959260a6f36cd948bb0ac6360c2f7f2b3acc2  spec/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json
 52090151e09378b905edc5b46791aa460805df5ba081ee87c9c746f66c4eb623  spec/schemas/chio-wire/v1/security/cage-process-exit-evidence-v1.schema.json
 4f7e36d618bd340375993bb8aede7b010ba5465d0af4ac462adf41cb07c0fb23  spec/schemas/chio-wire/v1/security/cage-receipt-body-v1.schema.json
 5da9dfca334b1dfcf2f438dba900e8bda2fa6e8b0499303778618b0e5667d377  spec/schemas/chio-wire/v1/security/cage-receipt-metadata-v1.schema.json

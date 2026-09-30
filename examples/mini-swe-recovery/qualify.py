@@ -143,6 +143,7 @@ capabilities:
             [demo_python(), str(HERE / "sandbox.py"), "--container", container],
             directory / "launch",
             directory,
+            read_paths=[HERE / "sandbox.py"],
         )
         config = {
             "schema": "chio.process.host.v1",

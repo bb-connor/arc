@@ -52,24 +52,20 @@ impl FsGuard {
         self.check_path(path, "cwd")
     }
 
-    fn check_path(&self, path: &str, operation: &str) -> Result<(), AcpProxyError> {
+    fn check_path(&self, path: &str, _operation: &str) -> Result<(), AcpProxyError> {
         // Reject empty paths immediately.
         if path.is_empty() {
-            return Err(AcpProxyError::AccessDenied(format!(
-                "fs {operation} denied: empty path"
-            )));
+            return Err(AcpProxyError::Guard(AcpGuardError::EmptyPath));
         }
 
         // Reject relative paths -- all allowed prefixes are absolute.
         if !path.starts_with('/') {
-            return Err(AcpProxyError::AccessDenied(format!(
-                "fs {operation} denied: relative path not allowed: {path}"
-            )));
+            return Err(AcpProxyError::Guard(AcpGuardError::RelativePath));
         }
 
         // Reject path traversal attempts.
         if contains_traversal(&canonicalize_path(path)) {
-            return Err(AcpProxyError::PathTraversal(path.to_string()));
+            return Err(AcpProxyError::Guard(AcpGuardError::PathTraversal));
         }
 
         // Resolve the canonical path (optionally through the filesystem).
@@ -77,9 +73,7 @@ impl FsGuard {
 
         // Fail-closed: deny if no prefix matches.
         if self.allowed_prefixes.is_empty() {
-            return Err(AcpProxyError::AccessDenied(format!(
-                "fs {operation} denied: no allowed path prefixes configured"
-            )));
+            return Err(AcpGuardError::EmptyAllowlist.into());
         }
 
         for prefix in &self.allowed_prefixes {
@@ -103,9 +97,7 @@ impl FsGuard {
             }
         }
 
-        Err(AcpProxyError::AccessDenied(format!(
-            "fs {operation} denied for path: {path}"
-        )))
+        Err(AcpProxyError::Guard(AcpGuardError::PathOutsideScope))
     }
 
     fn resolve_path(&self, path: &str) -> String {

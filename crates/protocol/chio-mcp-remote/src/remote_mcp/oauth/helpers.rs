@@ -19,7 +19,7 @@ pub(super) fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> Result<
                 crate::input::with_source(
                     oauth_token_error(
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        "server_error",
+                        OAuthError::ServerError,
                         "token canonicalization failed",
                     ),
                     error,
@@ -41,7 +41,7 @@ pub(super) fn jwk_key_id(public_key: &PublicKey) -> String {
 
 pub(super) fn redirect_oauth_error(
     redirect_uri: &str,
-    error: &str,
+    error: OAuthError,
     description: &str,
     state: Option<&str>,
 ) -> Response {
@@ -51,28 +51,35 @@ pub(super) fn redirect_oauth_error(
     };
     {
         let mut pairs = redirect.query_pairs_mut();
-        pairs.append_pair("error", error);
-        pairs.append_pair("error_description", description);
+        pairs.append_pair("error", error.wire_name());
+        pairs.append_pair("error_description", error.code());
         if let Some(state) = state {
             pairs.append_pair("state", state);
         }
     }
-    Redirect::to(redirect.as_str()).into_response()
+    crate::input::with_source(
+        Redirect::to(redirect.as_str()).into_response(),
+        OAuthRejection::new(error, description),
+    )
 }
 
-pub(super) fn oauth_token_error(status: StatusCode, error: &str, description: &str) -> Response {
+pub(super) fn oauth_token_error(
+    status: StatusCode,
+    error: OAuthError,
+    description: &str,
+) -> Response {
     let mut response = (
         status,
         Json(json!({
-            "error": error,
-            "error_description": description,
+            "error": error.wire_name(),
+            "error_description": error.code(),
         })),
     )
         .into_response();
     response
         .headers_mut()
         .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-    response
+    crate::input::with_source(response, OAuthRejection::new(error, description))
 }
 
 pub(super) fn html_escape(value: &str) -> String {

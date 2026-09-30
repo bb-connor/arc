@@ -1,0 +1,87 @@
+Cargo build-finished: True
+
+Cargo stderr:
+warning: patch `cmpv2 v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/home/ubuntu/arc-native-consumers-20260929/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/home/ubuntu/arc-native-consumers-20260929/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Checking typenum v1.20.0
+    Checking memchr v2.8.0
+    Checking smallvec v1.15.1
+    Checking libc v0.2.189
+    Checking signature v2.2.0
+    Checking form_urlencoded v1.2.2
+    Checking zeroize v1.9.0
+    Checking heapless v0.7.17
+    Checking chio-metrics-spec v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/observability/chio-metrics-spec)
+    Checking bytes v1.11.1
+    Checking once_cell v1.21.4
+    Checking enumflags2 v0.7.12
+    Checking ed25519 v2.2.3
+    Checking icu_normalizer v2.1.1
+    Checking serde_json v1.0.149
+    Checking aho-corasick v1.1.4
+    Checking idna_adapter v1.2.1
+    Checking idna v1.1.0
+    Checking generic-array v0.14.7
+    Checking postcard v1.1.3
+    Checking url v2.5.8
+    Checking getrandom v0.2.17
+    Checking parking_lot_core v0.9.12
+    Checking getrandom v0.3.4
+    Checking landlock v0.4.4
+    Checking seccompiler v0.5.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/seccompiler-chio)
+    Checking rand_core v0.6.4
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.7
+    Checking ahash v0.8.12
+    Checking parking_lot v0.12.5
+    Checking digest v0.10.7
+    Checking regex-automata v0.4.14
+    Checking nono-chio v0.53.0-chio.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-chio)
+    Checking frost-core v3.0.0
+    Checking sha2 v0.10.9
+    Checking curve25519-dalek v4.1.3
+    Checking sha3 v0.10.8
+    Checking referencing v0.46.0
+    Checking alloy-primitives v1.5.7
+    Checking chio-security-types v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-security-types)
+    Checking rs_merkle v1.5.0
+    Checking frost-rerandomized v3.0.0
+    Checking ed25519-dalek v2.2.0
+    Checking frost-ed25519 v3.0.0
+    Checking regex v1.12.3
+    Checking fancy-regex v0.17.0
+    Checking jsonschema v0.46.0
+    Checking chio-core-types v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/core/chio-core-types)
+    Checking chio-listing v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-revocation-oracle)
+    Checking chio-pheromone v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-pheromone)
+    Checking chio-did v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-did)
+    Checking chio-fincred v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-fincred)
+    Checking chio-cage-plan v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage-plan)
+    Checking chio-finding v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-finding)
+    Checking chio-cage-init v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage-init)
+    Checking chio-fiscal v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-governance)
+    Checking chio-appraisal v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-appraisal)
+    Checking chio-open-market v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-open-market)
+    Checking chio-underwriting v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-underwriting)
+    Checking chio-federation v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-federation)
+    Checking chio-credit v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-credit)
+    Checking chio-web3 v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-web3)
+    Checking chio-market v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-market)
+    Checking chio-autonomy v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-autonomy)
+    Checking chio-core v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/core/chio-core)
+    Checking chio-manifest v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-manifest)
+    Checking chio-cage v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage)
+    Finished `dev` profile [unoptimized] target(s) in 49.67s

@@ -347,6 +347,7 @@ pub(super) struct ProvisionedCeilings {
     pub(super) read_paths: BTreeSet<PathBuf>,
     pub(super) write_paths: BTreeSet<PathBuf>,
     pub(super) runtime_files: BTreeSet<PathBuf>,
+    pub(super) forbidden_paths: BTreeSet<PathBuf>,
 }
 
 #[allow(dead_code)]
@@ -555,7 +556,7 @@ impl ProvisionedCagePolicyFactory {
                 }]
                 .into_iter()
                 .collect(),
-                forbidden_paths: BTreeSet::new(),
+                forbidden_paths: self.input.ceilings.forbidden_paths.clone(),
             },
             runtime: CageRuntimePolicy {
                 cage_init_path: self.input.cage_init_path.clone(),

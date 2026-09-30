@@ -16,12 +16,7 @@ mod tests {
             let signer = (0..=u8::MAX)
                 .map(|seed| chio_core::crypto::Keypair::from_seed(&[seed; 32]))
                 .find(|candidate| candidate.public_key().to_hex() == manifest.public_key)
-                .ok_or_else(|| {
-                    AcpEdgeError::InvalidRequest(format!(
-                        "unit-test manifest signer is unavailable for {}",
-                        manifest.server_id
-                    ))
-                })?;
+                .ok_or_else(|| AcpEdgeError::InvalidRequest(AcpRequestError::UnsupportedTarget))?;
             let signed = chio_manifest::sign_manifest(manifest, &signer)?;
             registry
                 .register_public_only(
@@ -29,7 +24,7 @@ mod tests {
                     &signer.public_key(),
                     chio_manifest::RuntimeToolTopology::local(),
                 )
-                .map_err(|error| AcpEdgeError::InvalidRequest(error.to_string()))?;
+                .map_err(AcpEdgeError::Admission)?;
         }
         Ok(registry)
     }
@@ -81,6 +76,57 @@ mod tests {
             supplemental_authorization: request.supplemental_authorization.clone(),
             model_metadata: request.model_metadata.clone(),
         }
+    }
+
+    #[test]
+    fn deferred_failure_is_terminal_and_retains_the_same_local_cause() {
+        use std::error::Error;
+        let edge =
+            new_test_edge(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let (kernel, execution) = kernel_execution(
+            Box::new(MockToolServer {
+                server_id: "streaming-srv".into(),
+                tools: vec!["search_stream".into()],
+                response: json!({"ok": true}),
+            }),
+            "streaming-srv",
+            "search_stream",
+        );
+        let task = edge
+            .start_stream_task("search_stream", json!({}), &execution, &kernel)
+            .test_unwrap();
+        edge.tasks
+            .borrow_mut()
+            .get_mut(&task.id)
+            .test_unwrap()
+            .request
+            .target_server_id = "private_missing_server".into();
+        let first = edge
+            .resume_stream_task(&task.id, &kernel, &execution)
+            .test_unwrap_err();
+        let AcpEdgeError::Deferred(first) = first else {
+            panic!("deferred cause was lost")
+        };
+        assert!(first.source().is_some());
+        assert_eq!(
+            edge.tasks.borrow()[&task.id].task.status,
+            AcpTaskStatus::Failed
+        );
+        // Restoring a valid target cannot make a failed task execute again.
+        edge.tasks
+            .borrow_mut()
+            .get_mut(&task.id)
+            .test_unwrap()
+            .request
+            .target_server_id = "streaming-srv".into();
+        let second = edge
+            .resume_stream_task(&task.id, &kernel, &execution)
+            .test_unwrap_err();
+        let AcpEdgeError::Deferred(second) = second else {
+            panic!("failure was not retained")
+        };
+        assert!(std::sync::Arc::ptr_eq(&first, &second));
+        assert!(!format!("{second:?} {second}").contains("private_missing_server"));
     }
 
     #[test]
@@ -149,7 +195,8 @@ mod tests {
                 "chioAuthorization":chio_mcp_edge::authorization::authorization_capabilities()
             }), &kernel, &authorization_context(&request)).test_unwrap_err();
             assert!(
-                error
+                std::error::Error::source(&error)
+                    .test_expect("local feature cause")
                     .to_string()
                     .contains(&format!("invocation feature {feature} was not negotiated")),
                 "{error}"
@@ -994,7 +1041,8 @@ mod tests {
         let removed_error =
             execute_orchestrated_acp_request(&Default::default(), &kernel, &registry, removed)
                 .test_expect_err("removed ACP flow sidecar must fail before dispatch");
-        assert!(removed_error
+        assert!(std::error::Error::source(&removed_error)
+            .test_expect("local bridge cause")
             .to_string()
             .contains("bridge security does not match live registry entry for test-srv/read_file"));
 
@@ -1003,9 +1051,12 @@ mod tests {
         let mismatch_error =
             execute_orchestrated_acp_request(&Default::default(), &kernel, &registry, mismatched)
                 .test_expect_err("mismatched ACP flow sidecar must fail before dispatch");
-        assert!(mismatch_error.to_string().contains(
-            "bridge security does not match live registry entry for test-srv/different-tool"
-        ));
+        assert!(std::error::Error::source(&mismatch_error)
+            .test_expect("local bridge cause")
+            .to_string()
+            .contains(
+                "bridge security does not match live registry entry for test-srv/different-tool"
+            ));
     }
 
     fn dpop_proof_for_request(
@@ -1371,7 +1422,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: ACP execution agent_id must not be empty"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -1414,8 +1465,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: ACP request-bound authorization artifacts and execution nonces \
-             require invoke_with_request_id or start_stream_with_request_id"
+            "urn:chio:error:transport:invalid-request-shape"
         );
 
         edge.invoke_with_request_id(
@@ -1461,8 +1511,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: ACP request-bound authorization artifacts and execution nonces \
-             require invoke_with_request_id or start_stream_with_request_id"
+            "urn:chio:error:transport:invalid-request-shape"
         );
 
         edge.invoke_with_request_id(
@@ -1503,7 +1552,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "invalid request: ACP execution agent_id must not include control characters"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -1628,7 +1677,8 @@ mod tests {
             .invoke("read_file", json!({"path": "/tmp"}), &kernel, &execution)
             .test_expect_err("ACP web3 evidence prerequisite failure must reject");
 
-        assert!(error
+        assert!(std::error::Error::source(&error)
+            .test_expect("local bridge cause")
             .to_string()
             .contains("web3 evidence prerequisites unavailable"));
         assert!(
@@ -1693,7 +1743,10 @@ mod tests {
             execute_orchestrated_acp_request(&Default::default(), &kernel, &registry, request)
                 .test_expect_err("ACP capability reference mismatch must reject");
 
-        assert!(error.to_string().contains("capability reference mismatch"));
+        assert!(std::error::Error::source(&error)
+            .test_expect("local bridge cause")
+            .to_string()
+            .contains("capability reference mismatch"));
         assert_eq!(
             receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR),
             before_error,
@@ -1849,9 +1902,10 @@ mod tests {
             Ok(_) => panic!("expected invalid target protocol metadata to fail"),
             Err(error) => error,
         };
-        assert!(error
-            .to_string()
-            .contains("unsupported x-chio-target-protocol value"));
+        assert!(matches!(
+            error,
+            AcpEdgeError::InvalidRequest(AcpRequestError::UnsupportedTarget)
+        ));
     }
 
     // ---- JSON-RPC handler tests ----
@@ -1864,7 +1918,7 @@ mod tests {
         };
         assert_eq!(
             missing.to_string(),
-            "invalid request: session/request_permission requires params.capabilityId"
+            "urn:chio:error:transport:invalid-request-shape"
         );
 
         let permission = ChioAcpEdge::jsonrpc_permission_request(&json!({
@@ -1890,7 +1944,7 @@ mod tests {
         };
         assert_eq!(
             non_string.to_string(),
-            "invalid request: tool/invoke params.capabilityId must be a string"
+            "urn:chio:error:transport:invalid-request-shape"
         );
 
         let (capability_id, default_arguments) = ChioAcpEdge::jsonrpc_invocation_params(
@@ -2034,7 +2088,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"].as_str(),
-            Some("ACP execution agent_id must not include leading or trailing whitespace")
+            Some("urn:chio:error:transport:invalid-request-shape")
         );
     }
 
@@ -2075,7 +2129,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "session/request_permission params.capabilityId must not be empty"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2116,7 +2170,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "session/request_permission params.capabilityId must not include leading or trailing whitespace"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2157,7 +2211,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "session/request_permission params.capabilityId must not include control characters"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2239,7 +2293,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "tool/invoke params.capabilityId must be a string"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2281,7 +2335,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "tool/invoke params.capabilityId must not include leading or trailing whitespace"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2323,7 +2377,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "tool/invoke params.capabilityId must not include control characters"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2361,7 +2415,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "session/list_capabilities params must be an object"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2400,7 +2454,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "tool/invoke params must be an object"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2439,7 +2493,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "tool/resume params must be an object"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2511,7 +2565,7 @@ mod tests {
             assert_eq!(response["error"]["code"], -32600);
             assert_eq!(
                 response["error"]["message"],
-                "request id must be string, number, or null"
+                "urn:chio:error:transport:invalid-request-shape"
             );
         }
     }
@@ -2549,7 +2603,10 @@ mod tests {
 
         assert_eq!(response["id"], "request-7");
         assert_eq!(response["error"]["code"], -32600);
-        assert_eq!(response["error"]["message"], "invalid jsonrpc envelope");
+        assert_eq!(
+            response["error"]["message"],
+            "urn:chio:error:transport:invalid-request-shape"
+        );
     }
 
     #[test]
@@ -2572,7 +2629,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "session/request_permission params must be an object"
+            "urn:chio:error:transport:invalid-request-shape"
         );
     }
 
@@ -2960,7 +3017,7 @@ mod tests {
             assert_eq!(response["error"]["code"], -32602);
             assert_eq!(
                 response["error"]["message"],
-                format!("{method} params.taskId must not be empty")
+                "urn:chio:error:transport:invalid-request-shape"
             );
         }
     }
@@ -3003,7 +3060,7 @@ mod tests {
             assert_eq!(response["error"]["code"], -32602);
             assert_eq!(
                 response["error"]["message"],
-                format!("{method} params.taskId must not include leading or trailing whitespace")
+                "urn:chio:error:transport:invalid-request-shape"
             );
         }
     }
@@ -3046,7 +3103,7 @@ mod tests {
             assert_eq!(response["error"]["code"], -32602);
             assert_eq!(
                 response["error"]["message"],
-                format!("{method} params.taskId must not include control characters")
+                "urn:chio:error:transport:invalid-request-shape"
             );
         }
     }
@@ -3150,7 +3207,7 @@ mod tests {
         assert_eq!(rejected["error"]["code"], -32602);
         assert_eq!(
             rejected["error"]["message"].as_str(),
-            Some("ACP execution agent_id must not include leading or trailing whitespace")
+            Some("urn:chio:error:transport:invalid-request-shape")
         );
         assert!(edge.tasks.borrow().is_empty());
     }

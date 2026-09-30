@@ -11,7 +11,7 @@ The current batch has its own implementation and verification record below; this
 | --- | --- | --- |
 | Decoder classification | 279 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite and the selected native/remote/A2A protocol owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
-| Ambient clocks | 157 occurrences at 152 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. Expanded ACP scanning adds six preexisting calls: three receipt/compliance production owners still queued and three fixtures. Other owners remain. |
+| Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
 | Negative assertions | Baseline contains 1,260 assertions at 1,177 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
 | Schema/domain duplication | Wire lock records 163 identifiers declared in multiple files; domain gate has 32 shape exceptions and zero duplicate byte domains | Six duplicated byte domains and 37 schema duplicates retired with 43 canonical identity pins. Remaining schema consolidation and domain-shape repairs stay queued. |
@@ -92,24 +92,30 @@ and typed local causes; and explicit native CI/SDK/example/conformance fixtures.
 Focused local evidence is recorded there. Native x86_64 execution and the
 Docker/provider-dependent mini-SWE campaigns remain separate acceptance gates.
 
-The next substantial batch is:
+The [native consumer, ACP clock/error and OpenAPI batch](2026-09-29-native-consumers-acp-errors-openapi-execution.md)
+implements the three ACP/remote/OpenAPI owner tasks. ACP audit, signing and
+compliance use a shared fenced clock; semantic failures retain local native
+causes; original OpenAPI bytes are bounded before duplicate-aware JSON/YAML
+projection. Native x86_64 discovery and the two process recovery campaigns now
+pass on the restored OCI worker. Full mini-SWE and the other native consumers
+are not qualified by those fixtures.
 
-1. Complete the native consumer campaign: supply the remaining mini-SWE
-   filesystem dependencies and broker-backed Docker/provider access, then run
-   discovery, recovery, packaged SDK/examples and conformance on a supported
-   enforcing Linux x86_64 host. Preserve exact terminal evidence per campaign;
-   do not broaden ambient grants to make a fixture pass.
-2. Migrate ACP proxy receipt, kernel-signer and compliance timestamps to one
-   configured fallible clock with checked expiry and rollback/restart tests.
-   These three preexisting production readers are now explicitly inventoried.
-3. Replace remaining string-only semantic errors in remote MCP and ACP with
-   domain error variants and registered codes, preserving source chains through
-   caller responses, task completion and receipt generation. Keep wire errors
-   redacted and test the public caller boundaries.
-4. Extend the original-byte migration to the OpenAPI/MCP bridge owner and its
-   conformance callers, taking bounds and error provenance through actual
-   ingress before typed projection. Keep the wider reader inventory and the
-   structural/assurance queues open until their owners are handled.
+The next substantial batch is the remainder of native task 1:
+
+1. Extend the current single-route process-host broker composition to explicit
+   per-route Docker and model transport participants, preserving original
+   signed requests, quota/flow authority and terminal custody across restart.
+2. Add host-owned Docker execution and provider adapters. Caged tools receive
+   only their prepared authenticated broker stream; Docker sockets, provider
+   credentials and network authority remain outside the cage.
+3. Convert mini-SWE sandbox/model callers and dependency inputs to those
+   contracts. The remaining interpreter-based consumers also need a bounded
+   dependency closure compatible with 64 retained read resources and exact-file
+   writes; broad /usr or writable-directory grants are not valid fixtures.
+4. Run the mini-SWE recovery, native worker, provider/operator/session/public
+   repository campaigns, then the packaged SDK/example and conformance
+   consumers on the retained x86_64 worker. Preserve each terminal outcome.
+   Existing native discovery and process recovery should remain regression gates.
 
 Broader semantic error taxonomy, other product/protocol readers, and the
 remaining structural/declaration/assurance queues below remain open.

@@ -7,6 +7,7 @@ struct DeferredAcpTask {
     request: CrossProtocolExecutionRequest,
     task: AcpInvocationTask,
     result: Option<AcpInvocationResult>,
+    error: Option<std::sync::Arc<AcpEdgeError>>,
     deadline: AuthorityDeadline,
 }
 
@@ -32,20 +33,19 @@ fn validate_execution_context(
     validate_execution_agent_id(&execution.agent_id)?;
     if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
         return Err(AcpEdgeError::InvalidRequest(
-            "ACP execution must not mix singular and threshold approval tokens".to_string(),
+            AcpRequestError::MixedApprovals,
         ));
     }
     if execution.approval_tokens.len()
         > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
     {
-        return Err(AcpEdgeError::InvalidRequest(format!(
-            "ACP threshold approval set exceeds {} tokens",
-            chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
-        )));
+        return Err(AcpEdgeError::InvalidRequest(
+            AcpRequestError::TooManyApprovals,
+        ));
     }
     if execution.approval_tokens.is_empty() != execution.threshold_approval_proposal.is_none() {
         return Err(AcpEdgeError::InvalidRequest(
-            "ACP threshold approval tokens and proposal must be supplied together".to_string(),
+            AcpRequestError::ApprovalProposalRequired,
         ));
     }
     peer.validate_invocation_features(
@@ -55,27 +55,12 @@ fn validate_execution_context(
         execution.governed_intent.as_ref(),
         execution.supplemental_authorization.as_ref(),
     )
-    .map_err(|error| AcpEdgeError::InvalidRequest(error.to_string()))?;
+    .map_err(AcpEdgeError::Features)?;
     Ok(())
 }
 
 fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
-    if agent_id.trim().is_empty() {
-        return Err(AcpEdgeError::InvalidRequest(
-            "ACP execution agent_id must not be empty".to_string(),
-        ));
-    }
-    if agent_id.trim() != agent_id {
-        return Err(AcpEdgeError::InvalidRequest(
-            "ACP execution agent_id must not include leading or trailing whitespace".to_string(),
-        ));
-    }
-    if agent_id.chars().any(|character| character.is_control()) {
-        return Err(AcpEdgeError::InvalidRequest(
-            "ACP execution agent_id must not include control characters".to_string(),
-        ));
-    }
-    Ok(())
+    Ok(request_error::validate_text(AcpField::AgentId, agent_id)?)
 }
 
 fn reject_request_bound_artifacts_without_stable_request_id(
@@ -89,9 +74,7 @@ fn reject_request_bound_artifacts_without_stable_request_id(
         return Ok(());
     }
     Err(AcpEdgeError::InvalidRequest(
-        "ACP request-bound authorization artifacts and execution nonces require \
-         invoke_with_request_id or start_stream_with_request_id"
-            .to_string(),
+        AcpRequestError::StableRequestIdRequired,
     ))
 }
 
@@ -125,7 +108,7 @@ impl ChioAcpEdge {
         config
             .peer_capabilities
             .validate()
-            .map_err(|error| AcpEdgeError::InvalidRequest(error.to_string()))?;
+            .map_err(AcpEdgeError::Features)?;
         let mut capability_fidelity = BTreeMap::new();
         let mut capability_bindings = BTreeMap::new();
         let mut capability_sources: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -159,7 +142,7 @@ impl ChioAcpEdge {
 
                 let target_protocol =
                     target_protocol_for_tool_with_registry(tool, &authoritative_target_registry())
-                        .map_err(AcpEdgeError::InvalidRequest)?;
+                        .map_err(|_| AcpRequestError::UnsupportedTarget)?;
                 let security = manifest_registry
                     .bridge_security(&manifest.server_id, &tool.name)
                     .ok_or_else(|| AcpEdgeError::ToolNotFound(tool.name.clone()))?;
@@ -582,29 +565,36 @@ impl ChioAcpEdge {
         let AcpJsonRpcEnvelope { id, method, params } = match Self::parse_jsonrpc_envelope(&message)
         {
             Ok(envelope) => envelope,
-            Err(response) => return AcpJsonRpcResponse::from_optional(response),
+            Err(error) => {
+                let id = message
+                    .get("id")
+                    .filter(|id| id.is_string() || id.is_number() || id.is_null())
+                    .cloned()
+                    .unwrap_or(Value::Null);
+                return Self::jsonrpc_error_response(id, error)
+                    .respond_if(message.get("id").is_some());
+            }
         };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
-        if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
+        if let Err(error) = Self::ensure_jsonrpc_params_object_for_known_method(
             &id,
             &method,
             &params,
             ACP_JSONRPC_KNOWN_METHODS,
         ) {
-            return AcpJsonRpcResponse::from_optional(should_respond.then_some(response));
+            return Self::jsonrpc_error_response(id, error).respond_if(should_respond);
         }
 
         let response = match method.as_str() {
-            "session/list_capabilities" => AcpJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": {
-                    "capabilities": serde_json::to_value(&self.capabilities)
-                        .unwrap_or(Value::Null),
-                    "metadata": authoritative_surface_metadata(),
-                }
-            })),
+            "session/list_capabilities" => Self::jsonrpc_serialized_response(
+                id,
+                serde_json::to_value(&self.capabilities).map(|capabilities| {
+                    json!({
+                        "capabilities": capabilities, "metadata": authoritative_surface_metadata(),
+                    })
+                }),
+            ),
             "session/request_permission" => {
                 let request = match Self::jsonrpc_permission_request(&params) {
                     Ok(request) => request,
@@ -618,15 +608,9 @@ impl ChioAcpEdge {
                     return Self::jsonrpc_error_response(id, error).respond_if(should_respond);
                 }
                 let decision = self.evaluate_permission_with_kernel(&request, kernel, execution);
-                AcpJsonRpcResponse::response(json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "result": {
-                        "decision": serde_json::to_value(decision)
-                            .unwrap_or(Value::Null),
-                        "metadata": permission_preview_metadata("capability_preview")
-                    }
-                }))
+                Self::jsonrpc_serialized_response(id, serde_json::to_value(decision).map(|decision| json!({
+                    "decision": decision, "metadata": permission_preview_metadata("capability_preview")
+                })))
             }
             "tool/invoke" => {
                 let (capability_id, arguments) =
@@ -643,26 +627,16 @@ impl ChioAcpEdge {
                     return Self::jsonrpc_error_response(id, error).respond_if(should_respond);
                 }
                 match self.invoke(&capability_id, arguments, kernel, execution) {
-                    Ok(result) => AcpJsonRpcResponse::response(json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "result": serde_json::to_value(&result)
-                            .unwrap_or(Value::Null)
-                    })),
+                    Ok(result) => {
+                        Self::jsonrpc_serialized_response(id, serde_json::to_value(&result))
+                    }
                     Err(error) => Self::jsonrpc_error_response(id, error),
                 }
             }
             "tool/stream" => self.handle_jsonrpc_stream(id, params, execution, kernel),
             "tool/cancel" => self.handle_jsonrpc_cancel(id, params, execution, kernel),
             "tool/resume" => self.handle_jsonrpc_resume(id, params, kernel, execution),
-            _ => AcpJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": -32601,
-                    "message": "method not found"
-                }
-            })),
+            _ => Self::jsonrpc_error_response(id, AcpEdgeError::UnknownMethod),
         };
         response.respond_if(should_respond)
     }
@@ -683,13 +657,10 @@ impl ChioAcpEdge {
             return Self::jsonrpc_error_response(id, error);
         }
         match self.start_stream_task(&capability_id, arguments, execution, kernel) {
-            Ok(task) => AcpJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": {
-                    "task": serde_json::to_value(&task).unwrap_or(Value::Null)
-                }
-            })),
+            Ok(task) => Self::jsonrpc_serialized_response(
+                id,
+                serde_json::to_value(&task).map(|task| json!({"task": task})),
+            ),
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
@@ -709,13 +680,10 @@ impl ChioAcpEdge {
             return Self::jsonrpc_error_response(id, error);
         }
         match self.cancel_stream_task(&task_id, execution, kernel) {
-            Ok(task) => AcpJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": {
-                    "task": serde_json::to_value(&task).unwrap_or(Value::Null)
-                }
-            })),
+            Ok(task) => Self::jsonrpc_serialized_response(
+                id,
+                serde_json::to_value(&task).map(|task| json!({"task": task})),
+            ),
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
@@ -735,14 +703,10 @@ impl ChioAcpEdge {
             return Self::jsonrpc_error_response(id, error);
         }
         match self.resume_stream_task(&task_id, kernel, execution) {
-            Ok((task, result)) => AcpJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": {
-                    "task": serde_json::to_value(&task).unwrap_or(Value::Null),
-                    "result": result
-                }
-            })),
+            Ok((task, result)) => Self::jsonrpc_serialized_response(
+                id,
+                serde_json::to_value(&task).map(|task| json!({"task": task, "result": result})),
+            ),
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
@@ -823,6 +787,7 @@ impl ChioAcpEdge {
                 request,
                 task: task.clone(),
                 result: None,
+                error: None,
                 deadline,
             },
         );
@@ -842,9 +807,7 @@ impl ChioAcpEdge {
             .get_mut(task_id)
             .ok_or_else(|| AcpEdgeError::ToolNotFound(task_id.to_string()))?;
         if task.owner_agent_id != execution.agent_id {
-            return Err(AcpEdgeError::AccessDenied(
-                "task is not owned by the current agent".to_string(),
-            ));
+            return Err(AcpEdgeError::TaskOwnerMismatch);
         }
         match task.task.status {
             AcpTaskStatus::Working => {
@@ -856,9 +819,9 @@ impl ChioAcpEdge {
                 Ok(task.task.clone())
             }
             AcpTaskStatus::Cancelled => Ok(task.task.clone()),
-            status => Err(AcpEdgeError::InvalidRequest(format!(
-                "cannot cancel task in terminal status `{status:?}`"
-            ))),
+            _ => Err(AcpEdgeError::InvalidRequest(
+                AcpRequestError::InvalidTaskTransition,
+            )),
         }
     }
 
@@ -876,20 +839,29 @@ impl ChioAcpEdge {
                 .get(task_id)
                 .ok_or_else(|| AcpEdgeError::ToolNotFound(task_id.to_string()))?;
             if task.owner_agent_id != execution.agent_id {
-                return Err(AcpEdgeError::AccessDenied(
-                    "task is not owned by the current agent".to_string(),
-                ));
+                return Err(AcpEdgeError::TaskOwnerMismatch);
             }
             task.clone()
         };
 
         if task_snapshot.task.status == AcpTaskStatus::Working {
-            let orchestrated = execute_orchestrated_acp_request(
+            let orchestrated = match execute_orchestrated_acp_request(
                 &self.config.peer_capabilities,
                 kernel,
                 &self.manifest_registry,
                 task_snapshot.request,
-            )?;
+            ) {
+                Ok(result) => result,
+                Err(error) => {
+                    let error = std::sync::Arc::new(error);
+                    if let Some(task) = self.tasks.borrow_mut().get_mut(task_id) {
+                        task.task.status = AcpTaskStatus::Failed;
+                        task.task.status_message = Some(error.to_string());
+                        task.error = Some(error.clone());
+                    }
+                    return Err(AcpEdgeError::Deferred(error));
+                }
+            };
             let result = acp_invocation_result_from_orchestrated(orchestrated);
             let status = if result.success {
                 AcpTaskStatus::Completed
@@ -903,7 +875,7 @@ impl ChioAcpEdge {
                 task.task.metadata = result.metadata.clone();
                 task.result = Some(result.clone());
                 let task_view = task.task.clone();
-                let result_value = serde_json::to_value(&result).unwrap_or(Value::Null);
+                let result_value = serde_json::to_value(&result)?;
                 return Ok((task_view, result_value));
             }
         }
@@ -912,12 +884,9 @@ impl ChioAcpEdge {
         let task = tasks
             .get(task_id)
             .ok_or_else(|| AcpEdgeError::ToolNotFound(task_id.to_string()))?;
-        Ok((
-            task.task.clone(),
-            task.result
-                .as_ref()
-                .map(|result| serde_json::to_value(result).unwrap_or(Value::Null))
-                .unwrap_or(Value::Null),
-        ))
+        if let Some(error) = &task.error {
+            return Err(AcpEdgeError::Deferred(error.clone()));
+        }
+        Ok((task.task.clone(), serde_json::to_value(&task.result)?))
     }
 }

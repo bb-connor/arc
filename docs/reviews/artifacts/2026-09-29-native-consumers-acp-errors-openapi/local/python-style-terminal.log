@@ -1,0 +1,5 @@
+Command: uv tool run --offline ruff check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/recovery.py crates/products/chio-cli/tests/process_host/runner.py examples/mini-swe-recovery/qualify.py examples/mini-swe-recovery/qualify_native.py examples/mini-swe-recovery/qualify_state.py scripts/prepare-enforced-native-fixture.py sdks/python/chio-process/src/chio_process/broker_launch.py sdks/python/chio-process/src/chio_process/launch.py sdks/python/chio-process/tests/test_broker_launch.py
+All checks passed!
+
+Command: uv tool run --offline ruff format --check --config sdks/python/chio-mini-swe/pyproject.toml crates/products/chio-cli/tests/process_host/recovery.py crates/products/chio-cli/tests/process_host/runner.py examples/mini-swe-recovery/qualify.py examples/mini-swe-recovery/qualify_native.py examples/mini-swe-recovery/qualify_state.py scripts/prepare-enforced-native-fixture.py sdks/python/chio-process/src/chio_process/broker_launch.py sdks/python/chio-process/src/chio_process/launch.py sdks/python/chio-process/tests/test_broker_launch.py
+9 files already formatted

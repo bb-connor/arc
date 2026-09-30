@@ -1,0 +1,31 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 489  of event 'cpu-clock'
+# Event count (approx.): 9979591707
+#
+# Overhead  Symbol                                                    IPC   [IPC Coverage]
+# ........  ........................................................  ....................
+#
+    16.36%  [.] sha2::sha256::x86::digest_blocks                      -      -
+    13.29%  [.] core::core_arch::x86::__m128i::as_i32x4               -      -
+    12.07%  [.] core::core_arch::x86::sse2::_mm_set_epi32             -      -
+    11.66%  [.] core::core_arch::x86::sse2::_mm_add_epi32             -      -
+    10.43%  [.] core::core_arch::x86::sha::_mm_sha256rnds2_epu32      -      -
+     8.18%  [.] core::core_arch::x86::sha::_mm_sha256msg2_epu32       -      -
+     7.77%  [.] core::core_arch::x86::ssse3::_mm_alignr_epi8          -      -
+     5.32%  [.] sha2::sha256::x86::schedule                           -      -
+     3.07%  [.] core::core_arch::x86::sse2::_mm_loadu_si128           -      -
+     2.25%  [.] core::core_arch::x86::__m128i::as_i8x16               -      -
+     2.04%  [.] core::core_arch::x86::sse2::_mm_shuffle_epi32         -      -
+     2.04%  [.] core::core_arch::x86::ssse3::_mm_shuffle_epi8         -      -
+     1.02%  [.] core::core_arch::x86::sha::_mm_sha256msg1_epu32       -      -
+     1.02%  [.] core::ptr::copy_nonoverlapping::precondition_check    -      -
+     1.02%  [.] 0x0000000000188e62                                    -      -
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

@@ -107,11 +107,10 @@ impl RequestPermissionParams {
             "sessionId",
             &self.session_id,
         )?;
-        for (index, option) in self.options.iter().enumerate() {
-            let field_name = format!("options[{index}].optionId");
+        for option in &self.options {
             validate_non_empty_protocol_field(
                 "session/request_permission",
-                &field_name,
+                "options[].optionId",
                 &option.option_id,
             )?;
         }
@@ -298,19 +297,21 @@ impl ToolCallUpdateEvent {
 }
 
 fn validate_non_empty_protocol_field(
-    method_name: &str,
-    field_name: &str,
+    method_name: &'static str,
+    field_name: &'static str,
     value: &str,
 ) -> Result<(), AcpProxyError> {
     if value.trim().is_empty() {
-        return Err(AcpProxyError::Protocol(format!(
-            "invalid {method_name} params: {field_name} must be a non-empty string"
-        )));
+        return Err(AcpProxyError::Protocol(AcpProtocolError::EmptyField {
+            method: method_name,
+            field: field_name,
+        }));
     }
     if value.trim() != value || value.chars().any(|character| character.is_control()) {
-        return Err(AcpProxyError::Protocol(format!(
-            "invalid {method_name} params: {field_name} must be a non-empty unpadded string"
-        )));
+        return Err(AcpProxyError::Protocol(AcpProtocolError::MalformedField {
+            method: method_name,
+            field: field_name,
+        }));
     }
     Ok(())
 }

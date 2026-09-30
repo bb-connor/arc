@@ -1,0 +1,27 @@
+{
+  "/home/ubuntu/native-consumers-evidence-20260929/chio-cage-init": {
+    "sha256": "f5e2def48369e79d9c6c93961b20ebcfd85b7bdd07b3b8bb1aa2fdd4c5da652d",
+    "bytes": 3271776,
+    "mode": "0o755"
+  },
+  "/home/ubuntu/native-consumers-evidence-20260929/process-report-fixture": {
+    "sha256": "c2cc80388222382db582e3d95a6699fbb8ed846c6e6b2a9080a7da2fb8b5a01a",
+    "bytes": 1225552,
+    "mode": "0o755"
+  },
+  "/home/ubuntu/chio-x86-cage-c38ea127ed-target/debug/chio": {
+    "sha256": "9e647d859d1361c599767d8c3bf4255187f995555c18cab481bb8ea0b2ff513a",
+    "bytes": 430364672,
+    "mode": "0o775"
+  },
+  "/home/ubuntu/chio-x86-cage-c38ea127ed-target/debug/deps/enforced_discovery-a5f63df3cf0424a5": {
+    "sha256": "c2c101446cdd98561aa66f5ed81cf59f7a1cd355baeaa3cca956e8a964507e92",
+    "bytes": 1945760,
+    "mode": "0o775"
+  },
+  "/home/ubuntu/chio-x86-cage-c38ea127ed-target/debug/deps/process_host_native-87a25c3963612f48": {
+    "sha256": "a23df3143ff67b328e4327f31ce828c58d61100cc6afb1b5132922a58fb026fa",
+    "bytes": 3495560,
+    "mode": "0o775"
+  }
+}

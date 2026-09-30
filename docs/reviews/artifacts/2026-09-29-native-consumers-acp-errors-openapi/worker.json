@@ -1,0 +1,20 @@
+{
+  "name": "chio-security-qualification-20260929",
+  "instance_id": "ocid1.instance.oc1.iad.anuwcljrm7fixficqtd4bvcr5ravvj5qxdyipfcddyseiodmcz2zdf4qsoiq",
+  "region": "us-ashburn-1",
+  "shape": "VM.Standard.E4.Flex",
+  "ocpus": 8,
+  "memory_gib": 64,
+  "private_ip": "10.20.10.101",
+  "state": "running, observed through direct SSH; cloud stop not executed",
+  "observed_at": "2026-09-30T00:09:49.006331+00:00",
+  "boot_volume_id": "ocid1.bootvolume.oc1.iad.abuwcljrnlyskb7omb3ebrfzwmocxgzoaz5npxgkbnwkm4g33deex57ahera",
+  "anchor_volume_id": "ocid1.volume.oc1.iad.abuwcljrrjnazce6ixguvleb5eaiby2ukx6c4i5se5q5xz74qtaeckysxy2a",
+  "anchor_mount": "/mnt/chio-anchor",
+  "volumes": "retained, never formatted",
+  "checkout": "/home/ubuntu/arc-native-consumers-20260929",
+  "evidence": "/home/ubuntu/native-consumers-evidence-20260929",
+  "management_blocker": "Mac OCI CLI host 100.123.201.127 is offline in Tailscale; SSH connection timed out before the stop action could execute. Direct worker SSH remains available.",
+  "tailscale_mac_last_seen": "2026-09-29T23:20:00.1Z",
+  "next_action": "Reuse the running worker after verifying the retained anchor mount, or run OCI compute instance action --action SOFTSTOP against this instance_id once the Mac CLI is reachable."
+}

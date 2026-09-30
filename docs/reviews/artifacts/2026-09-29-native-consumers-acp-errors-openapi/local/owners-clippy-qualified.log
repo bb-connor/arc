@@ -1,0 +1,85 @@
+error: this function has too many arguments (8/7)
+  --> crates/protocol/chio-mcp-remote/src/remote_mcp/sender_constraint.rs:17:1
+   |
+17 | / pub(super) fn verify_sender_dpop_proof(
+18 | |     clock: &RemoteClock,
+19 | |     proof: &DpopProof,
+20 | |     expected_binding_id: &str,
+...  |
+25 | |     config: &DpopConfig,
+26 | | ) -> Result<(), SenderConstraintError> {
+   | |______________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_arguments
+   = note: `-D clippy::too-many-arguments` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::too_many_arguments)]`
+
+
+error: this function has too many arguments (8/7)
+  --> crates/protocol/chio-mcp-remote/src/remote_mcp/sender_constraint.rs:71:1
+   |
+71 | / pub(super) fn validate_sender_constraint_runtime(
+72 | |     clock: &RemoteClock,
+73 | |     sender_constraint: Option<&ChioSenderConstraintClaims>,
+74 | |     headers: &HeaderMap,
+...  |
+79 | |     config: &DpopConfig,
+80 | | ) -> Result<(), SenderConstraintError> {
+   | |______________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_arguments
+
+
+Cargo build-finished: False
+
+Cargo stderr:
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Checking chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+    Checking chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+    Checking chio-cage-init v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-init)
+    Checking chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+    Checking chio-cage v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage)
+    Checking chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+    Checking chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+    Checking chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+    Checking chio-edge-metrics v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-edge-metrics)
+    Checking chio-http-session v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-session)
+    Checking chio-trace-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-trace-validate)
+    Checking chio-siem v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-siem)
+    Checking chio-security-kernel v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-kernel)
+    Checking chio-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guards)
+    Checking chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+    Checking chio-finding-challenge v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-challenge)
+    Checking chio-mcp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-edge)
+    Checking chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+    Checking chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+    Checking chio-acp-proxy v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-proxy)
+    Checking chio-mcp-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-adapter)
+    Checking chio-acp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-edge)
+    Checking chio-openapi v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi)
+    Checking chio-policy v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-policy)
+    Checking chio-data-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards)
+    Checking chio-external-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-external-guards)
+    Checking chio-openapi-mcp-bridge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi-mcp-bridge)
+    Checking chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+    Checking chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+    Checking chio-enterprise-export v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-enterprise-export)
+    Checking chio-trust-market-context v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-trust-market-context)
+    Checking chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+    Checking chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+    Checking chio-conformance v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-conformance)
+    Checking chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+    Checking chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+error: could not compile `chio-mcp-remote` (lib) due to 2 previous errors

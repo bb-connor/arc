@@ -16,8 +16,8 @@ use chio_core::receipt::{
 use chio_kernel::receipt_store::{ReceiptCheckpointCreateReport, ReceiptStore, ReceiptStoreError};
 use chio_kernel::{
     ChioKernel, ExecutionNonceConfig, InMemoryExecutionNonceStore, KernelConfig,
-    DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_manifest::{
     sign_manifest, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration,
@@ -143,10 +143,7 @@ fn test_authority_manifest_registry(server_id: &str) -> Arc<VerifiedManifestRegi
     )
 }
 
-fn test_kernel_capability_checker(
-    kernel: ChioKernel,
-    server_id: &str,
-) -> KernelCapabilityChecker {
+fn test_kernel_capability_checker(kernel: ChioKernel, server_id: &str) -> KernelCapabilityChecker {
     KernelCapabilityChecker::new(
         kernel,
         server_id,
@@ -662,9 +659,7 @@ impl ReceiptSigner for FailingSigner {
         &self,
         _request: &AcpReceiptRequest,
     ) -> Result<ChioReceipt, ReceiptSignError> {
-        Err(ReceiptSignError::SigningFailed(
-            "test signer unavailable".to_string(),
-        ))
+        Err(ReceiptSignError::SignerUnavailable)
     }
 }
 
@@ -780,7 +775,7 @@ impl CapabilityChecker for SequencedChecker {
             .lock()
             .expect("sequenced checker verdict lock should succeed")
             .pop_front()
-            .ok_or_else(|| CapabilityCheckError::Internal("no verdict queued".to_string()))
+            .ok_or_else(|| CapabilityCheckError::CheckerUnavailable)
     }
 }
 
@@ -791,8 +786,24 @@ impl CapabilityChecker for ErrorChecker {
         &self,
         _request: &AcpCapabilityRequest,
     ) -> Result<AcpVerdict, CapabilityCheckError> {
-        Err(CapabilityCheckError::Internal(
-            "checker backend unavailable".to_string(),
-        ))
+        Err(CapabilityCheckError::CheckerUnavailable)
     }
 }
+
+#[path = "attestation_denials.rs"]
+mod denials;
+
+#[path = "attestation_lifecycle.rs"]
+mod lifecycle;
+
+#[path = "attestation_compliance.rs"]
+mod compliance;
+
+#[path = "attestation_clock.rs"]
+mod clock;
+
+#[path = "attestation_signer.rs"]
+mod signer;
+
+#[path = "attestation_telemetry_transport.rs"]
+mod telemetry_transport;

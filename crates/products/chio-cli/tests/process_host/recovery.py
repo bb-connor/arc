@@ -11,60 +11,31 @@ import tempfile
 from pathlib import Path
 
 
-def mcp(publications):
-    for line in sys.stdin:
-        message = json.loads(line)
-        if "id" not in message:
-            continue
-        method = message["method"]
-        if method == "initialize":
-            result = {
-                "protocolVersion": message["params"]["protocolVersion"],
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "report-tools", "version": "1"},
-            }
-        elif method == "tools/list":
-            suffix = "changed" if publications.with_suffix(".changed").exists() else ""
-            result = {
-                "tools": [
-                    {
-                        "name": name + suffix,
-                        "description": "Report tool",
-                        "inputSchema": {"type": "object"},
-                    }
-                    for name in ["read", "append"]
-                ]
-            }
-        elif method == "tools/call":
-            if message["params"]["name"] == "append":
-                with publications.open("a") as output:
-                    output.write(json.dumps(message["params"]["arguments"]) + "\n")
-                    output.flush()
-                    os.fsync(output.fileno())
-                if publications.with_suffix(".pause").exists():
-                    # Failure oracle: hold the effect without returning an outcome.
-                    # Host death closes stdin, allowing this test tool to exit.
-                    sys.stdin.readline()
-                    return
-                value = {"published": True}
-            else:
-                assert message["params"]["arguments"]["path"] == "source.txt"
-                value = {"source": publications.with_suffix(".source.txt").read_text()}
-            result = {
-                "content": [{"type": "text", "text": json.dumps(value)}],
-                "structuredContent": value,
-            }
-        else:
-            raise AssertionError(method)
-        print(
-            json.dumps({"jsonrpc": "2.0", "id": message["id"], "result": result}),
-            flush=True,
-        )
+def report_server(binary, directory):
+    """Use the reviewed static fixture with exact source, control and output grants."""
+    from chio_process.launch import provision_native_demo
+
+    target = Path(os.environ["CHIO_PROCESS_REPORT_TOOL"]).resolve(strict=True)
+    publications = directory / "tool-data" / "publications.jsonl"
+    publications.touch()
+    control = publications.with_suffix(".control")
+    control.write_text("ready")
+    source = publications.with_suffix(".source.txt")
+    if not source.exists():
+        source.write_text("A useful report source.")
+    return provision_native_demo(
+        binary,
+        "reports",
+        [str(target), str(publications)],
+        directory / "launch-reports",
+        directory,
+        read_paths=[control, source],
+        write_paths=[publications],
+    )
 
 
 def exercise(binary, directory):
     from chio_process import ProcessClient, WorkerError
-    from chio_process.launch import demo_python, provision_native_demo
 
     (directory / "tool-data").mkdir(exist_ok=True)
     state = directory / "state"
@@ -95,22 +66,7 @@ capabilities:
     config = {
         "schema": "chio.process.host.v1",
         "policy": "policy.yaml",
-        "servers": [
-            provision_native_demo(
-                binary,
-                "reports",
-                [
-                    demo_python(),
-                    str(Path(__file__).resolve()),
-                    "--mcp",
-                    str(publications),
-                ],
-                directory / "launch-reports",
-                directory,
-                read_paths=[directory / "tool-data"],
-                write_paths=[directory / "tool-data"],
-            )
-        ],
+        "servers": [report_server(binary, directory)],
         "limits": {"max_calls": 10, "max_processes": 4, "max_depth": 2},
         "children": [
             {
@@ -172,9 +128,7 @@ capabilities:
         assert descriptor["capability_id"]
         assert descriptor["process_id"] == process
         assert "capability" not in descriptor
-        return descriptor, ProcessClient(
-            descriptor["socket_path"], descriptor["credential"]
-        )
+        return descriptor, ProcessClient(descriptor["socket_path"], descriptor["credential"])
 
     @contextlib.contextmanager
     def serving(socket):
@@ -227,9 +181,7 @@ capabilities:
     changed = json.loads(original_config)
     changed["servers"][0]["command"].append("--unreviewed-argument")
     config_path.write_text(json.dumps(changed))
-    cli(
-        "init", "--config", config_path, "--state", directory / "changed", success=False
-    )
+    cli("init", "--config", config_path, "--state", directory / "changed", success=False)
     config_path.write_bytes(original_config)
     initialized = cli("init", "--config", config_path, "--state", state)
     assert initialized["processes"] == 4
@@ -243,9 +195,7 @@ capabilities:
     host_json = json.loads(recorded)
     assert host_json["abi"] == "chio.process.abi.v2"
     assert host_json["written_by"].startswith("chio-cli ")
-    host_record.write_bytes(
-        json.dumps({**host_json, "abi": "chio.process.abi.v0"}).encode()
-    )
+    host_record.write_bytes(json.dumps({**host_json, "abi": "chio.process.abi.v0"}).encode())
     refused = cli(
         "credential",
         "--state",
@@ -280,9 +230,7 @@ capabilities:
         else:
             legacy["abi"] = legacy_abi
         host_record.write_text(json.dumps(legacy))
-        assert "process ABI chio.process.abi.v1" in cli(
-            "export", "--state", state, success=False
-        )
+        assert "process ABI chio.process.abi.v1" in cli("export", "--state", state, success=False)
         assert cli("status", "--state", state)["abi"]["host"] == "chio.process.abi.v1"
         assert (state / "authority.db").read_bytes() == before_export
     host_record.write_bytes(recorded)
@@ -298,14 +246,10 @@ capabilities:
         )
         assert first["verdict"] == "allow", first
         assert first["terminal_state"]["state"] == "completed", first
-        denied = reader.invoke(
-            "forbidden", "reports", "append", {"report": "forbidden"}
-        )
+        denied = reader.invoke("forbidden", "reports", "append", {"report": "forbidden"})
         assert denied["verdict"] == "deny", denied
         try:
-            publisher.invoke(
-                "publish-report", "reports", "append", {"report": "changed"}
-            )
+            publisher.invoke("publish-report", "reports", "append", {"report": "changed"})
             raise AssertionError("payload rebind allowed")
         except WorkerError as failure:
             assert failure.code == "conflict", failure
@@ -356,9 +300,7 @@ capabilities:
         # Publication and the denied sibling consumed two logical calls.
         # Eight reads exhaust the shared root ceiling across both subtrees.
         for index in range(8):
-            read = fresh_reader.invoke(
-                f"read-{index}", "reports", "read", {"path": "source.txt"}
-            )
+            read = fresh_reader.invoke(f"read-{index}", "reports", "read", {"path": "source.txt"})
             assert read["verdict"] == "allow", read
         try:
             publisher.invoke("over-budget", "reports", "append", {"report": "extra"})
@@ -384,14 +326,10 @@ capabilities:
         except WorkerError as failure:
             assert failure.code == "cancelled", failure
     policy.write_text(original_policy + "\n# changed deployment\n")
-    assert "policy changed" in cli(
-        "serve", "--state", state, "--socket", socket, success=False
-    )
+    assert "policy changed" in cli("serve", "--state", state, "--socket", socket, success=False)
     policy.write_text(original_policy)
-    publications.with_suffix(".changed").touch()
-    assert "signed tool" in cli(
-        "serve", "--state", state, "--socket", socket, success=False
-    )
+    publications.with_suffix(".control").write_text("changed")
+    assert "signed tool" in cli("serve", "--state", state, "--socket", socket, success=False)
     assert len(publications.read_text().splitlines()) == 1
     print(
         json.dumps(
@@ -405,8 +343,5 @@ capabilities:
 
 
 if __name__ == "__main__":
-    if sys.argv[1] == "--mcp":
-        mcp(Path(sys.argv[2]))
-    else:
-        with tempfile.TemporaryDirectory(prefix="chio-process-host-") as temporary:
-            exercise(sys.argv[1], Path(temporary))
+    with tempfile.TemporaryDirectory(prefix="chio-process-host-") as temporary:
+        exercise(sys.argv[1], Path(temporary))

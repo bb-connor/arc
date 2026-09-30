@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn kernel_receipt_signer_uses_store_owned_checkpoint_creation() {
     let keypair = Keypair::generate();
@@ -6,7 +8,13 @@ fn kernel_receipt_signer_uses_store_owned_checkpoint_creation() {
         state: Arc::clone(&shared),
         supports_checkpoints: true,
     };
-    let signer = KernelReceiptSigner::new(keypair.clone(), "proxy-server", Box::new(store), 2);
+    let signer = KernelReceiptSigner::new(
+        keypair.clone(),
+        "proxy-server",
+        Box::new(store),
+        2,
+        AcpClock::default(),
+    );
 
     let request_a = AcpReceiptRequest {
         audit_entry: make_audit_entry("call-a", "session-1"),
@@ -64,7 +72,13 @@ fn kernel_receipt_signer_propagates_capability_metadata_into_receipts() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-enforced", "session-enforced");
     mark_entry_cryptographically_enforced(
@@ -195,7 +209,13 @@ fn kernel_receipt_signer_rejects_enforced_receipt_without_stored_authorization()
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-enforced-missing", "session-enforced");
     mark_entry_cryptographically_enforced(
@@ -213,10 +233,13 @@ fn kernel_receipt_signer_rejects_enforced_receipt_without_stored_authorization()
         })
         .expect_err("missing authorization receipt should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt missing-auth-receipt was not found"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Missing(
+                ReceiptBinding::Receipt
+            ))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -241,7 +264,13 @@ fn kernel_receipt_signer_rejects_authorization_request_id_mismatch() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-request", "session-request");
     mark_entry_cryptographically_enforced(
@@ -260,10 +289,13 @@ fn kernel_receipt_signer_rejects_authorization_request_id_mismatch() {
         })
         .expect_err("request id mismatch should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt request id mismatch"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Mismatch(
+                ReceiptBinding::Request
+            ))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -293,7 +325,13 @@ fn kernel_receipt_signer_rejects_authorization_receipt_parameter_hash_mismatch()
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-hash-mismatch", "session-hash-mismatch");
     mark_entry_cryptographically_enforced(
@@ -312,10 +350,13 @@ fn kernel_receipt_signer_rejects_authorization_receipt_parameter_hash_mismatch()
         })
         .expect_err("hash-mismatch authorization receipt should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt parameter hash mismatch"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Mismatch(
+                ReceiptBinding::ParameterHash
+            ))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -340,7 +381,13 @@ fn kernel_receipt_signer_rejects_stale_authorization_reuse_for_other_tool_call()
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-other", "session-other");
     mark_entry_cryptographically_enforced(
@@ -359,13 +406,13 @@ fn kernel_receipt_signer_rejects_stale_authorization_reuse_for_other_tool_call()
         })
         .expect_err("stale authorization receipt should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt session id mismatch")
-            || error
-                .to_string()
-                .contains("authorization receipt correlation id mismatch"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Mismatch(
+                ReceiptBinding::Session | ReceiptBinding::Correlation
+            ))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -409,7 +456,13 @@ fn kernel_receipt_signer_rejects_same_session_authorization_tool_call_id_mismatc
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-presented", "session-tool-call-mismatch");
     mark_entry_cryptographically_enforced(
@@ -428,10 +481,13 @@ fn kernel_receipt_signer_rejects_same_session_authorization_tool_call_id_mismatc
         })
         .expect_err("same-session wrong tool call id should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt tool call id mismatch"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Mismatch(
+                ReceiptBinding::ToolCall
+            ))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -473,7 +529,13 @@ fn kernel_receipt_signer_rejects_missing_or_non_string_authorization_tool_call_i
             state: Arc::clone(&shared),
             supports_checkpoints: false,
         };
-        let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+        let signer = KernelReceiptSigner::new(
+            keypair,
+            "proxy-server",
+            Box::new(store),
+            0,
+            AcpClock::default(),
+        );
 
         let mut enforced_entry =
             make_audit_entry("call-malformed-tool-call", "session-malformed-tool-call");
@@ -493,7 +555,14 @@ fn kernel_receipt_signer_rejects_missing_or_non_string_authorization_tool_call_i
             })
             .expect_err("malformed signed tool call id should fail closed");
         assert!(
-            error.to_string().contains("tool call id"),
+            matches!(
+                error,
+                ReceiptSignError::Authorization(
+                    ReceiptAuthorizationError::Missing(ReceiptBinding::ToolCall)
+                        | ReceiptAuthorizationError::Mismatch(ReceiptBinding::ToolCall)
+                        | ReceiptAuthorizationError::MalformedToolCall
+                )
+            ),
             "unexpected {case} tool call id error: {error}"
         );
     }
@@ -559,7 +628,13 @@ fn verify_live_authorization_receipt_accepts_deferred_bind_for_fs_operations() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry(resolved_tool_call_id, "session-deferred-bind");
     mark_entry_cryptographically_enforced(
@@ -610,7 +685,13 @@ fn kernel_receipt_signer_rejects_trace_authorization_receipt_for_enforced_entry(
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-trace", "session-trace");
     mark_entry_cryptographically_enforced(
@@ -629,9 +710,10 @@ fn kernel_receipt_signer_rejects_trace_authorization_receipt_for_enforced_entry(
         })
         .expect_err("trace authorization receipt should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt must be a mediated allow"),
+        matches!(
+            error,
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::NotAuthorizing)
+        ),
         "unexpected error: {error}"
     );
 }
@@ -658,7 +740,13 @@ fn kernel_receipt_signer_rejects_forged_authorization_receipt_signature() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-forged", "session-forged");
     mark_entry_cryptographically_enforced(
@@ -677,10 +765,11 @@ fn kernel_receipt_signer_rejects_forged_authorization_receipt_signature() {
         })
         .expect_err("forged authorization receipt should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt signature verification failed"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::InvalidSignature)
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -706,7 +795,13 @@ fn kernel_receipt_signer_rejects_wrong_authorization_signer() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(signer_keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        signer_keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-wrong-signer", "session-wrong-signer");
     mark_entry_cryptographically_enforced(
@@ -725,10 +820,13 @@ fn kernel_receipt_signer_rejects_wrong_authorization_signer() {
         })
         .expect_err("wrong authorization signer should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt signer mismatch"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Authorization(ReceiptAuthorizationError::Mismatch(
+                ReceiptBinding::Signer
+            ))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -754,7 +852,13 @@ fn kernel_receipt_signer_copies_tenant_from_live_authorization_receipt() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-tenant", "session-tenant");
     mark_entry_cryptographically_enforced(
@@ -794,6 +898,7 @@ fn kernel_receipt_signer_fails_closed_when_store_cannot_consume_authorization() 
             authorization_receipt: authorization_receipt.clone(),
         }),
         10,
+        AcpClock::default(),
     );
 
     let mut enforced_entry =
@@ -814,10 +919,11 @@ fn kernel_receipt_signer_fails_closed_when_store_cannot_consume_authorization() 
         })
         .expect_err("unsupported durable consumption should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("durable authorization receipt consumption is not supported"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Store(ReceiptStoreError::Conflict(_))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -843,7 +949,13 @@ fn kernel_receipt_signer_rejects_authorization_receipt_reuse() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut enforced_entry = make_audit_entry("call-reuse", "session-reuse");
     mark_entry_cryptographically_enforced(
@@ -866,10 +978,11 @@ fn kernel_receipt_signer_rejects_authorization_receipt_reuse() {
         .sign_acp_receipt(&request)
         .expect_err("authorization receipt reuse should fail closed");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt already consumed"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Store(ReceiptStoreError::Conflict(_))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -899,6 +1012,7 @@ fn kernel_receipt_signer_rejects_authorization_receipt_reuse_after_restart() {
             supports_checkpoints: false,
         }),
         0,
+        AcpClock::default(),
     );
 
     let mut enforced_entry = make_audit_entry("call-restart-reuse", "session-restart-reuse");
@@ -927,15 +1041,17 @@ fn kernel_receipt_signer_rejects_authorization_receipt_reuse_after_restart() {
             supports_checkpoints: false,
         }),
         0,
+        AcpClock::default(),
     );
     let error = restarted_signer
         .sign_acp_receipt(&request)
         .expect_err("persisted authorization consumption should survive signer restart");
     assert!(
-        error
-            .to_string()
-            .contains("authorization receipt already consumed"),
-        "unexpected error: {error}"
+        matches!(
+            error,
+            ReceiptSignError::Store(ReceiptStoreError::Conflict(_))
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -947,7 +1063,13 @@ fn kernel_receipt_signer_preserves_acp_content_hash_with_canonical_parameter_has
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut entry = make_audit_entry("call-provenance", "session-provenance");
     entry.content_hash = "acp-originated-content-hash".to_string();
@@ -989,7 +1111,13 @@ fn tool_call_running_and_terminal_update_produce_distinct_receipt_ids() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     // The `running` event has a distinct content hash from the terminal
     // `completed` update because the canonical event payloads differ.
@@ -1102,7 +1230,13 @@ fn live_authorization_request_id_uses_kernel_receipt_linkage() {
         state: Arc::clone(&shared),
         supports_checkpoints: false,
     };
-    let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 0);
+    let signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(store),
+        0,
+        AcpClock::default(),
+    );
 
     let mut entry = make_audit_entry("call-round-trip", "session-round-trip");
     entry.status = "completed".to_string();
@@ -1170,6 +1304,7 @@ fn kernel_receipt_signer_decouples_checkpoint_errors_from_message_flow() {
             authorization_receipt: status_error_receipt,
         }),
         1,
+        AcpClock::default(),
     );
     let receipt = status_error_signer
         .sign_acp_receipt(&AcpReceiptRequest {
@@ -1186,7 +1321,10 @@ fn kernel_receipt_signer_decouples_checkpoint_errors_from_message_flow() {
         .as_deref()
         .expect("checkpoint failure should be recorded in health");
     assert!(
-        recorded.contains("receipt checkpoint status failed"),
+        matches!(
+            recorded,
+            ReceiptSignError::Store(ReceiptStoreError::Conflict(_))
+        ),
         "unexpected recorded error: {recorded}"
     );
 
@@ -1200,6 +1338,7 @@ fn kernel_receipt_signer_decouples_checkpoint_errors_from_message_flow() {
         "proxy-server",
         Box::new(unsupported_store),
         1,
+        AcpClock::default(),
     );
     let receipt = unsupported_signer
         .sign_acp_receipt(&AcpReceiptRequest {
@@ -1216,8 +1355,10 @@ fn kernel_receipt_signer_decouples_checkpoint_errors_from_message_flow() {
         .as_deref()
         .expect("checkpoint failure should be recorded in health");
     assert!(
-        recorded.contains("receipt checkpoint status failed")
-            || recorded.contains("receipt checkpoint creation failed"),
+        matches!(
+            recorded,
+            ReceiptSignError::Store(ReceiptStoreError::Conflict(_))
+        ),
         "unexpected recorded error: {recorded}"
     );
     let state = unsupported_state.lock().expect("shared state should lock");
@@ -1233,7 +1374,13 @@ fn kernel_receipt_signer_decouples_checkpoint_errors_from_message_flow() {
         state: Arc::clone(&empty_state),
         supports_checkpoints: true,
     };
-    let empty_signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(empty_store), 1);
+    let empty_signer = KernelReceiptSigner::new(
+        keypair,
+        "proxy-server",
+        Box::new(empty_store),
+        1,
+        AcpClock::default(),
+    );
     let receipt = empty_signer
         .sign_acp_receipt(&AcpReceiptRequest {
             audit_entry: make_audit_entry("empty", "session-empty"),
@@ -1249,7 +1396,10 @@ fn kernel_receipt_signer_decouples_checkpoint_errors_from_message_flow() {
         .as_deref()
         .expect("checkpoint failure should be recorded in health");
     assert!(
-        recorded.contains("checkpoint canonical bytes are missing"),
+        matches!(
+            recorded,
+            ReceiptSignError::Store(ReceiptStoreError::Conflict(_))
+        ),
         "unexpected recorded error: {recorded}"
     );
     let state = empty_state.lock().expect("shared state should lock");

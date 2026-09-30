@@ -39,8 +39,19 @@ pub fn cmd_cert_generate(
         trusted_kernel_keys: BTreeSet::from([keypair.public_key().to_hex()]),
     };
 
-    let cert = generate_compliance_certificate(session_id, &receipts, &config, &keypair)
-        .map_err(|e| CliError::cli_other_error(format!("certificate generation failed: {e}")))?;
+    let cert = generate_compliance_certificate(
+        session_id,
+        &receipts,
+        &config,
+        &keypair,
+        &chio_acp_proxy::AcpClock::default(),
+    )
+    .map_err(|error| {
+        CliError::with_source(
+            &chio_errors::_generated::error_codes::ATTEST_RECEIPT_SIGNING_FAILED,
+            error,
+        )
+    })?;
 
     let cert_json = serde_json::to_string_pretty(&cert)
         .map_err(|e| CliError::cli_other_error(format!("serialization failed: {e}")))?;

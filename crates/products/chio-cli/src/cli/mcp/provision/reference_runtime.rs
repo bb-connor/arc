@@ -187,6 +187,7 @@ pub(crate) fn cmd_provision_reference_runtime(
         read_paths: grant_set(&args.read_paths, "read path")?,
         write_paths: grant_set(&args.write_paths, "write path")?,
         runtime_files: grant_set(&args.runtime_files, "runtime file")?,
+        forbidden_paths: BTreeSet::new(),
     };
     if let Some(file) = ceilings
         .runtime_files

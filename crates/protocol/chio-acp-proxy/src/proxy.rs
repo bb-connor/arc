@@ -39,14 +39,20 @@ impl AcpProxy {
         signer: Option<Box<dyn ReceiptSigner>>,
         checker: Option<Box<dyn CapabilityChecker>>,
         attestation_mode: AcpAttestationMode,
+        clock: AcpClock,
     ) -> Result<Self, AcpProxyError> {
         let transport = AcpTransport::spawn(
             config.agent_command(),
             config.agent_args(),
             config.agent_env(),
         )?;
-        let interceptor =
-            MessageInterceptor::with_kernel(config.clone(), signer, checker, attestation_mode);
+        let interceptor = MessageInterceptor::with_kernel(
+            config.clone(),
+            signer,
+            checker,
+            attestation_mode,
+            clock,
+        );
         Ok(Self {
             config,
             transport,

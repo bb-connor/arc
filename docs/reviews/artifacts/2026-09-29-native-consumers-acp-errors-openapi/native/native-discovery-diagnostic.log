@@ -1,0 +1,11 @@
+
+running 1 test
+Error: "discovery did not reach identity barrier: stderr=, marker=[]"
+test privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup ... FAILED
+
+failures:
+
+failures:
+    privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.03s

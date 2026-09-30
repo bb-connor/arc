@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn parse_json_rpc_message() {
     let raw = json!({

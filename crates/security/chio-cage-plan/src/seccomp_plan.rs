@@ -27,6 +27,7 @@ pub enum Syscall {
     Faccessat2,
     Fcntl,
     Fstat,
+    Fsync,
     Futex,
     Getcwd,
     Getdents64,
@@ -105,6 +106,7 @@ impl Syscall {
             Self::Faccessat2 => "faccessat2",
             Self::Fcntl => "fcntl",
             Self::Fstat => "fstat",
+            Self::Fsync => "fsync",
             Self::Futex => "futex",
             Self::Getcwd => "getcwd",
             Self::Getdents64 => "getdents64",
@@ -171,7 +173,7 @@ pub struct SeccompProfilePlan {
     pub(crate) profile: NativeSyscallProfile,
     pub(crate) default_action: SeccompDefaultAction,
     pub(crate) allowed_syscalls: Vec<Syscall>,
-    pub(crate) argument_constraints: BTreeMap<Syscall, Vec<SyscallArgumentConstraint>>,
+    pub(crate) argument_constraints: BTreeMap<Syscall, Vec<Vec<SyscallArgumentConstraint>>>,
 }
 
 #[derive(Deserialize)]
@@ -181,7 +183,7 @@ struct SeccompPlanWire {
     profile: NativeSyscallProfile,
     default_action: SeccompDefaultAction,
     allowed_syscalls: Vec<Syscall>,
-    argument_constraints: BTreeMap<Syscall, Vec<SyscallArgumentConstraint>>,
+    argument_constraints: BTreeMap<Syscall, Vec<Vec<SyscallArgumentConstraint>>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
@@ -194,6 +196,8 @@ pub enum SeccompPlanError {
     UnlistedConstraint(Syscall),
     #[error("syscall {0:?} has an empty constraint list")]
     EmptyConstraint(Syscall),
+    #[error("syscall {0:?} requires between one and eight argument alternatives")]
+    InvalidAlternatives(Syscall),
     #[error("invalid or duplicate argument {argument} for syscall {syscall:?}")]
     InvalidArgument { syscall: Syscall, argument: u8 },
     #[error("prlimit64 must constrain pid to the calling process")]
@@ -216,7 +220,7 @@ impl SeccompProfilePlan {
     #[doc(hidden)]
     pub fn test_argument_constraints_mut(
         &mut self,
-    ) -> &mut BTreeMap<Syscall, Vec<SyscallArgumentConstraint>> {
+    ) -> &mut BTreeMap<Syscall, Vec<Vec<SyscallArgumentConstraint>>> {
         &mut self.argument_constraints
     }
 
@@ -227,7 +231,7 @@ impl SeccompProfilePlan {
         profile: NativeSyscallProfile,
         default_action: SeccompDefaultAction,
         allowed_syscalls: Vec<Syscall>,
-        argument_constraints: BTreeMap<Syscall, Vec<SyscallArgumentConstraint>>,
+        argument_constraints: BTreeMap<Syscall, Vec<Vec<SyscallArgumentConstraint>>>,
     ) -> Self {
         Self {
             architecture,
@@ -242,7 +246,7 @@ impl SeccompProfilePlan {
         architecture: SandboxArchitecture,
         profile: NativeSyscallProfile,
         allowed_syscalls: Vec<Syscall>,
-        argument_constraints: BTreeMap<Syscall, Vec<SyscallArgumentConstraint>>,
+        argument_constraints: BTreeMap<Syscall, Vec<Vec<SyscallArgumentConstraint>>>,
     ) -> Result<Self, SeccompPlanError> {
         let plan = Self {
             architecture,
@@ -267,8 +271,10 @@ impl SeccompProfilePlan {
     pub fn allowed_syscalls(&self) -> &[Syscall] {
         &self.allowed_syscalls
     }
+    /// Each syscall maps to OR alternatives of ANDed argument constraints.
+    /// Absence means unconstrained; an empty alternative is never admissible.
     #[must_use]
-    pub fn argument_constraints(&self) -> &BTreeMap<Syscall, Vec<SyscallArgumentConstraint>> {
+    pub fn argument_constraints(&self) -> &BTreeMap<Syscall, Vec<Vec<SyscallArgumentConstraint>>> {
         &self.argument_constraints
     }
 
@@ -294,20 +300,31 @@ impl SeccompProfilePlan {
                 return Err(SeccompPlanError::ForbiddenSyscall(syscall));
             }
         }
-        for (&syscall, constraints) in &self.argument_constraints {
+        for (&syscall, alternatives) in &self.argument_constraints {
             if !allowed.contains(&syscall) {
                 return Err(SeccompPlanError::UnlistedConstraint(syscall));
             }
-            if constraints.is_empty() {
-                return Err(SeccompPlanError::EmptyConstraint(syscall));
+            if alternatives.is_empty() || alternatives.len() > 8 {
+                return Err(SeccompPlanError::InvalidAlternatives(syscall));
             }
-            let mut arguments = BTreeSet::new();
-            for constraint in constraints {
-                if constraint.argument_index > 5 || !arguments.insert(constraint.argument_index) {
-                    return Err(SeccompPlanError::InvalidArgument {
-                        syscall,
-                        argument: constraint.argument_index,
-                    });
+            let mut seen = Vec::new();
+            for constraints in alternatives {
+                if seen.contains(&constraints) {
+                    return Err(SeccompPlanError::InvalidAlternatives(syscall));
+                }
+                seen.push(constraints);
+                if constraints.is_empty() {
+                    return Err(SeccompPlanError::EmptyConstraint(syscall));
+                }
+                let mut arguments = BTreeSet::new();
+                for constraint in constraints {
+                    if constraint.argument_index > 5 || !arguments.insert(constraint.argument_index)
+                    {
+                        return Err(SeccompPlanError::InvalidArgument {
+                            syscall,
+                            argument: constraint.argument_index,
+                        });
+                    }
                 }
             }
         }
@@ -316,9 +333,11 @@ impl SeccompProfilePlan {
                 .argument_constraints
                 .get(&Syscall::Prlimit64)
                 .is_some_and(|constraints| {
-                    constraints
-                        .iter()
-                        .any(|constraint| constraint.argument_index == 0 && constraint.value == 0)
+                    constraints.iter().all(|alternative| {
+                        alternative.iter().any(|constraint| {
+                            constraint.argument_index == 0 && constraint.value == 0
+                        })
+                    })
                 })
         {
             return Err(SeccompPlanError::UnconfinedResourceLimits);
@@ -359,7 +378,7 @@ mod tests {
             SandboxArchitecture::X86_64,
             NativeSyscallProfile::NativeMinimalV1,
             vec![Syscall::Read],
-            BTreeMap::from([(Syscall::Write, vec![argument(0, 1)])]),
+            BTreeMap::from([(Syscall::Write, vec![vec![argument(0, 1)]])]),
         );
         assert_eq!(
             result,
@@ -371,7 +390,11 @@ mod tests {
     fn construction_rejects_unconfined_limits_and_invalid_arguments() {
         for constraints in [
             BTreeMap::new(),
-            BTreeMap::from([(Syscall::Prlimit64, vec![argument(0, 1)])]),
+            BTreeMap::from([(Syscall::Prlimit64, vec![vec![argument(0, 1)]])]),
+            BTreeMap::from([(
+                Syscall::Prlimit64,
+                vec![vec![argument(0, 0)], vec![argument(0, 1)]],
+            )]),
         ] {
             assert_eq!(
                 SeccompProfilePlan::new(
@@ -393,13 +416,30 @@ mod tests {
                     SandboxArchitecture::X86_64,
                     NativeSyscallProfile::NativeMinimalV1,
                     vec![Syscall::Read],
-                    BTreeMap::from([(Syscall::Read, arguments)])
+                    BTreeMap::from([(Syscall::Read, vec![arguments])])
                 ),
                 Err(SeccompPlanError::InvalidArgument {
                     syscall: Syscall::Read,
                     argument: expected
                 })
             );
+        }
+    }
+
+    #[test]
+    fn empty_alternatives_cannot_introduce_unconditional_syscall_authority() {
+        for alternatives in [vec![], vec![vec![]], vec![vec![argument(1, 1)]; 9]] {
+            let result = SeccompProfilePlan::new(
+                SandboxArchitecture::X86_64,
+                NativeSyscallProfile::NativeMinimalV1,
+                vec![Syscall::Fcntl],
+                BTreeMap::from([(Syscall::Fcntl, alternatives)]),
+            );
+            assert!(matches!(
+                result,
+                Err(SeccompPlanError::EmptyConstraint(Syscall::Fcntl)
+                    | SeccompPlanError::InvalidAlternatives(Syscall::Fcntl))
+            ));
         }
     }
 
@@ -418,7 +458,7 @@ mod tests {
             plan
         );
         wire["argument_constraints"] =
-            serde_json::json!({"write": [{"argument_index":0,"comparison":"equal","value":1}]});
+            serde_json::json!({"write": [[{"argument_index":0,"comparison":"equal","value":1}]]});
         let error = serde_json::from_value::<SeccompProfilePlan>(wire.clone())
             .err()
             .ok_or("unlisted constraint decoded")?;

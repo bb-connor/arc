@@ -1,0 +1,27 @@
+warning: patch `cmpv2 v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/home/ubuntu/arc-native-consumers-20260929/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/home/ubuntu/arc-native-consumers-20260929/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling libc v0.2.189
+   Compiling serde v1.0.228
+   Compiling getrandom v0.4.2
+   Compiling rustix v1.1.4
+   Compiling linux-raw-sys v0.12.1
+   Compiling once_cell v1.21.4
+   Compiling chio-security-types v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-security-types)
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling ed25519-dalek v2.2.0
+   Compiling tempfile v3.27.0
+   Compiling chio-core-types v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/core/chio-core-types)
+   Compiling chio-reference-tools v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/tooling/chio-reference-tools)
+    Finished `dev` profile [unoptimized] target(s) in 16.09s

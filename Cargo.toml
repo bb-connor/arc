@@ -364,6 +364,14 @@ split-debuginfo = "off"
 debug = 0
 split-debuginfo = "off"
 
+# Native qualification authenticates complete executable images. Unoptimized
+# SHA intrinsics make hashing debug binaries dominate the discovery deadline.
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.test.package.sha2]
+opt-level = 3
+
 [workspace.dependencies]
 secrecy = { version = "=0.10.3", features = ["serde"] }
 async-trait = "0.1"

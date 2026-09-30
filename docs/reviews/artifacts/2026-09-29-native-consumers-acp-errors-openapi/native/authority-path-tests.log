@@ -1,0 +1,26 @@
+Cargo build-finished: True
+
+running 2 tests
+test mcp_cli::provision::authority_paths::tests::deployed_policy_does_not_require_the_staging_filesystem ... ok
+test mcp_cli::provision::authority_paths::tests::authority_is_excluded_before_creation_and_on_restart ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 663 filtered out; finished in 0.00s
+
+
+Cargo stderr:
+warning: patch `cmpv2 v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/home/ubuntu/arc-native-consumers-20260929/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/home/ubuntu/arc-native-consumers-20260929/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-cli v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 28.89s
+     Running unittests src/bin/chio.rs (/home/ubuntu/chio-x86-cage-c38ea127ed-target/debug/deps/chio-3803b4e6f828034b)

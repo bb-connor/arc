@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn interceptor_client_to_agent_always_forwarded() {
     let interceptor = MessageInterceptor::new(test_config());
@@ -223,7 +225,7 @@ fn interceptor_fs_read_rejects_empty_session_id_before_forwarding() {
         .expect_err("empty sessionId must fail at the ACP request boundary");
     assert_eq!(
         err.to_string(),
-        "protocol error: invalid fs/read_text_file params: sessionId must be a non-empty string"
+        "urn:chio:error:transport:invalid-request-shape"
     );
 }
 
@@ -244,7 +246,7 @@ fn interceptor_fs_read_rejects_padded_session_id_before_forwarding() {
         .expect_err("padded sessionId must fail at the ACP request boundary");
     assert_eq!(
         err.to_string(),
-        "protocol error: invalid fs/read_text_file params: sessionId must be a non-empty unpadded string"
+        "urn:chio:error:transport:invalid-request-shape"
     );
 }
 
@@ -284,7 +286,7 @@ fn interceptor_session_update_rejects_empty_tool_call_id_before_receipt() {
         .expect_err("empty toolCallId must not produce an ACP audit receipt");
     assert_eq!(
         err.to_string(),
-        "protocol error: invalid session/update params: update.toolCallId must be a non-empty string"
+        "urn:chio:error:transport:invalid-request-shape"
     );
 }
 
@@ -309,7 +311,7 @@ fn interceptor_session_update_rejects_padded_tool_call_id_before_receipt() {
         .expect_err("padded toolCallId must not produce an ACP audit receipt");
     assert_eq!(
         err.to_string(),
-        "protocol error: invalid session/update params: update.toolCallId must be a non-empty unpadded string"
+        "urn:chio:error:transport:invalid-request-shape"
     );
 }
 
@@ -491,7 +493,7 @@ fn interceptor_permission_request_rejects_empty_boundary_ids() {
         .expect_err("empty permission sessionId must fail at the ACP boundary");
     assert_eq!(
         err.to_string(),
-        "protocol error: invalid session/request_permission params: sessionId must be a non-empty string"
+        "urn:chio:error:transport:invalid-request-shape"
     );
 
     let empty_option = json!({
@@ -510,7 +512,7 @@ fn interceptor_permission_request_rejects_empty_boundary_ids() {
         .expect_err("empty permission optionId must fail at the ACP boundary");
     assert_eq!(
         err.to_string(),
-        "protocol error: invalid session/request_permission params: options[0].optionId must be a non-empty string"
+        "urn:chio:error:transport:invalid-request-shape"
     );
 }
 
@@ -564,7 +566,7 @@ fn interceptor_session_update_rejects_missing_params_before_forwarding() {
         .expect_err("missing session/update params must fail at the ACP boundary");
     assert_eq!(
         err.to_string(),
-        "protocol error: missing params in session/update"
+        "urn:chio:error:transport:invalid-request-shape"
     );
 }
 

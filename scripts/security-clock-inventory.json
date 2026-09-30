@@ -130,9 +130,6 @@
     "crates/protocol/chio-a2a-edge/src/tests/all.rs::unix_now": 1,
     "crates/protocol/chio-a2a-edge/src/tests/nonce_preflight.rs::capability_for_tool": 1,
     "crates/protocol/chio-acp-edge/src/tests/nonce_preflight.rs::capability_for_tool": 1,
-    "crates/protocol/chio-acp-proxy/src/compliance.rs::generate_compliance_certificate": 1,
-    "crates/protocol/chio-acp-proxy/src/kernel_signer.rs::sign_acp_receipt": 1,
-    "crates/protocol/chio-acp-proxy/src/receipt.rs::now_unix_secs": 1,
     "crates/protocol/chio-acp-proxy/src/tests/attestation_support.rs::now_secs": 1,
     "crates/protocol/chio-acp-proxy/src/tests/core_guards.rs::fs_guard_blocks_symlink_escape_by_default": 1,
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc::signed_manifest_rejects_discovered_tool_surface_drift": 1,
@@ -1071,16 +1068,16 @@
         "contract": "Existing test setup only."
       },
       "crates/protocol/chio-acp-proxy/src/compliance.rs::generate_compliance_certificate": {
-        "disposition": "remaining-production",
-        "contract": "Existing receipt or compliance timestamp owner; migrate in the next protocol clock batch."
+        "disposition": "migrated",
+        "contract": "AcpClock injected shared fence. Audit logging, receipt signing and compliance generation preserve errors and fail before authority or certificate publication on invalid time."
       },
       "crates/protocol/chio-acp-proxy/src/kernel_signer.rs::sign_acp_receipt": {
-        "disposition": "remaining-production",
-        "contract": "Existing receipt or compliance timestamp owner; migrate in the next protocol clock batch."
+        "disposition": "migrated",
+        "contract": "AcpClock injected shared fence. Audit logging, receipt signing and compliance generation preserve errors and fail before authority or certificate publication on invalid time."
       },
       "crates/protocol/chio-acp-proxy/src/receipt.rs::now_unix_secs": {
-        "disposition": "remaining-production",
-        "contract": "Existing receipt or compliance timestamp owner; migrate in the next protocol clock batch."
+        "disposition": "migrated",
+        "contract": "AcpClock injected shared fence. Audit logging, receipt signing and compliance generation preserve errors and fail before authority or certificate publication on invalid time."
       },
       "crates/protocol/chio-acp-proxy/src/tests/attestation_support.rs::now_secs": {
         "disposition": "test-fixture",
@@ -1096,5 +1093,10 @@
       "crates/protocol/chio-mcp-remote/src/rate_limit.rs",
       "crates/protocol/chio-acp-edge/src/tests/original_input.rs"
     ]
+  },
+  "acp_receipt_clock_review_2026_09_29": {
+    "owner": "crates/protocol/chio-acp-proxy/src/clock.rs",
+    "tests": "crates/protocol/chio-acp-proxy/src/tests/attestation_clock.rs",
+    "restart_contract": "New owners reject persisted future audit/authorization time; this does not claim a durable global wall-clock high-water store."
   }
 }

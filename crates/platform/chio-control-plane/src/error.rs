@@ -13,8 +13,14 @@ use chio_kernel::StructuredErrorReport;
 
 use crate::policy;
 
+#[path = "error/registered_source.rs"]
+mod registered_source;
+pub use registered_source::RegisteredSourceError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
+    #[error("{0}")]
+    RegisteredSource(#[from] RegisteredSourceError),
     #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("record storage binding does not match {0}")]
@@ -91,6 +97,14 @@ pub enum CliError {
 }
 
 impl CliError {
+    /// Preserve an inspected local cause while projecting only the registry diagnostic.
+    pub fn with_source(
+        spec: &'static ErrorCodeSpec,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        RegisteredSourceError::new(spec, source).into()
+    }
+
     pub fn registry_error(spec: &'static ErrorCodeSpec, message: impl Into<String>) -> Self {
         Self::Chio(ChioError::from_spec(spec, message))
     }
@@ -186,6 +200,7 @@ impl CliError {
 
     pub fn report(&self) -> StructuredErrorReport {
         match self {
+            Self::RegisteredSource(error) => error.report(),
             Self::Clock(error) => self.report_with_context(error.code(), serde_json::json!({}), "Restore trusted time before retrying."),
             Self::SignedJson(error) => self.report_with_context(
                 error.code(), serde_json::json!({}),

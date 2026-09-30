@@ -35,6 +35,14 @@ resulting policy for restart. This requires a qualified enforcing Linux host. Pr
 ownership of their launch policy and publisher trust;
 the process host never infers authorization from discovery alone.
 
+`chio_process.broker_launch.provision_brokered_demo` provisions a static broker
+MCP tool from explicit `tools_fixture` and `broker_binding` inputs. It grants no
+filesystem access and does not inherit provider credentials. Dispatch still
+requires the process host's original signed broker request and durable
+admission. See the [native launch guide](../../../docs/security/native-launch-examples.md)
+for the helper, storage and qualification contracts. Docker/provider integration
+for mini-SWE remains separate work.
+
 ```python
 from chio_process import ProcessClient
 

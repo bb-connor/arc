@@ -1,0 +1,153 @@
+{
+  "scope": "focused local and native development qualification; no full workspace, hosted or release gate",
+  "checks": [
+    {
+      "name": "protocol-owner-tests",
+      "exit_code": 0,
+      "log": "local/owners-tests-final.log",
+      "scope": "Five protocol owners, before two additional sender regressions",
+      "passed": 513
+    },
+    {
+      "name": "sender-final",
+      "exit_code": 0,
+      "log": "local/sender-owner-final.log",
+      "scope": "Final verifier API and source/redaction regressions",
+      "passed": 7
+    },
+    {
+      "name": "registered-cli-source",
+      "exit_code": 0,
+      "log": "local/review-repairs-cli.log",
+      "scope": "Native cause remains inspectable; public report redacted",
+      "passed": 1
+    },
+    {
+      "name": "openapi-conformance",
+      "exit_code": 0,
+      "log": "local/conformance-final.log",
+      "scope": "Two actual conformance integration targets",
+      "passed": 4
+    },
+    {
+      "name": "protocol-owner-clippy",
+      "exit_code": 0,
+      "log": "local/owners-clippy-terminal.log",
+      "scope": "Five protocol libraries with -D warnings"
+    },
+    {
+      "name": "native-cage-unit",
+      "exit_code": 0,
+      "log": "native/cage-unit-final.log",
+      "scope": "Cage, cage-init and cage-plan with real enforcement",
+      "passed": 27
+    },
+    {
+      "name": "native-authority-paths",
+      "exit_code": 0,
+      "log": "native/authority-path-tests.log",
+      "scope": "Discovery exclusions and deployment without staging",
+      "passed": 2
+    },
+    {
+      "name": "native-discovery",
+      "exit_code": 0,
+      "log": "native/native-discovery-final.log",
+      "scope": "Privileged discovery; filesystem, identity, deadline, fcntl and cleanup",
+      "passed": 1
+    },
+    {
+      "name": "native-process-recovery",
+      "exit_code": 0,
+      "log": "native/native-recovery-final.log",
+      "scope": "Host and worker recovery with uncertain-effect safety",
+      "passed": 2
+    },
+    {
+      "name": "native-cage-clippy",
+      "exit_code": 0,
+      "log": "native/cage-clippy.log",
+      "scope": "Cage libraries with real enforcement and -D warnings"
+    },
+    {
+      "name": "sdk-launch",
+      "exit_code": 0,
+      "log": "local/sdk-launch-final.log",
+      "scope": "Python native and broker provisioning helpers",
+      "passed": 7
+    },
+    {
+      "name": "fixture-inputs",
+      "exit_code": 0,
+      "log": "local/fixture-tests-qualified.log",
+      "scope": "Explicit native fixture input rejection tests",
+      "passed": 2
+    },
+    {
+      "name": "rust-format",
+      "exit_code": 0,
+      "log": "local/format-terminal.log",
+      "scope": "cargo fmt --all -- --check"
+    },
+    {
+      "name": "python-style",
+      "exit_code": 0,
+      "log": "local/python-style-terminal.log",
+      "scope": "Ruff check and format check on nine changed Python files"
+    },
+    {
+      "name": "trust-boundaries",
+      "exit_code": 0,
+      "log": "local/trust-gate-qualified.log",
+      "scope": "371 constructors; 85 tenant tables; 170 explicit SQL principal contracts"
+    },
+    {
+      "name": "clocks",
+      "exit_code": 0,
+      "log": "local/clock-gate-final.log",
+      "scope": "154 remaining occurrences at 149 inventory keys; no additions"
+    },
+    {
+      "name": "negative-assertions",
+      "exit_code": 0,
+      "log": "local/negative-gate-final.log",
+      "scope": "1260 assertions at 1177 sites across 255 files"
+    },
+    {
+      "name": "rust-hygiene",
+      "exit_code": 0,
+      "log": "local/hygiene-terminal.log",
+      "scope": "No source allowance increase"
+    },
+    {
+      "name": "schema-registry",
+      "exit_code": 0,
+      "log": "local/schema-registry-terminal.log",
+      "scope": "Schema digests and registry integrity"
+    },
+    {
+      "name": "wire-schema",
+      "exit_code": 0,
+      "log": "local/wire-schema-gate.log",
+      "scope": "1325 identifiers; 1098 distinct; 163 duplicates still queued"
+    },
+    {
+      "name": "security-vectors",
+      "exit_code": 0,
+      "log": "local/security-wire-vectors-terminal.log",
+      "scope": "90 positive and 270 negative vector cases",
+      "passed": 360
+    },
+    {
+      "name": "adapter-no-bypass",
+      "exit_code": 0,
+      "log": "local/no-bypass-terminal.log",
+      "scope": "Adapter production enforcement and authority construction gate"
+    }
+  ],
+  "open": [
+    "mini-SWE multi-route Docker/provider integration",
+    "remaining packaged SDK/example/conformance native consumers",
+    "parent roadmap acceptance gates"
+  ]
+}

@@ -1,10 +1,12 @@
+use super::*;
+
 #[test]
 fn interceptor_jsonrpc_param_decoder_preserves_method_specific_protocol_errors() {
     let missing = MessageInterceptor::jsonrpc_params(&json!({}), "fs/read_text_file")
         .expect_err("missing params should fail closed");
     assert_eq!(
         missing.to_string(),
-        "protocol error: missing params in fs/read_text_file"
+        "urn:chio:error:transport:invalid-request-shape"
     );
 
     let invalid = MessageInterceptor::decode_jsonrpc_params::<ReadTextFileParams>(
@@ -164,7 +166,10 @@ fn interceptor_blocks_terminal_create_with_out_of_scope_cwd() {
     match result {
         InterceptResult::Block(v) => {
             assert!(v.get("error").is_some());
-            assert!(v["error"]["message"].as_str().unwrap_or("").contains("cwd"));
+            assert!(v["error"]["message"]
+                .as_str()
+                .unwrap_or("")
+                .contains("urn:chio:error:guard:denied"));
         }
         other => panic!("expected Block for out-of-scope cwd, got {:?}", other),
     }

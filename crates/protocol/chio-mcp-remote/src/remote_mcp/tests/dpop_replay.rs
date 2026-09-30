@@ -3,6 +3,76 @@ use chio_core::crypto::Keypair;
 use chio_kernel::dpop::{DpopProofBody, MAX_DPOP_REPLAY_IDENTITY_PART_BYTES};
 use std::time::Duration;
 
+#[test]
+fn sender_headers_retain_non_text_causes_before_replay_custody() {
+    use std::error::Error;
+    for (header, claims) in [
+        (
+            CHIO_MTLS_THUMBPRINT_HEADER,
+            ChioSenderConstraintClaims {
+                mtls_thumbprint_sha256: Some("thumbprint".into()),
+                ..Default::default()
+            },
+        ),
+        (
+            CHIO_RUNTIME_ATTESTATION_HEADER,
+            ChioSenderConstraintClaims {
+                chio_attestation_sha256: Some("attestation".into()),
+                ..Default::default()
+            },
+        ),
+        (
+            DPOP_HEADER,
+            ChioSenderConstraintClaims {
+                chio_sender_key: Some(Keypair::generate().public_key().to_hex()),
+                ..Default::default()
+            },
+        ),
+    ] {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header,
+            HeaderValue::from_bytes(b"private-marker\xff").unwrap(),
+        );
+        let store = DpopNonceStore::new(8, Duration::from_secs(30)).unwrap();
+        let error =
+            SenderConstraintVerifier::new(&RemoteClock::default(), &store, &DpopConfig::default())
+                .validate(
+                    Some(&claims),
+                    &headers,
+                    Some("sender-binding"),
+                    "chio-mcp",
+                    "POST",
+                )
+                .unwrap_err();
+        assert!(error
+            .source()
+            .unwrap()
+            .is::<axum::http::header::ToStrError>());
+        assert_eq!(store.utilization().unwrap().0, 0);
+        assert!(!format!("{error:?} {error}").contains("private-marker"));
+    }
+}
+
+#[tokio::test]
+async fn sender_key_rejection_keeps_decode_source_out_of_the_wire_response() {
+    let response =
+        build_request_sender_constraint(Some("private-invalid-key"), None, None, None).unwrap_err();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert!(response
+        .extensions()
+        .get::<Arc<chio_core::error::Error>>()
+        .is_some());
+    let body = axum::body::to_bytes(response.into_body(), 4096)
+        .await
+        .unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(value["error"], "invalid_request");
+    assert!(!std::str::from_utf8(&body)
+        .unwrap()
+        .contains("private-invalid-key"));
+}
+
 fn proof(key: &Keypair, nonce: String, issued_at: u64) -> DpopProof {
     DpopProof::sign(
         DpopProofBody {
@@ -26,15 +96,12 @@ fn verify(
     store: &DpopNonceStore,
     config: &DpopConfig,
 ) -> Result<(), SenderConstraintError> {
-    verify_sender_dpop_proof(
-        &RemoteClock::default(),
+    SenderConstraintVerifier::new(&RemoteClock::default(), store, config).verify_proof(
         proof,
         "sender-binding",
         "chio-mcp",
         "POST",
         &proof.body.agent_key,
-        store,
-        config,
     )
 }
 
@@ -99,10 +166,10 @@ fn sender_dpop_byte_pressure_preserves_the_consumed_proof() {
             chio_kernel::KernelError::Dpop(chio_kernel::dpop::DpopError::IdentityCapacity)
         ))
     ));
-    assert!(verify(&first, &store, &config)
-        .unwrap_err()
-        .to_string()
-        .contains("already used"));
+    assert!(matches!(
+        verify(&first, &store, &config),
+        Err(crate::input::SenderConstraintError::NonceReused)
+    ));
     assert_eq!(store.utilization().unwrap().0, 1);
 }
 
@@ -134,10 +201,10 @@ fn sender_legacy_profile_rejects_a_durable_domain_even_when_resigned_as_v1() {
     for schema in [chio_kernel::DPOP_SCHEMA, DPOP_AUTHORITY_SCHEMA] {
         body.schema = schema.into();
         let signed = DpopProof::sign(body.clone(), &key).unwrap();
-        assert!(verify(&signed, &store, &config)
-            .unwrap_err()
-            .to_string()
-            .contains("unsupported DPoP schema"));
+        assert!(matches!(
+            verify(&signed, &store, &config),
+            Err(crate::input::SenderConstraintError::UnsupportedSchema)
+        ));
         assert_eq!(store.utilization().unwrap().0, 0);
     }
 }

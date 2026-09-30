@@ -156,22 +156,12 @@ impl KernelCapabilityChecker {
         for tool_name in ACP_GUARD_TOOLS {
             let bridge_security = manifest_registry
                 .bridge_security(&server_id, tool_name)
-                .ok_or_else(|| {
-                    CapabilityCheckError::Internal(format!(
-                        "verified manifest registry has no ACP authority tool `{server_id}/{tool_name}`"
-                    ))
-                })?;
+                .ok_or(CapabilityCheckError::AuthorityToolUnavailable)?;
             manifest_registry
                 .validate_bridge_security(&server_id, tool_name, &bridge_security)
-                .map_err(|error| {
-                    CapabilityCheckError::Internal(format!(
-                        "ACP authority tool `{server_id}/{tool_name}` has invalid bridge security: {error}"
-                    ))
-                })?;
+                .map_err(CapabilityCheckError::Manifest)?;
             if bridge_security.flow().is_some() || bridge_security.effective_egress() {
-                return Err(CapabilityCheckError::Internal(format!(
-                    "ACP authority tool `{server_id}/{tool_name}` must use local topology with no flow declaration"
-                )));
+                return Err(CapabilityCheckError::InvalidAuthorityTopology);
             }
             bridge_security_by_tool.insert(tool_name, bridge_security);
         }
@@ -238,15 +228,11 @@ impl KernelCapabilityChecker {
                     "operation_payload": request.operation_payload,
                 }),
             )),
-            other => Err(CapabilityCheckError::Internal(format!(
-                "unsupported ACP operation for authoritative enforcement: {other}"
-            ))),
+            _ => Err(CapabilityCheckError::UnsupportedOperation),
         }?;
         {
             let Some(arguments) = arguments.as_object_mut() else {
-                return Err(CapabilityCheckError::Internal(
-                    "ACP authorization parameters must be a JSON object".to_string(),
-                ));
+                return Err(CapabilityCheckError::InvalidParameters);
             };
             arguments.insert("session_id".to_string(), json!(request.session_id));
             arguments.insert("tool_call_id".to_string(), json!(tool_call_id));
@@ -336,19 +322,7 @@ impl CapabilityChecker for KernelCapabilityChecker {
             }
             None => "",
         };
-        let (tool_name, arguments) = match self.map_request(request, tool_call_id) {
-            Ok(mapped) => mapped,
-            Err(error) => {
-                return Ok(AcpVerdict {
-                    allowed: false,
-                    capability_id: Some(capability.id.clone()),
-                    receipt_id: None,
-                    receipt_request_id: None,
-                    execution_nonce: None,
-                    reason: error.to_string(),
-                });
-            }
-        };
+        let (tool_name, arguments) = self.map_request(request, tool_call_id)?;
         let request_hash = chio_core::sha256_hex(
             &chio_core::canonical::canonical_json_bytes(&json!({
                 "sessionId": request.session_id,
@@ -359,19 +333,14 @@ impl CapabilityChecker for KernelCapabilityChecker {
                 "authorization_parameter_hash": request.authorization_parameter_hash,
                 "operation_payload": request.operation_payload,
             }))
-            .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?,
+            .map_err(CapabilityCheckError::Canonical)?,
         );
         let kernel_request_id = format!("acp-live-guard-{request_hash}");
         let bridge_security = self
             .bridge_security_by_tool
             .get(tool_name)
             .cloned()
-            .ok_or_else(|| {
-                CapabilityCheckError::Internal(format!(
-                    "ACP authority tool `{}/{tool_name}` was not bound at construction",
-                    self.server_id
-                ))
-            })?;
+            .ok_or(CapabilityCheckError::AuthorityToolUnavailable)?;
         let orchestrated =
             CrossProtocolOrchestrator::new(self.kernel.as_ref(), self.manifest_registry.as_ref())
                 .execute(

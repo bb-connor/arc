@@ -62,11 +62,17 @@ pub fn compile_seccomp_filter(
                 "seccomp_syscall",
             )
         })?);
-        let constraints = plan
+        let rule_chain = plan
             .argument_constraints()
             .get(name)
-            .map_or(&[][..], Vec::as_slice);
-        let rule_chain = compile_seccomp_rule(constraints)?;
+            .map(|alternatives| {
+                alternatives
+                    .iter()
+                    .map(|constraints| compile_seccomp_rule(constraints))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
         if rules.insert(number, rule_chain).is_some() {
             return Err(BootstrapFault::new(
                 CageEnforcementFailureCode::SeccompInstallFailed,
@@ -106,10 +112,7 @@ pub fn compile_seccomp_filter(
 
 fn compile_seccomp_rule(
     constraints: &[SyscallArgumentConstraint],
-) -> Result<Vec<seccompiler::SeccompRule>, BootstrapFault> {
-    if constraints.is_empty() {
-        return Ok(Vec::new());
-    }
+) -> Result<seccompiler::SeccompRule, BootstrapFault> {
     let mut conditions = Vec::with_capacity(constraints.len());
     let mut seen = BTreeSet::new();
     for constraint in constraints {
@@ -143,7 +146,7 @@ fn compile_seccomp_rule(
             "seccomp_rule",
         )
     })?;
-    Ok(vec![rule])
+    Ok(rule)
 }
 
 pub fn filter_digest(filter: &seccompiler::BpfProgram) -> Result<String, BootstrapFault> {
@@ -169,6 +172,7 @@ pub fn syscall_number(architecture: SandboxArchitecture, name: &str) -> Option<u
             "close" => 3,
             "stat" => 4,
             "fstat" => 5,
+            "fsync" => 74,
             "lstat" => 6,
             "poll" => 7,
             "lseek" => 8,
@@ -250,6 +254,7 @@ pub fn syscall_number(architecture: SandboxArchitecture, name: &str) -> Option<u
             "readlinkat" => 78,
             "newfstatat" => 79,
             "fstat" => 80,
+            "fsync" => 82,
             "exit" => 93,
             "exit_group" => 94,
             "set_tid_address" => 96,

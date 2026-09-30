@@ -466,15 +466,17 @@ impl JwtBearerVerifier {
                 })?;
             }
         }
-        validate_sender_constraint_runtime(
+        SenderConstraintVerifier::new(
             &self.clock,
+            &self.sender_dpop_nonce_store,
+            &self.sender_dpop_config,
+        )
+        .validate(
             claims.cnf.as_ref(),
             headers,
             claims.jti.as_deref(),
             expected_target,
             expected_method,
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
         )
         .map_err(|error| {
             let mut response =
@@ -720,15 +722,17 @@ impl IntrospectionBearerVerifier {
                 })?;
             }
         }
-        validate_sender_constraint_runtime(
+        SenderConstraintVerifier::new(
             &self.clock,
+            &self.sender_dpop_nonce_store,
+            &self.sender_dpop_config,
+        )
+        .validate(
             claims.cnf.as_ref(),
             input.headers,
             claims.jti.as_deref(),
             input.expected_target,
             input.expected_method,
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
         )
         .map_err(|error| {
             let mut response =

@@ -1,0 +1,23 @@
+warning: patch `cmpv2 v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/home/ubuntu/arc-native-consumers-20260929/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/home/ubuntu/arc-native-consumers-20260929/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling seccompiler v0.5.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/seccompiler-chio)
+   Compiling enumflags2_derive v0.7.12 (/home/ubuntu/arc-native-consumers-20260929/third_party/enumflags2-derive-chio)
+   Compiling chio-security-types v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-security-types)
+   Compiling enumflags2 v0.7.12
+   Compiling landlock v0.4.4
+   Compiling nono-chio v0.53.0-chio.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-chio)
+   Compiling chio-core-types v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/core/chio-core-types)
+   Compiling chio-cage-plan v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage-plan)
+   Compiling chio-cage-init v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage-init)
+    Finished `dev` profile [unoptimized] target(s) in 17.81s

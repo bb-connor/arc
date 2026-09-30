@@ -9,7 +9,9 @@ runs:
         set -euo pipefail
         test "$(uname -s):$(uname -m)" = "Linux:x86_64"
         export CARGO_INCREMENTAL=0
-        cargo build --locked -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement
+        rustup target add x86_64-unknown-linux-musl
+        cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement
+        install -m 755 "${CARGO_TARGET_DIR:-target}/x86_64-unknown-linux-musl/debug/chio-cage-init" "$RUNNER_TEMP/chio-cage-init"
         cargo test --locked -p chio-cli --features real-linux-enforcement --test enforced_discovery --no-run --message-format=json > "$RUNNER_TEMP/native-discovery-build.jsonl"
         python3 - "$RUNNER_TEMP/native-discovery-build.jsonl" "$RUNNER_TEMP/native-discovery-binary" <<'PY'
         import json, pathlib, sys
@@ -24,7 +26,7 @@ runs:
       run: |
         set -euo pipefail
         native_probe=$(cat "$RUNNER_TEMP/native-discovery-binary")
-        helper=$(realpath target/debug/chio-cage-init)
+        helper=$(realpath "$RUNNER_TEMP/chio-cage-init")
         sudo env CHIO_CAGE_TEST_HELPER="$helper" "$native_probe" --exact privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup --nocapture 2>&1 | tee "$RUNNER_TEMP/native-discovery.log"
         rg -q 'test result: ok\. 1 passed; 0 failed' "$RUNNER_TEMP/native-discovery.log"
     - name: Prepare independent authority fixture for non-root consumers
@@ -32,8 +34,9 @@ runs:
       run: |
         set -euo pipefail
         python3 scripts/prepare-enforced-native-fixture.py \
-          --helper "$(realpath target/debug/chio-cage-init)" \
+          --helper "$(realpath "$RUNNER_TEMP/chio-cage-init")" \
           --directory "$RUNNER_TEMP/enforced-native-fixture" \
+          --anchor-parent /dev/shm \
           --read-path /usr --read-path /etc/ld.so.cache \
           --read-path /opt/hostedtoolcache \
           --read-path "$GITHUB_WORKSPACE/sdks" \

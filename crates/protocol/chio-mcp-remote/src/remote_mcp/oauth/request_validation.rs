@@ -9,14 +9,14 @@ pub(super) fn validate_authorization_request(
     if request.response_type != "code" {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "unsupported_response_type",
+            OAuthError::UnsupportedResponseType,
             "response_type must be code",
         ));
     }
     if request.client_id.trim().is_empty() {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "client_id must not be empty",
         ));
     }
@@ -24,35 +24,35 @@ pub(super) fn validate_authorization_request(
     let resource = request.resource.clone().ok_or_else(|| {
         oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_target",
+            OAuthError::InvalidTarget,
             "missing resource parameter",
         )
     })?;
     if resource != expected_resource {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_target",
+            OAuthError::InvalidTarget,
             "resource parameter must match the advertised protected resource",
         ));
     }
     let code_challenge = request.code_challenge.as_deref().ok_or_else(|| {
         oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "missing code_challenge",
         )
     })?;
     if code_challenge.is_empty() {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "empty code_challenge",
         ));
     }
     if request.code_challenge_method.as_deref() != Some("S256") {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "code_challenge_method must be S256",
         ));
     }
@@ -64,17 +64,20 @@ pub(super) fn validate_authorization_request(
 }
 
 pub(super) fn validate_redirect_uri(redirect_uri: &str) -> Result<(), Response> {
-    let redirect = Url::parse(redirect_uri).map_err(|_| {
-        oauth_token_error(
-            StatusCode::BAD_REQUEST,
-            "invalid_request",
-            "invalid redirect_uri",
+    let redirect = Url::parse(redirect_uri).map_err(|source| {
+        crate::input::with_source(
+            oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidRequest,
+                "invalid redirect_uri",
+            ),
+            source,
         )
     })?;
     let Some(host) = redirect.host_str() else {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "invalid redirect_uri",
         ));
     };
@@ -84,7 +87,7 @@ pub(super) fn validate_redirect_uri(redirect_uri: &str) -> Result<(), Response> 
     } else {
         Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_request",
+            OAuthError::InvalidRequest,
             "redirect_uri must use https or localhost",
         ))
     }
@@ -116,7 +119,7 @@ pub(super) fn resolve_requested_scopes(
     } else {
         Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_scope",
+            OAuthError::InvalidScope,
             "requested scope is not supported",
         ))
     }
@@ -141,7 +144,7 @@ pub(super) fn resolve_exchange_scopes(
     } else {
         Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
-            "invalid_scope",
+            OAuthError::InvalidScope,
             "requested exchange scope exceeds subject token scope",
         ))
     }

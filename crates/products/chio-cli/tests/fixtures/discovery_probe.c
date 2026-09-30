@@ -45,6 +45,12 @@ void probe_start(long *stack) {
     // This world-readable host canary is deliberately outside the manifest grants.
     if (call(257, -100, (long)args[2], 0, 0) != -13) stop(97);
     mark(args[1], "filesystem-denied", 17);
+    if (args[4][0] == 'd' || args[4][0] == 'c') {
+        // F_DUPFD and clearing FD_CLOEXEC must remain SIGSYS, not error returns.
+        call(72, 1, args[4][0] == 'd' ? 0 : 2, 0, 0);
+        mark(args[1], "fcntl-syscall-returned", 22);
+        stop(98);
+    }
     if (args[4][0] == 'f') {
         call(56, 17, 0, 0, 0);
         // Any return, including a refused clone without SIGSYS, fails the oracle.
@@ -56,6 +62,8 @@ void probe_start(long *stack) {
         call(13, 15, (long)&ignore, 0, 8);
         for (;;) { call(271, 0, 0, 0, 0); }
     }
+    // Both signed fcntl alternatives must work on the actual kernel filter.
+    if (call(72, 1, 1, 0, 0) < 0 || call(72, 1, 2, 1, 0) != 0) stop(100);
     line();
     send("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"serverInfo\":{\"name\":\"confined\",\"version\":\"1\"}}}\n");
     line(); line();

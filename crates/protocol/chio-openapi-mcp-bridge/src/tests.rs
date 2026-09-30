@@ -783,7 +783,10 @@ async fn bridge_invocation_runtime_admission_denies_before_http_dispatch() {
 #[test]
 fn bridge_error_display_openapi() {
     let err = BridgeError::OpenApi(OpenApiError::MissingField("info".into()));
-    assert!(format!("{err}").contains("info"));
+    assert_eq!(
+        err.to_string(),
+        "urn:chio:error:transport:invalid-request-shape"
+    );
 }
 
 #[test]

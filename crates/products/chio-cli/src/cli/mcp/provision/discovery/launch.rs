@@ -72,7 +72,8 @@ pub(super) fn start(
         [NativeSyscallProfile::NativeMinimalV1]
             .into_iter()
             .collect(),
-    );
+    )
+    .with_forbidden_paths(super::super::authority_paths::existing(&inputs.profile)?);
     let admitted = chio_cage::admit(
         registry
             .authorize_cage_manifest(&inputs.server_id)

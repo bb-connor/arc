@@ -1,0 +1,67 @@
+Cargo build-finished: True
+
+Cargo stderr:
+warning: patch `cmpv2 v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/home/ubuntu/arc-native-consumers-20260929/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/home/ubuntu/arc-native-consumers-20260929/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-cage-plan v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage-plan)
+   Compiling chio-manifest v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-manifest)
+   Compiling chio-cage-init v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage-init)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-cage v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage)
+   Compiling chio-kernel v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-cross-protocol)
+   Compiling chio-http-session v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-http-session)
+   Compiling chio-edge-metrics v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-edge-metrics)
+   Compiling chio-trace-validate v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/tooling/chio-trace-validate)
+   Compiling chio-siem v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/observability/chio-siem)
+   Compiling chio-finding-hosted-edge v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-security-kernel v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-security-kernel)
+   Compiling chio-runtime-core v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/kernel/chio-runtime-core)
+   Compiling chio-config v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-config)
+   Compiling chio-process v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/kernel/chio-process)
+   Compiling chio-guards v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/guards/chio-guards)
+   Compiling chio-transaction-passport v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-transaction-passport)
+   Compiling chio-finding-challenge v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-finding-challenge)
+   Compiling chio-mcp-edge v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-mcp-edge)
+   Compiling chio-http-core v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-http-core)
+   Compiling chio-acp-proxy v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-acp-proxy)
+   Compiling chio-mcp-adapter v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-mcp-adapter)
+   Compiling chio-openapi v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-openapi)
+   Compiling chio-external-guards v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/guards/chio-external-guards)
+   Compiling chio-policy v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/guards/chio-policy)
+   Compiling chio-data-guards v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/guards/chio-data-guards)
+   Compiling chio-wasm-guards v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/guards/chio-wasm-guards)
+   Compiling chio-risk-comptroller v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-commerce-order)
+   Compiling chio-trust-market-context v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-trust-market-context)
+   Compiling chio-enterprise-export v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-enterprise-export)
+   Compiling chio-runtime v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/kernel/chio-runtime)
+   Compiling chio-attest-buyer v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-attest-buyer)
+   Compiling chio-agent-web-interop v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-store-sqlite)
+   Compiling chio-proof-room v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-proof-room)
+   Compiling chio-conformance v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/tooling/chio-conformance)
+   Compiling chio-tee v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-tee)
+   Compiling chio-runtime-harness v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/kernel/chio-runtime-harness)
+   Compiling chio-secret-broker v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-secret-broker)
+   Compiling chio-replay-corpus v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-replay-corpus)
+   Compiling chio-arena v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/core/chio-arena)
+   Compiling chio-control-plane v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-mcp-remote)
+   Compiling chio-active-response-authority v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-active-response-authority)
+   Compiling chio-api-protect v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-api-protect)
+   Compiling chio-hosted-mcp v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/protocol/chio-hosted-mcp)
+   Compiling chio-cli v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 2m 00s

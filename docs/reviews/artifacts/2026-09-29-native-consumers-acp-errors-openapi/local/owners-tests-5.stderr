@@ -1,0 +1,30 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+   Compiling chio-edge-metrics v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-edge-metrics)
+   Compiling chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+   Compiling chio-mcp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-edge)
+   Compiling chio-acp-proxy v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-proxy)
+   Compiling chio-acp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-edge)
+   Compiling chio-openapi v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi)
+   Compiling chio-openapi-mcp-bridge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi-mcp-bridge)
+    Finished `test` profile [unoptimized] target(s) in 14.45s
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_edge-2892651faccba426)
+error: test failed, to rerun pass `-p chio-acp-edge --lib`
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_proxy-f5edf840cf4878e8)
+     Running unittests src/lib.rs (target/debug/deps/chio_openapi-790fa2541fadcf97)
+     Running unittests src/lib.rs (target/debug/deps/chio_openapi_mcp_bridge-840cdf711ac106c2)
+error: 1 target failed:
+    `-p chio-acp-edge --lib`

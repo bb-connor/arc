@@ -73031,10 +73031,18 @@ pub mod security_cage_init_plan_v2 {
     ///    "argument_constraints": {
     ///      "type": "object",
     ///      "additionalProperties": {
+    ///        "description": "OR alternatives of ANDed argument constraints; no alternative grants an unconditional syscall.",
     ///        "type": "array",
     ///        "items": {
-    ///          "$ref": "#/$defs/syscallArgumentConstraint"
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/syscallArgumentConstraint"
+    ///          },
+    ///          "maxItems": 6,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
     ///        },
+    ///        "maxItems": 8,
     ///        "minItems": 1,
     ///        "uniqueItems": true
     ///      },
@@ -73065,7 +73073,7 @@ pub mod security_cage_init_plan_v2 {
         pub architecture: ::serde_json::Value,
         pub argument_constraints: ::std::collections::HashMap<
             SeccompPlanArgumentConstraintsKey,
-            Vec<SyscallArgumentConstraint>,
+            Vec<Vec<SyscallArgumentConstraint>>,
         >,
         pub default_action: ::serde_json::Value,
         pub profile: SeccompPlanProfile,
@@ -73673,10 +73681,10 @@ pub mod security_cage_init_plan_v2 {
     ///  "minItems": 1,
     ///  "prefixItems": [
     ///    {
-    ///      "type": "string",
-    ///      "minLength": 1,
     ///      "maxLength": 16384,
-    ///      "pattern": "^[^\\u0000]*$"
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]*$",
+    ///      "type": "string"
     ///    }
     ///  ]
     ///}
@@ -85092,10 +85100,18 @@ pub mod security_cage_receipt_metadata_v1 {
     ///    "argument_constraints": {
     ///      "type": "object",
     ///      "additionalProperties": {
+    ///        "description": "OR alternatives of ANDed argument constraints; no alternative grants an unconditional syscall.",
     ///        "type": "array",
     ///        "items": {
-    ///          "$ref": "#/$defs/syscallArgumentConstraint"
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/syscallArgumentConstraint"
+    ///          },
+    ///          "maxItems": 6,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
     ///        },
+    ///        "maxItems": 8,
     ///        "minItems": 1,
     ///        "uniqueItems": true
     ///      },
@@ -85126,7 +85142,7 @@ pub mod security_cage_receipt_metadata_v1 {
         pub architecture: ::serde_json::Value,
         pub argument_constraints: ::std::collections::HashMap<
             SeccompPlanArgumentConstraintsKey,
-            Vec<SyscallArgumentConstraint>,
+            Vec<Vec<SyscallArgumentConstraint>>,
         >,
         pub default_action: ::serde_json::Value,
         pub profile: SeccompPlanProfile,
@@ -85734,10 +85750,10 @@ pub mod security_cage_receipt_metadata_v1 {
     ///  "minItems": 1,
     ///  "prefixItems": [
     ///    {
-    ///      "type": "string",
-    ///      "minLength": 1,
     ///      "maxLength": 16384,
-    ///      "pattern": "^[^\\u0000]*$"
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]*$",
+    ///      "type": "string"
     ///    }
     ///  ]
     ///}
@@ -100211,11 +100227,11 @@ pub mod security_key_log_sync_response_v1 {
     ///      },
     ///      "additionalProperties": false,
     ///      "dependentRequired": {
-    ///        "recovery_policy_id": [
-    ///          "recovery_policy_binding"
-    ///        ],
     ///        "recovery_policy_binding": [
     ///          "recovery_policy_id"
+    ///        ],
+    ///        "recovery_policy_id": [
+    ///          "recovery_policy_binding"
     ///        ]
     ///      }
     ///    },
@@ -113158,10 +113174,10 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///      "minItems": 1,
     ///      "prefixItems": [
     ///        {
-    ///          "type": "string",
-    ///          "minLength": 1,
     ///          "maxLength": 16384,
-    ///          "pattern": "^[^\\u0000]*$"
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\u0000]*$",
+    ///          "type": "string"
     ///        }
     ///      ]
     ///    },
@@ -113355,10 +113371,18 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///    "argument_constraints": {
     ///      "type": "object",
     ///      "additionalProperties": {
+    ///        "description": "OR alternatives of ANDed argument constraints; no alternative grants an unconditional syscall.",
     ///        "type": "array",
     ///        "items": {
-    ///          "$ref": "#/$defs/syscallArgumentConstraint"
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/syscallArgumentConstraint"
+    ///          },
+    ///          "maxItems": 6,
+    ///          "minItems": 1,
+    ///          "uniqueItems": true
     ///        },
+    ///        "maxItems": 8,
     ///        "minItems": 1,
     ///        "uniqueItems": true
     ///      },
@@ -113389,7 +113413,7 @@ pub mod security_mcp_cage_launch_policy_v2 {
         pub architecture: ::serde_json::Value,
         pub argument_constraints: ::std::collections::HashMap<
             SeccompPlanArgumentConstraintsKey,
-            Vec<SyscallArgumentConstraint>,
+            Vec<Vec<SyscallArgumentConstraint>>,
         >,
         pub default_action: ::serde_json::Value,
         pub profile: SeccompPlanProfile,
@@ -114081,10 +114105,10 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///  "minItems": 1,
     ///  "prefixItems": [
     ///    {
-    ///      "type": "string",
-    ///      "minLength": 1,
     ///      "maxLength": 16384,
-    ///      "pattern": "^[^\\u0000]*$"
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]*$",
+    ///      "type": "string"
     ///    }
     ///  ]
     ///}

@@ -17,11 +17,11 @@ fn launch_revalidates_unlisted_constraint_keys() {
     .test_unwrap();
     plan.test_argument_constraints_mut().insert(
         crate::Syscall::Getcwd,
-        vec![SyscallArgumentConstraint {
+        vec![vec![SyscallArgumentConstraint {
             argument_index: 0,
             comparison: SeccompArgumentComparison::Equal,
             value: 0,
-        }],
+        }]],
     );
     assert_eq!(
         plan.validate(),

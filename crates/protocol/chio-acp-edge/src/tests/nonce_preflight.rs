@@ -161,7 +161,10 @@ fn generated_request_id_rejects_threshold_approvals() {
         .invoke("run", serde_json::json!({}), &kernel, &execution)
         .test_expect_err("generated request IDs must reject threshold approvals");
 
-    assert!(error.to_string().contains("invoke_with_request_id"));
+    assert!(matches!(
+        error,
+        AcpEdgeError::InvalidRequest(AcpRequestError::StableRequestIdRequired)
+    ));
 }
 
 #[test]
@@ -233,13 +236,17 @@ fn strict_nonce_retries_require_and_accept_stable_request_ids() {
     let generated_error = edge
         .invoke("read_file", arguments.clone(), &kernel, &retry_execution)
         .test_expect_err("generated invoke IDs must reject execution nonces");
-    assert!(generated_error
-        .to_string()
-        .contains("invoke_with_request_id"));
+    assert!(matches!(
+        generated_error,
+        AcpEdgeError::InvalidRequest(AcpRequestError::StableRequestIdRequired)
+    ));
     let mcp_error = edge
         .invoke_with_mcp_target("read_file", arguments.clone(), &kernel, &retry_execution)
         .test_expect_err("generated MCP-target IDs must reject execution nonces");
-    assert!(mcp_error.to_string().contains("invoke_with_request_id"));
+    assert!(matches!(
+        mcp_error,
+        AcpEdgeError::InvalidRequest(AcpRequestError::StableRequestIdRequired)
+    ));
 
     edge.start_stream_with_request_id(
         request_id,

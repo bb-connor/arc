@@ -15,6 +15,8 @@ use super::cage_policy::{
     ProvisionedCeilings,
 };
 
+#[path = "provision/authority_paths.rs"]
+mod authority_paths;
 #[path = "provision/discovery.rs"]
 mod discovery;
 #[path = "provision/linkage.rs"]
@@ -370,7 +372,7 @@ fn provision(inputs: &ProvisionInputs) -> Result<(), CliError> {
 
 #[allow(clippy::too_many_arguments)]
 fn resolve_inputs(
-    profile: ProvisionProfile,
+    mut profile: ProvisionProfile,
     output_dir: &Path,
     runtime_security_dir: Option<&Path>,
     tool_surface: ToolSurfaceSource<'_>,
@@ -410,6 +412,7 @@ fn resolve_inputs(
         )?,
         None => output_directory.clone(),
     };
+    authority_paths::protect(&mut profile, &output_directory, &runtime_security_directory)?;
     let target_path = require_exact_canonical_path(target, "target executable")?;
     let target_binding_digest = hash_executable(&target_path, "target executable")?;
     let execution_identity = chio_cage::ExecutionIdentity::new(
@@ -1180,7 +1183,10 @@ fn build_policy_factory(
         registered_public_key: signers.manifest.public_key(),
         policy_signer_public_key: signers.policy.public_key(),
         stage: inputs.profile.stage,
-        ceilings: inputs.profile.ceilings.clone(),
+        ceilings: authority_paths::runtime_ceilings(
+            &inputs.profile,
+            &inputs.runtime_security_directory,
+        ),
         broker: inputs.profile.broker.clone(),
         receipt_capability_id: inputs.profile.receipt_capability_id.to_string(),
         receipt_tenant_id: inputs.profile.receipt_tenant_id.map(str::to_string),

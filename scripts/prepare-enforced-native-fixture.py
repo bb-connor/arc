@@ -22,15 +22,15 @@ def validate_grants(paths: list[Path], protected: list[Path]) -> list[Path]:
             secret == grant or grant in secret.parents or secret in grant.parents
             for secret in protected
         ):
-            raise ValueError(
-                "read grants include fixture authority or its independent anchor"
-            )
+            raise ValueError("read grants include fixture authority or its independent anchor")
         if "\n" in str(grant) or "\r" in str(grant):
             raise ValueError("read grants cannot contain line separators")
     return grants
 
 
-def prepare(helper: Path, directory: Path, paths: list[Path], github_env: Path) -> None:
+def prepare(
+    helper: Path, directory: Path, paths: list[Path], github_env: Path, anchor_parent: Path
+) -> None:
     if (platform.system(), platform.machine()) != ("Linux", "x86_64"):
         raise ValueError("native consumer fixture requires Linux x86_64")
     if os.getuid() == 0 or os.getgid() == 0:
@@ -41,9 +41,12 @@ def prepare(helper: Path, directory: Path, paths: list[Path], github_env: Path) 
     helper = helper.resolve(strict=True)
     if not stat.S_ISREG(helper.stat().st_mode) or not os.access(helper, os.X_OK):
         raise ValueError("native helper must be an executable regular file")
+    anchor_parent = anchor_parent.resolve(strict=True)
+    if not anchor_parent.is_dir():
+        raise ValueError("anchor parent must be an existing directory")
     directory = directory.absolute()
     directory.mkdir(mode=0o700, parents=False, exist_ok=False)
-    anchor = Path(tempfile.mkdtemp(prefix="chio-native-anchors-", dir="/dev/shm"))
+    anchor = Path(tempfile.mkdtemp(prefix="chio-native-anchors-", dir=anchor_parent))
     try:
         if anchor.stat().st_dev == directory.stat().st_dev:
             raise ValueError("receipt anchors require an independent filesystem")
@@ -52,9 +55,7 @@ def prepare(helper: Path, directory: Path, paths: list[Path], github_env: Path) 
             protected.append((Path(workspace) / ".git").resolve())
         grants = validate_grants(paths, protected)
         grants_file = directory / "read-paths.txt"
-        grants_file.write_text(
-            "".join(f"{path}\n" for path in grants), encoding="utf-8"
-        )
+        grants_file.write_text("".join(f"{path}\n" for path in grants), encoding="utf-8")
         grants_file.chmod(0o600)
         settings = {
             "CHIO_CAGE_INIT": str(helper),
@@ -62,9 +63,7 @@ def prepare(helper: Path, directory: Path, paths: list[Path], github_env: Path) 
             "CHIO_CAGE_READ_PATHS_FILE": str(grants_file),
             "CHIO_CAGE_EXECUTION_UID": str(os.getuid()),
             "CHIO_CAGE_EXECUTION_GID": str(os.getgid()),
-            "CHIO_CAGE_EXECUTION_SUPPLEMENTARY_GIDS": ",".join(
-                str(group) for group in groups
-            ),
+            "CHIO_CAGE_EXECUTION_SUPPLEMENTARY_GIDS": ",".join(str(group) for group in groups),
         }
         if any("\n" in value or "\r" in value for value in settings.values()):
             raise ValueError("fixture settings cannot contain line separators")
@@ -97,8 +96,9 @@ def main() -> None:
     parser.add_argument("--directory", required=True, type=Path)
     parser.add_argument("--read-path", action="append", default=[], type=Path)
     parser.add_argument("--github-env", required=True, type=Path)
+    parser.add_argument("--anchor-parent", required=True, type=Path)
     args = parser.parse_args()
-    prepare(args.helper, args.directory, args.read_path, args.github_env)
+    prepare(args.helper, args.directory, args.read_path, args.github_env, args.anchor_parent)
 
 
 if __name__ == "__main__":

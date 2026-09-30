@@ -256,7 +256,7 @@ fn hosted_mcp_accepts_local_oauth_pkce_and_rejects_invalid_verifier() {
     assert_eq!(invalid_exchange["error"].as_str(), Some("invalid_grant"));
     assert_eq!(
         invalid_exchange["error_description"].as_str(),
-        Some("PKCE verification failed")
+        Some("urn:chio:error:policy:decision-denied")
     );
 
     let code = authorize_code(&server, redirect_uri, &resource, "chio-auth-verifier");

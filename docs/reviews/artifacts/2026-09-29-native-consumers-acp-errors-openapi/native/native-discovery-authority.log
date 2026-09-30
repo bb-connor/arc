@@ -1,0 +1,11 @@
+
+running 1 test
+Error: "discovery exited before identity observation: exit status: 1: error [urn:chio:error:cli:other]: failed to launch MCP discovery: runtime artifact is not an executable regular file: /home/ubuntu/chio-x86-cage-c38ea127ed-target/x86_64-unknown-linux-musl/debug/chio-cage-init\ncontext: {\"domain\":\"cli\",\"severity\":\"error\",\"stability\":\"deprecated\",\"string_code\":\"CHIO-CLI-OTHER\"}\nsuggested fix: Preserve the original message and migrate the call site to a specific registry code when touched.\n"
+test privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup ... FAILED
+
+failures:
+
+failures:
+    privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s

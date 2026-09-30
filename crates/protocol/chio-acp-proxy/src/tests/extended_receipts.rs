@@ -1,6 +1,8 @@
+use super::*;
+
 #[test]
 fn receipt_content_hash_deterministic_same_input() {
-    let logger = ReceiptLogger::new("srv-1");
+    let logger = ReceiptLogger::new("srv-1", AcpClock::default());
     let event = ToolCallEvent {
         tool_call_id: "tc-det".to_string(),
         title: Some("Hash test".to_string()),
@@ -8,15 +10,19 @@ fn receipt_content_hash_deterministic_same_input() {
         status: Some("running".to_string()),
         extra: Default::default(),
     };
-    let entry1 = logger.log_tool_call("session-det", &event, None);
-    let entry2 = logger.log_tool_call("session-det", &event, None);
+    let entry1 = logger
+        .log_tool_call("session-det", &event, None)
+        .expect("audit generation");
+    let entry2 = logger
+        .log_tool_call("session-det", &event, None)
+        .expect("audit generation");
     assert_eq!(entry1.content_hash, entry2.content_hash);
     assert_eq!(entry1.content_hash.len(), 64);
 }
 
 #[test]
 fn receipt_different_inputs_produce_different_hashes() {
-    let logger = ReceiptLogger::new("srv-1");
+    let logger = ReceiptLogger::new("srv-1", AcpClock::default());
     let event_a = ToolCallEvent {
         tool_call_id: "tc-a".to_string(),
         title: Some("Event A".to_string()),
@@ -31,8 +37,12 @@ fn receipt_different_inputs_produce_different_hashes() {
         status: Some("running".to_string()),
         extra: Default::default(),
     };
-    let entry_a = logger.log_tool_call("session-diff", &event_a, None);
-    let entry_b = logger.log_tool_call("session-diff", &event_b, None);
+    let entry_a = logger
+        .log_tool_call("session-diff", &event_a, None)
+        .expect("audit generation");
+    let entry_b = logger
+        .log_tool_call("session-diff", &event_b, None)
+        .expect("audit generation");
     assert_ne!(
         entry_a.content_hash, entry_b.content_hash,
         "different events should produce different hashes"
@@ -41,7 +51,7 @@ fn receipt_different_inputs_produce_different_hashes() {
 
 #[test]
 fn receipt_missing_optional_fields_handled_gracefully() {
-    let logger = ReceiptLogger::new("srv-1");
+    let logger = ReceiptLogger::new("srv-1", AcpClock::default());
     let event = ToolCallEvent {
         tool_call_id: "tc-minimal".to_string(),
         title: None,
@@ -49,7 +59,9 @@ fn receipt_missing_optional_fields_handled_gracefully() {
         status: None,
         extra: Default::default(),
     };
-    let entry = logger.log_tool_call("session-minimal", &event, None);
+    let entry = logger
+        .log_tool_call("session-minimal", &event, None)
+        .expect("audit generation");
     assert_eq!(entry.tool_call_id, "tc-minimal");
     assert_eq!(
         entry.title, "",
@@ -66,25 +78,29 @@ fn receipt_missing_optional_fields_handled_gracefully() {
 
 #[test]
 fn receipt_tool_call_update_without_status_returns_none() {
-    let logger = ReceiptLogger::new("srv-1");
+    let logger = ReceiptLogger::new("srv-1", AcpClock::default());
     let event = ToolCallUpdateEvent {
         tool_call_id: "tc-no-status".to_string(),
         status: None,
         extra: Default::default(),
     };
-    let result = logger.log_tool_call_update("session-none", &event, None);
+    let result = logger
+        .log_tool_call_update("session-none", &event, None)
+        .expect("audit generation");
     assert!(result.is_none());
 }
 
 #[test]
 fn receipt_tool_call_update_with_status_returns_some() {
-    let logger = ReceiptLogger::new("srv-1");
+    let logger = ReceiptLogger::new("srv-1", AcpClock::default());
     let event = ToolCallUpdateEvent {
         tool_call_id: "tc-with-status".to_string(),
         status: Some("error".to_string()),
         extra: Default::default(),
     };
-    let result = logger.log_tool_call_update("session-status", &event, None);
+    let result = logger
+        .log_tool_call_update("session-status", &event, None)
+        .expect("audit generation");
     assert!(result.is_some());
     if let Some(entry) = result {
         assert_eq!(entry.tool_call_id, "tc-with-status");
@@ -95,14 +111,18 @@ fn receipt_tool_call_update_with_status_returns_some() {
 
 #[test]
 fn receipt_update_content_hash_deterministic() {
-    let logger = ReceiptLogger::new("srv-1");
+    let logger = ReceiptLogger::new("srv-1", AcpClock::default());
     let event = ToolCallUpdateEvent {
         tool_call_id: "tc-upd-det".to_string(),
         status: Some("completed".to_string()),
         extra: Default::default(),
     };
-    let entry1 = logger.log_tool_call_update("session-upd", &event, None);
-    let entry2 = logger.log_tool_call_update("session-upd", &event, None);
+    let entry1 = logger
+        .log_tool_call_update("session-upd", &event, None)
+        .expect("audit generation");
+    let entry2 = logger
+        .log_tool_call_update("session-upd", &event, None)
+        .expect("audit generation");
     assert!(entry1.is_some());
     assert!(entry2.is_some());
     if let (Some(e1), Some(e2)) = (entry1, entry2) {
@@ -112,7 +132,7 @@ fn receipt_update_content_hash_deterministic() {
 
 #[test]
 fn receipt_server_id_matches_logger_config() {
-    let logger = ReceiptLogger::new("custom-server-id");
+    let logger = ReceiptLogger::new("custom-server-id", AcpClock::default());
     let event = ToolCallEvent {
         tool_call_id: "tc-srv".to_string(),
         title: Some("Server ID test".to_string()),
@@ -120,13 +140,15 @@ fn receipt_server_id_matches_logger_config() {
         status: Some("running".to_string()),
         extra: Default::default(),
     };
-    let entry = logger.log_tool_call("s1", &event, None);
+    let entry = logger
+        .log_tool_call("s1", &event, None)
+        .expect("audit generation");
     assert_eq!(entry.server_id, "custom-server-id");
 }
 
 #[test]
 fn receipt_timestamp_is_numeric_string() {
-    let logger = ReceiptLogger::new("srv-1");
+    let logger = ReceiptLogger::new("srv-1", AcpClock::default());
     let event = ToolCallEvent {
         tool_call_id: "tc-ts".to_string(),
         title: Some("Timestamp test".to_string()),
@@ -134,7 +156,9 @@ fn receipt_timestamp_is_numeric_string() {
         status: Some("running".to_string()),
         extra: Default::default(),
     };
-    let entry = logger.log_tool_call("s1", &event, None);
+    let entry = logger
+        .log_tool_call("s1", &event, None)
+        .expect("audit generation");
     assert!(!entry.timestamp.is_empty(), "timestamp should not be empty");
     let parsed: Result<u64, _> = entry.timestamp.parse();
     assert!(

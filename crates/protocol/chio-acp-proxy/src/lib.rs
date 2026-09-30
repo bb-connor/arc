@@ -18,6 +18,13 @@
 
 #![forbid(unsafe_code)]
 
+mod rejection;
+pub use rejection::{AcpGuardError, AcpProtocolError};
+mod receipt_error;
+pub use receipt_error::{ReceiptAuthorizationError, ReceiptBinding, ReceiptSignError};
+mod clock;
+use chio_security_types::clock::Clock;
+pub use clock::{AcpAuditError, AcpClock};
 mod input;
 use chio_core::crypto::PublicKey;
 pub use input::{AcpFrameReader, AcpMessage, MAX_ACP_MESSAGE_BYTES};
@@ -43,13 +50,18 @@ include!("telemetry.rs");
 include!("interceptor.rs");
 include!("transport.rs");
 include!("proxy.rs");
-include!("tests.rs");
+#[cfg(test)]
+mod tests;
 
 // ---------- error type ----------
 
 /// Errors produced by the ACP proxy.
 #[derive(thiserror::Error)]
 pub enum AcpProxyError {
+    #[error("{0}")]
+    Audit(#[from] AcpAuditError),
+    #[error("{0}")]
+    Receipt(#[from] ReceiptSignError),
     #[error("{0}")]
     SharedInput(#[from] chio_core::canonical::SharedUntrustedJsonError),
     #[error("{0}")]
@@ -63,21 +75,15 @@ pub enum AcpProxyError {
     #[error("{0}")]
     Capability(#[from] CapabilityCheckError),
 
-    /// A JSON-RPC protocol-level error (malformed message, bad params).
-    #[error("protocol error: {0}")]
-    Protocol(String),
-
-    /// Access was denied by a guard or policy check.
-    #[error("access denied: {0}")]
-    AccessDenied(String),
-
-    /// A path traversal attempt was detected.
-    #[error("path traversal detected: {0}")]
-    PathTraversal(String),
-
-    /// A transport-level error (process spawn, pipe I/O).
-    #[error("transport error: {0}")]
-    Transport(String),
+    /// A JSON-RPC semantic error.
+    #[error("{0}")]
+    Protocol(#[from] AcpProtocolError),
+    /// A local guard rejected access.
+    #[error("{0}")]
+    Guard(#[from] AcpGuardError),
+    /// A required child pipe was unavailable.
+    #[error("urn:chio:error:transport:upstream-failure")]
+    PipeUnavailable,
 }
 
 impl std::fmt::Debug for AcpProxyError {

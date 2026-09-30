@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use sha2::{Digest, Sha256};
 
 /// How strongly an ACP audit entry is tied to live capability enforcement.
@@ -47,6 +45,7 @@ pub struct AcpCapabilityAuditContext {
 #[derive(Debug, Clone)]
 pub struct ReceiptLogger {
     server_id: String,
+    clock: AcpClock,
 }
 
 /// An unsigned audit entry produced for an observed ACP tool-call event.
@@ -100,9 +99,10 @@ pub struct AcpToolCallAuditEntry {
 
 impl ReceiptLogger {
     /// Create a logger that tags audit entries with the given server ID.
-    pub fn new(server_id: impl Into<String>) -> Self {
+    pub fn new(server_id: impl Into<String>, clock: AcpClock) -> Self {
         Self {
             server_id: server_id.into(),
+            clock,
         }
     }
 
@@ -112,8 +112,8 @@ impl ReceiptLogger {
         session_id: &str,
         event: &ToolCallEvent,
         capability_context: Option<&AcpCapabilityAuditContext>,
-    ) -> AcpToolCallAuditEntry {
-        let content_hash = compute_content_hash(event);
+    ) -> Result<AcpToolCallAuditEntry, AcpAuditError> {
+        let content_hash = compute_content_hash(event)?;
         let mut entry = AcpToolCallAuditEntry {
             tool_call_id: event.tool_call_id.clone(),
             title: event.title.clone().unwrap_or_default(),
@@ -123,7 +123,7 @@ impl ReceiptLogger {
                 .clone()
                 .unwrap_or_else(|| "started".to_string()),
             session_id: session_id.to_string(),
-            timestamp: now_unix_secs(),
+            timestamp: self.clock.seconds()?.to_string(),
             server_id: self.server_id.clone(),
             content_hash,
             capability_id: None,
@@ -137,7 +137,7 @@ impl ReceiptLogger {
             enforcement_mode: Some(AcpEnforcementMode::AuditOnly),
         };
         apply_capability_context(&mut entry, capability_context);
-        entry
+        Ok(entry)
     }
 
     /// Optionally generate an audit entry for a tool-call update event.
@@ -148,16 +148,18 @@ impl ReceiptLogger {
         session_id: &str,
         event: &ToolCallUpdateEvent,
         capability_context: Option<&AcpCapabilityAuditContext>,
-    ) -> Option<AcpToolCallAuditEntry> {
-        let status = event.status.as_deref()?;
-        let content_hash = compute_update_content_hash(event);
+    ) -> Result<Option<AcpToolCallAuditEntry>, AcpAuditError> {
+        let Some(status) = event.status.as_deref() else {
+            return Ok(None);
+        };
+        let content_hash = compute_update_content_hash(event)?;
         let mut entry = AcpToolCallAuditEntry {
             tool_call_id: event.tool_call_id.clone(),
             title: String::new(),
             kind: None,
             status: status.to_string(),
             session_id: session_id.to_string(),
-            timestamp: now_unix_secs(),
+            timestamp: self.clock.seconds()?.to_string(),
             server_id: self.server_id.clone(),
             content_hash,
             capability_id: None,
@@ -171,7 +173,7 @@ impl ReceiptLogger {
             enforcement_mode: Some(AcpEnforcementMode::AuditOnly),
         };
         apply_capability_context(&mut entry, capability_context);
-        Some(entry)
+        Ok(Some(entry))
     }
 }
 
@@ -190,15 +192,6 @@ fn apply_capability_context(
         entry.authorization_parameter_hash = context.authorization_parameter_hash.clone();
         entry.enforcement_mode = Some(context.enforcement_mode);
     }
-}
-
-/// Return the current time as seconds since the Unix epoch (UTC).
-fn now_unix_secs() -> String {
-    let duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = duration.as_secs();
-    format!("{secs}")
 }
 
 /// Build a canonical-hash input for a `ToolCallEvent`.
@@ -237,9 +230,7 @@ fn tool_call_event_canonical_hash_input(event: &ToolCallEvent) -> serde_json::Va
 /// Build a canonical-hash input for a `ToolCallUpdateEvent`.
 ///
 /// See `tool_call_event_canonical_hash_input` for the rationale.
-fn tool_call_update_event_canonical_hash_input(
-    event: &ToolCallUpdateEvent,
-) -> serde_json::Value {
+fn tool_call_update_event_canonical_hash_input(event: &ToolCallUpdateEvent) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     map.insert(
         "toolCallId".to_string(),
@@ -260,26 +251,13 @@ fn tool_call_update_event_canonical_hash_input(
 /// `#[serde(flatten)]` is excluded so unknown JSON fields cannot silently
 /// alter the content hash. See `tool_call_event_canonical_hash_input`.
 ///
-/// # Wire-format compatibility note
-///
-/// This canonicalization is INTENTIONALLY not backward-compatible with the
-/// prior `serde_json::to_string(event)` digest. The v1 receipt wire format
-/// is grounded on the canonical JSON pipeline so receipts produced by
-/// independent implementations agree on a single content hash for the same
-/// logical event. Previously stored receipts computed with the v0
-/// (non-canonical) digest will therefore not match a freshly computed v1
-/// digest of the same event payload, and
-/// `content_hash`-based deduplication or comparability across the
-/// v0/v1 boundary is not supported by design. v0 stores must be
-/// rebuilt or migrated by re-deriving content hashes from the
-/// preserved event payload before being mixed with v1 receipts.
-fn compute_content_hash(event: &ToolCallEvent) -> String {
+fn compute_content_hash(event: &ToolCallEvent) -> Result<String, AcpAuditError> {
     let canonical_input = tool_call_event_canonical_hash_input(event);
-    let json = chio_core::canonical::canonical_json_bytes(&canonical_input).unwrap_or_default();
+    let json = chio_core::canonical::canonical_json_bytes(&canonical_input)?;
     let mut hasher = Sha256::new();
     hasher.update(json.as_slice());
     let result = hasher.finalize();
-    hex_encode(&result)
+    Ok(hex_encode(&result))
 }
 
 /// Compute a SHA-256 hex digest of a `ToolCallUpdateEvent` serialized as canonical JSON.
@@ -287,17 +265,13 @@ fn compute_content_hash(event: &ToolCallEvent) -> String {
 /// Hashes only the explicit ACP wire fields; the `extra` map captured by
 /// `#[serde(flatten)]` is excluded. See `tool_call_update_event_canonical_hash_input`.
 ///
-/// See the wire-format compatibility note on `compute_content_hash`:
-/// this digest is intentionally v1-only and is not comparable with the
-/// v0 `serde_json::to_string` digest. v0/v1 cross-version comparison
-/// is not supported by design.
-fn compute_update_content_hash(event: &ToolCallUpdateEvent) -> String {
+fn compute_update_content_hash(event: &ToolCallUpdateEvent) -> Result<String, AcpAuditError> {
     let canonical_input = tool_call_update_event_canonical_hash_input(event);
-    let json = chio_core::canonical::canonical_json_bytes(&canonical_input).unwrap_or_default();
+    let json = chio_core::canonical::canonical_json_bytes(&canonical_input)?;
     let mut hasher = Sha256::new();
     hasher.update(json.as_slice());
     let result = hasher.finalize();
-    hex_encode(&result)
+    Ok(hex_encode(&result))
 }
 
 /// Encode a byte slice as lowercase hex.

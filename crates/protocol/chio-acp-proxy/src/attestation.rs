@@ -19,22 +19,6 @@ pub struct AcpReceiptRequest {
     pub tool_name: String,
 }
 
-/// Error type for receipt signing failures.
-#[derive(Debug, thiserror::Error)]
-pub enum ReceiptSignError {
-    /// Signing key material is unavailable or corrupted.
-    #[error("signing key unavailable: {0}")]
-    KeyUnavailable(String),
-
-    /// Canonical serialization of the receipt body failed.
-    #[error("serialization failed: {0}")]
-    SerializationFailed(String),
-
-    /// The cryptographic signing operation itself failed.
-    #[error("signing operation failed: {0}")]
-    SigningFailed(String),
-}
-
 /// Trait for signing ACP audit entries into full Chio receipts.
 ///
 /// Implementations hold the Ed25519 key material needed to produce
@@ -103,32 +87,31 @@ pub struct AcpVerdict {
 }
 
 /// Error type for capability check failures.
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 pub enum CapabilityCheckError {
-    #[error("{0}")]
+    #[error("urn:chio:error:transport:upstream-failure")]
     Bridge(#[from] chio_cross_protocol::error::BridgeError),
     #[error("{0}")]
     UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
-    /// The token was malformed or could not be parsed.
-    #[error("invalid token: {0}")]
-    InvalidToken(String),
-
-    /// The token's signature could not be verified.
-    #[error("signature verification failed: {0}")]
-    SignatureVerificationFailed(String),
-
-    /// The capability has expired.
-    #[error("capability expired")]
-    Expired,
-
-    /// The capability has been revoked.
-    #[error("capability revoked: {0}")]
-    Revoked(String),
-
-    /// An internal error prevented the check from completing.
-    /// Fail-closed: this results in deny.
-    #[error("internal error: {0}")]
-    Internal(String),
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    Canonical(#[from] chio_core::error::Error),
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    Manifest(#[from] chio_manifest::VerifiedManifestAdmissionError),
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    AuthorityToolUnavailable,
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    InvalidAuthorityTopology,
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    UnsupportedOperation,
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    InvalidParameters,
+    #[error("urn:chio:error:transport:upstream-failure")]
+    CheckerUnavailable,
+}
+impl std::fmt::Debug for CapabilityCheckError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
 }
 
 /// Trait for checking capability tokens against ACP operations.

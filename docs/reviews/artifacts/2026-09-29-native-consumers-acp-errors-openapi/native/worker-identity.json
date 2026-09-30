@@ -1,0 +1,19 @@
+{
+  "system": "Linux-6.17.0-1020-oracle-x86_64-with-glibc2.39",
+  "machine": "x86_64",
+  "uid": 1001,
+  "gid": 1001,
+  "groups": [
+    4,
+    24,
+    27,
+    30,
+    105,
+    112,
+    1001
+  ],
+  "checkout": "/home/ubuntu/arc-native-consumers-20260929",
+  "target": "/home/ubuntu/chio-x86-cage-c38ea127ed-target",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+  "anchors": "/dev/sdb /mnt/chio-anchor ext4   a9c3e17f-57d1-4b15-b6e5-691671269458"
+}

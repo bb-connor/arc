@@ -1,0 +1,11 @@
+Command: uv tool run --offline ruff check --config examples/mini-swe-recovery/pyproject.toml crates/products/chio-cli/tests/process_host/recovery.py crates/products/chio-cli/tests/process_host/runner.py examples/mini-swe-recovery/qualify.py examples/mini-swe-recovery/qualify_native.py examples/mini-swe-recovery/qualify_state.py scripts/prepare-enforced-native-fixture.py sdks/python/chio-process/src/chio_process/broker_launch.py sdks/python/chio-process/src/chio_process/launch.py sdks/python/chio-process/tests/test_broker_launch.py
+error: invalid value 'examples/mini-swe-recovery/pyproject.toml' for '--config <CONFIG_OPTION>'
+
+  tip: A `--config` flag must either be a path to a `.toml` configuration file
+       or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+       option
+
+It looks like you were trying to pass a path to a configuration file.
+The path `examples/mini-swe-recovery/pyproject.toml` does not point to a configuration file
+
+For more information, try '--help'.

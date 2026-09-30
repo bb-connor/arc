@@ -11,3 +11,21 @@ fn test_config() -> AcpProxyConfig {
 // ================================================================
 // 1. Protocol Parsing Edge Cases
 // ================================================================
+
+#[path = "extended_protocol.rs"]
+mod protocol;
+
+#[path = "extended_guards.rs"]
+mod guards;
+
+#[path = "extended_interceptor.rs"]
+mod interceptor;
+
+#[path = "extended_permissions.rs"]
+mod permissions;
+
+#[path = "extended_receipts.rs"]
+mod receipts;
+
+#[path = "extended_config.rs"]
+mod config;

@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn telemetry_helpers_map_receipts_and_certificates() {
     let signer = Keypair::generate();
@@ -177,6 +179,7 @@ fn proxy_with_kernel_wraps_transport_and_interceptor() {
         Some(Box::new(DummySigner(Keypair::generate()))),
         Some(Box::new(DummyChecker)),
         AcpAttestationMode::Required,
+        AcpClock::default(),
     )
     .expect("proxy should start");
 

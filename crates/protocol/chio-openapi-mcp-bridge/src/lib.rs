@@ -54,7 +54,7 @@ fn manifest_tool_is_read_only(manifest: &ToolManifest, tool_name: &str) -> bool 
 #[derive(Debug, thiserror::Error)]
 pub enum BridgeError {
     /// The OpenAPI spec could not be parsed.
-    #[error("OpenAPI parse error: {0}")]
+    #[error("{0}")]
     OpenApi(#[from] OpenApiError),
 
     /// The manifest could not be validated.
@@ -104,8 +104,8 @@ pub enum BridgeError {
     },
 
     /// A manifest could not be canonicalized while checking an exact binding.
-    #[error("failed to canonicalize OpenAPI-MCP manifest binding: {0}")]
-    Canonicalization(String),
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    Canonicalization(#[from] chio_core::error::Error),
 }
 
 /// Configuration for the OpenAPI-MCP bridge.
@@ -218,7 +218,10 @@ impl RegistryBoundMcpTool {
 
 impl OpenApiMcpBridge {
     /// Create a new bridge from an OpenAPI spec string.
-    pub fn from_spec(spec_input: &str, config: BridgeConfig) -> Result<Self, BridgeError> {
+    pub fn from_spec(
+        spec_input: impl AsRef<[u8]>,
+        config: BridgeConfig,
+    ) -> Result<Self, BridgeError> {
         let spec = OpenApiSpec::parse(spec_input)?;
         Self::from_parsed_spec(&spec, config)
     }
@@ -328,9 +331,9 @@ impl OpenApiMcpBridge {
                 BridgeError::VerifiedManifestUnavailable(self.manifest.server_id.clone())
             })?;
         let generated_bytes = chio_core::canonical_json_bytes(&self.manifest)
-            .map_err(|error| BridgeError::Canonicalization(error.to_string()))?;
+            .map_err(BridgeError::Canonicalization)?;
         let verified_bytes = chio_core::canonical_json_bytes(&verified.manifest)
-            .map_err(|error| BridgeError::Canonicalization(error.to_string()))?;
+            .map_err(BridgeError::Canonicalization)?;
         if generated_bytes != verified_bytes {
             return Err(BridgeError::VerifiedManifestMismatch(
                 self.manifest.server_id.clone(),

@@ -117,7 +117,9 @@ fn range(content: &[u8], offset: u64, size: u64) -> Option<&[u8]> {
 }
 
 /// Read the ELF headers of `content` and report how it links.
-pub(crate) fn inspect_executable_linkage(content: &[u8]) -> Result<ExecutableLinkage, LinkageError> {
+pub(crate) fn inspect_executable_linkage(
+    content: &[u8],
+) -> Result<ExecutableLinkage, LinkageError> {
     let header = content
         .get(..ELF_HEADER_BYTES)
         .ok_or(LinkageError::Truncated("header"))?;
@@ -133,13 +135,17 @@ pub(crate) fn inspect_executable_linkage(content: &[u8]) -> Result<ExecutableLin
     let table_offset = u64_at(content, 32).ok_or(LinkageError::Truncated("header"))?;
     let entry_size = u16_at(content, 54).ok_or(LinkageError::Truncated("header"))?;
     let entry_count = u16_at(content, 56).ok_or(LinkageError::Truncated("header"))?;
-    if usize::from(entry_size) != PROGRAM_HEADER_BYTES || entry_count == 0 || entry_count > MAX_PROGRAM_HEADERS {
+    if usize::from(entry_size) != PROGRAM_HEADER_BYTES
+        || entry_count == 0
+        || entry_count > MAX_PROGRAM_HEADERS
+    {
         return Err(LinkageError::Malformed("program header table"));
     }
     let table_size = u64::from(entry_count)
         .checked_mul(PROGRAM_HEADER_BYTES as u64)
         .ok_or(LinkageError::Malformed("program header table"))?;
-    let table = range(content, table_offset, table_size).ok_or(LinkageError::Truncated("program header table"))?;
+    let table = range(content, table_offset, table_size)
+        .ok_or(LinkageError::Truncated("program header table"))?;
     let mut segments = Vec::with_capacity(usize::from(entry_count));
     for entry in table.chunks_exact(PROGRAM_HEADER_BYTES) {
         segments.push(Segment {
@@ -157,7 +163,8 @@ pub(crate) fn inspect_executable_linkage(content: &[u8]) -> Result<ExecutableLin
         }
         let bytes = range(content, segment.offset, segment.file_size)
             .ok_or(LinkageError::Truncated("interpreter segment"))?;
-        let path = terminated_string(bytes).ok_or(LinkageError::Malformed("interpreter segment"))?;
+        let path =
+            terminated_string(bytes).ok_or(LinkageError::Malformed("interpreter segment"))?;
         if !path.starts_with('/') {
             return Err(LinkageError::Malformed("interpreter path"));
         }
@@ -199,9 +206,12 @@ pub(crate) fn inspect_executable_linkage(content: &[u8]) -> Result<ExecutableLin
                 (relative < segment.file_size).then(|| segment.offset.checked_add(relative))?
             })
             .ok_or(LinkageError::Malformed("dynamic string table"))?;
-        let strings = range(content, file_offset, size).ok_or(LinkageError::Truncated("dynamic string table"))?;
+        let strings = range(content, file_offset, size)
+            .ok_or(LinkageError::Truncated("dynamic string table"))?;
         for offset in needed_offsets {
-            let start = usize::try_from(offset).ok().filter(|start| *start < strings.len());
+            let start = usize::try_from(offset)
+                .ok()
+                .filter(|start| *start < strings.len());
             let name = start
                 .and_then(|start| terminated_string(&strings[start..]))
                 .ok_or(LinkageError::Malformed("shared object name"))?;
@@ -210,9 +220,14 @@ pub(crate) fn inspect_executable_linkage(content: &[u8]) -> Result<ExecutableLin
     }
 
     if interpreter.is_none() && needed.is_empty() {
-        Ok(ExecutableLinkage::Static { position_independent })
+        Ok(ExecutableLinkage::Static {
+            position_independent,
+        })
     } else {
-        Ok(ExecutableLinkage::Dynamic { interpreter, needed })
+        Ok(ExecutableLinkage::Dynamic {
+            interpreter,
+            needed,
+        })
     }
 }
 
@@ -236,7 +251,11 @@ pub(crate) mod tests {
 
     /// A 64-bit little-endian ELF image whose program headers follow the
     /// ELF header and whose remaining bytes are `body`.
-    pub(crate) fn synthetic_elf(image_type: u16, segments: &[SyntheticSegment], body: &[u8]) -> Vec<u8> {
+    pub(crate) fn synthetic_elf(
+        image_type: u16,
+        segments: &[SyntheticSegment],
+        body: &[u8],
+    ) -> Vec<u8> {
         let mut image = vec![0_u8; ELF_HEADER_BYTES];
         image[..4].copy_from_slice(b"\x7fELF");
         image[4] = 2;
@@ -281,7 +300,9 @@ pub(crate) mod tests {
         let executable = synthetic_elf(ELF_TYPE_EXECUTABLE, &[load], &body);
         assert_eq!(
             inspect_executable_linkage(&executable),
-            Ok(ExecutableLinkage::Static { position_independent: false })
+            Ok(ExecutableLinkage::Static {
+                position_independent: false
+            })
         );
         let load = SyntheticSegment {
             kind: PT_LOAD,
@@ -292,7 +313,9 @@ pub(crate) mod tests {
         let pie = synthetic_elf(ELF_TYPE_SHARED_OBJECT, &[load], &body);
         assert_eq!(
             inspect_executable_linkage(&pie),
-            Ok(ExecutableLinkage::Static { position_independent: true })
+            Ok(ExecutableLinkage::Static {
+                position_independent: true
+            })
         );
     }
 
@@ -373,7 +396,12 @@ pub(crate) mod tests {
         );
         let truncated = synthetic_elf(
             ELF_TYPE_EXECUTABLE,
-            &[SyntheticSegment { kind: PT_INTERP, offset: 4096, address: 0, file_size: 16 }],
+            &[SyntheticSegment {
+                kind: PT_INTERP,
+                offset: 4096,
+                address: 0,
+                file_size: 16,
+            }],
             &[],
         );
         assert_eq!(
@@ -385,12 +413,19 @@ pub(crate) mod tests {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     #[test]
     fn the_test_executable_is_dynamically_linked() {
-        let image = std::fs::read(std::env::current_exe().unwrap_or_else(|error| panic!("{error}")))
-            .unwrap_or_else(|error| panic!("{error}"));
+        let image =
+            std::fs::read(std::env::current_exe().unwrap_or_else(|error| panic!("{error}")))
+                .unwrap_or_else(|error| panic!("{error}"));
         match inspect_executable_linkage(&image) {
-            Ok(ExecutableLinkage::Dynamic { interpreter: Some(interpreter), needed }) => {
+            Ok(ExecutableLinkage::Dynamic {
+                interpreter: Some(interpreter),
+                needed,
+            }) => {
                 assert!(interpreter.is_absolute());
-                assert!(needed.iter().any(|name| name.starts_with("libc.so")), "{needed:?}");
+                assert!(
+                    needed.iter().any(|name| name.starts_with("libc.so")),
+                    "{needed:?}"
+                );
             }
             other => panic!("unexpected linkage for the test executable: {other:?}"),
         }

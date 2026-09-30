@@ -1,0 +1,687 @@
+warning: unused import: `record_receipt_write_error`
+  --> crates/protocol/chio-acp-edge/src/lib.rs:76:48
+   |
+76 | use error::{record_receipt_write_bridge_error, record_receipt_write_error};
+   |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+
+warning: unused import: `decode_sender_dpop_proof`
+  --> crates/protocol/chio-mcp-remote/src/lib.rs:13:25
+   |
+13 | use sender_constraint::{decode_sender_dpop_proof, validate_sender_constraint_runtime, verify_sender_dpop_proof};
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+
+Cargo build-finished: True
+
+running 98 tests
+test metrics::tests::registry_constant_matches_spec ... ok
+test tests::acp_category_serializes ... ok
+test request_error::tests::semantic_field_rejections_keep_precise_causes_without_peer_text ... ok
+test metrics::tests::render_includes_pending_approval_outcome_label ... ok
+test metrics::tests::render_exposes_writer_liveness_gauges ... ok
+test tests::default_config_requires_permission ... ok
+test tests::bridge_fidelity_serializes ... ok
+test tests::acp_projection_preserves_complete_approval_set_and_opaque_extension ... ok
+test tests::acp_execution_request_preserves_complete_authorization_context ... ok
+test tests::approval_required_capability_is_adapted_with_permission_caveat ... ok
+test tests::edge_capability_ids_match_tool_names ... ok
+test tests::duplicate_manifest_owners_are_rejected ... ok
+test tests::browser_tools_are_not_auto_published ... ok
+test tests::edge_capability_lookup ... ok
+test tests::error_display_access_denied ... ok
+test tests::colliding_capability_ids_are_withheld_deterministically ... ok
+test tests::error_display_kernel ... ok
+test tests::edge_unknown_capability_returns_none ... ok
+test tests::edge_generates_capabilities_from_manifest ... ok
+test tests::error_display_tool_not_found ... ok
+test nonce_preflight_tests::generated_request_id_rejects_threshold_approvals ... ok
+test tests::deferred_failure_is_terminal_and_retains_the_same_local_cause ... ok
+test tests::acp_execution_boundary_rejects_removed_or_mismatched_flow_sidecar ... ok
+test tests::generic_side_effectful_tools_are_not_auto_published ... ok
+test tests::filesystem_tools_have_lossless_fidelity ... ok
+test tests::generic_readonly_tool_is_adapted_with_category_caveat ... ok
+test tests::hidden_capability_is_not_auto_published ... ok
+test tests::invoke_rejects_blank_execution_agent_id_before_dispatch ... ok
+test tests::invoke_rejects_control_character_execution_agent_id_before_dispatch ... ok
+test tests::invalid_target_protocol_metadata_is_rejected ... ok
+test tests::invoke_kernel_error_records_receipt_write_error_outcome ... ok
+test tests::invoke_rejects_supplemental_authorization_without_stable_request_id ... ok
+test tests::default_invoke_supports_openai_target_binding ... ok
+test tests::default_invoke_honors_protocol_aware_target_binding ... ok
+test tests::invoke_unknown_tool_errors ... ok
+test tests::invoke_rejects_singular_approval_token_without_stable_request_id ... ok
+test tests::invoke_with_kernel_denial_still_emits_receipt_metadata ... ok
+test tests::jsonrpc_invalid_version_preserves_scalar_request_id ... ok
+test tests::invoke_with_kernel_emits_signed_receipt_metadata ... ok
+test nonce_preflight_tests::strict_nonce_retries_require_and_accept_stable_request_ids ... ok
+test tests::jsonrpc_cancel_marks_deferred_stream_task_cancelled ... ok
+test tests::invoke_server_failure_returns_unsuccessful ... ok
+test tests::jsonrpc_param_helpers_validate_capability_and_default_arguments ... ok
+test tests::invoke_succeeds ... ok
+test tests::jsonrpc_cancel_rejects_missing_task_identity ... ok
+test tests::jsonrpc_lifecycle_rejects_control_character_task_id_before_lookup ... ok
+test tests::invoke_with_mcp_target_emits_receipt_metadata_and_mcp_projection ... ok
+test tests::jsonrpc_list_capabilities ... ok
+test tests::jsonrpc_list_capabilities_rejects_non_object_params_before_listing ... ok
+test tests::jsonrpc_lifecycle_rejects_empty_task_id_before_lookup ... ok
+test tests::jsonrpc_lifecycle_rejects_padded_task_id_before_lookup ... ok
+test tests::edge_rejects_manifest_with_unsupported_schema_version ... ok
+test tests::jsonrpc_kernel_paths_mark_authority_and_permission_preview ... ok
+test tests::jsonrpc_permission_rejects_non_object_params_before_preview ... ok
+test tests::jsonrpc_permission_rejects_padded_execution_agent_id_before_preview ... ok
+test tests::jsonrpc_rejects_non_scalar_request_ids_before_method_dispatch ... ok
+test tests::jsonrpc_request_permission_rejects_control_character_capability_id_before_preview ... ok
+test tests::jsonrpc_request_permission_rejects_empty_capability_id_before_preview ... ok
+test tests::jsonrpc_resume_rejects_non_object_params_before_task_lookup ... ok
+test tests::jsonrpc_request_permission_rejects_padded_capability_id_before_preview ... ok
+test tests::jsonrpc_stream_notification_creates_task_without_response ... ok
+test tests::jsonrpc_request_permission ... ok
+test tests::acp_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation ... ok
+test tests::jsonrpc_stream_rejects_padded_execution_agent_id_before_task_retention ... ok
+test tests::jsonrpc_tool_invoke_rejects_control_character_capability_id_before_lookup ... ok
+test tests::jsonrpc_tool_invoke_rejects_non_object_params_before_capability_lookup ... ok
+test tests::jsonrpc_tool_invoke_rejects_non_string_capability_id_before_lookup ... ok
+test tests::jsonrpc_resume_runtime_admission_denies_before_stream_tool_dispatch ... ok
+test tests::permission_decision_serializes ... ok
+test tests::jsonrpc_stream_creates_deferred_task_and_resume_resolves_result ... ok
+test tests::jsonrpc_unknown_method ... ok
+test tests::jsonrpc_resume_retains_completed_deferred_task_result ... ok
+test tests::original_input::invalid_notification_keeps_local_cause_without_emitting_a_wire_reply ... ok
+test tests::permissions::exec_command_gets_terminal_category ... ok
+test tests::jsonrpc_tool_invoke_rejects_padded_capability_id_before_lookup ... ok
+test tests::original_input::task_clock_failures_retain_pending_work_and_counters_never_wrap ... ok
+test tests::permissions::permission_not_required_when_config_disabled ... ok
+test tests::permissions::permission_denied_for_unknown_capability ... ok
+test tests::permissions::jsonrpc_permission_preview_uses_kernel_dpop_config ... ok
+test tests::permissions::permission_denied_by_default_for_required_caps ... ok
+test tests::jsonrpc_tool_invoke ... ok
+test tests::pending_approval_is_not_reported_as_success ... ok
+test tests::original_input::public_byte_ingress_rejects_duplicates_and_bounds_before_dispatch ... ok
+test tests::permissions::permission_with_capability_allows_matching_scope ... ok
+test tests::permissions::side_effect_tools_require_permission ... ok
+test tests::permissions::search_gets_default_tool_category ... ok
+test tests::permissions::read_file_gets_filesystem_category ... ok
+test tests::permissions::permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop ... ok
+test tests::permissions::permission_with_capability_denies_sender_bound_scope_without_dpop ... ok
+test tests::permissions::write_file_gets_filesystem_category ... ok
+test tests::permissions::permission_with_capability_denies_out_of_scope_request ... ok
+test tests::pre_kernel_bridge_error_does_not_record_receipt_write_error_outcome ... ok
+test tests::permissions::permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce ... ok
+test tests::terminal_tools_have_lossless_fidelity ... ok
+test tests::registry_admitted_flow_survives_acp_execution_projection_canonically ... ok
+test tests::streaming_capability_is_adapted_with_stream_and_cancellation_caveats ... ok
+test tests::jsonrpc_stream_rejects_deferred_task_map_over_cap ... ok
+test tests::jsonrpc_stream_capacity_includes_retained_cancelled_deferred_tasks ... ok
+
+test result: ok. 98 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+
+
+running 205 tests
+test clock::tests::clones_retain_the_fence_after_faults_and_rollback ... ok
+test clock::tests::persisted_events_reject_bad_future_and_overflowing_time ... ok
+test input::tests::complete_frames_and_clean_eof_are_distinct_from_truncation ... ok
+test input::tests::original_duplicates_and_malformed_bytes_retain_redacted_sources ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_checker_allow_path_records_capability_context_for_receipts ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_does_not_bind_ambiguous_pending_contexts_to_tool_calls ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_blocked_request_preserves_unrelated_capability_contexts ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_rejects_malformed_checker_verdict_evidence ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_rejects_cryptographic_allow_without_signed_authorization_receipt ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_required_attestation_blocks_when_signer_is_missing_or_fails ... ok
+test tests::attestation_and_telemetry_tests::compliance::compliance_certificate_rejects_mixed_kernel_keys ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_session_cancel_rejects_malformed_params_without_draining_contexts ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_session_cancel_clears_pending_capability_contexts ... ok
+test tests::attestation_and_telemetry_tests::compliance::compliance_certificate_serializes_snake_case ... ok
+test tests::attestation_and_telemetry_tests::clock::clock_faults_and_restart_preserve_authorization_custody ... ok
+test tests::attestation_and_telemetry_tests::compliance::compliance_verification_signer_mismatch_omits_redundant_body_reason ... ok
+test tests::attestation_and_telemetry_tests::clock::certificate_time_and_sequence_fail_closed ... ok
+test tests::attestation_and_telemetry_tests::lifecycle::cap_context_for_fs_read_links_to_later_session_update_via_request_id ... ok
+test tests::attestation_and_telemetry_tests::lifecycle::interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards ... ok
+test tests::attestation_and_telemetry_tests::lifecycle::interceptor_clears_capability_context_after_terminal_status_updates ... ok
+test tests::attestation_and_telemetry_tests::lifecycle::terminal_kill_with_authorized_receipt_succeeds ... ok
+test tests::attestation_and_telemetry_tests::lifecycle::terminal_kill_with_mismatched_parameter_hash_fails_closed ... ok
+test tests::attestation_and_telemetry_tests::compliance::compliance_certificate_round_trips_and_detects_full_bundle_tampering ... ok
+test tests::attestation_and_telemetry_tests::lifecycle::terminal_release_with_authorized_receipt_succeeds ... ok
+test tests::attestation_and_telemetry_tests::lifecycle::terminal_kill_without_receipt_fails_closed ... ok
+test tests::attestation_and_telemetry_tests::lifecycle::terminal_release_without_receipt_fails_closed ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_copies_tenant_from_live_authorization_receipt ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_decouples_checkpoint_errors_from_message_flow ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_fails_closed_when_store_cannot_consume_authorization ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_preserves_acp_content_hash_with_canonical_parameter_hash ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_pending_capability_buffer_is_bounded ... ok
+test tests::attestation_and_telemetry_tests::compliance::compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_authorization_receipt_parameter_hash_mismatch ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_enforced_receipt_without_stored_authorization ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_authorization_request_id_mismatch ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_propagates_capability_metadata_into_receipts ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_forged_authorization_receipt_signature ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_authorization_receipt_reuse ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_authorization_receipt_reuse_after_restart ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_stale_authorization_reuse_for_other_tool_call ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_same_session_authorization_tool_call_id_mismatch ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_wrong_authorization_signer ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_trace_authorization_receipt_for_enforced_entry ... ok
+test tests::attestation_and_telemetry_tests::signer::live_authorization_request_id_uses_kernel_receipt_linkage ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_rejects_missing_or_non_string_authorization_tool_call_id ... ok
+test tests::attestation_and_telemetry_tests::telemetry_transport::telemetry_exporters_write_and_fail_cleanly ... ok
+test tests::attestation_and_telemetry_tests::signer::tool_call_running_and_terminal_update_produce_distinct_receipt_ids ... ok
+test tests::attestation_and_telemetry_tests::signer::kernel_receipt_signer_uses_store_owned_checkpoint_creation ... ok
+test tests::attestation_and_telemetry_tests::telemetry_transport::telemetry_helpers_map_receipts_and_certificates ... ok
+test tests::extended_tests::config::config_builder_chaining ... ok
+test tests::extended_tests::config::config_builder_defaults ... ok
+test tests::attestation_and_telemetry_tests::signer::verify_live_authorization_receipt_accepts_deferred_bind_for_fs_operations ... ok
+test tests::extended_tests::config::proxy_interceptor_exposes_config ... ok
+test tests::extended_tests::guards::fs_guard_dot_segments_are_collapsed ... ok
+test tests::extended_tests::config::proxy_start_with_nonexistent_command_fails ... ok
+test tests::attestation_and_telemetry_tests::telemetry_transport::proxy_with_kernel_wraps_transport_and_interceptor ... ok
+test tests::extended_tests::guards::fs_guard_multiple_prefixes_matches_second ... ok
+test tests::attestation_and_telemetry_tests::telemetry_transport::transport_handles_eof_and_invalid_json ... ok
+test tests::extended_tests::guards::fs_guard_path_with_double_slashes ... ok
+test tests::extended_tests::guards::fs_guard_path_with_trailing_slash ... ok
+test tests::extended_tests::guards::fs_guard_path_with_unicode_characters ... ok
+test tests::extended_tests::guards::fs_guard_prefix_exact_match_no_trailing_slash ... ok
+test tests::extended_tests::guards::fs_guard_root_path ... ok
+test tests::extended_tests::guards::fs_guard_prefix_with_trailing_slash_in_config ... ok
+test tests::extended_tests::guards::fs_guard_root_path_not_configured ... ok
+test tests::extended_tests::guards::fs_guard_very_long_path ... ok
+test tests::attestation_and_telemetry_tests::telemetry_transport::transport_round_trips_json_and_lifecycle ... ok
+test tests::extended_tests::guards::terminal_guard_arg_with_backtick ... ok
+test tests::extended_tests::guards::fs_guard_write_blocked_read_allowed_separate_instances ... ok
+test tests::extended_tests::guards::terminal_guard_arg_with_carriage_return ... ok
+test tests::extended_tests::guards::terminal_guard_arg_with_dollar_paren ... ok
+test tests::extended_tests::guards::terminal_guard_arg_with_newline_character ... ok
+test tests::extended_tests::guards::terminal_guard_arg_with_pipe_only ... ok
+test tests::extended_tests::guards::terminal_guard_arg_with_semicolon_only ... ok
+test tests::extended_tests::guards::terminal_guard_clean_arg_with_equals_sign ... ok
+test tests::extended_tests::guards::terminal_guard_clean_arg_with_dashes_and_numbers ... ok
+test tests::extended_tests::guards::terminal_guard_command_matching_is_exact ... ok
+test tests::extended_tests::guards::terminal_guard_command_with_spaces_in_path ... ok
+test tests::extended_tests::guards::terminal_guard_empty_command_string ... ok
+test tests::extended_tests::guards::terminal_guard_multiple_allowed_matching_second ... ok
+test tests::extended_tests::interceptor::interceptor_client_to_agent_always_forwarded ... ok
+test tests::extended_tests::interceptor::interceptor_fs_read_missing_params_returns_protocol_error ... ok
+test tests::extended_tests::interceptor::interceptor_fs_read_blocked_returns_correct_error_json ... ok
+test tests::extended_tests::interceptor::interceptor_fs_read_rejects_empty_session_id_before_forwarding ... ok
+test tests::extended_tests::interceptor::interceptor_fs_read_rejects_padded_session_id_before_forwarding ... ok
+test tests::extended_tests::interceptor::interceptor_fs_write_allowed_in_prefix ... ok
+test tests::extended_tests::interceptor::interceptor_fs_write_missing_params_returns_protocol_error ... ok
+test tests::extended_tests::interceptor::interceptor_message_without_method_forwarded ... ok
+test tests::extended_tests::interceptor::interceptor_fs_write_blocked_returns_correct_error_json ... ok
+test tests::extended_tests::interceptor::interceptor_permission_request_forwarded ... ok
+test tests::extended_tests::interceptor::interceptor_permission_request_with_empty_options ... ok
+test tests::extended_tests::interceptor::interceptor_permission_request_rejects_empty_boundary_ids ... ok
+test tests::extended_tests::interceptor::interceptor_permission_request_with_no_params_forwarded ... ok
+test tests::extended_tests::interceptor::interceptor_response_message_forwarded_unchanged ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_agent_message_chunk_forwarded ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_rejects_empty_tool_call_id_before_receipt ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_rejects_bad_params_before_forwarding ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_rejects_malformed_tool_call_shape_before_forwarding ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_rejects_missing_params_before_forwarding ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_tool_call_update_with_status_generates_receipt ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_rejects_padded_tool_call_id_before_receipt ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_tool_call_generates_receipt ... ok
+test tests::extended_tests::interceptor::interceptor_session_update_tool_call_update_without_status_forwarded ... ok
+test tests::extended_tests::interceptor::interceptor_terminal_create_missing_params_returns_protocol_error ... ok
+test tests::extended_tests::interceptor::interceptor_unknown_method_forwarded ... ok
+test tests::extended_tests::permissions::permission_mapper_all_four_kinds ... ok
+test tests::extended_tests::permissions::permission_mapper_empty_kind_string_defaults_to_deny ... ok
+test tests::extended_tests::permissions::permission_mapper_preserves_original_option_id ... ok
+test tests::extended_tests::permissions::permission_mapper_scoped_duration_reflects_constructor ... ok
+test tests::extended_tests::permissions::permission_mapper_unknown_kind_defaults_to_deny ... ok
+test tests::extended_tests::protocol::all_acp_methods_have_correct_from_str ... ok
+test tests::extended_tests::protocol::create_terminal_params_with_no_args ... ok
+test tests::extended_tests::protocol::protocol_empty_method_string_maps_to_unknown ... ok
+test tests::extended_tests::protocol::protocol_empty_params_object ... ok
+test tests::extended_tests::protocol::protocol_extract_method_returns_none_for_no_method_field ... ok
+test tests::extended_tests::interceptor::interceptor_terminal_create_blocked_returns_correct_error_json ... ok
+test tests::extended_tests::interceptor::interceptor_terminal_create_with_injection_arg_blocked ... ok
+test tests::extended_tests::protocol::protocol_json_rpc_error_builder_replaces_non_scalar_ids_with_null ... ok
+test tests::extended_tests::protocol::protocol_extract_method_returns_none_for_non_string_method ... ok
+test tests::extended_tests::protocol::protocol_json_rpc_error_builder_uses_correct_structure ... ok
+test tests::extended_tests::protocol::protocol_json_rpc_error_builder_with_none_id ... ok
+test tests::extended_tests::protocol::protocol_json_rpc_notification_no_id ... ok
+test tests::extended_tests::protocol::protocol_json_rpc_with_null_id_notification ... ok
+test tests::extended_tests::protocol::protocol_json_rpc_with_numeric_id ... ok
+test tests::extended_tests::protocol::protocol_json_rpc_with_string_id ... ok
+test tests::extended_tests::protocol::protocol_params_as_array ... ok
+test tests::extended_tests::protocol::protocol_parse_session_update_empty_object ... ok
+test tests::extended_tests::protocol::protocol_json_rpc_error_response ... ok
+test tests::extended_tests::protocol::protocol_parse_session_update_tool_call_without_title ... ok
+test tests::extended_tests::protocol::protocol_session_update_with_unknown_type_maps_to_other ... ok
+test tests::extended_tests::protocol::protocol_unknown_method_maps_to_unknown_variant ... ok
+test tests::extended_tests::protocol::read_text_file_params_minimal ... ok
+test tests::extended_tests::protocol::request_permission_params_with_empty_options ... ok
+test tests::extended_tests::protocol::protocol_malformed_json_rpc_missing_jsonrpc_field ... ok
+test tests::extended_tests::receipts::receipt_content_hash_deterministic_same_input ... ok
+test tests::extended_tests::receipts::receipt_different_inputs_produce_different_hashes ... ok
+test tests::extended_tests::receipts::receipt_missing_optional_fields_handled_gracefully ... ok
+test tests::extended_tests::receipts::receipt_timestamp_is_numeric_string ... ok
+test tests::extended_tests::receipts::receipt_server_id_matches_logger_config ... ok
+test tests::extended_tests::receipts::receipt_tool_call_update_with_status_returns_some ... ok
+test tests::extended_tests::receipts::receipt_tool_call_update_without_status_returns_none ... ok
+test tests::extended_tests::receipts::tool_call_event_serialization_round_trip ... ok
+test tests::extended_tests::receipts::receipt_update_content_hash_deterministic ... ok
+test tests::extended_tests::receipts::tool_call_event_with_none_fields_omitted ... ok
+test tests::tests::guards::fs_guard_allows_path_under_prefix ... ok
+test tests::tests::guards::fs_guard_blocks_path_traversal ... ok
+test tests::tests::guards::fs_guard_blocks_path_outside_prefix ... ok
+test tests::tests::guards::fs_guard_blocks_prefix_substring_attack ... ok
+test tests::tests::guards::fs_guard_denies_when_no_prefixes_configured ... ok
+test tests::tests::guards::fs_guard_handles_empty_path ... ok
+test tests::tests::guards::fs_guard_rejects_relative_paths ... ok
+test tests::tests::guards::permission_mapper_denies_unknown_kind ... ok
+test tests::tests::guards::fs_guard_multiple_prefixes ... ok
+test tests::tests::guards::fs_guard_with_resolve_symlinks_flag ... ok
+test tests::tests::guards::permission_mapper_maps_known_kinds ... ok
+test tests::tests::guards::fs_guard_blocks_symlink_escape_by_default ... ok
+test tests::tests::guards::terminal_guard_allows_clean_args ... ok
+test tests::tests::guards::terminal_guard_allows_listed_command ... ok
+test tests::tests::guards::terminal_guard_blocks_shell_injection_in_args ... ok
+test tests::tests::guards::terminal_guard_blocks_unlisted_command ... ok
+test tests::tests::guards::terminal_guard_denies_when_no_commands_configured ... ok
+test tests::tests::guards::terminal_guard_rejects_path_command_by_basename_only ... ok
+test tests::tests::guards::terminal_guard_requires_exact_path_allowlist_for_path_commands ... ok
+test tests::extended_tests::receipts::audit_entry_serialization_round_trip ... ok
+test tests::tests::interceptor::interceptor_allows_terminal_create_listed_command ... ok
+test tests::tests::interceptor::interceptor_allows_fs_read_in_prefix ... ok
+test tests::tests::interceptor::interceptor_blocks_fs_read_outside_prefix ... ok
+test tests::tests::interceptor::interceptor_allows_terminal_create_with_in_scope_cwd ... ok
+test tests::tests::interceptor::interceptor_blocks_fs_write_with_traversal ... ok
+test tests::tests::interceptor::interceptor_blocks_fs_read_prefix_substring ... ok
+test tests::tests::interceptor::interceptor_blocks_terminal_create_unlisted_command ... ok
+test tests::tests::interceptor::interceptor_forwards_client_to_agent_unchanged ... ok
+test tests::tests::interceptor::interceptor_blocks_terminal_create_with_out_of_scope_cwd ... ok
+test tests::tests::interceptor::interceptor_forwards_unrelated_message ... ok
+test tests::tests::interceptor::interceptor_generates_receipt_for_tool_call ... ok
+test tests::tests::interceptor::interceptor_handles_new_method_variants ... ok
+test tests::tests::interceptor::interceptor_jsonrpc_param_decoder_preserves_method_specific_protocol_errors ... ok
+test tests::tests::protocol::extract_method_returns_correct_variant ... ok
+test tests::tests::interceptor::interceptor_uses_correct_error_code ... ok
+test tests::tests::protocol::extract_method_returns_none_for_response ... ok
+test tests::tests::interceptor::public_interceptor_retains_native_projection_errors ... ok
+test tests::tests::protocol::parse_create_terminal_params ... ok
+test tests::tests::protocol::parse_json_rpc_message ... ok
+test tests::tests::protocol::parse_permission_option ... ok
+test tests::tests::protocol::parse_read_text_file_params ... ok
+test tests::tests::protocol::parse_session_update_malformed_tool_call_id_fails_closed ... ok
+test tests::tests::protocol::parse_session_update_tool_call_id_takes_precedence_over_known_type ... ok
+test tests::tests::protocol::parse_tool_call_update_event ... ok
+test tests::tests::protocol::parse_tool_call_event ... ok
+test tests::tests::protocol::parse_write_text_file_params ... ok
+test tests::tests::protocol::protocol_parses_all_session_update_variants ... ok
+test tests::tests::protocol::protocol_parses_new_method_variants ... ok
+test tests::tests::interceptor::proxy_creation_and_shutdown ... ok
+test tests::tests::receipts::receipt_logger_generates_tool_call_receipt ... ok
+test tests::tests::receipts::audit_entry_content_hash_is_deterministic ... ok
+test tests::tests::receipts::receipt_logger_generates_update_receipt_with_status ... ok
+test tests::tests::receipts::receipt_logger_skips_update_without_status ... ok
+test tests::tests::receipts::tool_call_event_content_hash_ignores_unknown_extra_fields ... ok
+test tests::attestation_and_telemetry_tests::denials::kernel_capability_checker_denies_missing_and_malformed_tokens ... ok
+test tests::attestation_and_telemetry_tests::denials::kernel_capability_checker_supports_wildcard_terminal_grants ... ok
+test tests::attestation_and_telemetry_tests::denials::kernel_capability_checker_rejects_untrusted_and_tampered_tokens ... ok
+test tests::attestation_and_telemetry_tests::denials::kernel_capability_checker_requires_and_forwards_execution_nonce_in_strict_mode ... ok
+test tests::attestation_and_telemetry_tests::denials::interceptor_strict_nonce_preflight_returns_nonce_then_forwards_once ... ok
+test tests::attestation_and_telemetry_tests::denials::kernel_capability_checker_enforces_time_bounds_and_scope ... ok
+test input::tests::rejected_frames_poison_reader_without_reinterpreting_tail ... ok
+
+test result: ok. 205 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+
+running 99 tests
+test clock::tests::clones_share_high_water_and_faults_do_not_reset_it ... ok
+test hosted_tests::error_contract::hosted_mcp_rejects_malformed_jsonrpc_body_with_structured_error ... ok
+test hosted_tests::error_contract::hosted_mcp_duplicate_keys_deny_without_creating_a_session ... ok
+test hosted_tests::error_contract::hosted_mcp_rejects_expired_or_mismatched_auth_during_session_reuse_without_panicking ... ok
+test hosted_tests::auth_flows::hosted_mcp_accepts_jwt_and_rejects_wrong_audience ... ok
+test hosted_tests::error_contract::hosted_mcp_rejects_invalid_content_negotiation_without_panicking ... ok
+test hosted_tests::session_isolation::hosted_mcp_dedicated_sessions_require_exact_oauth_bearer_continuity ... ok
+test hosted_tests::error_contract::hosted_mcp_rejects_initialize_without_request_id ... ok
+test hosted_tests::support_config::base_remote_config_carries_wrapped_server_defaults ... ok
+test http_service_tests::parse_remote_session_peer_capabilities_honors_explicitly_disabled_elicitation ... ok
+test http_service_tests::parse_remote_session_peer_capabilities_honors_explicitly_disabled_roots ... ok
+test http_service_tests::parse_remote_session_peer_capabilities_honors_explicitly_disabled_sampling ... ok
+test http_service_tests::parse_remote_session_peer_capabilities_honors_progress_and_cancellation_declarations ... ok
+test http_service_tests::read_limited_mcp_post_body_rejects_oversized_content_length ... ok
+test hosted_tests::error_contract::hosted_mcp_rejects_initialize_with_session_header_without_issuing_session ... ok
+test input::tests::administrative_extractor_rejects_duplicates_and_retains_local_source ... ok
+test http_service_tests::read_limited_mcp_post_body_rejects_streaming_body_over_limit ... ok
+test input::tests::native_envelopes_preserve_u64_and_reject_original_duplicate_keys ... ok
+test rate_limit::tests::window_budget_exact_expiry_and_rollback ... ok
+test remote_mcp_admin::tests::validate_admin_request_accepts_local_origin_and_matching_bearer_token ... ok
+test remote_mcp_admin::tests::validate_admin_request_rejects_disallowed_origin_before_bearer_auth ... ok
+test hosted_tests::auth_flows::hosted_mcp_accepts_static_bearer_and_rejects_invalid_token ... ok
+test hosted_tests::auth_flows::hosted_mcp_accepts_local_oauth_pkce_and_rejects_invalid_verifier ... ok
+test remote_mcp_session_credentials::tests::completed_cache_replays_exact_request_and_rejects_conflicts ... ok
+test remote_mcp_session_credentials::tests::credential_response_filters_inventory_and_exposes_bound_context ... ok
+test remote_mcp_session_credentials::tests::credential_route_allowlist_excludes_issuance_and_hidden_tools ... ok
+test remote_mcp_session_credentials::tests::completed_tool_error_can_be_acknowledged_without_claiming_success ... ok
+test remote_mcp_session_credentials::tests::caller_acknowledgement_is_required_after_verified_kernel_completion ... ok
+test tests::bearer_edge_requires_a_dedicated_admin_token ... ok
+test tests::bearer_verifier::introspection_bearer_verifier_accepts_active_token_with_resource_claim ... ok
+test remote_mcp_session_credentials::tests::credential_storage_rejects_substitution_and_survives_reopen ... ok
+test tests::bearer_verifier::jwt_bearer_verifier_authenticates_es256_jwks_token ... ok
+test remote_mcp_session_credentials::tests::pending_owner_call_survives_reopen_and_token_rotation ... ok
+test tests::bearer_verifier::introspection_bearer_verifier_rejects_inactive_token ... ok
+test tests::bearer_verifier::jwt_bearer_verifier_authenticates_es384_jwks_token ... ok
+test tests::bearer_verifier::jwt_bearer_verifier_builds_oauth_session_auth_context ... ok
+test tests::build_federated_claims_normalizes_enterprise_identity_metadata ... ok
+test tests::build_federated_principal_azure_ad_prefers_oid_and_appid ... ok
+test tests::build_federated_principal_prefers_subject_over_client_id ... ok
+test tests::chio_oauth_discovery_profile_metadata_advertises_sender_constraints ... ok
+test tests::chio_oauth_discovery_validation_rejects_profile_mismatch ... ok
+test tests::clock_custody::authorization_code_expires_at_monotonic_deadline_with_frozen_wall_time ... ok
+test tests::clock_custody::clock_fault_and_rollback_retain_authorization_code_until_successful_exchange ... ok
+test tests::clock_custody::concurrent_exchange_consumes_one_grant_once ... ok
+test tests::clock_custody::exhausted_counters_fail_without_wrapping ... ok
+test tests::clock_custody::persisted_transitions_use_one_fenced_observation ... ok
+test tests::clock_custody::persistence_counter_exhaustion_cannot_initialize_or_extend_live_authority ... ok
+test tests::clock_custody::restored_session_rebuilds_deadline_without_reviving_expired_or_future_state ... ok
+test tests::clock_custody::session_initialization_and_renewal_keep_state_on_clock_faults ... ok
+test tests::dpop_replay::sender_dpop_byte_pressure_preserves_the_consumed_proof ... ok
+test tests::dpop_replay::sender_dpop_rejects_oversized_keys_before_signature_verification_or_storage ... ok
+test tests::dpop_replay::sender_dpop_signed_retention_overrides_local_ttl_for_future_dated_proofs ... ok
+test tests::dpop_replay::sender_legacy_profile_rejects_a_durable_domain_even_when_resigned_as_v1 ... ok
+test tests::expected_resume_agent_id_is_revalidated_from_identity_federation_seed ... ok
+test tests::hosted_edge_requires_a_session_credential_and_a_distinct_control_token ... ok
+test tests::identity_federation_derives_stable_keypair_per_principal ... ok
+test tests::jwt_original_bytes_reject_duplicates_and_retain_encoding_sources ... ok
+test tests::jwt_remote_auth_requires_separate_admin_token ... ok
+test tests::load_active_session_records_skips_malformed_rows ... ok
+test tests::local_authorization_server_issues_unique_codes_for_same_second_approvals ... ok
+test tests::malformed_terminal_state_blocks_active_replay_fail_closed ... ok
+test tests::mcp_rate_limit_key_ignores_unverified_client_headers ... ok
+test tests::mcp_session_id_header_classifies_missing_invalid_and_valid_values ... ok
+test tests::oauth_error_extensions_preserve_domain_context_with_redacted_wire_body ... ok
+test tests::oidc_fetch_rejects_special_use_address_contract ... ok
+test tests::oidc_fetch_uses_contract_backed_client_for_hostname_url ... ok
+test tests::provider_profile_can_derive_standard_oidc_discovery_url_from_issuer ... ok
+test tests::remote_auth_state_rejects_unusable_static_bearer_tokens ... ok
+test tests::remote_authority_configuration_requires_distinct_credentials_and_exact_pins ... ok
+test tests::remote_authority_only_configuration_is_rejected_without_control_url ... ok
+test tests::remote_session_auth_context_uses_static_bearer_fingerprint_and_origin ... ok
+test tests::restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions ... ok
+test tests::restored_ready_session_preserves_lifecycle_and_requires_store_lease ... ok
+test tests::resume_hmac_keyring_is_required_and_parsed_strictly ... ok
+test tests::runtime_contract_fingerprint_binds_upstream_argument_file_contents ... ok
+test tests::session_recovery::failed_restoration_preserves_authenticated_session_bytes ... ok
+test hosted_tests::cross_crate_pipeline::hosted_mcp_fail_closed_errors_emit_no_receipt_or_siem_export ... ok
+test tests::session_runtime::remote_session_factory_rejects_admission_sidecar_aliases ... ok
+test tests::session_runtime::remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition ... ok
+test tests::session_runtime::remote_session_factory_requires_manifest_trust_inputs ... ok
+test tests::session_store_rejects_concurrent_ownership ... ok
+test tests::shared_hosted_owner_notification_fanout_replays_to_all_live_taps ... ok
+test tests::shared_hosted_owner_notification_fanout_tracks_pruned_dead_subscribers ... ok
+test tests::shared_upstream_notification_fanout_copies_notifications_and_prunes_dead_queues ... ok
+test tests::stored_capability_issuer_revalidation_rejects_untrusted_restart_issuer ... ok
+test tests::terminal_transition_deletes_active_state_and_retains_replay_fence ... ok
+test tests::validate_restored_peer_capabilities_rejects_tampered_record ... ok
+test tests::validate_resume_record_integrity_rejects_tampered_auth_context ... ok
+test hosted_tests::cross_crate_pipeline::hosted_mcp_receipts_flow_into_chio_siem_export ... ok
+test rate_limit::tests::tracked_keys_are_bounded ... ok
+test tests::bearer_verifier::jwt_bearer_verifier_authenticates_rs256_jwks_token ... ok
+test tests::bearer_verifier::jwt_bearer_verifier_authenticates_ps256_jwks_token ... ok
+test hosted_tests::session_isolation::hosted_mcp_rejects_session_reuse_when_authorization_context_drifts ... ok
+test hosted_tests::session_isolation::hosted_mcp_rejects_session_reuse_when_origin_drifts ... ok
+test hosted_tests::session_lifecycle::hosted_mcp_sessions_initialize_resume_and_report_ready_state ... ok
+test hosted_tests::session_isolation::hosted_mcp_rejects_cross_tenant_session_reuse ... ok
+test hosted_tests::session_lifecycle::hosted_mcp_sessions_expire_under_ttl_and_cannot_be_reused ... ok
+test hosted_tests::session_isolation::hosted_mcp_isolates_receipt_and_trust_attribution_by_session ... ok
+test tests::session_runtime::remote_session_factory_holds_one_durable_admission_sidecar ... ok
+
+test result: ok. 99 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.29s
+
+
+running 59 tests
+test extensions::tests::empty_object ... ok
+test extensions::tests::sensitivity_serde_roundtrip ... ok
+test extensions::tests::unknown_sensitivity_ignored ... ok
+test extensions::tests::all_fields_present ... ok
+test extensions::tests::non_object_returns_default ... ok
+test extensions::tests::x_chio_flow_parses_strict_declaration ... ok
+test extensions::tests::normative_tool_flow_exports_back_to_identical_extension ... ok
+test generator::tests::approval_required_annotation ... ok
+test generator::tests::fallback_name_when_no_operation_id ... ok
+test generator::tests::invalid_x_chio_flow_fails_generation ... ok
+test generator::tests::input_schema_keeps_optional_request_body_optional ... ok
+test generator::tests::path_level_parameters_merged ... ok
+test generator::tests::x_chio_flow_is_retained_in_normative_tool ... ok
+test generator::tests::input_schema_includes_path_params_as_required ... ok
+test generator::tests::get_operations_are_read_only ... ok
+test generator::tests::x_chio_publish_false_excludes_operation ... ok
+test generator::tests::input_schema_includes_request_body ... ok
+test generator::tests::delete_operations_are_destructive ... ok
+test generator::tests::input_schema_includes_query_params ... ok
+test generator::tests::output_schema_from_200_response ... ok
+test generator::tests::petstore_generates_four_tools ... ok
+test generator::tests::post_operations_have_side_effects ... ok
+test parser::tests::broken_ref_produces_error ... ok
+test parser::tests::empty_paths_object ... ok
+test parser::tests::chio_extensions_extracted ... ok
+test parser::tests::external_ref_produces_error ... ok
+test parser::tests::invalid_yaml_produces_error ... ok
+test parser::tests::invalid_json_produces_error ... ok
+test parser::tests::fuzz_malformed_yaml_rejected_without_panic ... ok
+test parser::tests::missing_info_field ... ok
+test parser::tests::invalid_yaml_returns_an_error_without_panicking ... ok
+test parser::tests::missing_openapi_field ... ok
+test parser::tests::missing_title_defaults_to_untitled ... ok
+test parser::tests::missing_version_defaults_to_000 ... ok
+test parser::tests::non_array_parameters_rejected ... ok
+test input::tests::yaml_depth_documents_and_nonstring_keys_are_rejected ... ok
+test parser::tests::non_boolean_parameter_required_rejected ... ok
+test parser::tests::missing_paths_field ... ok
+test parser::tests::parameter_missing_in_is_rejected ... ok
+test parser::tests::parameter_missing_name_is_rejected ... ok
+test parser::tests::parameter_schema_ref_is_resolved ... ok
+test parser::tests::preferred_content_media_selects_application_json_when_present ... ok
+test parser::tests::path_parameters_required_by_default ... ok
+test parser::tests::parse_json_spec ... ok
+test parser::tests::parse_yaml_spec ... ok
+test parser::tests::ref_resolution ... ok
+test parser::tests::spec_with_no_operations_on_path ... ok
+test parser::tests::request_body_schema_extracted ... ok
+test parser::tests::unsupported_parameter_location_rejected ... ok
+test parser::tests::request_body_required_is_extracted_after_ref_resolution ... ok
+test policy::tests::approval_required_always_denies ... ok
+test policy::tests::extension_side_effects_override ... ok
+test policy::tests::safe_methods_allow ... ok
+test parser::tests::unsupported_version ... ok
+test policy::tests::has_side_effects_follows_method ... ok
+test policy::tests::unsafe_methods_deny ... ok
+test policy::tests::has_side_effects_respects_override ... ok
+test input::tests::original_duplicates_and_whitespace_oversize_are_rejected ... ok
+test input::tests::yaml_aliases_share_a_total_expansion_budget ... ok
+
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 52 tests
+test tests::bridge_dispatcher_rejects_null_or_empty_required_query_parameter ... ok
+test tests::bridge_delete_operation_has_side_effects ... ok
+test tests::bridge_as_tool_server_implements_connection ... ok
+test tests::bridge_dispatcher_rejects_dot_segment_path_parameters ... ok
+test tests::bridge_dispatcher_rejects_missing_request_body_before_dispatcher ... ok
+test tests::bridge_dispatcher_rejects_missing_path_parameter ... ok
+test tests::bridge_dispatcher_rejects_missing_required_query_parameter ... ok
+test tests::bridge_error_display_kernel ... ok
+test tests::bridge_dispatcher_without_egress_contract_fails_closed ... ok
+test tests::bridge_dispatcher_requires_observed_response_body_bytes ... ok
+test tests::bridge_dispatcher_receives_correct_url ... ok
+test tests::bridge_dispatcher_expands_path_parameters ... ok
+test tests::bridge_dispatcher_appends_declared_query_parameters ... ok
+test tests::bridge_dispatcher_rejects_redirect_responses ... ok
+test tests::bridge_error_display_tool_not_found ... ok
+test tests::bridge_error_display_upstream ... ok
+test tests::bridge_error_display_openapi ... ok
+test tests::bridge_dispatcher_allows_missing_optional_request_body ... ok
+test tests::bridge_dispatcher_normalizes_base_url_trailing_slash ... ok
+test tests::bridge_dispatcher_response_body_cap_uses_observed_raw_bytes ... ok
+test tests::bridge_dispatcher_response_body_cap_is_enforced ... ok
+test tests::bridge_generates_correct_tool_names ... ok
+test tests::bridge_get_side_effects_for_read_only_operations ... ok
+test tests::bridge_invoke_unknown_tool_returns_error ... ok
+test tests::bridge_manifest_clone ... ok
+test tests::bridge_invoke_dispatcher_error_response ... ok
+test tests::bridge_manifest_description_includes_api_info ... ok
+test tests::bridge_manifest_has_correct_version ... ok
+test tests::bridge_parses_spec_and_generates_manifest ... ok
+test tests::bridge_invoke_with_dispatcher ... ok
+test tests::bridge_rejects_declared_path_parameter_missing_from_template ... ok
+test tests::bridge_rejects_undeclared_path_template_parameter ... ok
+test tests::bridge_route_binding_unknown_returns_none ... ok
+test tests::bridged_tool_response_preserves_metadata_and_body ... ok
+test tests::expand_route_path_rejects_unmatched_closing_brace ... ok
+test tests::bridge_route_bindings_match_operations ... ok
+test tests::bridge_tool_server_reports_read_only_classification ... ok
+test tests::bridge_without_dispatcher_fails_closed ... ok
+test tests::owned_bridge_tool_server_reports_read_only_classification ... ok
+test tests::flow_bearing_plain_mcp_export_is_rejected ... ok
+test tests::unpublished_operations_are_not_routable ... ok
+test tests::bridge_tool_server_invoke_unknown_tool_errors ... ok
+test tests::owned_bridge_tool_server_implements_connection ... ok
+test tests::owned_bridge_tool_server_rejects_missing_required_query_parameter ... ok
+test tests::owned_bridge_tool_server_rejects_missing_request_body_before_dispatcher ... ok
+test tests::bridge_tool_server_invoke_delegates ... ok
+test tests::owned_bridge_tool_server_with_dispatcher ... ok
+test tests::bridge_invocation_runtime_admission_denies_before_http_dispatch ... ok
+test tests::registry_bound_mcp_export_rejects_same_name_different_manifest ... ok
+test tests::registry_bound_mcp_export_preserves_canonical_openapi_flow ... ok
+test tests::bridge_registry_bound_mcp_tools_list_has_annotations ... ok
+test tests::registry_bound_mcp_tools_list_entries ... ok
+
+test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+
+Cargo stderr:
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling sha2 v0.10.9
+   Compiling sha2 v0.11.0
+   Compiling scrypt v0.11.0
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling rs_merkle v1.5.0
+   Compiling pkcs5 v0.7.1
+   Compiling frost-ed25519 v3.0.0
+   Compiling pkcs8 v0.10.2
+   Compiling oauth2 v5.0.0
+   Compiling oci-client v0.17.0
+   Compiling ed25519 v2.2.3
+   Compiling sec1 v0.7.3
+   Compiling ed25519-dalek v2.2.0
+   Compiling elliptic-curve v0.13.8
+   Compiling pkcs1 v0.7.5
+   Compiling scrypt v0.12.0
+   Compiling primeorder v0.13.6
+   Compiling ecdsa v0.16.9
+   Compiling rsa v0.9.10
+   Compiling bls12_381_plus v0.8.13
+   Compiling sqlx-core v0.8.6
+   Compiling p384 v0.13.1
+   Compiling p256 v0.13.2
+   Compiling openidconnect v4.0.1
+   Compiling affinidi-bbs v0.1.0
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx-postgres v0.8.6
+   Compiling sigstore v0.14.0
+   Compiling sqlx v0.8.6
+   Compiling chio-finding-market-migrations v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-migrations)
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+   Compiling chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+   Compiling chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+   Compiling chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+   Compiling chio-swarm-authority v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-swarm-authority)
+   Compiling chio-disclosure-lineage v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-disclosure-lineage)
+   Compiling chio-finding-market-port v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-port)
+   Compiling chio-cage-init v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-init)
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+   Compiling chio-reputation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-reputation)
+   Compiling chio-decoy v0.1.0 (/tmp/arc-security-launch/crates/security/chio-decoy)
+   Compiling chio-flow v0.1.0 (/tmp/arc-security-launch/crates/security/chio-flow)
+   Compiling chio-keyring v0.1.0 (/tmp/arc-security-launch/crates/security/chio-keyring)
+   Compiling chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+   Compiling chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+   Compiling chio-finding-market-store-postgres v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-store-postgres)
+   Compiling chio-finding-worker v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-worker)
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+   Compiling chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+   Compiling chio-workflow v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow)
+   Compiling chio-metering v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-metering)
+   Compiling chio-credentials v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-credentials)
+   Compiling chio-selective-disclosure v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-selective-disclosure)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-cage v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage)
+   Compiling chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+   Compiling chio-signing-remote v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-signing-remote)
+   Compiling chio-federation-authority v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+   Compiling chio-http-session v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-session)
+   Compiling chio-edge-metrics v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-edge-metrics)
+   Compiling chio-trace-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-trace-validate)
+   Compiling chio-siem v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-siem)
+   Compiling chio-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guards)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+   Compiling chio-mcp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-edge)
+   Compiling chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+   Compiling chio-finding-challenge v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-challenge)
+   Compiling chio-data-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards)
+   Compiling chio-external-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-external-guards)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+   Compiling chio-policy v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-policy)
+   Compiling chio-mcp-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-adapter)
+   Compiling chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+   Compiling chio-enterprise-export v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-enterprise-export)
+   Compiling chio-trust-market-context v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-trust-market-context)
+   Compiling chio-security-kernel v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-kernel)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+   Compiling chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-openapi v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+   Compiling chio-openapi-mcp-bridge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi-mcp-bridge)
+   Compiling chio-acp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-edge)
+   Compiling chio-acp-proxy v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-proxy)
+   Compiling chio-conformance v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-conformance)
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+    Finished `test` profile [unoptimized] target(s) in 3m 42s
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_edge-7552a8f694fd35fa)
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_proxy-2fc1f31184742d0c)
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-2dd2fcabb79dba8a)
+     Running unittests src/lib.rs (target/debug/deps/chio_openapi-a2c3a65138c29bcf)
+     Running unittests src/lib.rs (target/debug/deps/chio_openapi_mcp_bridge-357c23bf13e2f676)

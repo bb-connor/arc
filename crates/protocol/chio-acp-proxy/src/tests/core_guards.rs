@@ -1,3 +1,5 @@
+use super::*;
+
 // -- FsGuard tests --
 
 #[test]
@@ -73,8 +75,7 @@ fn fs_guard_handles_empty_path() {
 fn fs_guard_with_resolve_symlinks_flag() {
     // Verify the builder works (actual symlink resolution depends
     // on filesystem state, so we just test the config path).
-    let guard =
-        FsGuard::new(vec!["/home/user/project".to_string()]).with_resolve_symlinks(true);
+    let guard = FsGuard::new(vec!["/home/user/project".to_string()]).with_resolve_symlinks(true);
     // A non-existent path falls back to textual canonicalization.
     assert!(guard
         .check_read("/home/user/project/nonexistent.txt")

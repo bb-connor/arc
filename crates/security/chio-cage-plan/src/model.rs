@@ -368,21 +368,25 @@ pub fn validate_cage_target_fd_binding(
     {
         return Err(CageError::InvalidTargetFdBinding("target_descriptor"));
     }
-    let mut execveat_target_constraints = plan
+    let alternatives = plan
         .seccomp
         .argument_constraints
         .get(&crate::Syscall::Execveat)
-        .into_iter()
-        .flatten()
-        .filter(|constraint| constraint.argument_index == 0);
-    let target_constraint = execveat_target_constraints
-        .next()
+        .filter(|alternatives| !alternatives.is_empty())
         .ok_or(CageError::InvalidTargetFdBinding("execveat_target"))?;
-    if execveat_target_constraints.next().is_some()
-        || target_constraint.comparison != SeccompArgumentComparison::Equal
-        || target_constraint.value != u64::from(plan.target_fd_slot)
-    {
-        return Err(CageError::InvalidTargetFdBinding("execveat_target"));
+    for constraints in alternatives {
+        let mut targets = constraints
+            .iter()
+            .filter(|constraint| constraint.argument_index == 0);
+        let target = targets
+            .next()
+            .ok_or(CageError::InvalidTargetFdBinding("execveat_target"))?;
+        if targets.next().is_some()
+            || target.comparison != SeccompArgumentComparison::Equal
+            || target.value != u64::from(plan.target_fd_slot)
+        {
+            return Err(CageError::InvalidTargetFdBinding("execveat_target"));
+        }
     }
     Ok(())
 }

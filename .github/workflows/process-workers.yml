@@ -146,6 +146,13 @@ jobs:
       - name: Native MCP and worker recovery under enforced authority
         if: ${{ !cancelled() && steps.native_fixture.outcome == 'success' }}
         run: |
+          cargo build --locked --target x86_64-unknown-linux-musl -p chio-reference-tools --example process-report-fixture
+          install -m 755 "${CARGO_TARGET_DIR:-target}/x86_64-unknown-linux-musl/debug/examples/process-report-fixture" "$RUNNER_TEMP/process-report-fixture"
+          export CHIO_PROCESS_REPORT_TOOL="$RUNNER_TEMP/process-report-fixture"
+          # The static report fixture declares each source/control/output file.
+          # It needs no ambient interpreter or workspace read authority.
+          touch "$RUNNER_TEMP/process-report-read-paths.txt"
+          export CHIO_CAGE_READ_PATHS_FILE="$RUNNER_TEMP/process-report-read-paths.txt"
           cargo test --locked -p chio-cli --features real-linux-enforcement --test process_host_native
           cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio
       - name: Preserve native host qualification evidence

@@ -1,0 +1,44 @@
+warning: patch `cmpv2 v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/home/ubuntu/arc-native-consumers-20260929/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/home/ubuntu/arc-native-consumers-20260929/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling ed25519-dalek v2.2.0
+   Compiling chio-security-types v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-security-types)
+   Compiling rs_merkle v1.5.0
+   Compiling frost-core v3.0.0
+   Compiling landlock v0.4.4
+   Compiling nono-chio v0.53.0-chio.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-chio)
+   Compiling frost-rerandomized v3.0.0
+   Compiling frost-ed25519 v3.0.0
+   Compiling chio-core-types v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-did)
+   Compiling chio-cage-plan v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage-plan)
+   Compiling chio-finding v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-finding)
+   Compiling chio-cage-init v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage-init)
+   Compiling chio-fiscal v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-governance)
+   Compiling chio-appraisal v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-appraisal)
+   Compiling chio-open-market v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-open-market)
+   Compiling chio-underwriting v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/trust/chio-federation)
+   Compiling chio-credit v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-credit)
+   Compiling chio-web3 v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/platform/chio-manifest)
+   Compiling chio-cage v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage)
+error: could not compile `chio-cage` (lib test) due to 5 previous errors

@@ -116,8 +116,10 @@ capabilities:
                 [demo_python(), str(directory / "sandbox.py"), "--container", repository],
                 directory / "launch-sandbox",
                 directory,
+                read_paths=[directory / "sandbox.py"],
             )
         ]
+        (directory / "queries.jsonl").touch(mode=0o600)
         gateway = [
             sys.executable,
             str(directory / "native_gateway.py"),
@@ -129,7 +131,15 @@ capabilities:
         if profile == "unknown":
             gateway.append("--unknown")
         servers.append(
-            provision_native_demo(binary, "model", gateway, directory / "launch-model", directory)
+            provision_native_demo(
+                binary,
+                "model",
+                gateway,
+                directory / "launch-model",
+                directory,
+                read_paths=[directory / "native_gateway.py", directory / "worker.py", sys.prefix],
+                write_paths=[directory / "queries.jsonl"],
+            )
         )
         config = {
             "schema": "chio.process.host.v1",

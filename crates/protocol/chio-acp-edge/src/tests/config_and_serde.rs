@@ -34,19 +34,25 @@ fn colliding_capability_ids_are_withheld_deterministically() {
 #[test]
 fn error_display_tool_not_found() {
     let err = AcpEdgeError::ToolNotFound("x".into());
-    assert!(format!("{err}").contains("x"));
+    assert_eq!(
+        err.to_string(),
+        "urn:chio:error:transport:invalid-request-shape"
+    );
 }
 
 #[test]
 fn error_display_access_denied() {
-    let err = AcpEdgeError::AccessDenied("no cap".into());
-    assert!(format!("{err}").contains("no cap"));
+    let err = AcpEdgeError::TaskOwnerMismatch;
+    assert_eq!(err.to_string(), "urn:chio:error:policy:decision-denied");
 }
 
 #[test]
 fn error_display_kernel() {
-    let err = AcpEdgeError::Kernel("internal".into());
-    assert!(format!("{err}").contains("internal"));
+    let err = AcpEdgeError::InvalidRequest(AcpRequestError::UnsupportedTarget);
+    assert_eq!(
+        err.to_string(),
+        "urn:chio:error:transport:invalid-request-shape"
+    );
 }
 
 // ---- Serde tests ----

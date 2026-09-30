@@ -182,10 +182,9 @@ fn execute_orchestrated_acp_request(
 ) -> Result<OrchestratedToolCall, AcpEdgeError> {
     let registry = authoritative_target_registry();
     if !registry.supports_target_protocol(request.target_protocol) {
-        return Err(AcpEdgeError::InvalidRequest(format!(
-            "ACP authoritative execution does not have a registered `{}` target executor",
-            request.target_protocol
-        )));
+        return Err(AcpEdgeError::InvalidRequest(
+            AcpRequestError::UnsupportedTarget,
+        ));
     }
 
     match CrossProtocolOrchestrator::new(kernel, manifest_registry)

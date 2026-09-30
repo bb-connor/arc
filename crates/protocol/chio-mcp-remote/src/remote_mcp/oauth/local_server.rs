@@ -173,7 +173,7 @@ impl LocalAuthorizationServer {
         if form.decision != "approve" {
             return Err(redirect_oauth_error(
                 &form.redirect_uri,
-                "access_denied",
+                OAuthError::AccessDenied,
                 "authorization request denied",
                 form.state.as_deref(),
             ));
@@ -224,15 +224,23 @@ impl LocalAuthorizationServer {
         if codes.len() >= 4096 {
             return Err(oauth_token_error(
                 StatusCode::SERVICE_UNAVAILABLE,
-                "temporarily_unavailable",
+                OAuthError::TemporarilyUnavailable,
                 "authorization grant capacity exhausted",
             ));
         }
         codes.insert(code.clone(), grant);
         drop(codes);
 
-        let mut redirect_uri = Url::parse(&form.redirect_uri)
-            .map_err(|_| plain_http_error(StatusCode::BAD_REQUEST, "invalid redirect_uri"))?;
+        let mut redirect_uri = Url::parse(&form.redirect_uri).map_err(|error| {
+            input::with_source(
+                oauth_token_error(
+                    StatusCode::BAD_REQUEST,
+                    OAuthError::InvalidRequest,
+                    "invalid redirect_uri",
+                ),
+                error,
+            )
+        })?;
         {
             let mut pairs = redirect_uri.query_pairs_mut();
             pairs.append_pair("code", &code);
@@ -255,7 +263,7 @@ impl LocalAuthorizationServer {
             }
             _ => Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "unsupported_grant_type",
+                OAuthError::UnsupportedGrantType,
                 "unsupported grant_type",
             )),
         }
@@ -267,26 +275,30 @@ impl LocalAuthorizationServer {
         form: TokenRequestForm,
     ) -> Result<Value, Response> {
         let code = form.code.as_deref().ok_or_else(|| {
-            oauth_token_error(StatusCode::BAD_REQUEST, "invalid_request", "missing code")
+            oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidRequest,
+                "missing code",
+            )
         })?;
         let redirect_uri = form.redirect_uri.as_deref().ok_or_else(|| {
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "missing redirect_uri",
             )
         })?;
         let client_id = form.client_id.as_deref().ok_or_else(|| {
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "missing client_id",
             )
         })?;
         let code_verifier = form.code_verifier.as_deref().ok_or_else(|| {
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "missing code_verifier",
             )
         })?;
@@ -298,7 +310,7 @@ impl LocalAuthorizationServer {
         let mut grant = codes.get(code).cloned().ok_or_else(|| {
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_grant",
+                OAuthError::InvalidGrant,
                 "unknown authorization code",
             )
         })?;
@@ -312,28 +324,28 @@ impl LocalAuthorizationServer {
         if reading.unix_millis().as_secs() >= grant.expires_at || expired {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_grant",
+                OAuthError::InvalidGrant,
                 "authorization code expired",
             ));
         }
         if grant.client_id != client_id || grant.redirect_uri != redirect_uri {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_grant",
+                OAuthError::InvalidGrant,
                 "client_id or redirect_uri mismatch",
             ));
         }
         if grant.code_challenge_method != "S256" {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_grant",
+                OAuthError::InvalidGrant,
                 "unsupported code_challenge_method",
             ));
         }
         if pkce_s256(code_verifier) != grant.code_challenge {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_grant",
+                OAuthError::InvalidGrant,
                 "PKCE verification failed",
             ));
         }
@@ -341,7 +353,7 @@ impl LocalAuthorizationServer {
         if resource != grant.resource {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_target",
+                OAuthError::InvalidTarget,
                 "resource parameter mismatch",
             ));
         }
@@ -355,19 +367,24 @@ impl LocalAuthorizationServer {
             sender_constraint: grant.sender_constraint.clone(),
             grant_type: Some("authorization_code".to_string()),
         })?;
-        validate_sender_constraint_runtime(
+        SenderConstraintVerifier::new(
             &self.clock,
+            &self.sender_dpop_nonce_store,
+            &self.sender_dpop_config,
+        )
+        .validate(
             grant.sender_constraint.as_ref(),
             headers,
             Some(code),
             &self.token_endpoint_url(),
             "POST",
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
         )
         .map_err(|error| {
-            let mut response =
-                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &error.to_string());
+            let mut response = oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidGrant,
+                &error.to_string(),
+            );
             response.extensions_mut().insert(Arc::new(error));
             response
         })?;
@@ -384,21 +401,21 @@ impl LocalAuthorizationServer {
         let subject_token = form.subject_token.as_deref().ok_or_else(|| {
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "missing subject_token",
             )
         })?;
         let subject_token_type = form.subject_token_type.as_deref().ok_or_else(|| {
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "missing subject_token_type",
             )
         })?;
         if subject_token_type != "urn:ietf:params:oauth:token-type:access_token" {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                OAuthError::InvalidRequest,
                 "unsupported subject_token_type",
             ));
         }
@@ -408,7 +425,7 @@ impl LocalAuthorizationServer {
         if resource != self.default_audience {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_target",
+                OAuthError::InvalidTarget,
                 "resource parameter must match the advertised protected resource",
             ));
         }
@@ -450,19 +467,24 @@ impl LocalAuthorizationServer {
             sender_constraint: claims.cnf.clone(),
             grant_type: Some("urn:ietf:params:oauth:grant-type:token-exchange".to_string()),
         })?;
-        validate_sender_constraint_runtime(
+        SenderConstraintVerifier::new(
             &self.clock,
+            &self.sender_dpop_nonce_store,
+            &self.sender_dpop_config,
+        )
+        .validate(
             claims.cnf.as_ref(),
             headers,
             claims.jti.as_deref(),
             &self.token_endpoint_url(),
             "POST",
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
         )
         .map_err(|error| {
-            let mut response =
-                oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &error.to_string());
+            let mut response = oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidGrant,
+                &error.to_string(),
+            );
             response.extensions_mut().insert(Arc::new(error));
             response
         })?;
@@ -481,14 +503,14 @@ impl LocalAuthorizationServer {
         {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_grant",
+                OAuthError::InvalidGrant,
                 "subject token signature is invalid",
             ));
         }
         if claims.iss.as_deref() != Some(self.issuer.as_str()) {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
-                "invalid_grant",
+                OAuthError::InvalidGrant,
                 "subject token issuer mismatch",
             ));
         }
@@ -496,7 +518,7 @@ impl LocalAuthorizationServer {
             if self.clock.seconds().map_err(clock::rejection)? >= exp {
                 return Err(oauth_token_error(
                     StatusCode::BAD_REQUEST,
-                    "invalid_grant",
+                    OAuthError::InvalidGrant,
                     "subject token expired",
                 ));
             }
@@ -510,7 +532,7 @@ impl LocalAuthorizationServer {
                 let expected_client_id = claims.client_id.as_deref().ok_or_else(|| {
                     oauth_token_error(
                         StatusCode::BAD_REQUEST,
-                        "invalid_grant",
+                        OAuthError::InvalidGrant,
                         "subject token chio_transaction_context.identityAssertion requires client_id",
                     )
                 })?;

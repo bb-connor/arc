@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards() {
     let deny_requests = Arc::new(Mutex::new(Vec::new()));
@@ -12,6 +14,7 @@ fn interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards() {
             "token scope does not cover fs_read on requested path",
         ))),
         AcpAttestationMode::Required,
+        AcpClock::default(),
     );
     let read = json!({
         "jsonrpc": "2.0",
@@ -43,6 +46,7 @@ fn interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards() {
         None,
         Some(Box::new(ErrorChecker)),
         AcpAttestationMode::Required,
+        AcpClock::default(),
     );
     let error = erroring
         .intercept_value(Direction::AgentToClient, &read)
@@ -66,6 +70,7 @@ fn interceptor_clears_capability_context_after_terminal_status_updates() {
             "auth-request-terminal",
         ))),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     let read = json!({
@@ -181,6 +186,7 @@ fn cap_context_for_fs_read_links_to_later_session_update_via_request_id() {
             "auth-request-fs-read-link",
         ))),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     // The ACP fs/read_text_file shape: sessionId + path + capabilityToken
@@ -341,8 +347,13 @@ fn terminal_kill_without_receipt_fails_closed() {
         .with_allowed_command("cargo")
         .with_server_id("proxy-server");
     // No capability checker installed: lifecycle ops must fail closed.
-    let interceptor =
-        MessageInterceptor::with_kernel(config, None, None, AcpAttestationMode::BestEffort);
+    let interceptor = MessageInterceptor::with_kernel(
+        config,
+        None,
+        None,
+        AcpAttestationMode::BestEffort,
+        AcpClock::default(),
+    );
 
     let kill = json!({
         "jsonrpc": "2.0",
@@ -376,8 +387,13 @@ fn terminal_release_without_receipt_fails_closed() {
         .with_allowed_path_prefix("/home/user/project")
         .with_allowed_command("cargo")
         .with_server_id("proxy-server");
-    let interceptor =
-        MessageInterceptor::with_kernel(config, None, None, AcpAttestationMode::BestEffort);
+    let interceptor = MessageInterceptor::with_kernel(
+        config,
+        None,
+        None,
+        AcpAttestationMode::BestEffort,
+        AcpClock::default(),
+    );
 
     let release = json!({
         "jsonrpc": "2.0",
@@ -422,6 +438,7 @@ fn terminal_kill_with_authorized_receipt_succeeds() {
             "auth-request-kill",
         ))),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     let kill = json!({
@@ -479,6 +496,7 @@ fn terminal_release_with_authorized_receipt_succeeds() {
             "auth-request-release",
         ))),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     let release = json!({
@@ -541,6 +559,7 @@ fn terminal_kill_with_mismatched_parameter_hash_fails_closed() {
             receipt_request_id: "auth-request-kill-A".to_string(),
         })),
         AcpAttestationMode::BestEffort,
+        AcpClock::default(),
     );
 
     // the approved binding is allowed.

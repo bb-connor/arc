@@ -30,9 +30,10 @@ impl AcpTransport {
 
         let mut child = cmd.spawn()?;
 
-        let stdout = child.stdout.take().ok_or_else(|| {
-            AcpProxyError::Transport("agent process stdout not captured".to_string())
-        })?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| AcpProxyError::PipeUnavailable)?;
 
         let reader = AcpFrameReader::new(BufReader::new(stdout));
 
@@ -41,9 +42,11 @@ impl AcpTransport {
 
     /// Send a JSON-RPC message to the agent's stdin.
     pub fn send(&mut self, message: &serde_json::Value) -> Result<(), AcpProxyError> {
-        let stdin = self.child.stdin.as_mut().ok_or_else(|| {
-            AcpProxyError::Transport("agent process stdin not available".to_string())
-        })?;
+        let stdin = self
+            .child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| AcpProxyError::PipeUnavailable)?;
 
         let serialized = input::encode(message)?;
         stdin.write_all(&serialized)?;

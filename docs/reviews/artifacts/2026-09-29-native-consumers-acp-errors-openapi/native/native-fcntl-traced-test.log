@@ -1,0 +1,32 @@
+
+running 1 test
+test process_host_runs_existing_mcp_tools_and_recovers_after_host_death ... FAILED
+
+failures:
+
+---- process_host_runs_existing_mcp_tools_and_recovers_after_host_death stdout ----
+
+thread 'process_host_runs_existing_mcp_tools_and_recovers_after_host_death' (21954) panicked at crates/products/chio-cli/tests/process_host_native.rs:19:5:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli/../../../crates/products/chio-cli/tests/process_host/recovery.py", line 361, in <module>
+    exercise(sys.argv[1], Path(temporary))
+  File "/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli/../../../crates/products/chio-cli/tests/process_host/recovery.py", line 65, in exercise
+    "servers": [report_server(binary, directory)],
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli/../../../crates/products/chio-cli/tests/process_host/recovery.py", line 26, in report_server
+    return provision_native_demo(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/arc-native-consumers-20260929/sdks/python/chio-process/src/chio_process/launch.py", line 105, in provision_native_demo
+    subprocess.run(
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/home/ubuntu/chio-x86-cage-c38ea127ed-target/debug/chio', 'security', 'provision-reference-runtime', '--stage', 'enforced', '--max-artifact-bytes', '67108864', '--cage-init', '/home/ubuntu/native-consumers-evidence-20260929/chio-cage-init', '--receipt-rollback-anchor-root', '/mnt/chio-anchor/native-consumers-20260929/chio-native-anchors-qure5sii', '--output-dir', '/tmp/chio-process-host-sl5mh7nv/launch-reports', '--discover-tools', '--target', '/home/ubuntu/native-consumers-evidence-20260929/process-report-fixture', '--working-directory', '/tmp/chio-process-host-sl5mh7nv', '--execution-uid', '1001', '--execution-gid', '1001', '--server-id', 'reports', '--server-name', 'reports', '--server-version', '1', '--execution-supplementary-gid', '4', '--execution-supplementary-gid', '24', '--execution-supplementary-gid', '27', '--execution-supplementary-gid', '30', '--execution-supplementary-gid', '105', '--execution-supplementary-gid', '112', '--read-path', '/tmp/chio-process-host-sl5mh7nv/tool-data/publications.control', '--read-path', '/tmp/chio-process-host-sl5mh7nv/tool-data/publications.source.txt', '--write-path', '/tmp/chio-process-host-sl5mh7nv/tool-data/publications.jsonl', '--target-arg', '/tmp/chio-process-host-sl5mh7nv/tool-data/publications.jsonl']' returned non-zero exit status 1.
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    process_host_runs_existing_mcp_tools_and_recovers_after_host_death
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.95s

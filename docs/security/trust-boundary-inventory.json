@@ -1119,6 +1119,7 @@
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire",
+    "crates/protocol/chio-openapi/src/input.rs::decode::from_wire",
     "crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frame::from_wire",
     "crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frames::from_wire",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire",
@@ -6241,8 +6242,9 @@
     "crates/protocol/chio-openapi/src/extensions.rs": [
       "from_operation::from_value"
     ],
-    "crates/protocol/chio-openapi/src/parser.rs": [
-      "parse::from_str"
+    "crates/protocol/chio-openapi/src/input.rs": [
+      "decode::Deserializer::from_slice",
+      "decode::custom_deserialize"
     ],
     "crates/protocol/chio-provider-adapter-core/src/http.rs": [
       "parse_ndjson_lines::from_str"
@@ -7958,10 +7960,6 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/protocol/chio-openapi/src/parser.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/protocol/chio-provider-adapter-core/src/http.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -8401,6 +8399,10 @@
     "crates/protocol/chio-openai-adapter/src/input.rs": {
       "kind": "reviewed-protocol-reader",
       "contract": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation."
+    },
+    "crates/protocol/chio-openapi/src/input.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "OpenApiSpec::parse passes original bytes bounded at 8 MiB before UTF-8 and format detection. JSON uses duplicate-aware signed decoding. The YAML seed rejects duplicate or nonstring keys and multiple documents while enforcing depth 64, 100000 nodes and 8 MiB cumulative expanded strings before projection. Bridge and fuzz callers pass original bytes; native decoder sources remain local."
     }
   },
   "tenant_runtime_families": {
@@ -11938,5 +11940,15 @@
       "crates/protocol/chio-acp-proxy/src/input.rs",
       "crates/protocol/chio-acp-proxy/src/tests/attestation_denials.rs"
     ]
+  },
+  "reviewed_openapi_ingress": {
+    "input": "crates/protocol/chio-openapi/src/input.rs",
+    "projection": "crates/protocol/chio-openapi/src/parser.rs",
+    "bridge": "crates/protocol/chio-openapi-mcp-bridge/src/lib.rs",
+    "tests": [
+      "crates/protocol/chio-openapi/src/input.rs",
+      "crates/tooling/chio-conformance/tests/ssrf_oversize_response_rejected.rs"
+    ],
+    "contract": "Original-byte validation precedes projection. from_value is a typed programmatic constructor and carries no original-byte validation claim."
   }
 }

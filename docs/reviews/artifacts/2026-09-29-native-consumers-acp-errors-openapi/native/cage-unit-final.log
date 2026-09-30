@@ -1,0 +1,63 @@
+Cargo build-finished: True
+
+running 20 tests
+test launch::platform::seccomp_validation_tests::launch_revalidates_unlisted_constraint_keys ... ok
+test launch::platform::tests::architecture_syscall_tables_cover_reviewed_profiles ... ok
+test launch::platform::stdio_tests::swapped_extra_and_missing_stdio_roles_fail_plan_validation ... ok
+test launch::platform::tests::helper_identity_control_rejects_same_bytes_different_identity ... ok
+test launch::platform::tests::required_enforcement_comparison_is_exact ... ok
+test launch::platform::stdio_tests::swapped_live_stdio_descriptors_fail_identity_verification ... ok
+test launch::platform::tests::seccomp_control_rejects_forbidden_socket_before_default_deny ... ok
+test linux::tests::path_identity_control_rejects_changed_retained_resource_identity ... ok
+test launch::platform::tests::constrained_exec_filter_fails_closed ... ok
+test tests::descriptor_purpose_rejects_unknown_nested_fields ... ok
+test tests::environment_is_minimal_and_credentials_fail_closed ... ok
+test tests::every_syscall_profile_is_default_deny_and_has_no_network_creation ... ok
+test launch::platform::tests::seccomp_rejects_peer_process_authority_in_every_profile ... ok
+test tests::signature_is_verified_before_permissions_are_read ... ok
+test tests::admission_consumes_nonforgeable_registry_authorization ... ok
+test tests::admission_fails_closed_on_unqualified_linux_architecture ... ok
+test launch::linux_child_custody_tests::child_reaper_send_failure_reaps_synchronously ... ok
+test launch::linux_child_custody_tests::child_reaper_start_failure_reaps_synchronously ... ok
+test launch::linux_child_custody_tests::acknowledged_child_reaper_handoff_reaps ... ok
+test launch::linux_child_custody_tests::child_supervisor_retries_sigkill_until_reaped ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+
+running 1 test
+test exec::tests::exact_target_argv_is_used_and_mutation_is_rejected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test execution_identity::tests::accepts_bounded_canonical_non_root_identity ... ok
+test execution_identity::tests::rejects_root_zero_unsorted_duplicate_and_primary_groups ... ok
+test seccomp_plan::tests::construction_rejects_constraints_for_unlisted_syscalls ... ok
+test seccomp_plan::tests::construction_rejects_unconfined_limits_and_invalid_arguments ... ok
+test seccomp_plan::tests::empty_alternatives_cannot_introduce_unconditional_syscall_authority ... ok
+test seccomp_plan::tests::wire_decode_uses_the_same_plan_validator_and_closed_syscall_keys ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+Cargo stderr:
+warning: patch `cmpv2 v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/home/ubuntu/arc-native-consumers-20260929/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/home/ubuntu/arc-native-consumers-20260929/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/home/ubuntu/arc-native-consumers-20260929/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/home/ubuntu/arc-native-consumers-20260929/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-cage v0.1.0 (/home/ubuntu/arc-native-consumers-20260929/crates/security/chio-cage)
+    Finished `test` profile [unoptimized] target(s) in 1.75s
+     Running unittests src/lib.rs (/home/ubuntu/chio-x86-cage-c38ea127ed-target/debug/deps/chio_cage-b1ebbf07b023d1a0)
+     Running unittests src/lib.rs (/home/ubuntu/chio-x86-cage-c38ea127ed-target/debug/deps/chio_cage_init-408c4d2b9abc3310)
+     Running unittests src/lib.rs (/home/ubuntu/chio-x86-cage-c38ea127ed-target/debug/deps/chio_cage_plan-6d980e95c416912b)

@@ -118,7 +118,7 @@ def provision_native_demo(
     }
 
 
-def _native_cage_arguments(output: Path) -> list[str]:
+def _native_cage_authority_arguments() -> list[str]:
     arguments = ["--stage", "enforced", "--max-artifact-bytes", str(64 * 1024 * 1024)]
     for variable, flag in (
         ("CHIO_CAGE_INIT", "--cage-init"),
@@ -128,6 +128,11 @@ def _native_cage_arguments(output: Path) -> list[str]:
         if not os.path.isabs(path):
             raise ValueError(f"{variable} must name an absolute path on the enforcing host")
         arguments.extend([flag, path])
+    return arguments
+
+
+def _native_cage_arguments(output: Path) -> list[str]:
+    arguments = _native_cage_authority_arguments()
     grants = os.environ.get("CHIO_CAGE_READ_PATHS_FILE", "")
     if not os.path.isabs(grants):
         raise ValueError("CHIO_CAGE_READ_PATHS_FILE must name the reviewed read-grants file")

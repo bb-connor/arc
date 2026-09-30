@@ -2603,6 +2603,7 @@ dependencies = [
  "chio-cross-protocol",
  "chio-kernel",
  "chio-manifest",
+ "chio-security-types",
  "serde",
  "serde_json",
  "sha2 0.10.9",

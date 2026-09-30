@@ -1103,6 +1103,7 @@ pub(super) fn validate_cage_target_fd_binding_production_paths(
                 .and_then(|constraints| {
                     constraints
                         .iter_mut()
+                        .flatten()
                         .find(|constraint| constraint.argument_index == 0)
                 })
                 .ok_or(CageError::InvalidTargetFdBinding(
@@ -1786,6 +1787,7 @@ mod stdio_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{SeccompArgumentComparison, SyscallArgumentConstraint, AT_EMPTY_PATH};
     #[cfg(target_arch = "x86_64")]
     use chio_test_support::prelude::*;
 
@@ -1869,7 +1871,7 @@ mod tests {
         let mut argument_constraints = BTreeMap::new();
         argument_constraints.insert(
             crate::Syscall::Execveat,
-            vec![
+            vec![vec![
                 SyscallArgumentConstraint {
                     argument_index: 0,
                     comparison: SeccompArgumentComparison::Equal,
@@ -1880,7 +1882,7 @@ mod tests {
                     comparison: SeccompArgumentComparison::Equal,
                     value: AT_EMPTY_PATH as u64,
                 },
-            ],
+            ]],
         );
         let mut plan = chio_cage_plan::SeccompProfilePlan::test_unchecked(
             SandboxArchitecture::current().test_expect("supported test architecture"),
@@ -1895,7 +1897,7 @@ mod tests {
 
         plan.test_argument_constraints_mut()
             .get_mut(&crate::Syscall::Execveat)
-            .test_expect("execveat constraint")[0]
+            .test_expect("execveat constraint")[0][0]
             .value = (TARGET_FD - 1) as u64;
         let mutated = compile_seccomp_filter(&plan).test_expect("valid mutated filter");
         assert_ne!(
@@ -1938,7 +1940,7 @@ mod tests {
             peer_limits
                 .test_argument_constraints_mut()
                 .get_mut(&crate::Syscall::Prlimit64)
-                .test_unwrap()[0]
+                .test_unwrap()[0][0]
                 .value = 1;
             assert!(!seccomp_profile_is_fail_closed(&peer_limits));
         }

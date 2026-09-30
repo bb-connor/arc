@@ -1,0 +1,257 @@
+error: unused import: `record_receipt_write_error`
+  --> crates/protocol/chio-acp-edge/src/lib.rs:76:48
+   |
+76 | use error::{record_receipt_write_bridge_error, record_receipt_write_error};
+   |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+
+error: redundant closure
+  --> crates/protocol/chio-acp-edge/src/edge.rs:58:14
+   |
+58 |     .map_err(|error| AcpEdgeError::Features(error))?;
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `AcpEdgeError::Features`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+   = note: `-D clippy::redundant-closure` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::redundant_closure)]`
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-edge/src/edge.rs:111:22
+    |
+111 |             .map_err(|error| AcpEdgeError::Features(error))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `AcpEdgeError::Features`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:200:26
+    |
+200 |                 .map_err(|e| ReceiptSignError::Store(e))?
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Store`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+    = note: `-D clippy::redundant-closure` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure)]`
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:215:22
+    |
+215 |             .map_err(|error| ReceiptSignError::Canonical(error))?
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Canonical`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:234:22
+    |
+234 |             .map_err(|error| ReceiptSignError::Canonical(error))?
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Canonical`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:255:22
+    |
+255 |             .map_err(|error| ReceiptSignError::Canonical(error))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Canonical`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:377:22
+    |
+377 |             .map_err(|e| ReceiptSignError::Store(e))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Store`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:380:22
+    |
+380 |             .map_err(|e| ReceiptSignError::Store(e))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Store`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:387:22
+    |
+387 |             .map_err(|e| ReceiptSignError::Store(e))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Store`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:476:22
+    |
+476 |             .map_err(|e| ReceiptSignError::Canonical(e))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Canonical`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:554:60
+    |
+554 |             ChioReceipt::sign(body, &self.keypair).map_err(|e| ReceiptSignError::Canonical(e))?;
+    |                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Canonical`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:586:30
+    |
+586 |                     .map_err(|e| ReceiptSignError::Store(e))?;
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Store`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+error: redundant closure
+   --> crates/protocol/chio-acp-proxy/src/kernel_signer.rs:590:30
+    |
+590 |                     .map_err(|e| ReceiptSignError::Store(e))?;
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ReceiptSignError::Store`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+
+Cargo build-finished: False
+
+Cargo stderr:
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Checking sha2 v0.10.9
+    Checking chio-metrics-spec v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-metrics-spec)
+    Checking sha2 v0.11.0
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+    Checking chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+    Checking chio-web3-bindings v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3-bindings)
+    Checking scrypt v0.11.0
+    Checking chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+    Checking rs_merkle v1.5.0
+    Checking pkcs5 v0.7.1
+    Checking frost-ed25519 v3.0.0
+    Checking oauth2 v5.0.0
+    Checking chio-data-guards-redactors-default v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards/redactors/default)
+    Checking pkcs8 v0.10.2
+    Checking oci-client v0.17.0
+    Checking ed25519 v2.2.3
+    Checking sec1 v0.7.3
+    Checking ed25519-dalek v2.2.0
+    Checking elliptic-curve v0.13.8
+    Checking pkcs1 v0.7.5
+    Checking scrypt v0.12.0
+    Checking chio-log-redact v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-log-redact)
+    Checking rsa v0.9.10
+    Checking primeorder v0.13.6
+    Checking ecdsa v0.16.9
+    Checking chio-supervisor v0.1.0 (/tmp/arc-security-launch/crates/core/chio-supervisor)
+    Checking chio-bounded v0.1.0 (/tmp/arc-security-launch/crates/core/chio-bounded)
+    Checking bls12_381_plus v0.8.13
+    Checking chio-workflow-preflight v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow-preflight)
+    Checking p384 v0.13.1
+    Checking p256 v0.13.2
+    Checking sqlx-core v0.8.6
+    Checking openidconnect v4.0.1
+    Checking chio-sqlite-file-identity v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-sqlite-file-identity)
+   Compiling chio-conformance v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-conformance)
+    Checking chio-secure-ipc v0.1.0 (/tmp/arc-security-launch/crates/security/chio-secure-ipc)
+    Checking affinidi-bbs v0.1.0
+    Checking chio-http-serve v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-http-serve)
+    Checking chio-spec-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-spec-validate)
+    Checking chio-errors v0.1.0 (/tmp/arc-security-launch/crates/core/chio-errors)
+    Checking sqlx-postgres v0.8.6
+    Checking sigstore v0.14.0
+    Checking sqlx v0.8.6
+    Checking chio-finding-market-migrations v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-migrations)
+    Checking chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+    Checking chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+    Checking chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+    Checking chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+    Checking chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+    Checking chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+    Checking chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+    Checking chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+    Checking chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+    Checking chio-swarm-authority v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-swarm-authority)
+    Checking chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+    Checking chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+    Checking chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+    Checking chio-disclosure-lineage v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-disclosure-lineage)
+    Checking chio-finding-market-port v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-port)
+    Checking chio-cage-init v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-init)
+    Checking chio-flow v0.1.0 (/tmp/arc-security-launch/crates/security/chio-flow)
+    Checking chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+    Checking chio-decoy v0.1.0 (/tmp/arc-security-launch/crates/security/chio-decoy)
+    Checking chio-reputation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-reputation)
+    Checking chio-keyring v0.1.0 (/tmp/arc-security-launch/crates/security/chio-keyring)
+    Checking chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+    Checking chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+    Checking chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+    Checking chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+    Checking chio-finding-market-store-postgres v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-store-postgres)
+    Checking chio-finding-worker v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-worker)
+    Checking chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+    Checking chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+    Checking chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+    Checking chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+    Checking chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+    Checking chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+    Checking chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+    Checking chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+    Checking chio-workflow v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow)
+    Checking chio-metering v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-metering)
+    Checking chio-signing-remote v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-signing-remote)
+    Checking chio-credentials v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-credentials)
+    Checking chio-selective-disclosure v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-selective-disclosure)
+    Checking chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+    Checking chio-cage v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage)
+    Checking chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+    Checking chio-federation-authority v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-authority)
+    Checking chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+    Checking chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+    Checking chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+    Checking chio-edge-metrics v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-edge-metrics)
+    Checking chio-http-session v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-session)
+    Checking chio-trace-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-trace-validate)
+    Checking chio-security-kernel v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-kernel)
+    Checking chio-siem v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-siem)
+    Checking chio-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guards)
+    Checking chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+    Checking chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+    Checking chio-mcp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-edge)
+    Checking chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+    Checking chio-finding-challenge v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-challenge)
+    Checking chio-acp-proxy v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-proxy)
+    Checking chio-mcp-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-adapter)
+    Checking chio-acp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-edge)
+error: could not compile `chio-acp-edge` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `chio-acp-proxy` (lib) due to 11 previous errors

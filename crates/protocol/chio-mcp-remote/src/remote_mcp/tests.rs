@@ -45,6 +45,31 @@ fn test_native_launch_factory() -> Arc<dyn chio_mcp_adapter::transport::NativeMc
     Arc::new(TestNativeLaunchFactory)
 }
 
+#[tokio::test]
+async fn oauth_error_extensions_preserve_domain_context_with_redacted_wire_body() {
+    let response = oauth_token_error(
+        StatusCode::BAD_REQUEST,
+        OAuthError::InvalidGrant,
+        "private_marker",
+    );
+    let cause = response
+        .extensions()
+        .get::<Arc<OAuthRejection>>()
+        .expect("local OAuth cause");
+    assert_eq!(cause.kind, OAuthError::InvalidGrant);
+    assert_eq!(cause.local_detail(), "private_marker");
+    assert!(!format!("{cause:?} {cause}").contains("private_marker"));
+    let body = axum::body::to_bytes(response.into_body(), 4096)
+        .await
+        .unwrap();
+    let value: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(value["error"], "invalid_grant");
+    assert_eq!(
+        value["error_description"],
+        "urn:chio:error:policy:decision-denied"
+    );
+}
+
 #[test]
 fn jwt_original_bytes_reject_duplicates_and_retain_encoding_sources() {
     use chio_core::canonical::UntrustedJsonError;

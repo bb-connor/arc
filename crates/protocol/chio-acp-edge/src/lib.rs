@@ -19,6 +19,9 @@
 
 #![forbid(unsafe_code)]
 
+mod request_error;
+pub use request_error::{AcpField, AcpFieldViolation, AcpRequestError};
+
 use chio_security_types::clock::{AuthorityDeadline, ClockError, ClockReading};
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
@@ -68,7 +71,11 @@ pub use metrics::{
 // Each fragment merges into this crate-root module scope; item paths and
 // visibility resolve as if the fragments were inlined here.
 
-include!("error.rs");
+mod error;
+use error::record_receipt_write_bridge_error;
+#[cfg(test)]
+use error::record_receipt_write_error;
+pub use error::AcpEdgeError;
 include!("config.rs");
 include!("types.rs");
 include!("bridge.rs");

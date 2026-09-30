@@ -7,8 +7,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_core::receipt::body::chio_receipt_id;
 use chio_core::crypto::Signature;
+use chio_core::receipt::body::chio_receipt_id;
 
 /// One-shot guard for the empty-`trusted_kernel_keys` warning.
 ///
@@ -39,35 +39,38 @@ fn warn_empty_compliance_trusted_keys_once() {
 }
 
 /// Error types that abort compliance certificate generation.
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 pub enum ComplianceCertificateError {
+    /// Trusted audit time or canonical serialization failed.
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    Audit(#[from] AcpAuditError),
     /// No receipts found for the given session.
-    #[error("empty session: no receipts found for session {0}")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     EmptySession(String),
 
     /// A receipt's Ed25519 signature is invalid.
-    #[error("invalid receipt signature: receipt {receipt_id} failed verification")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     InvalidReceiptSignature {
         /// The receipt ID whose signature failed.
         receipt_id: String,
     },
 
     /// A receipt ID does not match the content-addressed receipt body.
-    #[error("invalid receipt id: receipt {receipt_id} does not match its canonical body")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     InvalidReceiptId {
         /// The receipt ID whose content-addressed identity failed.
         receipt_id: String,
     },
 
     /// A receipt action hash does not match the canonical action parameters.
-    #[error("invalid receipt action hash: receipt {receipt_id} failed parameter hash verification")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     InvalidActionHash {
         /// The receipt ID whose action hash failed.
         receipt_id: String,
     },
 
     /// A receipt does not belong to the certificate's named session.
-    #[error("session mismatch: receipt {receipt_id} is not bound to session {session_id}")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     SessionMismatch {
         /// The receipt ID whose session binding failed.
         receipt_id: String,
@@ -76,7 +79,7 @@ pub enum ComplianceCertificateError {
     },
 
     /// A receipt does not belong to the configured tenant.
-    #[error("tenant mismatch: receipt {receipt_id} is not bound to tenant {tenant_id}")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     TenantMismatch {
         /// The receipt ID whose tenant binding failed.
         receipt_id: String,
@@ -85,14 +88,14 @@ pub enum ComplianceCertificateError {
     },
 
     /// A receipt carries an allow decision without authorization semantics.
-    #[error("non-authorizing allow receipt: receipt {receipt_id} is not mediated/prevent/allow")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     NonAuthorizingReceipt {
         /// The receipt ID whose semantics failed.
         receipt_id: String,
     },
 
     /// A receipt was signed by a kernel key outside the verifier trust set.
-    #[error("untrusted kernel key: receipt {receipt_id} was signed by {kernel_key}")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     UntrustedKernelKey {
         /// The receipt ID whose signer was not trusted.
         receipt_id: String,
@@ -101,7 +104,7 @@ pub enum ComplianceCertificateError {
     },
 
     /// A gap or reordering was detected in the receipt chain.
-    #[error("chain discontinuity: expected seq {expected} but found {found}")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     ChainDiscontinuity {
         /// The expected sequence number.
         expected: u64,
@@ -110,7 +113,7 @@ pub enum ComplianceCertificateError {
     },
 
     /// A receipt's scope exceeds the session's authorized scope.
-    #[error("scope violation: receipt {receipt_id} accesses {resource} outside authorized scope")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     ScopeViolation {
         /// The receipt that violated scope.
         receipt_id: String,
@@ -119,7 +122,7 @@ pub enum ComplianceCertificateError {
     },
 
     /// The session's invocation budget was exceeded.
-    #[error("budget exceeded: {used} invocations against limit of {limit}")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     BudgetExceeded {
         /// Actual number of invocations observed.
         used: u64,
@@ -128,7 +131,7 @@ pub enum ComplianceCertificateError {
     },
 
     /// A guard was bypassed (no evidence recorded for a required guard).
-    #[error("guard bypass: guard {guard_name} has no evidence in receipt {receipt_id}")]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     GuardBypass {
         /// The guard that was expected to run.
         guard_name: String,
@@ -142,21 +145,25 @@ pub enum ComplianceCertificateError {
     /// mixes receipts from different kernels would produce a certificate
     /// whose `kernel_key` field misrepresents the signer for some receipts;
     /// fail closed.
-    #[error(
-        "kernel key mismatch: receipt {receipt_id} signed by a different kernel than the session's first receipt"
-    )]
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
     KernelKeyMismatch {
         /// The receipt whose kernel_key did not match the session's first receipt.
         receipt_id: String,
     },
 
     /// Serialization error during certificate construction.
-    #[error("serialization error: {0}")]
-    Serialization(String),
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    Canonical(#[from] chio_core::error::Error),
 
     /// Signing error during certificate construction.
-    #[error("signing error: {0}")]
-    Signing(String),
+    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    SelfVerification,
+}
+
+impl std::fmt::Debug for ComplianceCertificateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
 }
 
 /// A receipt entry used during compliance analysis.
@@ -287,23 +294,19 @@ fn validate_compliance_receipt(
     let receipt = &entry.receipt;
     let sig_ok = receipt
         .verify_signature()
-        .map_err(|e| ComplianceCertificateError::Signing(format!("{e}")))?;
+        .map_err(ComplianceCertificateError::Canonical)?;
     if !sig_ok {
         return Err(ComplianceCertificateError::InvalidReceiptSignature {
             receipt_id: receipt.id.clone(),
         });
     }
-    let id_ok = chio_receipt_id(&receipt.body())
-        .map(|expected| expected == receipt.id)
-        .unwrap_or(false);
+    let id_ok = chio_receipt_id(&receipt.body()).map(|expected| expected == receipt.id)?;
     if !id_ok {
         return Err(ComplianceCertificateError::InvalidReceiptId {
             receipt_id: receipt.id.clone(),
         });
     }
-    let action_hash_ok = receipt.action.verify_hash().map_err(|e| {
-        ComplianceCertificateError::Signing(format!("action hash verification failed: {e}"))
-    })?;
+    let action_hash_ok = receipt.action.verify_hash()?;
     if !action_hash_ok {
         return Err(ComplianceCertificateError::InvalidActionHash {
             receipt_id: receipt.id.clone(),
@@ -341,8 +344,7 @@ fn validate_compliance_receipt(
     if matches!(
         receipt.decision.as_ref(),
         Some(chio_core::receipt::decision::Decision::Allow)
-    )
-        && !receipt.is_allowed()
+    ) && !receipt.is_allowed()
     {
         return Err(ComplianceCertificateError::NonAuthorizingReceipt {
             receipt_id: receipt.id.clone(),
@@ -361,6 +363,7 @@ pub fn generate_compliance_certificate(
     receipts: &[ComplianceReceiptEntry],
     config: &ComplianceConfig,
     keypair: &Keypair,
+    clock: &AcpClock,
 ) -> Result<ComplianceCertificate, ComplianceCertificateError> {
     // 1. Empty session check.
     if receipts.is_empty() {
@@ -376,13 +379,15 @@ pub fn generate_compliance_certificate(
 
     // 3. Check chain continuity.
     for i in 1..receipts.len() {
-        let expected = receipts[i - 1].seq + 1;
+        let expected = receipts[i - 1]
+            .seq
+            .checked_add(1)
+            .ok_or(AcpAuditError::Clock(
+                chio_security_types::clock::ClockError::Overflow,
+            ))?;
         let found = receipts[i].seq;
         if found != expected {
-            return Err(ComplianceCertificateError::ChainDiscontinuity {
-                expected,
-                found,
-            });
+            return Err(ComplianceCertificateError::ChainDiscontinuity { expected, found });
         }
     }
 
@@ -446,24 +451,20 @@ pub fn generate_compliance_certificate(
     }
 
     // All checks passed -- build the certificate.
-    let first_ts = receipts
-        .first()
-        .map(|e| e.receipt.timestamp)
-        .unwrap_or(0);
-    let last_ts = receipts
-        .last()
-        .map(|e| e.receipt.timestamp)
-        .unwrap_or(0);
+    let first_ts = receipts.first().map(|e| e.receipt.timestamp).unwrap_or(0);
+    let last_ts = receipts.last().map(|e| e.receipt.timestamp).unwrap_or(0);
 
     let kernel_key = receipts
         .first()
         .map(|e| e.receipt.kernel_key.clone())
         .unwrap_or_else(|| keypair.public_key());
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = clock.seconds()?;
+    if receipts.iter().any(|entry| entry.receipt.timestamp > now) {
+        return Err(
+            AcpAuditError::Clock(chio_security_types::clock::ClockError::NotYetValid).into(),
+        );
+    }
 
     let body = ComplianceCertificateBody {
         schema: COMPLIANCE_CERTIFICATE_SCHEMA.to_string(),
@@ -481,8 +482,7 @@ pub fn generate_compliance_certificate(
         kernel_key,
     };
 
-    let body_bytes = canonical_json_bytes(&body)
-        .map_err(|e| ComplianceCertificateError::Serialization(e.to_string()))?;
+    let body_bytes = canonical_json_bytes(&body).map_err(ComplianceCertificateError::Canonical)?;
     let signature = keypair.sign(&body_bytes);
 
     let certificate = ComplianceCertificate {
@@ -518,10 +518,7 @@ pub fn generate_compliance_certificate(
         &self_verify_config,
     );
     if !self_verification.passed {
-        return Err(ComplianceCertificateError::Signing(format!(
-            "generated compliance certificate failed self-verification: {}",
-            self_verification.summary
-        )));
+        return Err(ComplianceCertificateError::SelfVerification);
     }
 
     Ok(certificate)
@@ -653,7 +650,9 @@ fn verification_failure_summary(
         reasons.push("body consistency check failed".to_string());
     }
     if receipt_failures > 0 {
-        reasons.push(format!("{receipt_failures} receipt authority check(s) failed"));
+        reasons.push(format!(
+            "{receipt_failures} receipt authority check(s) failed"
+        ));
     }
     format!("verification failed: {}", reasons.join(", "))
 }

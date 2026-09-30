@@ -1,0 +1,38 @@
+
+running 2 tests
+
+thread 'process_host_runs_existing_mcp_tools_and_recovers_after_host_death' (19427) panicked at crates/products/chio-cli/tests/process_host_native.rs:19:5:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli/../../../crates/products/chio-cli/tests/process_host/recovery.py", line 361, in <module>
+    exercise(sys.argv[1], Path(temporary))
+  File "/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli/../../../crates/products/chio-cli/tests/process_host/recovery.py", line 251, in exercise
+    assert first["verdict"] == "allow", first
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'execution_nonce_json': None, 'output': None, 'reason': 'upstream MCP process exited before responding', 'receipt_json': '{"action":{"parameter_hash":"fbe82d254a8d4edc861750db04f1adee0255523fbd237fa2d21480804e17a63e","parameters":{"report":"kernel host recovery"}},"boundary_class":"prevent","capability_id":"55486cbf-9512-441f-aaef-e81c3220a908","content_hash":"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b","decision":{"reason":"upstream MCP process exited before responding","verdict":"incomplete"},"id":"6cd477a0968529c80c93714dcca704dbd038674c68be5fd2fe149ec46bd1aabb","kernel_key":"35ef63c22a5b2caabc9906001a168dbacfb389293e6a8afb5fd450153e8e3ab8","metadata":{"attribution":{"delegation_depth":2,"grant_index":0,"issuer_key":"35ef63c22a5b2caabc9906001a168dbacfb389293e6a8afb5fd450153e8e3ab8","subject_key":"048cf2333de33d62aabfb29c771380fc40b641e7fad1c97eddfcfc54245cae25"},"chio_process":{"attempt":1,"operation_key":"publish-report","process_id":"publisher","request_sha256":"007381c5512820aef9936c7d41a40b79410f206345049360664d2df11b0d4810","runtime_id":"97cafcaa-bce8-4b1a-8711-d43c44a72d15"},"chio_receipt_signing_nonce":"rcpt-01a0ef83-08c8-72e3-b012-ce730e80eabf","native_launch":{"receipt_id":"f2d3b48d0e238a854fec885ab49532de798b99e06674bc3e9fdcf55314d5cf2e","receipt_sha256":"c2233b6563171ec9200536c2d1fa242915e11bb34ba6821680eb6018d7b98155"},"receipt_context":{"request_id":"process:8d63ca3edcf9d0f1a0c9bee0a7f0cfeeeeddd6d3fbacd7582c5839921bfeb9e0"}},"policy_hash":"ae48b39f581338445aae660a7d9d520f540f6fd0076063220f6fdf2c098c5139","receipt_kind":"mediated_decision","redaction_mode":"none","signature":"ed55f8d2675c741105e16e5f5125abb39fe5f1b8c5529c8ff7f73c7e38c5d5aa93393f16fbc5f3924671ce708e352a9888cb8df2299c5dd905fc7b78f9bcd30e","timestamp":1790724736,"tool_name":"append","tool_origin":"caller_executed","tool_server":"reports","trust_level":"mediated"}', 'request_id': 'process:8d63ca3edcf9d0f1a0c9bee0a7f0cfeeeeddd6d3fbacd7582c5839921bfeb9e0', 'terminal_state': {'reason': 'upstream MCP process exited before responding', 'state': 'incomplete'}, 'verdict': 'deny'}
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test process_host_runs_existing_mcp_tools_and_recovers_after_host_death ... FAILED
+
+thread 'process_runner_recovers_workers_and_host_without_repeating_effects' (19428) panicked at crates/products/chio-cli/tests/process_host_native.rs:47:5:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli/../../../crates/products/chio-cli/tests/process_host/runner.py", line 812, in <module>
+    exercise(sys.argv[1], root / "automatic", False)
+  File "/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli/../../../crates/products/chio-cli/tests/process_host/runner.py", line 301, in exercise
+    command(binary, "run", "--state", state, "--plan", path).stdout
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/arc-native-consumers-20260929/crates/products/chio-cli/../../../crates/products/chio-cli/tests/process_host/runner.py", line 141, in command
+    assert (result.returncode == 0) == success, (args, result.stdout, result.stderr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (('run', '--state', PosixPath('/tmp/chio-run-irivqzzm/durable-state-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/automatic/host'), '--plan', PosixPath('/tmp/chio-run-irivqzzm/durable-state-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/automatic/plan.json')), '{"abandoned_socket_intents":0,"complete":false,"pending_container_records":0,"schema":"chio.process.run-report.v1","workers":[{"attempts":3,"cpu_ms":348,"outcome":"exit_1","peak_resident_bytes":39534592,"process":"publisher","state":"failed","suspensions":0},{"attempts":2,"cpu_ms":105,"outcome":"exit_0","peak_resident_bytes":37163008,"process":"reader","state":"completed","suspensions":0}]}\n', 'WARN chio_kernel::kernel::evaluation::async_evaluation_core message=tool call incomplete request_id=process:[REDACTED-BEARER] reason=upstream MCP process exited before responding retained_hold=true\nWARN chio_kernel::kernel::evaluation::async_evaluation_core message=durable admission denied request_id=process:[REDACTED-BEARER] reason=durable admission failed: request replay is retained in state OutcomeUnknownAfterDispatch\nWARN chio_kernel::kernel::evaluation::async_evaluation_core message=durable admission denied request_id=process:[REDACTED-BEARER] reason=durable admission failed: request replay is retained in state OutcomeUnknownAfterDispatch\nerror [urn:chio:error:cli:other]: process host: worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs\ncontext: {"domain":"cli","severity":"error","stability":"deprecated","string_code":"CHIO-CLI-OTHER"}\nsuggested fix: Preserve the original message and migrate the call site to a specific registry code when touched.\n')
+
+test process_runner_recovers_workers_and_host_without_repeating_effects ... FAILED
+
+failures:
+
+failures:
+    process_host_runs_existing_mcp_tools_and_recovers_after_host_death
+    process_runner_recovers_workers_and_host_without_repeating_effects
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.80s

@@ -68,8 +68,8 @@ b07b7ba52e253bb19fc6f0b005e31e4aafd755e2b14d3ba95db77dc94c2ce264  tests/bindings
 9009b797d8bb3710c107f3c81ce7696fd938d555751c6749f8abe9daced41287  tests/bindings/vectors/security/cage/positive/cage-enforcement-record-fully-enforced-v1.json
 9bcca230df86a13478fd0b2c5917613fa619c95b1a3aeebf98ad92b68d5b4b1d  tests/bindings/vectors/security/cage/positive/cage-exec-transition-observed-v1.json
 f84ae676daf8aee63bbe66ba0fed3b2512167dc24c805ac1f44ba49c297547d8  tests/bindings/vectors/security/cage/positive/cage-fully-enforced-evidence-v1.json
-8a44d206c6cdff9424005df7f965e2a4b8dfa821a4f807dcd842dde8094db19d  tests/bindings/vectors/security/cage/positive/cage-init-plan-brokered-v2.json
-a00d0e7410826b7515af15ba02abc4912a93c2b68c08f23fee23dc13096d8486  tests/bindings/vectors/security/cage/positive/cage-init-plan-native-v2.json
+55fdad6b687c816ef5090aa88ff869db80c046d5b56adf8c4adaa9d26abd383f  tests/bindings/vectors/security/cage/positive/cage-init-plan-brokered-v2.json
+41c3940230d44c0870877c053d4f62738b9423503e5f359f9c88a981782864ff  tests/bindings/vectors/security/cage/positive/cage-init-plan-native-v2.json
 c4c8f6a782f2b382b3acf5775c0b962c304b7e2a9a32f0721634f50a81d13de7  tests/bindings/vectors/security/cage/positive/cage-process-exit-evidence-v1.json
 b6f2fce032324bb1c704c58b47b5a6751750f698108282dbc1e2f37fd4e20fd6  tests/bindings/vectors/security/cage/positive/mcp-cage-launch-policy-v2.json
 4f9a91d6859c909e118bc89d1645d20da15fc3ac90aae26c4d796e3c56e8d603  tests/bindings/vectors/security/cage/positive/signed-tool-manifest-v2.json

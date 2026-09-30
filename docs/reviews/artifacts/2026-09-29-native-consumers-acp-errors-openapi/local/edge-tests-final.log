@@ -1,0 +1,134 @@
+warning: associated function `jsonrpc_protocol_error_response` is never used
+  --> crates/protocol/chio-acp-edge/src/jsonrpc.rs:27:8
+   |
+19 | impl ChioAcpEdge {
+   | ---------------- associated function in this implementation
+...
+27 |     fn jsonrpc_protocol_error_response(id: Value, code: i64, message: &str) -> Value {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+
+Cargo build-finished: True
+
+running 98 tests
+test metrics::tests::registry_constant_matches_spec ... ok
+test metrics::tests::render_exposes_writer_liveness_gauges ... ok
+test tests::acp_category_serializes ... ok
+test metrics::tests::render_includes_pending_approval_outcome_label ... ok
+test request_error::tests::semantic_field_rejections_keep_precise_causes_without_peer_text ... ok
+test tests::default_config_requires_permission ... ok
+test tests::bridge_fidelity_serializes ... ok
+test tests::acp_projection_preserves_complete_approval_set_and_opaque_extension ... ok
+test tests::acp_execution_request_preserves_complete_authorization_context ... ok
+test tests::browser_tools_are_not_auto_published ... ok
+test tests::approval_required_capability_is_adapted_with_permission_caveat ... ok
+test tests::duplicate_manifest_owners_are_rejected ... ok
+test tests::edge_capability_ids_match_tool_names ... ok
+test tests::acp_execution_boundary_rejects_removed_or_mismatched_flow_sidecar ... ok
+test nonce_preflight_tests::generated_request_id_rejects_threshold_approvals ... ok
+test tests::colliding_capability_ids_are_withheld_deterministically ... ok
+test tests::deferred_failure_is_terminal_and_retains_the_same_local_cause ... ok
+test tests::error_display_access_denied ... ok
+test tests::error_display_kernel ... ok
+test tests::edge_capability_lookup ... ok
+test tests::error_display_tool_not_found ... ok
+test tests::default_invoke_supports_openai_target_binding ... ok
+test tests::edge_unknown_capability_returns_none ... ok
+test tests::edge_generates_capabilities_from_manifest ... ok
+test tests::generic_side_effectful_tools_are_not_auto_published ... ok
+test tests::filesystem_tools_have_lossless_fidelity ... ok
+test tests::invalid_target_protocol_metadata_is_rejected ... ok
+test tests::invoke_kernel_error_records_receipt_write_error_outcome ... ok
+test tests::hidden_capability_is_not_auto_published ... ok
+test tests::generic_readonly_tool_is_adapted_with_category_caveat ... ok
+test tests::default_invoke_honors_protocol_aware_target_binding ... ok
+test tests::invoke_rejects_control_character_execution_agent_id_before_dispatch ... ok
+test nonce_preflight_tests::strict_nonce_retries_require_and_accept_stable_request_ids ... ok
+test tests::invoke_rejects_blank_execution_agent_id_before_dispatch ... ok
+test tests::invoke_unknown_tool_errors ... ok
+test tests::invoke_rejects_singular_approval_token_without_stable_request_id ... ok
+test tests::jsonrpc_cancel_rejects_missing_task_identity ... ok
+test tests::jsonrpc_cancel_marks_deferred_stream_task_cancelled ... ok
+test tests::invoke_rejects_supplemental_authorization_without_stable_request_id ... ok
+test tests::invoke_succeeds ... ok
+test tests::invoke_with_kernel_denial_still_emits_receipt_metadata ... ok
+test tests::invoke_with_kernel_emits_signed_receipt_metadata ... ok
+test tests::jsonrpc_param_helpers_validate_capability_and_default_arguments ... ok
+test tests::jsonrpc_list_capabilities ... ok
+test tests::jsonrpc_lifecycle_rejects_control_character_task_id_before_lookup ... ok
+test tests::acp_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation ... ok
+test tests::jsonrpc_invalid_version_preserves_scalar_request_id ... ok
+test tests::edge_rejects_manifest_with_unsupported_schema_version ... ok
+test tests::jsonrpc_permission_rejects_non_object_params_before_preview ... ok
+test tests::jsonrpc_lifecycle_rejects_empty_task_id_before_lookup ... ok
+test tests::jsonrpc_list_capabilities_rejects_non_object_params_before_listing ... ok
+test tests::jsonrpc_lifecycle_rejects_padded_task_id_before_lookup ... ok
+test tests::invoke_server_failure_returns_unsuccessful ... ok
+test tests::invoke_with_mcp_target_emits_receipt_metadata_and_mcp_projection ... ok
+test tests::jsonrpc_request_permission ... ok
+test tests::jsonrpc_rejects_non_scalar_request_ids_before_method_dispatch ... ok
+test tests::jsonrpc_permission_rejects_padded_execution_agent_id_before_preview ... ok
+test tests::jsonrpc_kernel_paths_mark_authority_and_permission_preview ... ok
+test tests::jsonrpc_request_permission_rejects_empty_capability_id_before_preview ... ok
+test tests::jsonrpc_request_permission_rejects_control_character_capability_id_before_preview ... ok
+test tests::jsonrpc_request_permission_rejects_padded_capability_id_before_preview ... ok
+test tests::jsonrpc_resume_rejects_non_object_params_before_task_lookup ... ok
+test tests::jsonrpc_stream_notification_creates_task_without_response ... ok
+test tests::jsonrpc_tool_invoke_rejects_control_character_capability_id_before_lookup ... ok
+test tests::jsonrpc_stream_rejects_padded_execution_agent_id_before_task_retention ... ok
+test tests::jsonrpc_tool_invoke_rejects_non_string_capability_id_before_lookup ... ok
+test tests::jsonrpc_resume_runtime_admission_denies_before_stream_tool_dispatch ... ok
+test tests::jsonrpc_tool_invoke_rejects_non_object_params_before_capability_lookup ... ok
+test tests::jsonrpc_tool_invoke_rejects_padded_capability_id_before_lookup ... ok
+test tests::original_input::invalid_notification_keeps_local_cause_without_emitting_a_wire_reply ... ok
+test tests::jsonrpc_unknown_method ... ok
+test tests::jsonrpc_stream_creates_deferred_task_and_resume_resolves_result ... ok
+test tests::jsonrpc_resume_retains_completed_deferred_task_result ... ok
+test tests::permission_decision_serializes ... ok
+test tests::jsonrpc_tool_invoke ... ok
+test tests::permissions::exec_command_gets_terminal_category ... ok
+test tests::permissions::permission_not_required_when_config_disabled ... ok
+test tests::permissions::jsonrpc_permission_preview_uses_kernel_dpop_config ... ok
+test tests::original_input::task_clock_failures_retain_pending_work_and_counters_never_wrap ... ok
+test tests::permissions::permission_with_capability_allows_matching_scope ... ok
+test tests::permissions::permission_with_capability_denies_out_of_scope_request ... ok
+test tests::pending_approval_is_not_reported_as_success ... ok
+test tests::permissions::permission_denied_by_default_for_required_caps ... ok
+test tests::permissions::permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop ... ok
+test tests::permissions::read_file_gets_filesystem_category ... ok
+test tests::permissions::permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce ... ok
+test tests::permissions::permission_denied_for_unknown_capability ... ok
+test tests::original_input::public_byte_ingress_rejects_duplicates_and_bounds_before_dispatch ... ok
+test tests::permissions::search_gets_default_tool_category ... ok
+test tests::permissions::side_effect_tools_require_permission ... ok
+test tests::permissions::permission_with_capability_denies_sender_bound_scope_without_dpop ... ok
+test tests::permissions::write_file_gets_filesystem_category ... ok
+test tests::pre_kernel_bridge_error_does_not_record_receipt_write_error_outcome ... ok
+test tests::terminal_tools_have_lossless_fidelity ... ok
+test tests::streaming_capability_is_adapted_with_stream_and_cancellation_caveats ... ok
+test tests::registry_admitted_flow_survives_acp_execution_projection_canonically ... ok
+test tests::jsonrpc_stream_rejects_deferred_task_map_over_cap ... ok
+test tests::jsonrpc_stream_capacity_includes_retained_cancelled_deferred_tasks ... ok
+
+test result: ok. 98 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+
+Cargo stderr:
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-acp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-edge)
+    Finished `test` profile [unoptimized] target(s) in 10.49s
+     Running unittests src/lib.rs (target/debug/deps/chio_acp_edge-2892651faccba426)

@@ -57,7 +57,7 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
     assert!(compiled.success(), "native discovery probe did not compile");
     let host = root.path().join("host-canary");
     write(&host, b"host filesystem must remain private")?;
-    for mode in ["respond", "fork", "stall"] {
+    for mode in ["respond", "fork", "duplicate-fd", "clear-cloexec", "stall"] {
         let marker = root.path().join(format!("pid-{mode}"));
         let gate = root.path().join(format!("gate-{mode}"));
         write(&marker, b"")?;
@@ -79,6 +79,7 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
             .arg(&output_dir)
             .arg("--cage-init")
             .arg(&helper)
+            .args(["--max-artifact-bytes", "67108864"])
             .arg("--target")
             .arg(&target)
             .arg("--working-directory")
@@ -122,7 +123,12 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
                 .into());
             }
             if started.elapsed() >= Duration::from_secs(10) {
-                return Err("discovery did not reach identity barrier".into());
+                return Err(format!(
+                    "discovery did not reach identity barrier: stderr={}, marker={:?}",
+                    std::fs::read_to_string(&stderr)?,
+                    std::fs::read(&marker)?
+                )
+                .into());
             }
             std::thread::sleep(Duration::from_millis(5));
         };
@@ -186,7 +192,7 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
         assert_eq!(
             std::fs::read(&marker)?,
             b"filesystem-denied",
-            "peer must observe EACCES, and the clone syscall must never return"
+            "peer must observe EACCES, and forbidden syscalls must never return"
         );
         let reap_started = Instant::now();
         while Path::new(&format!("/proc/{pid}")).exists() {
