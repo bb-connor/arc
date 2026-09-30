@@ -2887,12 +2887,14 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "aws-types",
+ "bytes",
  "chio-attest-verify",
  "chio-core-types",
  "chio-manifest",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "http 1.4.0",
+ "http-body 1.0.1",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3577,6 +3579,7 @@ dependencies = [
 name = "chio-egress-contract"
 version = "0.1.0"
 dependencies = [
+ "chio-core-types",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
@@ -4785,6 +4788,7 @@ dependencies = [
  "chio-test-support",
  "chio-tool-call-fabric",
  "reqwest 0.13.2",
+ "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
@@ -4805,12 +4809,16 @@ dependencies = [
  "chio-mistral-tools-adapter",
  "chio-ollama-tools-adapter",
  "chio-openai-adapter",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "chrono",
  "clap 4.6.0",
+ "rustix",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]

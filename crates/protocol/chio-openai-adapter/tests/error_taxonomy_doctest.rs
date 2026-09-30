@@ -339,6 +339,8 @@ fn require_provider_error<T>(
         ProviderError::Clock(_) => "Clock",
         ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
         ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

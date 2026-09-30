@@ -7,11 +7,8 @@ use serde_json::Value;
 use crate::native::FunctionCallPart;
 
 pub(crate) fn function_calls(raw: ProviderRequest) -> Result<Vec<FunctionCallPart>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!(
-            "Mistral chat/completions payload was not JSON: {error}"
-        ))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&raw.0).map_err(ProviderError::from)?;
     let body = response_body(value, "Mistral chat/completions")?;
     classify_content_policy(&body)?;
     extract_function_calls(&body)

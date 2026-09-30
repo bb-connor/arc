@@ -414,10 +414,7 @@ mod tests {
     #[tokio::test]
     async fn send_messages_maps_upstream_status() {
         let mock = Arc::new(transport::MockTransport::new());
-        mock.push_error(transport::HttpTransportError::Status {
-            code: 429,
-            body: "rate limited".to_string(),
-        });
+        mock.push_error(transport::HttpTransportError::Status { code: 429 });
         let adapter = AnthropicAdapter::new(config(), mock);
 
         let error = adapter
@@ -431,8 +428,8 @@ mod tests {
     async fn send_messages_timeout_fails_closed() {
         let mock = Arc::new(transport::MockTransport::new());
         mock.push_error(transport::HttpTransportError::Timeout {
-            url: "https://api.anthropic.com/v1/messages".to_string(),
             timeout_ms: 60_000,
+            source: Box::new(std::io::Error::from(std::io::ErrorKind::TimedOut)),
         });
         let adapter = AnthropicAdapter::new(config(), mock);
 
@@ -442,7 +439,7 @@ mod tests {
             .expect_err("a timeout must fail closed");
         assert!(matches!(
             error,
-            ProviderError::TransportTimeout { ms: 60_000 }
+            ProviderError::TransportTimeout { ms: 60_000, .. }
         ));
     }
 
@@ -457,6 +454,6 @@ mod tests {
             .expect_err("an empty mock script must fail closed");
         // An exhausted mock surfaces through the transport-error mapping as a
         // malformed upstream payload rather than a silent empty success.
-        assert!(matches!(error, ProviderError::Malformed(_)));
+        assert!(matches!(error, ProviderError::Transport { .. }));
     }
 }

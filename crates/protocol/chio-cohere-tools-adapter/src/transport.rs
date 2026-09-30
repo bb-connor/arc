@@ -283,7 +283,7 @@ mod tests {
     async fn mock_transport_exhaustion_fails_closed() {
         let mock = MockTransport::new();
         match mock.send_chat(b"{}").await {
-            Err(ProviderError::Malformed(_)) => {}
+            Err(ProviderError::Transport { .. }) => {}
             Err(other) => panic!("an empty script must fail closed, got {other:?}"),
             Ok(_) => panic!("an empty script must fail closed, got success"),
         }
@@ -292,10 +292,7 @@ mod tests {
     #[tokio::test]
     async fn mock_transport_maps_status_error() {
         let mock = MockTransport::new();
-        mock.push_error(HttpTransportError::Status {
-            code: 429,
-            body: "rate limited".to_string(),
-        });
+        mock.push_error(HttpTransportError::Status { code: 429 });
         match mock.send_chat(b"{}").await {
             Err(ProviderError::RateLimited { .. }) => {}
             Err(other) => panic!("a 429 must fail closed, got {other:?}"),

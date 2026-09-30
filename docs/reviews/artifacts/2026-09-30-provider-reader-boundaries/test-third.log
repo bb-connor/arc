@@ -1,0 +1,995 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-provider-adapter-core v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-provider-adapter-core)
+   Compiling chio-bedrock-converse-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-bedrock-converse-adapter)
+   Compiling chio-openai-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openai-adapter)
+   Compiling chio-anthropic-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-anthropic-tools-adapter)
+   Compiling chio-cohere-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cohere-tools-adapter)
+   Compiling chio-mistral-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mistral-tools-adapter)
+   Compiling chio-groq-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-groq-tools-adapter)
+   Compiling chio-ollama-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-ollama-tools-adapter)
+   Compiling chio-gemini-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-gemini-tools-adapter)
+   Compiling chio-provider-conformance v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-provider-conformance)
+    Finished `test` profile [unoptimized] target(s) in 57.56s
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_anthropic_tools_adapter-bd37cf90703cfcd3)
+
+running 23 tests
+test tests::adapter_reports_provider_and_pin ... ok
+test native::tests::server_tool_round_trips_serde ... ok
+test native::tests::tool_result_block_allow_and_deny ... ok
+test tests::computer_use_flag_matches_cfg ... ok
+test adapter::tests::lower_pending_tool_result_applies_allow_redactions ... ok
+test native::tests::server_tool_wire_names ... ok
+test tests::config_pins_api_version ... ok
+test native::tests::tool_result_serialises_is_error ... ok
+test transport::tests::computer_use_header_tracks_feature ... ok
+test tests::config_round_trips_canonical_json ... ok
+test transport::tests::pinned_constants_are_correct ... ok
+test transport::tests::transport_config_uses_api_key_header_and_version ... ok
+test transport::tests::mock_transport_advertises_pin ... ok
+test native::tests::tool_use_block_round_trips ... ok
+test adapter::tests::lower_pending_tool_result_requires_content_on_allow ... ok
+test transport::tests::transport_from_env_fails_closed_when_unset ... ok
+test transport::tests::mock_transport_records_calls ... ok
+test adapter::tests::lift_rejects_tool_use_name_with_surrounding_whitespace ... ok
+test tests::send_messages_maps_upstream_status ... ok
+test tests::send_messages_timeout_fails_closed ... ok
+test tests::send_messages_exhausted_mock_fails_closed ... ok
+test tests::send_messages_posts_and_lifts ... ok
+test transport::tests::transport_builds_client ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/batch.rs (/home/connor/chio-security-target-6d-final/debug/deps/batch-a125b7e0124a5936)
+
+running 12 tests
+test trait_lower_rejects_whitespace_padded_tool_use_id ... ok
+test adapter_reports_anthropic_provider_and_snapshot_pin ... ok
+test lower_allow_applies_redactions_before_provider_serialization ... ok
+test lift_fails_closed_for_non_object_input ... ok
+test lower_without_pending_tool_use_fails_closed ... ok
+test lift_single_message_response_builds_tool_invocation ... ok
+test trait_lift_fails_closed_for_parallel_response ... ok
+test lower_deny_emits_error_tool_result_with_reason ... ok
+test lift_batch_parallel_response_lifts_each_tool_use ... ok
+test lower_allow_emits_tool_result_with_executed_content ... ok
+test lift_accepts_envelope_with_string_body ... ok
+test lower_tool_result_block_rejects_whitespace_padded_tool_use_id ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/error_taxonomy_doctest.rs (/home/connor/chio-security-target-6d-final/debug/deps/error_taxonomy_doctest-41b2a44f6ceefb74)
+
+running 3 tests
+test readme_taxonomy_envelopes_are_class_specific ... ok
+test readme_taxonomy_table_covers_adapter_visible_classes ... ok
+test current_adapter_paths_match_documented_classes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/server_tools.rs (/home/connor/chio-security-target-6d-final/debug/deps/server_tools-2610943e847580c7)
+
+running 6 tests
+test server_tools_fail_closed_without_manifest_allowlist ... ok
+test server_tools_manifest_allowlist_allows_matching_tool ... ok
+test server_tools_manifest_allows_date_suffixed_family ... ok
+test server_tools_manifest_allowlist_denies_unlisted_peer ... ok
+test registry_admitted_flow_survives_anthropic_invocation_round_trip_canonically ... ok
+test server_tools_gate_ignores_regular_custom_tools ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/streaming.rs (/home/connor/chio-security-target-6d-final/debug/deps/streaming-5ac08c3bedc1c58e)
+
+running 15 tests
+test allowed_tool_use_stream_preserves_original_crlf_frame_bytes ... ok
+test denied_tool_use_start_fails_closed ... ok
+test input_json_delta_without_active_tool_fails_closed ... ok
+test forbidden_late_input_json_delta_fails_closed_before_forwarding ... ok
+test evaluator_errors_fail_closed ... ok
+test batch_lift_lower_behavior_still_round_trips ... ok
+test malformed_json_event_fails_closed ... ok
+test lower_allow_applies_redactions_before_serialization ... ok
+test text_content_stream_passes_without_verdict ... ok
+test non_empty_start_input_with_delta_fails_closed ... ok
+test gates_tool_use_at_content_block_start_and_forwards_after_allow ... ok
+test invalid_message_tail_prevents_every_evaluator_call ... ok
+test non_append_start_frame_rejects_at_shared_frame_byte_limit ... ok
+test content_block_stop_is_forwarded_when_pre_verdict_frames_reach_limit ... ok
+test zero_length_input_json_deltas_count_toward_buffered_frame_limit ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_bedrock_converse_adapter-44508201222797b8)
+
+running 28 tests
+test iam_principals::tests::assumed_role_identity_preserves_session_arn ... ok
+test native::tests::tool_result_allow_and_deny_statuses ... ok
+test tests::adapter_reports_provider_pin_and_region ... ok
+test tests::config_pins_region_and_api_version ... ok
+test adapter::tests::lower_pending_tool_result_applies_allow_redactions ... ok
+test iam_principals::tests::wildcard_match_supports_ordered_star_patterns ... ok
+test tests::config_rejects_non_us_east_1 ... ok
+test native::tests::tool_use_block_round_trips_camel_case_id ... ok
+test native::tests::tool_config_round_trips ... ok
+test tests::config_rejects_unknown_api_version ... ok
+test tests::config_round_trips_json ... ok
+test tests::principal_uses_bedrock_iam_shape ... ok
+test transport::tests::build_message_rejects_tool_result_identifier_padding_before_sdk_request ... ok
+test transport::tests::build_message_rejects_tool_use_identifier_padding_before_sdk_request ... ok
+test tests::transport_error_retains_native_input_cause ... ok
+test transport::tests::mock_transport_records_supported_operations ... ok
+test transport::tests::document_round_trips_through_json ... ok
+test transport::tests::converse_request_rejects_missing_model_id ... ok
+test transport::tests::converse_request_rejects_padded_model_id_from_json_envelope ... ok
+test transport::tests::mock_converse_replays_scripted_response ... ok
+test transport::tests::pinned_constants_are_correct ... ok
+test transport::tests::operation_names_match_sdk_surface ... ok
+test transport::tests::converse_request_parses_json_envelope ... ok
+test transport::bounded_response::tests::validates_original_bytes_before_exposing_any_data_to_sdk ... ok
+test tests::registry_bound_constructor_rejects_config_mismatch ... ok
+test tests::registry_bound_lift_preserves_exact_flow_sidecar ... ok
+test tests::registry_bound_constructor_rejects_missing_server ... ok
+test tests::registry_bound_lift_rejects_unknown_tool_sidecar ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/batch.rs (/home/connor/chio-security-target-6d-final/debug/deps/batch-3a6ac9a5b8682f5f)
+
+running 14 tests
+test adapter_reports_bedrock_provider_and_converse_pin ... ok
+test lower_fails_closed_when_trait_result_lacks_tool_use_id ... ok
+test lift_accepts_single_tool_use_content_block ... ok
+test lift_fails_closed_for_malformed_tool_use_shapes ... ok
+test lower_allow_builds_bedrock_tool_result_content_block ... ok
+test lower_allow_applies_redactions_before_provider_serialization ... ok
+test lift_batch_converse_response_lifts_each_tool_use_block ... ok
+test trait_lift_fails_closed_for_parallel_tool_uses ... ok
+test lift_batch_provider_metadata_uses_receive_time ... ok
+test lift_fails_closed_when_tool_config_declares_no_tools ... ok
+test lift_fails_closed_when_tool_use_name_has_surrounding_whitespace ... ok
+test lift_fails_closed_when_tool_use_is_not_declared_in_tool_config ... ok
+test lower_deny_builds_error_tool_result_with_deterministic_reason ... ok
+test trait_lower_accepts_tool_use_id_envelope ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/error_taxonomy_doctest.rs (/home/connor/chio-security-target-6d-final/debug/deps/error_taxonomy_doctest-54ed9c6e2d24b739)
+
+running 3 tests
+test readme_taxonomy_envelopes_are_bedrock_specific ... ok
+test readme_taxonomy_table_covers_adapter_visible_classes ... ok
+test current_adapter_paths_match_documented_classes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/principal.rs (/home/connor/chio-security-target-6d-final/debug/deps/principal-905dada44534c08f)
+
+running 8 tests
+test invalid_config_fails_closed ... ok
+test exact_role_match_resolves_principal_owner ... ok
+test account_wildcard_match_resolves_caller ... ok
+test assumed_role_session_match_preserves_role_and_session_arns ... ok
+test missing_config_fails_closed ... ok
+test signature_rejection_fails_closed ... ok
+test unmapped_caller_fails_closed ... ok
+test unsigned_config_fails_closed ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/sdk_transport.rs (/home/connor/chio-security-target-6d-final/debug/deps/sdk_transport-f7d5934145a14d1d)
+
+running 5 tests
+test converse_rejects_padded_model_id_before_sdk_dispatch ... ok
+test converse_maps_throttling_to_rate_limited ... ok
+test converse_retains_redacted_native_validation_error ... ok
+test converse_lifts_tool_use_from_real_sdk_response ... ok
+test sdk_rejects_duplicate_original_fields_before_projection ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/streaming.rs (/home/connor/chio-security-target-6d-final/debug/deps/streaming-d881923783610427)
+
+running 19 tests
+test lower_allow_applies_redactions_before_serialization ... ok
+test mismatched_tool_use_block_index_fails_closed ... ok
+test batch_lift_lower_behavior_still_round_trips ... ok
+test denied_tool_use_start_fails_closed ... ok
+test malformed_json_event_fails_closed ... ok
+test non_empty_start_input_with_delta_fails_closed ... ok
+test evaluator_errors_fail_closed ... ok
+test forbidden_late_tool_use_delta_fails_closed_before_forwarding ... ok
+test text_stream_passes_without_verdict ... ok
+test scalar_start_only_input_fails_closed_before_verdict ... ok
+test gates_tool_use_at_content_block_start_and_forwards_after_allow ... ok
+test raw_projection_cannot_enter_stream_evaluator ... ok
+test invalid_event_tail_prevents_every_evaluator_call ... ok
+test streaming_tool_use_id_with_surrounding_whitespace_fails_closed ... ok
+test streaming_tool_use_name_with_surrounding_whitespace_fails_closed ... ok
+test tool_use_delta_without_active_start_fails_closed ... ok
+test zero_length_tool_use_deltas_count_toward_buffered_frame_limit ... ok
+test content_block_stop_is_forwarded_when_pre_verdict_frames_reach_limit ... ok
+test non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_cohere_tools_adapter-6a8be91edea9a580)
+
+running 27 tests
+test tests::config_pins_api_version ... ok
+test tests::adapter_reports_provider_and_pin ... ok
+test native::tests::tool_call_round_trips ... ok
+test tests::lift_batch_rejects_api_version_drift_before_provenance_stamp ... ok
+test tests::chat_stream_rejects_api_version_drift_before_transport_call ... ok
+test tests::chat_stream_rejects_transport_api_version_drift_before_send ... ok
+test tests::chat_rejects_transport_api_version_drift_before_send ... ok
+test streaming::tests::tool_call_end_without_tool_call_fails_closed ... ok
+test tests::lift_batch_extracts_tool_calls ... ok
+test tests::lift_batch_rejects_malformed_envelope_before_outer_tool_calls ... ok
+test tests::chat_propagates_upstream_status_error ... ok
+test tests::chat_rejects_api_version_drift_before_transport_call ... ok
+test transport::tests::cohere_transport_rejects_empty_key ... ok
+test transport::tests::mock_transport_advertises_pin ... ok
+test tests::chat_proxies_request_and_lifts_tool_calls ... ok
+test native::tests::tool_result_round_trips ... ok
+test tests::lower_tool_message_allow ... ok
+test tests::lift_batch_rejects_payload_without_tool_calls ... ok
+test tests::lift_batch_rejects_tool_call_name_with_surrounding_whitespace ... ok
+test tests::lower_allow_tool_message_helper_applies_redactions_and_canonicalizes ... ok
+test transport::tests::mock_transport_exhaustion_fails_closed ... ok
+test transport::tests::mock_transport_maps_status_error ... ok
+test transport::tests::mock_transport_records_calls ... ok
+test transport::tests::mock_transport_send_chat_returns_scripted_body ... ok
+test transport::tests::pinned_constants_are_correct ... ok
+test tests::lower_tool_message_rejects_api_version_drift ... ok
+test transport::tests::cohere_transport_builds_with_key ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/error_taxonomy_doctest.rs (/home/connor/chio-security-target-6d-final/debug/deps/error_taxonomy_doctest-367a1fb80413ced6)
+
+running 2 tests
+test readme_taxonomy_table_covers_adapter_visible_classes ... ok
+test current_adapter_paths_match_documented_classes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/live_transport.rs (/home/connor/chio-security-target-6d-final/debug/deps/live_transport-0c40a9d482da2929)
+
+running 3 tests
+test chat_maps_upstream_429_to_rate_limited ... ok
+test chat_stream_gates_sse_response ... ok
+test chat_posts_to_v2_chat_with_bearer_and_lifts_tool_calls ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/registry_security.rs (/home/connor/chio-security-target-6d-final/debug/deps/registry_security-6171a97c95556fed)
+
+running 6 tests
+test registry_bound_constructor_rejects_config_mismatch ... ok
+test raw_batch_projection_remains_non_authoritative ... ok
+test registry_bound_stream_preserves_exact_canonical_flow_bytes ... ok
+test raw_projection_stream_rejects_before_evaluator ... ok
+test registry_bound_constructor_rejects_missing_server ... ok
+test registry_bound_lift_rejects_unknown_tool_sidecar ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_egress_contract-691514bc70007fa4)
+
+running 33 tests
+test tests::ipv4_mapped_private_literal_fails_closed_even_when_declared ... ok
+test tests::explicit_default_port_matches_no_port_allowlist_entry ... ok
+test tests::loopback_hostname_policy_respects_contract_flag ... ok
+test tests::no_port_url_matches_explicit_default_port_allowlist_entry ... ok
+test tests::prepare_rejects_invalid_contract_shape ... ok
+test tests::reqwest_egress_tests::resolved_hostname_private_address_fails_closed ... ok
+test tests::reqwest_egress_tests::resolved_hostname_special_use_addresses_fail_closed ... ok
+test tests::private_ipv4_literal_fails_closed_even_when_declared ... ok
+test tests::prepared_contract_keeps_validated_snapshot_after_raw_mutation ... ok
+test tests::prepared_contract_normalizes_tenant_namespace ... ok
+test tests::reqwest_egress_tests::enforce_url_with_dns_preserves_localhost_when_loopback_is_allowed ... ok
+test tests::reqwest_egress_tests::send_with_contract_denies_oversized_response_body ... ok
+test tests::reqwest_egress_tests::send_with_contract_strips_sensitive_headers_on_cross_origin_redirect ... ok
+test tests::reqwest_egress_tests::send_with_contract_aborts_oversized_chunked_body_mid_stream ... ok
+test tests::resolved_ipv6_ula_respects_ula_allowance ... ok
+test tests::resolved_loopback_respects_loopback_allowance ... ok
+test tests::resolved_public_ip_is_allowed ... ok
+test tests::validate_accepts_explicit_default_port_authority ... ok
+test tests::validate_accepts_http_allowed_schemes ... ok
+test tests::validate_rejects_allowed_authority_with_empty_port ... ok
+test tests::reqwest_egress_tests::send_with_contract_denies_oversized_response_without_content_length ... ok
+test tests::validate_rejects_non_http_allowed_schemes ... ok
+test tests::validate_rejects_non_canonical_allowed_authorities ... ok
+test tests::reqwest_egress_tests::send_with_contract_dispatches_localhost_through_contract_resolver ... ok
+test tests::reqwest_egress_tests::send_with_contract_validates_redirect_before_following ... ok
+test tests::reqwest_egress_tests::validate_dispatchable_accepts_production_domain_hostnames_for_pinned_resolver ... ok
+test tests::reqwest_egress_tests::send_with_contract_denies_cross_origin_post_302_before_rewrite ... ok
+test tests::reqwest_egress_tests::send_with_contract_denies_cross_origin_post_307_before_replay ... ok
+test tests::reqwest_egress_tests::send_with_contract_denies_cross_origin_post_303_before_rewrite ... ok
+test tests::reqwest_egress_tests::send_with_contract_denies_cross_origin_post_301_before_rewrite ... ok
+test tests::reqwest_egress_tests::send_with_contract_denies_cross_origin_post_308_before_replay ... ok
+test tests::reqwest_egress_tests::send_with_contract_refuses_loopback_resolving_host_before_connect ... ok
+test operator_readiness::tests::dns_uses_the_async_resolver_inside_the_deadline ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.13s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_gemini_tools_adapter-e3bfca97f61b4f8d)
+
+running 39 tests
+test adapter::tests::config_pins_api_version ... ok
+test adapter::tests::adapter_reports_provider_and_pin ... ok
+test adapter::tests::invocation_from_function_call_rejects_api_version_drift_before_provenance_stamp ... ok
+test adapter::tests::generate_content_rejects_api_version_drift_before_transport_call ... ok
+test adapter::tests::generate_content_stream_rejects_transport_api_version_drift_before_send ... ok
+test adapter::tests::generate_content_rejects_transport_api_version_drift_before_send ... ok
+test adapter::tests::generate_content_stream_rejects_api_version_drift_before_transport_call ... ok
+test adapter::tests::generate_content_propagates_upstream_status_error ... ok
+test adapter::tests::gate_sse_stream_rejects_api_version_drift_before_evaluator ... ok
+test adapter::tests::lift_batch_rejects_api_version_drift_before_provenance_stamp ... ok
+test adapter::tests::lower_function_response_rejects_api_version_drift ... ok
+test adapter::tests::lift_batch_maps_candidate_safety_finish_reason_to_content_policy ... ok
+test adapter::tests::lift_batch_rejects_function_call_name_with_surrounding_whitespace ... ok
+test adapter::tests::raw_projection_cannot_enter_stream_evaluator ... ok
+test adapter::tests::lift_batch_rejects_malformed_envelope_before_outer_function_calls ... ok
+test adapter::tests::lower_function_response_allow ... ok
+test adapter::tests::lower_allow_function_response_helper_applies_redactions ... ok
+test adapter::tests::lift_batch_maps_prompt_feedback_safety_block_to_content_policy ... ok
+test native::tests::function_response_round_trips ... ok
+test adapter::tests::generate_content_proxies_request_and_lifts_tool_calls ... ok
+test adapter::tests::lift_batch_extracts_function_call_parts ... ok
+test response::tests::maps_prompt_feedback_block_reason_to_content_policy ... ok
+test native::tests::function_call_round_trips ... ok
+test response::tests::rejects_non_object_envelope_body ... ok
+test transport::tests::mock_transport_advertises_pin ... ok
+test transport::tests::mock_transport_exhaustion_fails_closed ... ok
+test transport::tests::gemini_transport_rejects_empty_key ... ok
+test response::tests::parses_string_wrapped_body ... ok
+test transport::tests::model_scoped_paths_are_built ... ok
+test transport::tests::pinned_constants_are_correct ... ok
+test transport::tests::mock_transport_maps_status_error ... ok
+test transport::tests::mock_transport_records_calls ... ok
+test transport::tests::mock_transport_send_returns_scripted_body ... ok
+test adapter::tests::registry_bound_constructor_rejects_missing_server ... ok
+test adapter::tests::registry_bound_constructor_rejects_config_mismatch ... ok
+test adapter::tests::registry_bound_lift_rejects_unknown_tool_sidecar ... ok
+test adapter::tests::registry_bound_lift_preserves_exact_flow_sidecar ... ok
+test adapter::tests::generate_content_stream_gates_function_call_frames ... ok
+test transport::tests::gemini_transport_builds_with_key ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/error_taxonomy_doctest.rs (/home/connor/chio-security-target-6d-final/debug/deps/error_taxonomy_doctest-1790f4c9c857428e)
+
+running 2 tests
+test readme_taxonomy_table_covers_adapter_visible_classes ... ok
+test current_adapter_paths_match_documented_classes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_groq_tools_adapter-5d26742ab48989b2)
+
+running 30 tests
+test tests::config_pins_api_version ... ok
+test tests::adapter_reports_provider_and_pin ... ok
+test tests::lift_batch_rejects_api_version_drift_before_provenance_stamp ... ok
+test tests::gate_sse_stream_rejects_api_version_drift_before_evaluator ... ok
+test native::tests::function_call_round_trips ... ok
+test tests::lower_function_response_rejects_api_version_drift ... ok
+test tests::lower_function_response_allow ... ok
+test native::tests::function_response_round_trips ... ok
+test tests::lift_batch_maps_safety_block_to_content_policy ... ok
+test tests::lift_batch_maps_content_filter_finish_reason_to_content_policy ... ok
+test tests::lower_allow_function_response_helper_applies_redactions ... ok
+test tests::lift_batch_rejects_malformed_envelope_before_outer_tool_calls ... ok
+test tests::lift_batch_rejects_function_call_name_with_surrounding_whitespace ... ok
+test tests::lift_batch_rejects_function_tool_call_missing_function_object ... ok
+test tests::lift_batch_extracts_openai_tool_calls ... ok
+test tests::lift_batch_extracts_parallel_tool_calls ... ok
+test transport::tests::groq_transport_config_uses_bearer_and_host ... ok
+test transport::tests::mock_transport_advertises_pin ... ok
+test transport::tests::groq_transport_from_env_fails_closed_when_unset ... ok
+test tests::send_chat_completion_posts_and_lifts ... ok
+test tests::send_chat_completion_rejects_api_version_drift_before_transport_call ... ok
+test tests::send_chat_completion_stream_rejects_api_version_drift_before_transport_call ... ok
+test tests::send_chat_completion_stream_rejects_invalid_request_body_before_transport_call ... ok
+test tests::send_chat_completion_rejects_invalid_request_body_before_transport_call ... ok
+test transport::tests::mock_transport_records_calls ... ok
+test transport::tests::pinned_constants_are_correct ... ok
+test tests::send_chat_completion_timeout_fails_closed ... ok
+test tests::send_chat_completion_maps_upstream_status ... ok
+test tests::raw_send_chat_completion_stream_rejects_before_evaluator ... ok
+test transport::tests::groq_transport_builds_client ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/error_taxonomy_doctest.rs (/home/connor/chio-security-target-6d-final/debug/deps/error_taxonomy_doctest-ae544f7dd199127f)
+
+running 2 tests
+test readme_taxonomy_table_covers_adapter_visible_classes ... ok
+test current_adapter_paths_match_documented_classes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/http_transport_replay.rs (/home/connor/chio-security-target-6d-final/debug/deps/http_transport_replay-ac850eaa11ba5432)
+
+running 2 tests
+test real_transport_posts_bearer_and_lifts_tool_calls ... ok
+test real_transport_maps_upstream_5xx_fail_closed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/registry_security.rs (/home/connor/chio-security-target-6d-final/debug/deps/registry_security-655f3e5f7333977c)
+
+running 6 tests
+test registry_bound_constructor_rejects_config_mismatch ... ok
+test registry_bound_constructor_rejects_missing_server ... ok
+test registry_bound_lift_rejects_unknown_tool_sidecar ... ok
+test raw_batch_projection_remains_non_authoritative ... ok
+test raw_projection_stream_rejects_before_evaluator ... ok
+test registry_bound_stream_preserves_exact_canonical_flow_bytes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_mistral_tools_adapter-16199ec66bafc554)
+
+running 30 tests
+test tests::config_pins_api_version ... ok
+test tests::chat_request_fails_closed_on_empty_model ... ok
+test tests::chat_request_serializes_expected_shape ... ok
+test native::tests::function_response_round_trips ... ok
+test native::tests::function_call_round_trips ... ok
+test tests::lift_batch_rejects_api_version_drift_before_provenance_stamp ... ok
+test tests::lower_function_response_rejects_api_version_drift ... ok
+test tests::lift_batch_rejects_function_tool_call_missing_function_object ... ok
+test tests::lower_function_response_allow ... ok
+test tests::lift_batch_extracts_parallel_tool_calls ... ok
+test tests::lift_batch_rejects_function_call_name_with_surrounding_whitespace ... ok
+test tests::lift_batch_classifies_content_filter_finish_reason ... ok
+test tests::lower_allow_function_response_helper_applies_redactions ... ok
+test tests::lift_batch_extracts_openai_tool_calls ... ok
+test tests::adapter_reports_provider_and_pin ... ok
+test tests::lift_batch_rejects_malformed_envelope_before_outer_tool_calls ... ok
+test tests::gate_sse_stream_rejects_api_version_drift_before_evaluator ... ok
+test tests::send_chat_completion_fails_closed_when_transport_empty ... ok
+test tests::send_chat_completion_posts_and_lifts_tool_calls ... ok
+test tests::raw_send_chat_completion_stream_rejects_before_evaluator ... ok
+test transport::tests::mock_transport_advertises_pin ... ok
+test tests::send_chat_completion_stream_rejects_transport_api_version_drift_before_send ... ok
+test tests::send_chat_completion_rejects_transport_api_version_drift_before_send ... ok
+test tests::send_chat_completion_stream_rejects_api_version_drift_before_transport_call ... ok
+test tests::send_chat_completion_rejects_api_version_drift_before_transport_call ... ok
+test transport::tests::pinned_constants_are_correct ... ok
+test transport::tests::mock_transport_records_and_scripts_calls ... ok
+test transport::tests::mock_transport_exhaustion_fails_closed ... ok
+test transport::tests::http_transport_from_env_is_fail_closed_when_unset ... ok
+test transport::tests::http_transport_advertises_real_endpoint ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/error_taxonomy_doctest.rs (/home/connor/chio-security-target-6d-final/debug/deps/error_taxonomy_doctest-351623164e6050c1)
+
+running 2 tests
+test readme_taxonomy_table_covers_adapter_visible_classes ... ok
+test current_adapter_paths_match_documented_classes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/live_transport.rs (/home/connor/chio-security-target-6d-final/debug/deps/live_transport-59c7b236f1000b8e)
+
+running 3 tests
+test real_transport_maps_upstream_429_to_rate_limited ... ok
+test real_transport_streams_and_gates_tool_calls ... ok
+test real_transport_posts_with_bearer_and_lifts_tool_calls ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/registry_security.rs (/home/connor/chio-security-target-6d-final/debug/deps/registry_security-dea725641e70d264)
+
+running 6 tests
+test registry_bound_constructor_rejects_missing_server ... ok
+test registry_bound_constructor_rejects_config_mismatch ... ok
+test raw_batch_projection_remains_non_authoritative ... ok
+test registry_bound_lift_rejects_unknown_tool_sidecar ... ok
+test raw_projection_stream_rejects_before_evaluator ... ok
+test registry_bound_stream_preserves_exact_canonical_flow_bytes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_ollama_tools_adapter-b86ddb213893313c)
+
+running 35 tests
+test tests::config_pins_api_version ... ok
+test tests::chat_maps_upstream_5xx_to_provider_error ... ok
+test tests::chat_stream_rejects_api_version_drift_before_transport_call ... ok
+test native::tests::tool_result_round_trips ... ok
+test tests::adapter_reports_provider_and_pin ... ok
+test tests::chat_rejects_api_version_drift_before_transport_call ... ok
+test tests::invocation_from_tool_call_rejects_api_version_drift_before_provenance_stamp ... ok
+test tests::gate_sse_stream_classifies_policy_refusal_before_forwarding ... ok
+test native::tests::tool_call_round_trips ... ok
+test tests::gate_sse_stream_rejects_api_version_drift_before_evaluator ... ok
+test tests::chat_posts_to_api_chat_and_lifts_tool_calls ... ok
+test tests::lift_batch_extracts_tool_calls_from_string_body_envelope ... ok
+test tests::lift_batch_rejects_api_version_drift_before_provenance_stamp ... ok
+test tests::lower_allow_tool_message_helper_applies_redactions_and_canonicalizes ... ok
+test tests::lift_batch_rejects_tool_call_name_with_surrounding_whitespace ... ok
+test tests::lift_batch_rejects_malformed_envelope_before_outer_tool_calls ... ok
+test tests::raw_projection_cannot_enter_stream_evaluator ... ok
+test tests::lower_tool_message_allow ... ok
+test tests::lower_tool_message_rejects_api_version_drift ... ok
+test tests::lift_batch_rejects_payload_without_tool_calls ... ok
+test tests::lift_batch_extracts_tool_calls ... ok
+test transport::tests::pinned_constants_are_correct ... ok
+test tests::lift_batch_classifies_policy_refusal_as_content_policy ... ok
+test transport::tests::resolve_config_defaults_to_localhost_without_auth ... ok
+test transport::tests::resolve_config_honors_host_override_and_bearer ... ok
+test transport::tests::resolve_config_treats_blank_values_as_unset ... ok
+test tests::stream_policy_error_does_not_expose_provider_diagnostics ... ok
+test transport::tests::mock_transport_advertises_base_url ... ok
+test transport::tests::mock_transport_records_calls ... ok
+test tests::chat_stream_gates_ndjson_tool_calls ... ok
+test tests::registry_bound_constructor_rejects_config_mismatch ... ok
+test tests::registry_bound_lift_rejects_unknown_tool_sidecar ... ok
+test tests::registry_bound_lift_preserves_exact_flow_sidecar ... ok
+test tests::registry_bound_constructor_rejects_missing_server ... ok
+test tests::invalid_ndjson_tail_prevents_every_evaluator_call ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/error_taxonomy_doctest.rs (/home/connor/chio-security-target-6d-final/debug/deps/error_taxonomy_doctest-5763795df27effab)
+
+running 2 tests
+test readme_taxonomy_table_covers_adapter_visible_classes ... ok
+test current_adapter_paths_match_documented_classes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/localhost_replay.rs (/home/connor/chio-security-target-6d-final/debug/deps/localhost_replay-27b08056c82ca008)
+
+running 3 tests
+test response_has_chat_shape_rejects_unrelated_json ... ok
+test fixture_replay_through_mock_transport ... ok
+test live_ollama_host_chat_probe ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_openai-ec63ff45e46cb193)
+
+running 46 tests
+test tests::error_display_kernel ... ok
+test tests::error_display_invalid_request ... ok
+test tests::error_display_function_not_found ... ok
+test tests::denied_tool_call_result_preserves_call_identity_without_receipt ... ok
+test tests::adapter_empty_manifests_errors ... ok
+test tests::adapter_creates_from_manifest ... ok
+test tests::adapter_function_def_lookup ... ok
+test tests::adapter_unknown_function_def_returns_none ... ok
+test tests::duplicate_tools_across_manifests_deduplicated ... ok
+test tests::adapter_function_names ... ok
+test tests::execute_tool_call_unknown_function ... ok
+test tests::execute_tool_call_invalid_arguments ... ok
+test tests::execute_tool_calls_rejects_shared_legacy_approval_token ... ok
+test tests::execute_tool_calls_rejects_shared_supplemental_authorization ... ok
+test tests::execute_tool_call_with_string_result ... ok
+test tests::extract_responses_api_calls ... ok
+test tests::extract_responses_api_empty_output ... ok
+test tests::extract_responses_api_filters_non_function_calls ... ok
+test tests::execute_tool_call_server_error ... ok
+test tests::execute_tool_call_with_object_result ... ok
+test tests::extract_responses_api_rejects_malformed_function_call_in_mixed_output ... ok
+test tests::extract_responses_api_rejects_missing_call_id ... ok
+test tests::extract_tool_calls_empty_when_no_calls ... ok
+test tests::execute_tool_call_treats_pending_approval_as_denied ... ok
+test tests::execute_tool_calls_rejects_shared_threshold_approvals ... ok
+test tests::execute_tool_call_success ... ok
+test tests::execute_tool_call_fails_closed_on_nonce_preflight ... ok
+test tests::execute_tool_call_runtime_admission_denies_before_tool_server_dispatch ... ok
+test tests::execute_tool_call_preserves_model_metadata_for_model_constrained_grant ... ok
+test tests::extract_tool_calls_from_chat_completions ... ok
+test tests::openai_function_call_roundtrips ... ok
+test tests::openai_tool_def_roundtrips ... ok
+test tests::openai_tool_has_parameters_schema ... ok
+test tests::openai_tools_format ... ok
+test tests::openai_tools_json_is_valid ... ok
+test tests::results_to_messages_format ... ok
+test tests::execute_tool_calls_batch ... ok
+test tests::execute_tool_call_generates_unique_receipts ... ok
+test tests::extract_tool_calls_multiple ... ok
+test tests::results_to_messages_multiple ... ok
+test tests::results_to_responses_api_format ... ok
+test tests::tool_call_result_omits_receipt_ref_when_none ... ok
+test tests::tool_call_result_serializes ... ok
+test tests::openai_ordinary_host_rejects_flow_required_manifest_before_exposure ... ok
+test tests::openai_host_rejects_unnegotiated_authority_before_effect_or_receipt ... ok
+test tests::execute_tool_calls_uses_per_call_execution_nonces ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/adapter_lift.rs (/home/connor/chio-security-target-6d-final/debug/deps/adapter_lift-6fa00ccb3106d78d)
+
+running 16 tests
+test lift_batch_rejects_api_version_drift_before_provenance_stamp ... ok
+test adapter_reports_openai_provider_and_snapshot_pin ... ok
+test protocol_boundary_provenance_uses_injected_clock_and_rejects_faults ... ok
+test protocol_boundary_rejects_duplicate_arguments ... ok
+test registry_bound_constructor_rejects_missing_server ... ok
+test lift_rejects_function_call_name_with_surrounding_whitespace ... ok
+test lift_reads_org_id_from_header_envelope ... ok
+test lift_batch_parallel_response_lifts_each_call ... ok
+test lift_fails_closed_for_malformed_arguments ... ok
+test lift_rejects_malformed_org_header_before_config_fallback ... ok
+test trait_lift_fails_closed_for_parallel_response ... ok
+test lift_single_batch_response_builds_tool_invocation ... ok
+test lift_accepts_single_function_call_item_payload ... ok
+test protocol_boundary_provider_payload_and_nested_arguments_fail_precisely ... ok
+test registry_bound_lift_rejects_tool_without_admitted_sidecar ... ok
+test registry_bound_lift_preserves_exact_flow_sidecar ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/adapter_lower.rs (/home/connor/chio-security-target-6d-final/debug/deps/adapter_lower-e934922811eb49cb)
+
+running 9 tests
+test lower_rejects_api_version_drift_before_provider_serialization ... ok
+test lift_batch_fails_closed_on_missing_response_call_id ... ok
+test lower_fails_closed_when_call_id_is_missing ... ok
+test lower_rejects_multiple_outputs_for_single_verdict ... ok
+test lower_fails_closed_when_allow_output_is_missing ... ok
+test lift_batch_fails_closed_on_malformed_mixed_response_output ... ok
+test lower_allow_single_output_into_openai_tool_outputs ... ok
+test lower_allow_applies_redactions_before_provider_serialization ... ok
+test lower_deny_emits_synthetic_tool_output_with_reason ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/error_taxonomy_doctest.rs (/home/connor/chio-security-target-6d-final/debug/deps/error_taxonomy_doctest-685aa37bfabd6a28)
+
+running 3 tests
+test readme_taxonomy_envelopes_are_class_specific ... ok
+test readme_taxonomy_table_covers_adapter_visible_classes ... ok
+test current_adapter_paths_match_documented_classes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/streaming.rs (/home/connor/chio-security-target-6d-final/debug/deps/streaming-896444a4fcda9404)
+
+running 16 tests
+test gate_sse_stream_rejects_api_version_drift_before_evaluator ... ok
+test malformed_delta_without_active_tool_call_fails_closed ... ok
+test non_empty_start_arguments_with_delta_fail_closed_before_verdict ... ok
+test mismatched_function_arguments_done_fails_closed_before_verdict ... ok
+test function_arguments_done_must_match_output_item_done_before_verdict ... ok
+test id_only_function_call_fails_closed_before_verdict ... ok
+test mismatched_done_arguments_fail_closed_before_verdict ... ok
+test malformed_done_tool_call_arguments_fail_closed ... ok
+test deny_verdict_fails_closed_before_tool_frames_are_released ... ok
+test done_sentinel_after_completed_is_idempotent ... ok
+test missing_function_arguments_done_fails_closed_before_verdict ... ok
+test buffers_function_call_argument_deltas_until_done_verdict_allows ... ok
+test verdict_timeout_terminates_before_tool_frames_are_released ... ok
+test non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit ... ok
+test zero_length_argument_deltas_count_toward_buffered_frame_limit ... ok
+test output_item_done_is_forwarded_when_pre_verdict_frames_reach_limit ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/transport.rs (/home/connor/chio-security-target-6d-final/debug/deps/transport-a059520e1aab48e3)
+
+running 16 tests
+test from_env_is_fail_closed_when_key_is_unset ... ok
+test auth_scheme_bearer_is_constructible_for_callers ... ok
+test send_responses_rejects_api_version_drift_before_transport_call ... ok
+test send_chat_completions_rejects_api_version_drift_before_transport_call ... ok
+test chat_http_status_is_classified_before_parsing ... ok
+test stream_responses_rejects_api_version_drift_before_transport_call ... ok
+test responses_http_status_is_classified_before_lift ... ok
+test malformed_upstream_body_fails_closed ... ok
+test send_responses_posts_to_responses_path_and_lifts_tool_calls ... ok
+test send_chat_completions_returns_empty_for_plain_text_answer ... ok
+test streaming_send_gates_buffered_sse_through_adapter ... ok
+test send_chat_completions_parses_tool_calls_and_lifts_invocations ... ok
+test upstream_5xx_fails_closed_as_upstream_5xx ... ok
+test upstream_rate_limit_fails_closed_as_rate_limited ... ok
+test real_transport_maps_non_2xx_to_content_policy ... ok
+test real_transport_posts_bearer_and_org_header_to_responses ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_provider_adapter_core-ace010978fd1d5e5)
+
+running 44 tests
+test http::tests::auth_scheme_from_env_is_fail_closed_when_unset ... ok
+test http::tests::auth_scheme_from_env_rejects_whitespace_only_value ... ok
+test http::tests::auth_scheme_from_env_reads_value ... ok
+test http::boundary_tests::malformed_headers_and_urls_retain_native_parser_causes ... ok
+test http::tests::default_headers_for_config_rejects_blank_bearer_auth ... ok
+test http::tests::default_headers_for_config_rejects_whitespace_in_bearer_auth ... ok
+test http::tests::http_transport_rejects_blank_base_url_at_construction ... ok
+test http::tests::default_headers_for_config_includes_extra_and_bearer_auth ... ok
+test http::tests::http_transport_rejects_authority_material_in_base_url ... ok
+test http::tests::http_transport_rejects_blank_or_padded_direct_query_auth ... ok
+test http::tests::http_transport_rejects_invalid_direct_query_auth_name ... ok
+test http::tests::http_transport_rejects_non_http_base_url_at_construction ... ok
+test http::tests::http_transport_rejects_padded_base_url_at_construction ... ok
+test http::tests::map_http_status_classifies_codes ... ok
+test http::tests::http_transport_rejects_blank_or_padded_direct_header_auth ... ok
+test http::tests::mock_transport_records_and_scripts ... ok
+test http::tests::mock_transport_exhaustion_fails_closed ... ok
+test http::tests::ndjson_parser_fails_closed_on_garbage ... ok
+test http::tests::ndjson_parser_reads_lines_and_skips_blanks ... ok
+test http::tests::query_param_from_env_rejects_invalid_name_before_returning_secret ... ok
+test input::tests::original_json_and_nested_arguments_reject_ambiguity ... ok
+test input::tests::limits_apply_before_argument_append_or_decode ... ok
+test streaming::assembly::completion_tests::upstream_error_and_transport_sentinel_cannot_complete_a_choice ... ok
+test streaming::assembly::tests::complete_fragmented_arguments_are_assembled_once ... ok
+test streaming::assembly::tests::invalid_tail_identity_or_arguments_prevent_all_evaluation ... ok
+test tests::sse_parser_ignores_unknown_fields_when_configured ... ok
+test tests::sse_parser_infers_event_from_type_when_cross_checking ... ok
+test tests::sse_parser_marks_done_sentinel_frame ... ok
+test tests::sse_parser_rejects_data_frame_without_event_name ... ok
+test tests::sse_parser_rejects_event_type_mismatch ... ok
+test tests::sse_parser_rejects_unknown_fields_when_configured ... ok
+test tests::sse_parser_retains_original_crlf_frame_bytes ... ok
+test tests::sse_parser_without_cross_check_keeps_explicit_event ... ok
+test http::boundary_tests::native_transport_cause_survives_without_query_credentials ... ok
+test http::tests::http_transport_connect_error_fails_closed ... ok
+test http::tests::http_transport_sends_query_param_auth ... ok
+test http::tests::http_transport_sends_custom_auth_header ... ok
+test sse::boundary_tests::protocol_boundary_sse_frame_quota_and_ambiguous_payload_refuse ... ok
+test http::tests::http_transport_posts_json_with_bearer_and_headers ... ok
+test http::tests::http_transport_buffers_sse_body ... ok
+test http::tests::http_transport_maps_non_2xx_to_status_error ... ok
+test http::tests::http_transport_buffers_ndjson_body ... ok
+test http::boundary_tests::redirects_are_denied_and_failure_body_is_not_retained ... ok
+test http::boundary_tests::response_bound_checks_content_length_and_chunked_actual_bytes ... ok
+
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_provider_conformance-8195c291b8de4b98)
+
+running 8 tests
+test replay::tests::load_fixture_rejects_spaced_fixture_id ... ok
+test replay::tests::load_fixture_rejects_fixture_id_that_does_not_match_filename ... ok
+test replay::tests::fixture_paths_for_dir_filters_ndjson_and_sorts ... ok
+test replay::tests::required_field_rejects_surrounding_whitespace ... ok
+test replay::tests::load_fixture_rejects_provider_drift_within_file ... ok
+test input::tests::fixture_reader_rejects_symlinks_and_nonregular_files ... ok
+test replay::tests::load_fixture_rejects_empty_fixture_id ... ok
+test input::tests::fixture_reader_accepts_bounded_regular_files_and_rejects_oversize ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/bin/record.rs (/home/connor/chio-security-target-6d-final/debug/deps/record-f63a8726074399d8)
+
+running 3 tests
+test process::tests::capture_bounds_both_pipes_and_never_echoes_failed_payloads ... ok
+test process::descendant_tests::closed_pipe_descendants_are_stopped_on_success_and_failure ... ok
+test process::tests::capture_deadline_stops_a_descendant_holding_pipes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/cross_provider_equality.rs (/home/connor/chio-security-target-6d-final/debug/deps/cross_provider_equality-9068efc6ef4da64e)
+
+running 1 test
+test weather_tool_policy_verdicts_match_across_all_providers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/replay_anthropic.rs (/home/connor/chio-security-target-6d-final/debug/deps/replay_anthropic-bff913a73afb9365)
+
+running 1 test
+test replays_all_anthropic_fixtures_with_canonical_byte_assertions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/replay_bedrock.rs (/home/connor/chio-security-target-6d-final/debug/deps/replay_bedrock-cc1238825f965f7f)
+
+running 1 test
+test replays_all_bedrock_fixtures_with_canonical_byte_assertions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/replay_cohere.rs (/home/connor/chio-security-target-6d-final/debug/deps/replay_cohere-4618a0cbd2134956)
+
+running 1 test
+test replays_all_cohere_fixtures_with_canonical_byte_assertions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/replay_gemini.rs (/home/connor/chio-security-target-6d-final/debug/deps/replay_gemini-329ae95261a5b202)
+
+running 1 test
+test replays_all_gemini_fixtures_with_canonical_byte_assertions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/replay_groq.rs (/home/connor/chio-security-target-6d-final/debug/deps/replay_groq-e616e666529c4391)
+
+running 1 test
+test replays_all_groq_fixtures_with_canonical_byte_assertions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/replay_mistral.rs (/home/connor/chio-security-target-6d-final/debug/deps/replay_mistral-e92d03dd77f778b8)
+
+running 1 test
+test replays_all_mistral_fixtures_with_canonical_byte_assertions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/replay_ollama.rs (/home/connor/chio-security-target-6d-final/debug/deps/replay_ollama-c88eb1bc35aa54cb)
+
+running 1 test
+test replays_all_ollama_fixtures_with_canonical_byte_assertions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/replay_openai.rs (/home/connor/chio-security-target-6d-final/debug/deps/replay_openai-e9464e8149ac21ab)
+
+running 2 tests
+test openai_batch_tool_call_without_verdict_fails_replay ... ok
+test replays_all_openai_fixtures_with_canonical_byte_assertions ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_tool_call_fabric-5f5cfebcea7d3b29)
+
+running 21 tests
+test provenance::tests::sign_and_verify_round_trip ... ok
+test stream::tests::buffering_append_at_exact_limit_is_allowed ... ok
+test stream::tests::buffering_append_bytes_accumulates ... ok
+test stream::tests::buffering_append_overflow_is_rejected ... ok
+test stream::tests::projected_buffer_len_rejects_overflow ... ok
+test tests::deny_reason_round_trips ... ok
+test stream::tests::default_phase_is_idle ... ok
+test stream::tests::buffering_finish_block_emits ... ok
+test stream::tests::close_is_terminal ... ok
+test stream::tests::idle_to_buffering_on_start_block ... ok
+test provenance::tests::wrong_public_key_fails_signature_mismatch ... ok
+test provenance::tests::tampered_stamp_fails_canonical_drift ... ok
+test tests::principal_kind_tags_render_per_provider ... ok
+test provenance::tests::signed_provenance_round_trips_through_canonical_json ... ok
+test provenance::tests::tampered_signed_bytes_fail_canonical_drift ... ok
+test tests::principal_round_trips_all_variants ... ok
+test tests::provenance_stamp_round_trips ... ok
+test tests::verdict_result_tags_with_verdict_field ... ok
+test tests::provider_id_serializes_snake_case ... ok
+test tests::tool_invocation_round_trips ... ok
+test stream::tests::default_transition_caps_at_one_mib ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/invariants.rs (/home/connor/chio-security-target-6d-final/debug/deps/invariants-3062fe2f053485de)
+
+running 15 tests
+test validation_rejects_cross_provider_principal ... ok
+test validation_rejects_control_characters_in_invocation_identity_fields ... ok
+test validation_rejects_empty_or_padded_provenance_identity_fields ... ok
+test validation_rejects_control_characters_in_principal_fields ... ok
+test validation_rejects_empty_or_padded_tool_names ... ok
+test validation_rejects_non_canonical_argument_bytes ... ok
+test validation_rejects_provider_mismatch_between_invocation_and_provenance ... ok
+test invariant_c_principal_round_trips_all_variants ... ok
+test invariant_f_provider_error_display_has_no_em_dash ... ok
+test invariant_e_verdict_deny_always_carries_receipt_id ... ok
+test invariant_b_provenance_stamp_round_trips ... ok
+test invariant_g_received_at_round_trips_within_ms ... ok
+test invariant_a_tool_invocation_round_trips_canonical_json ... ok
+test invariant_d_lift_lower_preserves_invocation_identity ... ok
+test invariant_h_schema_subsumption_self_check ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/lift_lower_fixtures.rs (/home/connor/chio-security-target-6d-final/debug/deps/lift_lower_fixtures-0b299bf1071e35b8)
+
+running 2 tests
+test lift_lower_fixture_directories_have_three_json_files_each ... ok
+test lift_lower_fixtures_round_trip_canonical_json ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/stream_transitions.rs (/home/connor/chio-security-target-6d-final/debug/deps/stream_transitions-e045b098fecfb707)
+
+running 15 tests
+test append_bytes_in_emitting_is_invalid ... ok
+test append_bytes_in_idle_is_invalid ... ok
+test buffering_to_closed_on_close_drops_buffer ... ok
+test block_kinds_are_distinct ... ok
+test buffering_accumulates_across_multiple_append_bytes ... ok
+test buffering_to_buffering_on_append_bytes ... ok
+test buffering_to_emitting_on_finish_block ... ok
+test finish_block_in_emitting_is_invalid ... ok
+test idle_to_buffering_on_start_block ... ok
+test idle_to_closed_on_close ... ok
+test multiple_blocks_full_lifecycle ... ok
+test start_block_while_buffering_is_invalid ... ok
+test emitting_to_closed_on_close ... ok
+test finish_block_in_idle_is_invalid ... ok
+test closed_is_terminal_for_every_event ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_anthropic_tools_adapter
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_bedrock_converse_adapter
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_cohere_tools_adapter
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_egress_contract
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_gemini_tools_adapter
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_groq_tools_adapter
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_mistral_tools_adapter
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_ollama_tools_adapter
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_openai
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_provider_adapter_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_provider_conformance
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_tool_call_fabric
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

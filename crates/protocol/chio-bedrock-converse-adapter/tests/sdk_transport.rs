@@ -121,11 +121,14 @@ async fn converse_rejects_padded_model_id_before_sdk_dispatch() {
         .await
         .expect_err("padded modelId must fail before SDK dispatch");
 
+    assert!(!format!("{err} {err:?}").contains("private-provider-payload"));
+    assert!(std::error::Error::source(&err).is_some());
     assert!(
-        matches!(err, ProviderError::Malformed(_)),
-        "expected Malformed, got {err:?}"
+        matches!(err, ProviderError::Transport { .. }),
+        "expected native transport cause, got {err:?}"
     );
-    assert!(err
+    assert!(std::error::Error::source(&err)
+        .unwrap()
         .to_string()
         .contains("request modelId must not contain surrounding whitespace"));
     assert_eq!(recorded.actual_requests().count(), 0);
@@ -209,8 +212,8 @@ async fn converse_maps_throttling_to_rate_limited() {
 }
 
 #[tokio::test]
-async fn converse_maps_validation_error_to_malformed() {
-    let error_body = serde_json::to_vec(&json!({"message": "model id is invalid"})).unwrap();
+async fn converse_retains_redacted_native_validation_error() {
+    let error_body = serde_json::to_vec(&json!({"message": "private-provider-payload"})).unwrap();
     let request = http::Request::builder()
         .method("POST")
         .uri("https://bedrock-runtime.us-east-1.amazonaws.com/placeholder")
@@ -229,8 +232,24 @@ async fn converse_maps_validation_error_to_malformed() {
         .converse(weather_request())
         .await
         .expect_err("validation error should fail closed");
+    assert!(!format!("{err} {err:?}").contains("private-provider-payload"));
+    assert!(std::error::Error::source(&err).is_some());
     assert!(
-        matches!(err, ProviderError::Malformed(_)),
-        "expected Malformed, got {err:?}"
+        matches!(err, ProviderError::Transport { .. }),
+        "expected native transport cause, got {err:?}"
     );
+}
+
+#[tokio::test]
+async fn sdk_rejects_duplicate_original_fields_before_projection() {
+    let original = String::from_utf8(converse_response_body()).unwrap();
+    let duplicate = original.replace(
+        "\"location\":\"Boston\"",
+        "\"location\":\"secret\",\"location\":\"Boston\"",
+    );
+    assert_ne!(duplicate, original);
+    let adapter = adapter_with_replay(replay_client(200, duplicate.into_bytes()));
+    let error = adapter.converse(weather_request()).await.unwrap_err();
+    assert!(!format!("{error} {error:?}").contains("secret"));
+    assert!(std::error::Error::source(&error).is_some());
 }

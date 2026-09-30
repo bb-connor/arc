@@ -70,7 +70,7 @@ it against adapter behavior, so keep both in sync.
 | `ProviderError::Upstream5xx` | `{"status": 503, "body": {"error": "model not loaded"}}` | `map_http_status` (5xx) | Any 5xx status from the daemon. |
 | `ProviderError::TransportTimeout` | `{"transport": "timeout", "elapsed_ms": 5000}` | `map_transport_error` | Outbound call exceeded the transport's configured timeout. |
 | `ProviderError::VerdictBudgetExceeded` | `{"observed_ms": 300, "budget_ms": 250}` | caller's `evaluate` closure | The verdict evaluator did not return in time; the adapter propagates the error and fails closed. |
-| `ProviderError::Malformed` | `{"event": "message", "frame": "missing-tool_calls"}` | `response.rs`, `streaming.rs`, `lib.rs` | Upstream payload could not be parsed: bad JSON, an unrecognised envelope field, or a non-UTF-8 stream. |
+| `ProviderError::Malformed` | `{"event": "message", "frame": "missing-tool_calls"}` | `response.rs`, `streaming.rs`, `lib.rs` | A structurally invalid envelope or incomplete NDJSON lifecycle fails closed. Original JSON syntax, ambiguity and size errors retain their typed `UntrustedInput` cause. |
 <!-- error-taxonomy:end -->
 
 ## API pin

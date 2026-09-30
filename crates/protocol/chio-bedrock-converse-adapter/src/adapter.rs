@@ -154,7 +154,7 @@ impl BedrockAdapter {
             ))
         })?;
 
-        Ok(ToolInvocation {
+        chio_provider_adapter_core::input::invocation(ToolInvocation {
             provider: ProviderId::Bedrock,
             tool_name: tool_use.name,
             arguments,
@@ -176,11 +176,8 @@ struct PendingToolResult {
 }
 
 fn pending_tool_result(result: ToolResult) -> Result<PendingToolResult, ProviderError> {
-    let payload: Value = serde_json::from_slice(&result.0).map_err(|error| {
-        ProviderError::BadToolArgs(format!(
-            "bedrock ToolResult payload was not valid JSON: {error}"
-        ))
-    })?;
+    let payload: Value =
+        chio_provider_adapter_core::input::json(&result.0).map_err(ProviderError::from)?;
     let tool_use_id = payload
         .get(TOOL_USE_ID_FIELD)
         .and_then(Value::as_str)
@@ -236,22 +233,27 @@ impl ProviderAdapter for BedrockAdapter {
 }
 
 fn parse_json_payload(raw: ProviderRequest) -> Result<Value, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!("bedrock Converse payload was not JSON: {error}"))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&raw.0).map_err(ProviderError::from)?;
     unwrap_envelope(value)
 }
 
 fn unwrap_envelope(value: Value) -> Result<Value, ProviderError> {
+    if ["body", "response", "payload"]
+        .iter()
+        .filter(|key| value.get(**key).is_some())
+        .count()
+        > 1
+    {
+        return Err(ProviderError::Malformed(
+            "ambiguous Bedrock response envelope".into(),
+        ));
+    }
     for field in ["body", "response", "payload"] {
         if let Some(nested) = value.get(field) {
             return match nested {
                 Value::Object(_) | Value::Array(_) => Ok(nested.clone()),
-                Value::String(body) => serde_json::from_str(body).map_err(|error| {
-                    ProviderError::Malformed(format!(
-                        "bedrock Converse envelope field `{field}` was not JSON: {error}"
-                    ))
-                }),
+                Value::String(body) => chio_provider_adapter_core::input::text(body).map_err(ProviderError::from),
                 _ => Err(ProviderError::Malformed(format!(
                     "bedrock Converse envelope field `{field}` was not an object, array, or string body"
                 ))),
@@ -337,9 +339,8 @@ fn tool_use_from_block(block: &Value) -> Result<Option<ToolUseBlock>, ProviderEr
         return Ok(None);
     };
 
-    let tool_use: ToolUseBlock = serde_json::from_value(value.clone()).map_err(|error| {
-        ProviderError::Malformed(format!("bedrock toolUse block was malformed: {error}"))
-    })?;
+    let tool_use: ToolUseBlock =
+        chio_provider_adapter_core::input::typed(value.clone()).map_err(ProviderError::from)?;
 
     validate_tool_use(tool_use).map(Some)
 }
@@ -357,9 +358,8 @@ fn validate_tool_use(tool_use: ToolUseBlock) -> Result<ToolUseBlock, ProviderErr
 }
 
 fn parse_tool_result_content(result: ToolResult) -> Result<Value, ProviderError> {
-    let value: Value = serde_json::from_slice(&result.0).map_err(|error| {
-        ProviderError::BadToolArgs(format!("bedrock tool result was not valid JSON: {error}"))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&result.0).map_err(ProviderError::from)?;
     Ok(value)
 }
 

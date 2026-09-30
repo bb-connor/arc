@@ -62,7 +62,7 @@ fn tool_call_stream() -> Vec<u8> {
     let mut sse = Vec::new();
     sse.extend_from_slice(b"data: ");
     sse.extend_from_slice(&serde_json::to_vec(&chunk).unwrap());
-    sse.extend_from_slice(b"\n\n");
+    sse.extend_from_slice(b"\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n");
     sse
 }
 
@@ -117,7 +117,7 @@ async fn send_chat_completion_rejects_invalid_request_body_before_transport_call
         (
             "not-json",
             b"not-json".to_vec(),
-            "Groq chat/completions request body was not JSON",
+            "urn:chio:error:attest:signed-json-canonicalization",
         ),
         (
             "not-object",
@@ -473,9 +473,7 @@ fn lift_batch_rejects_function_call_name_with_surrounding_whitespace() {
         .lift_batch(raw)
         .expect_err("whitespace-padded function name must fail closed");
 
-    assert!(err
-        .to_string()
-        .contains("functionCall name must not contain surrounding whitespace"));
+    assert!(err.to_string().contains("tool call identity is invalid"));
 }
 
 #[test]
@@ -570,10 +568,7 @@ async fn send_chat_completion_posts_and_lifts() {
 #[tokio::test]
 async fn send_chat_completion_maps_upstream_status() {
     let mock = Arc::new(transport::MockTransport::new());
-    mock.push_error(transport::HttpTransportError::Status {
-        code: 429,
-        body: "rate limited".to_string(),
-    });
+    mock.push_error(transport::HttpTransportError::Status { code: 429 });
     let adapter = GroqAdapter::new(config(), mock);
 
     let error = adapter
@@ -587,8 +582,8 @@ async fn send_chat_completion_maps_upstream_status() {
 async fn send_chat_completion_timeout_fails_closed() {
     let mock = Arc::new(transport::MockTransport::new());
     mock.push_error(transport::HttpTransportError::Timeout {
-        url: "https://api.groq.com/openai/v1/chat/completions".to_string(),
         timeout_ms: 60_000,
+        source: Box::new(std::io::Error::from(std::io::ErrorKind::TimedOut)),
     });
     let adapter = GroqAdapter::new(config(), mock);
 
@@ -598,7 +593,7 @@ async fn send_chat_completion_timeout_fails_closed() {
         .expect_err("a timeout must fail closed");
     assert!(matches!(
         error,
-        ProviderError::TransportTimeout { ms: 60_000 }
+        ProviderError::TransportTimeout { ms: 60_000, .. }
     ));
 }
 
@@ -624,7 +619,7 @@ async fn raw_send_chat_completion_stream_rejects_before_evaluator() {
     let mut sse = Vec::new();
     sse.extend_from_slice(b"data: ");
     sse.extend_from_slice(&serde_json::to_vec(&chunk).unwrap());
-    sse.extend_from_slice(b"\n\ndata: [DONE]\n\n");
+    sse.extend_from_slice(b"\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n");
 
     let mock = Arc::new(transport::MockTransport::new());
     mock.push_response(transport::HttpResponse::new(

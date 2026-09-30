@@ -60,7 +60,7 @@ fn openai_invocation_from_item(
     let request_id = required_json_str(item, "call_id", &seed.path)?;
     let tool_name = required_json_str(item, "name", &seed.path)?;
     let arguments_text = required_json_str(item, "arguments", &seed.path)?;
-    let arguments = serde_json::from_str::<Value>(arguments_text)?;
+    let arguments = chio_provider_adapter_core::input::arguments(arguments_text)?;
     tool_invocation(
         ProviderId::OpenAi,
         tool_name,
@@ -90,26 +90,19 @@ pub(crate) fn extract_anthropic_invocations(
         .collect()
 }
 
-pub(crate) fn anthropic_invocation_from_stream_record(
+pub(crate) fn anthropic_stream_invocations(
     seed: &ScenarioSeed,
     workspace_id: &str,
-    record: &CaptureRecord,
-) -> Result<Option<ToolInvocation>, RecordError> {
-    if record.payload.get("event").and_then(Value::as_str) != Some("content_block_start") {
-        return Ok(None);
-    }
-    let Some(block) = record
-        .payload
-        .get("data")
-        .and_then(|data| data.get("content_block"))
-    else {
-        return Ok(None);
-    };
-    if block.get("type").and_then(Value::as_str) != Some("tool_use") {
-        return Ok(None);
-    }
-    anthropic_invocation_from_block(seed, workspace_id, block).map(Some)
+    records: &[CaptureRecord],
+) -> Result<Vec<ToolInvocation>, RecordError> {
+    anthropic_stream::tool_blocks(records.iter().map(|record| &record.payload))?
+        .iter()
+        .map(|block| anthropic_invocation_from_block(seed, workspace_id, block))
+        .collect()
 }
+
+#[path = "invoke/anthropic_stream.rs"]
+mod anthropic_stream;
 
 fn anthropic_invocation_from_block(
     seed: &ScenarioSeed,
@@ -193,7 +186,7 @@ fn tool_invocation(
     api_version: String,
     principal: Principal,
 ) -> Result<ToolInvocation, RecordError> {
-    Ok(ToolInvocation {
+    let invocation = ToolInvocation {
         provider,
         tool_name: tool_name.to_string(),
         arguments: canonical_json_bytes_for("recorded tool arguments", &arguments).map_err(
@@ -210,7 +203,8 @@ fn tool_invocation(
             received_at: SystemTime::now(),
         },
         bridge_security: None,
-    })
+    };
+    Ok(chio_provider_adapter_core::input::invocation(invocation)?)
 }
 
 fn openai_api_version(seed: &ScenarioSeed) -> String {

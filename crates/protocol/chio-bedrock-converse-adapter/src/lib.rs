@@ -422,19 +422,46 @@ fn map_transport_error(error: transport::TransportError) -> chio_tool_call_fabri
     use chio_tool_call_fabric::ProviderError;
     use transport::TransportError;
 
-    match error {
-        TransportError::RateLimited { retry_after_ms } => {
-            ProviderError::RateLimited { retry_after_ms }
-        }
-        TransportError::Timeout { ms } => ProviderError::TransportTimeout { ms },
-        TransportError::Upstream { status, message } => ProviderError::Upstream5xx {
-            status,
-            body: message,
+    use aws_sdk_bedrockruntime::operation::converse::ConverseError;
+    use aws_smithy_runtime_api::client::result::SdkError;
+    if let TransportError::UntrustedInput(source) = error {
+        return ProviderError::UntrustedInput(source);
+    }
+    match &error {
+        TransportError::Timeout { ms, .. } => ProviderError::TransportTimeout {
+            ms: *ms,
+            source: Some(Box::new(error)),
         },
-        TransportError::Rejected(detail)
-        | TransportError::MalformedRequest(detail)
-        | TransportError::DecodeResponse(detail) => ProviderError::Malformed(detail),
-        other => ProviderError::Malformed(other.to_string()),
+        TransportError::Sdk(native) => match native.as_service_error() {
+            Some(ConverseError::ThrottlingException(_)) => ProviderError::RateLimited {
+                retry_after_ms: 1000,
+                source: Some(Box::new(error)),
+            },
+            Some(ConverseError::InternalServerException(_)) => ProviderError::Upstream5xx {
+                status: 500,
+                source: Some(Box::new(error)),
+            },
+            Some(ConverseError::ServiceUnavailableException(_)) => ProviderError::Upstream5xx {
+                status: 503,
+                source: Some(Box::new(error)),
+            },
+            Some(ConverseError::ModelTimeoutException(_)) => ProviderError::TransportTimeout {
+                ms: 0,
+                source: Some(Box::new(error)),
+            },
+            _ if matches!(native.as_ref(), SdkError::TimeoutError(_)) => {
+                ProviderError::TransportTimeout {
+                    ms: 0,
+                    source: Some(Box::new(error)),
+                }
+            }
+            _ => ProviderError::Transport {
+                source: Box::new(error),
+            },
+        },
+        _ => ProviderError::Transport {
+            source: Box::new(error),
+        },
     }
 }
 
@@ -670,31 +697,15 @@ mod tests {
         assert_eq!(cfg, back);
     }
     #[test]
-    fn transport_error_maps_into_fabric_taxonomy() {
-        use chio_tool_call_fabric::ProviderError;
-
-        assert!(matches!(
-            map_transport_error(transport::TransportError::RateLimited {
-                retry_after_ms: 1000
-            }),
-            ProviderError::RateLimited {
-                retry_after_ms: 1000
-            }
+    fn transport_error_retains_native_input_cause() {
+        use std::error::Error;
+        let error = map_transport_error(transport::TransportError::UntrustedInput(
+            chio_core::canonical::UntrustedJsonError::TooLarge { bytes: 2, bound: 1 },
         ));
         assert!(matches!(
-            map_transport_error(transport::TransportError::Timeout { ms: 30000 }),
-            ProviderError::TransportTimeout { ms: 30000 }
+            error,
+            chio_tool_call_fabric::ProviderError::UntrustedInput(_)
         ));
-        assert!(matches!(
-            map_transport_error(transport::TransportError::Upstream {
-                status: 500,
-                message: "boom".to_string(),
-            }),
-            ProviderError::Upstream5xx { status: 500, .. }
-        ));
-        assert!(matches!(
-            map_transport_error(transport::TransportError::Rejected("bad".to_string())),
-            ProviderError::Malformed(_)
-        ));
+        assert!(error.source().is_some());
     }
 }

@@ -1,0 +1,224 @@
+{
+  "base_commit": "82eec927b20ec4dae1fff2a4eb149fef4592c817",
+  "branch": "packet/3-retention-accounting",
+  "delivery": "local commit only; no hosted, merge, release or operational acceptance",
+  "qualification": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--no-fail-fast",
+      "-p",
+      "chio-provider-adapter-core",
+      "-p",
+      "chio-tool-call-fabric",
+      "-p",
+      "chio-egress-contract",
+      "-p",
+      "chio-anthropic-tools-adapter",
+      "-p",
+      "chio-bedrock-converse-adapter",
+      "-p",
+      "chio-cohere-tools-adapter",
+      "-p",
+      "chio-gemini-tools-adapter",
+      "-p",
+      "chio-groq-tools-adapter",
+      "-p",
+      "chio-mistral-tools-adapter",
+      "-p",
+      "chio-ollama-tools-adapter",
+      "-p",
+      "chio-provider-conformance",
+      "-p",
+      "chio-openai-adapter",
+      "--features",
+      "chio-egress-contract/reqwest-egress,chio-openai-adapter/provider-adapter,chio-provider-conformance/fixtures-openai,chio-provider-conformance/fixtures-anthropic,chio-provider-conformance/fixtures-bedrock,chio-provider-conformance/fixtures-cohere,chio-provider-conformance/fixtures-gemini,chio-provider-conformance/fixtures-groq,chio-provider-conformance/fixtures-mistral,chio-provider-conformance/fixtures-ollama"
+    ],
+    "environment": {
+      "CARGO_TARGET_DIR": "/home/connor/chio-security-target-6d-final",
+      "CARGO_INCREMENTAL": "0",
+      "CHIO_CHECKOUT_ROOT": "/tmp/arc-security-launch"
+    },
+    "exit_code": 0,
+    "elapsed_seconds": 35.46
+  },
+  "test_results": {
+    "targets": 63,
+    "passed": 596,
+    "failed": 0,
+    "ignored": 0
+  },
+  "reader_disposition": {
+    "pinned_completed": 28,
+    "raw_baseline_before": 194,
+    "raw_baseline_after": 166,
+    "raw_protocol_baseline_after": 0,
+    "raw_cli_baseline_after": 0
+  },
+  "checks": {
+    "trust_inventory": {
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "log": "inventory-final.log"
+    },
+    "file_hygiene": {
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "log": "file-hygiene.log"
+    },
+    "negative_assertions": {
+      "command": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "log": "negative-assertions.log"
+    },
+    "wire_schemas": {
+      "command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "exit_code": 0,
+      "log": "wire.log"
+    },
+    "changed_rust_format": {
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "--config",
+        "skip_children=true",
+        "crates/protocol/chio-anthropic-tools-adapter/src/adapter.rs",
+        "crates/protocol/chio-anthropic-tools-adapter/src/lib.rs",
+        "crates/protocol/chio-anthropic-tools-adapter/src/streaming.rs",
+        "crates/protocol/chio-anthropic-tools-adapter/src/transport.rs",
+        "crates/protocol/chio-anthropic-tools-adapter/tests/error_taxonomy_doctest.rs",
+        "crates/protocol/chio-anthropic-tools-adapter/tests/streaming.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/src/adapter.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/src/lib.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/src/streaming.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/src/transport.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/src/transport/bounded_response.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/tests/batch.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/tests/error_taxonomy_doctest.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/tests/sdk_transport.rs",
+        "crates/protocol/chio-bedrock-converse-adapter/tests/streaming.rs",
+        "crates/protocol/chio-cohere-tools-adapter/src/lib.rs",
+        "crates/protocol/chio-cohere-tools-adapter/src/streaming.rs",
+        "crates/protocol/chio-cohere-tools-adapter/src/transport.rs",
+        "crates/protocol/chio-cohere-tools-adapter/tests/error_taxonomy_doctest.rs",
+        "crates/protocol/chio-egress-contract/src/lib.rs",
+        "crates/protocol/chio-egress-contract/src/reqwest_helper.rs",
+        "crates/protocol/chio-gemini-tools-adapter/src/adapter.rs",
+        "crates/protocol/chio-gemini-tools-adapter/src/response.rs",
+        "crates/protocol/chio-gemini-tools-adapter/src/streaming.rs",
+        "crates/protocol/chio-gemini-tools-adapter/src/transport.rs",
+        "crates/protocol/chio-gemini-tools-adapter/tests/error_taxonomy_doctest.rs",
+        "crates/protocol/chio-groq-tools-adapter/benches/verdict_latency.rs",
+        "crates/protocol/chio-groq-tools-adapter/src/lib.rs",
+        "crates/protocol/chio-groq-tools-adapter/src/response.rs",
+        "crates/protocol/chio-groq-tools-adapter/src/tests.rs",
+        "crates/protocol/chio-groq-tools-adapter/src/transport.rs",
+        "crates/protocol/chio-groq-tools-adapter/tests/error_taxonomy_doctest.rs",
+        "crates/protocol/chio-groq-tools-adapter/tests/registry_security.rs",
+        "crates/protocol/chio-mistral-tools-adapter/benches/verdict_latency.rs",
+        "crates/protocol/chio-mistral-tools-adapter/src/lib.rs",
+        "crates/protocol/chio-mistral-tools-adapter/src/response.rs",
+        "crates/protocol/chio-mistral-tools-adapter/src/streaming.rs",
+        "crates/protocol/chio-mistral-tools-adapter/src/tests.rs",
+        "crates/protocol/chio-mistral-tools-adapter/tests/error_taxonomy_doctest.rs",
+        "crates/protocol/chio-mistral-tools-adapter/tests/live_transport.rs",
+        "crates/protocol/chio-mistral-tools-adapter/tests/registry_security.rs",
+        "crates/protocol/chio-ollama-tools-adapter/src/lib.rs",
+        "crates/protocol/chio-ollama-tools-adapter/src/response.rs",
+        "crates/protocol/chio-ollama-tools-adapter/src/streaming.rs",
+        "crates/protocol/chio-ollama-tools-adapter/src/tests.rs",
+        "crates/protocol/chio-ollama-tools-adapter/tests/error_taxonomy_doctest.rs",
+        "crates/protocol/chio-openai-adapter/src/transport.rs",
+        "crates/protocol/chio-openai-adapter/tests/error_taxonomy_doctest.rs",
+        "crates/protocol/chio-openai-adapter/tests/transport.rs",
+        "crates/protocol/chio-provider-adapter-core/src/http.rs",
+        "crates/protocol/chio-provider-adapter-core/src/http/boundary_tests.rs",
+        "crates/protocol/chio-provider-adapter-core/src/input.rs",
+        "crates/protocol/chio-provider-adapter-core/src/lib.rs",
+        "crates/protocol/chio-provider-adapter-core/src/response.rs",
+        "crates/protocol/chio-provider-adapter-core/src/streaming.rs",
+        "crates/protocol/chio-provider-adapter-core/src/streaming/assembly.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/anthropic.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/bedrock.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/cli.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/fixture.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/http.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/invoke.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/invoke/anthropic_stream.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/openai.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/process.rs",
+        "crates/protocol/chio-provider-conformance/src/bin/record/util.rs",
+        "crates/protocol/chio-provider-conformance/src/input.rs",
+        "crates/protocol/chio-provider-conformance/src/lib.rs",
+        "crates/protocol/chio-provider-conformance/src/replay/assert.rs",
+        "crates/protocol/chio-provider-conformance/src/replay/fixture.rs",
+        "crates/protocol/chio-tool-call-fabric/src/error.rs",
+        "crates/protocol/chio-tool-call-fabric/src/types.rs",
+        "crates/protocol/chio-tool-call-fabric/tests/invariants.rs"
+      ],
+      "exit_code": 0,
+      "log": "format.log"
+    },
+    "source_documentation_diff": {
+      "command": [
+        "git",
+        "diff",
+        "82eec927b20ec4dae1fff2a4eb149fef4592c817",
+        "8b08faf06051d3721041b34ee317e2d83ff4781a",
+        "--check",
+        "--",
+        ".",
+        ":(exclude)docs/reviews/artifacts/2026-09-30-provider-reader-boundaries/*.log"
+      ],
+      "exit_code": 0,
+      "raw_log_exception": "Three unmodified command logs retain terminal blank lines; full diff --check reports EOF warnings only in those logs."
+    }
+  },
+  "review": {
+    "count": 1,
+    "reviewer": "/root/provider_reader_final_review",
+    "model": "gpt-6-astra",
+    "initial_assessment": "with fixes",
+    "important_findings_resolved": 3,
+    "native_parser_cause_gap_resolved": true,
+    "rulings": "review-resolutions.md",
+    "final_commit_rereviewed": false
+  },
+  "limits": {
+    "document_bytes": 16777216,
+    "arguments_per_call_bytes": 1048576,
+    "stream_records": 16384,
+    "stream_calls": 1024,
+    "fixture_directory_entries": 4096,
+    "recorder_stdout_bytes": 16777216,
+    "recorder_stderr_bytes": 65536,
+    "recorder_deadline_seconds": 60
+  },
+  "not_qualified": [
+    "real-provider compatibility beyond existing fixture/native-codec contracts",
+    "non-Unix path and process-tree behavior",
+    "hostile ancestor mutation or subprocess group escape",
+    "full workspace clippy/build/test",
+    "exact-candidate hosted/native enforcement/M5",
+    "publish or live activation"
+  ],
+  "source_hashes": "source-hashes.json",
+  "binary_hashes": "binary-hashes.json"
+}

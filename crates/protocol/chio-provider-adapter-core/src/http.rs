@@ -49,7 +49,7 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 /// [`AuthScheme::header_from_env`], or [`AuthScheme::query_param_from_env`] to
 /// read a secret from a named environment variable at construction time when a
 /// caller (such as a CLI) opts in to that convenience.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum AuthScheme {
     /// `Authorization: Bearer <token>` (OpenAI, Groq, Mistral, Cohere).
     Bearer(String),
@@ -99,7 +99,7 @@ fn read_required_env(var: &str) -> Result<String, HttpTransportError> {
 }
 
 /// Configuration for a [`HttpTransport`].
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HttpTransportConfig {
     /// Endpoint host, for example `https://api.openai.com` (no trailing slash
     /// required; request paths are joined onto it).
@@ -110,6 +110,8 @@ pub struct HttpTransportConfig {
     pub extra_headers: Vec<(String, String)>,
     /// Per-request timeout.
     pub timeout: Duration,
+    /// Maximum bytes retained from a response, capped by the shared document limit.
+    pub max_response_bytes: usize,
 }
 
 impl HttpTransportConfig {
@@ -121,7 +123,13 @@ impl HttpTransportConfig {
             auth: AuthScheme::None,
             extra_headers: Vec::new(),
             timeout: DEFAULT_TIMEOUT,
+            max_response_bytes: crate::input::MAX_DOCUMENT_BYTES,
         }
+    }
+
+    pub fn with_max_response_bytes(mut self, maximum: usize) -> Self {
+        self.max_response_bytes = maximum;
+        self
     }
 
     /// Set the authentication scheme.
@@ -169,39 +177,80 @@ impl HttpResponse {
 ///
 /// Every variant denotes a denied request: there is no success path that hides
 /// a network or decode failure.
-#[derive(Debug, Error)]
+#[derive(Error)]
 pub enum HttpTransportError {
-    /// The reqwest client could not be constructed (for example an invalid
-    /// timeout or TLS backend failure).
-    #[error("failed to build HTTP client: {0}")]
-    Build(String),
-    /// A header name or value could not be encoded.
-    #[error("invalid header `{name}`: {detail}")]
-    InvalidHeader { name: String, detail: String },
-    /// The request URL could not be parsed.
-    #[error("invalid request URL `{url}`: {detail}")]
-    InvalidUrl { url: String, detail: String },
-    /// The connection could not be established.
-    #[error("connect error to `{url}`: {detail}")]
-    Connect { url: String, detail: String },
-    /// The request exceeded the configured timeout.
-    #[error("request to `{url}` timed out after {timeout_ms}ms")]
-    Timeout { url: String, timeout_ms: u64 },
-    /// A generic request/transport failure that is neither connect nor timeout.
-    #[error("request to `{url}` failed: {detail}")]
-    Request { url: String, detail: String },
-    /// The upstream returned a non-2xx status.
-    #[error("upstream returned status {code}: {body}")]
-    Status { code: u16, body: String },
-    /// The response body could not be read or decoded.
-    #[error("failed to decode response from `{url}`: {detail}")]
-    Decode { url: String, detail: String },
-    /// A requested environment variable holding a secret was unset or empty.
-    #[error("required environment variable `{var}` is unset or empty")]
+    #[error("urn:chio:error:transport:http-failed")]
+    Build(#[source] reqwest::Error),
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    InvalidHeader {
+        name: String,
+        detail: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+    #[error("urn:chio:error:transport:invalid-request-shape")]
+    InvalidUrl {
+        url: String,
+        detail: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+    #[error("urn:chio:error:transport:http-failed")]
+    Connect {
+        #[source]
+        source: reqwest::Error,
+    },
+    #[error("HTTP request timed out after {timeout_ms}ms")]
+    Timeout {
+        timeout_ms: u64,
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+    #[error("urn:chio:error:transport:http-failed")]
+    Request {
+        #[source]
+        source: reqwest::Error,
+    },
+    #[error("upstream returned HTTP {code}")]
+    Status { code: u16 },
+    #[error("urn:chio:error:transport:http-failed")]
+    Decode {
+        #[source]
+        source: reqwest::Error,
+    },
+    #[error("HTTP response exceeds {maximum} bytes")]
+    ResponseTooLarge { maximum: usize },
+    #[error("HTTP transport requires a positive timeout and bounded response limit")]
+    InvalidLimits,
+    #[error("required credential environment variable is unset or empty")]
     MissingEnvVar { var: String },
-    /// A [`MockHttpTransport`] had no scripted response for the call.
-    #[error("mock transport has no scripted response for `{path}`")]
+    #[error("mock transport has no scripted response")]
     MockExhausted { path: String },
+}
+
+impl std::fmt::Debug for HttpTransportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+impl std::fmt::Debug for AuthScheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Bearer(_) => "Bearer([redacted])",
+            Self::Header { .. } => "Header([redacted])",
+            Self::QueryParam { .. } => "QueryParam([redacted])",
+            Self::None => "None",
+        })
+    }
+}
+impl std::fmt::Debug for HttpTransportConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HttpTransportConfig")
+            .field("auth", &self.auth)
+            .field("timeout", &self.timeout)
+            .field("max_response_bytes", &self.max_response_bytes)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Outbound transport contract shared by every HTTP-backed provider adapter.
@@ -249,14 +298,21 @@ impl HttpTransport {
     /// auth) are resolved up front so per-request work is minimal.
     pub fn new(config: HttpTransportConfig) -> Result<Self, HttpTransportError> {
         validate_base_url(&config.base_url)?;
+        if config.timeout.is_zero()
+            || config.max_response_bytes == 0
+            || config.max_response_bytes > crate::input::MAX_DOCUMENT_BYTES
+        {
+            return Err(HttpTransportError::InvalidLimits);
+        }
         let default_headers = default_headers_for_config(&config)?;
 
         // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: shared provider-adapter
         // transport client; egress is bounded by the validated base URL.
         let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
             .timeout(config.timeout)
             .build()
-            .map_err(|error| HttpTransportError::Build(error.to_string()))?;
+            .map_err(HttpTransportError::Build)?;
 
         Ok(Self {
             client,
@@ -288,6 +344,11 @@ impl HttpTransport {
         body: &[u8],
         accept: &'static str,
     ) -> Result<HttpResponse, HttpTransportError> {
+        if body.len() > crate::input::MAX_DOCUMENT_BYTES {
+            return Err(HttpTransportError::ResponseTooLarge {
+                maximum: crate::input::MAX_DOCUMENT_BYTES,
+            });
+        }
         let url = self.request_url(path);
         let mut request = self
             .client
@@ -305,32 +366,23 @@ impl HttpTransport {
         let response = request
             .send()
             .await
-            .map_err(|error| map_send_error(&url, &error, self.config.timeout))?;
+            .map_err(|error| map_send_error(error, self.config.timeout))?;
         let status = response.status();
         let content_type = response
             .headers()
             .get(CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
             .map(str::to_string);
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|error| HttpTransportError::Decode {
-                url: url.clone(),
-                detail: error.to_string(),
-            })?;
-
         if !status.is_success() {
-            let body = String::from_utf8_lossy(&bytes).into_owned();
             return Err(HttpTransportError::Status {
                 code: status.as_u16(),
-                body,
             });
         }
+        let bytes = collect_response(response, self.config.max_response_bytes).await?;
 
         Ok(HttpResponse {
             status: status.as_u16(),
-            body: bytes.to_vec(),
+            body: bytes,
             content_type,
         })
     }
@@ -350,8 +402,11 @@ fn validate_base_url(base_url: &str) -> Result<(), HttpTransportError> {
             "base URL must not contain surrounding whitespace".to_string(),
         ));
     }
-    let parsed = reqwest::Url::parse(base_url)
-        .map_err(|error| invalid_base_url(base_url, error.to_string()))?;
+    let parsed = reqwest::Url::parse(base_url).map_err(|error| HttpTransportError::InvalidUrl {
+        url: base_url.to_owned(),
+        detail: "base URL parse failed".into(),
+        source: Some(Box::new(error)),
+    })?;
     match parsed.scheme() {
         "http" | "https" => {}
         scheme => {
@@ -386,6 +441,7 @@ fn invalid_base_url(base_url: &str, detail: String) -> HttpTransportError {
     HttpTransportError::InvalidUrl {
         url: base_url.to_string(),
         detail,
+        source: None,
     }
 }
 
@@ -457,6 +513,7 @@ fn invalid_auth_query_param_name(name: &str, detail: &str) -> HttpTransportError
     HttpTransportError::InvalidHeader {
         name: name.to_string(),
         detail: detail.to_string(),
+        source: None,
     }
 }
 
@@ -465,12 +522,14 @@ fn validate_auth_secret(name: &str, value: &str, label: &str) -> Result<(), Http
         return Err(HttpTransportError::InvalidHeader {
             name: name.to_string(),
             detail: format!("{label} must not be empty"),
+            source: None,
         });
     }
     if value.trim() != value {
         return Err(HttpTransportError::InvalidHeader {
             name: name.to_string(),
             detail: format!("{label} must not contain surrounding whitespace"),
+            source: None,
         });
     }
     Ok(())
@@ -485,6 +544,7 @@ fn validate_bearer_auth_secret(value: &str) -> Result<(), HttpTransportError> {
         return Err(HttpTransportError::InvalidHeader {
             name: AUTHORIZATION.to_string(),
             detail: "bearer token must not contain whitespace or control bytes".to_string(),
+            source: None,
         });
     }
     Ok(())
@@ -493,11 +553,13 @@ fn validate_bearer_auth_secret(value: &str) -> Result<(), HttpTransportError> {
 fn insert_bearer_header(headers: &mut HeaderMap, token: &str) -> Result<(), HttpTransportError> {
     validate_bearer_auth_secret(token)?;
     let value = format!("Bearer {token}");
-    let header_value =
+    let mut header_value =
         HeaderValue::from_str(&value).map_err(|error| HttpTransportError::InvalidHeader {
             name: AUTHORIZATION.to_string(),
-            detail: error.to_string(),
+            detail: "header parse failed".into(),
+            source: Some(Box::new(error)),
         })?;
+    header_value.set_sensitive(true);
     headers.insert(AUTHORIZATION, header_value);
     Ok(())
 }
@@ -510,40 +572,60 @@ fn insert_header(
     let header_name = HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
         HttpTransportError::InvalidHeader {
             name: name.to_string(),
-            detail: error.to_string(),
+            detail: "header parse failed".into(),
+            source: Some(Box::new(error)),
         }
     })?;
-    let header_value =
+    let mut header_value =
         HeaderValue::from_str(value).map_err(|error| HttpTransportError::InvalidHeader {
             name: name.to_string(),
-            detail: error.to_string(),
+            detail: "header parse failed".into(),
+            source: Some(Box::new(error)),
         })?;
+    // Caller-supplied headers may carry provider-specific credentials.
+    header_value.set_sensitive(true);
     headers.insert(header_name, header_value);
     Ok(())
 }
 
-fn map_send_error(url: &str, error: &reqwest::Error, timeout: Duration) -> HttpTransportError {
+fn map_send_error(error: reqwest::Error, timeout: Duration) -> HttpTransportError {
+    let error = error.without_url();
     if error.is_timeout() {
         HttpTransportError::Timeout {
-            url: url.to_string(),
-            timeout_ms: timeout.as_millis().min(u128::from(u64::MAX)) as u64,
+            timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+            source: Box::new(error),
         }
     } else if error.is_connect() {
-        HttpTransportError::Connect {
-            url: url.to_string(),
-            detail: error.to_string(),
-        }
-    } else if error.is_builder() {
-        HttpTransportError::InvalidUrl {
-            url: url.to_string(),
-            detail: error.to_string(),
-        }
+        HttpTransportError::Connect { source: error }
     } else {
-        HttpTransportError::Request {
-            url: url.to_string(),
-            detail: error.to_string(),
-        }
+        HttpTransportError::Request { source: error }
     }
+}
+
+async fn collect_response(
+    mut response: reqwest::Response,
+    maximum: usize,
+) -> Result<Vec<u8>, HttpTransportError> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > maximum as u64)
+    {
+        return Err(HttpTransportError::ResponseTooLarge { maximum });
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|error| HttpTransportError::Decode {
+            source: error.without_url(),
+        })?
+    {
+        if chunk.len() > maximum.saturating_sub(body.len()) {
+            return Err(HttpTransportError::ResponseTooLarge { maximum });
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
 }
 
 #[async_trait]
@@ -578,26 +660,27 @@ impl ProviderHttpTransport for HttpTransport {
 /// - anything else non-2xx -> [`ProviderError::Malformed`].
 ///
 /// A 2xx status is not an error and is reported as [`None`].
-pub fn map_http_status(provider_label: &str, status: u16, body: &[u8]) -> Option<ProviderError> {
-    if (200..300).contains(&status) {
-        return None;
-    }
-    let body_text = String::from_utf8_lossy(body).into_owned();
-    let error = match status {
-        429 => ProviderError::RateLimited { retry_after_ms: 0 },
-        403 => ProviderError::ContentPolicy(format!("{provider_label}: {body_text}")),
-        400..=499 => ProviderError::BadToolArgs(format!(
-            "{provider_label} rejected request ({status}): {body_text}"
-        )),
-        500..=599 => ProviderError::Upstream5xx {
+pub fn map_http_status(provider_label: &str, status: u16) -> Option<ProviderError> {
+    match status {
+        200..=299 => None,
+        429 => Some(ProviderError::RateLimited {
+            retry_after_ms: 0,
+            source: None,
+        }),
+        403 => Some(ProviderError::ContentPolicy(format!(
+            "{provider_label} denied the request"
+        ))),
+        400..=499 => Some(ProviderError::BadToolArgs(format!(
+            "{provider_label} rejected the request with HTTP {status}"
+        ))),
+        500..=599 => Some(ProviderError::Upstream5xx {
             status,
-            body: format!("{provider_label}: {body_text}"),
-        },
-        _ => ProviderError::Malformed(format!(
-            "{provider_label} returned unexpected status {status}: {body_text}"
-        )),
-    };
-    Some(error)
+            source: None,
+        }),
+        _ => Some(ProviderError::Malformed(format!(
+            "{provider_label} returned HTTP {status}"
+        ))),
+    }
 }
 
 /// Map a [`HttpTransportError`] into the fabric [`ProviderError`] taxonomy.
@@ -605,18 +688,21 @@ pub fn map_http_status(provider_label: &str, status: u16, body: &[u8]) -> Option
 /// Transport-layer failures fail closed: a timeout becomes
 /// [`ProviderError::TransportTimeout`], a non-2xx status is routed through
 /// [`map_http_status`], and connect/decode failures surface as
-/// [`ProviderError::Malformed`] so no failed request is mistaken for success.
+/// [`ProviderError::Transport`] with their native cause retained.
 pub fn map_transport_error(provider_label: &str, error: HttpTransportError) -> ProviderError {
-    match error {
-        HttpTransportError::Timeout { timeout_ms, .. } => {
-            ProviderError::TransportTimeout { ms: timeout_ms }
-        }
-        HttpTransportError::Status { code, body } => {
-            map_http_status(provider_label, code, body.as_bytes()).unwrap_or_else(|| {
-                ProviderError::Malformed(format!("{provider_label} returned status {code}: {body}"))
-            })
-        }
-        other => ProviderError::Malformed(format!("{provider_label} transport error: {other}")),
+    if let HttpTransportError::Timeout { timeout_ms, .. } = &error {
+        return ProviderError::TransportTimeout {
+            ms: *timeout_ms,
+            source: Some(Box::new(error)),
+        };
+    }
+    if let HttpTransportError::Status { code } = error {
+        return map_http_status(provider_label, code).unwrap_or_else(|| {
+            ProviderError::Malformed("transport rejected a successful status".into())
+        });
+    }
+    ProviderError::Transport {
+        source: Box::new(error),
     }
 }
 
@@ -627,6 +713,7 @@ pub fn map_transport_error(provider_label: &str, error: HttpTransportError) -> P
 /// trailing newline) are skipped; any non-empty line that is not valid JSON
 /// fails closed with [`ProviderError::Malformed`].
 pub fn parse_ndjson_lines(raw: &[u8], provider_label: &str) -> Result<Vec<Value>, ProviderError> {
+    chio_core::canonical::UntrustedJsonText::from_wire(raw, crate::input::MAX_DOCUMENT_BYTES)?;
     let text = std::str::from_utf8(raw).map_err(|error| {
         ProviderError::Malformed(format!(
             "{provider_label} NDJSON bytes were not UTF-8: {error}"
@@ -638,11 +725,10 @@ pub fn parse_ndjson_lines(raw: &[u8], provider_label: &str) -> Result<Vec<Value>
         if trimmed.is_empty() {
             continue;
         }
-        let value = serde_json::from_str::<Value>(trimmed).map_err(|error| {
-            ProviderError::Malformed(format!(
-                "{provider_label} NDJSON line was not JSON: {error}"
-            ))
-        })?;
+        let value = crate::input::text::<Value>(trimmed).map_err(ProviderError::from)?;
+        if values.len() >= crate::input::MAX_RECORDS {
+            return Err(ProviderError::StreamCapacityExceeded);
+        }
         values.push(value);
     }
     Ok(values)
@@ -789,6 +875,14 @@ mod tests {
         }
     }
 
+    fn validation_detail(error: &HttpTransportError) -> &str {
+        match error {
+            HttpTransportError::InvalidHeader { detail, .. }
+            | HttpTransportError::InvalidUrl { detail, .. } => detail,
+            _ => panic!("expected a configuration rejection"),
+        }
+    }
+
     #[test]
     fn auth_scheme_from_env_is_fail_closed_when_unset() {
         // SAFETY: single-threaded test mutation of a unique variable name.
@@ -860,7 +954,7 @@ mod tests {
             error,
             HttpTransportError::InvalidHeader { ref name, .. } if name == AUTHORIZATION.as_str()
         ));
-        assert!(error.to_string().contains("bearer token"));
+        assert!(validation_detail(&error).contains("bearer token"));
     }
 
     #[test]
@@ -878,7 +972,7 @@ mod tests {
                 error,
                 HttpTransportError::InvalidHeader { ref name, .. } if name == AUTHORIZATION.as_str()
             ));
-            assert!(error.to_string().contains("bearer token"));
+            assert!(validation_detail(&error).contains("bearer token"));
         }
     }
 
@@ -901,7 +995,7 @@ mod tests {
                 error,
                 HttpTransportError::InvalidHeader { ref name, .. } if name == "x-api-key"
             ));
-            assert!(error.to_string().contains("auth header value"));
+            assert!(validation_detail(&error).contains("auth header value"));
         }
     }
 
@@ -924,7 +1018,7 @@ mod tests {
                 error,
                 HttpTransportError::InvalidHeader { ref name, .. } if name == "key"
             ));
-            assert!(error.to_string().contains("auth query value"));
+            assert!(validation_detail(&error).contains("auth query value"));
         }
     }
 
@@ -955,7 +1049,7 @@ mod tests {
             let message = error.to_string();
 
             assert!(matches!(error, HttpTransportError::InvalidHeader { .. }));
-            assert!(message.contains("auth query parameter name"));
+            assert!(validation_detail(&error).contains("auth query parameter name"));
             assert!(
                 !message.contains("secret-value"),
                 "query auth secret leaked in `{message}`"
@@ -974,7 +1068,7 @@ mod tests {
         let message = error.to_string();
 
         assert!(matches!(error, HttpTransportError::InvalidHeader { .. }));
-        assert!(message.contains("auth query parameter name"));
+        assert!(validation_detail(&error).contains("auth query parameter name"));
         assert!(
             !message.contains("secret-value"),
             "query auth secret leaked in `{message}`"
@@ -989,7 +1083,7 @@ mod tests {
         };
 
         assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
-        assert!(error.to_string().contains("base URL"));
+        assert!(validation_detail(&error).contains("base URL"));
     }
 
     #[test]
@@ -1001,7 +1095,7 @@ mod tests {
         };
 
         assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
-        assert!(error.to_string().contains("surrounding whitespace"));
+        assert!(validation_detail(&error).contains("surrounding whitespace"));
     }
 
     #[test]
@@ -1013,7 +1107,7 @@ mod tests {
         };
 
         assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
-        assert!(error.to_string().contains("http or https"));
+        assert!(validation_detail(&error).contains("http or https"));
     }
 
     #[test]
@@ -1029,27 +1123,27 @@ mod tests {
             };
 
             assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
-            assert!(error.to_string().contains("base URL"));
+            assert!(validation_detail(&error).contains("base URL"));
         }
     }
 
     #[test]
     fn map_http_status_classifies_codes() {
-        assert!(map_http_status("OpenAI", 200, b"{}").is_none());
+        assert!(map_http_status("OpenAI", 200).is_none());
         assert!(matches!(
-            map_http_status("OpenAI", 429, b"slow down"),
+            map_http_status("OpenAI", 429),
             Some(ProviderError::RateLimited { .. })
         ));
         assert!(matches!(
-            map_http_status("OpenAI", 403, b"blocked"),
+            map_http_status("OpenAI", 403),
             Some(ProviderError::ContentPolicy(_))
         ));
         assert!(matches!(
-            map_http_status("OpenAI", 400, b"bad"),
+            map_http_status("OpenAI", 400),
             Some(ProviderError::BadToolArgs(_))
         ));
         assert!(matches!(
-            map_http_status("OpenAI", 503, b"down"),
+            map_http_status("OpenAI", 503),
             Some(ProviderError::Upstream5xx { status: 503, .. })
         ));
     }
@@ -1069,7 +1163,7 @@ mod tests {
             parse_ndjson_lines(raw, "Ollama"),
             "a non-JSON line must fail closed",
         );
-        assert!(matches!(error, ProviderError::Malformed(_)));
+        assert!(matches!(error, ProviderError::UntrustedInput(_)));
     }
 
     #[tokio::test]
@@ -1238,13 +1332,7 @@ mod tests {
             other => panic!("expected Status error, got {other}"),
         }
         // The status maps into the fabric rate-limit variant.
-        let mapped = map_transport_error(
-            "OpenAI",
-            HttpTransportError::Status {
-                code: 429,
-                body: "rate limited".to_string(),
-            },
-        );
+        let mapped = map_transport_error("OpenAI", HttpTransportError::Status { code: 429 });
         assert!(matches!(mapped, ProviderError::RateLimited { .. }));
     }
 
@@ -1264,3 +1352,6 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod boundary_tests;

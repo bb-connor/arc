@@ -92,6 +92,10 @@ fn function_call_stream() -> Vec<u8> {
     // string.
     br#"data: {"id": "chatcmpl_taxonomy", "object": "chat.completion.chunk", "choices": [{"index": 0, "delta": {"tool_calls": [{"id": "call_weather_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"Paris\"}"}}]}}]}
 
+data: {"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+
 "#
     .to_vec()
 }
@@ -293,6 +297,8 @@ fn require_provider_error<T>(
         ProviderError::Clock(_) => "Clock",
         ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
         ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

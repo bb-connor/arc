@@ -235,12 +235,7 @@ impl CohereAdapter {
         self.ensure_supported_api_version()?;
         validate_tool_call(call)?;
         let parsed_args: Value =
-            serde_json::from_str(&call.function.arguments).map_err(|error| {
-                ProviderError::BadToolArgs(format!(
-                    "Cohere tool_call `{}` arguments did not parse as JSON: {error}",
-                    call.function.name
-                ))
-            })?;
+            chio_provider_adapter_core::input::arguments(&call.function.arguments)?;
         if !parsed_args.is_object() {
             return Err(ProviderError::BadToolArgs(format!(
                 "Cohere tool_call `{}` arguments did not parse as a JSON object",
@@ -264,7 +259,7 @@ impl CohereAdapter {
             None => None,
         };
 
-        Ok(ToolInvocation {
+        chio_provider_adapter_core::input::invocation(ToolInvocation {
             provider: ProviderId::Cohere,
             tool_name: call.function.name.clone(),
             arguments,
@@ -333,9 +328,8 @@ pub enum CohereAdapterError {
 }
 
 fn tool_calls(raw: ProviderRequest) -> Result<Vec<ToolCallBlock>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!("Cohere /v2/chat payload was not JSON: {error}"))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&raw.0).map_err(ProviderError::from)?;
     let body = chio_provider_adapter_core::response_body(value, "Cohere /v2/chat")?;
     extract_tool_calls(&body)
 }
@@ -351,9 +345,8 @@ fn extract_tool_calls(body: &Value) -> Result<Vec<ToolCallBlock>, ProviderError>
     };
     let mut calls = Vec::with_capacity(array.len());
     for entry in array {
-        let parsed: ToolCallBlock = serde_json::from_value(entry.clone()).map_err(|error| {
-            ProviderError::Malformed(format!("Cohere tool_call block was malformed: {error}"))
-        })?;
+        let parsed: ToolCallBlock =
+            chio_provider_adapter_core::input::typed(entry.clone()).map_err(ProviderError::from)?;
         calls.push(parsed);
     }
     Ok(calls)
@@ -372,9 +365,7 @@ fn validate_tool_call(call: &ToolCallBlock) -> Result<(), ProviderError> {
 }
 
 fn parse_value(bytes: &[u8]) -> Result<Value, ProviderError> {
-    serde_json::from_slice(bytes).map_err(|error| {
-        ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
-    })
+    chio_provider_adapter_core::input::json(bytes).map_err(ProviderError::from)
 }
 
 fn apply_redactions(
@@ -843,12 +834,7 @@ mod tests {
     async fn chat_propagates_upstream_status_error() {
         let cfg = config();
         let mock = transport::MockTransport::new();
-        mock.push_error(
-            chio_provider_adapter_core::http::HttpTransportError::Status {
-                code: 503,
-                body: "service unavailable".to_string(),
-            },
-        );
+        mock.push_error(chio_provider_adapter_core::http::HttpTransportError::Status { code: 503 });
         let adapter = CohereAdapter::new(cfg, Arc::new(mock));
         let err = adapter.chat(b"{}").await.unwrap_err();
         assert!(matches!(

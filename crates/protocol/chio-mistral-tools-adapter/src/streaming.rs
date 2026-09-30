@@ -28,7 +28,7 @@ impl MistralAdapter {
         gate_openai_sse_tool_calls(
             raw,
             "Mistral",
-            None,
+            Some("[DONE]"),
             |call| {
                 let invocation = self.invocation_from_function_call(&FunctionCallPart::new(
                     call.id.clone(),

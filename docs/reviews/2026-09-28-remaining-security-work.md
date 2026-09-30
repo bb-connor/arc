@@ -11,7 +11,7 @@ hosted or release qualification.
 
 | Work | Current recorded scope | Interpretation |
 | --- | --- | --- |
-| Decoder classification | 194 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers, the remaining 29 CLI readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
+| Decoder classification | 166 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers, the remaining 29 CLI readers, all 28 remaining protocol readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
 | Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
 | Negative assertions | Baseline contains 1,257 assertions at 1,175 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
@@ -132,12 +132,19 @@ The batch removes status-floor v1 conversion, binds publish acknowledgements and
 retained market records, caps aggregate failed reads, validates complete archive
 namespaces before extraction, and makes relay/reloader time fallible.
 
-Next execute its 28 pinned protocol readers: shared provider/egress transports,
-provider streaming and nested tool arguments, and recorder/replay/conformance
-fixture owners. There are 194 baseline files across the workspace and zero CLI
-baseline files. These lexical counts describe
-semantic review debt, not known vulnerabilities. Broader clock/deadline/accounting
-and negative-control work remains owner-specific.
+The [provider reader batch](2026-09-30-provider-reader-boundaries-execution.md)
+disposes those 28 protocol readers. Shared HTTP and Bedrock SDK response custody,
+strict original/nested JSON, complete selected stream lifecycles, native error
+sources, bounded recorder/replay inputs and process cleanup are qualified locally
+with 596 tests. Its record distinguishes existing fixture event contracts from
+live-provider interoperability and hosted acceptance.
+
+Next execute its 35 pinned trust readers: attestation/credential/buyer imports,
+custody/TEE/remote-signing responses, federation ceremonies, and pheromone
+persisted/exchanged evidence. There are 166 baseline files across the workspace,
+with zero protocol or CLI baseline files. These lexical counts describe semantic
+review debt, not known vulnerabilities. Broader clock/deadline/accounting and
+negative-control work remains owner-specific.
 
 Broader semantic error taxonomy, other product/protocol readers, and the
 remaining structural/declaration/assurance queues below remain open.

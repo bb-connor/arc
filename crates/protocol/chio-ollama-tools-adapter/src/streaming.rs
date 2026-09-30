@@ -1,30 +1,19 @@
-//! Ollama NDJSON gating for `/api/chat` stream payloads.
-//!
-//! Ollama streams `/api/chat` as one JSON object per line (NDJSON). Each
-//! object carries a partial `message` with optional `tool_calls`. The adapter
-//! buffers tool-call entries (which Ollama emits whole on the line that has
-//! `done: true` for the assistant message) and gates emission on a kernel
-//! verdict before forwarding bytes downstream.
-
-use chio_provider_adapter_core::ensure_streaming_allow_no_redactions;
+//! Validate complete bounded NDJSON before evaluating calls or forwarding bytes.
+use crate::{response, OllamaAdapter};
+use chio_provider_adapter_core::{
+    ensure_streaming_allow_no_redactions, http::parse_ndjson_lines, input,
+};
 use chio_tool_call_fabric::{ProviderError, ToolInvocation, VerdictResult};
 use serde_json::Value;
 
-use crate::{native::ToolCallPart, response, OllamaAdapter};
-
-/// Result of gating one Ollama NDJSON stream payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GatedNdjsonStream {
-    /// NDJSON bytes that are safe to forward downstream.
     pub bytes: Vec<u8>,
-    /// Tool invocations evaluated when each `tool_calls` entry finalised.
     pub invocations: Vec<ToolInvocation>,
-    /// Verdicts returned for each invocation in stream order.
     pub verdicts: Vec<VerdictResult>,
 }
 
 impl OllamaAdapter {
-    /// Gate a deterministic Ollama NDJSON `/api/chat` stream payload.
     pub fn gate_sse_stream<F>(
         &self,
         raw: &[u8],
@@ -34,60 +23,70 @@ impl OllamaAdapter {
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
         self.ensure_supported_api_version()?;
-        let text = std::str::from_utf8(raw).map_err(|error| {
-            ProviderError::Malformed(format!("Ollama NDJSON stream was not UTF-8: {error}"))
-        })?;
-        let mut output: Vec<u8> = Vec::with_capacity(raw.len());
+        let frames = parse_ndjson_lines(raw, "Ollama")?;
         let mut invocations = Vec::new();
-        let mut verdicts = Vec::new();
-        let mut tool_index: usize = 0;
-
-        for line in text.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                continue;
+        let mut done = false;
+        for frame in frames {
+            if done {
+                return Err(ProviderError::Malformed(
+                    "Ollama data followed its terminal frame".into(),
+                ));
             }
-            let frame: Value = serde_json::from_str(trimmed).map_err(|error| {
-                ProviderError::Malformed(format!("Ollama NDJSON line was not JSON: {error}"))
+            if frame.get("error").is_some() {
+                return Err(ProviderError::Malformed(
+                    "Ollama stream reported an upstream error".into(),
+                ));
+            }
+            done = frame.get("done").and_then(Value::as_bool).ok_or_else(|| {
+                ProviderError::Malformed("Ollama frame omitted its done flag".into())
             })?;
             response::classify_content_policy(&frame)?;
-
-            if let Some(array) = frame
-                .get("message")
-                .and_then(|message| message.get("tool_calls"))
-                .and_then(Value::as_array)
-            {
-                for entry in array {
-                    let parsed: ToolCallPart = response::tool_call_part(entry)?;
-                    let invocation = self.invocation_from_tool_call(tool_index, &parsed)?;
-                    if !invocation.bridge_security.as_ref().is_some_and(
-                        chio_manifest::BridgeSecurityMetadata::has_registry_coordinates,
-                    ) {
-                        return Err(ProviderError::Malformed(
-                            "Ollama stream evaluation requires a registry-admitted security sidecar"
-                                .to_string(),
-                        ));
+            if let Some(message) = frame.get("message") {
+                if !message.is_object() {
+                    return Err(ProviderError::Malformed(
+                        "Ollama message must be an object".into(),
+                    ));
+                }
+                if let Some(calls) = message.get("tool_calls") {
+                    let calls = calls.as_array().ok_or_else(|| {
+                        ProviderError::Malformed("Ollama tool_calls must be an array".into())
+                    })?;
+                    for entry in calls {
+                        if invocations.len() >= input::MAX_TOOL_CALLS {
+                            return Err(ProviderError::StreamCapacityExceeded);
+                        }
+                        let call = response::tool_call_part(entry)?;
+                        let invocation =
+                            self.invocation_from_tool_call(invocations.len(), &call)?;
+                        if !invocation.bridge_security.as_ref().is_some_and(
+                            chio_manifest::BridgeSecurityMetadata::has_registry_coordinates,
+                        ) {
+                            return Err(ProviderError::Malformed("Ollama stream evaluation requires a registry-admitted security sidecar".into()));
+                        }
+                        invocations.push(invocation);
                     }
-                    let verdict = evaluate(&invocation)?;
-                    ensure_streaming_allow_no_redactions(
-                        "Ollama",
-                        "tool_call",
-                        &parsed.function.name,
-                        None,
-                        &verdict,
-                    )?;
-                    invocations.push(invocation);
-                    verdicts.push(verdict);
-                    tool_index += 1;
                 }
             }
-
-            output.extend_from_slice(line.as_bytes());
-            output.push(b'\n');
         }
-
+        if !done {
+            return Err(ProviderError::Malformed(
+                "Ollama stream ended without its terminal frame".into(),
+            ));
+        }
+        let mut verdicts = Vec::with_capacity(invocations.len());
+        for invocation in &invocations {
+            let verdict = evaluate(invocation)?;
+            ensure_streaming_allow_no_redactions(
+                "Ollama",
+                "tool_call",
+                &invocation.tool_name,
+                None,
+                &verdict,
+            )?;
+            verdicts.push(verdict);
+        }
         Ok(GatedNdjsonStream {
-            bytes: output,
+            bytes: raw.to_vec(),
             invocations,
             verdicts,
         })

@@ -210,7 +210,7 @@ impl OllamaAdapter {
             .post_json(OLLAMA_CHAT_PATH, request_body)
             .await
             .map_err(|error| map_transport_error(PROVIDER_LABEL, error))?;
-        if let Some(error) = map_http_status(PROVIDER_LABEL, response.status, &response.body) {
+        if let Some(error) = map_http_status(PROVIDER_LABEL, response.status) {
             return Err(error);
         }
         self.lift_batch(ProviderRequest(response.body))
@@ -270,7 +270,7 @@ impl OllamaAdapter {
             ))
         })?;
 
-        Ok(ToolInvocation {
+        chio_provider_adapter_core::input::invocation(ToolInvocation {
             provider: ProviderId::Ollama,
             tool_name: call.function.name.clone(),
             arguments,
@@ -387,9 +387,7 @@ fn synthesised_request_id(name: &str, index: usize) -> String {
 }
 
 fn parse_value(bytes: &[u8]) -> Result<Value, ProviderError> {
-    serde_json::from_slice(bytes).map_err(|error| {
-        ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
-    })
+    chio_provider_adapter_core::input::json(bytes).map_err(ProviderError::from)
 }
 
 fn apply_redactions(

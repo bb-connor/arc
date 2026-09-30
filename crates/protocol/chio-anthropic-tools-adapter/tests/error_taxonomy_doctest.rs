@@ -34,7 +34,10 @@ fn allow_verdict() -> VerdictResult {
 }
 
 fn tool_use_stream() -> Vec<u8> {
-    br#"event: content_block_start
+    br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture"}}
+
+event: content_block_start
 data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_weather_1","name":"get_weather","input":{}}}
 
 event: content_block_stop
@@ -48,7 +51,10 @@ data: {"type":"message_stop"}
 }
 
 fn malformed_delta_stream() -> Vec<u8> {
-    br#"event: content_block_delta
+    br#"event: message_start
+data: {"type":"message_start","message":{"id":"msg_fixture"}}
+
+event: content_block_delta
 data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}
 
 "#
@@ -348,6 +354,8 @@ fn require_provider_error<T>(
         ProviderError::Clock(_) => "Clock",
         ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
         ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

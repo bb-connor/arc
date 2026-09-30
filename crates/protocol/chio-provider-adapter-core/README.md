@@ -73,3 +73,23 @@ built from.
   `chio-groq-tools-adapter`, `chio-mistral-tools-adapter`,
   `chio-ollama-tools-adapter`, `chio-openai-adapter` - per-provider adapters
   built on these primitives.
+
+## Input boundaries
+
+External JSON is limited to 16 MiB and validated before projection, including
+repeated keys and I-JSON numeric constraints. Tool arguments must be objects,
+with at most 1 MiB per assembled call; streams admit at most 1,024 tool calls
+and 16,384 frames. Provider-specific tighter frame limits still apply.
+
+The HTTP transport checks actual response chunks against its configured limit,
+rejects redirects, and retains a total request deadline. Errors expose redacted
+public text and native local sources. Authentication headers are marked sensitive.
+HTTP status, timeout and rate-limit classifications remain available without
+retaining remote failure bodies.
+
+The shared OpenAI-compatible gate validates every frame and complete invocation
+before the first evaluator callback. Argument fragments must retain stable
+identities, each choice must finish successfully, and configured transport
+terminators remain mandatory. Byte forwarding requires every verdict to allow
+without redactions. Provider captures and decoded values grant no authority;
+admission still requires the owning adapter's verified registry metadata.

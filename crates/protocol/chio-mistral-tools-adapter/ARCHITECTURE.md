@@ -31,8 +31,8 @@ Non-streaming (`send_chat_completion`):
 Streaming (`send_chat_completion_stream`):
 
 1. The request is cloned with `stream = true`; the API-version pin is re-checked before the POST.
-2. `Transport::chat_completion_stream` buffers the full SSE body (no incremental network read).
-3. `gate_sse_stream` parses SSE frames and, for each `choices[].delta.tool_calls[]` (or `.message.tool_calls[]`) entry, builds a `ToolInvocation` and calls the caller's `evaluate` closure before appending the frame's raw bytes to the output.
+2. `Transport::chat_completion_stream` reads chunks under the shared response cap and total deadline, then supplies the bounded complete body to the gate.
+3. `gate_sse_stream` strictly parses original SSE JSON, assembles bounded argument fragments under stable call identities, and requires each choice to finish successfully before `[DONE]`. Every invocation is prepared before any evaluator runs. Provider errors and malformed or incomplete tails deny the whole stream.
 4. An allow verdict carrying redactions, or any deny verdict, fails the whole stream closed rather than partially forwarding a gated chunk.
 5. The result is a `GatedSseStream` (`GatedStream` alias): forwardable bytes plus the invocations and verdicts observed in stream order.
 

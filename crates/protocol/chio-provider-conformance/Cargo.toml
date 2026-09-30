@@ -9,6 +9,10 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+chio-provider-adapter-core = { workspace = true }
+tokio = { workspace = true, features = ["rt", "process", "io-util", "time"] }
+rustix = { workspace = true, features = ["fs", "process"] }
+tempfile = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-anthropic-tools-adapter = { workspace = true, features = ["computer-use"], optional = true }
 chio-bedrock-converse-adapter = { workspace = true, optional = true }

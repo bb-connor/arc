@@ -97,7 +97,9 @@ fn tool_call_payload() -> Value {
 }
 
 fn tool_call_stream() -> Vec<u8> {
-    let mut ndjson = serde_json::to_vec(&tool_call_payload()).unwrap();
+    let mut payload = tool_call_payload();
+    payload["done"] = json!(true);
+    let mut ndjson = serde_json::to_vec(&payload).unwrap();
     ndjson.push(b'\n');
     ndjson
 }
@@ -368,7 +370,7 @@ async fn chat_maps_upstream_5xx_to_provider_error() {
 #[tokio::test]
 async fn chat_stream_gates_ndjson_tool_calls() {
     let ndjson = concat!(
-        "{\"model\":\"llama3.2:1b\",\"message\":{\"role\":\"assistant\",\"content\":\"\"}}\n",
+        "{\"model\":\"llama3.2:1b\",\"done\":false,\"message\":{\"role\":\"assistant\",\"content\":\"\"}}\n",
         "{\"model\":\"llama3.2:1b\",\"done\":true,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"function\":{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}}]}}\n"
     );
     let mock = mock();
@@ -544,4 +546,42 @@ fn lower_allow_tool_message_helper_applies_redactions_and_canonicalizes() {
     assert_eq!(msg.role, "tool");
     assert_eq!(msg.name, "get_weather");
     assert_eq!(msg.content, r#"{"ok":true,"token":"[redacted]"}"#);
+}
+
+#[test]
+fn invalid_ndjson_tail_prevents_every_evaluator_call() {
+    let (adapter, _) = admitted_adapter("get_weather");
+    let mut value = tool_call_payload();
+    value["done"] = json!(false);
+    let prefix = serde_json::to_string(&value).unwrap();
+    let complete = format!("{prefix}\n{{\"done\":true}}\n");
+    let valid = adapter
+        .gate_sse_stream(complete.as_bytes(), |_| Ok(allow_verdict()))
+        .unwrap();
+    assert_eq!(valid.invocations.len(), 1);
+    for invalid in [
+        prefix,
+        format!("{complete}{{\"done\":false}}\n"),
+        format!("{complete}not-json\n"),
+    ] {
+        let mut calls = 0;
+        let result = adapter.gate_sse_stream(invalid.as_bytes(), |_| {
+            calls += 1;
+            Ok(allow_verdict())
+        });
+        assert!(result.is_err());
+        assert_eq!(calls, 0);
+    }
+}
+
+#[test]
+fn stream_policy_error_does_not_expose_provider_diagnostics() {
+    let error = adapter()
+        .gate_sse_stream(
+            br#"{"done":true,"policy":"refusal","done_reason":"private-provider-payload"}"#,
+            |_| panic!("refusal reached evaluator"),
+        )
+        .unwrap_err();
+    assert!(matches!(error, ProviderError::ContentPolicy(_)));
+    assert!(!format!("{error} {error:?}").contains("private-provider-payload"));
 }

@@ -334,7 +334,7 @@ fn lift_fails_closed_for_malformed_tool_use_shapes() {
     let bad_json = ProviderRequest(b"{not json".to_vec());
     assert!(matches!(
         adapter.lift_batch(bad_json),
-        Err(ProviderError::Malformed(_))
+        Err(ProviderError::UntrustedInput(_))
     ));
 
     let no_tool_use = adapter.lift_batch(raw(json!({

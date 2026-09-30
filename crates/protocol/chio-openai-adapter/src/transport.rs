@@ -290,7 +290,7 @@ fn transport_build_error(error: HttpTransportError) -> ProviderError {
 }
 
 fn classify_openai_http_status(response: &HttpResponse) -> Result<(), ProviderError> {
-    if let Some(error) = map_http_status("OpenAI", response.status, &response.body) {
+    if let Some(error) = map_http_status("OpenAI", response.status) {
         return Err(error);
     }
     Ok(())

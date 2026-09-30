@@ -1,0 +1,27 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-provider-conformance v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-provider-conformance)
+error[E0583]: file not found for module `anthropic_stream`
+   --> crates/protocol/chio-provider-conformance/src/bin/record/invoke.rs:104:1
+    |
+104 | mod anthropic_stream;
+    | ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: to create the module `anthropic_stream`, create file "crates/protocol/chio-provider-conformance/src/bin/record/anthropic_stream.rs" or "crates/protocol/chio-provider-conformance/src/bin/record/anthropic_stream/mod.rs"
+    = note: if there is a `mod anthropic_stream` elsewhere in the crate already, import it with `use crate::...` instead
+
+For more information about this error, try `rustc --explain E0583`.
+error: could not compile `chio-provider-conformance` (bin "record" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `chio-provider-conformance` (bin "record") due to 1 previous error

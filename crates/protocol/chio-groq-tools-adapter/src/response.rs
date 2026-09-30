@@ -7,11 +7,8 @@ use serde_json::Value;
 use crate::native::FunctionCallPart;
 
 pub(crate) fn function_calls(raw: ProviderRequest) -> Result<Vec<FunctionCallPart>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!(
-            "Groq chat/completions payload was not JSON: {error}"
-        ))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&raw.0).map_err(ProviderError::from)?;
     let body = response_body(value, "Groq chat/completions")?;
     classify_content_policy(&body)?;
     extract_function_calls(&body)
@@ -49,7 +46,14 @@ fn safety_block_reason(body: &Value) -> Option<String> {
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|reason| !reason.is_empty())
-        .map(|reason| format!("promptFeedback.blockReason={reason}"))
+        .map(|reason| {
+            if reason == "SAFETY" {
+                "promptFeedback.blockReason=SAFETY"
+            } else {
+                "promptFeedback blocked the request"
+            }
+            .into()
+        })
 }
 
 fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, ProviderError> {
@@ -74,4 +78,16 @@ fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, Provide
         }
     }
     Ok(calls)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod diagnostic_tests {
+    #[test]
+    fn refusal_diagnostics_do_not_echo_arbitrary_provider_text() {
+        let payload =
+            serde_json::json!({"promptFeedback":{"blockReason":"private-provider-payload"}});
+        let error = super::classify_content_policy(&payload).unwrap_err();
+        assert!(!format!("{error} {error:?}").contains("private-provider-payload"));
+    }
 }

@@ -30,7 +30,9 @@ aws-sdk-sts = { version = "1", default-features = false, features = [
 aws-smithy-runtime-api = { version = "1", default-features = false, features = [
     "client",
 ] }
-aws-smithy-types = { version = "1", default-features = false }
+aws-smithy-types = { version = "1", default-features = false, features = ["http-body-1-x"] }
+bytes = "1"
+http-body = "1"
 aws-types = { version = "1", default-features = false }
 chio-attest-verify = { workspace = true }
 chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }

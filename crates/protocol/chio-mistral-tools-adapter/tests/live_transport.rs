@@ -191,7 +191,7 @@ async fn real_transport_streams_and_gates_tool_calls() {
     });
     let mut sse = b"data: ".to_vec();
     sse.extend_from_slice(&serde_json::to_vec(&chunk).unwrap());
-    sse.extend_from_slice(b"\n\n");
+    sse.extend_from_slice(b"\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n");
 
     Mock::given(method("POST"))
         .and(path(MISTRAL_CHAT_COMPLETIONS_PATH))

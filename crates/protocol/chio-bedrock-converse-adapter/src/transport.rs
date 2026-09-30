@@ -28,6 +28,13 @@ use thiserror::Error;
 
 use crate::native::ToolConfig;
 
+mod bounded_response;
+
+pub type ConverseSdkError = aws_smithy_runtime_api::client::result::SdkError<
+    aws_sdk_bedrockruntime::operation::converse::ConverseError,
+    aws_smithy_runtime_api::client::orchestrator::HttpResponse,
+>;
+
 /// Pinned Bedrock Converse API marker used in Chio provenance.
 pub const BEDROCK_CONVERSE_API_VERSION: &str = "bedrock.converse.v1";
 
@@ -101,8 +108,8 @@ impl ConverseRequest {
     /// Parse a Converse request from a JSON envelope of the form
     /// `{ "modelId": "...", "messages": [...], "toolConfig": { ... } }`.
     pub fn from_json_bytes(raw: &[u8]) -> Result<Self, TransportError> {
-        let value: Value = serde_json::from_slice(raw)
-            .map_err(|error| TransportError::MalformedRequest(format!("not JSON: {error}")))?;
+        let value: Value =
+            chio_provider_adapter_core::input::json(raw).map_err(TransportError::from)?;
         let object = value.as_object().ok_or_else(|| {
             TransportError::MalformedRequest("request must be a JSON object".to_string())
         })?;
@@ -124,9 +131,10 @@ impl ConverseRequest {
             .clone();
 
         let tool_config = match object.get("toolConfig") {
-            Some(value) => Some(serde_json::from_value(value.clone()).map_err(|error| {
-                TransportError::MalformedRequest(format!("toolConfig was malformed: {error}"))
-            })?),
+            Some(value) => Some(
+                chio_provider_adapter_core::input::typed(value.clone())
+                    .map_err(TransportError::from)?,
+            ),
             None => None,
         };
 
@@ -139,8 +147,10 @@ impl ConverseRequest {
 }
 
 /// Wire-level transport errors.
-#[derive(Debug, Error)]
+#[derive(Error)]
 pub enum TransportError {
+    #[error("{0}")]
+    UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("mock bedrock transport has no scripted response for {operation}")]
     MockExhausted { operation: &'static str },
     #[error("unsupported bedrock runtime operation: {operation}")]
@@ -149,16 +159,22 @@ pub enum TransportError {
     UnsupportedRegion { region: String },
     #[error("bedrock Converse request was malformed: {0}")]
     MalformedRequest(String),
-    #[error("bedrock Converse upstream rate limited; retry after {retry_after_ms}ms")]
-    RateLimited { retry_after_ms: u64 },
-    #[error("bedrock Converse upstream {status} error: {message}")]
-    Upstream { status: u16, message: String },
+    #[error("bedrock Converse SDK request failed")]
+    Sdk(#[source] Box<ConverseSdkError>),
     #[error("bedrock Converse call timed out after {ms}ms")]
-    Timeout { ms: u64 },
-    #[error("bedrock Converse upstream rejected the request: {0}")]
-    Rejected(String),
+    Timeout {
+        ms: u64,
+        #[source]
+        source: tokio::time::error::Elapsed,
+    },
     #[error("bedrock Converse response could not be decoded: {0}")]
     DecodeResponse(String),
+}
+
+impl std::fmt::Debug for TransportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
 }
 
 /// Wire-level transport contract.
@@ -283,12 +299,16 @@ impl AwsSdkTransport {
             call = call.tool_config(tool_config);
         }
 
-        let send = call.send();
+        let send = call
+            .customize()
+            .interceptor(bounded_response::ValidateResponse)
+            .send();
         let output = match tokio::time::timeout(self.timeout, send).await {
-            Ok(result) => result.map_err(map_sdk_error)?,
-            Err(_) => {
+            Ok(result) => result.map_err(|error| TransportError::Sdk(Box::new(error)))?,
+            Err(source) => {
                 return Err(TransportError::Timeout {
-                    ms: self.timeout.as_millis() as u64,
+                    ms: u64::try_from(self.timeout.as_millis()).unwrap_or(u64::MAX),
+                    source,
                 })
             }
         };
@@ -699,69 +719,6 @@ fn document_number_to_json(number: &Number) -> Value {
         Number::Float(value) => serde_json::Number::from_f64(*value)
             .map(Value::Number)
             .unwrap_or(Value::Null),
-    }
-}
-
-fn map_sdk_error(
-    error: aws_smithy_runtime_api::client::result::SdkError<
-        aws_sdk_bedrockruntime::operation::converse::ConverseError,
-        aws_smithy_runtime_api::client::orchestrator::HttpResponse,
-    >,
-) -> TransportError {
-    use aws_sdk_bedrockruntime::operation::converse::ConverseError;
-    use aws_smithy_runtime_api::client::result::SdkError;
-
-    if error.as_service_error().is_none() {
-        return match &error {
-            SdkError::TimeoutError(_) => TransportError::Timeout { ms: 0 },
-            SdkError::DispatchFailure(_) => TransportError::Upstream {
-                status: 503,
-                message: error.to_string(),
-            },
-            SdkError::ResponseError(_) => TransportError::DecodeResponse(error.to_string()),
-            other => TransportError::Rejected(other.to_string()),
-        };
-    }
-
-    match error.into_service_error() {
-        ConverseError::ThrottlingException(_) => TransportError::RateLimited {
-            retry_after_ms: 1_000,
-        },
-        ConverseError::ModelTimeoutException(inner) => TransportError::Upstream {
-            status: 408,
-            message: error_message(inner.message(), "model timeout"),
-        },
-        ConverseError::InternalServerException(inner) => TransportError::Upstream {
-            status: 500,
-            message: error_message(inner.message(), "internal server error"),
-        },
-        ConverseError::ServiceUnavailableException(inner) => TransportError::Upstream {
-            status: 503,
-            message: error_message(inner.message(), "service unavailable"),
-        },
-        ConverseError::ValidationException(inner) => {
-            TransportError::Rejected(error_message(inner.message(), "validation error"))
-        }
-        ConverseError::AccessDeniedException(inner) => {
-            TransportError::Rejected(error_message(inner.message(), "access denied"))
-        }
-        ConverseError::ResourceNotFoundException(inner) => {
-            TransportError::Rejected(error_message(inner.message(), "resource not found"))
-        }
-        ConverseError::ModelErrorException(inner) => {
-            TransportError::Rejected(error_message(inner.message(), "model error"))
-        }
-        ConverseError::ModelNotReadyException(inner) => {
-            TransportError::Rejected(error_message(inner.message(), "model not ready"))
-        }
-        other => TransportError::Rejected(other.to_string()),
-    }
-}
-
-fn error_message(message: Option<&str>, fallback: &str) -> String {
-    match message {
-        Some(message) if !message.trim().is_empty() => message.to_string(),
-        _ => fallback.to_string(),
     }
 }
 

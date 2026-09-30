@@ -275,7 +275,7 @@ impl GroqAdapter {
             None => None,
         };
 
-        Ok(ToolInvocation {
+        chio_provider_adapter_core::input::invocation(ToolInvocation {
             provider: ProviderId::Groq,
             tool_name: call.name.clone(),
             arguments,
@@ -360,11 +360,8 @@ fn validate_function_call(call: &FunctionCallPart) -> Result<(), ProviderError> 
 }
 
 fn validate_chat_request_body(request_body: &[u8]) -> Result<(), ProviderError> {
-    let value: Value = serde_json::from_slice(request_body).map_err(|error| {
-        ProviderError::Malformed(format!(
-            "Groq chat/completions request body was not JSON: {error}"
-        ))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(request_body).map_err(ProviderError::from)?;
     let request = value.as_object().ok_or_else(|| {
         ProviderError::BadToolArgs(
             "Groq chat/completions request body must be a JSON object".to_string(),
@@ -396,9 +393,7 @@ fn validate_chat_request_body(request_body: &[u8]) -> Result<(), ProviderError> 
 }
 
 fn parse_value(bytes: &[u8]) -> Result<Value, ProviderError> {
-    serde_json::from_slice(bytes).map_err(|error| {
-        ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
-    })
+    chio_provider_adapter_core::input::json(bytes).map_err(ProviderError::from)
 }
 
 fn apply_redactions(

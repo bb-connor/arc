@@ -60,12 +60,12 @@ The adapter projects upstream Cohere failures onto
 |---|---|---|---|
 | `ProviderError::RateLimited` | `{"status": 429, "body": {"message": "rate limit exceeded"}}` | HTTP transport boundary | Status 429 from the upstream API, mapped by `chio_provider_adapter_core::http::map_http_status`. `retry_after_ms` is hardcoded to `0`; no `Retry-After` header is read. |
 | `ProviderError::ContentPolicy` | `{"status": 200, "body": {"finish_reason": "ERROR_TOXIC", "message": "refusal"}}` | HTTP transport boundary | Status 403 from the upstream API, mapped by `chio_provider_adapter_core::http::map_http_status`. The adapter does not parse `finish_reason` or other body fields from a 2xx response; only the HTTP status triggers this class. |
-| `ProviderError::BadToolArgs` | `{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "not-json"}}` | current adapter path | `tool_calls[].function.arguments` does not parse as a JSON object (`CohereAdapter::invocation_from_tool_call`); also 4xx statuses other than 429/403 from the upstream API. |
+| `ProviderError::BadToolArgs` | `{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "[]"}}` | current adapter path | `tool_calls[].function.arguments` decodes as a non-object JSON value (`CohereAdapter::invocation_from_tool_call`); also 4xx statuses other than 429/403 from the upstream API. |
 | `ProviderError::Upstream5xx` | `{"status": 503, "body": {"message": "service unavailable"}}` | HTTP transport boundary | Any 5xx status from the upstream API. |
 | `ProviderError::TransportTimeout` | `{"transport": "timeout", "elapsed_ms": 5000}` | HTTP transport boundary | The request exceeds the transport's configured timeout (`HttpTransportError::Timeout`, mapped to `ProviderError::TransportTimeout`). |
 | `ProviderError::VerdictBudgetExceeded` | `{"observed_ms": 300, "budget_ms": 250}` | current adapter path | The caller's verdict evaluator returns this error; `gate_sse_stream` propagates it unchanged. |
 | `ProviderError::Malformed` | `{"event": "tool-call-end", "frame": "missing-tool_call"}` | current adapter path | `lift_batch` requires at least one `tool_calls` entry; also non-stream JSON payload bytes, an envelope field that is not a JSON object or string body, a malformed `tool_call` block, or a streamed `tool-call-end` frame missing `tool_call`. |
-| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original SSE JSON; local parser source retained and public error text redacted. |
+| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original JSON, including nested argument strings; local parser source retained and public error text redacted. |
 <!-- error-taxonomy:end -->
 
 ## API pin

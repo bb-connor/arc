@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod http;
+pub mod input;
 mod response;
 mod sse;
 mod streaming;

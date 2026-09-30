@@ -64,7 +64,7 @@ fn tool_call_stream() -> Vec<u8> {
     let mut sse = Vec::new();
     sse.extend_from_slice(b"data: ");
     sse.extend_from_slice(&serde_json::to_vec(&chunk).unwrap());
-    sse.extend_from_slice(b"\n\n");
+    sse.extend_from_slice(b"\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n");
     sse
 }
 
@@ -449,7 +449,7 @@ fn lift_batch_rejects_function_call_name_with_surrounding_whitespace() {
     let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
     let err = adapter.lift_batch(raw).unwrap_err();
 
-    assert!(err.to_string().contains("surrounding whitespace"));
+    assert!(err.to_string().contains("tool call identity is invalid"));
 }
 
 #[test]
@@ -595,7 +595,7 @@ async fn raw_send_chat_completion_stream_rejects_before_evaluator() {
     });
     let mut sse = b"data: ".to_vec();
     sse.extend_from_slice(&serde_json::to_vec(&chunk).unwrap());
-    sse.extend_from_slice(b"\n\n");
+    sse.extend_from_slice(b"\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n");
     mock.push_response(sse);
     let adapter = MistralAdapter::new(config(), Arc::new(mock));
 

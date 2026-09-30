@@ -47,7 +47,8 @@ fn kernel_verdict_record(
     seed: &ScenarioSeed,
     captured: &CapturedInvocation,
 ) -> Result<CaptureRecord, RecordError> {
-    let arguments = serde_json::from_slice::<Value>(&captured.invocation.arguments)?;
+    let arguments =
+        chio_provider_conformance::input::json::<Value>(&captured.invocation.arguments)?;
     let invocation = json!({
         "provider": captured.invocation.provider,
         "tool_name": captured.invocation.tool_name,

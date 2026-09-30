@@ -1,0 +1,186 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling serde_json v1.0.149
+   Compiling indexmap v2.14.1
+   Compiling num-integer v0.1.46
+   Compiling tokio-util v0.7.18
+   Compiling futures-util v0.3.32
+   Compiling ahash v0.8.12
+   Compiling crypto-bigint v0.5.5
+   Compiling num-bigint v0.4.6
+   Compiling num-iter v0.1.45
+   Compiling tempfile v3.27.0
+   Compiling http v0.2.12
+   Compiling h2 v0.4.16
+   Compiling num-rational v0.4.2
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling referencing v0.46.0
+   Compiling num v0.4.3
+   Compiling assert-json-diff v2.0.2
+   Compiling fraction v0.15.3
+   Compiling tower v0.5.3
+   Compiling futures-executor v0.3.32
+   Compiling jsonschema v0.46.0
+   Compiling futures v0.3.32
+   Compiling elliptic-curve v0.13.8
+   Compiling tower-http v0.6.8
+   Compiling http-body v0.4.6
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling base64-simd v0.8.0
+   Compiling bytes-utils v0.1.4
+   Compiling olpc-cjson v0.1.4
+   Compiling aws-smithy-types v1.4.7
+   Compiling num-bigint-dig v0.8.6
+   Compiling oci-spec v0.9.0
+   Compiling hyper v1.8.1
+   Compiling rsa v0.9.10
+   Compiling oauth2 v5.0.0
+   Compiling serde_with v3.18.0
+   Compiling hyper-util v0.1.20
+   Compiling p384 v0.13.1
+   Compiling p256 v0.13.2
+   Compiling jsonwebtoken v10.4.0
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling openidconnect v4.0.1
+   Compiling toml_edit v0.22.27
+   Compiling hyper-rustls v0.27.7
+   Compiling tough v0.22.0
+   Compiling sigstore_protobuf_specs v0.5.1
+   Compiling reqwest v0.13.2
+   Compiling num_cpus v1.17.0
+   Compiling deadpool v0.12.3
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling oci-client v0.17.0
+   Compiling toml v0.8.23
+   Compiling aws-smithy-async v1.2.14
+   Compiling aws-smithy-runtime-api-macros v1.0.0
+   Compiling wiremock v0.6.5
+   Compiling aws-smithy-runtime-api v1.12.0
+   Compiling der v0.6.1
+   Compiling crypto-bigint v0.4.9
+   Compiling sigstore v0.14.0
+   Compiling spki v0.6.0
+   Compiling ff v0.12.1
+   Compiling xmlparser v0.13.6
+   Compiling pkcs8 v0.9.0
+   Compiling base16ct v0.1.1
+   Compiling group v0.12.1
+   Compiling separator v0.4.1
+   Compiling sec1 v0.3.0
+   Compiling diff v0.1.13
+   Compiling yansi v1.0.1
+   Compiling cbor-diag v0.1.12
+   Compiling elliptic-curve v0.12.3
+   Compiling roxmltree v0.14.1
+   Compiling pretty_assertions v1.4.1
+   Compiling rfc6979 v0.3.1
+   Compiling aws-smithy-eventstream v0.60.20
+   Compiling signature v1.6.4
+   Compiling regex-lite v0.1.9
+   Compiling ecdsa v0.14.8
+   Compiling aws-smithy-http v0.63.6
+   Compiling aws-credential-types v1.2.14
+   Compiling aws-smithy-protocol-test v0.63.14
+   Compiling aws-types v1.3.15
+   Compiling p256 v0.11.1
+   Compiling der-parser v9.0.0
+   Compiling aws-smithy-http-client v1.1.12
+   Compiling aws-smithy-observability v0.2.6
+   Compiling simple_asn1 v0.6.4
+   Compiling x509-parser v0.16.0
+   Compiling aws-sigv4 v1.4.3
+   Compiling jsonwebtoken v9.3.1
+   Compiling chio-web3-bindings v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3-bindings)
+   Compiling chio-data-guards-redactors-default v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards/redactors/default)
+   Compiling aws-smithy-runtime v1.11.1
+   Compiling chio-log-redact v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-log-redact)
+   Compiling ureq v2.12.1
+   Compiling aws-smithy-json v0.62.5
+   Compiling urlencoding v2.1.3
+   Compiling aws-smithy-query v0.60.15
+   Compiling aws-smithy-xml v0.60.15
+   Compiling tinytemplate v1.2.1
+   Compiling is-terminal v0.4.17
+   Compiling rusty-fork v0.3.1
+   Compiling criterion v0.5.1
+   Compiling rand_chacha v0.9.0
+   Compiling proptest v1.10.0
+   Compiling aws-runtime v1.7.3
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+   Compiling chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+   Compiling chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+   Compiling chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+   Compiling chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+   Compiling chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+   Compiling chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+   Compiling chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling aws-sdk-bedrockruntime v1.130.0
+   Compiling aws-sdk-sts v1.103.0
+   Compiling chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+   Compiling chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+   Compiling chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-provider-adapter-core v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-provider-adapter-core)
+   Compiling chio-bedrock-converse-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-bedrock-converse-adapter)
+   Compiling chio-anthropic-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-anthropic-tools-adapter)
+   Compiling chio-mistral-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mistral-tools-adapter)
+   Compiling chio-cohere-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cohere-tools-adapter)
+   Compiling chio-groq-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-groq-tools-adapter)
+   Compiling chio-ollama-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-ollama-tools-adapter)
+   Compiling chio-gemini-tools-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-gemini-tools-adapter)
+error[E0004]: non-exhaustive patterns: `ProviderError::Invocation(_)` and `ProviderError::Transport { .. }` not covered
+   --> crates/protocol/chio-gemini-tools-adapter/tests/error_taxonomy_doctest.rs:242:24
+    |
+242 |     let actual = match error {
+    |                        ^^^^^ patterns `ProviderError::Invocation(_)` and `ProviderError::Transport { .. }` not covered
+    |
+note: `ProviderError` defined here
+   --> crates/protocol/chio-tool-call-fabric/src/error.rs:4:1
+    |
+  4 | pub enum ProviderError {
+    | ^^^^^^^^^^^^^^^^^^^^^^
+  5 |     #[error("urn:chio:error:transport:invalid-request-shape")]
+  6 |     Invocation(#[from] crate::ToolInvocationValidationError),
+    |     ---------- not covered
+  7 |     #[error("urn:chio:error:transport:http-failed")]
+  8 |     Transport {
+    |     --------- not covered
+    = note: the matched value is of type `ProviderError`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern, a match arm with multiple or-patterns as shown, or multiple match arms
+    |
+253 ~         ProviderError::UntrustedInput(_) => "UntrustedInput",
+254 ~         ProviderError::Invocation(_) | ProviderError::Transport { .. } => todo!(),
+    |
+
+For more information about this error, try `rustc --explain E0004`.
+error: could not compile `chio-gemini-tools-adapter` (test "error_taxonomy_doctest") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

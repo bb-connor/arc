@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use crate::cli::ScenarioSeed;
 use crate::fixture::RecordPlan;
-use crate::http::curl_json_post;
+use crate::http::post_json_capture;
 use crate::invoke::{
     captured_invocations, extract_openai_invocations, openai_invocation_from_stream_record,
     CapturedInvocation,
@@ -27,7 +27,7 @@ pub(crate) fn record_openai(
         .and_then(Value::as_bool)
         .unwrap_or(false);
 
-    let response_text = curl_json_post(
+    let response_text = post_json_capture(
         "openai",
         OPENAI_RESPONSES_URL,
         &[
@@ -46,7 +46,7 @@ pub(crate) fn record_openai(
             invocations,
         })
     } else {
-        let response_payload = serde_json::from_str::<Value>(&response_text)?;
+        let response_payload = chio_provider_conformance::input::text::<Value>(&response_text)?;
         let response_record =
             capture_record(&seed, CaptureDirection::UpstreamResponse, response_payload);
         let invocations = openai_batch_invocations(&seed, org_id, &response_record.payload)?;

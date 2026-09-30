@@ -149,7 +149,7 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
     require_provider_error(bad_args, "BadToolArgs")?;
 
     let nonjson = adapter.gate_sse_stream(b"not-json\n", |_invocation| Ok(allow_verdict()));
-    require_provider_error(nonjson, "Malformed")?;
+    require_provider_error(nonjson, "UntrustedInput")?;
 
     let budget = adapter.gate_sse_stream(&tool_call_stream(), |_invocation| {
         Err(ProviderError::VerdictBudgetExceeded {
@@ -263,6 +263,8 @@ fn require_provider_error<T>(
         ProviderError::Clock(_) => "Clock",
         ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
         ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

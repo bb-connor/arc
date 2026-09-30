@@ -1,0 +1,114 @@
+{
+  "crates/protocol/chio-anthropic-tools-adapter/src/adapter.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original external provider/request/result JSON is bounded and strict before typed or Value projection. Nested argument strings are strict objects; each constructed invocation passes canonical argument validation before evaluator exposure. Existing provider identifiers, principal stamps, declared tools and registry sidecar requirements remain."
+  },
+  "crates/protocol/chio-anthropic-tools-adapter/src/streaming.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original SSE/NDJSON/event-array input is bounded and strict before projection. Selected stream owners constrain argument accumulation, identity and termination, and prepare every invocation before evaluator callbacks. Provider lifecycles, sidecar admission and allow-without-redaction requirements remain enforced."
+  },
+  "crates/protocol/chio-bedrock-converse-adapter/src/adapter.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original external provider/request/result JSON is bounded and strict before typed or Value projection. Nested argument strings are strict objects; each constructed invocation passes canonical argument validation before evaluator exposure. Existing provider identifiers, principal stamps, declared tools and registry sidecar requirements remain."
+  },
+  "crates/protocol/chio-bedrock-converse-adapter/src/streaming.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original SSE/NDJSON/event-array input is bounded and strict before projection. Selected stream owners constrain argument accumulation, identity and termination, and prepare every invocation before evaluator callbacks. Provider lifecycles, sidecar admission and allow-without-redaction requirements remain enforced."
+  },
+  "crates/protocol/chio-bedrock-converse-adapter/src/transport.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original request JSON is bounded and strict before typed construction. Every SDK Converse operation installs the bounded original-response interceptor before SDK deserialization, including supplied-client construction. Native SDK and timeout causes survive without public response-body echo; region/operation gates remain."
+  },
+  "crates/protocol/chio-cohere-tools-adapter/src/lib.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original external provider/request/result JSON is bounded and strict before typed or Value projection. Nested argument strings are strict objects; each constructed invocation passes canonical argument validation before evaluator exposure. Existing provider identifiers, principal stamps, declared tools and registry sidecar requirements remain."
+  },
+  "crates/protocol/chio-egress-contract/src/reqwest_helper.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Contract egress retains DNS/address, redirect-origin and declared/actual body limits, adds a default total request deadline, and strict-decodes original buffered JSON. Native request and redirect-header errors remain local sources behind redacted public errors."
+  },
+  "crates/protocol/chio-gemini-tools-adapter/src/adapter.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original external provider/request/result JSON is bounded and strict before typed or Value projection. Nested argument strings are strict objects; each constructed invocation passes canonical argument validation before evaluator exposure. Existing provider identifiers, principal stamps, declared tools and registry sidecar requirements remain."
+  },
+  "crates/protocol/chio-gemini-tools-adapter/src/response.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original provider JSON and string-wrapped bodies use bounded strict I-JSON before projection. Competing response envelopes reject. Nested tool arguments are strict object values under their limit; semantic provider refusal and extraction rules remain provider-owned."
+  },
+  "crates/protocol/chio-groq-tools-adapter/src/lib.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original external provider/request/result JSON is bounded and strict before typed or Value projection. Nested argument strings are strict objects; each constructed invocation passes canonical argument validation before evaluator exposure. Existing provider identifiers, principal stamps, declared tools and registry sidecar requirements remain."
+  },
+  "crates/protocol/chio-groq-tools-adapter/src/response.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original provider JSON and string-wrapped bodies use bounded strict I-JSON before projection. Competing response envelopes reject. Nested tool arguments are strict object values under their limit; semantic provider refusal and extraction rules remain provider-owned."
+  },
+  "crates/protocol/chio-mistral-tools-adapter/src/lib.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original external provider/request/result JSON is bounded and strict before typed or Value projection. Nested argument strings are strict objects; each constructed invocation passes canonical argument validation before evaluator exposure. Existing provider identifiers, principal stamps, declared tools and registry sidecar requirements remain."
+  },
+  "crates/protocol/chio-mistral-tools-adapter/src/response.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original provider JSON and string-wrapped bodies use bounded strict I-JSON before projection. Competing response envelopes reject. Nested tool arguments are strict object values under their limit; semantic provider refusal and extraction rules remain provider-owned."
+  },
+  "crates/protocol/chio-ollama-tools-adapter/src/lib.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original external provider/request/result JSON is bounded and strict before typed or Value projection. Nested argument strings are strict objects; each constructed invocation passes canonical argument validation before evaluator exposure. Existing provider identifiers, principal stamps, declared tools and registry sidecar requirements remain."
+  },
+  "crates/protocol/chio-ollama-tools-adapter/src/response.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original provider JSON and string-wrapped bodies use bounded strict I-JSON before projection. Competing response envelopes reject. Nested tool arguments are strict object values under their limit; semantic provider refusal and extraction rules remain provider-owned."
+  },
+  "crates/protocol/chio-ollama-tools-adapter/src/streaming.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original SSE/NDJSON/event-array input is bounded and strict before projection. Selected stream owners constrain argument accumulation, identity and termination, and prepare every invocation before evaluator callbacks. Provider lifecycles, sidecar admission and allow-without-redaction requirements remain enforced."
+  },
+  "crates/protocol/chio-provider-adapter-core/src/http.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Shared reqwest transport checks declared and actual response bytes before retention (16 MiB ceiling), rejects redirects, retains a total deadline and redacts credential/response diagnostics. Parser/network causes remain native sources. NDJSON checks total bytes, record count and original strict JSON before projection."
+  },
+  "crates/protocol/chio-provider-adapter-core/src/response.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Original provider JSON and string-wrapped bodies use bounded strict I-JSON before projection. Competing response envelopes reject. Nested tool arguments are strict object values under their limit; semantic provider refusal and extraction rules remain provider-owned."
+  },
+  "crates/protocol/chio-provider-conformance/src/bin/record/anthropic.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Recorder inputs are bounded fixture or HTTP/process captures. Original external JSON and nested strings pass strict I-JSON before typed projection. Captured invocations are fixture data with no admitted bridge sidecar and cannot mint runtime authority."
+  },
+  "crates/protocol/chio-provider-conformance/src/bin/record/bedrock.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Recorder inputs are bounded fixture or HTTP/process captures. Original external JSON and nested strings pass strict I-JSON before typed projection. Captured invocations are fixture data with no admitted bridge sidecar and cannot mint runtime authority."
+  },
+  "crates/protocol/chio-provider-conformance/src/bin/record/cli.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Recorder inputs are bounded fixture or HTTP/process captures. Original external JSON and nested strings pass strict I-JSON before typed projection. Captured invocations are fixture data with no admitted bridge sidecar and cannot mint runtime authority."
+  },
+  "crates/protocol/chio-provider-conformance/src/bin/record/fixture.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Recorder inputs are bounded fixture or HTTP/process captures. Original external JSON and nested strings pass strict I-JSON before typed projection. Captured invocations are fixture data with no admitted bridge sidecar and cannot mint runtime authority."
+  },
+  "crates/protocol/chio-provider-conformance/src/bin/record/invoke.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Recorder inputs are bounded fixture or HTTP/process captures. Original external JSON and nested strings pass strict I-JSON before typed projection. Captured invocations are fixture data with no admitted bridge sidecar and cannot mint runtime authority."
+  },
+  "crates/protocol/chio-provider-conformance/src/bin/record/openai.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Recorder inputs are bounded fixture or HTTP/process captures. Original external JSON and nested strings pass strict I-JSON before typed projection. Captured invocations are fixture data with no admitted bridge sidecar and cannot mint runtime authority."
+  },
+  "crates/protocol/chio-provider-conformance/src/bin/record/util.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Recorder inputs are bounded fixture or HTTP/process captures. Original external JSON and nested strings pass strict I-JSON before typed projection. Captured invocations are fixture data with no admitted bridge sidecar and cannot mint runtime authority."
+  },
+  "crates/protocol/chio-provider-conformance/src/replay/assert.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Replay fixtures use bounded nofollow regular-file custody and strict original NDJSON records before typed captured-value projections. Captured verdicts are test expectations, not live kernel authorization; replay retains invocation/verdict/response comparison checks."
+  },
+  "crates/protocol/chio-provider-conformance/src/replay/fixture.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Replay fixtures use bounded nofollow regular-file custody and strict original NDJSON records before typed captured-value projections. Captured verdicts are test expectations, not live kernel authorization; replay retains invocation/verdict/response comparison checks."
+  },
+  "crates/protocol/chio-tool-call-fabric/src/types.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Normalized invocation validation rejects original duplicate-key, lossy I-JSON, non-object or noncanonical argument bytes under a 1 MiB limit before accepting the invocation. Provider/principal/version and sidecar checks retain their own meaning; structural decoding grants no authority."
+  }
+}

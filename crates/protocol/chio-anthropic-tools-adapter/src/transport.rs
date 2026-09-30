@@ -102,6 +102,7 @@ pub fn anthropic_transport_config(auth: AuthScheme) -> HttpTransportConfig {
         auth,
         extra_headers,
         timeout: Duration::from_secs(60),
+        max_response_bytes: chio_provider_adapter_core::input::MAX_DOCUMENT_BYTES,
     }
 }
 

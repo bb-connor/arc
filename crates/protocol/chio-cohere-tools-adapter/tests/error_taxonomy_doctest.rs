@@ -139,7 +139,7 @@ fn current_adapter_paths_match_documented_classes() -> Result<(), String> {
         "message": {
             "role": "assistant",
             "tool_calls": [
-                {"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "not-json"}}
+                {"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "[]"}}
             ]
         }
     }))?);
@@ -263,6 +263,8 @@ fn require_provider_error<T>(
         ProviderError::Clock(_) => "Clock",
         ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
         ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

@@ -59,10 +59,10 @@ impl BedrockAdapter {
         let mut gate = StreamGate::new(self);
 
         for event in events {
-            gate.accept(event, &mut evaluate)?;
+            gate.accept(event)?;
         }
 
-        gate.finish()
+        gate.finish(&mut evaluate)
     }
 }
 
@@ -73,6 +73,9 @@ struct StreamGate<'a> {
     active: Option<ActiveToolBlock>,
     invocations: Vec<ToolInvocation>,
     verdicts: Vec<VerdictResult>,
+    blocks: Vec<ToolUseBlock>,
+    seen_ids: std::collections::BTreeSet<String>,
+    started: bool,
 }
 
 impl<'a> StreamGate<'a> {
@@ -84,17 +87,23 @@ impl<'a> StreamGate<'a> {
             active: None,
             invocations: Vec::new(),
             verdicts: Vec::new(),
+            blocks: Vec::new(),
+            seen_ids: std::collections::BTreeSet::new(),
+            started: false,
         }
     }
 
-    fn accept<F>(
-        &mut self,
-        event: ConverseStreamEvent,
-        evaluate: &mut F,
-    ) -> Result<(), ProviderError>
-    where
-        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
-    {
+    fn accept(&mut self, event: ConverseStreamEvent) -> Result<(), ProviderError> {
+        if event.kind == EventKind::MessageStart {
+            if self.started || self.phase.is_closed() {
+                return Err(ProviderError::Malformed("duplicate message start".into()));
+            }
+            self.started = true;
+        } else if event.kind != EventKind::Metadata && (!self.started || self.phase.is_closed()) {
+            return Err(ProviderError::Malformed(
+                "event outside the message lifetime".into(),
+            ));
+        }
         match event.kind {
             EventKind::MessageStart | EventKind::Metadata => {
                 self.forward(event);
@@ -102,12 +111,11 @@ impl<'a> StreamGate<'a> {
             }
             EventKind::ContentBlockStart => self.start_content_block(event),
             EventKind::ContentBlockDelta => self.delta_content_block(event),
-            EventKind::ContentBlockStop => self.stop_content_block(event, evaluate),
+            EventKind::ContentBlockStop => self.stop_content_block(event),
             EventKind::MessageStop => self.stop_message(event),
-            EventKind::Error => Err(ProviderError::Malformed(format!(
-                "Bedrock ConverseStream error event `{}`: {}",
-                event.name, event.payload
-            ))),
+            EventKind::Error => Err(ProviderError::Malformed(
+                "Bedrock stream reported an upstream error".into(),
+            )),
             EventKind::Unknown => Err(ProviderError::Malformed(format!(
                 "Bedrock ConverseStream event `{}` is not supported",
                 event.name
@@ -132,6 +140,11 @@ impl<'a> StreamGate<'a> {
             return Ok(());
         };
 
+        if !self.seen_ids.insert(block.tool_use_id.clone()) {
+            return Err(ProviderError::Malformed(
+                "stream reuses a tool call id".into(),
+            ));
+        }
         self.phase = transition(
             &self.phase,
             StreamEvent::StartBlock {
@@ -164,19 +177,12 @@ impl<'a> StreamGate<'a> {
                 chunk: input.as_bytes().to_vec(),
             },
         )?;
-        active.input_json.push_str(input);
+        chio_provider_adapter_core::input::append_arguments(&mut active.input_json, input)?;
         active.push_frame(event.raw)?;
         Ok(())
     }
 
-    fn stop_content_block<F>(
-        &mut self,
-        event: ConverseStreamEvent,
-        evaluate: &mut F,
-    ) -> Result<(), ProviderError>
-    where
-        F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
-    {
+    fn stop_content_block(&mut self, event: ConverseStreamEvent) -> Result<(), ProviderError> {
         let index = content_block_index(&event.payload, "contentBlockStop")?;
         let Some(active) = self.active.take() else {
             self.forward(event);
@@ -196,11 +202,12 @@ impl<'a> StreamGate<'a> {
                     .to_string(),
             ));
         }
-        let verdict = evaluate(&invocation)?;
-        ensure_streaming_allow(&block, &verdict)?;
         self.phase = transition(&self.phase, StreamEvent::FinishBlock)?;
+        if self.invocations.len() >= chio_provider_adapter_core::input::MAX_TOOL_CALLS {
+            return Err(ProviderError::StreamCapacityExceeded);
+        }
         self.invocations.push(invocation);
-        self.verdicts.push(verdict);
+        self.blocks.push(block);
         self.output.extend(active.frames);
         self.output.push(event.raw);
         Ok(())
@@ -222,7 +229,10 @@ impl<'a> StreamGate<'a> {
         self.output.push(event.raw);
     }
 
-    fn finish(self) -> Result<GatedConverseStream, ProviderError> {
+    fn finish(
+        mut self,
+        evaluate: &mut impl FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
+    ) -> Result<GatedConverseStream, ProviderError> {
         if let Some(active) = self.active {
             return Err(ProviderError::Malformed(format!(
                 "Bedrock ConverseStream ended before content block {} stopped",
@@ -230,6 +240,16 @@ impl<'a> StreamGate<'a> {
             )));
         }
 
+        if !self.started || !self.phase.is_closed() {
+            return Err(ProviderError::Malformed(
+                "stream ended without a complete message".into(),
+            ));
+        }
+        for (block, invocation) in self.blocks.iter().zip(&self.invocations) {
+            let verdict = evaluate(invocation)?;
+            ensure_streaming_allow(block, &verdict)?;
+            self.verdicts.push(verdict);
+        }
         let bytes = serde_json::to_vec(&self.output).map_err(|error| {
             ProviderError::Malformed(format!(
                 "Bedrock ConverseStream forwarded events failed JSON encoding: {error}"
@@ -328,12 +348,7 @@ impl ActiveToolBlock {
             )));
         }
 
-        let input: Value = serde_json::from_str(&self.input_json).map_err(|error| {
-            ProviderError::BadToolArgs(format!(
-                "Bedrock toolUse `{}` completed delta.toolUse.input was not valid JSON: {error}",
-                block.tool_use_id
-            ))
-        })?;
+        let input: Value = chio_provider_adapter_core::input::arguments(&self.input_json)?;
         if !input.is_object() {
             return Err(ProviderError::BadToolArgs(format!(
                 "Bedrock toolUse `{}` completed delta.toolUse.input was not a JSON object",
@@ -366,19 +381,25 @@ enum EventKind {
 }
 
 fn parse_event_messages(raw: &[u8]) -> Result<Vec<ConverseStreamEvent>, ProviderError> {
-    let value: Value = serde_json::from_slice(raw).map_err(|error| {
-        ProviderError::Malformed(format!(
-            "Bedrock ConverseStream event payload was not JSON: {error}"
-        ))
-    })?;
+    let value: Value = chio_provider_adapter_core::input::json(raw).map_err(ProviderError::from)?;
 
     let values = match value {
         Value::Array(values) => values,
         Value::Object(mut map) => {
-            if let Some(Value::Array(values)) = map.remove("events") {
-                values
-            } else if let Some(Value::Array(values)) = map.remove("eventStream") {
-                values
+            if map.contains_key("events") && map.contains_key("eventStream") {
+                return Err(ProviderError::Malformed(
+                    "ambiguous Bedrock event envelope".into(),
+                ));
+            }
+            if let Some(value) = map.remove("events").or_else(|| map.remove("eventStream")) {
+                match value {
+                    Value::Array(values) => values,
+                    _ => {
+                        return Err(ProviderError::Malformed(
+                            "Bedrock events must be an array".into(),
+                        ))
+                    }
+                }
             } else {
                 vec![Value::Object(map)]
             }
@@ -390,6 +411,9 @@ fn parse_event_messages(raw: &[u8]) -> Result<Vec<ConverseStreamEvent>, Provider
         }
     };
 
+    if values.len() > chio_provider_adapter_core::input::MAX_RECORDS {
+        return Err(ProviderError::StreamCapacityExceeded);
+    }
     values.into_iter().map(parse_event_message).collect()
 }
 

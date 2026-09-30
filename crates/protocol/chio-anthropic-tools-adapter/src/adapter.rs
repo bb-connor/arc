@@ -83,7 +83,7 @@ impl AnthropicAdapter {
             ))
         })?;
 
-        Ok(ToolInvocation {
+        chio_provider_adapter_core::input::invocation(ToolInvocation {
             provider: ProviderId::Anthropic,
             tool_name: block.name.clone(),
             arguments,
@@ -183,33 +183,25 @@ impl ProviderAdapter for AnthropicAdapter {
 }
 
 fn tool_use_blocks(raw: ProviderRequest) -> Result<Vec<ToolUseBlock>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!("messages.create payload was not JSON: {error}"))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&raw.0).map_err(ProviderError::from)?;
     let body = message_body(value)?;
     extract_tool_use_blocks(&body)
 }
 
 fn message_body(value: Value) -> Result<Value, ProviderError> {
-    for field in ["body", "response", "payload", "message"] {
-        if let Some(nested) = value.get(field) {
-            return nested_message_body(nested).ok_or_else(|| {
-                ProviderError::Malformed(format!(
-                    "messages.create envelope field `{field}` was not a JSON object or string body"
-                ))
-            });
+    if let Some(message) = value.get("message") {
+        if ["body", "response", "payload"]
+            .iter()
+            .any(|key| value.get(key).is_some())
+        {
+            return Err(ProviderError::Malformed(
+                "Anthropic response has multiple envelopes".into(),
+            ));
         }
+        return chio_provider_adapter_core::nested_response_body(message);
     }
-
-    Ok(value)
-}
-
-fn nested_message_body(value: &Value) -> Option<Value> {
-    match value {
-        Value::Object(_) => Some(value.clone()),
-        Value::String(body) => serde_json::from_str(body).ok(),
-        _ => None,
-    }
+    chio_provider_adapter_core::response_body(value, "Anthropic")
 }
 
 fn extract_tool_use_blocks(body: &Value) -> Result<Vec<ToolUseBlock>, ProviderError> {
@@ -241,9 +233,7 @@ fn is_tool_use_block(value: &Value) -> bool {
 }
 
 fn parse_tool_use_block(value: &Value) -> Result<ToolUseBlock, ProviderError> {
-    serde_json::from_value(value.clone()).map_err(|error| {
-        ProviderError::Malformed(format!("Anthropic tool_use block was malformed: {error}"))
-    })
+    chio_provider_adapter_core::input::typed(value.clone()).map_err(ProviderError::from)
 }
 
 fn validate_tool_use_block(block: &ToolUseBlock) -> Result<(), ProviderError> {
@@ -294,9 +284,8 @@ struct PendingToolResult {
 }
 
 fn parse_tool_result_envelope(result: ToolResult) -> Result<PendingToolResult, ProviderError> {
-    let value: Value = serde_json::from_slice(&result.0).map_err(|error| {
-        ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
-    })?;
+    let value: Value =
+        chio_provider_adapter_core::input::json(&result.0).map_err(ProviderError::from)?;
     let object = value.as_object().ok_or_else(|| {
         ProviderError::Malformed(
             "Anthropic ProviderAdapter::lower requires ToolResult JSON with tool_use_id"
@@ -323,9 +312,7 @@ fn parse_tool_result_envelope(result: ToolResult) -> Result<PendingToolResult, P
 }
 
 fn parse_tool_result_content(result: ToolResult) -> Result<Value, ProviderError> {
-    serde_json::from_slice(&result.0).map_err(|error| {
-        ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
-    })
+    chio_provider_adapter_core::input::json(&result.0).map_err(ProviderError::from)
 }
 
 fn apply_redactions(

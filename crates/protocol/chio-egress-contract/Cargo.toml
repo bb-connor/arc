@@ -13,6 +13,7 @@ publish = false
 name = "chio_egress_contract"
 
 [dependencies]
+chio-core = { package = "chio-core-types", path = "../../core/chio-core-types", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
@@ -25,7 +26,7 @@ default = []
 # Opt-in helper that wraps a `reqwest` dispatch with `HttpEgressContract`
 # enforcement on the initial URL, on every redirect, and on observed response
 # size. Callers that depend on this feature get `send_with_contract`.
-reqwest-egress = ["dep:reqwest", "dep:serde_json", "dep:tokio"]
+reqwest-egress = ["dep:reqwest", "dep:serde_json", "dep:tokio", "dep:chio-core"]
 
 [dev-dependencies]
 reqwest = { workspace = true, default-features = false, features = ["rustls"] }

@@ -254,7 +254,7 @@ impl GeminiAdapter {
             ))
         })?;
 
-        Ok(ToolInvocation {
+        chio_provider_adapter_core::input::invocation(ToolInvocation {
             provider: ProviderId::Gemini,
             tool_name: call.name.clone(),
             arguments,
@@ -339,9 +339,7 @@ fn validate_function_call(call: &FunctionCallPart) -> Result<(), ProviderError> 
 }
 
 fn parse_value(bytes: &[u8]) -> Result<Value, ProviderError> {
-    serde_json::from_slice(bytes).map_err(|error| {
-        ProviderError::Malformed(format!("tool result was not JSON bytes: {error}"))
-    })
+    chio_provider_adapter_core::input::json(bytes).map_err(ProviderError::from)
 }
 
 fn apply_redactions(
@@ -990,12 +988,7 @@ mod tests {
     async fn generate_content_propagates_upstream_status_error() {
         let cfg = config();
         let mock = transport::MockTransport::new();
-        mock.push_error(
-            chio_provider_adapter_core::http::HttpTransportError::Status {
-                code: 503,
-                body: "service unavailable".to_string(),
-            },
-        );
+        mock.push_error(chio_provider_adapter_core::http::HttpTransportError::Status { code: 503 });
         let adapter = GeminiAdapter::new(cfg, Arc::new(mock));
         let err = adapter
             .generate_content("gemini-1.5-pro", b"{}")

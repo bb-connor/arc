@@ -80,6 +80,7 @@ fn allow_verdict() -> VerdictResult {
 
 fn tool_use_stream() -> Result<Vec<u8>, String> {
     serde_json::to_vec(&json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockStart": {
                 "contentBlockIndex": 0,
@@ -106,6 +107,7 @@ fn tool_use_stream() -> Result<Vec<u8>, String> {
 
 fn malformed_delta_stream() -> Result<Vec<u8>, String> {
     serde_json::to_vec(&json!([
+        {"messageStart":{"role":"assistant"}},
         {
             "contentBlockDelta": {
                 "contentBlockIndex": 0,
@@ -415,6 +417,8 @@ fn require_provider_error<T>(
         ProviderError::Clock(_) => "Clock",
         ProviderError::StreamCapacityExceeded => "StreamCapacityExceeded",
         ProviderError::UntrustedInput(_) => "UntrustedInput",
+        ProviderError::Invocation(_) => "Invocation",
+        ProviderError::Transport { .. } => "Transport",
     };
 
     if actual != expected {

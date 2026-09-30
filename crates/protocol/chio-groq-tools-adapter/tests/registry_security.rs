@@ -94,7 +94,7 @@ fn stream_payload(tool_name: &str) -> Vec<u8> {
     });
     let mut stream = b"data: ".to_vec();
     stream.extend_from_slice(&serde_json::to_vec(&chunk).test_unwrap());
-    stream.extend_from_slice(b"\n\ndata: [DONE]\n\n");
+    stream.extend_from_slice(b"\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n");
     stream
 }
 

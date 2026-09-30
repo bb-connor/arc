@@ -47,50 +47,27 @@ pub(crate) fn sse_records(
 }
 
 fn parse_sse_payloads(text: &str) -> Result<Vec<Value>, RecordError> {
-    let mut payloads = Vec::new();
-    let mut event: Option<String> = None;
-    let mut data_lines: Vec<String> = Vec::new();
-
-    for line in text.lines() {
-        let line = line.trim_end_matches('\r');
-        if line.is_empty() {
-            push_sse_payload(&mut payloads, &mut event, &mut data_lines)?;
-            continue;
-        }
-        if let Some(rest) = line.strip_prefix("event:") {
-            event = Some(rest.trim().to_string());
-        } else if let Some(rest) = line.strip_prefix("data:") {
-            data_lines.push(rest.trim_start().to_string());
-        }
-    }
-    push_sse_payload(&mut payloads, &mut event, &mut data_lines)?;
-    Ok(payloads)
-}
-
-fn push_sse_payload(
-    payloads: &mut Vec<Value>,
-    event: &mut Option<String>,
-    data_lines: &mut Vec<String>,
-) -> Result<(), RecordError> {
-    if data_lines.is_empty() {
-        *event = None;
-        return Ok(());
-    }
-    let data_text = data_lines.join("\n");
-    data_lines.clear();
-    if data_text.trim() == "[DONE]" {
-        *event = None;
-        return Ok(());
-    }
-    let data = serde_json::from_str::<Value>(&data_text)?;
-    let event_name = event.take().unwrap_or_else(|| {
-        data.get("type")
-            .and_then(Value::as_str)
-            .unwrap_or("message")
-            .to_string()
-    });
-    payloads.push(json!({ "event": event_name, "data": data }));
-    Ok(())
+    use chio_provider_adapter_core::{parse_sse_frames, SseParseOptions};
+    let frames = parse_sse_frames(
+        text.as_bytes(),
+        SseParseOptions::ignoring_unknown("recorder")
+            .with_done_sentinel("[DONE]")
+            .with_event_type_cross_check(),
+    )?;
+    Ok(frames
+        .into_iter()
+        .filter_map(|frame| {
+            frame.data.map(|data| {
+                let event = frame.event.unwrap_or_else(|| {
+                    data.get("type")
+                        .and_then(Value::as_str)
+                        .unwrap_or("message")
+                        .into()
+                });
+                json!({ "event": event, "data": data })
+            })
+        })
+        .collect())
 }
 
 pub(crate) fn now_ts() -> String {

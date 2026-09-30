@@ -58,6 +58,9 @@ pub struct PreparedHttpEgressContract {
 /// Fail-closed reasons returned by HTTP egress contract enforcement.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum HttpEgressError {
+    #[cfg(feature = "reqwest-egress")]
+    #[error("urn:chio:error:transport:http-failed")]
+    Transport(#[from] reqwest_helper::RequestFailure),
     #[error("outbound HTTP egress requires a declared HttpEgressContract")]
     MissingContract,
     #[error("invalid HttpEgressContract: {0}")]

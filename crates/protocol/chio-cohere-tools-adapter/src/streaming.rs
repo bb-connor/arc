@@ -46,19 +46,25 @@ impl CohereAdapter {
                                 .to_string(),
                         ));
                     }
-                    let verdict = evaluate(&invocation)?;
-                    ensure_streaming_allow_no_redactions(
-                        "Cohere",
-                        "tool_call",
-                        &block.function.name,
-                        None,
-                        &verdict,
-                    )?;
+                    if invocations.len() >= chio_provider_adapter_core::input::MAX_TOOL_CALLS {
+                        return Err(ProviderError::StreamCapacityExceeded);
+                    }
                     invocations.push(invocation);
-                    verdicts.push(verdict);
                 }
             }
             output.extend_from_slice(&frame.raw);
+        }
+
+        for invocation in &invocations {
+            let verdict = evaluate(invocation)?;
+            ensure_streaming_allow_no_redactions(
+                "Cohere",
+                "tool_call",
+                &invocation.tool_name,
+                None,
+                &verdict,
+            )?;
+            verdicts.push(verdict);
         }
 
         Ok(GatedSseStream {
@@ -78,9 +84,8 @@ fn tool_call_from_data(data: &Value) -> Result<ToolCallBlock, ProviderError> {
             "Cohere tool-call-end frame was missing tool_call".to_string(),
         ));
     };
-    let parsed: ToolCallBlock = serde_json::from_value(block.clone()).map_err(|error| {
-        ProviderError::Malformed(format!("Cohere tool_call block was malformed: {error}"))
-    })?;
+    let parsed: ToolCallBlock =
+        chio_provider_adapter_core::input::typed(block.clone()).map_err(ProviderError::from)?;
     Ok(parsed)
 }
 
