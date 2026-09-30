@@ -80,6 +80,7 @@ pub enum Syscall {
     Statx,
     Tgkill,
     Tkill,
+    Uname,
     Write,
     Writev,
 }
@@ -159,6 +160,7 @@ impl Syscall {
             Self::Statx => "statx",
             Self::Tgkill => "tgkill",
             Self::Tkill => "tkill",
+            Self::Uname => "uname",
             Self::Write => "write",
             Self::Writev => "writev",
         }

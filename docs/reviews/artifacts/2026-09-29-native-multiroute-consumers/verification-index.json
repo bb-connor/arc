@@ -1,0 +1,130 @@
+{
+  "schema": "chio.native-multiroute-verification.v1",
+  "m5_acceptance_complete": false,
+  "checks": [
+    {
+      "name": "broker unit",
+      "result": "passed",
+      "passed": 183,
+      "evidence": "local/broker-unit-final.jsonl.gz"
+    },
+    {
+      "name": "privileged native broker",
+      "result": "passed",
+      "passed": 6,
+      "mode": "serial",
+      "evidence": "local/native-serial.log.gz"
+    },
+    {
+      "name": "native capture routes",
+      "result": "passed",
+      "passed": 5,
+      "evidence": "local/capture-routes-tests.jsonl.gz"
+    },
+    {
+      "name": "strengthened capture substitutions",
+      "result": "passed",
+      "passed": 1,
+      "evidence": "local/capture-specific-rejections-2.log.gz"
+    },
+    {
+      "name": "retained native history",
+      "result": "passed after targeted disk-failure retries",
+      "distinct_passed": 95,
+      "evidence": [
+        "local/native-history-final.log.gz",
+        "local/native-history-space-retry.log.gz"
+      ]
+    },
+    {
+      "name": "process state readers",
+      "result": "passed",
+      "passed": 6,
+      "evidence": "local/process-state-reader-final.log.gz"
+    },
+    {
+      "name": "Python process SDK",
+      "result": "passed",
+      "passed": 44,
+      "evidence": "local/python-process-profile.log.gz"
+    },
+    {
+      "name": "mini-SWE operator/provider",
+      "result": "passed",
+      "passed": 25,
+      "evidence": "local/python-operator-routes.log.gz"
+    },
+    {
+      "name": "conformance launch configuration",
+      "result": "passed",
+      "passed": 5,
+      "evidence": "local/conformance-profile-retry.log.gz"
+    },
+    {
+      "name": "current signed outcome and ELF loader",
+      "result": "passed",
+      "passed": 3,
+      "evidence": "local/cli-current-outcomes-exact.log.gz"
+    },
+    {
+      "name": "native read closure compiler",
+      "result": "passed after fixture repair",
+      "distinct_passed": 16,
+      "evidence": [
+        "native/cage-overlap-native-2.log.gz",
+        "native/cage-overlap-native-3.log.gz"
+      ]
+    },
+    {
+      "name": "Docker adapter physical effects",
+      "result": "passed",
+      "evidence": "docker-native.json"
+    },
+    {
+      "name": "native budget host death and recovery",
+      "result": "passed",
+      "physical_effects": 2,
+      "additional_effects_on_recovery": 0,
+      "evidence": "native/budget-native-5.log.gz"
+    },
+    {
+      "name": "signed native budget export verification",
+      "result": "passed",
+      "evidence": "native/current-native-budget-verify.log.gz"
+    },
+    {
+      "name": "standard profile bounded uname",
+      "result": "passed",
+      "passed": 1,
+      "evidence": "local/cage-standard-profile.log.gz"
+    },
+    {
+      "name": "owning CLI, broker, cage Clippy",
+      "result": "passed",
+      "evidence": [
+        "local/cli-clippy-complete.log.gz",
+        "local/broker-clippy-final.stderr.gz",
+        "local/cage-profile-clippy.log.gz"
+      ]
+    },
+    {
+      "name": "native mini-SWE baseline",
+      "result": "failed",
+      "latest_run": 12,
+      "completed_calls": 4,
+      "failure": "fifth lifecycle handoff; original dispatch custody retained",
+      "evidence": "native/mini-native-12.log.gz"
+    },
+    {
+      "name": "native Python closure",
+      "result": "passed",
+      "evidence": "python-native-8.json",
+      "scope": "enforced startup and MCP discovery with the selected stdlib/native imports"
+    },
+    {
+      "name": "session/public repository/packaged consumers/CI",
+      "result": "incomplete",
+      "note": "requires native baseline and complete consumer migration"
+    }
+  ]
+}

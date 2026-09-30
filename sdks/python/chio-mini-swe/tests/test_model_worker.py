@@ -325,7 +325,7 @@ def test_native_worker_keeps_full_result_in_checkpoint_and_emits_a_bounded_locat
         assert timeout > 60
         return client
 
-    monkeypatch.setattr("chio_mini_swe.worker.ProcessClient", connect)
+    monkeypatch.setattr("chio_mini_swe.worker.BrokerProcessClient", connect)
     result = run_bootstrap(data)
     assert result["submission_truncated"]
     assert len(result["submission_preview"]) == 1024

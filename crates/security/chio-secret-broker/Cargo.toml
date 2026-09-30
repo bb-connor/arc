@@ -19,6 +19,10 @@ path = "src/bin/chio-secret-brokerd.rs"
 name = "chio-broker-mcp"
 path = "src/bin/chio-broker-mcp.rs"
 
+[[bin]]
+name = "chio-docker-adapter"
+path = "src/bin/chio-docker-adapter.rs"
+
 [features]
 # Compatibility selection for the production durable authority exercised by
 # the broker boundary gate. Conformance does not expose a second coordinator.

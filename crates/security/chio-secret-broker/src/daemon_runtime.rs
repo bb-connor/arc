@@ -59,7 +59,7 @@ use crate::{
     SealedSigningKeyFd,
 };
 
-pub const BROKER_DAEMON_CONFIG_SCHEMA: &str = "chio.secret-brokerd.runtime-config.v5";
+pub const BROKER_DAEMON_CONFIG_SCHEMA: &str = "chio.secret-brokerd.runtime-config.v6";
 const MAX_CONFIG_BYTES: u64 = 65_536;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -210,6 +210,7 @@ pub struct BrokerDaemonConfig {
     pub provider_adapter_id: String,
     pub provider_adapter_version: u32,
     pub provider_placement: ProviderPlacementConfig,
+    pub local_adapter: Option<crate::generic_https::LocalHttpsAdapterConfig>,
     pub trusted_service_uid: u32,
     pub authorized_client_uid: u32,
     pub ipc_read_timeout_ms: u64,
@@ -268,6 +269,9 @@ impl BrokerDaemonConfig {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if let Some(adapter) = &self.local_adapter {
+            adapter.validate()?;
+        }
         if self.schema != BROKER_DAEMON_CONFIG_SCHEMA {
             return Err(BrokerError::InvalidRequest(
                 "daemon config schema is invalid".to_string(),
@@ -648,7 +652,10 @@ impl BrokerDaemonRuntime {
         )?);
         let https = match https_override {
             Some(https) => https,
-            None => Arc::new(GenericHttpsExecutor::production()?),
+            None => Arc::new(match &config.local_adapter {
+                Some(adapter) => GenericHttpsExecutor::for_local_adapter(adapter)?,
+                None => GenericHttpsExecutor::production()?,
+            }),
         };
         let budget: Arc<dyn BrokerExecutionBudget> = authority.clone();
         let liveness: Arc<dyn CapabilityLiveness> = authority.clone();

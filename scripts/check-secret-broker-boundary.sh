@@ -221,7 +221,7 @@ service::ipc::prepared::tests::prepared_connection_lifetime_respects_capability_
 service::ipc::prepared::tests::prepared_connection_rejects_unauthorized_capacity_and_substituted_frames
 service::ipc::prepared::tests::prepared_connection_waits_without_blocking_control_and_executes_once
 EOF
-)" cargo test --locked -p chio-secret-broker --lib prepared_connection_tests::
+)" cargo test --locked -p chio-secret-broker --lib service::ipc::prepared::tests::
 
   run_tests "native kernel broker daemon, MCP and TLS provider" yes "$(cat <<'EOF'
 process_boundary_tests::native::cutpoints::native_broker_death_after_capture_retains_all_quotas_without_effect
@@ -232,8 +232,14 @@ process_boundary_tests::native::native_kernel_broker_mcp_tool_keeps_capture_on_l
 process_boundary_tests::native::native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion
 EOF
 )" \
-    cargo test --locked -p chio-secret-broker --features native-mcp --lib \
+    env RUST_TEST_THREADS=1 cargo test --locked -p chio-secret-broker --features native-mcp --lib \
     process_boundary_tests::native::
+
+  run_tests "host Docker resource lifetime and bounded stream" yes "$(cat <<'EOF'
+docker_adapter::tests::restart_during_exec_creation_or_completion_never_certifies_success
+docker_adapter::wire::tests::complete_frames_keep_both_streams_and_incomplete_output_never_completes
+EOF
+)" cargo test --locked -p chio-secret-broker --lib docker_adapter::
 fi
 
 run_tests "kernel broker capability and composite quota admission" yes "$(cat <<'EOF'
@@ -242,11 +248,15 @@ kernel_admission::tests::broker_admission_rejects_substitution_even_when_kernel_
 kernel_admission::tests::broker_admission_requires_bounded_exact_typed_canonical_json
 kernel_admission::tests::broker_admission_uses_installed_trust_and_live_clock
 kernel_admission::tests::broker_quota_identity_stays_constant_across_separate_invocations
+kernel_admission::tests::daemon_response_ceiling_is_checked_before_admission_custody
 kernel_admission::tests::kernel::issued_nonce_cannot_adopt_a_changed_or_removed_broker_participant
 kernel_admission::tests::kernel::kernel_captures_parent_family_and_broker_once_and_denies_exhaustion
 kernel_admission::tests::kernel::strict_nonce_registers_original_broker_attempt_before_both_holds
 kernel_admission::tests::registration::registration_generation_binds_transport_tenant_signers_domain_and_verifier
 kernel_admission::tests::registration::registration_quota_aliases_preserve_all_owners_and_reject_collisions
+kernel_admission::tests::routes::route_set_binds_all_members_without_order_dependence
+kernel_admission::tests::routes::route_set_rejects_ambiguous_and_unbounded_composition
+kernel_admission::tests::routes::route_set_verifies_each_audience_and_rejects_cross_route_authority
 kernel_admission::tests::signed_broker_request_cannot_move_between_kernel_requests
 kernel_admission::tests::signed_broker_request_produces_original_operation_bound_quota
 EOF

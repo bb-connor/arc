@@ -21,8 +21,8 @@ pub(super) fn start(
         ));
     }
     use chio_manifest::{
-        NativeSyscallProfile, RequiredPermissions, RuntimeToolTopology, ToolAnnotations,
-        ToolDefinition, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+        RequiredPermissions, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest,
+        VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
     };
 
     // This ephemeral authority admits only a metadata-discovery process. No
@@ -55,7 +55,7 @@ pub(super) fn start(
             write_paths: super::super::declared_grants(&inputs.profile.ceilings.write_paths),
             network_destinations: None,
             environment_variables: None,
-            native_syscall_profile: NativeSyscallProfile::NativeMinimalV1,
+            native_syscall_profile: inputs.profile.syscall_profile,
         }),
         public_key: signer.public_key().to_hex(),
     };
@@ -69,9 +69,7 @@ pub(super) fn start(
         inputs.profile.ceilings.write_paths.clone(),
         BTreeSet::new(),
         BTreeSet::new(),
-        [NativeSyscallProfile::NativeMinimalV1]
-            .into_iter()
-            .collect(),
+        [inputs.profile.syscall_profile].into_iter().collect(),
     )
     .with_forbidden_paths(super::super::authority_paths::existing(&inputs.profile)?);
     let admitted = chio_cage::admit(

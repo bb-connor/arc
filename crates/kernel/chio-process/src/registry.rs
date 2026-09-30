@@ -96,6 +96,20 @@ impl ProcessRegistry {
         self.with_store(|store| store.with_process_signer(process, sign))
     }
 
+    /// Retain a trusted host's preparation under the caller's original logical
+    /// key and configuration/input binding. The callback may sign an artifact,
+    /// but must perform no external effect. Recovery returns the original bytes
+    /// without invoking it again. Storage counts against the process tree quota.
+    pub fn prepare_invocation(
+        &self,
+        process: &str,
+        operation_key: &str,
+        binding: &str,
+        prepare: impl FnOnce(&CapabilityToken, &Keypair) -> Result<Value, ProcessError>,
+    ) -> Result<Value, ProcessError> {
+        self.with_store(|store| store.prepare_invocation(process, operation_key, binding, prepare))
+    }
+
     /// Resolve an admitted call to exactly one live persisted process.
     pub fn caller(&self, context: &ToolInvocationContext) -> Result<ProcessSnapshot, ProcessError> {
         self.with_store(|store| store.caller(context))

@@ -44,14 +44,28 @@ impl BrokerNativeCaptureReader {
         Ok(Some((registration, original.execute)))
     }
 
+    pub(super) fn validate_original_route(
+        &self,
+        participant: &BrokerAdmissionParticipant,
+        original: &OriginalBrokerRequest,
+    ) -> Result<()> {
+        let route = original.retained.request_for_revalidation();
+        if participant.binding() != &self.participant
+            || route.server_id != participant.server_id
+            || route.tool_name != participant.tool_name
+            || original.execute.capability.body.audience != participant.audience
+        {
+            return Err(rejected());
+        }
+        Ok(())
+    }
+
     pub(super) fn registration_for_original(
         &self,
         participant: &BrokerAdmissionParticipant,
         original: &OriginalBrokerRequest,
     ) -> Result<Option<AttemptRegistration>> {
-        if participant.binding() != &self.participant {
-            return Err(rejected());
-        }
+        self.validate_original_route(participant, original)?;
         let Some(custody) = &original.custody else {
             return Ok(None);
         };

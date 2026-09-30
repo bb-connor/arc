@@ -13,6 +13,9 @@ mod children;
 #[cfg(feature = "worker-server")]
 mod credentials;
 mod nonces;
+mod prepared;
+
+pub(crate) const JOURNAL_VERSION: u32 = 2;
 
 pub(crate) struct Store {
     connection: Connection,
@@ -29,29 +32,16 @@ impl Store {
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute_batch(include_str!("store.sql"))?;
-        // Journals created before dispatch attempts were recorded gain the column;
-        // their existing operations keep attempt one and its request identity.
-        let has_attempts = tx
-            .prepare("PRAGMA table_info(process_calls)")?
-            .query_map([], |row| row.get::<_, String>(1))?
-            .collect::<Result<Vec<_>, _>>()?
-            .iter()
-            .any(|column| column == "attempts");
-        if !has_attempts {
-            tx.execute_batch(
-                "ALTER TABLE process_calls ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1 CHECK (attempts >= 1)",
-            )?;
-        }
         tx.execute(
             "INSERT OR IGNORE INTO process_runtime(singleton, version, namespace, authority, kernel_key)
-             VALUES (1, 1, ?1, ?2, ?3)",
-            params![uuid::Uuid::new_v4().to_string(), authority, kernel_key],
+             VALUES (1, ?1, ?2, ?3, ?4)",
+            params![JOURNAL_VERSION, uuid::Uuid::new_v4().to_string(), authority, kernel_key],
         )?;
         let (version, namespace, stored_authority, stored_key): (u32, String, String, String) = tx.query_row(
             "SELECT version, namespace, authority, kernel_key FROM process_runtime WHERE singleton = 1",
             [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )?;
-        if version != 1 || stored_authority != authority || stored_key != kernel_key {
+        if version != JOURNAL_VERSION || stored_authority != authority || stored_key != kernel_key {
             return Err(ProcessError::Configuration(
                 "process journal belongs to a different durable authority, kernel key or version",
             ));
@@ -170,7 +160,7 @@ impl Store {
     }
 
     /// The dispatch attempt recorded for a logical operation. Operations that
-    /// have not been admitted, and every operation of an older journal, are at one.
+    /// have not been admitted are at one.
     pub fn call_attempt(&self, id: &str, key: &str) -> Result<u32, ProcessError> {
         Ok(self
             .connection

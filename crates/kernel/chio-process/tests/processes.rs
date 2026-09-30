@@ -87,7 +87,10 @@ fn host_retains_process_signer_and_selects_exact_supplemental_route() -> Result 
     let calls = Arc::new(AtomicUsize::new(0));
     let kernel = kernel(directory.path(), server(&calls))?;
     let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel.clone())?
-        .with_supplemental_authorization_route("tools".into(), "append".into())?;
+        .with_supplemental_authorization_routes([
+            ("tools".into(), "append".into()),
+            ("model".into(), "infer".into()),
+        ])?;
     let capability = root(&runtime, &kernel, 2)?;
     runtime
         .registry()
@@ -111,6 +114,23 @@ fn host_retains_process_signer_and_selects_exact_supplemental_route() -> Result 
         "{\"a\":1,\"b\":2}"
     );
     assert!(runtime
+        .tool_request("root", "second-route", "model", "infer", original.clone())?
+        .supplemental_authorization
+        .is_some());
+    assert!(runtime
+        .tool_request("root", "cross-route", "model", "append", original.clone())?
+        .supplemental_authorization
+        .is_none());
+    assert!(matches!(
+        runtime.clone().with_supplemental_authorization_routes([
+            ("tools".into(), "append".into()),
+            ("tools".into(), "read".into())
+        ]),
+        Err(ProcessError::Invalid(
+            "supplemental routes are duplicated or oversized"
+        ))
+    ));
+    assert!(runtime
         .tool_request("root", "ordinary", "tools", "read", original)?
         .supplemental_authorization
         .is_none());
@@ -118,6 +138,89 @@ fn host_retains_process_signer_and_selects_exact_supplemental_route() -> Result 
         .registry()
         .with_process_signer("other", |_, _| ())
         .is_err());
+    Ok(())
+}
+
+#[test]
+fn incompatible_journal_versions_cannot_gain_preparation_authority() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(directory.path(), server(&calls))?;
+    let path = directory.path().join("process.db");
+    drop(ProcessRuntime::open(&path, kernel.clone())?);
+    let database = rusqlite::Connection::open(&path)?;
+    assert_eq!(
+        database.query_row("SELECT version FROM process_runtime", [], |row| row
+            .get::<_, u32>(0))?,
+        2
+    );
+    database.execute("UPDATE process_runtime SET version = 1", [])?;
+    drop(database);
+    assert!(matches!(
+        ProcessRuntime::open(&path, kernel),
+        Err(ProcessError::Configuration(
+            "process journal belongs to a different durable authority, kernel key or version"
+        ))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn prepared_invocations_survive_reopen_without_reissuing_and_share_storage_limits() -> Result {
+    let directory = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(directory.path(), server(&calls))?;
+    let path = directory.path().join("process.db");
+    let runtime = ProcessRuntime::open(&path, kernel.clone())?;
+    let capability =
+        kernel.issue_capability(&parent_key().public_key(), scope(&["append", "read"]), 3600)?;
+    let mut limits = support::limits(2);
+    limits.state.max_blobs = 2;
+    runtime.create_root("root", &capability, limits)?;
+    runtime
+        .registry()
+        .provision_signers(&[("root".into(), &parent_key())])?;
+    let registry = runtime.registry();
+    let binding = "a".repeat(64);
+    let original =
+        registry.prepare_invocation("root", "prepared", &binding, |parent, signer| {
+            assert_eq!(parent.subject, signer.public_key());
+            Ok(json!({"original_nonce":"once", "expiry":123}))
+        })?;
+    let before = runtime.storage("root")?;
+    assert_eq!(before.tree_blobs, 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    drop(registry);
+    drop(runtime);
+    let reopened = ProcessRuntime::open(path, kernel)?;
+    let recovered =
+        reopened
+            .registry()
+            .prepare_invocation("root", "prepared", &binding, |_, _| {
+                Err(ProcessError::Invalid("must not reissue"))
+            })?;
+    assert_eq!(original, recovered);
+    assert_eq!(reopened.storage("root")?.tree_bytes, before.tree_bytes);
+    assert!(matches!(
+        reopened
+            .registry()
+            .prepare_invocation("root", "prepared", &"b".repeat(64), |_, _| Ok(json!({}))),
+        Err(ProcessError::Conflict)
+    ));
+    let limits = before.limits;
+    for index in 1..limits.max_blobs {
+        // Filling the existing immutable-state owner must also fence signing.
+        let bytes = format!("blob-{index}").into_bytes();
+        reopened.put_blob("root", &bytes)?;
+    }
+    assert!(matches!(
+        reopened
+            .registry()
+            .prepare_invocation("root", "second", &binding, |_, _| Ok(json!({"new":true}))),
+        Err(ProcessError::Limit("immutable process state"))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
     Ok(())
 }
 

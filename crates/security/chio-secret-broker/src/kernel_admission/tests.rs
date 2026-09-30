@@ -14,6 +14,7 @@ mod kernel;
 mod registration_peer;
 
 mod registration;
+mod routes;
 
 struct Clock(u64);
 impl chio_security_types::clock::Clock for Clock {
@@ -331,5 +332,35 @@ fn broker_quota_identity_stays_constant_across_separate_invocations() -> TestRes
     );
     assert_eq!(first.broker_capability_id, second.broker_capability_id);
     assert_ne!(first.request_binding_hash, second.request_binding_hash);
+    Ok(())
+}
+
+#[test]
+fn daemon_response_ceiling_is_checked_before_admission_custody() -> TestResult {
+    let (verifier, mut request, mut context) = fixture()?;
+    request.request.options.response_limit_bytes =
+        crate::daemon::MAX_DAEMON_COMBINED_RESPONSE_BYTES + 1;
+    request.capability.body.constraints.maximum_response_bytes =
+        request.request.options.response_limit_bytes;
+    request.capability = issue_capability(
+        request.capability.body,
+        &Ed25519Backend::new(Keypair::from_seed(&[31; 32])),
+        true,
+    )?;
+    request.proof = issue_request_proof(
+        &request.capability,
+        &request.request,
+        "oversized-response".into(),
+        100,
+        &Keypair::from_seed(&[32; 32]),
+    )?;
+    let bytes = canonical(&request)?;
+    context.arguments_hash = hex::encode(Sha256::digest(&bytes));
+    assert_eq!(
+        verifier.verify(&bytes, &context).err(),
+        Some(SupplementalQuotaVerifierError::new(
+            rejected().diagnostic_code()
+        ))
+    );
     Ok(())
 }

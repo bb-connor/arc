@@ -56,7 +56,7 @@ impl ProcessStateReader {
             [],
             |row| row.get(0),
         )?;
-        if version != 1 {
+        if version != crate::store::JOURNAL_VERSION {
             return Err(ProcessError::Configuration(
                 "unsupported process journal version",
             ));

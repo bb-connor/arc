@@ -27,6 +27,11 @@ pub(super) fn run_broker_helper() -> Result<()> {
     }
     harden_broker_process_custody()?;
     let config = BrokerDaemonConfig::load(required_environment(CONFIG_ENV))?;
+    if config.local_adapter.is_some() {
+        let master = inherited_key_file(MASTER_FD_ENV, "master key")?;
+        let signing = inherited_key_file(SIGNING_FD_ENV, "signing key")?;
+        return BrokerDaemonRuntime::build(config, master, signing)?.serve();
+    }
     let certificate = fs::read(required_environment(CERT_ENV))
         .map_err(|_| BrokerError::Storage("test root certificate read failed".to_string()))?;
     let mut roots = RootCertStore::empty();

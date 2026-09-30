@@ -36,7 +36,8 @@ pub const CAPABILITY_CONTROL_SCHEMA: &str = "chio.broker-capability-control.v1";
 pub const CAPABILITY_STATUS_SCHEMA: &str = "chio.broker-capability-status.v1";
 pub const CREDENTIAL_MUTATION_SCHEMA: &str = "chio.broker-credential-mutation.v1";
 const DAEMON_ADMIN_INTENT_DOMAIN: &[u8] = b"chio.broker-daemon-admin-intent.v1\0";
-const MAX_DAEMON_COMBINED_RESPONSE_BYTES: u64 = 16_384;
+/// Bound used by every daemon-backed route before capture.
+pub const MAX_DAEMON_COMBINED_RESPONSE_BYTES: u64 = 16_384;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 
 pub use chio_security_types::clock::{Clock, SystemClock};

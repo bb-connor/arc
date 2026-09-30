@@ -26,6 +26,8 @@ pub enum ProcessError {
     BlobCorrupt,
     #[error("process store mutex is poisoned")]
     StorePoisoned,
+    #[error("host invocation preparation failed")]
+    Preparation(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]

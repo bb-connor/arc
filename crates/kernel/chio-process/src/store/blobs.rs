@@ -62,7 +62,7 @@ impl Store {
     }
 }
 
-fn read_bytes(
+pub(super) fn read_bytes(
     connection: &Connection,
     id: &str,
     sha256: &str,
@@ -88,7 +88,7 @@ fn read_bytes(
     }
 }
 
-fn usage(
+pub(super) fn usage(
     connection: &Connection,
     process: &ProcessSnapshot,
 ) -> Result<ProcessStorage, ProcessError> {

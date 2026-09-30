@@ -24,6 +24,7 @@ const HTTP_READER_CAPACITY: usize = 8_192;
 
 pub(crate) struct RustlsPinnedHttpsTransport {
     tls_config: Arc<ClientConfig>,
+    leaf_certificate_sha256: Option<[u8; 32]>,
 }
 
 impl RustlsPinnedHttpsTransport {
@@ -41,12 +42,37 @@ impl RustlsPinnedHttpsTransport {
         config.alpn_protocols = vec![b"http/1.1".to_vec()];
         Ok(Self {
             tls_config: Arc::new(config),
+            leaf_certificate_sha256: None,
+        })
+    }
+
+    pub(super) fn for_local_adapter(certificate: &[u8]) -> Result<Self> {
+        use sha2::{Digest, Sha256};
+        let mut roots = RootCertStore::empty();
+        roots
+            .add(rustls::pki_types::CertificateDer::from(
+                certificate.to_vec(),
+            ))
+            .map_err(|_| BrokerError::InvalidRequest("invalid local adapter certificate".into()))?;
+        let mut config =
+            ClientConfig::builder_with_provider(rustls::crypto::ring::default_provider().into())
+                .with_safe_default_protocol_versions()
+                .map_err(|_| BrokerError::Invariant("TLS protocol configuration failed".into()))?
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+        config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        Ok(Self {
+            tls_config: Arc::new(config),
+            leaf_certificate_sha256: Some(Sha256::digest(certificate).into()),
         })
     }
 
     #[cfg(test)]
     pub(crate) fn with_tls_config(tls_config: Arc<ClientConfig>) -> Self {
-        Self { tls_config }
+        Self {
+            tls_config,
+            leaf_certificate_sha256: None,
+        }
     }
 }
 
@@ -96,6 +122,18 @@ impl PinnedHttpsTransport for RustlsPinnedHttpsTransport {
             return Err(BrokerError::Upstream(
                 "TLS peer verification did not complete".to_string(),
             ));
+        }
+        if let Some(expected) = self.leaf_certificate_sha256 {
+            use sha2::{Digest, Sha256};
+            let actual = connection
+                .peer_certificates()
+                .and_then(|chain| chain.first())
+                .map(|certificate| <[u8; 32]>::from(Sha256::digest(certificate.as_ref())));
+            if actual != Some(expected) {
+                return Err(BrokerError::AuthorizationDenied(
+                    "local adapter certificate changed".into(),
+                ));
+            }
         }
         let verified_tls_server_name = request.original_hostname.clone();
         let mut stream = StreamOwned::new(connection, socket);
@@ -238,10 +276,10 @@ struct ParsedHeader {
     value: Zeroizing<Vec<u8>>,
 }
 
-struct ParsedHttpResponse {
-    status: u16,
+pub(crate) struct ParsedHttpResponse {
+    pub(crate) status: u16,
     headers: Vec<HeaderField>,
-    body: Vec<u8>,
+    pub(crate) body: Vec<u8>,
     response_head_bytes: usize,
 }
 
@@ -254,7 +292,7 @@ impl Drop for ParsedHttpResponse {
     }
 }
 
-fn parse_http_response(
+pub(crate) fn parse_http_response(
     reader: &mut impl Read,
     request_method: &str,
     combined_limit: usize,

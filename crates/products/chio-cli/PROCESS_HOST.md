@@ -200,7 +200,7 @@ version checks still apply at the new location.
 ## Process ABI
 
 Every surface an application or operator depends on is covered by one
-declared compatibility contract, `chio.process.abi.v2`, exported by the
+declared compatibility contract, `chio.process.abi.v3`, exported by the
 `chio-process` crate as `PROCESS_ABI`: the process journal schema with its
 checkpoint and blob bounds, the worker protocol `chio.process.v1` with its
 bootstrap and connection descriptors, the host configuration, the run plan,
@@ -355,3 +355,38 @@ after that ceiling is exhausted.
 ```bash
 cargo test --locked -p chio-cli --test process_host
 ```
+
+
+## Native broker route preparation
+
+Interpreter targets need an explicit runtime closure. The
+[CPython packager](../../../scripts/prepare-native-python-runtime.py) emits a
+bounded stdlib archive, selected extensions, exact runtime files and read grants.
+For the Python launch helper, select its outputs with `CHIO_DEMO_PYTHON`,
+`CHIO_CAGE_READ_PATHS_FILE`, `CHIO_CAGE_RUNTIME_FILES_FILE` and
+`CHIO_CAGE_SYSCALL_PROFILE=native-standard-v1`. Application imports and mutable
+data still require their own exact resources. Packaging the interpreter alone
+does not qualify an application's filesystem behavior or recovery campaign.
+
+The native host configuration installs `native_broker.routes`, a bounded list of
+1 to 16 exact server/tool routes. Each route pins its issuer, broker audience,
+provider adapter, receipt signer, authenticated process peer and authority socket.
+Duplicate servers, audiences and socket identities are rejected. The entire set
+belongs to one retained authority generation. Reordering routes preserves broker
+verification identity; changing any member invalidates old admission authority.
+
+A route can install an explicit host-owned `preparation` policy. The authenticated
+worker `prepare_invocation` operation accepts an operation key, original server,
+tool and application arguments. It cannot select keys, credentials, destinations,
+provider options or retries. The host signs a one-use, body-bound request under
+that route, capped by the live parent expiry, and commits the exact envelope in
+the process journal before returning it. Repeating the same preparation returns
+the original bytes. Changed arguments or host configuration conflict; expired
+requests are never renewed during recovery. Preparation charges immutable storage
+and the per-process preparation count. It performs no provider action.
+
+Python workers use `chio_process.broker.BrokerProcessClient` to prepare, then
+invoke the original envelope. Receipts and completion evidence retain their
+original broker identities. `decode_broker_output` is an application decoder,
+not a receipt verifier. ABI v3 and process journal version 2 are required; old
+journals and ABI records are refused without migration fallback.

@@ -28,5 +28,19 @@
     "private_keys_exported": false,
     "retrospective_observation": false,
     "m5_acceptance_complete": false
+  },
+  "current-native-budget": {
+    "local_source_base": "95f04d5d74",
+    "runtime_checkout_base": "cacaf69fc9d4b709ebe30fd9c549fc0eeffc12f9",
+    "source_state": "uncommitted native multi-route consumer changes; binary identity retained, not exact-commit qualification",
+    "runtime_binary_sha256": "de2773e21ce312e08a809b856b38ad7bb02fedd546698de0b837313c811e4bc1",
+    "runtime_id": "428c8b57-51e6-45f8-9f86-f97b0ce92f70",
+    "source_directory": "/tmp/chio-native-budget-0v0o_e9s/campaign",
+    "evidence_directory": "/home/ubuntu/native-multiroute-evidence-20260929",
+    "campaign": "budget-native-5",
+    "sha256": "a7226862742a02e1c0a1715199edd6f295be0a59aa6fec9373ce12ff45e2bf1b",
+    "private_keys_exported": false,
+    "retrospective_observation": true,
+    "m5_acceptance_complete": false
   }
 }

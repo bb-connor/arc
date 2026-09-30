@@ -66,3 +66,11 @@ CREATE TABLE IF NOT EXISTS process_state_blobs (
     data BLOB NOT NULL CHECK (typeof(data) = 'blob' AND length(data) <= 1048576),
     PRIMARY KEY (process_id, sha256)
 );
+CREATE TABLE IF NOT EXISTS process_prepared_invocations (
+    process_id TEXT NOT NULL,
+    operation_key TEXT NOT NULL,
+    binding TEXT NOT NULL CHECK (length(binding) = 64),
+    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    PRIMARY KEY (process_id, operation_key),
+    FOREIGN KEY (process_id, sha256) REFERENCES process_state_blobs(process_id, sha256)
+);

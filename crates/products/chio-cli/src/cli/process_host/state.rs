@@ -662,17 +662,17 @@ impl Host {
                 .map_err(error)?
                 .with_launch_receipts(launch_receipts)
                 .map_err(error)?;
-        let runtime = match &record.config.native_broker {
-            Some(config) => runtime
-                .with_security_profile(config.security.clone())
-                .map_err(error)?
-                .with_supplemental_authorization_route(
-                    config.quota.server_id.clone(),
-                    config.quota.tool_name.clone(),
-                )
-                .map_err(error)?,
-            None => runtime,
-        };
+        let runtime =
+            match &record.config.native_broker {
+                Some(config) => runtime
+                    .with_security_profile(config.security.clone())
+                    .map_err(error)?
+                    .with_supplemental_authorization_routes(config.routes.iter().map(|route| {
+                        (route.quota.server_id.clone(), route.quota.tool_name.clone())
+                    }))
+                    .map_err(error)?,
+                None => runtime,
+            };
         lease.directory.validate_path_identity()?;
         Ok(Self {
             lease,

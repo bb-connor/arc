@@ -811,6 +811,7 @@
     "crates/economy/chio-finding/src/recovery_context.rs::parse_finding_recovery_context::new",
     "crates/economy/chio-finding/src/status.rs::parse_exact_canonical::new",
     "crates/economy/chio-finding/src/validate.rs::parse_canonical_json_text::new",
+    "crates/guards/chio-guards/src/action/extractor.rs::extract_shell_action::from_wire",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation.part2.inc::validate_cleanup_payload::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::from_canonical_bytes::from_wire",
@@ -1020,11 +1021,11 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs::validate_owned_declassification::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/storage.rs::current_operation::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/storage.rs::load::from_wire",
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::load::from_wire",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::load_inner::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load::from_wire",
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::load::from_wire",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::load_inner::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/contract.rs::require_original::from_wire",
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::load::from_wire",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::load_inner::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::load_retained_proposal::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::verify_nonce_capture_approval::from_wire",
     "crates/platform/chio-store-sqlite/src/approval_store.rs::deserialize_payload::from_wire",
@@ -1138,6 +1139,9 @@
     "crates/security/chio-secret-broker/src/authority_ipc.rs::serve_stream::from_wire",
     "crates/security/chio-secret-broker/src/daemon.rs::decode_canonical_payload::from_wire",
     "crates/security/chio-secret-broker/src/daemon_runtime.rs::load::from_wire",
+    "crates/security/chio-secret-broker/src/docker_adapter.rs::json::from_wire",
+    "crates/security/chio-secret-broker/src/docker_adapter/server.rs::handle::from_wire",
+    "crates/security/chio-secret-broker/src/docker_adapter/server.rs::load::from_wire",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response::from_wire",
     "crates/security/chio-secret-broker/src/kernel_admission.rs::verify_request::from_wire",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::read_message::from_wire",
@@ -2264,7 +2268,7 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
-      "owner": "load",
+      "owner": "load_inner",
       "sha256": "652f4cc27289c283d5c839120dc04c29fd80fa9dd28da7d862a8de6641564269",
       "tables": [
         "security_participant_egress_events"
@@ -2275,7 +2279,7 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
-      "owner": "load_operation",
+      "owner": "load_operation_inner",
       "sha256": "c8ad86eaeede8effa88b12cc5535732fe8faffa56d191ae3c394ba1dd069eed2",
       "tables": [
         "security_participant_egress_events"
@@ -2441,7 +2445,7 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
-      "owner": "load",
+      "owner": "load_inner",
       "sha256": "fc0570a1cdcc1c74b384f76376137353d9f4f674fd5ec3974db0dbd27d5b6889",
       "tables": [
         "security_participant_nonce_preflight_events"
@@ -2510,7 +2514,7 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
-      "owner": "load",
+      "owner": "load_inner",
       "sha256": "e44bc844514cf9733112cae3816ab77c96087e8cc37c0bef246508571e84ee00",
       "tables": [
         "security_participant_output_events"
@@ -5135,6 +5139,9 @@
     "crates/kernel/chio-process/src/store/nonces.rs": [
       "retained_nonce::from_slice"
     ],
+    "crates/kernel/chio-process/src/store/prepared.rs": [
+      "prepare_invocation::from_slice"
+    ],
     "crates/kernel/chio-process/src/store.rs": [
       "attach_child::from_str",
       "read_process::from_str",
@@ -5815,6 +5822,9 @@
     "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs": [
       "classify::from_slice",
       "classify::from_value"
+    ],
+    "crates/products/chio-cli/src/cli/process_host/native_broker/payload.rs": [
+      "body::from_value"
     ],
     "crates/products/chio-cli/src/cli/process_host/nonce_evidence.rs": [
       "operation_id::from_value",
@@ -8403,6 +8413,14 @@
     "crates/protocol/chio-openapi/src/input.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "OpenApiSpec::parse passes original bytes bounded at 8 MiB before UTF-8 and format detection. JSON uses duplicate-aware signed decoding. The YAML seed rejects duplicate or nonstring keys and multiple documents while enforcing depth 64, 100000 nodes and 8 MiB cumulative expanded strings before projection. Bridge and fuzz callers pass original bytes; native decoder sources remain local."
+    },
+    "crates/kernel/chio-process/src/store/prepared.rs": {
+      "kind": "durable-internal-state",
+      "contract": "Decodes only the original canonical host-prepared bytes retained under the process owner and operation key. An immediate transaction checks the immutable preparation binding, verifies the content digest, and never reissues retained authority. Downstream admission still authenticates the signed invocation."
+    },
+    "crates/products/chio-cli/src/cli/process_host/native_broker/payload.rs": {
+      "kind": "validated-worker-input",
+      "contract": "Decodes an already bounded worker JSON Value into deny_unknown_fields ModelQuery. Checks the fixed host-selected model ID, schema, positive turn and bounded message count, strips worker metadata, then constructs provider options exclusively from validated host configuration. This mapping does not mint dispatch authority."
     }
   },
   "tenant_runtime_families": {

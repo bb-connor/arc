@@ -1,0 +1,9 @@
+{
+  "runtime_id": "428c8b57-51e6-45f8-9f86-f97b0ce92f70",
+  "launch_policy_signers": {
+    "alice-probe": "58e32605ad160bb27ae43b0b6af34367db5c4d7a4ff5dafc1457cc92619df86c",
+    "bob-probe": "9cf7dc938d4e754c899d3e68df2f79974cd4a4da7689def376b69c9796472110",
+    "carol-probe": "add6ba6cdb7ab815529be0fe48c02a88cbbc993ae39e3d2a75f3a97740adb41e",
+    "dave-probe": "2b34a8ada7b8f80e1f1790775679d957ec529735f421b31d0fca5cf1030b1b1b"
+  }
+}

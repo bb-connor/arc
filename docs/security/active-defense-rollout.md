@@ -116,7 +116,7 @@ Every stage requires a new signed release record naming the cohort, policy hash,
 
 The active-response protocol in `chio-control-plane`, the
 `chio-active-response-authorityd` runtime, and the
-`chio-secret-brokerd.runtime-config.v5` broker daemon are boundaries that must
+`chio-secret-brokerd.runtime-config.v6` broker daemon are boundaries that must
 be qualified independently. A combined deployment uses the closed
 `chio.active-defense.deployment-config.v2` schema and validates its digest with
 `chio security authority-deployment validate` before it may enter this

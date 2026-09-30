@@ -24,7 +24,9 @@ const fn is_redirect_status(status: u16) -> bool {
     matches!(status, 300 | 301 | 302 | 303 | 305 | 307 | 308)
 }
 
-mod rustls_transport;
+mod local_adapter;
+pub(crate) mod rustls_transport;
+pub use local_adapter::LocalHttpsAdapterConfig;
 
 pub(crate) use rustls_transport::RustlsPinnedHttpsTransport;
 
@@ -161,6 +163,7 @@ pub struct GenericHttpsExecutor {
     resolver: Arc<dyn DestinationResolver>,
     transport: Arc<dyn PinnedHttpsTransport>,
     network_policy: NetworkPolicy,
+    exact_destination: Option<(String, u16)>,
 }
 
 pub(crate) enum HttpsDispatchFailure {
@@ -176,6 +179,7 @@ impl GenericHttpsExecutor {
             resolver: Arc::new(SystemDestinationResolver),
             transport: Arc::new(RustlsPinnedHttpsTransport::new()?),
             network_policy: NetworkPolicy::production(),
+            exact_destination: None,
         })
     }
 
@@ -189,6 +193,7 @@ impl GenericHttpsExecutor {
             resolver,
             transport,
             network_policy,
+            exact_destination: None,
         }
     }
 
@@ -391,6 +396,15 @@ impl GenericHttpsExecutor {
     }
 
     fn resolve_and_pin(&self, destination: &crate::protocol::BrokerDestination) -> Result<IpAddr> {
+        if self.exact_destination.as_ref().is_some_and(|(host, port)| {
+            destination.scheme != BrokerScheme::Https
+                || &destination.normalized_host != host
+                || &destination.explicit_port != port
+        }) {
+            return Err(BrokerError::AuthorizationDenied(
+                "request differs from the installed local adapter".into(),
+            ));
+        }
         let literal_address = destination.normalized_host.parse::<IpAddr>().ok();
         if literal_address.is_some() && literal_address != self.network_policy.allow_exact_address {
             return Err(BrokerError::AuthorizationDenied(
@@ -595,6 +609,18 @@ fn sanitize_response_headers(
         zeroize_headers(&mut sanitized);
         return Err(BrokerError::ResponseRejected(
             "upstream response header is invalid".to_string(),
+        ));
+    }
+    // Durable responses commit a unique, normalized header vector. Establish
+    // that representation before signing, independent of upstream wire order.
+    sanitized.sort_unstable_by(|left, right| left.name.cmp(&right.name));
+    if sanitized
+        .windows(2)
+        .any(|pair| matches!(pair, [left, right] if left.name == right.name))
+    {
+        zeroize_headers(&mut sanitized);
+        return Err(BrokerError::ResponseRejected(
+            "upstream response contains duplicate retained headers".to_string(),
         ));
     }
     Ok(sanitized)
@@ -891,6 +917,109 @@ mod tests {
     }
 
     #[test]
+    fn local_adapter_pins_endpoint_and_tls_before_credential_delivery(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        use rustls::{pki_types::PrivatePkcs8KeyDer, ServerConfig, ServerConnection, StreamOwned};
+        use std::{
+            io::{Read, Write},
+            net::TcpListener,
+            thread,
+            time::Duration,
+        };
+        for correct_certificate in [true, false] {
+            let trusted = rcgen::generate_simple_self_signed(vec!["adapter.example".into()])?;
+            let other = rcgen::generate_simple_self_signed(vec!["adapter.example".into()])?;
+            let selected = if correct_certificate {
+                &trusted
+            } else {
+                &other
+            };
+            let tls = ServerConfig::builder_with_provider(
+                rustls::crypto::ring::default_provider().into(),
+            )
+            .with_safe_default_protocol_versions()?
+            .with_no_client_auth()
+            .with_single_cert(
+                vec![selected.cert.der().clone()],
+                PrivatePkcs8KeyDer::from(selected.key_pair.serialize_der()).into(),
+            )?;
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+            let port = listener.local_addr()?.port();
+            let configured = LocalHttpsAdapterConfig {
+                server_name: "adapter.example".into(),
+                address: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port,
+                certificate_der: trusted.cert.der().to_vec(),
+            };
+            let executor = GenericHttpsExecutor::for_local_adapter(&configured)?;
+            let (mut request, mut constraints) = request_and_constraints();
+            request.destination = crate::protocol::BrokerDestination::parse(
+                &format!("https://adapter.example:{port}/execute"),
+                "POST",
+                false,
+            )?;
+            request.options.timeout_ms = 2000;
+            constraints.maximum_timeout_ms = 2000;
+            for change in 0..3 {
+                let mut other = request.destination.clone();
+                match change {
+                    0 => other.normalized_host = "different.example".into(),
+                    1 => other.explicit_port = if port == 443 { 444 } else { 443 },
+                    _ => other.normalized_host = "127.0.0.1".into(),
+                }
+                assert!(matches!(
+                    executor.resolve_and_pin(&other),
+                    Err(BrokerError::AuthorizationDenied(_))
+                ));
+            }
+            let mut public = configured.clone();
+            public.address = "93.184.216.34".parse()?;
+            assert!(matches!(
+                GenericHttpsExecutor::for_local_adapter(&public),
+                Err(BrokerError::InvalidRequest(_))
+            ));
+            let server = thread::spawn(move || -> std::result::Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+                let (socket, _) = listener.accept()?;
+                socket.set_read_timeout(Some(Duration::from_secs(3)))?;
+                socket.set_write_timeout(Some(Duration::from_secs(3)))?;
+                let mut stream = StreamOwned::new(ServerConnection::new(Arc::new(tls))?, socket);
+                let mut received = Vec::new();
+                loop {
+                    let mut byte = [0];
+                    if stream.read_exact(&mut byte).is_err() { return Ok(received); }
+                    received.push(byte[0]);
+                    if received.ends_with(b"\r\n\r\n") { break; }
+                    if received.len() > 16_384 { return Err("oversized fixture request".into()); }
+                }
+                let mut body = [0; 4]; stream.read_exact(&mut body)?;
+                received.extend(body);
+                stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}")?;
+                stream.conn.send_close_notify(); stream.flush()?;
+                Ok(received)
+            });
+            let credential = SecretMaterial::new(b"local-adapter-canary".to_vec());
+            let prepared = executor.prepare(&provider(), &request, &constraints, &credential)?;
+            let response = executor.dispatch(prepared, &constraints, &credential);
+            let received = server
+                .join()
+                .map_err(|_| "TLS fixture panicked")?
+                .map_err(|error| error.to_string())?;
+            if correct_certificate {
+                assert_eq!(response?.2, b"{}");
+                assert!(String::from_utf8(received)?
+                    .contains("authorization: Bearer local-adapter-canary\r\n"));
+            } else {
+                assert!(matches!(response, Err(BrokerError::Upstream(_))));
+                assert!(
+                    received.is_empty(),
+                    "credential bytes preceded TLS authentication"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn restricted_ranges_cover_ipv4_ipv6_and_mapped_forms() {
         for address in [
             "127.0.0.1",
@@ -1072,6 +1201,43 @@ mod tests {
             .dispatch(prepared, &constraints, &credential)
             .test_expect("dispatch retained pinned request");
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn response_headers_are_canonical_before_receipt_persistence() {
+        let credential = SecretMaterial::new(b"unique-network-canary".to_vec());
+        let headers = sanitize_response_headers(
+            vec![
+                HeaderField::normalized("server", b"fixture").test_expect("server"),
+                HeaderField::normalized("content-type", b"application/json")
+                    .test_expect("content type"),
+                HeaderField::normalized("content-length", b"2").test_expect("length"),
+            ],
+            &credential,
+        )
+        .test_expect("normalize response");
+        assert_eq!(
+            headers
+                .iter()
+                .map(|header| header.name.as_str())
+                .collect::<Vec<_>>(),
+            ["content-length", "content-type", "server"]
+        );
+        let error = sanitize_response_headers(
+            vec![
+                HeaderField {
+                    name: "X-Result".into(),
+                    value: b"one".to_vec(),
+                },
+                HeaderField {
+                    name: "x-result".into(),
+                    value: b"two".to_vec(),
+                },
+            ],
+            &credential,
+        )
+        .test_expect_err("duplicate normalized header refused");
+        assert!(matches!(error, BrokerError::ResponseRejected(_)));
     }
 
     #[test]

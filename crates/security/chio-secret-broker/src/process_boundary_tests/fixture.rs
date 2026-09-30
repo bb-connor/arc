@@ -351,6 +351,7 @@ pub(super) fn boundary_fixture(
         provider_adapter_id: PROVIDER_ADAPTER_ID.to_string(),
         provider_adapter_version: 1,
         provider_placement: ProviderPlacementConfig::BearerAuthorization,
+        local_adapter: None,
         trusted_service_uid: service_uid,
         authorized_client_uid: service_uid,
         ipc_read_timeout_ms: 3_000,

@@ -23,7 +23,6 @@ mod native;
 
 const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v3";
 const PREVIOUS_OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v2";
-const LEGACY_OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v1";
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -65,7 +64,7 @@ fn verify_outcomes(
         !runtime.is_empty()
             && matches!(
                 run.schema.as_str(),
-                OUTCOMES_SCHEMA | PREVIOUS_OUTCOMES_SCHEMA | LEGACY_OUTCOMES_SCHEMA
+                OUTCOMES_SCHEMA | PREVIOUS_OUTCOMES_SCHEMA
             )
             && run.runtime_id == runtime
             && run.bootstrap.action.parameters["runtime_id"] == runtime
@@ -285,15 +284,7 @@ fn verify_outcomes(
             && committed <= family.max_invocations,
         "authoritative family usage differs from retained dispatches",
     )?;
-    if run.schema == LEGACY_OUTCOMES_SCHEMA {
-        require(
-            run.confinement.is_empty() && pins.is_empty(),
-            "v1 outcomes do not verify native launches",
-        )?;
-        Ok(BTreeMap::new())
-    } else {
-        native::verify(run, pins)
-    }
+    native::verify(run, pins)
 }
 
 fn task_authority(
@@ -407,11 +398,7 @@ pub(crate) fn verify_file(
     } else {
         unchecked.extend(["execution_nonces", "receipt_log_inclusion"]);
     }
-    if run.schema == LEGACY_OUTCOMES_SCHEMA {
-        unchecked.push("confinement");
-    } else {
-        checks.push("call_referenced_native_launches");
-    }
+    checks.push("call_referenced_native_launches");
     println!(
         "{}",
         json!({
@@ -435,7 +422,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn retained_version_one_network_outcomes_keep_their_original_limits(
+    fn historical_network_outcomes_cannot_claim_current_host_acceptance(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
             include_str!(
@@ -449,9 +436,9 @@ mod tests {
         )?;
         let run: Outcomes = serde_json::from_value(signed.action.parameters.clone())?;
         let runtime = "a86fa37d-97ec-4e6b-afbd-b178dd9a10a8";
-        assert_eq!(run.schema, LEGACY_OUTCOMES_SCHEMA);
+        assert_eq!(run.schema, "chio.process.worker-outcomes.v1");
         assert_eq!(run.calls.len(), 2);
-        assert!(verify_outcomes(&signed, &run, &key, runtime, &BTreeMap::new())?.is_empty());
+        assert!(verify_outcomes(&signed, &run, &key, runtime, &BTreeMap::new()).is_err());
         assert!(verify_outcomes(&signed, &run, &key, "other-runtime", &BTreeMap::new()).is_err());
         assert!(verify_outcomes(
             &signed,

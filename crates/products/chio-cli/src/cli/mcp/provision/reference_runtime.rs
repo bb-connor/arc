@@ -32,6 +32,22 @@ pub(crate) enum ProvisionStage {
     Enforced,
 }
 
+/// Reviewed closed syscall sets for targets without broker IPC.
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub(crate) enum ProvisionSyscallProfile {
+    NativeMinimalV1,
+    NativeStandardV1,
+}
+
+impl From<ProvisionSyscallProfile> for chio_manifest::NativeSyscallProfile {
+    fn from(value: ProvisionSyscallProfile) -> Self {
+        match value {
+            ProvisionSyscallProfile::NativeMinimalV1 => Self::NativeMinimalV1,
+            ProvisionSyscallProfile::NativeStandardV1 => Self::NativeStandardV1,
+        }
+    }
+}
+
 /// Arguments for `chio security provision-reference-runtime`.
 #[derive(clap::Args, Debug)]
 pub(crate) struct ProvisionReferenceRuntimeArgs {
@@ -100,6 +116,12 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
     /// must also be a read path. A static target needs none.
     #[arg(long = "runtime-file", value_name = "PATH")]
     pub runtime_files: Vec<PathBuf>,
+
+    /// Select an existing reviewed syscall set. Minimal is the default; dynamic
+    /// interpreters may require Standard for allocator remapping and directory reads.
+    /// Broker targets always use their separate descriptor-restricted profile.
+    #[arg(long, value_enum, conflicts_with = "broker_binding")]
+    pub syscall_profile: Option<ProvisionSyscallProfile>,
 
     #[arg(long, value_name = "UID")]
     pub execution_uid: u32,
@@ -224,6 +246,7 @@ pub(crate) fn cmd_provision_reference_runtime(
         cage_init: CageInitSource::Helper(args.cage_init.clone()),
         ceilings,
         broker,
+        syscall_profile: args.syscall_profile.unwrap_or(ProvisionSyscallProfile::NativeMinimalV1).into(),
     };
     let inputs = resolve_inputs(
         profile,

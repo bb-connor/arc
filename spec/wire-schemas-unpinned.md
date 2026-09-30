@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-166 of 509 identifier constants in the security crates are unpinned.
+168 of 511 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (26)
 
@@ -108,7 +108,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:13` `SCIM_LIFECYCLE_REGISTRY_VERSION` = `chio.scim-lifecycle-registry.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:14` `SCIM_LIFECYCLE_RECORD_SCHEMA` = `chio.scim-lifecycle-record.v1`
 - `crates/platform/chio-control-plane/src/security/event_consumer/admission.rs:43` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
-- `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:14` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
+- `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:12` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:11` `ENTERPRISE_MIGRATION_CANARY_EVIDENCE_SCHEMA` = `chio.enterprise-migration-canary-evidence.v1`
 - `crates/platform/chio-control-plane/src/security/migration_evidence.rs:13` `ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_SCHEMA` = `chio.enterprise-migration-cutover-attestation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:145` `DEFECT_DOMAIN` = `chio.finding.defect.v1`
@@ -169,7 +169,7 @@ since been pinned is removed by the next `--update`.
 
 ## crates/security/chio-cage (1)
 
-- `crates/security/chio-cage/src/lib.rs:60` `COMPILED_SANDBOX_PROFILE_SCHEMA` = `chio.cage.compiled-sandbox-profile.v2`
+- `crates/security/chio-cage/src/lib.rs:62` `COMPILED_SANDBOX_PROFILE_SCHEMA` = `chio.cage.compiled-sandbox-profile.v2`
 
 ## crates/security/chio-cage-plan (2)
 
@@ -195,14 +195,16 @@ since been pinned is removed by the next `--update`.
 - `crates/security/chio-keyring/src/service.rs:19` `KEY_LOG_AUDIT_RESPONSE_SCHEMA` = `chio.key-log.audit-response.v1`
 - `crates/security/chio-keyring/src/witness.rs:15` `CHECKPOINT_EQUIVOCATION_SCHEMA` = `chio.key-log.equivocation.v1`
 
-## crates/security/chio-secret-broker (9)
+## crates/security/chio-secret-broker (11)
 
 - `crates/security/chio-secret-broker/src/audit.rs:40` `BROKER_AUDIT_GOVERNED_INTENT_SCHEMA` = `chio.broker-audit-intent.v1`
 - `crates/security/chio-secret-broker/src/daemon.rs:33` `DAEMON_ADMIN_INTENT_SCHEMA` = `chio.broker-daemon-admin-intent.v1`
 - `crates/security/chio-secret-broker/src/daemon.rs:34` `ISSUE_CAPABILITY_SCHEMA` = `chio.broker-issue-capability.v1`
-- `crates/security/chio-secret-broker/src/daemon_runtime.rs:62` `BROKER_DAEMON_CONFIG_SCHEMA` = `chio.secret-brokerd.runtime-config.v5`
+- `crates/security/chio-secret-broker/src/daemon_runtime.rs:62` `BROKER_DAEMON_CONFIG_SCHEMA` = `chio.secret-brokerd.runtime-config.v6`
 - `crates/security/chio-secret-broker/src/kernel_admission.rs:25` `VERIFIER_ID` = `chio.secret-broker.kernel-quota-verifier.v1`
 - `crates/security/chio-secret-broker/src/kernel_admission/registration.rs:23` `PARTICIPANT_ID` = `chio.secret-broker.kernel-registration.v1`
+- `crates/security/chio-secret-broker/src/kernel_admission/routes.rs:24` `VERIFIER_ID` = `chio.secret-broker.route-quota-verifier.v1`
+- `crates/security/chio-secret-broker/src/kernel_admission/routes.rs:25` `PARTICIPANT_ID` = `chio.secret-broker.route-registration.v1`
 - `crates/security/chio-secret-broker/src/migration.rs:18` `BROKER_MIGRATION_POSTURE_SCHEMA` = `chio.broker-migration-posture.v1`
 - `crates/security/chio-secret-broker/src/provision.rs:19` `GOVERNED_ADMIN_AUTHORIZATION_SCHEMA` = `chio.broker-admin-authorization.v1`
 - `crates/security/chio-secret-broker/src/provision.rs:22` `GOVERNED_ADMIN_INTENT_SCHEMA` = `chio.broker-admin-intent.v1`

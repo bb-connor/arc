@@ -163,6 +163,19 @@ fn retain_read_closure(
     resources: &mut Vec<RetainedResource>,
     visited_directories: &mut BTreeSet<(u64, u64)>,
 ) -> Result<(), CageError> {
+    // An explicit child grant can also be reached through a declared parent.
+    // Retain that exact path once, but reject a replacement between visits.
+    // Distinct paths to one inode remain visible to descriptor-alias checks.
+    if let Some(previous) = resources
+        .iter()
+        .find(|previous| previous.path == resource.path)
+    {
+        return if previous.identity == resource.identity {
+            Ok(())
+        } else {
+            Err(CageError::DescriptorIdentityChanged(resource.path))
+        };
+    }
     if resources.len() >= crate::MAX_READ_GRANTS {
         return Err(CageError::ResourceLimitExceeded("read grants"));
     }

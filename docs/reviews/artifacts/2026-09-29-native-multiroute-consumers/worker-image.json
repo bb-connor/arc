@@ -1,0 +1,10 @@
+{
+  "local_tag": "chio-mini-worker:29db077be1733013d02c147d",
+  "image": "sha256:f593aa276220204e9cb2a6abad3004c8459a4a8bff42cfe9fff00dd9c84fe569",
+  "base": "python@sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e",
+  "requirements_sha256": "4eae20c0e474a2af3844474ccb2884967366e6b5f024e57536fccaaa59738664",
+  "wheels": {
+    "chio_mini_swe-0.1.0-py3-none-any.whl": "e37a5475c6d1e754ef63673b3b7d4ec16bbadfdf5db92815b42e389679ac87ac",
+    "chio_process-0.1.0-py3-none-any.whl": "4d2cdfa878e00ca0a4377f937fb3e22ef3bcda750e7b9c552002a67b0aa8445b"
+  }
+}

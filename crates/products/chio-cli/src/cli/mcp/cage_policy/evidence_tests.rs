@@ -2,7 +2,7 @@
 use super::super::tests::{policy, signed_policy};
 use super::*;
 use chio_cage::*;
-use chio_core::{canonical_json_bytes, Ed25519Backend, Keypair};
+use chio_core::{Ed25519Backend, Keypair, canonical_json_bytes};
 use chio_manifest::NativeSyscallProfile;
 use serde_json::json;
 
@@ -123,12 +123,14 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
     assert_eq!(window.started_at_unix_ms, 1300);
     assert_eq!(window.exited_at_unix_ms, 2000);
     assert_eq!(window.tools, BTreeSet::from(["echo".into()]));
-    assert!(verify_native_launch_evidence(
-        &evidence,
-        "cage-policy-test",
-        &Keypair::from_seed(&[92; 32]).public_key()
-    )
-    .is_err());
+    assert!(
+        verify_native_launch_evidence(
+            &evidence,
+            "cage-policy-test",
+            &Keypair::from_seed(&[92; 32]).public_key()
+        )
+        .is_err()
+    );
     assert!(
         verify_native_launch_evidence(&evidence, "other-server", &signer.public_key()).is_err()
     );
@@ -217,21 +219,25 @@ fn native_start_verification_binds_original_receipt_without_claiming_exit() -> R
     };
     verify("cage-policy-test", &pin, &evidence.enforcement.id, target)?;
     assert!(verify("other-server", &pin, &evidence.enforcement.id, target).is_err());
-    assert!(verify(
-        "cage-policy-test",
-        &Keypair::from_seed(&[92; 32]).public_key().to_hex(),
-        &evidence.enforcement.id,
-        target,
-    )
-    .is_err());
+    assert!(
+        verify(
+            "cage-policy-test",
+            &Keypair::from_seed(&[92; 32]).public_key().to_hex(),
+            &evidence.enforcement.id,
+            target,
+        )
+        .is_err()
+    );
     assert!(verify("cage-policy-test", &pin, &"a".repeat(64), target).is_err());
-    assert!(verify(
-        "cage-policy-test",
-        &pin,
-        &evidence.enforcement.id,
-        &"b".repeat(64)
-    )
-    .is_err());
+    assert!(
+        verify(
+            "cage-policy-test",
+            &pin,
+            &evidence.enforcement.id,
+            &"b".repeat(64)
+        )
+        .is_err()
+    );
 
     // A valid signed exit is not the selected original enforcement receipt.
     std::fs::write(&receipt_path, canonical_json_bytes(&evidence.terminal)?)?;
@@ -376,9 +382,11 @@ fn native_policy_verification_rejects_legacy_and_mismatched_terminal_commitments
     )
     .err()
     .ok_or("legacy receipt proved complete policy")?;
-    assert!(error
-        .to_string()
-        .contains("complete admitted signed policy"));
+    assert!(
+        error
+            .to_string()
+            .contains("complete admitted signed policy")
+    );
     Ok(())
 }
 
@@ -396,12 +404,14 @@ fn native_observation_keeps_missing_exit_distinct_and_rejects_substituted_termin
     let start = verify(&observed)?;
     assert_eq!(start.started_at_unix_ms, 1300);
     assert_eq!(start.exited_at_unix_ms, None);
-    assert!(verify_native_launch_observation(
-        &observed,
-        "cage-policy-test",
-        &Keypair::from_seed(&[92; 32]).public_key()
-    )
-    .is_err());
+    assert!(
+        verify_native_launch_observation(
+            &observed,
+            "cage-policy-test",
+            &Keypair::from_seed(&[92; 32]).public_key()
+        )
+        .is_err()
+    );
     observed.terminal = Some(evidence.terminal.clone());
     assert_eq!(verify(&observed)?.exited_at_unix_ms, Some(2000));
 

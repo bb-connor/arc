@@ -68,10 +68,21 @@ impl Record {
         &self,
         connection: &Connection,
     ) -> Result<(), AdmissionOperationStoreError> {
-        let operation = AdmissionOperationV1::from_persisted(self.operation.clone())?;
         let initialized =
             super::super::records::load_metadata(connection, self.authority.as_str())?
                 .ok_or_else(|| invalid("native egress initialization is absent"))?;
+        self.validate_initialized(connection, &initialized)
+    }
+
+    fn validate_initialized(
+        &self,
+        connection: &Connection,
+        initialized: &SecurityParticipantStateInitialization,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        if self.authority != initialized.authority {
+            return Err(invalid("native history initialization authority differs"));
+        }
+        let operation = AdmissionOperationV1::from_persisted(self.operation.clone())?;
         let fence = self.command.fence().map_err(invalid)?;
         let original = contract::require_original(
             connection,
@@ -114,9 +125,13 @@ impl Record {
                 }
             }
             NativeEgressCommand::Commit(_) | NativeEgressCommand::CommitDeclassified { .. } => {
-                let acquired =
-                    load_operation(connection, operation.binding().operation_id(), "acquired")?
-                        .ok_or_else(|| invalid("native egress commit has no owned acquisition"))?;
+                let acquired = load_operation_inner(
+                    connection,
+                    operation.binding().operation_id(),
+                    "acquired",
+                    Some(initialized),
+                )?
+                .ok_or_else(|| invalid("native egress commit has no owned acquisition"))?;
                 if acquired.authority != self.authority
                     || acquired.initialization != self.initialization
                     || acquired.sequence >= self.sequence
@@ -173,6 +188,30 @@ pub(in crate::admission_operation_store::security_participant_state) fn load(
     authority: &str,
     sequence: u64,
 ) -> Result<Option<Record>, AdmissionOperationStoreError> {
+    load_inner(connection, authority, sequence, None)
+}
+
+// The caller has just verified this initialization in the same read snapshot.
+// Every event still validates its bytes, indexes, operation, lease and binding.
+pub(in crate::admission_operation_store::security_participant_state) fn load_initialized(
+    connection: &Connection,
+    initialized: &SecurityParticipantStateInitialization,
+    sequence: u64,
+) -> Result<Option<Record>, AdmissionOperationStoreError> {
+    load_inner(
+        connection,
+        initialized.authority.as_str(),
+        sequence,
+        Some(initialized),
+    )
+}
+
+fn load_inner(
+    connection: &Connection,
+    authority: &str,
+    sequence: u64,
+    initialized: Option<&SecurityParticipantStateInitialization>,
+) -> Result<Option<Record>, AdmissionOperationStoreError> {
     let row: Option<Option<Vec<u8>>> = connection.query_row(
         "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216
           AND length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512 THEN canonical_record END
@@ -203,7 +242,10 @@ pub(in crate::admission_operation_store::security_participant_state) fn load(
     if !exact {
         return Err(invalid("native egress index is inconsistent"));
     }
-    record.validate(connection)?;
+    match initialized {
+        Some(initialized) => record.validate_initialized(connection, initialized)?,
+        None => record.validate(connection)?,
+    }
     Ok(Some(record))
 }
 
@@ -212,6 +254,15 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_ope
     operation: &AdmissionOperationId,
     phase: &str,
 ) -> Result<Option<Record>, AdmissionOperationStoreError> {
+    load_operation_inner(connection, operation, phase, None)
+}
+
+fn load_operation_inner(
+    connection: &Connection,
+    operation: &AdmissionOperationId,
+    phase: &str,
+    initialized: Option<&SecurityParticipantStateInitialization>,
+) -> Result<Option<Record>, AdmissionOperationStoreError> {
     let located: Option<(Option<String>, i64)> = connection.query_row(
         "SELECT CASE WHEN length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512 THEN security_authority_id END, sequence
          FROM security_participant_egress_events WHERE operation_id = ?1 AND phase = ?2", params![operation.as_str(),phase], |row| Ok((row.get(0)?,row.get(1)?))).optional().map_err(sqlite_error)?;
@@ -219,10 +270,11 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_ope
         return Ok(None);
     };
     let authority = authority.ok_or_else(|| invalid("native egress authority exceeds bounds"))?;
-    let record = load(
+    let record = load_inner(
         connection,
         &authority,
         u64::try_from(sequence).map_err(invalid)?,
+        initialized,
     )?
     .ok_or_else(|| invalid("native egress index has no record"))?;
     Ok(Some(record))

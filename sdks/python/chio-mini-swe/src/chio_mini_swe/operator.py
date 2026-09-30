@@ -161,12 +161,21 @@ def prepare(profile_path, task_path, state):
         raise ValueError("The selected child needs the model and execution routes")
     with open(task_path, "rb") as stream:
         task = stream.read(128 * 1024 + 1).decode("utf-8")
-    model_id = identity(read_json(paths["provider_config"]))
+    provider_config = read_json(paths["provider_config"])
+    model_id = identity(provider_config)
+    from chio_mini_swe.operator_native import validate_routes
+    from chio_mini_swe.provider_response import response_policy
+
+    aggregate_invocations = validate_routes(host, model_route, route, provider_config)
     data = {
         "schema": "chio.mini-swe.worker.v1",
         "run_id": uuid.uuid4().hex,
         "task": task,
-        "model": {**model_route, "model_id": model_id},
+        "model": {
+            **model_route,
+            "model_id": model_id,
+            "provider_response": response_policy(provider_config),
+        },
         "environment": {**route, "template_vars": profile["environment"]},
         "agent": profile["agent"],
     }
@@ -210,6 +219,8 @@ def prepare(profile_path, task_path, state):
         state / "host-config.json",
         "--state",
         state / "host",
+        "--aggregate-invocations",
+        aggregate_invocations,
         diagnostic=state / "initialization-error.json",
     )
     prepared = {

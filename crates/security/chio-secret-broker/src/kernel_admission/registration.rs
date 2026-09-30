@@ -27,7 +27,7 @@ const PARTICIPANT_ID: &str = "chio.secret-broker.kernel-registration.v1";
 pub struct BrokerAdmissionParticipant {
     pub(super) client: BrokerIpcClient,
     revocation_authority_domain: String,
-    binding: SupplementalAdmissionAuthorityBindingV1,
+    pub(super) binding: SupplementalAdmissionAuthorityBindingV1,
     pub(super) server_id: String,
     pub(super) tool_name: String,
     pub(super) audience: String,
@@ -113,7 +113,10 @@ impl BrokerAdmissionParticipant {
             serde_json::from_value(context.request().arguments.clone()).map_err(|_| rejected())?;
         request.validate_bounds()?;
         let operation = context.operation().binding();
-        if canonical(&request)? != canonical(&context.request().arguments)?
+        if context.request().server_id != self.server_id
+            || context.request().tool_name != self.tool_name
+            || request.capability.body.audience != self.audience
+            || canonical(&request)? != canonical(&context.request().arguments)?
             || request.invocation_id != operation.request_id().as_str()
             || request.capability.body.parent_capability_id != operation.capability_id().as_str()
             || context.budget().capability_id != operation.capability_id().as_str()

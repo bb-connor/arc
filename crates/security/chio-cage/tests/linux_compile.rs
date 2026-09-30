@@ -854,6 +854,65 @@ fn forbidden_hard_link_alias_is_rejected_before_compilation() {
 }
 
 #[test]
+fn overlapping_read_grants_retain_each_path_once_and_reject_hardlink_aliases() {
+    let tree = TestTree::new();
+    let directory = tree.root.join("extensions");
+    std::fs::create_dir(&directory).test_unwrap();
+    let files: Vec<_> = (0..63)
+        .map(|index| directory.join(format!("module-{index:02}")))
+        .collect();
+    for file in &files {
+        std::fs::write(file, b"module bytes").test_unwrap();
+    }
+    let paths: BTreeSet<_> = std::iter::once(directory.clone())
+        .chain(files.iter().cloned())
+        .collect();
+    let keypair = Keypair::from_seed(&[54; 32]);
+    let signed = signed_manifest(
+        &keypair,
+        paths.iter().cloned().collect(),
+        Vec::new(),
+        NativeSyscallProfile::NativeStandardV1,
+        Vec::new(),
+    );
+    let ceilings = OperatorCeilings::new(
+        paths,
+        BTreeSet::new(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        [NativeSyscallProfile::NativeStandardV1]
+            .into_iter()
+            .collect(),
+    );
+    let ceilings = ceilings.with_forbidden_paths([tree.forbidden.clone()].into_iter().collect());
+    let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
+    assert_eq!(admitted.read_resources().len(), 64);
+    let runtime_files = [files[0].clone()].into_iter().collect();
+    let compiled = compile(
+        admitted,
+        retain_runtime_resources(&tree.runtime_paths_with(runtime_files)).test_unwrap(),
+        &BTreeMap::new(),
+        None,
+    )
+    .test_unwrap();
+    assert!(compiled.plan().fd_table.iter().any(|entry| {
+        matches!(entry.purpose, FdPurpose::RuntimeFile { .. })
+            && entry.path.as_deref() == files[0].to_str()
+            && entry.binding_digest.is_some()
+    }));
+
+    // Replacing an existing child with an alias keeps the resource count
+    // constant. It must still fail the distinct-path alias boundary.
+    std::fs::remove_file(&files[1]).test_unwrap();
+    std::fs::hard_link(&files[0], &files[1]).test_unwrap();
+    assert!(matches!(
+        admit(&signed, &keypair.public_key(), &ceilings),
+        Err(CageError::GrantDescriptorAlias { first, second })
+            if first == files[0] && second == files[1]
+    ));
+}
+
+#[test]
 fn directory_read_grant_is_bounded_to_its_admitted_descendant_inode_closure() {
     use std::os::unix::fs::symlink;
 

@@ -65,6 +65,7 @@ impl BrokerNativeCaptureReader {
     /// Time must come from the trusted host, never from the authority RPC body.
     pub fn read_capture(
         &self,
+        participant: &super::BrokerAdmissionParticipant,
         request: &CaptureExecutionHoldRequest,
         trusted_now_unix_ms: u64,
     ) -> Result<Option<CombinedCaptureCommit>> {
@@ -74,6 +75,9 @@ impl BrokerNativeCaptureReader {
         let Some(original) = self.read_original(&operation_id, trusted_now_unix_ms)? else {
             return Ok(None);
         };
+        // CapturePending may not yet name its hold in the operation record.
+        // Authenticate the route here; the physical witness below owns capture.
+        self.validate_original_route(participant, &original)?;
         self.read_capture_for_original(request, &original, trusted_now_unix_ms)
     }
 

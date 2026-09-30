@@ -121,6 +121,12 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
     mut apply: impl FnMut(&Event) -> Result<(), AdmissionOperationStoreError>,
 ) -> Result<(), AdmissionOperationStoreError> {
     let authority = initialization.authority.as_str();
+    // Recheck the initialization once for this history traversal. No verification
+    // result survives this call or crosses a transaction/mutation boundary.
+    if super::super::records::load_metadata(connection, authority)?.as_ref() != Some(initialization)
+    {
+        return Err(invalid("native history initialization changed"));
+    }
     validate_history_bounds(connection, authority)?;
     let join_head = super::head(connection, authority)?;
     let egress_head = if egress::exists(connection)? {
@@ -197,7 +203,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
                 Event::Join(Box::new(record))
             }
             "security_participant_egress" => {
-                let record = egress::load(connection, authority, sequence)?
+                let record = egress::load_initialized(connection, initialization, sequence)?
                     .ok_or_else(|| invalid("native global egress is absent"))?;
                 let operation = AdmissionOperationV1::from_persisted(record.operation.clone())?;
                 if sequence != egress_sequence + 1
@@ -217,7 +223,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
                 Event::Egress(Box::new(record))
             }
             "security_participant_output" => {
-                let record = output::load(connection, authority, sequence)?
+                let record = output::load_initialized(connection, initialization, sequence)?
                     .ok_or_else(|| invalid("native global output is absent"))?;
                 if sequence != output_sequence + 1
                     || record.initialization != initialization.digest
@@ -236,8 +242,9 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
                 Event::Output(Box::new(record))
             }
             "security_participant_nonce_preflight" => {
-                let record = nonce_preflight::load(connection, authority, sequence)?
-                    .ok_or_else(|| invalid("native global nonce_preflight is absent"))?;
+                let record =
+                    nonce_preflight::load_initialized(connection, initialization, sequence)?
+                        .ok_or_else(|| invalid("native global nonce_preflight is absent"))?;
                 if sequence != nonce_preflight_sequence + 1
                     || record.initialization != initialization.digest
                     || record.previous != nonce_preflight_previous

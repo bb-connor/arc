@@ -62,6 +62,7 @@ pub(super) fn verify(
     let execute: BrokerExecuteRequest =
         serde_json::from_value(call_evidence.request["arguments"].clone()).map_err(error)?;
     let completed = response(&call_evidence.response)?;
+    let route = config.route(&call.tool_server, &call.tool_name)?;
     let committed = operation
         .dispatch_commit
         .as_ref()
@@ -71,13 +72,13 @@ pub(super) fn verify(
             && execute.capability.body.parent_capability_id == parent.id
             && execute.capability.body.subject == parent.subject
             && execute.proof.body.authority_key == parent.subject
-            && call.tool_server == config.quota.server_id
-            && call.tool_name == config.quota.tool_name
-            && execute.capability.body.provider_adapter_id == config.quota.provider_adapter_id
+            && call.tool_server == route.quota.server_id
+            && call.tool_name == route.quota.tool_name
+            && execute.capability.body.provider_adapter_id == route.quota.provider_adapter_id
             && execute.capability.body.provider_adapter_version
-                == config.quota.provider_adapter_version
+                == route.quota.provider_adapter_version
             && evidence.capture.registration.revocation_authority_domain
-                == config.revocation_authority_domain
+                == route.revocation_authority_domain
             && completed.evidence.leader_epoch == committed.store_fence.owner_epoch,
         "broker completion differs from original process, provider or authority",
     )?;
@@ -92,8 +93,8 @@ pub(super) fn verify(
     )?;
     chio_secret_broker::capability::verify_capability(
         &execute.capability,
-        &config.quota.issuer,
-        &config.quota.audience,
+        &route.quota.issuer,
+        &route.quota.audience,
         issued,
         true,
     )
@@ -112,7 +113,7 @@ pub(super) fn verify(
             &binding,
             &execute,
             &completed,
-            &config.broker_identity,
+            &route.broker_identity,
             call_evidence.observed_at_unix_ms,
         )
         .map_err(error)?;
@@ -135,7 +136,17 @@ pub(super) fn verify(
             && reference["receipt_sha256"] == hash(&evidence.confinement.enforcement)?,
         "broker cage receipt differs from the original call's prepared connection",
     )?;
-    let server = &trusted.servers[0];
+    let server = trusted
+        .servers
+        .iter()
+        .find(|server| server.id == call.tool_server)
+        .ok_or_else(|| error("missing selected broker server"))?;
+    let manifest = evidence
+        .host_record
+        .manifests
+        .iter()
+        .find(|manifest| manifest.server_id == call.tool_server)
+        .ok_or_else(|| error("missing selected broker manifest"))?;
     let signer = PublicKey::from_hex(
         server
             .launch_policy_signer
@@ -150,8 +161,7 @@ pub(super) fn verify(
     )?;
     require(
         window.target_argv == server.command
-            && evidence.host_record.manifests.len() == 1
-            && hash(&window.manifest)? == hash(&evidence.host_record.manifests[0])?
+            && hash(&window.manifest)? == hash(manifest)?
             && window.tools.contains(&call.tool_name)
             && completed.receipt.body.issued_at_unix_seconds >= window.started_at_unix_ms / 1000
             && completed.receipt.body.issued_at_unix_seconds <= window.exited_at_unix_ms / 1000
@@ -172,6 +182,8 @@ pub(super) fn export(
     let completed = response(value)?;
     let capture = super::super::native_broker::completion_evidence(
         host,
+        &call.tool_server,
+        &call.tool_name,
         &operation.binding.operation_id,
         &completed,
         now,
@@ -187,7 +199,8 @@ pub(super) fn export(
         .record
         .config
         .servers
-        .first()
+        .iter()
+        .find(|server| server.id == call.tool_server)
         .ok_or_else(|| error("missing broker route"))?;
     let signer = PublicKey::from_hex(
         server

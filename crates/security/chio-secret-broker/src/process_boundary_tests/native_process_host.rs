@@ -257,9 +257,9 @@ fn process_host(governed: bool) -> TestResult {
             "native_broker": {
                 "keyring":keyring.as_ref().map(|keyring| keyring.process_host_config()),
                 "security":{"tenant_id":TENANT_SCOPE,"isolation_epoch_id":"host-epoch-1","generation":1},
-                "quota":{"issuer":issuer.public_key(),"audience":BROKER_AUDIENCE,"server_id":host::SERVER,"tool_name":host::TOOL,"provider_adapter_id":PROVIDER_ADAPTER_ID,"provider_adapter_version":1,"credential_placement":"bearer_authorization"},
-                "broker_identity":broker_key.public_key(),"authority_seed_file":seed,"authority_public_key":authority_key.public_key(),
-                "revocation_authority_domain":AUTHORITY_DOMAIN,"ipc_timeout_ms":3000,"fence_ttl_ms":10000,
+                "routes":[{"quota":{"issuer":issuer.public_key(),"audience":BROKER_AUDIENCE,"server_id":host::SERVER,"tool_name":host::TOOL,"provider_adapter_id":PROVIDER_ADAPTER_ID,"provider_adapter_version":1,"credential_placement":"bearer_authorization"},
+                    "broker_identity":broker_key.public_key(),"revocation_authority_domain":AUTHORITY_DOMAIN,"ipc_timeout_ms":3000,"authority_socket_name":"broker-authority.sock"}],
+                "authority_seed_file":seed,"authority_public_key":authority_key.public_key(),"fence_ttl_ms":10000,
                 "operator_input_floor":{"kind":"known","owners":{},"compartments":[]},
                 "classifier":{"id":"host-rules","version":"1","rules":[{"category":"private","expression":"PRIVATE_INPUT","confidence_basis_points":10000}],"category_labels":{"private":{"kind":"known","owners":{},"compartments":["private"]}}}
             }
@@ -622,7 +622,7 @@ fn process_host(governed: bool) -> TestResult {
         "chio.process.call-observation.v3"
     );
     let mut wrong = record["config"].clone();
-    wrong["native_broker"]["broker_identity"] = json!(authority_key.public_key());
+    wrong["native_broker"]["routes"][0]["broker_identity"] = json!(authority_key.public_key());
     write_private(&pin, &canonical_json_bytes(&wrong)?);
     assert!(
         !Command::new(&binary)

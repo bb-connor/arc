@@ -1,0 +1,23 @@
+{
+  "schema": "chio.native-python-closure-qualification.v1",
+  "status": "passed",
+  "checks": [
+    "enforced_mcp_discovery",
+    "selected_stdlib_and_extension_imports",
+    "explicit_runtime_files",
+    "explicit_standard_syscall_profile"
+  ],
+  "chio_sha256": "67ed0ddce55e4f7e57a6c62498fbe8fc9d2b7a7a82d98ef5fec97b0181fc71c4",
+  "runtime_manifest_sha256": "d8f0c95115bb10ca9ad727384725796624ba4b0629e23c0df4a298fa10b6b6cc",
+  "signed_policy_sha256": "15ab23f7d0771a79f93da292939f528e04dc9115b402c825727e2305449902cf",
+  "server": {
+    "id": "python-closure",
+    "command": [
+      "/home/ubuntu/native-multiroute-evidence-20260929/python-runtime-5/python",
+      "/tmp/chio-python-closure-cxwdrene/python-mcp.py"
+    ],
+    "launch_policy": "/tmp/chio-python-closure-cxwdrene/policy/cage-launch-policy.json",
+    "launch_policy_signer": "dca57645d7f35935897e14ee4128fc2c596efa85d848a870e2616eac239e8294"
+  },
+  "m5_acceptance_complete": false
+}

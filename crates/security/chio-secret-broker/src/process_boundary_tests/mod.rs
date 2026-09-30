@@ -238,6 +238,8 @@ fn install_fixed_panic_hook(marker: &'static str) {
     }));
 }
 
+#[cfg(feature = "real-linux-enforcement")]
+mod consumer_services;
 mod fixture;
 #[cfg(feature = "kernel-admission")]
 mod native;

@@ -2,7 +2,7 @@
 
 use super::*;
 use chio_cage::{
-    verify_signed_cage_receipt_with_trusted_key, CageEnforcementState, CageReceiptBody,
+    CageEnforcementState, CageReceiptBody, verify_signed_cage_receipt_with_trusted_key,
 };
 use chio_core::receipt::body::ChioReceipt;
 
@@ -356,8 +356,8 @@ fn export_observations(
     receipt_ids: &BTreeSet<String>,
     brokered: bool,
 ) -> Result<BTreeMap<String, NativeLaunchObservation>, CliError> {
-    use chio_kernel::receipt_query::ReceiptQuery;
     use chio_kernel::ReceiptStore;
+    use chio_kernel::receipt_query::ReceiptQuery;
 
     let bytes = read_cage_policy(policy_path)?;
     let policy = decode_cage_policy(policy_path, &bytes, trusted_policy_signer)?;

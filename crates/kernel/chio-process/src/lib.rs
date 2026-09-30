@@ -62,7 +62,7 @@ pub use types::{
 /// documents, and the relocation manifest. A host records the ABI it was
 /// initialized under and refuses to serve, run or import state recorded under
 /// another; an incompatible change to any covered surface is a new ABI.
-pub const PROCESS_ABI: &str = "chio.process.abi.v2";
+pub const PROCESS_ABI: &str = "chio.process.abi.v3";
 
 /// Dispatch attempts one logical operation may consume: the first, plus a bounded
 /// number of fresh dispatches after the kernel reports an unknown outcome for a
@@ -80,7 +80,7 @@ pub struct ProcessRuntime {
     routes: Arc<BTreeMap<String, ProcessRoute>>,
     launch_receipts: Arc<BTreeMap<String, ProcessLaunchReceipt>>,
     security_profile: Option<ProcessSecurityProfile>,
-    supplemental_route: Option<(String, String)>,
+    supplemental_routes: Arc<BTreeMap<String, String>>,
 }
 
 impl ProcessRuntime {
@@ -97,7 +97,7 @@ impl ProcessRuntime {
             routes: Arc::new(BTreeMap::new()),
             launch_receipts: Arc::new(BTreeMap::new()),
             security_profile: None,
-            supplemental_route: None,
+            supplemental_routes: Arc::new(BTreeMap::new()),
         })
     }
 
@@ -116,14 +116,26 @@ impl ProcessRuntime {
     /// Present the exact signed argument envelope to the kernel's independently
     /// installed supplemental verifier on this selected route. This conveys no
     /// authority by itself; malformed or unsigned envelopes still fail there.
-    pub fn with_supplemental_authorization_route(
+    pub fn with_supplemental_authorization_routes(
         mut self,
-        server: String,
-        tool: String,
+        routes: impl IntoIterator<Item = (String, String)>,
     ) -> Result<Self, ProcessError> {
-        validate_id(&server)?;
-        validate_id(&tool)?;
-        self.supplemental_route = Some((server, tool));
+        let mut selected = BTreeMap::new();
+        for (server, tool) in routes {
+            validate_id(&server)?;
+            validate_id(&tool)?;
+            if selected.len() == 16 || selected.insert(server, tool).is_some() {
+                return Err(ProcessError::Invalid(
+                    "supplemental routes are duplicated or oversized",
+                ));
+            }
+        }
+        if selected.is_empty() {
+            return Err(ProcessError::Invalid(
+                "supplemental routes must not be empty",
+            ));
+        }
+        self.supplemental_routes = Arc::new(selected);
         Ok(self)
     }
 
@@ -291,9 +303,9 @@ impl ProcessRuntime {
         let process = self.process(process_id)?;
         let attempt = self.with_store(|store| store.call_attempt(process_id, operation_key))?;
         let supplemental_authorization = if self
-            .supplemental_route
-            .as_ref()
-            .is_some_and(|(server, tool)| server == server_id && tool == tool_name)
+            .supplemental_routes
+            .get(server_id)
+            .is_some_and(|tool| tool == tool_name)
         {
             Some(serde_json::from_value(json!({
                 "signed_extension": String::from_utf8(canonical_json_bytes(&arguments)?).map_err(|_| ProcessError::Invalid("supplemental authorization is not UTF-8"))?,

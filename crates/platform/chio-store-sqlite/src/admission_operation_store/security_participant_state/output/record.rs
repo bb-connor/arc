@@ -73,11 +73,22 @@ impl Record {
         &self,
         connection: &Connection,
     ) -> Result<(), AdmissionOperationStoreError> {
-        let operation = AdmissionOperationV1::from_persisted(self.operation.clone())?;
         let initialized =
             super::super::records::load_metadata(connection, self.authority.as_str())?
                 .ok_or_else(|| invalid("native output initialization is absent"))?;
-        contract::require_original(connection, &operation, &initialized, &self.intent, false)?;
+        self.validate_initialized(connection, &initialized)
+    }
+
+    fn validate_initialized(
+        &self,
+        connection: &Connection,
+        initialized: &SecurityParticipantStateInitialization,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        if self.authority != initialized.authority {
+            return Err(invalid("native history initialization authority differs"));
+        }
+        let operation = AdmissionOperationV1::from_persisted(self.operation.clone())?;
+        contract::require_original(connection, &operation, initialized, &self.intent, false)?;
         self.intent
             .validate_resolution(&self.request, &self.result)?;
         if self.schema != Self::format(self.declassification.is_some())
@@ -163,6 +174,30 @@ pub(in crate::admission_operation_store::security_participant_state) fn load(
     authority: &str,
     sequence: u64,
 ) -> Result<Option<Record>, AdmissionOperationStoreError> {
+    load_inner(connection, authority, sequence, None)
+}
+
+// The caller has just verified this initialization in the same read snapshot.
+// Every event still validates its bytes, indexes, operation, lease and binding.
+pub(in crate::admission_operation_store::security_participant_state) fn load_initialized(
+    connection: &Connection,
+    initialized: &SecurityParticipantStateInitialization,
+    sequence: u64,
+) -> Result<Option<Record>, AdmissionOperationStoreError> {
+    load_inner(
+        connection,
+        initialized.authority.as_str(),
+        sequence,
+        Some(initialized),
+    )
+}
+
+fn load_inner(
+    connection: &Connection,
+    authority: &str,
+    sequence: u64,
+    initialized: Option<&SecurityParticipantStateInitialization>,
+) -> Result<Option<Record>, AdmissionOperationStoreError> {
     let bytes: Option<Option<Vec<u8>>> = connection.query_row(
         "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216
          THEN canonical_record END FROM security_participant_output_events WHERE security_authority_id = ?1 AND sequence = ?2",
@@ -203,7 +238,10 @@ pub(in crate::admission_operation_store::security_participant_state) fn load(
     if !exact {
         return Err(invalid("native output relational history differs"));
     }
-    record.validate(connection)?;
+    match initialized {
+        Some(initialized) => record.validate_initialized(connection, initialized)?,
+        None => record.validate(connection)?,
+    }
     Ok(Some(record))
 }
 

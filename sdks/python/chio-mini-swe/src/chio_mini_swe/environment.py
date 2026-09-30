@@ -3,6 +3,7 @@
 import json
 
 from chio_process import ProcessClient
+from chio_process.broker import BrokerProcessClient, decode_broker_output
 from minisweagent.exceptions import Submitted
 
 from chio_mini_swe.state import digest, encode
@@ -71,7 +72,8 @@ class ChioEnvironment:
             raise ChioExecutionError("command differs from persisted decision")
         self._index += 1
         key = "mini-swe:" + digest(["chio.mini-swe.command.v1", run_id, turn, index])
-        # Keep command at the top level so Chio's shell guards classify it.
+        # Broker preparation retains the original command body. Shell guards
+        # classify those exact bytes before capture and again before dispatch.
         result = self.client.invoke(key, self.server_id, self.tool_name, action)
         receipt = result.get("receipt_json")
         if not isinstance(receipt, str) or not receipt:
@@ -92,6 +94,8 @@ class ChioEnvironment:
             if value.get("isError", False) is not False:
                 raise ChioExecutionError("MCP execution failed", receipt)
             value = value.get("structuredContent")
+        if isinstance(self.client, BrokerProcessClient):
+            value = decode_broker_output(value)
         if (
             not isinstance(value, dict)
             or not isinstance(value.get("output"), str)

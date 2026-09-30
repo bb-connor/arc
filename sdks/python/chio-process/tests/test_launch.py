@@ -77,6 +77,31 @@ class NativeLaunchTests(unittest.TestCase):
                         provision_native_demo(sys.executable, "test", [sys.executable], "/out", "/")
                     launch.assert_not_called()
 
+    def test_dynamic_runtime_declarations_are_explicit_and_cannot_read_authority(self):
+        from chio_process.launch import _native_cage_arguments
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            grants, runtime = root / "reads", root / "runtime"
+            grants.write_text("/usr/lib/example.so\n")
+            runtime.write_text("/usr/lib/example.so\n")
+            env = {
+                "CHIO_CAGE_INIT": "/helper",
+                "CHIO_RECEIPT_ANCHOR_ROOT": str(root / "anchor"),
+                "CHIO_CAGE_READ_PATHS_FILE": str(grants),
+                "CHIO_CAGE_RUNTIME_FILES_FILE": str(runtime),
+            }
+            with mock.patch.dict(os.environ, env, clear=True):
+                arguments = _native_cage_arguments(root / "authority")
+                self.assertEqual(arguments[-2:], ["--runtime-file", "/usr/lib/example.so"])
+                for path in (root / "anchor", root / "authority", root, Path("/")):
+                    runtime.write_text(str(path) + "\n")
+                    with self.assertRaisesRegex(ValueError, "authority|anchors"):
+                        _native_cage_arguments(root / "authority")
+                runtime.write_text("a" * 65537)
+                with self.assertRaisesRegex(ValueError, "64 KiB"):
+                    _native_cage_arguments(root / "authority")
+
 
 if __name__ == "__main__":
     unittest.main()

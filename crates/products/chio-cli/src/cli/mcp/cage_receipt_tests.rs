@@ -3,8 +3,8 @@ use std::os::unix::fs::PermissionsExt;
 use super::*;
 
 #[test]
-fn cage_receipt_persistence_requires_the_independent_anchor(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn cage_receipt_persistence_requires_the_independent_anchor()
+-> Result<(), Box<dyn std::error::Error>> {
     let root = tempfile::tempdir()?;
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700))?;
     let seed = root.path().join("signer.seed");
@@ -25,9 +25,11 @@ fn cage_receipt_persistence_requires_the_independent_anchor(
         cage_receipt_persistence(&policy, "test-server", &profile, &plan, &"a".repeat(64))
             .err()
             .ok_or("missing receipt anchor was accepted")?;
-    assert!(missing
-        .to_string()
-        .contains("signed receipt rollback anchor"));
+    assert!(
+        missing
+            .to_string()
+            .contains("signed receipt rollback anchor")
+    );
     assert!(!policy.database_path.exists());
     policy.rollback_anchor_root = Some(root.path().to_path_buf());
     let colocated =

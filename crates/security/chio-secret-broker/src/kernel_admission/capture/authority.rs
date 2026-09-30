@@ -289,7 +289,7 @@ impl BrokerExecutionBudget for BrokerKernelAdmissionAuthority {
         // quota members, physical capture and authority commitments together.
         // Re-reading that same capture through the generic hold projection adds
         // no authority and can exhaust the broker's bounded IPC deadline.
-        if let Some(commit) = self.reader.read_capture(request, now)? {
+        if let Some(commit) = self.reader.read_capture(&self.participant, request, now)? {
             return Ok(ExecutionHoldState::Captured(commit));
         }
         let Some(original) = self.original(&request.operation_id, now)? else {

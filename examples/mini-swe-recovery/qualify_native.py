@@ -1,22 +1,20 @@
 """Installed mini-SWE-agent with native scheduling and mediated model queries."""
 
 import argparse
-import ctypes
 import hashlib
 import json
 import os
 import shutil
-import signal
 import sqlite3
 import subprocess
 import sys
-import sysconfig
 import tempfile
 import time
 from pathlib import Path
 
+from broker_campaign import POLICY, BrokerCampaign
 from chio_process import ProcessClient
-from chio_process.launch import demo_python, provision_native_demo
+from chio_process.broker import BrokerProcessClient
 from qualify import command, serving
 
 from chio_mini_swe import ChioModel, ChioModelError
@@ -25,26 +23,6 @@ from chio_mini_swe.worker import SCHEMA, export_result
 
 HERE = Path(__file__).resolve().parent
 DOCKER = ["/usr/bin/docker", "--host", "unix:///var/run/docker.sock"]
-
-# Some standalone Python builds omit os.pidfd_open despite running on a
-# supporting Linux host. Use libc's typed wrappers, never a recycled bare PID.
-LIBC = ctypes.CDLL(None, use_errno=True)
-LIBC.pidfd_open.argtypes = [ctypes.c_int, ctypes.c_uint]
-LIBC.pidfd_open.restype = ctypes.c_int
-LIBC.pidfd_send_signal.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint]
-LIBC.pidfd_send_signal.restype = ctypes.c_int
-
-
-def pidfd_open(pid):
-    descriptor = LIBC.pidfd_open(pid, 0)
-    if descriptor < 0:
-        raise OSError(ctypes.get_errno(), "Could not pin qualification gateway process")
-    return descriptor
-
-
-def kill_gateway(descriptor):
-    if LIBC.pidfd_send_signal(descriptor, signal.SIGKILL, None, 0) < 0:
-        raise OSError(ctypes.get_errno(), "Could not stop qualification gateway process")
 
 
 def docker(*args, **kwargs):
@@ -90,75 +68,7 @@ def prepare(binary, directory, base_image, worker_image, profile):
                 "        self.assertEqual(add(-2, -3), -5)\\n')\n"
             ),
         )
-        policy = directory / "policy.yaml"
-        policy.write_text("""kernel:
-  max_capability_ttl: 3600
-  delegation_depth_limit: 8
-  durable_admission_mode: all
-capabilities:
-  default:
-    tools:
-      - server: sandbox
-        tool: execute
-        operations: [invoke, delegate]
-        ttl: 3600
-      - server: model
-        tool: model_infer
-        operations: [invoke, delegate]
-        ttl: 3600
-""")
-        for name in ("native_gateway.py", "worker.py", "sandbox.py"):
-            shutil.copyfile(HERE / name, directory / name)
-        servers = [
-            provision_native_demo(
-                binary,
-                "sandbox",
-                [demo_python(), str(directory / "sandbox.py"), "--container", repository],
-                directory / "launch-sandbox",
-                directory,
-                read_paths=[directory / "sandbox.py"],
-            )
-        ]
-        (directory / "queries.jsonl").touch(mode=0o600)
-        gateway = [
-            sys.executable,
-            str(directory / "native_gateway.py"),
-            "--packages",
-            sysconfig.get_path("purelib"),
-            "--record",
-            str(directory / "queries.jsonl"),
-        ]
-        if profile == "unknown":
-            gateway.append("--unknown")
-        servers.append(
-            provision_native_demo(
-                binary,
-                "model",
-                gateway,
-                directory / "launch-model",
-                directory,
-                read_paths=[directory / "native_gateway.py", directory / "worker.py", sys.prefix],
-                write_paths=[directory / "queries.jsonl"],
-            )
-        )
-        config = {
-            "schema": "chio.process.host.v1",
-            "policy": str(policy),
-            "servers": servers,
-            "limits": {"max_calls": 12, "max_processes": 2, "max_depth": 1},
-            "children": [
-                {
-                    "id": "coder",
-                    "parent": "root",
-                    "budget_share_bps": 9000,
-                    "tools": [
-                        {"server_id": "sandbox", "tool_name": "execute"},
-                        {"server_id": "model", "tool_name": "model_infer"},
-                    ],
-                }
-            ],
-        }
-        (directory / "config.json").write_text(json.dumps(config))
+        services = BrokerCampaign(binary, directory, repository, profile)
         initialized = json.loads(
             command(
                 binary,
@@ -168,9 +78,12 @@ capabilities:
                 directory / "config.json",
                 "--state",
                 directory / "host",
+                "--aggregate-invocations",
+                "24",
             )
         )
         (directory / "kernel.pub").write_text(initialized["kernel_key"])
+        services.start(binary)
         worker_command = ["/usr/local/bin/chio-mini-swe-worker"]
         if profile == "known":
             worker_command = [
@@ -187,6 +100,7 @@ capabilities:
                 "server_id": "model",
                 "tool_name": "model_infer",
                 "model_id": "saved-native-decisions-v1",
+                "provider_response": POLICY,
             },
             "environment": {
                 "server_id": "sandbox",
@@ -217,8 +131,12 @@ capabilities:
             ],
         }
         (directory / "plan.json").write_text(json.dumps(plan))
-        return repository
-    except BaseException:
+        return repository, services
+    except BaseException as error:
+        if isinstance(error, subprocess.CalledProcessError):
+            (directory / "preparation-failure.stderr").write_text(error.stderr or "")
+        if "services" in locals():
+            services.close()
         docker("rm", "--force", "--volumes", repository)
         raise
 
@@ -256,7 +174,9 @@ def model_returned(directory):
     if not path.exists():
         return None
     with sqlite3.connect(path) as db:
-        if not db.execute("SELECT 1 FROM sqlite_master WHERE name='run_containers'").fetchone():
+        if not db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='run_containers'"
+        ).fetchone():
             return None
         row = db.execute(
             "SELECT container_id FROM run_containers WHERE process='coder' AND attempt=1"
@@ -274,7 +194,11 @@ def model_returned(directory):
 
 def queries(directory):
     path = directory / "queries.jsonl"
-    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+    return (
+        [json.loads(line) for line in path.read_text().splitlines()]
+        if path.exists()
+        else []
+    )
 
 
 def finish(process, success=True):
@@ -306,7 +230,11 @@ def read_state(binary, directory, unknown=False):
         snapshot = Journal(client).read()
         assert snapshot["phase"] == "model_pending" and snapshot["n_calls"] == 0
         model = ChioModel(
-            client, server_id="model", tool_name="model_infer", model_id="saved-native-decisions-v1"
+            BrokerProcessClient(connection["socket_path"], connection["credential"]),
+            server_id="model",
+            tool_name="model_infer",
+            model_id="saved-native-decisions-v1",
+            provider_response=POLICY,
         )
         model.bind("native-mini-repair", 1)
         try:
@@ -315,21 +243,24 @@ def read_state(binary, directory, unknown=False):
             assert error.receipt_json
             receipt = json.loads(error.receipt_json)
             assert (
-                receipt["metadata"]["admission_operation"]["schema"] == "chio.admission-receipt.v1"
+                receipt["metadata"]["admission_operation"]["schema"]
+                == "chio.admission-receipt.v1"
             )
             assert (
                 receipt["metadata"]["admission_operation"]["projected_state"]
                 == "outcome_unknown_after_dispatch"
             )
-            assert receipt["metadata"]["chio_process"]["recovery_policy"] == "known_outcome_only"
+            assert (
+                receipt["metadata"]["chio_process"]["recovery_policy"]
+                == "known_outcome_only"
+            )
             return {"unknown_receipt": error.receipt_json}
         raise AssertionError("Unknown model outcome was accepted")
 
 
 def exercise(binary, directory, base, image, profile):
-    repository = prepare(binary, directory, base, image, profile)
+    repository, services = prepare(binary, directory, base, image, profile)
     host = None
-    gateway_fd = None
     first = None
     try:
         initial = subprocess.run(
@@ -348,14 +279,10 @@ def exercise(binary, directory, base, image, profile):
             assert json.loads(docker("inspect", old_id))[0]["State"]["Running"]
             host = launch(binary, directory)
         elif profile == "unknown":
-            started = wait_until(host, lambda: (queries(directory) or [None])[0])
-            gateway_fd = pidfd_open(started["pid"])
+            wait_until(host, lambda: (queries(directory) or [None])[0])
             host.kill()
             host.communicate(timeout=15)
-            try:
-                kill_gateway(gateway_fd)
-            except ProcessLookupError:
-                pass
+            services.stop_provider()
             host = launch(binary, directory)
         report, error = finish(host, success=profile != "unknown")
         (directory / "run-report.json").write_text(json.dumps(report))
@@ -394,13 +321,20 @@ def exercise(binary, directory, base, image, profile):
             (directory / "tests-after.txt").write_text(after)
             receipts = exported["model_receipts"] + exported["command_receipts"]
             assert len(receipts) == len(set(receipts)) == 8
-            assert len(exported["model_receipts"]) == 3 and len(exported["command_receipts"]) == 5
+            assert (
+                len(exported["model_receipts"]) == 3
+                and len(exported["command_receipts"]) == 5
+            )
             if first:
                 assert first["receipt_json"] == exported["model_receipts"][0]
-                assert not docker("ps", "--all", "--quiet", "--filter", "id=" + old_id).strip()
+                assert not docker(
+                    "ps", "--all", "--quiet", "--filter", "id=" + old_id
+                ).strip()
                 patch_log = (directory / "host/run-logs/coder-2.stdout").read_text()
                 patch = next(
-                    json.loads(line) for line in patch_log.splitlines() if '"event"' in line
+                    json.loads(line)
+                    for line in patch_log.splitlines()
+                    if '"event"' in line
                 )
                 assert patch["receipt_json"] in exported["command_receipts"]
             before = (directory / "queries.jsonl").read_bytes()
@@ -436,17 +370,16 @@ def exercise(binary, directory, base, image, profile):
         if host is not None and host.poll() is None:
             host.kill()
             host.communicate(timeout=15)
-        if gateway_fd is not None:
-            try:
-                kill_gateway(gateway_fd)
-            except ProcessLookupError:
-                pass
-            os.close(gateway_fd)
+        services.close()
         path = directory / "host/runner.db"
         if path.exists():
             with sqlite3.connect(path) as db:
-                if db.execute("SELECT 1 FROM sqlite_master WHERE name='run_containers'").fetchone():
-                    for (identifier,) in db.execute("SELECT container_id FROM run_containers"):
+                if db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='run_containers'"
+                ).fetchone():
+                    for (identifier,) in db.execute(
+                        "SELECT container_id FROM run_containers"
+                    ):
                         if identifier:
                             subprocess.run(
                                 [*DOCKER, "rm", "--force", "--volumes", identifier],
@@ -472,12 +405,16 @@ def main():
         "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
         "worker_image": image["image"],
         "private_state": str(root),
-        "provider": "saved tool-call fixture through Chio model gateway",
+        "provider": "saved HTTPS completions through two native broker routes",
     }
     print("Private native mini-SWE state: " + str(root), file=sys.stderr, flush=True)
     for profile in ("baseline", "known", "unknown"):
-        print(f"Starting native mini-SWE profile: {profile}", file=sys.stderr, flush=True)
-        result[profile] = exercise(binary, root / profile, image["base"], image["image"], profile)
+        print(
+            f"Starting native mini-SWE profile: {profile}", file=sys.stderr, flush=True
+        )
+        result[profile] = exercise(
+            binary, root / profile, image["base"], image["image"], profile
+        )
         print(f"Passed native mini-SWE profile: {profile}", file=sys.stderr, flush=True)
         target = args.output / profile
         target.mkdir()

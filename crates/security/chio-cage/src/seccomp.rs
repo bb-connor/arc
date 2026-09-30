@@ -96,7 +96,13 @@ pub(super) fn build_seccomp_plan(
     }
     match profile {
         NativeSyscallProfile::NativeMinimalV1 => {}
-        NativeSyscallProfile::NativeStandardV1 => allowed.extend(STANDARD.iter().copied()),
+        NativeSyscallProfile::NativeStandardV1 => {
+            allowed.extend(STANDARD.iter().copied());
+            // CPython's uuid/platform imports inspect kernel identification.
+            // This reads bounded metadata without opening resources. Keep it
+            // specific to the operator-selected standard interpreter profile.
+            allowed.insert(Syscall::Uname);
+        }
         NativeSyscallProfile::BrokeredNativeV1 => {
             allowed.extend(STANDARD.iter().copied());
             allowed.extend(BROKERED.iter().copied());

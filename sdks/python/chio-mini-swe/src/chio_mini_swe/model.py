@@ -3,6 +3,7 @@
 import json
 import math
 
+from chio_process.broker import BrokerProcessClient, decode_broker_output
 from minisweagent.exceptions import FormatError
 from minisweagent.models.utils.actions_toolcall import format_toolcall_observation_messages
 from minisweagent.models.utils.openai_multimodal import expand_multimodal_content
@@ -129,7 +130,16 @@ class ChioModel:
     unknown-outcome redispatch independently of the tool's read-only annotation.
     """
 
-    def __init__(self, client, *, server_id, tool_name, model_id, observation_template=OBSERVATION):
+    def __init__(
+        self,
+        client,
+        *,
+        server_id,
+        tool_name,
+        model_id,
+        observation_template=OBSERVATION,
+        provider_response=None,
+    ):
         if any(
             not isinstance(v, str) or not v or len(v.encode()) > 1024
             for v in (server_id, tool_name, model_id)
@@ -140,6 +150,11 @@ class ChioModel:
         self.client = client
         self.server_id, self.tool_name, self.model_id = server_id, tool_name, model_id
         self.observation_template = observation_template
+        from chio_mini_swe.provider_response import validate_policy
+
+        self.provider_response = (
+            None if provider_response is None else validate_policy(provider_response)
+        )
         self.receipts = []
         self._query = None
 
@@ -151,6 +166,7 @@ class ChioModel:
             self.tool_name,
             self.model_id,
             self.observation_template,
+            self.provider_response,
         ]
 
     def bind(self, run_id, turn):
@@ -197,6 +213,17 @@ class ChioModel:
             if value.get("isError", False) is not False:
                 raise ChioModelError("model gateway failed", receipt)
             value = value.get("structuredContent")
+        if isinstance(self.client, BrokerProcessClient):
+            value = decode_broker_output(value)
+        if self.provider_response is not None:
+            from chio_mini_swe.provider_response import parse_completion
+
+            value = {
+                "schema": RESULT_SCHEMA,
+                "model_id": self.model_id,
+                "kind": "message",
+                "message": parse_completion(value, self.provider_response),
+            }
         value = validate_result(value, self.model_id)
         if value["kind"] == "format_error":
             raise FormatError(*value["messages"])

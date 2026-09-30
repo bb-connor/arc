@@ -4230,9 +4230,9 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
-value = "chio.process.abi.v2"
+value = "chio.process.abi.v3"
 files = ["crates/kernel/chio-process/src/lib.rs"]
-first_seen = "c5cca80042"
+first_seen = "95f04d5d74"
 
 [[schema]]
 value = "chio.process.blobs.v1"
@@ -4288,11 +4288,6 @@ first_seen = "84f8e77740"
 value = "chio.process.v1"
 files = ["crates/kernel/chio-process/src/worker.rs"]
 first_seen = "6e5e44836d"
-
-[[schema]]
-value = "chio.process.worker-outcomes.v1"
-files = ["crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs"]
-first_seen = "95b11b74ab"
 
 [[schema]]
 value = "chio.process.worker-outcomes.v2"
@@ -4980,9 +4975,19 @@ files = ["crates/security/chio-secret-broker/src/kernel_admission/registration.r
 first_seen = "77764444d5"
 
 [[schema]]
-value = "chio.secret-brokerd.runtime-config.v5"
+value = "chio.secret-broker.route-quota-verifier.v1"
+files = ["crates/security/chio-secret-broker/src/kernel_admission/routes.rs"]
+first_seen = "95f04d5d74"
+
+[[schema]]
+value = "chio.secret-broker.route-registration.v1"
+files = ["crates/security/chio-secret-broker/src/kernel_admission/routes.rs"]
+first_seen = "95f04d5d74"
+
+[[schema]]
+value = "chio.secret-brokerd.runtime-config.v6"
 files = ["crates/security/chio-secret-broker/src/daemon_runtime.rs"]
-first_seen = "38d8cd4341"
+first_seen = "95f04d5d74"
 
 [[schema]]
 value = "chio.security-admission-operation.v1"

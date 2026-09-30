@@ -20,6 +20,8 @@ pub mod budget;
 pub mod capability;
 pub mod daemon;
 pub mod daemon_runtime;
+#[cfg(target_os = "linux")]
+pub mod docker_adapter;
 pub mod generic_https;
 pub mod inherited_fd;
 pub mod ipc_client;

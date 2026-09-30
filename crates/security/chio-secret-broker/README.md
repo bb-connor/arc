@@ -52,7 +52,7 @@ The public `audit` module supplies the domain-separated reference commitment fun
 
 ## Trust roots and custody
 
-The canonical `chio.secret-brokerd.runtime-config.v5` configuration pins the deployment and broker instance, designated audit runner key and logical identity, audit runner UID and GID, distinct privileged audit socket, audit deadlines and authorization lifetime, capability issuer, admission authority, broker signing identity, broker and parent audiences, provider adapter identity and version, tenant scope, governed admin approvers, trusted service UID, authorized IPC client UID, bounded normal IPC deadlines, and the exact provider-scoped enterprise migration posture. The posture requires sorted trusted transition signers, exact externally stored minimum heads, and enforced or legacy-removed stages for both `broker_credential_custody` and `broker_quota_enforcement`. Earlier versions are rejected because they cannot express all supported production boundaries. Startup opens the signed append-only SQLite ledger and binds the configured stages and posture digests to its exact current records before either socket is published. Every credential materialization, credential mutation, quota capture, and dispatch commitment re-reads those records. A promotion, posture change, restored prefix, file replacement, or storage failure denies until the process is rebuilt with matching external heads and configuration. Startup also requires the trusted service UID to equal the kernel-observed effective UID and the owner of the config, sealed keys, persistent databases and SQLite sidecars, socket directories, and broker sockets. The daemon applies absolute read and write budgets as soon as each stream is accepted and authenticates clients with Linux `SO_PEERCRED`. Client framing, authorization, disconnect, and backpressure faults are contained to that connection. Handler invariant, storage, and custody faults, deadline setup or maintenance faults, response encoding faults, and unexpected operating-system write errors reach daemon supervision as fatal service errors. The normal and privileged listeners run on separate supervised serving threads, so a bounded two-phase audit cannot stall ordinary tool traffic. The control-plane client separately pins the broker process identity (`pid`, `uid`, and `gid`), validates the socket type, owner, permissions, and stable inode, and pins the receipt-signing public key.
+The canonical `chio.secret-brokerd.runtime-config.v6` configuration pins the deployment and broker instance, designated audit runner key and logical identity, audit runner UID and GID, distinct privileged audit socket, audit deadlines and authorization lifetime, capability issuer, admission authority, broker signing identity, broker and parent audiences, provider adapter identity and version, tenant scope, governed admin approvers, trusted service UID, authorized IPC client UID, bounded normal IPC deadlines, and the exact provider-scoped enterprise migration posture. The posture requires sorted trusted transition signers, exact externally stored minimum heads, and enforced or legacy-removed stages for both `broker_credential_custody` and `broker_quota_enforcement`. Earlier versions are rejected because they cannot express all supported production boundaries. Startup opens the signed append-only SQLite ledger and binds the configured stages and posture digests to its exact current records before either socket is published. Every credential materialization, credential mutation, quota capture, and dispatch commitment re-reads those records. A promotion, posture change, restored prefix, file replacement, or storage failure denies until the process is rebuilt with matching external heads and configuration. Startup also requires the trusted service UID to equal the kernel-observed effective UID and the owner of the config, sealed keys, persistent databases and SQLite sidecars, socket directories, and broker sockets. The daemon applies absolute read and write budgets as soon as each stream is accepted and authenticates clients with Linux `SO_PEERCRED`. Client framing, authorization, disconnect, and backpressure faults are contained to that connection. Handler invariant, storage, and custody faults, deadline setup or maintenance faults, response encoding faults, and unexpected operating-system write errors reach daemon supervision as fatal service errors. The normal and privileged listeners run on separate supervised serving threads, so a bounded two-phase audit cannot stall ordinary tool traffic. The control-plane client separately pins the broker process identity (`pid`, `uid`, and `gid`), validates the socket type, owner, permissions, and stable inode, and pins the receipt-signing public key.
 
 The supervisor passes distinct read-only, fully sealed, owner-checked 32-byte descriptors for the tenant master key and broker signing seed. The daemon consumes each descriptor once. Credential blobs are tenant-scoped and encrypted at rest; administrative provision, disable, and delete operations require threshold-governed authorization with durable replay protection. The plaintext credential exists transiently in broker memory and in the outbound provider request only.
 
@@ -77,3 +77,39 @@ After restart, the daemon reopens encrypted credentials, attempt state, admin re
 ## Residual risks
 
 The operating-system service boundary remains trusted: a host principal able to inspect broker memory can recover plaintext credentials while they are in use. The selected upstream provider receives the injected credential, and transport security depends on rustls validation plus the configured destination constraints. SQLite durability depends on the host filesystem, and authority or receipt-store unavailability stops execution. Request, attempt, and receipt metadata remain observable even though credential bytes are excluded from those records and from diagnostics.
+
+
+## Host-owned local adapters
+
+Runtime config v6 has an explicit `localAdapter` selection. Omit it for public
+provider HTTPS. When selected, it pins one DNS TLS name, loopback IP, port and
+DER leaf certificate. There is no DNS lookup, redirect, system-root fallback or
+caller-selected private-network exception. The broker verifies TLS before
+writing any credential bytes.
+
+`chio-docker-adapter --config PATH` owns one Docker Unix socket and one running
+container. Its private configuration pins the kernel-observed daemon PID/UID/GID,
+socket inode, Engine API version, daemon ID, container ID, start time and canonical
+container configuration digest. It serves authenticated loopback HTTPS only. The
+container must have no network, a read-only root, a non-root user and no privileged
+mode. Commands use the fixed `/workspace` directory and `/bin/bash -lc`; the caller
+cannot select another Docker object, user, working directory or transport.
+
+Docker exec uses bounded HTTP upgrade and multiplex frames, followed by inspection
+of the same exec identity. Timeouts, truncated frames, output overflow and loss of
+the final exit status are unknown outcomes. The adapter never retries. It runs
+outside native tool cages; the ordinary broker retains original durable capture
+and signs the terminal outcome. The caged MCP proxy holds only its prepared stream.
+
+The qualification-only `examples/mini-swe-recovery/broker_campaign.py` constructs
+two independent production brokers, the Docker adapter and a saved HTTPS model.
+It supplies no extra filesystem or network grants to either caged proxy. The
+saved model is a fixture, not evidence of a public provider deployment.
+
+The Docker daemon and its privileged operators remain trusted. Engine exec has no
+atomic container-start-time precondition. The adapter checks the lifetime before
+creation, before start and after exit. A concurrent privileged restart can cause
+an uncertain effect in the final pre-start interval; the final lifetime check
+refuses to certify success and the broker never retries that operation. Operators
+must coordinate lifecycle changes with serving adapters. This is not protection
+against a principal that independently controls the Docker daemon.

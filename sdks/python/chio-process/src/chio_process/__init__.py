@@ -74,6 +74,25 @@ class ProcessClient:
             operation["governed_intent"] = governed_intent
         return self._call(operation)
 
+    def prepare_invocation(
+        self, operation_key: str, server_id: str, tool_name: str, arguments: Any
+    ) -> dict[str, Any]:
+        """Retain one host-prepared envelope without dispatching an effect.
+
+        The host selects the issuer, credential, destination and limits. Repeating
+        the same key/input returns the original envelope, including its original
+        expiry and proof. Changed input or host policy fails closed.
+        """
+        return self._call(
+            {
+                "op": "prepare_invocation",
+                "operation_key": operation_key,
+                "server_id": server_id,
+                "tool_name": tool_name,
+                "arguments": arguments,
+            }
+        )
+
     def checkpoint(self, expected_revision: str, value: Any) -> dict[str, Any]:
         """CAS against the decimal revision string returned by inspect/checkpoint."""
         return self._call(

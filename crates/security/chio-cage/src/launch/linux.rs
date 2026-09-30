@@ -1787,6 +1787,7 @@ mod stdio_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_arch = "x86_64")]
     use crate::{SeccompArgumentComparison, SyscallArgumentConstraint, AT_EMPTY_PATH};
     #[cfg(target_arch = "x86_64")]
     use chio_test_support::prelude::*;

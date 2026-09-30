@@ -243,13 +243,29 @@ impl VerifiedCageManifest<'_> {
     }
 }
 
-/// Registry whose only insertion API verifies v2 signatures and composes policy with topology.
+/// Registry containing only signature-verified entries with admitted policy and topology.
 #[derive(Clone, Debug, Default)]
 pub struct VerifiedManifestRegistry {
     manifests: BTreeMap<chio_core::ServerId, VerifiedManifestEntry>,
 }
 
 impl VerifiedManifestRegistry {
+    /// Compose already verified entries without reclassifying policy or topology.
+    /// A duplicate refuses the entire merge before either registry is changed.
+    pub fn merge_verified(&mut self, other: &Self) -> Result<(), VerifiedManifestAdmissionError> {
+        if let Some(server) = other
+            .manifests
+            .keys()
+            .find(|server| self.manifests.contains_key(*server))
+        {
+            return Err(VerifiedManifestAdmissionError::DuplicateServer(
+                server.clone(),
+            ));
+        }
+        self.manifests.extend(other.manifests.clone());
+        Ok(())
+    }
+
     /// Return whether any admitted manifest, policy, or topology needs flow mediation.
     #[must_use]
     pub fn requires_flow_runtime(&self) -> bool {

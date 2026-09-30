@@ -4,7 +4,7 @@ import json
 import math
 import sys
 
-from chio_process import ProcessClient
+from chio_process.broker import BrokerProcessClient
 
 from chio_mini_swe import ChioAgent, ChioEnvironment, ChioModel
 from chio_mini_swe.state import Journal
@@ -66,7 +66,7 @@ def validate_bootstrap(bootstrap):
     for key, allowed, required in [
         (
             "model",
-            {"server_id", "tool_name", "model_id", "observation_template"},
+            {"server_id", "tool_name", "model_id", "observation_template", "provider_response"},
             {"server_id", "tool_name", "model_id"},
         ),
         (
@@ -106,7 +106,7 @@ def validate_bootstrap(bootstrap):
 def build_agent(bootstrap):
     """Build an upstream loop from a native bootstrap without ambient provider access."""
     data, connection = validate_bootstrap(bootstrap)
-    client = ProcessClient(
+    client = BrokerProcessClient(
         connection["socket_path"],
         connection["credential"],
         timeout=data["agent"]["wall_time_limit_seconds"],

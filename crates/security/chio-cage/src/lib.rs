@@ -1716,6 +1716,10 @@ mod tests {
         ] {
             let plan = build_seccomp_plan(SandboxArchitecture::X86_64, profile).test_unwrap();
             assert_eq!(plan.default_action(), SeccompDefaultAction::KillProcess);
+            assert_eq!(
+                plan.allowed_syscalls().contains(&Syscall::Uname),
+                profile == NativeSyscallProfile::NativeStandardV1,
+            );
             for forbidden in [
                 "socket",
                 "socketpair",

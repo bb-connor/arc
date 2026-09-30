@@ -543,6 +543,49 @@ fn compartment_label(name: &str) -> InformationLabel {
 }
 
 #[test]
+fn verified_registry_merge_preserves_security_and_rejects_duplicates_atomically(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let keypair = Keypair::from_seed(&[26; 32]);
+    let registry = |servers: &[&str]| -> Result<_, Box<dyn std::error::Error>> {
+        let mut registry = VerifiedManifestRegistry::default();
+        for server in servers {
+            let mut manifest = v2_manifest(keypair.public_key().to_hex());
+            manifest.server_id = (*server).into();
+            registry.register(
+                sign_manifest(&manifest, &keypair)?,
+                &keypair.public_key(),
+                &BTreeMap::from([("read".into(), AuthoritativeToolPolicy::public_only())]),
+                &BTreeMap::from([("read".into(), RuntimeToolTopology::brokered())]),
+            )?;
+        }
+        Ok(registry)
+    };
+    let mut selected = registry(&["existing"])?;
+    let conflicting = registry(&["added", "existing"])?;
+    assert!(
+        matches!(selected.merge_verified(&conflicting), Err(VerifiedManifestAdmissionError::DuplicateServer(server)) if server == "existing")
+    );
+    assert_eq!(selected.verified_manifests().count(), 1);
+    assert!(selected.verified_manifest("added").is_none());
+    let added = registry(&["added"])?;
+    selected.merge_verified(&added)?;
+    assert_eq!(selected.verified_manifests().count(), 2);
+    assert_eq!(
+        selected.tool_security("added", "read"),
+        added.tool_security("added", "read")
+    );
+    assert_eq!(
+        selected.bridge_security("added", "read"),
+        added.bridge_security("added", "read")
+    );
+    assert!(selected
+        .tool_security("added", "read")
+        .ok_or("missing security")?
+        .effective_egress());
+    Ok(())
+}
+
+#[test]
 fn verified_registry_composes_registered_key_policy_and_runtime_topology() {
     let keypair = Keypair::from_seed(&[25; 32]);
     let mut manifest = v2_manifest(keypair.public_key().to_hex());

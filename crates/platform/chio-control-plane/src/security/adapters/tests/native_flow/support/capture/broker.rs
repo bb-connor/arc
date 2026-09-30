@@ -10,8 +10,8 @@ use chio_kernel::supplemental_admission::{
 use chio_kernel::supplemental_quota::SupplementalQuotaVerifierError;
 use chio_secret_broker::budget::CaptureExecutionHoldRequest;
 use chio_secret_broker::kernel_admission::{
-    BrokerAdmissionParticipant, BrokerNativeCaptureReader, BrokerQuotaVerifier,
-    BrokerQuotaVerifierConfig,
+    BrokerAdmissionParticipant, BrokerNativeCaptureReader, BrokerQuotaVerifierConfig,
+    BrokerRouteConfig, BrokerRouteSet,
 };
 use chio_secret_broker::protocol::*;
 use chio_secret_broker::{capability::issue_capability, proof::issue_request_proof};
@@ -28,6 +28,7 @@ struct ObserveRegistration {
     count: AtomicUsize,
     reader: BrokerNativeCaptureReader,
     registrar: Arc<BrokerAdmissionParticipant>,
+    sibling: Arc<BrokerAdmissionParticipant>,
     prepared: Mutex<Option<chio_secret_broker::store::AttemptRegistration>>,
 }
 
@@ -48,7 +49,11 @@ impl SupplementalAdmissionParticipant for ObserveRegistration {
                 context.operation().binding(),
                 binding.revocation_set.ids().to_vec(),
             )?;
-            assert_eq!(self.reader.read_capture(&request, now_ms()?)?, None);
+            assert_eq!(
+                self.reader
+                    .read_capture(self.registrar.as_ref(), &request, now_ms()?)?,
+                None
+            );
             assert!(self
                 .reader
                 .read_registration(
@@ -174,13 +179,27 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
         witness.capture.operation.binding(),
         binding.revocation_set.ids().to_vec(),
     )?;
+    // Common route-set custody must never let a sibling read this route.
+    assert_eq!(registrar.binding(), registrations.sibling.binding());
+    assert!(matches!(
+        reader.read_capture(registrations.sibling.as_ref(), &request, now_ms()?),
+        Err(chio_secret_broker::BrokerError::AuthorizationDenied(_))
+    ));
+    assert!(matches!(
+        reader.read_registration(
+            registrations.sibling.as_ref(),
+            &ledger.operation_id,
+            now_ms()?
+        ),
+        Err(chio_secret_broker::BrokerError::AuthorizationDenied(_))
+    ));
     let before = fixture.authority.budget_store().list_mutation_events(
         100,
         Some(&fixture.request.capability.id),
         None,
     )?;
     let commit = reader
-        .read_capture(&request, now_ms()?)?
+        .read_capture(registrar.as_ref(), &request, now_ms()?)?
         .ok_or("broker capture readback")?;
     assert_eq!(
         commit.budget_commit_index,
@@ -223,8 +242,23 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
     ] {
         let mut value = serde_json::to_value(&request)?;
         value[field] = serde_json::Value::String("e".repeat(64));
-        let changed: CaptureExecutionHoldRequest = serde_json::from_value(value)?;
-        assert!(reader.read_capture(&changed, now_ms()?).is_err(), "{field}");
+        let mut changed: CaptureExecutionHoldRequest = serde_json::from_value(value)?;
+        // Keep the submitted revocation set internally valid so parent and
+        // broker substitutions reach the original-custody comparison.
+        if matches!(field, "parentCapabilityId" | "brokerCapabilityId") {
+            changed.revocation_ids.push("e".repeat(64));
+            changed.revocation_ids.sort();
+            changed.revocation_set_digest = broker_revocations(&execute, &changed.revocation_ids)?
+                .digest()
+                .into();
+        }
+        assert!(
+            matches!(
+                reader.read_capture(registrar.as_ref(), &changed, now_ms()?),
+                Err(chio_secret_broker::BrokerError::AuthorizationDenied(_))
+            ),
+            "{field}"
+        );
     }
     let mut changed = request.clone();
     changed.revocation_ids.push("unrelated-extra-member".into());
@@ -232,7 +266,11 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
     changed.revocation_set_digest = broker_revocations(&execute, &changed.revocation_ids)?
         .digest()
         .into();
-    assert!(reader.read_capture(&changed, now_ms()?).is_err());
+    assert!(matches!(
+        reader.read_capture(registrar.as_ref(), &changed, now_ms()?),
+        Err(chio_secret_broker::BrokerError::AuthorizationDenied(message))
+            if message == "broker request differs from installed kernel authority"
+    ));
     let wrong_participant = SupplementalAdmissionAuthorityBindingV1::new(
         AdmissionIdentifier::try_new("participant", "foreign-participant")?,
         AdmissionDigest::try_new("configuration", "d".repeat(64))?,
@@ -244,7 +282,11 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
         fixture.binding.clone(),
         wrong_participant,
     )?;
-    assert!(wrong_reader.read_capture(&request, now_ms()?).is_err());
+    assert!(matches!(
+        wrong_reader.read_capture(registrar.as_ref(), &request, now_ms()?),
+        Err(chio_secret_broker::BrokerError::AuthorizationDenied(message))
+            if message == "broker request differs from installed kernel authority"
+    ));
     assert!(wrong_reader
         .read_registration(registrar.as_ref(), &ledger.operation_id, now_ms()?)
         .is_err());
@@ -254,7 +296,7 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
         .revocation_store()
         .revoke(&fixture.request.capability.id)?);
     assert_eq!(
-        reader.read_capture(&request, now_ms()?)?,
+        reader.read_capture(registrar.as_ref(), &request, now_ms()?)?,
         Some(commit.clone())
     );
     assert_eq!(
@@ -291,7 +333,10 @@ fn native_broker_capture_reads_only_original_operation_and_never_recharges() -> 
         clock.clone(),
     )?;
     let reader = BrokerNativeCaptureReader::new(&reopened, native, participant)?;
-    assert_eq!(reader.read_capture(&request, now_ms()?)?, Some(commit));
+    assert_eq!(
+        reader.read_capture(registrar.as_ref(), &request, now_ms()?)?,
+        Some(commit)
+    );
     assert_eq!(
         reader.read_registration(registrar.as_ref(), &ledger.operation_id, now_ms()?)?,
         Some(original_registration)
@@ -307,20 +352,16 @@ fn install_broker(
     Arc<ObserveRegistration>,
 )> {
     let issuer = Keypair::from_seed(&[31; 32]);
-    let verifier = BrokerQuotaVerifier::new(
-        BrokerQuotaVerifierConfig {
-            issuer: issuer.public_key(),
-            audience: "native-broker".into(),
-            server_id: fixture.request.server_id.clone(),
-            tool_name: fixture.request.tool_name.clone(),
-            provider_adapter_id: "bearer".into(),
-            provider_adapter_version: 1,
-            credential_placement:
-                chio_secret_broker::daemon_runtime::ProviderPlacementConfig::BearerAuthorization,
-        },
-        fixture.clock.clone(),
-    )?;
-    let selected = verifier.binding().clone();
+    let quota = BrokerQuotaVerifierConfig {
+        issuer: issuer.public_key(),
+        audience: "native-broker".into(),
+        server_id: fixture.request.server_id.clone(),
+        tool_name: fixture.request.tool_name.clone(),
+        provider_adapter_id: "bearer".into(),
+        provider_adapter_version: 1,
+        credential_placement:
+            chio_secret_broker::daemon_runtime::ProviderPlacementConfig::BearerAuthorization,
+    };
     // No broker transport is invoked by this custody-read test. Its production
     // configuration still determines the exact original participant identity.
     #[cfg(unix)]
@@ -331,8 +372,9 @@ fn install_broker(
     // Non-Unix custody tests retain a fixed configuration without opening IPC.
     #[cfg(not(unix))]
     let (user_id, group_id) = (0, 0);
-    let registrar = Arc::new(BrokerAdmissionParticipant::new(
-        chio_secret_broker::ipc_client::BrokerIpcClientConfig {
+    let route = BrokerRouteConfig {
+        quota,
+        ipc: chio_secret_broker::ipc_client::BrokerIpcClientConfig {
             socket_path: fixture._directory.path().join("b.sock"),
             tenant_scope: "native-broker-tenant".into(),
             // Transport scheduling includes real SQLite verification under the
@@ -345,17 +387,25 @@ fn install_broker(
             },
             trusted_receipt_signer: Keypair::from_seed(&[35; 32]).public_key(),
         },
-        Arc::new(Ed25519Backend::new(Keypair::from_seed(&[34; 32]))),
-        "native-broker-domain".into(),
-        &verifier,
-    )?);
-    let participant = registrar.binding().clone();
+        authority_signer: Arc::new(Ed25519Backend::new(Keypair::from_seed(&[34; 32]))),
+        revocation_authority_domain: "native-broker-domain".into(),
+    };
+    let mut other = route.clone();
+    other.quota.server_id = "sibling-server".into();
+    other.quota.audience = "sibling-audience".into();
+    other.ipc.socket_path.set_file_name("sibling.sock");
+    let routes = BrokerRouteSet::new(vec![route, other], fixture.clock.clone())?;
+    let registrar = routes.participant(&fixture.request.server_id, &fixture.request.tool_name)?;
+    let sibling = routes.participant("sibling-server", &fixture.request.tool_name)?;
+    let selected = routes.verifier_binding().clone();
+    let participant = routes.participant_binding().clone();
     fixture
         .kernel
-        .set_supplemental_quota_verifier(Arc::new(verifier), selected)?;
+        .set_supplemental_quota_verifier(Arc::new(routes), selected)?;
     let registrations = Arc::new(ObserveRegistration {
         count: AtomicUsize::new(0),
         registrar,
+        sibling,
         prepared: Mutex::new(None),
         reader: BrokerNativeCaptureReader::new(
             &fixture.authority,

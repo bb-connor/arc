@@ -1,7 +1,9 @@
 //! Authenticated, process-scoped worker API. Credentials are bearer secrets;
 //! the host must protect them with OS isolation and private delivery.
-//! This protocol supplies no capability issuance or kernel administration.
+//! Host-selected preparation can issue bounded per-call broker authority.
+//! Workers cannot select an issuer, credential, endpoint or administrative action.
 
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
@@ -45,6 +47,26 @@ impl std::fmt::Debug for WorkerCredential {
 pub struct WorkerService {
     runtime: ProcessRuntime,
     error_observer: Option<fn(&ProcessError)>,
+    preparer: Option<Arc<dyn InvocationPreparer>>,
+}
+
+/// A composition-owned preparation service. Its output still goes through the
+/// ordinary signed invocation and kernel admission path. Workers never select
+/// issuer keys, credentials, destinations or preparation policy.
+pub trait InvocationPreparer: Send + Sync {
+    fn prepare(
+        &self,
+        runtime: &ProcessRuntime,
+        request: PreparationRequest<'_>,
+    ) -> Result<Value, ProcessError>;
+}
+
+pub struct PreparationRequest<'a> {
+    pub process: &'a str,
+    pub operation_key: &'a str,
+    pub server_id: &'a str,
+    pub tool_name: &'a str,
+    pub arguments: &'a Value,
 }
 
 // Deliberately no Debug derive on requests containing bearer credentials.
@@ -60,6 +82,12 @@ struct Request {
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Operation {
     Inspect {},
+    PrepareInvocation {
+        operation_key: String,
+        server_id: String,
+        tool_name: String,
+        arguments: Value,
+    },
     Invoke {
         operation_key: String,
         server_id: String,
@@ -89,7 +117,13 @@ impl WorkerService {
         Self {
             runtime,
             error_observer: None,
+            preparer: None,
         }
+    }
+
+    pub fn with_invocation_preparer(mut self, preparer: Arc<dyn InvocationPreparer>) -> Self {
+        self.preparer = Some(preparer);
+        self
     }
 
     /// Observe failures in the trusted host without changing the bounded,
@@ -153,6 +187,27 @@ impl WorkerService {
         }
         let id = self.authenticate(&request.credential)?;
         let result = match request.operation {
+            Operation::PrepareInvocation {
+                operation_key,
+                server_id,
+                tool_name,
+                arguments,
+            } => self
+                .preparer
+                .as_ref()
+                .ok_or(ProcessError::Configuration(
+                    "host has no invocation preparer",
+                ))?
+                .prepare(
+                    &self.runtime,
+                    PreparationRequest {
+                        process: &id,
+                        operation_key: &operation_key,
+                        server_id: &server_id,
+                        tool_name: &tool_name,
+                        arguments: &arguments,
+                    },
+                )?,
             Operation::Inspect {} => {
                 let process = self.runtime.process(&id)?;
                 let storage = self.runtime.storage(&id)?;

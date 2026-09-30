@@ -13,7 +13,7 @@ mod schema;
 mod write;
 pub(super) use integrity::verify_coverage;
 pub(in crate::admission_operation_store) use issuance::require_preflight_for_issuance;
-pub(super) use record::{head, load, load_operation, Record};
+pub(super) use record::{head, load, load_initialized, load_operation, Record};
 pub(in crate::admission_operation_store) use schema::{exists, sql, verify_catalog};
 
 const PROJECTION: &str = "security_participant_nonce_preflight";

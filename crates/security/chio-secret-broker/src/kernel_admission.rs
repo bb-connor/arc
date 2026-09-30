@@ -26,6 +26,8 @@ const VERIFIER_ID: &str = "chio.secret-broker.kernel-quota-verifier.v1";
 
 mod registration;
 pub use registration::BrokerAdmissionParticipant;
+mod routes;
+pub use routes::{BrokerRouteConfig, BrokerRouteSet, MAX_BROKER_ROUTES};
 mod capture;
 pub use capture::{
     BrokerKernelAdmissionAuthority, BrokerKernelConnection, BrokerNativeCaptureReader,
@@ -134,7 +136,11 @@ impl BrokerQuotaVerifier {
         }
         execute.validate_bounds()?;
         let body = &execute.capability.body;
-        if execute.invocation_id != context.request_id
+        if body.constraints.maximum_response_bytes
+            > crate::daemon::MAX_DAEMON_COMBINED_RESPONSE_BYTES
+            || execute.request.options.response_limit_bytes
+                > crate::daemon::MAX_DAEMON_COMBINED_RESPONSE_BYTES
+            || execute.invocation_id != context.request_id
             || body.parent_capability_id != context.capability_id
             || body.subject != context.subject
             || body.provider_adapter_id != self.config.provider_adapter_id

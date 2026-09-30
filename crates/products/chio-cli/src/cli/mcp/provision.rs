@@ -105,6 +105,7 @@ pub(super) struct ProvisionProfile {
     pub(super) cage_init: CageInitSource,
     pub(super) ceilings: ProvisionedCeilings,
     pub(super) broker: Option<ProvisionedBrokerBinding>,
+    pub(super) syscall_profile: chio_manifest::NativeSyscallProfile,
 }
 
 impl ProvisionProfile {
@@ -123,6 +124,7 @@ impl ProvisionProfile {
             cage_init: CageInitSource::ChioExecutable,
             ceilings: ProvisionedCeilings::default(),
             broker: None,
+            syscall_profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
         }
     }
 
@@ -553,7 +555,9 @@ fn require_target_linkage_declared(
         }) => {
             let declared_interpreter = interpreter
                 .as_ref()
-                .is_none_or(|interpreter| runtime_files.contains(interpreter));
+                .map(|path| declared_runtime_interpreter(path, runtime_files))
+                .transpose()?
+                .unwrap_or(true);
             if runtime_files.is_empty() || !declared_interpreter {
                 return Err(CliError::cli_other_error(format!(
                     "target executable is {}; declare its interpreter and shared objects with --runtime-file, or build it static",
@@ -565,6 +569,44 @@ fn require_target_linkage_declared(
         Err(error) => Err(CliError::cli_other_error(format!(
             "target executable: {error}"
         ))),
+    }
+}
+
+fn declared_runtime_interpreter(
+    interpreter: &Path,
+    runtime_files: &BTreeSet<PathBuf>,
+) -> Result<bool, CliError> {
+    // PT_INTERP commonly uses a distribution-owned symlink such as /lib64.
+    // Compare its resolved file with the exact canonical resource declaration.
+    // Retention and Landlock still bind and authorize that file's identity.
+    let resolved = std::fs::canonicalize(interpreter).map_err(|error| {
+        CliError::cli_other_error(format!("cannot resolve target ELF interpreter: {error}"))
+    })?;
+    Ok(runtime_files.contains(&resolved))
+}
+
+#[cfg(all(test, unix))]
+mod runtime_linkage_tests {
+    use super::*;
+
+    #[test]
+    fn elf_loader_alias_requires_the_exact_declared_file() -> Result<(), Box<dyn std::error::Error>> {
+        let root = tempfile::tempdir()?;
+        let loader = root.path().join("loader");
+        let other = root.path().join("other");
+        let alias = root.path().join("interpreter");
+        std::fs::write(&loader, b"loader")?;
+        std::fs::write(&other, b"other")?;
+        std::os::unix::fs::symlink(&loader, &alias)?;
+        let declared = BTreeSet::from([loader.canonicalize()?]);
+        assert!(declared_runtime_interpreter(&alias, &declared)?);
+        assert!(!declared_runtime_interpreter(&alias, &BTreeSet::new())?);
+        std::fs::remove_file(&alias)?;
+        std::os::unix::fs::symlink(&other, &alias)?;
+        assert!(!declared_runtime_interpreter(&alias, &declared)?);
+        std::fs::remove_file(&alias)?;
+        assert!(declared_runtime_interpreter(&alias, &declared).is_err());
+        Ok(())
     }
 }
 
@@ -1150,7 +1192,7 @@ fn build_signed_manifest(
         native_syscall_profile: if inputs.profile.broker.is_some() {
             chio_manifest::NativeSyscallProfile::BrokeredNativeV1
         } else {
-            chio_manifest::NativeSyscallProfile::NativeMinimalV1
+            inputs.profile.syscall_profile
         },
     });
     chio_manifest::sign_manifest(&manifest, signer).map_err(|error| {
@@ -1188,6 +1230,7 @@ fn build_policy_factory(
             &inputs.runtime_security_directory,
         ),
         broker: inputs.profile.broker.clone(),
+        syscall_profile: inputs.profile.syscall_profile,
         receipt_capability_id: inputs.profile.receipt_capability_id.to_string(),
         receipt_tenant_id: inputs.profile.receipt_tenant_id.map(str::to_string),
         cage_init_path: inputs.cage_init_path.clone(),

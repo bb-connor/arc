@@ -43,7 +43,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_c
         for sequence in
             1..=head(connection, initialized.authority.as_str()).map_err(map_integrity)?
         {
-            let record = load(connection, initialized.authority.as_str(), sequence)
+            let record = load_initialized(connection, initialized, sequence)
                 .map_err(map_integrity)?
                 .ok_or_else(|| map_integrity("native egress history disappeared"))?;
             let count: i64 = connection.query_row("SELECT COUNT(*) FROM authority_global_commits WHERE projection_kind = ?1 AND projection_key = ?2 AND projection_sequence = ?3

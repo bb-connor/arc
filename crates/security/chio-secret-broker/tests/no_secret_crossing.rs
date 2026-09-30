@@ -261,6 +261,7 @@ mod linux_process {
             provider_adapter_id: "generic-bearer".to_string(),
             provider_adapter_version: 1,
             provider_placement: ProviderPlacementConfig::BearerAuthorization,
+            local_adapter: None,
             trusted_service_uid: expected_owner_uid,
             authorized_client_uid: expected_owner_uid,
             ipc_read_timeout_ms: 1_000,

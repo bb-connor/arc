@@ -6,6 +6,7 @@ import pytest
 from test_provider import config
 
 from chio_mini_swe.operator import prepare, prepared, private_directory
+from chio_mini_swe.provider_config import identity
 
 
 def test_session_symlink_ancestor_normalizes_identity_but_final_symlink_refuses(tmp_path):
@@ -34,6 +35,8 @@ def test_symlink_ancestor_does_not_relax_protected_parent_policy(tmp_path):
 
 @pytest.fixture
 def profile(tmp_path, monkeypatch):
+    from minisweagent.models.utils.actions_toolcall import BASH_TOOL
+
     binary = tmp_path / "chio"
     binary.write_text("#!/bin/sh\nexit 1\n")
     binary.chmod(0o700)
@@ -59,6 +62,33 @@ def profile(tmp_path, monkeypatch):
                     for name in ("model", "sandbox")
                 ],
                 "children": [{"id": "coder", "tools": tools}],
+                "limits": {"max_calls": 24},
+                "native_broker": {
+                    "routes": [
+                        {
+                            "quota": tools[0],
+                            "preparation": {
+                                "payload": {
+                                    "kind": "mini_swe_chat",
+                                    "model_id": identity(config()),
+                                    "model": "coding-model",
+                                    "tools": [BASH_TOOL],
+                                    "max_completion_tokens": 1024,
+                                    "temperature": None,
+                                },
+                                "destination": {
+                                    "scheme": "https",
+                                    "normalizedHost": "provider.example",
+                                    "explicitPort": 443,
+                                    "method": "POST",
+                                    "exactPathAndQuery": "/v1/chat/completions",
+                                },
+                                "timeout_ms": 2000,
+                            },
+                        },
+                        {"quota": tools[1], "preparation": {"payload": {"kind": "json"}}},
+                    ]
+                },
             }
         )
     )
@@ -100,6 +130,7 @@ def test_provider_change_blocks_running_but_not_reading_retained_results(profile
     root, path, calls = profile
     value = prepare(path, root / "task.md", root / "run")
     assert len(calls) == 1
+    assert calls[0][-2:] == ("--aggregate-invocations", 24)
     assert prepared(root / "run", running=True)[1]["model_id"] == value["model_id"]
     (root / "provider.json").write_text(json.dumps(config() | {"model": "changed"}))
     with pytest.raises(ValueError, match="Provider configuration changed"):
@@ -144,6 +175,34 @@ def test_old_host_is_refused_before_task_initialization(profile, monkeypatch):
     root, path, calls = profile
     monkeypatch.setattr("chio_mini_swe.operator.supports_state_reader", lambda _: False)
     with pytest.raises(ValueError, match="administrative process state reads"):
+        prepare(path, root / "task.md", root / "run")
+    assert not calls and not (root / "run").exists()
+
+
+@pytest.mark.parametrize(
+    "change", ["absent", "duplicate", "missing_route", "model", "endpoint", "timeout", "limit"]
+)
+def test_unprepared_or_mismatched_routes_refuse_before_state_creation(profile, change):
+    root, path, calls = profile
+    host_path = root / "host.json"
+    host = json.loads(host_path.read_text())
+    routes = host["native_broker"]["routes"]
+    if change == "absent":
+        del host["native_broker"]
+    elif change == "duplicate":
+        routes.append(routes[0])
+    elif change == "missing_route":
+        routes.pop()
+    elif change == "model":
+        routes[0]["preparation"]["payload"]["model"] = "different"
+    elif change == "endpoint":
+        routes[0]["preparation"]["destination"]["normalizedHost"] = "different.example"
+    elif change == "timeout":
+        routes[0]["preparation"]["timeout_ms"] = 1000
+    else:
+        host["limits"]["max_calls"] = True
+    host_path.write_text(json.dumps(host))
+    with pytest.raises(ValueError):
         prepare(path, root / "task.md", root / "run")
     assert not calls and not (root / "run").exists()
 

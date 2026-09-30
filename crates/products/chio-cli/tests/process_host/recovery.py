@@ -123,7 +123,7 @@ capabilities:
         assert descriptor["credential"] not in json.dumps(response)
         assert out.stat().st_mode & 0o777 == 0o600
         assert descriptor["schema"] == "chio.process.connection.v1"
-        assert descriptor["abi"] == "chio.process.abi.v2"
+        assert descriptor["abi"] == "chio.process.abi.v3"
         assert descriptor["runtime_id"]
         assert descriptor["capability_id"]
         assert descriptor["process_id"] == process
@@ -193,7 +193,7 @@ capabilities:
     host_record = state / "host.json"
     recorded = host_record.read_bytes()
     host_json = json.loads(recorded)
-    assert host_json["abi"] == "chio.process.abi.v2"
+    assert host_json["abi"] == "chio.process.abi.v3"
     assert host_json["written_by"].startswith("chio-cli ")
     host_record.write_bytes(json.dumps({**host_json, "abi": "chio.process.abi.v0"}).encode())
     refused = cli(
@@ -217,7 +217,7 @@ capabilities:
     assert (state / "authority.db").read_bytes() == before_export
     status = cli("status", "--state", state)
     assert status["abi"] == {
-        "serving": "chio.process.abi.v2",
+        "serving": "chio.process.abi.v3",
         "host": "chio.process.abi.v0",
         "written_by": host_json["written_by"],
     }

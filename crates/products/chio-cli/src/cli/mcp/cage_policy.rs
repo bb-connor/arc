@@ -12,15 +12,14 @@ const MAX_CAGE_POLICY_BYTES: usize = 4 * 1024 * 1024;
 
 #[path = "cage_policy/evidence.rs"]
 mod evidence;
+pub(crate) use evidence::{
+    NativeLaunchEvidence, NativeLaunchObservation, verify_broker_native_launch_evidence,
+    verify_native_launch_evidence, verify_native_launch_observation, verify_native_start_file,
+};
 #[cfg(target_os = "linux")]
 pub(crate) use evidence::{
     export_broker_native_launch_evidence, export_native_launch_evidence,
     export_native_launch_observations,
-};
-pub(crate) use evidence::{
-    verify_broker_native_launch_evidence, verify_native_launch_evidence,
-    verify_native_launch_observation, verify_native_start_file, NativeLaunchEvidence,
-    NativeLaunchObservation,
 };
 
 #[cfg(all(test, target_os = "linux"))]
@@ -360,6 +359,7 @@ pub(super) struct ProvisionedCagePolicyInput {
     pub(super) stage: chio_security_types::EnterpriseMigrationStage,
     pub(super) ceilings: ProvisionedCeilings,
     pub(super) broker: Option<ProvisionedBrokerBinding>,
+    pub(super) syscall_profile: chio_manifest::NativeSyscallProfile,
     pub(super) receipt_capability_id: String,
     pub(super) receipt_tenant_id: Option<String>,
     pub(super) cage_init_path: PathBuf,
@@ -431,7 +431,16 @@ impl ProvisionedCagePolicyFactory {
             }
             chio_manifest::NativeSyscallProfile::BrokeredNativeV1
         } else {
-            chio_manifest::NativeSyscallProfile::NativeMinimalV1
+            if !matches!(
+                input.syscall_profile,
+                chio_manifest::NativeSyscallProfile::NativeMinimalV1
+                    | chio_manifest::NativeSyscallProfile::NativeStandardV1
+            ) {
+                return Err(CliError::cli_other_error(
+                    "nonbroker provisioning requires a reviewed native syscall profile",
+                ));
+            }
+            input.syscall_profile
         };
         if permissions.native_syscall_profile != expected_profile
             || permissions.network_destinations.is_some()
@@ -552,7 +561,7 @@ impl ProvisionedCagePolicyFactory {
                 native_syscall_profiles: [if self.input.broker.is_some() {
                     chio_manifest::NativeSyscallProfile::BrokeredNativeV1
                 } else {
-                    chio_manifest::NativeSyscallProfile::NativeMinimalV1
+                    self.input.syscall_profile
                 }]
                 .into_iter()
                 .collect(),

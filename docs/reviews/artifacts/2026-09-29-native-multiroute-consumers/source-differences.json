@@ -1,0 +1,74 @@
+[
+  {
+    "path": "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/broker.rs",
+    "local_sha256": "849846e86eeb7e77bfdfb9423751228c63b071eff5f6b14597f48a68c4eb15e6",
+    "native_sha256": "f3050c68cb4d0679ec561e4ffcdff592c874498b1d3168b796d622e4f91fc32a",
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/products/chio-cli/PROCESS_HOST.md",
+    "local_sha256": "4c6cb59781838472506c7a9aa38bf3fa3d401d69b4a64c5e3eef48fa5ab9457f",
+    "native_sha256": "8b10fd298694c15ac0ead053a65f21f90ed7f10e4871b77f483cf08133686364",
+    "difference": "documentation update"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/cage_policy/evidence.rs",
+    "local_sha256": "9b2675831726188d78654da28f65970ba3b03c982a38be83a6a99d684f715cfb",
+    "native_sha256": "b20e15dd8ef1b187c649fb0f4cd77ccce18605dfb8356a64ad038748a3ff5250",
+    "difference": "formatting only; production behavior unchanged"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/cage_policy/evidence_tests.rs",
+    "local_sha256": "b6ab5c1d5cd4819aa4b63a7befb04ae40224d7031a8ac88cfcccd603e0d01e53",
+    "native_sha256": "19fea1e279447066ba130d2ac175d4364d458359b0e5b2c0d33872c03e2e6b95",
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/cage_policy/tests.rs",
+    "local_sha256": "4f65b9677ee44dfd4d4b649bd25679644b0292ed9c76eed4152a28a63d597f2f",
+    "native_sha256": "3dd1936b6399b7b5e7d8c20c3ee05d8bc6fb4cf8648615194a217f9d776482af",
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/mcp/cage_receipt_tests.rs",
+    "local_sha256": "e819aa48d5b4df20fa811ed462038bc78f1f9b39e979217124b2437258901395",
+    "native_sha256": "865d01c4a2fbb02935a8188444898bc9a2dbacd99754b8b1bd9305a41b8a4be3",
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs",
+    "local_sha256": "131c9a6b24487465b5d6974ed7dcdcf0340ef91ccd95de88e8dcdf13a3707716",
+    "native_sha256": "361241953da20499d9d31111e013d02bd09a906023a26aaa71eddd742b32bc49",
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/current-native-budget-kernel.pub",
+    "local_sha256": "6981e8375009b978c1d7de897128205d09148a7a625cae1f19fc01ba81a5a784",
+    "native_sha256": null,
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/current-native-budget-pins.json",
+    "local_sha256": "6f69527b3b470978538f8f253152ea31499d1d00316f87224f4b269de818f327",
+    "native_sha256": null,
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/current-native-budget.json",
+    "local_sha256": "a7226862742a02e1c0a1715199edd6f295be0a59aa6fec9373ce12ff45e2bf1b",
+    "native_sha256": null,
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/provenance.json",
+    "local_sha256": "58bbef13ae19b0426dce49f0276b200f52ff1b04670911e75e7dce6a44b69434",
+    "native_sha256": "0cbf15a84f98f96e266cbb93ed8f75e8b5abeb7959a74565ade80090fca46a30",
+    "difference": "local test/fixture update or test formatting"
+  },
+  {
+    "path": "crates/security/chio-cage/src/linux.rs",
+    "local_sha256": "fc6aaea1038d15202705769f22c364f681fc16da3663816b223759db750d32d6",
+    "native_sha256": "8e1943a06cbf364cacd59a0b577d74ce604ec59a3a2896d1801cabaed4e1a4e4",
+    "difference": "formatting only; production behavior unchanged"
+  }
+]

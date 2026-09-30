@@ -1,0 +1,14 @@
+Observed through journalctl -k during this batch. These diagnostic excerpts
+were copied from tool output; they are not signed qualification evidence.
+
+2026-09-30T03:49:57 UTC: audit type=1326, event 1790740197.488:146,
+pid=97721, comm=python, sig=31, arch=c000003e, syscall=25,
+code=0x80000000. Profile-build-3 discovery still selected the minimal profile.
+
+2026-09-30T04:01:05 UTC: audit type=1326, event 1790740865.013:148,
+pid=105278, comm=python, sig=31, arch=c000003e, syscall=63,
+code=0x80000000. Profile-build-4 discovery selected standard, which still
+needed uname for CPython's UUID/platform import.
+
+The uninstrumented python-native-8.json records the successful probe after
+discovery profile propagation and the reviewed standard-profile uname rule.

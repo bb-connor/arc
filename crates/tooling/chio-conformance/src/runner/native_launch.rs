@@ -30,23 +30,21 @@ fn cage_arguments(
         arguments.push(required_path(&setting, variable)?);
     }
     let grants_file = required_path(&setting, "CHIO_CAGE_READ_PATHS_FILE")?;
-    let mut grants = String::new();
-    File::open(grants_file)?
-        .take(MAX_READ_GRANTS_BYTES + 1)
-        .read_to_string(&mut grants)?;
-    if grants.len() as u64 > MAX_READ_GRANTS_BYTES {
-        return Err(RunnerError::InvalidSecurityMaterial(
-            "native read grants exceed 64 KiB".into(),
-        ));
+    path_arguments(&mut arguments, &grants_file, "--read-path")?;
+    if setting("CHIO_CAGE_RUNTIME_FILES_FILE").is_some() {
+        let runtime_file = required_path(&setting, "CHIO_CAGE_RUNTIME_FILES_FILE")?;
+        path_arguments(&mut arguments, &runtime_file, "--runtime-file")?;
     }
-    for path in grants.lines().filter(|line| !line.is_empty()) {
-        if !Path::new(path).is_absolute() {
+    if let Some(profile) = setting("CHIO_CAGE_SYSCALL_PROFILE") {
+        if !matches!(
+            profile.to_str(),
+            Some("native-minimal-v1" | "native-standard-v1")
+        ) {
             return Err(RunnerError::InvalidSecurityMaterial(
-                "native read grants must be absolute paths".into(),
+                "CHIO_CAGE_SYSCALL_PROFILE must select a reviewed native profile".into(),
             ));
         }
-        arguments.push("--read-path".into());
-        arguments.push(path.into());
+        arguments.extend(["--syscall-profile".into(), profile]);
     }
     let uid = identity_id(&setting, "CHIO_CAGE_EXECUTION_UID")?;
     let gid = identity_id(&setting, "CHIO_CAGE_EXECUTION_GID")?;
@@ -89,6 +87,32 @@ fn cage_arguments(
         ]);
     }
     Ok(arguments)
+}
+
+fn path_arguments(
+    arguments: &mut Vec<OsString>,
+    source: &OsString,
+    flag: &str,
+) -> Result<(), RunnerError> {
+    let mut paths = String::new();
+    File::open(source)?
+        .take(MAX_READ_GRANTS_BYTES + 1)
+        .read_to_string(&mut paths)?;
+    if paths.len() as u64 > MAX_READ_GRANTS_BYTES {
+        return Err(RunnerError::InvalidSecurityMaterial(
+            "native path declarations exceed 64 KiB".into(),
+        ));
+    }
+    for path in paths.lines().filter(|line| !line.is_empty()) {
+        if !Path::new(path).is_absolute() {
+            return Err(RunnerError::InvalidSecurityMaterial(
+                "native path declarations must be absolute paths".into(),
+            ));
+        }
+        arguments.push(flag.into());
+        arguments.push(path.into());
+    }
+    Ok(())
 }
 
 fn identity_id(
@@ -189,6 +213,39 @@ mod tests {
         }
         Ok(())
     }
+
+    #[test]
+    fn dynamic_runtime_files_are_explicit_bounded_paths() -> Result<(), RunnerError> {
+        let root = tempfile::tempdir()?;
+        let paths = root.path().join("paths");
+        for (input, valid) in [("/lib/loader.so\n", true), ("relative.so\n", false)] {
+            std::fs::write(&paths, input)?;
+            let result = cage_arguments(|name| match name {
+                "CHIO_CAGE_EXECUTION_UID" | "CHIO_CAGE_EXECUTION_GID" => Some("10001".into()),
+                "CHIO_CAGE_EXECUTION_SUPPLEMENTARY_GIDS" => Some("".into()),
+                "CHIO_CAGE_SYSCALL_PROFILE" => Some("native-standard-v1".into()),
+                "CHIO_CAGE_READ_PATHS_FILE" | "CHIO_CAGE_RUNTIME_FILES_FILE" => {
+                    Some(paths.clone().into_os_string())
+                }
+                _ => Some("/configured".into()),
+            });
+            if valid {
+                let arguments = result?;
+                assert!(arguments.windows(2).any(|pair| {
+                    pair == [
+                        OsString::from("--runtime-file"),
+                        OsString::from("/lib/loader.so"),
+                    ]
+                }));
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(RunnerError::InvalidSecurityMaterial(_))
+                ));
+            }
+        }
+        Ok(())
+    }
     #[test]
     fn identities_and_group_sets_are_explicit_and_bounded() -> Result<(), RunnerError> {
         let root = tempfile::tempdir()?;
@@ -211,6 +268,12 @@ mod tests {
             ),
         ] {
             let result = cage_arguments(|name| {
+                if matches!(
+                    name,
+                    "CHIO_CAGE_RUNTIME_FILES_FILE" | "CHIO_CAGE_SYSCALL_PROFILE"
+                ) {
+                    return None;
+                }
                 Some(match name {
                     "CHIO_CAGE_EXECUTION_UID" => uid.into(),
                     "CHIO_CAGE_EXECUTION_GID" => "1002".into(),

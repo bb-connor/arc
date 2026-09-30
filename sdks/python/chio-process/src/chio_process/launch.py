@@ -20,7 +20,11 @@ def demo_python() -> str:
     A system interpreter may replace a writable development interpreter. Tools
     needing installed dependencies must select and protect their own executable.
     """
-    for candidate in (sys.executable, "/usr/bin/python3", "/usr/local/bin/python3"):
+    selected = os.environ.get("CHIO_DEMO_PYTHON")
+    candidates = (
+        (selected,) if selected else (sys.executable, "/usr/bin/python3", "/usr/local/bin/python3")
+    )
+    for candidate in candidates:
         path = Path(candidate).resolve()
         if path.is_file() and os.access(path, os.X_OK):
             mode = path.stat().st_mode
@@ -49,6 +53,8 @@ def provision_native_demo(
     operators must separately supply it when starting the process host.
     Enforcement inputs come from the operator's CHIO_CAGE_INIT,
     CHIO_RECEIPT_ANCHOR_ROOT and CHIO_CAGE_READ_PATHS_FILE environment settings.
+    Dynamic targets also require CHIO_CAGE_RUNTIME_FILES_FILE to declare their
+    exact loader and shared objects, each included in the reviewed read grants.
     """
     if not command or not command[0]:
         raise ValueError("A native MCP command is required")
@@ -133,10 +139,26 @@ def _native_cage_authority_arguments() -> list[str]:
 
 def _native_cage_arguments(output: Path) -> list[str]:
     arguments = _native_cage_authority_arguments()
+    profile = os.environ.get("CHIO_CAGE_SYSCALL_PROFILE")
+    if profile is not None:
+        if profile not in {"native-minimal-v1", "native-standard-v1"}:
+            raise ValueError("CHIO_CAGE_SYSCALL_PROFILE must select a reviewed native profile")
+        arguments.extend(["--syscall-profile", profile])
     grants = os.environ.get("CHIO_CAGE_READ_PATHS_FILE", "")
     if not os.path.isabs(grants):
         raise ValueError("CHIO_CAGE_READ_PATHS_FILE must name the reviewed read-grants file")
-    with open(grants, encoding="utf-8") as handle:
+    arguments.extend(_native_path_arguments(grants, "--read-path", output))
+    runtime = os.environ.get("CHIO_CAGE_RUNTIME_FILES_FILE")
+    if runtime is not None:
+        if not os.path.isabs(runtime):
+            raise ValueError("CHIO_CAGE_RUNTIME_FILES_FILE must name an absolute path")
+        arguments.extend(_native_path_arguments(runtime, "--runtime-file", output))
+    return arguments
+
+
+def _native_path_arguments(source: str, flag: str, output: Path) -> list[str]:
+    arguments = []
+    with open(source, encoding="utf-8") as handle:
         text = handle.read(64 * 1024 + 1)
         if len(text.encode("utf-8")) > 64 * 1024:
             raise ValueError("native read grants exceed 64 KiB")
@@ -152,5 +174,5 @@ def _native_cage_arguments(output: Path) -> list[str]:
                 for protected in (output, anchor)
             ):
                 raise ValueError("read grants cannot include launch authority or receipt anchors")
-            arguments.extend(["--read-path", str(grant)])
+            arguments.extend([flag, str(grant)])
     return arguments

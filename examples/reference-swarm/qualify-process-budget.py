@@ -90,12 +90,17 @@ def main():
                     with closing(sqlite3.connect(
                         f"file:{runner_db}?mode=ro", uri=True
                     )) as db:
-                        runner_states = {
-                            name: (state, attempts)
-                            for name, state, attempts in db.execute(
-                                "SELECT process,state,attempts FROM run_workers"
-                            )
-                        }
+                        # File creation precedes the runner's first schema commit.
+                        # An empty catalog is still startup, not failed contention.
+                        if db.execute(
+                            "SELECT 1 FROM sqlite_schema WHERE type='table' AND name='run_workers'"
+                        ).fetchone():
+                            runner_states = {
+                                name: (state, attempts)
+                                for name, state, attempts in db.execute(
+                                    "SELECT process,state,attempts FROM run_workers"
+                                )
+                            }
                 if len(written) == 2 and len(checkpoints) == 2:
                     assert set(written).isdisjoint(checkpoints), checkpoints
                     if any(

@@ -100,22 +100,25 @@ projection. Native x86_64 discovery and the two process recovery campaigns now
 pass on the restored OCI worker. Full mini-SWE and the other native consumers
 are not qualified by those fixtures.
 
-The next substantial batch is the remainder of native task 1:
+The [multi-route consumer batch](2026-09-29-native-multiroute-consumers-execution.md)
+implements bounded per-route broker authority, host-owned Docker/provider
+adapters, durable prepared requests and mini-SWE model/execution callers. Native
+broker tests and a fresh four-worker budget-contention/crash/recovery campaign
+pass. Those results do not close native task 1. The remaining substantial work is:
 
-1. Extend the current single-route process-host broker composition to explicit
-   per-route Docker and model transport participants, preserving original
-   signed requests, quota/flow authority and terminal custody across restart.
-2. Add host-owned Docker execution and provider adapters. Caged tools receive
-   only their prepared authenticated broker stream; Docker sockets, provider
-   credentials and network authority remain outside the cage.
-3. Convert mini-SWE sandbox/model callers and dependency inputs to those
-   contracts. The remaining interpreter-based consumers also need a bounded
-   dependency closure compatible with 64 retained read resources and exact-file
-   writes; broad /usr or writable-directory grants are not valid fixtures.
-4. Run the mini-SWE recovery, native worker, provider/operator/session/public
-   repository campaigns, then the packaged SDK/example and conformance
-   consumers on the retained x86_64 worker. Preserve each terminal outcome.
-   Existing native discovery and process recovery should remain regression gates.
+1. Finish scalable retained-history verification in the hot native lifecycle.
+   The optimized mini-SWE baseline completes four calls, then its fifth handoff
+   fails under the existing deadline. Preserve original custody and fail-closed
+   corruption/rollback checks while removing repeated transaction-local work.
+2. Migrate operator/session/public repository launchers to host-owned broker
+   authority with their complete repository/scope/receipt proof chain. The
+   explicit CPython closure is implemented; remaining interpreter consumers
+   still need exact application reads and writes, not broad directory grants.
+3. Complete mini-SWE baseline, crash/restart and unknown-effect campaigns, then
+   provider/operator/session/public repository and packaged SDK/example/
+   conformance campaigns. Wire the bounded runtime and migrated callers into
+   native CI without skipping existing discovery and recovery gates. Preserve
+   every terminal result and separate source/binary identities.
 
 Broader semantic error taxonomy, other product/protocol readers, and the
 remaining structural/declaration/assurance queues below remain open.
