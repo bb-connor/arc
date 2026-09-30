@@ -140,7 +140,7 @@ pub(crate) fn dispatch_chio_runtime_command(command: ChioRuntimeCommands) -> Res
                 &profile,
                 &store,
                 &evidence_dir,
-                now_unix_ms.unwrap_or_else(unix_now_ms),
+                now_unix_ms.map_or_else(unix_now_ms, Ok)?,
                 &report,
             ),
             ChioRuntimeOrchestrateCommands::Drift {
@@ -232,7 +232,7 @@ pub(crate) fn dispatch_chio_runtime_command(command: ChioRuntimeCommands) -> Res
                 &run_id,
                 &store,
                 &evidence_root,
-                now_unix_ms.unwrap_or_else(unix_now_ms),
+                now_unix_ms.map_or_else(unix_now_ms, Ok)?,
                 &report,
             ),
             ChioRuntimeOpsCommands::ProviderHealth {
@@ -243,7 +243,7 @@ pub(crate) fn dispatch_chio_runtime_command(command: ChioRuntimeCommands) -> Res
             } => cmd_chio_runtime_ops_provider_health(
                 &supervisor_profile,
                 &provider_bindings,
-                now_unix_ms.unwrap_or_else(unix_now_ms),
+                now_unix_ms.map_or_else(unix_now_ms, Ok)?,
                 &report,
             ),
             ChioRuntimeOpsCommands::Retention { command } => match command {

@@ -18,14 +18,14 @@ use finding_challenge::cmd_finding_challenge;
 
 #[path = "finding/operator.rs"]
 mod finding_operator;
-use finding_operator::{cmd_finding_operator_init, cmd_finding_operator_serve, cmd_finding_operator_tick};
 use finding_operator::cmd_finding_operator_repair_challenge_retention;
+use finding_operator::{
+    cmd_finding_operator_init, cmd_finding_operator_serve, cmd_finding_operator_tick,
+};
 
 #[path = "finding/hosted.rs"]
 mod finding_hosted;
-use finding_hosted::{
-    cmd_finding_operator_evaluate_canary, cmd_finding_operator_validate_hosted,
-};
+use finding_hosted::{cmd_finding_operator_evaluate_canary, cmd_finding_operator_validate_hosted};
 
 #[path = "finding/verified_fix.rs"]
 mod finding_verified_fix;
@@ -57,9 +57,9 @@ const FINDING_STATUS_RESPONSE_MAX_BYTES: usize = 512 * 1024;
 
 #[path = "finding/status_floor.rs"]
 mod status_floor;
-use status_floor::{FindingStatusFloorLock, FindingStatusFloorObservation};
 #[cfg(test)]
 use status_floor::read_status_floor;
+use status_floor::{FindingStatusFloorLock, FindingStatusFloorObservation};
 
 pub(crate) fn dispatch_finding(
     command: FindingCommands,
@@ -87,9 +87,7 @@ pub(crate) fn dispatch_finding(
                 &seller_payout,
                 json_output,
             ),
-            FindingOperatorCommands::Serve { profile } => {
-                cmd_finding_operator_serve(&profile)
-            }
+            FindingOperatorCommands::Serve { profile } => cmd_finding_operator_serve(&profile),
             FindingOperatorCommands::Tick { profile } => {
                 cmd_finding_operator_tick(&profile, json_output)
             }
@@ -98,15 +96,13 @@ pub(crate) fn dispatch_finding(
                 bundle,
                 receipt,
                 receipt_signing_seed_env,
-            } => {
-                cmd_finding_operator_repair_challenge_retention(
-                    &database,
-                    &bundle,
-                    &receipt,
-                    &receipt_signing_seed_env,
-                    json_output,
-                )
-            }
+            } => cmd_finding_operator_repair_challenge_retention(
+                &database,
+                &bundle,
+                &receipt,
+                &receipt_signing_seed_env,
+                json_output,
+            ),
             FindingOperatorCommands::ValidateHosted { profile } => {
                 cmd_finding_operator_validate_hosted(&profile, json_output)
             }
@@ -279,12 +275,8 @@ pub(super) fn require_finding_id(value: &str) -> Result<&str, CliError> {
 }
 
 fn http_status_error(status: u16, response: ureq::Response) -> CliError {
-    let message = response
-        .into_string()
-        .ok()
-        .filter(|body| !body.trim().is_empty())
-        .unwrap_or_else(|| format!("request failed with status {status}"));
-    CliError::transport_error(message)
+    let _ = response;
+    CliError::transport_error(format!("finding request failed with HTTP {status}"))
 }
 
 /// Fetch the exact stored bytes of one artifact from the public
@@ -292,7 +284,10 @@ fn http_status_error(status: u16, response: ureq::Response) -> CliError {
 /// response body is the canonical artifact and never a reserialization.
 pub(super) fn fetch_finding_bytes(control_url: &str, finding_id: &str) -> Result<String, CliError> {
     let url = finding_endpoint(control_url, &format!("/v1/findings/{finding_id}"));
-    match ureq::get(&url).call() {
+    match ureq::get(&url)
+        .timeout(std::time::Duration::from_secs(30))
+        .call()
+    {
         Ok(response) => read_bounded_response(response, MAX_RAW_FINDING_BYTES, "finding response"),
         Err(ureq::Error::Status(status, _)) => Err(CliError::transport_error(format!(
             "finding request failed with status {status}"
@@ -319,7 +314,7 @@ fn cmd_finding_publish(
     let url = require_control_url(control_url)?;
     let token = require_control_token(control_token)?;
 
-    let raw = fs::read(file)?;
+    let raw = crate::input::read_regular(file, FINDING_PUBLISH_MAX_BODY_BYTES)?;
     if raw.len() > FINDING_PUBLISH_MAX_BODY_BYTES {
         return Err(CliError::cli_other_error(format!(
             "{} is {} bytes, above the {FINDING_PUBLISH_MAX_BODY_BYTES} byte publish bound",
@@ -331,11 +326,13 @@ fn cmd_finding_publish(
         CliError::cli_other_error(format!("{} is not valid UTF-8: {error}", file.display()))
     })?;
 
+    let accepted = finding_verify::strict_finding_ingress(artifact, "publish input")?;
     let endpoint = finding_endpoint(url, FINDING_PUBLISH_PATH);
     let response = match ureq::post(&endpoint)
+        .timeout(std::time::Duration::from_secs(30))
         .set(AUTHORIZATION_HEADER, &format!("Bearer {token}"))
         .set("Content-Type", "application/json")
-        .send_string(&artifact)
+        .send_string(&accepted.raw)
     {
         Ok(response) => response,
         Err(ureq::Error::Status(status, response)) => {
@@ -347,7 +344,16 @@ fn cmd_finding_publish(
             )))
         }
     };
-    let published: FindingPublishResponse = serde_json::from_reader(response.into_reader())?;
+    let published: FindingPublishResponse = crate::input::json(&crate::input::read_stream(
+        response.into_reader(),
+        crate::input::MAX_DOCUMENT_BYTES,
+    )?)?;
+
+    validate_publish_response(
+        &published,
+        &accepted.finding.finding_id,
+        &accepted.artifact_sha256,
+    )?;
 
     if json_output {
         println!(
@@ -435,10 +441,15 @@ fn cmd_finding_search(
     })?;
     let endpoint = format!("{}?{encoded}", finding_endpoint(url, FINDING_SEARCH_PATH));
 
-    let body = match ureq::get(&endpoint).call() {
-        Ok(response) => response.into_string().map_err(|error| {
-            CliError::transport_error(format!("failed to read search response body: {error}"))
-        })?,
+    let body = match ureq::get(&endpoint)
+        .timeout(std::time::Duration::from_secs(30))
+        .call()
+    {
+        Ok(response) => read_bounded_response(
+            response,
+            crate::input::MAX_DOCUMENT_BYTES,
+            "search response",
+        )?,
         Err(ureq::Error::Status(status, response)) => {
             return Err(http_status_error(status, response))
         }
@@ -450,12 +461,12 @@ fn cmd_finding_search(
     };
 
     if json_output {
-        let value: serde_json::Value = serde_json::from_str(&body)?;
+        let value: serde_json::Value = crate::input::text(&body)?;
         println!("{}", serde_json::to_string_pretty(&value)?);
         return Ok(());
     }
 
-    let page: FindingSearchPage = serde_json::from_str(&body)?;
+    let page: FindingSearchPage = crate::input::text(&body)?;
     println!(
         "{:<64}  {:<40}  {:<12}  ADMISSION",
         "FINDING_ID", "TOPIC", "EXPIRES_AT"
@@ -522,7 +533,7 @@ fn purchase_http_status_error(status: u16, response: ureq::Response) -> CliError
         }
     };
     let strict = chio_core::canonical::canonical_json_bytes_from_str(&body);
-    let parsed = serde_json::from_str::<FindingPurchaseErrorBody>(&body);
+    let parsed = crate::input::text::<FindingPurchaseErrorBody>(&body);
     match (strict, parsed) {
         (Ok(strict), Ok(error))
             if strict.as_slice() == body.as_bytes()
@@ -586,6 +597,7 @@ fn cmd_finding_buy(
     let request_bytes = chio_core::canonical_json_bytes(&request)?;
     let endpoint = finding_endpoint(url, &format!("/v1/findings/{finding_id}/purchase"));
     let response = match ureq::post(&endpoint)
+        .timeout(std::time::Duration::from_secs(30))
         .set(AUTHORIZATION_HEADER, &format!("Bearer {token}"))
         .set("Content-Type", "application/json")
         .send_bytes(&request_bytes)
@@ -644,16 +656,16 @@ fn parse_purchase_result(
             "purchase response bytes are not canonical".to_owned(),
         ));
     }
-    let result: FindingPurchaseResult = serde_json::from_str(raw)?;
+    let result: FindingPurchaseResult = crate::input::text(raw)?;
     let typed = chio_core::canonical_json_bytes(&result)?;
     if typed != strict {
         return Err(CliError::transport_shape_error(
             "purchase response typed bytes drift from the accepted response".to_owned(),
         ));
     }
-    result
-        .validate_shape(request)
-        .map_err(|error| CliError::transport_shape_error(format!("invalid purchase result: {error}")))?;
+    result.validate_shape(request).map_err(|error| {
+        CliError::transport_shape_error(format!("invalid purchase result: {error}"))
+    })?;
     Ok(result)
 }
 
@@ -678,8 +690,8 @@ fn verify_purchased_output(
         "media_type": output.media_type,
         "payload_b64": output.payload_b64,
     });
-    let digest = chio_core::canonical_json_bytes(&reveal)
-        .map(|bytes| chio_core::sha256_hex(&bytes))?;
+    let digest =
+        chio_core::canonical_json_bytes(&reveal).map(|bytes| chio_core::sha256_hex(&bytes))?;
     if digest != finding.payload_sha256 {
         return Err(CliError::transport_shape_error(
             "purchased output does not match the signed finding commitment".to_owned(),
@@ -697,10 +709,13 @@ fn emit_purchase_result(result: &FindingPurchaseResult, json_output: bool) -> Re
     println!("finding_id:        {}", result.finding_id);
     println!("payer:             {}", result.payer);
     println!("payer_key:         {}", result.payer_key.to_hex());
-    println!("verdict:           {}", match result.verdict {
-        FindingPurchaseVerdict::Allow => "allow",
-        FindingPurchaseVerdict::Deny => "deny",
-    });
+    println!(
+        "verdict:           {}",
+        match result.verdict {
+            FindingPurchaseVerdict::Allow => "allow",
+            FindingPurchaseVerdict::Deny => "deny",
+        }
+    );
     println!("settlement:        {}", match result.settlement {
         chio_control_plane::trust_control::finding_purchase_routes::FindingPurchaseSettlementTerminal::Captured => "captured",
         chio_control_plane::trust_control::finding_purchase_routes::FindingPurchaseSettlementTerminal::Released => "released",
@@ -796,10 +811,7 @@ fn load_status_operator_authorization(
     path: &Path,
     expected_feed: &str,
 ) -> Result<chio_finding::FindingStatusOperatorAuthorization, CliError> {
-    let mut reader = std::fs::File::open(path)?
-        .take((FINDING_STATUS_AUTHORIZATION_MAX_BYTES as u64).saturating_add(1));
-    let mut bytes = Vec::with_capacity(FINDING_STATUS_AUTHORIZATION_MAX_BYTES.saturating_add(1));
-    reader.read_to_end(&mut bytes)?;
+    let bytes = crate::input::read_regular(path, FINDING_STATUS_AUTHORIZATION_MAX_BYTES)?;
     if bytes.len() > FINDING_STATUS_AUTHORIZATION_MAX_BYTES {
         return Err(CliError::cli_other_error(format!(
             "{} exceeds the finding status operator authorization bound",
@@ -822,7 +834,7 @@ fn load_status_operator_authorization(
         )));
     }
     let authorization: chio_finding::FindingStatusOperatorAuthorization =
-        serde_json::from_slice(&bytes)?;
+        crate::input::json(&bytes)?;
     authorization.validate().map_err(|error| {
         CliError::cli_other_error(format!(
             "finding status operator authorization is invalid: {error}"
@@ -843,10 +855,7 @@ fn load_status_service_bond(
     authorization_sha256: &str,
     now: u64,
 ) -> Result<chio_control_plane::trust_control::FindingStatusServiceBond, CliError> {
-    let mut reader = std::fs::File::open(path)?
-        .take((FINDING_STATUS_SERVICE_BOND_MAX_BYTES as u64).saturating_add(1));
-    let mut bytes = Vec::with_capacity(FINDING_STATUS_SERVICE_BOND_MAX_BYTES.saturating_add(1));
-    reader.read_to_end(&mut bytes)?;
+    let bytes = crate::input::read_regular(path, FINDING_STATUS_SERVICE_BOND_MAX_BYTES)?;
     if bytes.len() > FINDING_STATUS_SERVICE_BOND_MAX_BYTES {
         return Err(CliError::cli_other_error(format!(
             "{} exceeds the finding status service-bond bound",
@@ -869,7 +878,7 @@ fn load_status_service_bond(
         )));
     }
     let bond: chio_control_plane::trust_control::FindingStatusServiceBond =
-        serde_json::from_slice(&bytes)?;
+        crate::input::json(&bytes)?;
     let operator = chio_control_plane::trust_control::FindingStatusOperatorPin {
         feed_id: authorization.feed_id.clone(),
         role: chio_control_plane::trust_control::FINDING_STATUS_OPERATOR_ROLE.to_owned(),
@@ -918,10 +927,10 @@ fn verify_status_projection(
             "finding status response binds different service-bond evidence".to_owned(),
         ));
     }
-    let max_proof_b64 = (chio_finding::MAX_FINDING_STATUS_PROOF_BYTES.saturating_add(2) / 3)
-        .saturating_mul(4);
-    let max_epoch_b64 = (chio_finding::MAX_FINDING_STATUS_EPOCH_BYTES.saturating_add(2) / 3)
-        .saturating_mul(4);
+    let max_proof_b64 =
+        (chio_finding::MAX_FINDING_STATUS_PROOF_BYTES.saturating_add(2) / 3).saturating_mul(4);
+    let max_epoch_b64 =
+        (chio_finding::MAX_FINDING_STATUS_EPOCH_BYTES.saturating_add(2) / 3).saturating_mul(4);
     if response.proof_input_b64.len() > max_proof_b64
         || response.signed_epoch_b64.len() > max_epoch_b64
     {
@@ -938,7 +947,9 @@ fn verify_status_projection(
         ));
     }
     let proof = chio_finding::parse_status_proof_input(&proof_bytes).map_err(|error| {
-        CliError::cli_other_error(format!("finding status proof is not strict canonical input: {error}"))
+        CliError::cli_other_error(format!(
+            "finding status proof is not strict canonical input: {error}"
+        ))
     })?;
     let (
         proof_kind,
@@ -1001,7 +1012,9 @@ fn verify_status_projection(
         ));
     }
     let epoch = chio_finding::parse_signed_status_epoch(&epoch_bytes).map_err(|error| {
-        CliError::cli_other_error(format!("finding status epoch is not strict canonical input: {error}"))
+        CliError::cli_other_error(format!(
+            "finding status epoch is not strict canonical input: {error}"
+        ))
     })?;
     if epoch.body.feed_id != response.feed_id
         || epoch.body.key_domain_nonce != response.key_domain_nonce
@@ -1011,7 +1024,9 @@ fn verify_status_projection(
         || epoch.body.valid_until != response.valid_until
         || epoch.signer_key != epoch.body.operator_key
         || !epoch.verify_signature().map_err(|error| {
-            CliError::cli_other_error(format!("finding status epoch signature check failed: {error}"))
+            CliError::cli_other_error(format!(
+                "finding status epoch signature check failed: {error}"
+            ))
         })?
     {
         return Err(CliError::cli_other_error(
@@ -1058,12 +1073,10 @@ fn cmd_finding_status(
         ));
     }
     let authorization = load_status_operator_authorization(operator_authorization, feed_id)?;
-    let authorization_sha256 = chio_core::sha256_hex(&chio_core::canonical_json_bytes(&authorization)?);
+    let authorization_sha256 =
+        chio_core::sha256_hex(&chio_core::canonical_json_bytes(&authorization)?);
     let _floor_lock = FindingStatusFloorLock::acquire(rollback_floor)?;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|error| CliError::cli_other_error(format!("system clock is invalid: {error}")))?
-        .as_secs();
+    let now = crate::input::time::seconds()?;
     status_floor::advance_trusted_time_locked(rollback_floor, now)?;
     let service_bond = load_status_service_bond(
         service_bond,
@@ -1077,7 +1090,10 @@ fn cmd_finding_status(
         url,
         &format!("/v1/findings/status/{encoded_feed}/proof/{finding_id}"),
     );
-    let response = match ureq::get(&endpoint).call() {
+    let response = match ureq::get(&endpoint)
+        .timeout(std::time::Duration::from_secs(30))
+        .call()
+    {
         Ok(response) => response,
         Err(ureq::Error::Status(status, response)) => {
             return Err(http_status_error(status, response))
@@ -1093,11 +1109,8 @@ fn cmd_finding_status(
         FINDING_STATUS_RESPONSE_MAX_BYTES,
         "finding status response",
     )?;
-    let status: FindingStatusProofResponse = serde_json::from_str(&raw_status)?;
-    let post_fetch_now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|error| CliError::cli_other_error(format!("system clock is invalid: {error}")))?
-        .as_secs();
+    let status: FindingStatusProofResponse = crate::input::text(&raw_status)?;
+    let post_fetch_now = crate::input::time::seconds()?;
     if post_fetch_now < now {
         return Err(CliError::cli_other_error(
             "finding status host clock rolled back during proof retrieval".to_owned(),
@@ -1162,3 +1175,37 @@ const AUTHORIZATION_HEADER: &str = "Authorization";
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 #[path = "finding/unit_tests.rs"]
 mod unit_tests;
+
+fn validate_publish_response(
+    response: &FindingPublishResponse,
+    finding_id: &str,
+    artifact_sha256: &str,
+) -> Result<(), CliError> {
+    if response.finding_id != finding_id || response.artifact_sha256 != artifact_sha256 {
+        return Err(CliError::transport_shape_error(
+            "publish acknowledgement binds a different finding or artifact",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod publish_binding_tests {
+    use super::*;
+    #[test]
+    fn publish_response_binds_both_identifier_and_original_digest() {
+        let valid = FindingPublishResponse {
+            finding_id: "a".repeat(64),
+            artifact_sha256: "b".repeat(64),
+        };
+        assert!(validate_publish_response(&valid, &"a".repeat(64), &"b".repeat(64)).is_ok());
+        for (id, digest) in [
+            ("c".repeat(64), "b".repeat(64)),
+            ("a".repeat(64), "c".repeat(64)),
+        ] {
+            let error = validate_publish_response(&valid, &id, &digest).unwrap_err();
+            assert!(error.to_string().contains("different finding or artifact"));
+        }
+    }
+}

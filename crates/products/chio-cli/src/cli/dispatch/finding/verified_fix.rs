@@ -4,21 +4,21 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use chio_control_plane::trust_control::finding_challenge_coordinator::FindingAuthorityStatusResolver;
+use chio_control_plane::trust_control::finding_operator_filing_resolver::finding_operator_bundle_artifact_indexes;
 use chio_control_plane::trust_control::finding_operator_profile::{
     FindingOperatorBuyerClientProfile, FindingOperatorClientProfile, FindingOperatorProfile,
     FindingOperatorSellerClientProfile, FINDING_OPERATOR_BUYER_CLIENT_SCHEMA,
     FINDING_OPERATOR_CLIENT_PROFILE_SCHEMA, FINDING_OPERATOR_PROFILE_SCHEMA,
     FINDING_OPERATOR_SELLER_CLIENT_SCHEMA,
 };
-use chio_control_plane::trust_control::finding_operator_filing_resolver::finding_operator_bundle_artifact_indexes;
 use chio_control_plane::trust_control::finding_operator_status::FindingOperatorAuthorityStatusResolver;
 use chio_control_plane::trust_control::finding_purchase_routes::{
     FindingPurchaseRequest, FindingPurchaseResult, FINDING_PURCHASE_MAX_RESULT_BYTES,
@@ -44,9 +44,7 @@ mod admission_lock;
 use admission_lock::FindingAdmissionJobLock;
 #[path = "verified_fix_sandbox.rs"]
 mod sandbox;
-use sandbox::{
-    require_sandbox, run_test_commands, runtime_fingerprint, PACKAGE_WORK_TIMEOUT,
-};
+use sandbox::{require_sandbox, run_test_commands, runtime_fingerprint, PACKAGE_WORK_TIMEOUT};
 #[path = "verified_fix_repository_sandbox.rs"]
 mod repository_sandbox;
 use repository_sandbox::{
@@ -170,7 +168,10 @@ pub(super) fn cmd_finding_package_verified_fix(
             "verified-fix baseline unexpectedly passed every test".to_owned(),
         ));
     }
-    if let Some(failure) = candidate_results.iter().find(|result| result.exit_code != 0) {
+    if let Some(failure) = candidate_results
+        .iter()
+        .find(|result| result.exit_code != 0)
+    {
         return Err(CliError::cli_other_error(format!(
             "verified-fix candidate failed `{}` with exit code {}",
             terminal_safe(&failure.command),
@@ -356,10 +357,9 @@ fn run_finding_admission(
     draft
         .verify_static(&profile)
         .map_err(CliError::cli_other_error)?;
-    let job_path = paths.reports_directory.join(format!(
-        "{}.admission-job.json",
-        draft.finding.finding_id
-    ));
+    let job_path = paths
+        .reports_directory
+        .join(format!("{}.admission-job.json", draft.finding.finding_id));
     let _job_lock = FindingAdmissionJobLock::acquire(&root)?;
     let mut job = load_or_create_admission_job(
         &job_path,
@@ -463,7 +463,7 @@ fn run_finding_admission(
     job.accepted_at = Some(accepted_at);
     let evaluation_time = job
         .evaluation_time
-        .unwrap_or(unix_time()?.max(accepted_at.saturating_add(1)));
+        .unwrap_or(unix_time()?.max(crate::input::time::deadline(accepted_at, 1)?));
     if evaluation_time <= accepted_at {
         return Err(CliError::cli_other_error(
             "admission job evaluation time does not follow collateral acceptance".to_owned(),
@@ -485,11 +485,7 @@ fn run_finding_admission(
         finding_operator_bundle_artifact_indexes(&finalization.bundle, Some(&profile.market))
             .map_err(CliError::cli_other_error)?;
     bundle_store
-        .put_with_artifact_indexes(
-            &draft.finding.finding_id,
-            &bundle_bytes,
-            &artifact_indexes,
-        )
+        .put_with_artifact_indexes(&draft.finding.finding_id, &bundle_bytes, &artifact_indexes)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let payload = decode_canonical_b64(&draft.payload_b64, MAX_PAYLOAD_BYTES, "payload")?;
     SqliteFindingPayloadStore::open(&paths.operator_database)
@@ -589,9 +585,10 @@ pub(super) fn cmd_finding_verify_bundle(
     let proof: FindingOperatorProofBundle = parse_canonical(&bytes, "proof bundle")?;
     let authorized_terminal = match (purchase_request_path, purchase_result_path) {
         (Some(request_path), Some(result_path)) => {
-            let request: FindingPurchaseRequest =
-                read_canonical_file(request_path, 64 * 1024)?;
-            request.validate().map_err(CliError::transport_shape_error)?;
+            let request: FindingPurchaseRequest = read_canonical_file(request_path, 64 * 1024)?;
+            request
+                .validate()
+                .map_err(CliError::transport_shape_error)?;
             if request.max_price.units > i64::MAX as u64 {
                 return Err(CliError::transport_shape_error(
                     "purchase request exceeds the durable payment range".to_owned(),
@@ -600,11 +597,7 @@ pub(super) fn cmd_finding_verify_bundle(
             let result: FindingPurchaseResult =
                 read_canonical_file(result_path, FINDING_PURCHASE_MAX_RESULT_BYTES)?;
             result
-                .validate_authorized(
-                    &request,
-                    &proof.bundle.finding,
-                    &proof.bundle.admission,
-                )
+                .validate_authorized(&request, &proof.bundle.finding, &proof.bundle.admission)
                 .map_err(CliError::transport_shape_error)?;
             let terminal_time = result
                 .purchase_record
@@ -657,7 +650,10 @@ pub(super) fn cmd_finding_verify_bundle(
     if json_output {
         println!("{}", serde_json::to_string_pretty(&result)?);
     } else {
-        println!("finding_id:              {}", proof.bundle.finding.finding_id);
+        println!(
+            "finding_id:              {}",
+            proof.bundle.finding.finding_id
+        );
         println!("required_facets_verified: true");
         println!("purchase_terminal_verified: {purchase_verified}");
         println!(
@@ -955,8 +951,8 @@ fn repository_identity(repository: &Path) -> Result<String, CliError> {
         REPOSITORY_STAGE_TIMEOUT,
         "resolve seller repository identity",
     )?
-        .and_then(|remote| credential_free_repository_url(&remote))
-        .unwrap_or_else(|| repository.display().to_string()))
+    .and_then(|remote| credential_free_repository_url(&remote))
+    .unwrap_or_else(|| repository.display().to_string()))
 }
 
 fn credential_free_repository_url(remote: &str) -> Option<String> {
@@ -1049,9 +1045,8 @@ pub(super) fn run_bounded_output_command_capture(
         .ok_or_else(|| CliError::cli_other_error("git stderr pipe is unavailable".to_owned()))?;
     let overflow = Arc::new(AtomicBool::new(false));
     let stdout_overflow = Arc::clone(&overflow);
-    let stdout_reader = thread::spawn(move || {
-        read_output_prefix(stdout, max_bytes, Some(&stdout_overflow))
-    });
+    let stdout_reader =
+        thread::spawn(move || read_output_prefix(stdout, max_bytes, Some(&stdout_overflow)));
     let stderr_reader =
         thread::spawn(move || read_output_prefix(stderr, MAX_GIT_ERROR_BYTES, None));
     let outcome = loop {
@@ -1135,11 +1130,7 @@ fn seller_authorization_status(
                 .body
                 .revocation_status_ref
                 .clone(),
-            authority_id: draft
-                .seller_authorization
-                .body
-                .authorization_id
-                .clone(),
+            authority_id: draft.seller_authorization.body.authorization_id.clone(),
             key: draft.seller_authorization.body.issuer.clone(),
             key_epoch: FINDING_SELLER_AUTHORIZATION_KEY_EPOCH_V1,
             revoked_from: None,
@@ -1167,15 +1158,16 @@ fn post_bytes(
 ) -> Result<serde_json::Value, CliError> {
     let endpoint = format!("{}{path}", base_url.trim_end_matches('/'));
     let response = match ureq::post(&endpoint)
+        .timeout(std::time::Duration::from_secs(30))
         .set("authorization", &format!("Bearer {token}"))
         .set("content-type", "application/json")
         .send_bytes(bytes)
     {
         Ok(response) => response,
         Err(ureq::Error::Status(status, response)) => {
-            let body = response.into_string().unwrap_or_default();
+            let _ = response;
             return Err(CliError::transport_error(format!(
-                "operator request to {path} failed with HTTP {status}: {body}"
+                "operator request to {path} failed with HTTP {status}"
             )));
         }
         Err(ureq::Error::Transport(error)) => {
@@ -1184,45 +1176,40 @@ fn post_bytes(
             )));
         }
     };
-    let mut body = Vec::new();
-    response
-        .into_reader()
-        .take(1024 * 1024)
-        .read_to_end(&mut body)?;
+    let body = crate::input::read_stream(response.into_reader(), 1024 * 1024)?;
     if body.is_empty() {
         return Ok(serde_json::json!({}));
     }
-    serde_json::from_slice(&body).map_err(CliError::from)
+    crate::input::json(&body).map_err(CliError::from)
 }
 
 fn load_verification_market(
     path: &Path,
 ) -> Result<chio_control_plane::trust_control::FindingMarketConfig, CliError> {
-    let bytes = read_file_bounded(path, 1024 * 1024)?;
-    let value: serde_json::Value = parse_canonical(&bytes, "verification profile")?;
-    let schema = value
-        .get("schema")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| CliError::cli_other_error("verification profile has no schema".to_owned()))?;
+    let bytes = zeroize::Zeroizing::new(read_file_bounded(path, 1024 * 1024)?);
+    #[derive(serde::Deserialize)]
+    struct Schema {
+        schema: String,
+    }
+    let schema: Schema = serde_json::from_slice(&bytes).map_err(|source| {
+        CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+    })?;
+    let schema = schema.schema.as_str();
     let market = match schema {
-        FINDING_OPERATOR_PROFILE_SCHEMA => load_profile(path)?.0.market,
+        FINDING_OPERATOR_PROFILE_SCHEMA => load_profile(path)?.0.market.clone(),
         FINDING_OPERATOR_CLIENT_PROFILE_SCHEMA => {
             let profile: FindingOperatorClientProfile =
                 parse_canonical(&bytes, "operator client profile")?;
-            profile
-                .validate()
-                .map_err(CliError::cli_other_error)?;
-            profile.market
+            profile.validate().map_err(CliError::cli_other_error)?;
+            profile.market.clone()
         }
         FINDING_OPERATOR_BUYER_CLIENT_SCHEMA => {
-            let profile: FindingOperatorBuyerClientProfile =
-                parse_canonical(&bytes, "buyer client profile")?;
-            profile.market
+            let profile: FindingOperatorBuyerClientProfile = read_private_client_profile(path)?;
+            profile.market.clone()
         }
         FINDING_OPERATOR_SELLER_CLIENT_SCHEMA => {
-            let profile: FindingOperatorSellerClientProfile =
-                parse_canonical(&bytes, "seller client profile")?;
-            profile.market
+            let profile: FindingOperatorSellerClientProfile = read_private_client_profile(path)?;
+            profile.market.clone()
         }
         _ => {
             return Err(CliError::cli_other_error(
@@ -1248,22 +1235,8 @@ fn parse_canonical<T: serde::de::DeserializeOwned + serde::Serialize>(
     bytes: &[u8],
     label: &str,
 ) -> Result<T, CliError> {
-    let text = std::str::from_utf8(bytes)
-        .map_err(|_| CliError::cli_other_error(format!("{label} is not UTF-8")))?;
-    let strict = chio_core::canonical::canonical_json_bytes_from_str(text)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    if strict != bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{label} is not strict canonical JSON"
-        )));
-    }
-    let value: T = serde_json::from_slice(bytes)?;
-    if canonical_json_bytes(&value)? != bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{label} typed serialization is not byte-stable"
-        )));
-    }
-    Ok(value)
+    let _ = label;
+    crate::input::canonical_ijson(bytes)
 }
 
 fn load_or_create_admission_job(
@@ -1346,55 +1319,14 @@ fn same_activation(stored: &serde_json::Value, replay: &serde_json::Value) -> bo
 }
 
 fn read_file_bounded(path: &Path, max_bytes: usize) -> Result<Vec<u8>, CliError> {
-    let mut options = OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt as _;
-        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
-    }
-    let file = options.open(path)?;
-    let metadata = file.metadata()?;
-    if !metadata.is_file() || metadata.len() > u64::try_from(max_bytes).unwrap_or(u64::MAX) {
-        return Err(CliError::cli_other_error(format!(
-            "{} is not a bounded regular file",
-            path.display()
-        )));
-    }
-    let mut bytes = Vec::with_capacity(
-        usize::try_from(metadata.len())
-            .unwrap_or(max_bytes)
-            .min(max_bytes),
-    );
-    file.take(u64::try_from(max_bytes.saturating_add(1)).unwrap_or(u64::MAX))
-        .read_to_end(&mut bytes)?;
-    if bytes.len() > max_bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{} exceeds its size bound",
-            path.display()
-        )));
-    }
-    Ok(bytes)
+    Ok(crate::input::read_regular(path, max_bytes)?)
 }
 
 fn read_stdin_bounded(max_bytes: usize) -> Result<Vec<u8>, CliError> {
-    let mut bytes = Vec::new();
-    std::io::stdin()
-        .take(u64::try_from(max_bytes.saturating_add(1)).unwrap_or(u64::MAX))
-        .read_to_end(&mut bytes)?;
-    if bytes.len() > max_bytes {
-        return Err(CliError::cli_other_error(
-            "standard input exceeds the proof-bundle size bound".to_owned(),
-        ));
-    }
-    Ok(bytes)
+    Ok(crate::input::read_stream(std::io::stdin(), max_bytes)?)
 }
 
-fn decode_canonical_b64(
-    encoded: &str,
-    max_bytes: usize,
-    label: &str,
-) -> Result<Vec<u8>, CliError> {
+fn decode_canonical_b64(encoded: &str, max_bytes: usize, label: &str) -> Result<Vec<u8>, CliError> {
     let bytes = STANDARD
         .decode(encoded)
         .map_err(|_| CliError::cli_other_error(format!("{label} is not base64")))?;
@@ -1433,9 +1365,12 @@ fn write_private_new_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
     let parent = path.parent().ok_or_else(|| {
         CliError::cli_other_error("output path has no parent directory".to_owned())
     })?;
-    let file_name = path.file_name().and_then(|name| name.to_str()).ok_or_else(|| {
-        CliError::cli_other_error("output path has no portable file name".to_owned())
-    })?;
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            CliError::cli_other_error("output path has no portable file name".to_owned())
+        })?;
     let temporary = parent.join(format!(".{file_name}.tmp"));
     if temporary.exists() {
         let metadata = fs::symlink_metadata(&temporary)?;
@@ -1462,7 +1397,7 @@ fn write_private_exact_or_new(path: &Path, bytes: &[u8]) -> Result<(), CliError>
     match write_private_new_atomic(path, bytes) {
         Ok(()) => Ok(()),
         Err(_) if path.is_file() => {
-            let existing = fs::read(path)?;
+            let existing = crate::input::read_regular(path, bytes.len())?;
             if existing == bytes {
                 Ok(())
             } else {
@@ -1526,8 +1461,15 @@ fn wait_until(timestamp: u64) -> Result<(), CliError> {
 mod tests;
 
 fn unix_time() -> Result<u64, CliError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(|error| CliError::cli_other_error(error.to_string()))
+    crate::input::time::seconds()
+}
+
+fn read_private_client_profile<T: serde::de::DeserializeOwned + serde::Serialize>(
+    path: &Path,
+) -> Result<T, CliError> {
+    let bytes = chio_control_plane::read_private_signing_custody(path, 1024 * 1024)?;
+    Ok(
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 1024 * 1024)?
+            .decode_canonical()?,
+    )
 }

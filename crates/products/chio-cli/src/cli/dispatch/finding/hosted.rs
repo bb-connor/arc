@@ -1,7 +1,6 @@
 use std::fs::{File, Metadata, OpenOptions};
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::trust_control::finding_hosted_profile::{
     FindingHostedCanaryDecision, FindingHostedEdgeProfile, FindingHostedProfile,
@@ -20,21 +19,15 @@ pub(super) fn cmd_finding_operator_evaluate_canary(
     observation_path: &Path,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let profile: FindingHostedProfile = read_canonical_private_json(
-        profile_path,
-        MAX_HOSTED_PROFILE_BYTES,
-        "hosted profile",
-    )?;
+    let profile: FindingHostedProfile =
+        read_canonical_private_json(profile_path, MAX_HOSTED_PROFILE_BYTES, "hosted profile")?;
     profile.validate().map_err(CliError::cli_other_error)?;
     let observation: SignedFindingHostedCanaryObservation = read_canonical_private_json(
         observation_path,
         MAX_CANARY_OBSERVATION_BYTES,
         "canary observation",
     )?;
-    let evaluated_at_unix_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| CliError::cli_other_error("system clock is before Unix epoch".to_owned()))?
-        .as_secs();
+    let evaluated_at_unix_secs = crate::input::time::seconds()?;
     let decision = profile.evaluate_signed_canary(&observation, evaluated_at_unix_secs);
     let (name, reason) = match decision {
         FindingHostedCanaryDecision::Promote => ("promote", None),
@@ -79,57 +72,24 @@ fn rollback_reason_name(reason: FindingHostedRollbackReason) -> &'static str {
     }
 }
 
-fn read_canonical_private_json<T: serde::de::DeserializeOwned>(
+fn read_canonical_private_json<T: serde::de::DeserializeOwned + serde::Serialize>(
     path: &Path,
     maximum: u64,
     label: &str,
 ) -> Result<T, CliError> {
-    let (mut file, metadata) = open_regular_nofollow(path)?;
-    require_private_file(path, &metadata)?;
-    if metadata.len() == 0 || metadata.len() > maximum {
-        return Err(CliError::cli_other_error(format!(
-            "{label} exceeds its byte bound"
-        )));
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.read_to_end(&mut bytes)?;
-    let raw = std::str::from_utf8(&bytes)
-        .map_err(|_| CliError::cli_other_error(format!("{label} is not UTF-8")))?;
-    let canonical = chio_core::canonical::canonical_json_bytes_from_str(raw).map_err(|error| {
-        CliError::cli_other_error(format!("{label} is not strict canonical JSON: {error}"))
-    })?;
-    if canonical != bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{label} bytes are not canonical JSON"
-        )));
-    }
-    serde_json::from_slice(&bytes).map_err(Into::into)
+    let _ = label;
+    let maximum = usize::try_from(maximum)
+        .map_err(|_| CliError::cli_other_error("invalid private input bound"))?;
+    let bytes = chio_control_plane::read_private_signing_custody(path, maximum)?;
+    Ok(chio_core::canonical::UntrustedJsonText::from_wire(&bytes, maximum)?.decode_canonical()?)
 }
 
 pub(super) fn cmd_finding_operator_validate_hosted(
     profile_path: &Path,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let (mut profile_file, metadata) = open_regular_nofollow(profile_path)?;
-    require_private_file(profile_path, &metadata)?;
-    if metadata.len() == 0 || metadata.len() > MAX_HOSTED_PROFILE_BYTES {
-        return Err(CliError::cli_other_error(
-            "hosted profile exceeds its byte bound".to_owned(),
-        ));
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    profile_file.read_to_end(&mut bytes)?;
-    let raw = std::str::from_utf8(&bytes)
-        .map_err(|_| CliError::cli_other_error("hosted profile is not UTF-8".to_owned()))?;
-    let canonical = chio_core::canonical::canonical_json_bytes_from_str(raw).map_err(|error| {
-        CliError::cli_other_error(format!("hosted profile is not strict canonical JSON: {error}"))
-    })?;
-    if canonical != bytes {
-        return Err(CliError::cli_other_error(
-            "hosted profile bytes are not canonical JSON".to_owned(),
-        ));
-    }
-    let profile: FindingHostedProfile = serde_json::from_slice(&bytes)?;
+    let profile: FindingHostedProfile =
+        read_canonical_private_json(profile_path, MAX_HOSTED_PROFILE_BYTES, "hosted profile")?;
     profile.validate().map_err(CliError::cli_other_error)?;
     validate_referenced_files(&profile)?;
     validate_secret_environment(&profile)?;
@@ -139,16 +99,15 @@ pub(super) fn cmd_finding_operator_validate_hosted(
     profile
         .load_api_key_pepper()
         .map_err(CliError::cli_other_error)?;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| CliError::cli_other_error("system clock is before Unix epoch".to_owned()))?
-        .as_secs();
+    let now = crate::input::time::seconds()?;
     profile.load_tls(now).map_err(CliError::cli_other_error)?;
     profile
         .load_trusted_proxy()
         .map_err(CliError::cli_other_error)?;
     for role in FindingHostedSigningRole::ALL {
-        profile.load_signer(role).map_err(CliError::cli_other_error)?;
+        profile
+            .load_signer(role)
+            .map_err(CliError::cli_other_error)?;
     }
     profile
         .load_bond_observer()
@@ -177,7 +136,10 @@ pub(super) fn cmd_finding_operator_validate_hosted(
     } else {
         println!("hosted_profile: valid");
         println!("deployment:     {}", terminal_safe(&profile.deployment_id));
-        println!("endpoint:       {}", terminal_safe(&profile.public_endpoint));
+        println!(
+            "endpoint:       {}",
+            terminal_safe(&profile.public_endpoint)
+        );
         println!("tenants:        {}", profile.tenants.len());
         println!("signers:        {}", profile.signers.len());
     }
@@ -299,7 +261,9 @@ fn validate_secret_environment(profile: &FindingHostedProfile) -> Result<(), Cli
 
 fn require_secret_env(name: &str) -> Result<(), CliError> {
     let value = std::env::var(name).map_err(|_| {
-        CliError::cli_other_error(format!("required hosted secret environment variable {name} is missing"))
+        CliError::cli_other_error(format!(
+            "required hosted secret environment variable {name} is missing"
+        ))
     })?;
     if value.is_empty() || value.len() > 16 * 1024 || value.chars().any(char::is_control) {
         return Err(CliError::cli_other_error(format!(
@@ -384,10 +348,7 @@ fn require_private_file(_path: &Path, _metadata: &Metadata) -> Result<(), CliErr
 }
 
 #[cfg(unix)]
-fn require_not_group_or_world_writable(
-    path: &Path,
-    metadata: &Metadata,
-) -> Result<(), CliError> {
+fn require_not_group_or_world_writable(path: &Path, metadata: &Metadata) -> Result<(), CliError> {
     use std::os::unix::fs::MetadataExt as _;
     if metadata.mode() & 0o022 != 0 {
         return Err(CliError::cli_other_error(format!(
@@ -399,10 +360,7 @@ fn require_not_group_or_world_writable(
 }
 
 #[cfg(not(unix))]
-fn require_not_group_or_world_writable(
-    _path: &Path,
-    _metadata: &Metadata,
-) -> Result<(), CliError> {
+fn require_not_group_or_world_writable(_path: &Path, _metadata: &Metadata) -> Result<(), CliError> {
     Ok(())
 }
 

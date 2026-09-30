@@ -3,7 +3,6 @@ use super::{
     write_pretty_json,
 };
 use crate::CliError;
-use std::fs;
 use std::path::Path;
 
 pub(crate) fn cmd_chio_pheromone_relay_alert_delivery_import(
@@ -13,7 +12,7 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_delivery_import(
     now_unix_ms: u64,
     report: &Path,
 ) -> Result<(), CliError> {
-    let handoff_report: chio_pheromone_relay::RelayAlertHandoffReport = serde_json::from_str(
+    let handoff_report: chio_pheromone_relay::RelayAlertHandoffReport = crate::input::text(
         &read_utf8_json_file(handoff_report, "Chio relay alert handoff report")?,
     )
     .map_err(|error| {
@@ -48,13 +47,13 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_delivery_acknowledge(
     now_unix_ms: u64,
     report: &Path,
 ) -> Result<(), CliError> {
-    let handoff_report: chio_pheromone_relay::RelayAlertHandoffReport = serde_json::from_str(
+    let handoff_report: chio_pheromone_relay::RelayAlertHandoffReport = crate::input::text(
         &read_utf8_json_file(handoff_report, "Chio relay alert handoff report")?,
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("Chio relay alert handoff report: {error}"))
     })?;
-    let delivery_report: chio_pheromone_relay::RelayAlertDeliveryReport = serde_json::from_str(
+    let delivery_report: chio_pheromone_relay::RelayAlertDeliveryReport = crate::input::text(
         &read_utf8_json_file(delivery_report, "Chio relay alert delivery report")?,
     )
     .map_err(|error| {
@@ -162,30 +161,18 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_delivery_drift_window(
 pub(crate) fn read_relay_alert_delivery_evidence(
     dir: &Path,
 ) -> Result<Vec<chio_pheromone_relay::RelayAlertDeliveryEvidence>, CliError> {
-    let entries = fs::read_dir(dir).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to read Chio relay alert delivery evidence dir {}: {error}",
-            dir.display()
-        ))
-    })?;
-    let mut paths = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to read Chio relay alert delivery evidence dir entry {}: {error}",
-                dir.display()
-            ))
-        })?;
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
-            paths.push(path);
-        }
-    }
-    paths.sort();
+    let mut budget = crate::input::collection::Budget::default();
+    let paths = crate::input::collection::directory(dir, &mut budget)?;
     let mut evidence = Vec::new();
     for path in paths {
-        let json = read_utf8_json_file(&path, "relay alert delivery evidence")?;
-        let value: serde_json::Value = serde_json::from_str(&json).map_err(|error| {
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        let bytes = budget.read(&path)?;
+        let json = std::str::from_utf8(&bytes).map_err(|source| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+        })?;
+        let value: serde_json::Value = crate::input::text(&json).map_err(|error| {
             CliError::cli_other_error(format!(
                 "Chio relay alert delivery evidence {}: {error}",
                 path.display()

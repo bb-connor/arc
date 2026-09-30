@@ -1,0 +1,47 @@
+warning: variants `CatalogIo`, `CatalogParse`, and `InstallRecordParse` are never constructed
+   --> crates/products/chio-cli/src/bin/../market.rs:121:5
+    |
+117 | pub enum MarketError {
+    |          ----------- variants in this enum
+...
+121 |     CatalogIo(String),
+    |     ^^^^^^^^^
+122 |     #[error("market catalog parse failed: {0}")]
+123 |     CatalogParse(String),
+    |     ^^^^^^^^^^^^
+...
+127 |     InstallRecordParse(String),
+    |     ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `MarketError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `read_relay_alert_assurance_archive_candidate` is never used
+   --> crates/products/chio-cli/src/bin/../cli/chio/dispatch/pheromone/assurance/support.rs:166:15
+    |
+166 | pub(super) fn read_relay_alert_assurance_archive_candidate(
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variants `CatalogIo`, `CatalogParse`, and `InstallRecordParse` are never constructed
+   --> crates/products/chio-cli/src/bin/../market.rs:121:5
+    |
+117 | pub enum MarketError {
+    |          ----------- variants in this enum
+...
+121 |     CatalogIo(String),
+    |     ^^^^^^^^^
+122 |     #[error("market catalog parse failed: {0}")]
+123 |     CatalogParse(String),
+    |     ^^^^^^^^^^^^
+...
+127 |     InstallRecordParse(String),
+    |     ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `MarketError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `read_relay_alert_assurance_archive_candidate` is never used
+   --> crates/products/chio-cli/src/bin/../cli/chio/dispatch/pheromone/assurance/support.rs:166:15
+    |
+166 | pub(super) fn read_relay_alert_assurance_archive_candidate(
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

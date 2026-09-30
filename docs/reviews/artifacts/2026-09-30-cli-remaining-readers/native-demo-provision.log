@@ -1,0 +1,13 @@
+
+running 9 tests
+test disabled_preparation_requires_a_reviewed_fixture ... ok
+test symlinked_runtime_directory_is_rejected ... ok
+test relative_runtime_directory_is_rejected ... ok
+test exact_rerun_is_idempotent_and_emits_no_secret ... ok
+test distinct_logical_runtime_directory_is_signed_while_artifacts_remain_in_output ... ok
+test runtime_directory_drift_is_rejected_without_overwrite ... ok
+test tampered_artifact_is_rejected_without_overwrite ... ok
+test exact_target_mismatch_is_rejected ... ok
+test disabled_preparation_has_no_live_discovery_option ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.72s

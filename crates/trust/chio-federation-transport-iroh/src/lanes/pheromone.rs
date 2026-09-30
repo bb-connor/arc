@@ -363,7 +363,7 @@ pub struct PheromoneBatchHandler {
     gate: DirectoryGate,
     receiver: Arc<dyn RelayBatchReceiver>,
     store: Arc<SqlitePheromoneRelayStore>,
-    now: Arc<dyn Fn() -> u64 + Send + Sync>,
+    now: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync>,
     /// Inbound per-peer directory-scope gate (the SAME `enforce_peer_batch_directory_scope`
     /// the HTTP relay runs before receiving). Evaluated fail-closed BEFORE the batch
     /// reaches the receiver, so an out-of-scope sender is rejected on the iroh path
@@ -400,7 +400,7 @@ impl PheromoneBatchHandler {
         gate: DirectoryGate,
         receiver: Arc<dyn RelayBatchReceiver>,
         store: Arc<SqlitePheromoneRelayStore>,
-        now: Arc<dyn Fn() -> u64 + Send + Sync>,
+        now: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync>,
         scope_check: InboundBatchScopeCheck,
     ) -> Self {
         Self {
@@ -612,7 +612,7 @@ impl PheromoneBatchHandler {
                             slot.release()?;
                             recovered
                         } else {
-                            let now = (self.now)();
+                            let now = (self.now)()?;
                             // The report type (chio-pheromone-runtime PheromoneReceiveReport)
                             // is not nameable here; it flows through by inference. The per-frame
                             // verifier (pheromone_gossip.rs:236/244) runs inside this call,
@@ -1888,7 +1888,7 @@ mod tests {
         );
 
         let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
-        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let now: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync> = Arc::new(|| Ok(NOW));
         let handler = PheromoneBatchHandler::new(
             gate.clone(),
             receiver,
@@ -2003,7 +2003,7 @@ mod tests {
                 Ok(())
             },
         );
-        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let now: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync> = Arc::new(|| Ok(NOW));
         let handler = PheromoneBatchHandler::new(
             gate.clone(),
             receiver,
@@ -2125,7 +2125,7 @@ mod tests {
                 Ok(())
             },
         );
-        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let now: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync> = Arc::new(|| Ok(NOW));
         let handler = PheromoneBatchHandler::new(
             gate.clone(),
             receiver,
@@ -2287,7 +2287,7 @@ mod tests {
                 Ok(())
             },
         );
-        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let now: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync> = Arc::new(|| Ok(NOW));
         let handler = PheromoneBatchHandler::new(
             gate.clone(),
             receiver,
@@ -2374,7 +2374,7 @@ mod tests {
                 Ok(())
             },
         );
-        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let now: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync> = Arc::new(|| Ok(NOW));
         let handler = PheromoneBatchHandler::new(
             gate.clone(),
             receiver,
@@ -2460,7 +2460,7 @@ mod tests {
                 Ok(())
             },
         );
-        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let now: Arc<dyn Fn() -> std::io::Result<u64> + Send + Sync> = Arc::new(|| Ok(NOW));
         let handler = PheromoneBatchHandler::new(gate.clone(), receiver, store, now, scope_check)
             .with_accept_limits(AcceptLimitConfig {
                 max_in_flight_per_peer: 1,

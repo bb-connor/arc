@@ -702,7 +702,7 @@ pub(crate) fn cmd_check(
     let agent_kp = Keypair::generate();
     let agent_pk = agent_kp.public_key();
     let session_agent_id = agent_pk.to_hex();
-    let params: serde_json::Value = serde_json::from_str(params_str)?;
+    let params: serde_json::Value = crate::input::text(params_str)?;
     let initial_caps = issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
     let cap = match select_capability_for_request(&initial_caps, tool, server, &params) {
         Some(capability) => capability,
@@ -836,13 +836,13 @@ fn validate_check_mode(
 }
 
 fn load_check_output_fixture(path: &Path) -> Result<serde_json::Value, CliError> {
-    let content = fs::read_to_string(path).map_err(|error| {
+    let content = crate::input::read_text(path).map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to read check output fixture {}: {error}",
             path.display()
         ))
     })?;
-    serde_json::from_str(&content).map_err(|error| {
+    crate::input::text(&content).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to parse check output fixture {} as JSON: {error}",
             path.display()
@@ -1379,13 +1379,13 @@ pub(crate) fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<
 }
 
 pub(crate) fn load_roster_policy(path: &Path) -> Result<trust_control::RosterPolicy, CliError> {
-    let bytes = std::fs::read(path).map_err(|error| {
+    let bytes = crate::input::read(path).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to read roster policy file `{}`: {error}",
             path.display()
         ))
     })?;
-    serde_json::from_slice(&bytes).map_err(|error| {
+    crate::input::json(&bytes).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to parse roster policy file `{}`: {error}",
             path.display()

@@ -1,5 +1,9 @@
 use super::*;
 
+use chio_control_plane::trust_control::{
+    FindingChallengeSubmissionAuthorization, FindingChallengeSubmissionResponse,
+    FindingChallengeSubmissionWrite,
+};
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_core_types::{canonical_json_bytes, canonical_json_bytes_from_str, canonical_json_string};
@@ -8,10 +12,6 @@ use chio_finding::{
     FindingAffectedDelivery, FindingChallenge, FindingChallengeAuthorization,
     FindingChallengeAuthorizationKind, FindingChallengeEvidence, FindingChallengeEvidenceKind,
     SignedFindingChallenge, FINDING_CHALLENGE_SCHEMA_V1,
-};
-use chio_control_plane::trust_control::{
-    FindingChallengeSubmissionAuthorization, FindingChallengeSubmissionResponse,
-    FindingChallengeSubmissionWrite,
 };
 
 use super::finding_verify::{accept_finding_from_venue, AcceptedFinding};
@@ -133,16 +133,17 @@ fn submit_prepared_challenge(
     prepared: &PreparedChallenge,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let signed = prepared.signed.as_ref().ok_or_else(live_venue_audit_error)?;
+    let signed = prepared
+        .signed
+        .as_ref()
+        .ok_or_else(live_venue_audit_error)?;
     let canonical_envelope = canonical_json_string(signed)?;
     let endpoint = finding_endpoint(
         control_url,
-        &format!(
-            "/v1/findings/{}/challenges",
-            prepared.challenge.finding_id
-        ),
+        &format!("/v1/findings/{}/challenges", prepared.challenge.finding_id),
     );
     let response = match ureq::post(&endpoint)
+        .timeout(std::time::Duration::from_secs(30))
         .set(AUTHORIZATION_HEADER, &format!("Bearer {control_token}"))
         .set("Content-Type", "application/json")
         .send_string(&canonical_envelope)
@@ -157,8 +158,9 @@ fn submit_prepared_challenge(
             )))
         }
     };
-    let submitted: FindingChallengeSubmissionResponse =
-        serde_json::from_reader(response.into_reader())?;
+    let submitted: FindingChallengeSubmissionResponse = crate::input::json(
+        &crate::input::read_stream(response.into_reader(), 64 * 1024)?,
+    )?;
     if submitted.challenge_id != prepared.challenge.challenge_id {
         return Err(CliError::transport_error(
             "challenge submission response named a different challenge id".to_string(),
@@ -170,8 +172,7 @@ fn submit_prepared_challenge(
         }
         FindingChallengeAuthorization::VenueAudit(_) => return Err(live_venue_audit_error()),
     };
-    if submitted.authorization_branch
-        != FindingChallengeSubmissionAuthorization::BuyerSubmission
+    if submitted.authorization_branch != FindingChallengeSubmissionAuthorization::BuyerSubmission
         || submitted.dispute_fee_intent_key.is_none()
         || submitted.dispute_bond_lock_id.as_deref() != Some(expected_lock_id)
     {
@@ -221,7 +222,7 @@ fn emit_submitted_challenge(
 pub(super) fn load_challenge_evidence_document(
     path: &Path,
 ) -> Result<FindingChallengeEvidenceDocument, CliError> {
-    let bytes = fs::read(path)?;
+    let bytes = crate::input::read_regular(path, FINDING_CHALLENGE_EVIDENCE_MAX_BYTES)?;
     if bytes.len() > FINDING_CHALLENGE_EVIDENCE_MAX_BYTES {
         return Err(CliError::cli_other_error(format!(
             "{} is {} bytes, above the {FINDING_CHALLENGE_EVIDENCE_MAX_BYTES} byte challenge evidence bound",
@@ -246,13 +247,12 @@ pub(super) fn load_challenge_evidence_document(
         )));
     }
 
-    let document: FindingChallengeEvidenceDocument =
-        serde_json::from_str(&raw).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "{} is not a challenge evidence document: {error}",
-                path.display()
-            ))
-        })?;
+    let document: FindingChallengeEvidenceDocument = crate::input::text(&raw).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "{} is not a challenge evidence document: {error}",
+            path.display()
+        ))
+    })?;
     let typed_bytes = canonical_json_bytes(&document)?;
     if typed_bytes != strict_bytes {
         return Err(CliError::cli_other_error(format!(
@@ -410,7 +410,7 @@ pub(super) fn prepare_challenge(
 /// references. Checking against the committed schema rather than a local
 /// restatement of it means the two cannot drift.
 fn challenge_body_schema() -> Result<serde_json::Value, CliError> {
-    let envelope: serde_json::Value = serde_json::from_str(FINDING_CHALLENGE_SCHEMA_JSON)?;
+    let envelope: serde_json::Value = crate::input::text(FINDING_CHALLENGE_SCHEMA_JSON)?;
     let definitions = envelope.get("$defs").cloned().ok_or_else(|| {
         CliError::cli_other_error(
             "the registered challenge schema carries no shared definitions".to_string(),
@@ -454,13 +454,7 @@ fn validate_against_registered_schema(challenge: &FindingChallenge) -> Result<()
 /// underlying decode error is dropped deliberately: it can quote the
 /// offending byte of a secret seed.
 fn load_challenger_keypair(path: &Path) -> Result<Keypair, CliError> {
-    let seed = fs::read_to_string(path)?;
-    Keypair::from_seed_hex(seed.trim()).map_err(|_| {
-        CliError::cli_other_error(format!(
-            "{} must hold a 32-byte Ed25519 seed as 64 hex characters",
-            path.display()
-        ))
-    })
+    chio_control_plane::load_existing_authority_keypair(path)
 }
 
 fn evidence_kind_label(kind: FindingChallengeEvidenceKind) -> &'static str {

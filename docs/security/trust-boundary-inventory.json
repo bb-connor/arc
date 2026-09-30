@@ -116,6 +116,8 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs",
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs",
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs",
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile/custody.rs",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs",
@@ -221,12 +223,36 @@
     "crates/products/chio-cli/src/active_defense_migration.rs",
     "crates/products/chio-cli/src/active_response_authority.rs",
     "crates/products/chio-cli/src/admin.rs",
+    "crates/products/chio-cli/src/archive.rs",
+    "crates/products/chio-cli/src/archive/namespace.rs",
     "crates/products/chio-cli/src/cert.rs",
     "crates/products/chio-cli/src/cli/chio/dispatch/authority.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/buyer.rs",
     "crates/products/chio-cli/src/cli/chio/dispatch/io.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/alerts.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/archive.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/package.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/reports.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/support.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/delivery.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/io.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/iroh_mount.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/iroh_mount/reloader.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/relay.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/runtime.rs",
     "crates/products/chio-cli/src/cli/chio/dispatch/runtime/ops.rs",
     "crates/products/chio-cli/src/cli/chio/dispatch/runtime/orchestration.rs",
     "crates/products/chio-cli/src/cli/chio/dispatch/runtime/signing.rs",
+    "crates/products/chio-cli/src/cli/chio/dispatch/treaty.rs",
+    "crates/products/chio-cli/src/cli/dispatch/attest.rs",
+    "crates/products/chio-cli/src/cli/dispatch/finding.rs",
+    "crates/products/chio-cli/src/cli/dispatch/finding/challenge.rs",
+    "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs",
+    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs",
+    "crates/products/chio-cli/src/cli/dispatch/finding/status_floor.rs",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verify.rs",
     "crates/products/chio-cli/src/cli/dispatch/proof.rs",
     "crates/products/chio-cli/src/cli/dispatch/proof/artifacts.rs",
     "crates/products/chio-cli/src/cli/dispatch/proof/assemble.rs",
@@ -240,11 +266,20 @@
     "crates/products/chio-cli/src/cli/dispatch/proof/fixture_catalog_paths.rs",
     "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs",
     "crates/products/chio-cli/src/cli/dispatch/proof/room.rs",
+    "crates/products/chio-cli/src/cli/dispatch/runtime.rs",
+    "crates/products/chio-cli/src/cli/dispatch/workflow.rs",
     "crates/products/chio-cli/src/cli/input.rs",
     "crates/products/chio-cli/src/cli/input/collection.rs",
     "crates/products/chio-cli/src/cli/input/config.rs",
+    "crates/products/chio-cli/src/cli/input/private.rs",
     "crates/products/chio-cli/src/cli/input/snapshot.rs",
     "crates/products/chio-cli/src/cli/input/time.rs",
+    "crates/products/chio-cli/src/cli/mcp.rs",
+    "crates/products/chio-cli/src/cli/mcp/cage_policy.rs",
+    "crates/products/chio-cli/src/cli/mcp/provision.rs",
+    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs",
+    "crates/products/chio-cli/src/cli/mcp/provision/reference_runtime.rs",
+    "crates/products/chio-cli/src/cli/mcp/wrap.rs",
     "crates/products/chio-cli/src/cli/process_host/call_evidence.rs",
     "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs",
     "crates/products/chio-cli/src/cli/process_host/diagnostics.rs",
@@ -260,12 +295,15 @@
     "crates/products/chio-cli/src/cli/replay/ndjson.rs",
     "crates/products/chio-cli/src/cli/replay/reader.rs",
     "crates/products/chio-cli/src/cli/replay/validate.rs",
+    "crates/products/chio-cli/src/cli/runtime.rs",
     "crates/products/chio-cli/src/cli/trust/credit.rs",
     "crates/products/chio-cli/src/cli/trust/liability.rs",
     "crates/products/chio-cli/src/cli/trust/receipt/explain.rs",
     "crates/products/chio-cli/src/cli/trust/runtime_attestation.rs",
     "crates/products/chio-cli/src/cli/trust/shared.rs",
     "crates/products/chio-cli/src/cli/trust/underwriting.rs",
+    "crates/products/chio-cli/src/lineage.rs",
+    "crates/products/chio-cli/src/market.rs",
     "crates/products/chio-cli/src/passport.rs",
     "crates/products/chio-cli/src/passport/http.rs",
     "crates/products/chio-cli/src/passport/verifier.rs",
@@ -1186,9 +1224,13 @@
     "crates/products/chio-cli/src/active_defense_migration.rs::parse_shadow_migration_input::from_wire",
     "crates/products/chio-cli/src/active_defense_migration.rs::parse_shadow_migration_input::from_wire",
     "crates/products/chio-cli/src/active_response_authority.rs::read_canonical::from_wire",
+    "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs::read_canonical_private_json::from_wire",
+    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::load_profile::from_wire",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::read_private_client_profile::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::canonical_ijson::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::decode::from_wire",
     "crates/products/chio-cli/src/cli/input/config.rs::yaml::from_wire",
+    "crates/products/chio-cli/src/cli/input/private.rs::read::from_wire",
     "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse::from_wire",
     "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire",
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire",
@@ -1884,6 +1926,7 @@
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs::flush::from_slice",
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_receipt_event::from_value",
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs::strict_artifact_ingress::from_str",
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile/custody.rs::schema::custom_deserialize",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::verify_terminal::from_value",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::verify_terminal::from_value",
     "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs::serialize::custom_deserialize",
@@ -1915,10 +1958,18 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value",
     "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs::parse_relay_peer_directory_json::from_value",
+    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::cmd_finding_operator_repair_challenge_retention::from_value",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::load_verification_market::from_slice",
     "crates/products/chio-cli/src/cli/input.rs::literal::from_value",
     "crates/products/chio-cli/src/cli/input.rs::project::from_value",
     "crates/products/chio-cli/src/cli/input/config.rs::yaml::Deserializer::from_slice",
     "crates/products/chio-cli/src/cli/input/config.rs::yaml::custom_deserialize",
+    "crates/products/chio-cli/src/cli/input/private.rs::as_str::custom_deserialize",
+    "crates/products/chio-cli/src/cli/mcp.rs::load_tools_fixture::from_value",
+    "crates/products/chio-cli/src/cli/mcp/wrap.rs::cmd_mcp_wrap_e2e_fixture::from_value",
+    "crates/products/chio-cli/src/cli/mcp/wrap.rs::cmd_mcp_wrap_e2e_fixture::from_value",
+    "crates/products/chio-cli/src/cli/mcp/wrap.rs::output_to_mcp_result::from_value",
     "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs::classify::from_value",
     "crates/products/chio-cli/src/cli/process_response_verify.rs::response_nonce::from_value",
     "crates/products/chio-cli/src/cli/process_response_verify.rs::verify_values::from_value",
@@ -4194,6 +4245,7 @@
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs::flush::from_slice": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_receipt_event::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs::strict_artifact_ingress::from_str": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile/custody.rs::schema::custom_deserialize": "Private profile Deserialize implementations own seed/token strings in wiping guards even before all fields have parsed. Successful conversion transfers allocations into wiping owner types; serde errors retain no surviving partial secret fields.",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::verify_terminal::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
     "crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs::serialize::custom_deserialize": "Custom field deserialization and typed Value conversion after an outer original-byte reader. No authority token is constructed.",
     "crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs::serialize::custom_deserialize": "Custom field deserialization and typed Value conversion after an outer original-byte reader. No authority token is constructed.",
@@ -4218,10 +4270,17 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority.",
-    "crates/products/chio-cli/src/cli/input.rs::literal::from_value": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention.",
-    "crates/products/chio-cli/src/cli/input.rs::project::from_value": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention.",
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs::parse_relay_peer_directory_json::from_value": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody.",
+    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::cmd_finding_operator_repair_challenge_retention::from_value": "Bounded original JSON and retained-state reads precede existing finding signature, deployment, freshness, status and authority binding. Remote success bodies are capped; command-owned time observes the shared fallible fence. Canonical owners continue to compare exact original and typed bytes.",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::load_verification_market::from_slice": "Bounded exact canonical admission jobs preserve requested package/finding bindings. HTTP responses have actual-byte limits and request deadlines; oversized prefixes cannot decode as complete replies. Collateral evaluation increment is checked; existing profile, retained bundle and activation identities remain checked before completion.",
+    "crates/products/chio-cli/src/cli/input.rs::literal::from_value": "Shared bounded original native JSON, separate canonical I-JSON and typed projection contracts. Input decoding grants no authentication authority.",
+    "crates/products/chio-cli/src/cli/input.rs::project::from_value": "Shared bounded original native JSON, separate canonical I-JSON and typed projection contracts. Input decoding grants no authentication authority.",
     "crates/products/chio-cli/src/cli/input/config.rs::yaml::Deserializer::from_slice": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection.",
     "crates/products/chio-cli/src/cli/input/config.rs::yaml::custom_deserialize": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection.",
+    "crates/products/chio-cli/src/cli/input/private.rs::as_str::custom_deserialize": "Private nofollow custody with opened-file ownership/mode checks feeds direct canonical typed decoding. Seed fields wipe on every drop, including partial deserialization failures; secret parse trees are not materialized.",
+    "crates/products/chio-cli/src/cli/mcp.rs::load_tools_fixture::from_value": "Bounded original file or transport JSON rejects duplicate and lossy input before projection. Existing signed-policy trust pins, admitted-manifest verification and enforcing-host requirements remain authority gates; fixture decoding grants no live launch authority.",
+    "crates/products/chio-cli/src/cli/mcp/wrap.rs::cmd_mcp_wrap_e2e_fixture::from_value": "Bounded original request frames reject duplicate/lossy JSON and invalid JSON-RPC version/method/id/params before gate or tool dispatch. Fixtures are bounded and strictly decoded; typed result projections are not new authority.",
+    "crates/products/chio-cli/src/cli/mcp/wrap.rs::output_to_mcp_result::from_value": "Bounded original request frames reject duplicate/lossy JSON and invalid JSON-RPC version/method/id/params before gate or tool dispatch. Fixtures are bounded and strictly decoded; typed result projections are not new authority.",
     "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs::classify::from_value": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest.",
     "crates/products/chio-cli/src/cli/process_response_verify.rs::response_nonce::from_value": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them.",
     "crates/products/chio-cli/src/cli/process_response_verify.rs::verify_values::from_value": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them.",
@@ -5381,6 +5440,9 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_handlers.rs": [
       "strict_artifact_ingress::from_str"
     ],
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile/custody.rs": [
+      "schema::custom_deserialize"
+    ],
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs": [
       "verify_terminal::from_value",
       "verify_terminal::from_value"
@@ -5599,163 +5661,35 @@
     "crates/products/chio-cli/src/active_defense_migration.rs": [
       "strict_typed_value::from_value"
     ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/buyer.rs": [
-      "cmd_chio_attest_buyer_explain::from_str",
-      "cmd_chio_attest_buyer_package::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/alerts.rs": [
-      "cmd_chio_pheromone_relay_alert_evaluate::from_str",
-      "cmd_chio_pheromone_relay_alert_handoff::from_str",
-      "cmd_chio_pheromone_relay_alert_handoff::from_str",
-      "cmd_chio_pheromone_relay_alert_normalize::from_str",
-      "cmd_chio_pheromone_relay_alert_review::from_str",
-      "cmd_chio_pheromone_relay_alert_review::from_str",
-      "cmd_chio_pheromone_relay_alert_review::from_str",
-      "cmd_chio_pheromone_relay_alert_review::from_str",
-      "cmd_chio_pheromone_relay_alert_review::from_str",
-      "read_relay_alert_normalization_sources::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/archive.rs": [
-      "read_relay_alert_assurance_archive_package::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/package.rs": [
-      "cmd_chio_pheromone_relay_alert_assurance_package::from_str",
-      "cmd_chio_pheromone_relay_alert_assurance_package::from_str",
-      "cmd_chio_pheromone_relay_alert_assurance_package::from_str",
-      "cmd_chio_pheromone_relay_alert_assurance_package::from_str",
-      "cmd_chio_pheromone_relay_alert_assurance_package::from_str",
-      "cmd_chio_pheromone_relay_alert_assurance_package::from_str",
-      "cmd_chio_pheromone_relay_alert_assurance_package::from_str",
-      "cmd_chio_pheromone_relay_alert_assurance_package::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/reports.rs": [
-      "read_relay_report_documents::from_value"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/delivery.rs": [
-      "cmd_chio_pheromone_relay_alert_delivery_acknowledge::from_str",
-      "cmd_chio_pheromone_relay_alert_delivery_acknowledge::from_str",
-      "cmd_chio_pheromone_relay_alert_delivery_import::from_str",
-      "read_relay_alert_delivery_evidence::from_str"
-    ],
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs": [
-      "load_relay_peer_directory_bundle::from_str",
-      "load_relay_trusted_issuers::from_str",
-      "parse_relay_peer_directory_json::from_str",
       "parse_relay_peer_directory_json::from_value"
     ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/io.rs": [
-      "load_relay_signing_key::from_str",
-      "read_json_documents_from_dir::from_str",
-      "read_json_documents_from_dir::from_str",
-      "read_json_file::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/iroh_mount.rs": [
-      "load_iroh_serve_inputs::from_str",
-      "load_transport_secret_key::from_str",
-      "read_bundle_document::from_str",
-      "read_trusted_issuers::from_str",
-      "transport_bundle_trust::from_str",
-      "transport_bundle_trust::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/relay.rs": [
-      "cmd_chio_pheromone_relay_enqueue::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/runtime.rs": [
-      "cmd_chio_pheromone_receive::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/treaty.rs": [
-      "cmd_chio_attest_buyer_verify_packet::from_str",
-      "cmd_chio_attest_buyer_verify_packet::from_str",
-      "cmd_chio_attest_buyer_verify_packet::from_str",
-      "cmd_chio_attest_buyer_verify_packet::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/attest.rs": [
-      "verify_runtime_quote_with_backend::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/finding/challenge.rs": [
-      "challenge_body_schema::from_str",
-      "load_challenge_evidence_document::from_str",
-      "submit_prepared_challenge::from_reader"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs": [
-      "cmd_finding_operator_validate_hosted::from_slice",
-      "read_canonical_private_json::from_slice"
-    ],
     "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs": [
-      "cmd_finding_operator_repair_challenge_retention::from_value",
-      "load_profile::from_slice",
-      "post_operator_bytes::from_reader",
-      "retract::from_slice",
-      "retract::from_slice",
-      "retract::from_slice",
-      "run_chio_json::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/finding/status_floor.rs": [
-      "read_status_floor_state::from_slice",
-      "read_status_floor_state::from_value",
-      "read_status_floor_state::from_value",
-      "read_status_retraction::from_slice",
-      "read_trusted_time_floor::from_slice"
+      "cmd_finding_operator_repair_challenge_retention::from_value"
     ],
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs": [
-      "parse_canonical::from_slice",
-      "post_bytes::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/finding/verify.rs": [
-      "load_evidence_file::from_slice",
-      "load_trust_roots::from_str",
-      "strict_finding_ingress::from_str",
-      "strict_finding_ingress::from_str",
-      "strict_finding_ingress::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/finding.rs": [
-      "cmd_finding_publish::from_reader",
-      "cmd_finding_search::from_str",
-      "cmd_finding_search::from_str",
-      "cmd_finding_status::from_str",
-      "load_status_operator_authorization::from_slice",
-      "load_status_service_bond::from_slice",
-      "parse_purchase_result::from_str",
-      "purchase_http_status_error::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/workflow.rs": [
-      "run_workflow_preflight::from_slice"
+      "load_verification_market::from_slice"
     ],
     "crates/products/chio-cli/src/cli/input/config.rs": [
       "yaml::Deserializer::from_slice",
       "yaml::custom_deserialize"
     ],
+    "crates/products/chio-cli/src/cli/input/private.rs": [
+      "as_str::custom_deserialize"
+    ],
     "crates/products/chio-cli/src/cli/input.rs": [
       "literal::from_value",
       "project::from_value"
     ],
-    "crates/products/chio-cli/src/cli/mcp/cage_policy.rs": [
-      "decode_cage_policy::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs": [
-      "parse_message::from_slice"
-    ],
     "crates/products/chio-cli/src/cli/mcp/provision/discovery.rs": [
       "discover_tool_surface::from_value"
     ],
-    "crates/products/chio-cli/src/cli/mcp/provision/reference_runtime.rs": [
-      "cmd_provision_reference_runtime::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/mcp/provision.rs": [
-      "decode_tools_fixture::from_slice",
-      "validate_existing_provision::from_slice",
-      "validate_existing_provision::from_slice",
-      "validate_existing_provision::from_slice"
-    ],
     "crates/products/chio-cli/src/cli/mcp/wrap.rs": [
-      "cmd_mcp_wrap_e2e_fixture::from_str",
       "cmd_mcp_wrap_e2e_fixture::from_value",
       "cmd_mcp_wrap_e2e_fixture::from_value",
-      "output_to_mcp_result::from_value",
-      "run_wrap_with_gate::from_str"
+      "output_to_mcp_result::from_value"
     ],
     "crates/products/chio-cli/src/cli/mcp.rs": [
-      "load_tools_fixture::from_str",
       "load_tools_fixture::from_value"
     ],
     "crates/products/chio-cli/src/cli/process_host/call_evidence/broker.rs": [
@@ -5817,21 +5751,8 @@
     "crates/products/chio-cli/src/cli/replay.rs": [
       "run_log_replay::from_value"
     ],
-    "crates/products/chio-cli/src/cli/runtime.rs": [
-      "cmd_check::from_str",
-      "load_check_output_fixture::from_str",
-      "load_roster_policy::from_slice"
-    ],
     "crates/products/chio-cli/src/cli/session/response.rs": [
       "pending_proposal::from_value"
-    ],
-    "crates/products/chio-cli/src/lineage.rs": [
-      "cmd_roots::from_slice",
-      "read_graph::from_slice"
-    ],
-    "crates/products/chio-cli/src/market.rs": [
-      "read_catalog::from_slice",
-      "read_install_record::from_slice"
     ],
     "crates/products/chio-finding-market-canary/src/main.rs": [
       "network_canary::from_slice",
@@ -6985,6 +6906,10 @@
       "kind": "bounded-original-reader",
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO."
     },
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile/custody.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Private profile Deserialize implementations own seed/token strings in wiping guards even before all fields have parsed. Successful conversion transfers allocations into wiping owner types; serde errors retain no surviving partial secret fields."
+    },
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs": {
       "kind": "bounded-original-reader",
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO."
@@ -7181,125 +7106,41 @@
       "kind": "reviewed-bounded-input",
       "contract": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority."
     },
-    "crates/products/chio-cli/src/cli/chio/dispatch/buyer.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/alerts.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/archive.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/package.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/reports.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/delivery.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/io.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/iroh_mount.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/relay.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/runtime.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/chio/dispatch/treaty.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/attest.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/finding.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/finding/challenge.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody."
     },
     "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/finding/status_floor.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON and retained-state reads precede existing finding signature, deployment, freshness, status and authority binding. Remote success bodies are capped; command-owned time observes the shared fallible fence. Canonical owners continue to compare exact original and typed bytes."
     },
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/finding/verify.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/dispatch/workflow.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded exact canonical admission jobs preserve requested package/finding bindings. HTTP responses have actual-byte limits and request deadlines; oversized prefixes cannot decode as complete replies. Collateral evaluation increment is checked; existing profile, retained bundle and activation identities remain checked before completion."
     },
     "crates/products/chio-cli/src/cli/input.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention."
+      "contract": "Shared bounded original native JSON, separate canonical I-JSON and typed projection contracts. Input decoding grants no authentication authority."
     },
     "crates/products/chio-cli/src/cli/input/config.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection."
     },
+    "crates/products/chio-cli/src/cli/input/private.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Private nofollow custody with opened-file ownership/mode checks feeds direct canonical typed decoding. Seed fields wipe on every drop, including partial deserialization failures; secret parse trees are not materialized."
+    },
     "crates/products/chio-cli/src/cli/mcp.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/mcp/cage_policy.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/mcp/provision.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original file or transport JSON rejects duplicate and lossy input before projection. Existing signed-policy trust pins, admitted-manifest verification and enforcing-host requirements remain authority gates; fixture decoding grants no live launch authority."
     },
     "crates/products/chio-cli/src/cli/mcp/provision/discovery.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/mcp/provision/reference_runtime.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/products/chio-cli/src/cli/mcp/wrap.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original request frames reject duplicate/lossy JSON and invalid JSON-RPC version/method/id/params before gate or tool dispatch. Fixtures are bounded and strictly decoded; typed result projections are not new authority."
     },
     "crates/products/chio-cli/src/cli/process_host/call_evidence/broker.rs": {
       "kind": "typed-value-conversion",
@@ -7361,21 +7202,9 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/products/chio-cli/src/cli/runtime.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/products/chio-cli/src/cli/session/response.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
-    "crates/products/chio-cli/src/lineage.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/market.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/products/chio-finding-market-canary/src/main.rs": {
       "kind": "raw-input-baseline",
@@ -11581,6 +11410,14 @@
       "kind": "parser-internal-or-typed",
       "contract": "Existing private-file signing custody rejects missing, permissive, multiply linked, wrong-owner or replaced files; nonblocking nofollow reads are bounded and zeroizing from allocation through all exits."
     },
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Current private operator and client profile shapes deserialize through wiping custody and wipe secret fields on drop. Existing profile, role, endpoint and deployment validation remains unchanged; serde construction alone does not grant authority."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile/custody.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Private profile Deserialize implementations own seed/token strings in wiping guards even before all fields have parsed. Successful conversion transfers allocations into wiping owner types; serde errors retain no surviving partial secret fields."
+    },
     "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
       "kind": "parser-internal-or-typed",
       "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only."
@@ -11621,6 +11458,14 @@
       "kind": "reviewed-bounded-input",
       "contract": "Bounded original signed documents and registry projections precede existing signing/authorization operations. Created-at observes the shared fallible fenced clock instead of converting clock failure to zero."
     },
+    "crates/products/chio-cli/src/archive.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Compressed bytes are captured under their actual-byte cap before decompression, avoiding metadata-only read bounds and special-file opens. Expanded-member limits and complete path namespace checks precede extraction; all existing output writers validate namespaces before filesystem effects."
+    },
+    "crates/products/chio-cli/src/archive/namespace.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Portable archive namespaces account for implicit parent directories and reject duplicate, case-folded and file/directory collisions before extraction. Explicit parent directory entries remain permitted once after an implicit parent."
+    },
     "crates/products/chio-cli/src/cert.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Certificate documents are bounded and duplicate-aware before signature verification. Existing private key custody is required. Read-only SQLite queries select exact signed session metadata independently of capability ID; SQL bounds receipt text before materialization, and count/actual-byte/checked-sequence bounds precede retaining receipts. Certificate inspection is diagnostic, not authentication."
@@ -11629,9 +11474,61 @@
       "kind": "reviewed-bounded-input",
       "contract": "Authority profiles/requests delegate bounded original input to their validated authority-library decoders. Private key JSON is read through existing private-file custody with identity/mode/owner checks and zeroizing buffers, then exact canonical custody decoding into secret fields. Typed projection never substitutes for authority issuance checks."
     },
+    "crates/products/chio-cli/src/cli/chio/dispatch/buyer.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Buyer package sources use shared retained-byte and entry budgets, duplicate-role/path checks and portable member paths rejecting stable ancestor symlinks. Original artifacts remain inputs to the existing trust/context-bound proof verifier; report classification is diagnostic only."
+    },
     "crates/products/chio-cli/src/cli/chio/dispatch/io.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Shared bounded regular UTF-8 reader serves JSON and seed/text callers; owning current-schema decoders still establish format/signature semantics."
+      "contract": "Shared bounded regular UTF-8 JSON is validated as original duplicate-aware native JSON before downstream owner parsers. Signature, schema and authority checks remain downstream."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/alerts.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/archive.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Archive decoding caps compressed bytes, expanded members, cumulative bytes and namespace entries. Names reject traversal, duplicate paths, case collisions and file/directory conflicts before extraction. Original manifest JSON is duplicate-aware and existing packager/exporter signature plus report hash checks precede verified extraction."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/package.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/reports.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Report directory readers delegate to shared bounded original collection ingress; report projections do not replace archive-package packager/exporter authentication or original report digest binding."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/assurance/support.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Bundle source discovery and retained artifacts share a cumulative budget. Original manifest/report decoding and unique portable member paths precede retention; output namespaces are validated in a private snapshot before directory writes. Candidate diagnostics do not reset consumed capacity."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/delivery.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/io.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/iroh_mount.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Original transport directory and issuer JSON is bounded and duplicate-aware; exact issuer, version, predecessor and local endpoint identity gates remain. Transport seeds use private canonical wiping custody. Fallible clocks freeze directory admission on observation failure; configured caller time remains explicit."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/iroh_mount/reloader.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Fallible reload clock errors swap admission to deny-all and mark the lane unavailable. Last verified chain state is retained for recovery; no invented zero or maximum timestamp is used."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/relay.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/runtime.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON before report projection or existing relay verification. Relay directory configuration preserves pinned issuer, profile, time and version gates; decoding alone is not authenticated identity. Collection readers share entry and retained-byte budgets; JSON signing keys use private canonical wiping custody."
     },
     "crates/products/chio-cli/src/cli/chio/dispatch/runtime/ops.rs": {
       "kind": "reviewed-bounded-input",
@@ -11644,6 +11541,42 @@
     "crates/products/chio-cli/src/cli/chio/dispatch/runtime/signing.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Signed runtime inputs use bounded original decoders and existing private signing custody, without creating missing keys. Signature and authority checks remain in runtime/attestation owners; serialization of constructed signed output is not ingress."
+    },
+    "crates/products/chio-cli/src/cli/chio/dispatch/treaty.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON and regular-file reads precede existing owner validation. Diagnostic or fixture projections cannot grant authority."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/attest.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON and regular-file reads precede existing owner validation. Diagnostic or fixture projections cannot grant authority. Binary supply-chain artifacts have a separate 512 MiB opaque-input bound. Quote collateral remains a JSON document; explicit verification times remain caller-owned and absent times use the fenced clock."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/finding.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON and retained-state reads precede existing finding signature, deployment, freshness, status and authority binding. Remote success bodies are capped; command-owned time observes the shared fallible fence. Canonical owners continue to compare exact original and typed bytes. Publication validates the original canonical signed finding locally before POST, then compares both returned finding ID and artifact digest before success."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/finding/challenge.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded exact canonical challenge evidence, schema and typed-byte equality precede challenge construction. Existing private challenger keys are loaded without creation. Bounded timeout-controlled submission responses must match challenge and lock identities."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private canonical bounded hosted profiles and canary observations decode directly to typed records, then existing deployment validation and signed canary verification run using fenced current time. Secret custody is checked on the opened file; metadata length is not the allocation bound."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON and retained-state reads precede existing finding signature, deployment, freshness, status and authority binding. Remote success bodies are capped; command-owned time observes the shared fallible fence. Canonical owners continue to compare exact original and typed bytes."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/finding/status_floor.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Only current v2 floors decode, with a mandatory operator key; v1 migration and optional-key compatibility are deleted. Canonical bounded state reads use nonblocking nofollow descriptors. Existing durable time, epoch, operator, retraction and equivocation checks remain; lock files reject links and special files. Obsolete inputs never rewrite the floor."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded exact canonical admission jobs preserve requested package/finding bindings. HTTP responses have actual-byte limits and request deadlines; oversized prefixes cannot decode as complete replies. Collateral evaluation increment is checked; existing profile, retained bundle and activation identities remain checked before completion."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/finding/verify.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON and retained-state reads precede existing finding signature, deployment, freshness, status and authority binding. Remote success bodies are capped; command-owned time observes the shared fallible fence. Canonical owners continue to compare exact original and typed bytes."
     },
     "crates/products/chio-cli/src/cli/dispatch/proof.rs": {
       "kind": "reviewed-bounded-input",
@@ -11697,17 +11630,29 @@
       "kind": "parser-internal-or-typed",
       "contract": "CLI verification adapts the sealed proof-room verifier result without flattening causes; captured input custody binds subsequent output readers to private bounded bytes."
     },
+    "crates/products/chio-cli/src/cli/dispatch/runtime.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Dispatch propagates fallible relay time before runtime operation calls; explicit caller timestamps remain explicit inputs."
+    },
+    "crates/products/chio-cli/src/cli/dispatch/workflow.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON and regular-file reads precede existing owner validation. Diagnostic or fixture projections cannot grant authority."
+    },
     "crates/products/chio-cli/src/cli/input.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Native signed original-byte decoder preserves full-width integers, rejects duplicate/lossy JSON and retains redacted typed errors. Canonical I-JSON and literal/typed projection are distinct explicit APIs. Regular file and stream readers bound actual bytes before retention."
+      "contract": "Shared bounded original native JSON, separate canonical I-JSON and typed projection contracts. Input decoding grants no authentication authority."
     },
     "crates/products/chio-cli/src/cli/input/collection.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Count/depth and actual-byte budget shared across each artifact collection. File retention is bounded by remaining capacity before the read; nonregular entries reject."
+      "contract": "Shared entry, depth and actual-byte limits. Failed file reads exhaust the remaining byte budget so diagnostic candidate collection cannot retry oversized reads without charge. Portable relative members reject stable intermediate symlinks; concurrent hostile ancestor mutation remains outside this helper contract."
     },
     "crates/products/chio-cli/src/cli/input/config.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Explicit JSON/YAML selector with no error fallback. YAML rejects duplicate/non-string keys, multiple documents, nonfinite numbers and excessive depth, expanded nodes or string bytes before typed projection."
+    },
+    "crates/products/chio-cli/src/cli/input/private.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Private nofollow custody with opened-file ownership/mode checks feeds direct canonical typed decoding. Seed fields wipe on every drop, including partial deserialization failures; secret parse trees are not materialized."
     },
     "crates/products/chio-cli/src/cli/input/snapshot.rs": {
       "kind": "parser-internal-or-typed",
@@ -11716,6 +11661,30 @@
     "crates/products/chio-cli/src/cli/input/time.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Process-local clock fence locks before observing wall and monotonic time. Fault or regression rejects; explicit deadline addition rejects zero and overflow."
+    },
+    "crates/products/chio-cli/src/cli/mcp.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original file or transport JSON rejects duplicate and lossy input before projection. Existing signed-policy trust pins, admitted-manifest verification and enforcing-host requirements remain authority gates; fixture decoding grants no live launch authority."
+    },
+    "crates/products/chio-cli/src/cli/mcp/cage_policy.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original file or transport JSON rejects duplicate and lossy input before projection. Existing signed-policy trust pins, admitted-manifest verification and enforcing-host requirements remain authority gates; fixture decoding grants no live launch authority."
+    },
+    "crates/products/chio-cli/src/cli/mcp/provision.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original file or transport JSON rejects duplicate and lossy input before projection. Existing signed-policy trust pins, admitted-manifest verification and enforcing-host requirements remain authority gates; fixture decoding grants no live launch authority."
+    },
+    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded deadline-controlled original response lines reject duplicate/lossy JSON. Known response IDs require JSON-RPC 2.0 and exclusive result/error shape, initialized ordering, and an actual tools array. Enforced discovery transport remains mandatory."
+    },
+    "crates/products/chio-cli/src/cli/mcp/provision/reference_runtime.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original file or transport JSON rejects duplicate and lossy input before projection. Existing signed-policy trust pins, admitted-manifest verification and enforcing-host requirements remain authority gates; fixture decoding grants no live launch authority."
+    },
+    "crates/products/chio-cli/src/cli/mcp/wrap.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original request frames reject duplicate/lossy JSON and invalid JSON-RPC version/method/id/params before gate or tool dispatch. Fixtures are bounded and strictly decoded; typed result projections are not new authority."
     },
     "crates/products/chio-cli/src/cli/process_host/call_evidence.rs": {
       "kind": "reviewed-bounded-input",
@@ -11777,6 +11746,10 @@
       "kind": "reviewed-bounded-input",
       "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
     },
+    "crates/products/chio-cli/src/cli/runtime.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original JSON and regular-file reads precede existing owner validation. Diagnostic or fixture projections cannot grant authority."
+    },
     "crates/products/chio-cli/src/cli/trust/credit.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Credit policies explicitly select JSON or YAML with original duplicate rejection and bounded YAML expansion; JSON rejection never retries YAML. CLI enums are literal string projections. Credit evaluation/signature checks remain the owning library contract."
@@ -11800,6 +11773,14 @@
     "crates/products/chio-cli/src/cli/trust/underwriting.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Underwriting policy loading uses bounded explicit JSON/YAML with no parse-error fallback. Enum arguments are literal strings; typed policy projection does not replace signed underwriting/receipt verification."
+    },
+    "crates/products/chio-cli/src/lineage.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original graph and frontier documents retain typed input errors. Root enumeration has entry and cumulative actual-byte limits; malformed selected JSON is an error rather than silently disappearing from diagnostics. Graph queries and root listings make no signature-authentication claim."
+    },
+    "crates/products/chio-cli/src/market.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded original catalog and retained installation documents retain typed decode causes. Catalog references are unique and count-capped. Replayed installation records must bind the requested tenant, reference and current schema, while current fiscal/revocation checks still precede replay."
     },
     "crates/products/chio-cli/src/passport.rs": {
       "kind": "reviewed-bounded-input",

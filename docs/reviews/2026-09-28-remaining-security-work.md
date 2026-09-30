@@ -3,7 +3,7 @@
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
-Updated through the September 30 CLI authority and proof-reader batch. Each batch has its own
+Updated through the September 30 remaining CLI reader batch. Each batch has its own
 implementation and verification record below; this queue does not establish
 hosted or release qualification.
 
@@ -11,7 +11,7 @@ hosted or release qualification.
 
 | Work | Current recorded scope | Interpretation |
 | --- | --- | --- |
-| Decoder classification | 223 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
+| Decoder classification | 194 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers, the remaining 29 CLI readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
 | Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
 | Negative assertions | Baseline contains 1,257 assertions at 1,175 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
@@ -125,9 +125,17 @@ disposes the next 26 CLI readers and retires the manifest-v1 conversion owner.
 Its shared input, private custody, exact session, captured export, collection,
 clock/deadline and catalog-path contracts are recorded with focused evidence.
 
-Next execute the 29 remaining CLI baseline readers pinned in that record:
-finding/attestation/workflow, buyer/treaty/pheromone, and MCP/runtime/lineage/market.
-There are 223 baseline files across the workspace. These lexical counts describe
+The [remaining CLI reader batch](2026-09-30-cli-remaining-readers-execution.md)
+disposes all 29 of those readers. Finding/attestation/workflow, buyer/treaty/pheromone
+and MCP/runtime/lineage/market use bounded original documents and explicit custody.
+The batch removes status-floor v1 conversion, binds publish acknowledgements and
+retained market records, caps aggregate failed reads, validates complete archive
+namespaces before extraction, and makes relay/reloader time fallible.
+
+Next execute its 28 pinned protocol readers: shared provider/egress transports,
+provider streaming and nested tool arguments, and recorder/replay/conformance
+fixture owners. There are 194 baseline files across the workspace and zero CLI
+baseline files. These lexical counts describe
 semantic review debt, not known vulnerabilities. Broader clock/deadline/accounting
 and negative-control work remains owner-specific.
 

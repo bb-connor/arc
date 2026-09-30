@@ -1,0 +1,5 @@
+
+running 1 test
+test trust_control::finding_operator_profile::custody::tests::partial_private_profile_failure_wipes_already_decoded_seeds ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1185 filtered out; finished in 0.02s

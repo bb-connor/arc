@@ -13,7 +13,7 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_evaluate(
     now_unix_ms: u64,
     report: &Path,
 ) -> Result<(), CliError> {
-    let observability: chio_pheromone_relay::RelayObservabilityReport = serde_json::from_str(
+    let observability: chio_pheromone_relay::RelayObservabilityReport = crate::input::text(
         &read_utf8_json_file(observability_report, "Chio relay observability report")?,
     )
     .map_err(|error| {
@@ -56,11 +56,11 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_handoff(
     now_unix_ms: u64,
     report: &Path,
 ) -> Result<(), CliError> {
-    let alert_report: chio_pheromone_relay::RelayAlertReport = serde_json::from_str(
+    let alert_report: chio_pheromone_relay::RelayAlertReport = crate::input::text(
         &read_utf8_json_file(alert_report, "Chio relay alert report")?,
     )
     .map_err(|error| CliError::cli_other_error(format!("Chio relay alert report: {error}")))?;
-    let trend_report: chio_pheromone_relay::RelayTrendReport = serde_json::from_str(
+    let trend_report: chio_pheromone_relay::RelayTrendReport = crate::input::text(
         &read_utf8_json_file(trend_report, "Chio relay trend report")?,
     )
     .map_err(|error| CliError::cli_other_error(format!("Chio relay trend report: {error}")))?;
@@ -98,14 +98,12 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_normalize(
     out_dir: &Path,
     report: &Path,
 ) -> Result<(), CliError> {
-    let profile: chio_pheromone_relay::RelayAlertNormalizationProfileDocument =
-        serde_json::from_str(&read_utf8_json_file(
-            profile,
-            "Chio relay alert normalization profile",
-        )?)
-        .map_err(|error| {
-            CliError::cli_other_error(format!("Chio relay alert normalization profile: {error}"))
-        })?;
+    let profile: chio_pheromone_relay::RelayAlertNormalizationProfileDocument = crate::input::text(
+        &read_utf8_json_file(profile, "Chio relay alert normalization profile")?,
+    )
+    .map_err(|error| {
+        CliError::cli_other_error(format!("Chio relay alert normalization profile: {error}"))
+    })?;
     let sources = read_relay_alert_normalization_sources(input_dir)?;
     let normalization = chio_pheromone_relay::normalize_relay_alert_delivery_evidence(
         chio_pheromone_relay::RelayAlertNormalizationInput {
@@ -141,34 +139,34 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_review(
     now_unix_ms: u64,
     report: &Path,
 ) -> Result<(), CliError> {
-    let handoff_report: chio_pheromone_relay::RelayAlertHandoffReport = serde_json::from_str(
+    let handoff_report: chio_pheromone_relay::RelayAlertHandoffReport = crate::input::text(
         &read_utf8_json_file(handoff_report, "Chio relay alert handoff report")?,
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("Chio relay alert handoff report: {error}"))
     })?;
-    let delivery_report: chio_pheromone_relay::RelayAlertDeliveryReport = serde_json::from_str(
+    let delivery_report: chio_pheromone_relay::RelayAlertDeliveryReport = crate::input::text(
         &read_utf8_json_file(delivery_report, "Chio relay alert delivery report")?,
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("Chio relay alert delivery report: {error}"))
     })?;
     let acknowledgement_report: chio_pheromone_relay::RelayAlertAcknowledgementReport =
-        serde_json::from_str(&read_utf8_json_file(
+        crate::input::text(&read_utf8_json_file(
             acknowledgement_report,
             "Chio relay alert acknowledgement report",
         )?)
         .map_err(|error| {
             CliError::cli_other_error(format!("Chio relay alert acknowledgement report: {error}"))
         })?;
-    let drift_report: chio_pheromone_relay::RelayAlertDeliveryDriftReport = serde_json::from_str(
+    let drift_report: chio_pheromone_relay::RelayAlertDeliveryDriftReport = crate::input::text(
         &read_utf8_json_file(drift_report, "Chio relay alert delivery drift report")?,
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("Chio relay alert delivery drift report: {error}"))
     })?;
     let route_owner_profile: chio_pheromone_relay::RelayAlertRouteOwnerProfileDocument =
-        serde_json::from_str(&read_utf8_json_file(
+        crate::input::text(&read_utf8_json_file(
             route_owner_profile,
             "Chio relay alert route-owner profile",
         )?)
@@ -196,30 +194,18 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_review(
 pub(crate) fn read_relay_alert_normalization_sources(
     dir: &Path,
 ) -> Result<Vec<serde_json::Value>, CliError> {
-    let entries = fs::read_dir(dir).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to read Chio relay alert normalization input dir {}: {error}",
-            dir.display()
-        ))
-    })?;
-    let mut paths = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to read Chio relay alert normalization input dir entry {}: {error}",
-                dir.display()
-            ))
-        })?;
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
-            paths.push(path);
-        }
-    }
-    paths.sort();
+    let mut budget = crate::input::collection::Budget::default();
+    let paths = crate::input::collection::directory(dir, &mut budget)?;
     let mut sources = Vec::new();
     for path in paths {
-        let json = read_utf8_json_file(&path, "relay alert normalization input")?;
-        let value: serde_json::Value = serde_json::from_str(&json).map_err(|error| {
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        let bytes = budget.read(&path)?;
+        let json = std::str::from_utf8(&bytes).map_err(|source| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+        })?;
+        let value: serde_json::Value = crate::input::text(&json).map_err(|error| {
             CliError::cli_other_error(format!(
                 "Chio relay alert normalization input {}: {error}",
                 path.display()

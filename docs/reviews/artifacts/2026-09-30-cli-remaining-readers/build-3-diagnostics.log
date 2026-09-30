@@ -1,0 +1,12 @@
+error[E0425]: cannot find value `FINDING_VERIFY_SUPPORT_MAX_BYTES` in this scope
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/finding/unit_tests.rs:677:49
+    |
+677 |         input_boundary::assert_too_large(error, FINDING_VERIFY_SUPPORT_MAX_BYTES);
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+    |
+help: consider importing this constant
+    |
+  1 + use crate::dispatch_cli::finding_cmd::finding_verify::FINDING_VERIFY_SUPPORT_MAX_BYTES;
+    |
+
+For more information about this error, try `rustc --explain E0425`.

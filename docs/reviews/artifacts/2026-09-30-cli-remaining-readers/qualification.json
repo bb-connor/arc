@@ -1,0 +1,173 @@
+{
+  "schema": "chio.local-cli-reader-qualification.v1",
+  "recorded_at": "2026-09-30T21:09:39.149748+00:00",
+  "base_commit": "da4086017fc04e0d69dbe942a8ba42f6f4404b71",
+  "branch": "packet/3-retention-accounting",
+  "platform": {
+    "system": "Linux",
+    "architecture": "aarch64",
+    "kernel": "6.17.0-1020-oracle"
+  },
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8",
+  "build_environment": {
+    "CARGO_TARGET_DIR": "/home/connor/chio-security-target-6d-final",
+    "CARGO_INCREMENTAL": "0",
+    "CHIO_CHECKOUT_ROOT": "/tmp/arc-security-launch"
+  },
+  "final_build_command": "cargo test -p chio-cli -p chio-control-plane --features chio-cli/iroh --bin chio --lib --test native_mcp_demo_provision --test mcp_wrap_e2e --test workflow_preflight --no-run --locked --message-format=json",
+  "build_attempts": [
+    {
+      "attempt": 1,
+      "exit_code": 101,
+      "compiler_diagnostics": 13,
+      "log": "build.log"
+    },
+    {
+      "attempt": 2,
+      "exit_code": 0,
+      "compiler_diagnostics": 4,
+      "log": "build-2.log"
+    },
+    {
+      "attempt": 3,
+      "exit_code": 101,
+      "compiler_diagnostics": 2,
+      "log": "build-3.log"
+    },
+    {
+      "attempt": 4,
+      "exit_code": 0,
+      "compiler_diagnostics": 0,
+      "log": "build-4.log"
+    },
+    {
+      "attempt": 5,
+      "exit_code": 0,
+      "compiler_diagnostics": 0,
+      "log": "build-5.log"
+    }
+  ],
+  "final_build_exit_code": 0,
+  "artifacts": {
+    "native_mcp_demo_provision": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/deps/native_mcp_demo_provision-f0d68ea182fa87ca",
+      "sha256": "22efc26e4bd9519df176edaad4a962c7eafd588c5ecb3bbc57006cdede09d905",
+      "fresh_in_final_build": true
+    },
+    "workflow_preflight": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/deps/workflow_preflight-ff722acf79ca5957",
+      "sha256": "549ac955795af3bf42a64e0eed88cf40f0242fd75e2c15055f66cf3a3c290c0e",
+      "fresh_in_final_build": true
+    },
+    "mcp_wrap_e2e": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/deps/mcp_wrap_e2e-028df49b41a6c921",
+      "sha256": "960f3058b4d48f71f9ac3108156208b9c85c8bcf98c28fccb05976d18d95d551",
+      "fresh_in_final_build": true
+    },
+    "chio_control_plane_unit": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-5164ecc451cc0e73",
+      "sha256": "9a71bdff61e851650defede47055d71c70802b5add4b0ff8cc00a2a262ec9ecc",
+      "fresh_in_final_build": true
+    },
+    "chio_unit": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/deps/chio-df98bdbf73dfdec1",
+      "sha256": "87aa66c9dedc72b0ea8bcce3b67f74ace5cc860b4841096e636333eb9f395c0f",
+      "fresh_in_final_build": false
+    },
+    "chio": {
+      "path": "/home/connor/chio-security-target-6d-final/debug/chio",
+      "sha256": "9a4010413e473d1f529122eb48037f2bd062abe0aaccf9df61d0362a1f709943",
+      "fresh_in_final_build": false
+    }
+  },
+  "tests": [
+    {
+      "log": "unit-final.log",
+      "artifact": "chio_unit",
+      "exit_code": 0,
+      "passed": 247,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 494
+    },
+    {
+      "log": "profile-custody.log",
+      "artifact": "chio_control_plane_unit",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 1185
+    },
+    {
+      "log": "native-demo-provision.log",
+      "artifact": "native_mcp_demo_provision",
+      "exit_code": 0,
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0
+    },
+    {
+      "log": "mcp-wrap-e2e.log",
+      "artifact": "mcp_wrap_e2e",
+      "exit_code": 0,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0
+    },
+    {
+      "log": "workflow-preflight.log",
+      "artifact": "workflow_preflight",
+      "exit_code": 0,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0
+    }
+  ],
+  "total_passed": 266,
+  "checks": [
+    {
+      "command": "python3 scripts/check-trust-boundaries.py",
+      "log": "trust-boundaries-final.log",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 scripts/check-rust-file-hygiene.py",
+      "log": "rust-file-hygiene-final.log",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 scripts/check-security-clocks.py",
+      "log": "clocks.log",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 scripts/check-accounting-arithmetic.py",
+      "log": "accounting.log",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 scripts/check-negative-assertions.py",
+      "log": "negative-assertions-final.log",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 scripts/check-wire-schemas.py",
+      "log": "wire-final.log",
+      "exit_code": 0
+    },
+    {
+      "command": "rustfmt --edition 2021 --check --config skip_children=true <46 changed Rust files>",
+      "log": "format.log",
+      "exit_code": 0
+    }
+  ],
+  "reviewed_readers": 29,
+  "remaining_raw_baseline": 194,
+  "remaining_cli_raw_baseline": 0,
+  "next_protocol_readers": 28,
+  "qualification_boundary": "Focused local iroh-enabled CLI owners and fixtures; no claim of workspace-wide tests/clippy, optional TEE backends, native x86_64 host enforcement, hosted CI, M5, merge, publication or activation."
+}

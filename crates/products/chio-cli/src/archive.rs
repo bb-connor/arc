@@ -36,13 +36,9 @@ pub(crate) fn read_tar_gz_file(
     label: &str,
     limits: SafeArchiveLimits,
 ) -> Result<Vec<SafeArchiveEntry>, CliError> {
-    let compressed_len = compressed_archive_len(archive_path, label, limits)?;
-    let file = fs::File::open(archive_path).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to open {label} {}: {error}",
-            archive_path.display()
-        ))
-    })?;
+    let bytes = read_compressed_archive(archive_path, limits)?;
+    let compressed_len = bytes.len() as u64;
+    let file = std::io::Cursor::new(bytes);
     let decoder = flate2::read::GzDecoder::new(file);
     read_tar_archive_entries(archive_path, label, limits, compressed_len, decoder)
 }
@@ -52,13 +48,9 @@ pub(crate) fn read_tar_zstd_file(
     label: &str,
     limits: SafeArchiveLimits,
 ) -> Result<Vec<SafeArchiveEntry>, CliError> {
-    let compressed_len = compressed_archive_len(archive_path, label, limits)?;
-    let file = fs::File::open(archive_path).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to open {label} {}: {error}",
-            archive_path.display()
-        ))
-    })?;
+    let bytes = read_compressed_archive(archive_path, limits)?;
+    let compressed_len = bytes.len() as u64;
+    let file = std::io::Cursor::new(bytes);
     let decoder = zstd::stream::read::Decoder::new(file).map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to open {label} zstd stream {}: {error}",
@@ -68,26 +60,10 @@ pub(crate) fn read_tar_zstd_file(
     read_tar_archive_entries(archive_path, label, limits, compressed_len, decoder)
 }
 
-fn compressed_archive_len(
-    archive_path: &Path,
-    label: &str,
-    limits: SafeArchiveLimits,
-) -> Result<u64, CliError> {
-    let compressed_len = fs::metadata(archive_path)
-        .map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to inspect {label} {}: {error}",
-                archive_path.display()
-            ))
-        })?
-        .len();
-    if compressed_len > limits.max_compressed_bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{label} {} exceeds compressed byte limit",
-            archive_path.display()
-        )));
-    }
-    Ok(compressed_len)
+fn read_compressed_archive(path: &Path, limits: SafeArchiveLimits) -> Result<Vec<u8>, CliError> {
+    let bound = usize::try_from(limits.max_compressed_bytes)
+        .map_err(|_| CliError::cli_other_error("archive byte bound overflows"))?;
+    Ok(crate::input::read_regular(path, bound)?)
 }
 
 fn read_tar_archive_entries<R: Read>(
@@ -99,6 +75,7 @@ fn read_tar_archive_entries<R: Read>(
 ) -> Result<Vec<SafeArchiveEntry>, CliError> {
     let mut archive = tar::Archive::new(reader);
     let mut entries_out = Vec::new();
+    let mut namespace = namespace::Namespace::default();
     let mut seen = BTreeSet::new();
     let mut seen_casefold = BTreeSet::new();
     let mut total_bytes = 0_u64;
@@ -121,7 +98,7 @@ fn read_tar_archive_entries<R: Read>(
                 "{label} has too many members"
             )));
         }
-        entry_count = entry_count.saturating_add(1);
+        entry_count += 1;
         let entry_path = entry.path().map_err(|error| {
             CliError::cli_io_error(format!(
                 "failed to read {label} entry path {}: {error}",
@@ -138,6 +115,7 @@ fn read_tar_archive_entries<R: Read>(
                 continue;
             }
             let _ = safe_archive_member_path(directory_path, label)?;
+            namespace.add(directory_path, true)?;
             continue;
         }
         let path = safe_archive_member_path(entry_path, label)?;
@@ -156,6 +134,7 @@ fn read_tar_archive_entries<R: Read>(
                 "{label} member has a casefold collision"
             )));
         }
+        namespace.add(&path, false)?;
         let size = entry.size();
         if size > limits.max_member_bytes {
             return Err(CliError::cli_other_error(format!(
@@ -315,6 +294,7 @@ pub(crate) fn write_entries_to_fresh_dir(
     label: &str,
     entries: &[SafeArchiveEntry],
 ) -> Result<u64, CliError> {
+    namespace::validate(entries)?;
     if out_dir.exists() {
         return Err(CliError::cli_other_error(format!(
             "{label} output {} must not exist",
@@ -360,6 +340,7 @@ pub(crate) fn write_entries_to_existing_dir(
     label: &str,
     entries: &[SafeArchiveEntry],
 ) -> Result<(), CliError> {
+    namespace::validate(entries)?;
     fs::create_dir_all(root).map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to create {label} root {}: {error}",
@@ -378,6 +359,7 @@ pub(crate) fn replace_entries_in_existing_dir(
     label: &str,
     entries: &[SafeArchiveEntry],
 ) -> Result<(), CliError> {
+    namespace::validate(entries)?;
     fs::create_dir_all(root).map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to create {label} root {}: {error}",
@@ -392,7 +374,10 @@ pub(crate) fn replace_entries_in_existing_dir(
 }
 
 pub(crate) fn safe_archive_member_path(relative: &str, label: &str) -> Result<String, CliError> {
-    if relative.trim() != relative
+    if relative.len() > 4096
+        || relative.split('/').count() > 64
+        || relative.split('/').any(|part| part.len() > 255)
+        || relative.trim() != relative
         || relative.is_empty()
         || relative.contains('\\')
         || relative.contains(':')
@@ -842,3 +827,6 @@ mod tests {
         assert!(!outside.join("peer").exists());
     }
 }
+
+#[path = "archive/namespace.rs"]
+mod namespace;

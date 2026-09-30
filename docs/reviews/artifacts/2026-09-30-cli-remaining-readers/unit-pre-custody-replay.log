@@ -1,0 +1,506 @@
+
+running 245 tests
+test archive::tests::safe_archive_helper_rejects_backslash_and_colon ... ok
+test archive::tests::safe_archive_helper_rejects_traversal_path ... ok
+test chio_dispatch::pheromone::assurance::reports::archive_restore_input_tests::archive_restore_inputs_keep_only_tarballs_when_json_reports_are_present ... ok
+test chio_dispatch::pheromone::assurance::reports::archive_restore_input_tests::archive_restore_inputs_drop_report_json_when_no_tarballs_are_present ... ok
+test archive::namespace::tests::collisions_fail_before_creating_output ... ok
+test archive::tests::safe_archive_helper_rejects_symlink_target_on_refresh ... ok
+test archive::namespace::tests::explicit_parent_after_child_is_valid_but_a_duplicate_is_not ... ok
+test archive::tests::safe_archive_helper_rejects_symlink_parent_on_refresh ... ok
+test chio_dispatch::pheromone::assurance::reports::archive_restore_input_tests::archive_restore_source_reports_match_by_canonical_hash ... ok
+test archive::tests::safe_archive_helper_roundtrips_regular_files ... ok
+test archive::tests::safe_archive_helper_rejects_symlink_member_on_read ... ok
+test archive::tests::safe_archive_helper_rejects_duplicate_member ... ok
+test archive::tests::safe_archive_helper_counts_directory_members ... ok
+test archive::tests::safe_archive_helper_rejects_decompression_ratio_bomb ... ok
+test archive::tests::safe_archive_helper_rejects_casefold_collision ... ok
+test chio_dispatch::pheromone::assurance::support::tests::output_directory_errors_use_chio_boundary_label ... ok
+test chio_dispatch::pheromone::assurance::reports::archive_restore_input_tests::archive_restore_tarball_rejects_mismatched_sidecar_report ... ok
+test chio_dispatch::pheromone::assurance::reports::archive_restore_input_tests::archive_restore_tarball_prefers_hash_stable_sidecar_report ... ok
+test chio_dispatch::pheromone::io::tests::directory_read_errors_use_chio_boundary_label ... ok
+test chio_dispatch::pheromone::io::tests::relay_signing_key_errors_use_chio_boundary_label ... ok
+test chio_dispatch::pheromone::assurance::reports::archive_restore_input_tests::archive_restore_rejects_unverified_standalone_package_report_json ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_fails_closed_when_successor_reassigns_bound_endpoint ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_rejects_rollback_and_keeps_last_good ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::build_iroh_router_rejects_relay_vs_transport_local_id_mismatch ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_denies_unchanged_directory_below_raised_min_version ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::disabled_loads_no_inputs_and_touches_nothing ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::enable_without_transport_directory_fails_closed ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::invalid_transport_directory_bundle_fails_closed ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_fails_closed_when_successor_rotates_local_binding ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::local_kernel_without_directory_binding_fails_closed ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_fails_closed_when_below_floor_running_directory_has_an_invalid_successor ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reloader_self_heals_after_expiry_lapse ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_swaps_in_successor_and_evicts_tombstoned_peer ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::local_transport_key_mismatch_fails_closed ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_advances_chain_after_local_binding_revoked ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::reloader_rechecks_immediately_when_a_live_directory_expires_mid_cycle ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::reloader_wakes_at_expiry_before_the_fixed_interval ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::revocation_and_bilateral_lanes_are_rejected_fail_closed ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::bundle_below_trusted_issuer_min_version_is_rejected_without_state_file ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_denies_newer_successor_below_raised_min_version ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::reload_fails_closed_when_trusted_issuers_becomes_empty ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::matching_local_transport_key_binding_loads ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::watchdog_flips_gauge_and_alarms_on_death ... ok
+test chio_dispatch::pheromone::relay::tests::local_dev_relay_service_limits_keep_existing_body_bound ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::directory_reload_self_heals_across_below_floor_successors ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::reload_rejects_unchanged_bundle_when_signing_issuer_leaves_trust_roots ... ok
+test chio_dispatch::pheromone::relay::tests::parse_iroh_peer_addr_book_rejects_malformed_entries_fail_closed ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::successor_bundle_accepted_with_rotation_state_supplied ... ok
+test chio_dispatch::pheromone::relay::tests::parse_iroh_peer_addr_book_is_empty_for_no_entries ... ok
+test chio_dispatch::pheromone::relay::tests::production_relay_service_limits_use_profile_body_bound ... ok
+test chio_dispatch::pheromone::relay::tests::parse_iroh_peer_addr_book_parses_and_groups_multi_homed_recipients ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::reload_expiry_is_checked_before_the_unchanged_fast_path ... ok
+test dispatch_cli::finding_cmd::finding_hosted::tests::missing_secret_references_fail_closed ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::reload_denies_same_version_bundle_whose_body_was_replaced ... ok
+test dispatch_cli::finding_cmd::finding_operator::tests::package_failures_are_reclaimable_while_admission_failures_remain_retryable ... ok
+test chio_dispatch::pheromone::relay::tests::iroh_tick::direct_address_book_threads_the_socket_onto_the_resolved_endpoint ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::reload_rejects_successor_that_reassigns_local_kernel_id ... ok
+test dispatch_cli::finding_cmd::finding_operator::tests::failed_verified_fix_jobs_reclaim_only_nonrecoverable_files ... ok
+test dispatch_cli::finding_cmd::finding_operator::tests::seller_repository_is_confined_to_the_configured_root ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rlimit_tests::host_user_process_count_is_not_used_as_the_sandbox_bound ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_dependency_resolves_host_symlinks_before_parent_components ... ok
+test dispatch_cli::finding_cmd::finding_operator::tests::retraction_bundle_failures_preserve_missing_retryable_and_integrity_classes ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_excludes_ambient_bin_lib_and_documentation ... ok
+test dispatch_cli::finding_cmd::finding_operator::tests::retraction_status_failures_preserve_retryable_operator_responses ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_rejects_filesystem_root ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_rejects_component_symlink_escapes_and_cycles ... ok
+test chio_dispatch::treaty::tests::treaty_admit_rejects_malformed_evidence_token ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_rejects_redirected_rustlib_without_changing_existing_mounts ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_rejects_missing_required_components_without_partial_mounts ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_relocates_only_its_own_dependency_paths ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_resolves_internal_file_and_directory_aliases ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::expired_package_deadline_stops_before_repository_staging ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::failed_repository_staging_removes_its_partial_root ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::admission_reconciliation_continues_after_one_job_fails ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::tick_outbound_endpoint_uses_ephemeral_port_not_the_serving_bind_addr ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::tests::aggregate_deadline_caps_each_remaining_command ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::paid_terminal_uses_its_authenticated_historical_verification_time ... ok
+test dispatch_cli::finding_cmd::finding_operator::tests::seller_submission_capacity_bounds_jobs_and_storage ... ok
+test chio_dispatch::treaty::tests::buyer_verify_packet_returns_error_when_report_denies ... ok
+test chio_dispatch::treaty::tests::treaty_admit_returns_error_when_report_denies ... ok
+test chio_dispatch::pheromone::relay::tests::iroh_tick::iroh_tick_drains_the_outbox_and_folds_an_unresolvable_recipient_into_retry ... ok
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+test chio_dispatch::pheromone::iroh_mount::tests::iroh_ingress_rejects_out_of_scope_sender_before_the_receiver ... ok
+Initialized empty Git repository in /tmp/.tmprDFsFE/.git/
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::private_new_output_is_published_only_after_complete_write ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::admission_lock::tests::admission_job_lock_serializes_independent_open_files ... ok
+Initialized empty Git repository in /tmp/.tmpTtJzoP/approved/source/.git/
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::source_git_sandbox_rejects_repository_config_includes ... ok
+test dispatch_cli::finding_cmd::finding_verify::tests::finding_verify_binds_status_freshness_to_report_clock ... ok
+test chio_dispatch::pheromone::iroh_mount::tests::build_iroh_router_succeeds_and_403s_unadmitted_over_loopback ... ok
+test dispatch_cli::finding_cmd::finding_verify::tests::evidence_report_rejects_a_failed_optional_facet ... ok
+test dispatch_cli::finding_cmd::finding_verify::tests::finding_verify_preserves_exact_canonical_status_proof_bytes ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::repository_identity_strips_remote_credentials_and_url_secrets ... ok
+test dispatch_cli::finding_cmd::finding_verify::tests::finding_verify_rejects_status_proof_without_pinned_trust ... ok
+test dispatch_cli::finding_cmd::finding_verify::tests::finding_verify_requires_a_durable_status_floor ... ok
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+test dispatch_cli::finding_cmd::finding_verify::tests::resolver_policy_records_resolved_nonce_evidence ... ok
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+Initialized empty Git repository in /tmp/.tmpU4p5Wx/approved/source/.git/
+test dispatch_cli::finding_cmd::publish_binding_tests::publish_response_binds_both_identifier_and_original_digest ... Initialized empty Git repository in /tmp/.tmpMxwpUg/worktree/.git/
+ok
+test dispatch_cli::finding_cmd::finding_verify::tests::finding_verify_does_not_persist_retraction_without_authenticated_operator_standing ... ok
+test dispatch_cli::finding_cmd::unit_tests::buy_requires_a_venue_url_and_service_token ... ok
+Initialized empty Git repository in /tmp/.tmp43RpIH/source/.git/
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+Initialized empty Git repository in /tmp/.tmpU4p5Wx/outside/.git/
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::patch_output_runner_enforces_deadline_and_output_bound ... ok
+test dispatch_cli::finding_cmd::unit_tests::buy_subcommand_parses ... ok
+[master (root-commit) 3f9781e] test
+ 1 file changed, 1 insertion(+)
+ create mode 100644 file.txt
+[master (root-commit) 209c437] secret
+ 1 file changed, 1 insertion(+)
+ create mode 100644 secret.txt
+test dispatch_cli::finding_cmd::finding_verify::tests::finding_verify_rejects_a_verified_epoch_below_its_durable_floor ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::repository_staging_enforces_deadline_and_aggregate_storage ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::source_git_sandbox_rejects_an_external_alternate_object_store ... ok
+test dispatch_cli::finding_cmd::finding_verify::tests::finding_verify_persists_an_authenticated_retraction_before_failure ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_buyer_submission_without_a_challenger_key ... ok
+{
+  "schema": "chio.finding.purchase-result.v1",
+  "requestId": "d76fbfcaae73d07854a0c3ec0ab644b1ee4b481ff9a6987ddef3b17f681c60da",
+  "findingId": "44ddeac1238e67af6a81adaf5e021e6d6cf96cc56fdec363c13e0ac8b16cd04e",
+  "payer": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+  "payerKey": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+  "reservationId": "8888888888888888888888888888888888888888888888888888888888888888",
+  "purchaseIntentId": "3a29c5a5fca21bdfa714d3fc9709537008872b3fafa1ad2b87faefd8e8e00958",
+  "authoritativePaymentOperationId": "832c5978833c4bb8c4ecc3bedccb8ee521007a3b17a9f28743dc4f2b4ab257b9",
+  "verdict": "allow",
+  "settlement": "captured",
+  "acceptedPrice": {
+    "units": 300,
+    "currency": "USD"
+  },
+  "realizedSpend": {
+    "units": 300,
+    "currency": "USD"
+  },
+  "deliveryReceipt": {
+    "id": "62ea621569f3de3902de552f48a689dcf593d0121fa1e8766245c7510c361312",
+    "timestamp": 1790802073,
+    "capability_id": "capability-live-buy",
+    "tool_server": "finding-server.test",
+    "tool_name": "read_finding",
+    "action": {
+      "parameters": {
+        "finding_id": "44ddeac1238e67af6a81adaf5e021e6d6cf96cc56fdec363c13e0ac8b16cd04e"
+      },
+      "parameter_hash": "5535376062ffbd43b1de9abfa804c43d704d9f2ae37ec63ea20a8f27d888319e"
+    },
+    "decision": {
+      "verdict": "allow"
+    },
+    "receipt_kind": "mediated_decision",
+    "boundary_class": "prevent",
+    "tool_origin": "caller_executed",
+    "redaction_mode": "none",
+    "content_hash": "3585cc254bb8f7308183b6689bb40ddcafe09fc4d74f4044776ae3d82e1bce2c",
+    "policy_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "trust_level": "mediated",
+    "kernel_key": "772c8a442b7db06e166cfbc1ccbcbcde6f3eba76a4e98ef3ffc519502237d6ef",
+    "signature": "f01b62a174d7d10939d153af28cf3c3d9bec08de88103f9185faa6b7e1c8a7a542fd072a19932b65b498ceec108b2e72ec99d3b64967e91667ef756ccb5b5a0b"
+  },
+  "purchaseRecord": {
+    "body": {
+      "schema": "chio.finding.purchase-record.v1",
+      "purchase_key": "049583b4934e3e7fc5043dbe59e56f2ee6a6f102c029cd7574c1ade671c386cb",
+      "purchase_intent_id": "3a29c5a5fca21bdfa714d3fc9709537008872b3fafa1ad2b87faefd8e8e00958",
+      "authoritative_payment_operation_id": "832c5978833c4bb8c4ecc3bedccb8ee521007a3b17a9f28743dc4f2b4ab257b9",
+      "buyer": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+      "payer": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+      "finding_id": "44ddeac1238e67af6a81adaf5e021e6d6cf96cc56fdec363c13e0ac8b16cd04e",
+      "listing_id": "listing-live-buy",
+      "accepted_bid_envelope_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "venue_admission_envelope_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "accepted_price": {
+        "units": 300,
+        "currency": "USD"
+      },
+      "realized_spend": {
+        "units": 300,
+        "currency": "USD"
+      },
+      "seller_backing_envelope_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "encumbrance_id": "encumbrance-live-buy",
+      "delivery_receipt_id": "62ea621569f3de3902de552f48a689dcf593d0121fa1e8766245c7510c361312",
+      "payment_reference": "832c5978833c4bb8c4ecc3bedccb8ee521007a3b17a9f28743dc4f2b4ab257b9",
+      "payout_destination": "0x1111111111111111111111111111111111111111",
+      "recorded_at": 1790802073
+    },
+    "signerKey": "353c8a7feeca38b2c4536e0bd2586fdb18d070e50e059f1d43f8bfefb97a7ce1",
+    "signature": "e5156bfe6547326d4a8d8687785e18c7412dbd0519b431a6f6ab1bca703b923a5a67920f3e6aef7cdd6ed0b4ee0bdf39d3d224aa8788747fc1978cbbe3ed6b06"
+  },
+  "output": {
+    "mediaType": "application/json",
+    "payloadB64": "eyJmaXgiOiJ2ZXJpZmllZCB0aHJvdWdoIHRoZSBwdWJsaWMgcm91dGUifQ=="
+  }
+}
+test dispatch_cli::finding_cmd::unit_tests::challenge_evidence_invalid_class_parses ... ok
+test dispatch_cli::finding_cmd::unit_tests::buy_drives_the_authenticated_live_purchase_roundtrip ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_class_the_document_does_not_carry ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_challenger_key_with_a_venue_audit ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_malformed_evidence_document ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_non_canonical_evidence_document ... ok
+{
+  "authorization": "buyer_submission",
+  "canonical_challenge": "{\"affected_deliveries\":[{\"checkpoint_ref\":\"checkpoints/venue-wedge/9001\",\"checkpoint_sha256\":\"7777777777777777777777777777777777777777777777777777777777777777\",\"receipt_id\":\"delivery-receipt-42\",\"receipt_sha256\":\"6666666666666666666666666666666666666666666666666666666666666666\"}],\"authorization\":{\"buyer_submission\":{\"challenger\":\"fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565\",\"dispute_fee_terminal\":{\"amount\":{\"currency\":\"USD\",\"units\":2500},\"beneficiary_pool_principal_id\":\"pool:challenge-administration\",\"event\":\"challenge_filing\",\"fee_schedule_envelope_sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"payer\":\"fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565\",\"rail_destination\":\"rail:venue-ledger:challenge-admin\"},\"dispute_lock_ref\":{\"amount\":{\"currency\":\"USD\",\"units\":10000},\"class\":\"dispute\",\"expiry\":1760000000,\"fee_schedule_envelope_sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"lock_id\":\"dispute-lock-42\"},\"standing\":{\"failed_delivery\":{\"failed_delivery_envelope_sha256\":\"4444444444444444444444444444444444444444444444444444444444444444\",\"failed_delivery_id\":\"6666666666666666666666666666666666666666666666666666666666666666\"}}}},\"backing_envelope_sha256\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"challenge_id\":\"9b1f8e4ca920b3877716c00a32f59410c173647d60f35b95f7b8b555434a3571\",\"evidence\":{\"digest_mismatch\":{\"deny_checkpoint_ref\":{\"checkpoint_ref\":\"checkpoints/venue-wedge/9001\",\"checkpoint_sha256\":\"7777777777777777777777777777777777777777777777777777777777777777\"},\"deny_receipt_ref\":{\"receipt_id\":\"deny-receipt-42\",\"receipt_sha256\":\"6666666666666666666666666666666666666666666666666666666666666666\"},\"failed_delivery_envelope_sha256\":\"4444444444444444444444444444444444444444444444444444444444444444\"}},\"filed_at\":1750000000,\"finding_artifact_sha256\":\"41102b0f14eafb3af60d8708865a9a7ff07de96db2df962da9014bdfa4adeb2e\",\"finding_id\":\"dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817\",\"listing_id\":\"finding-listing-01\",\"profile_envelope_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"schema\":\"chio.finding.challenge.v1\",\"terms_envelope_sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"venue_admission_envelope_sha256\":\"6666666666666666666666666666666666666666666666666666666666666666\"}",
+  "canonical_envelope": "{\"body\":{\"affected_deliveries\":[{\"checkpoint_ref\":\"checkpoints/venue-wedge/9001\",\"checkpoint_sha256\":\"7777777777777777777777777777777777777777777777777777777777777777\",\"receipt_id\":\"delivery-receipt-42\",\"receipt_sha256\":\"6666666666666666666666666666666666666666666666666666666666666666\"}],\"authorization\":{\"buyer_submission\":{\"challenger\":\"fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565\",\"dispute_fee_terminal\":{\"amount\":{\"currency\":\"USD\",\"units\":2500},\"beneficiary_pool_principal_id\":\"pool:challenge-administration\",\"event\":\"challenge_filing\",\"fee_schedule_envelope_sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"payer\":\"fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565\",\"rail_destination\":\"rail:venue-ledger:challenge-admin\"},\"dispute_lock_ref\":{\"amount\":{\"currency\":\"USD\",\"units\":10000},\"class\":\"dispute\",\"expiry\":1760000000,\"fee_schedule_envelope_sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"lock_id\":\"dispute-lock-42\"},\"standing\":{\"failed_delivery\":{\"failed_delivery_envelope_sha256\":\"4444444444444444444444444444444444444444444444444444444444444444\",\"failed_delivery_id\":\"6666666666666666666666666666666666666666666666666666666666666666\"}}}},\"backing_envelope_sha256\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"challenge_id\":\"9b1f8e4ca920b3877716c00a32f59410c173647d60f35b95f7b8b555434a3571\",\"evidence\":{\"digest_mismatch\":{\"deny_checkpoint_ref\":{\"checkpoint_ref\":\"checkpoints/venue-wedge/9001\",\"checkpoint_sha256\":\"7777777777777777777777777777777777777777777777777777777777777777\"},\"deny_receipt_ref\":{\"receipt_id\":\"deny-receipt-42\",\"receipt_sha256\":\"6666666666666666666666666666666666666666666666666666666666666666\"},\"failed_delivery_envelope_sha256\":\"4444444444444444444444444444444444444444444444444444444444444444\"}},\"filed_at\":1750000000,\"finding_artifact_sha256\":\"41102b0f14eafb3af60d8708865a9a7ff07de96db2df962da9014bdfa4adeb2e\",\"finding_id\":\"dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817\",\"listing_id\":\"finding-listing-01\",\"profile_envelope_sha256\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"schema\":\"chio.finding.challenge.v1\",\"terms_envelope_sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"venue_admission_envelope_sha256\":\"6666666666666666666666666666666666666666666666666666666666666666\"},\"signature\":\"f46a15b39609ac883b999a14f38978a1c46f04353cf84a5ccb32776657c6e0f8ef21cdee7a65720f4dc722bdbeb6af141a5f5b7a0e198a94f65f4e0ddd759307\",\"signerKey\":\"fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565\"}",
+  "challenge_id": "9b1f8e4ca920b3877716c00a32f59410c173647d60f35b95f7b8b555434a3571",
+  "challenge_sha256": "69847b7a45c6c3c8b46cdfb322039beb09e9c69114c5862739ad2e2a4b56e4a1",
+  "envelope_sha256": "e21dde56941ba38a06687e83359154d5a9e7bc9289012bf038aecddb47537cbb",
+  "evidence_class": "digest-mismatch",
+  "finding_id": "dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817",
+  "mode": "dry_run"
+}
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_venue_audit_over_a_buyer_submission ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_an_audit_document_without_the_audit_flag ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_dry_run_emits_the_canonical_challenge_without_transmitting ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_an_evidence_document_above_the_ingest_bound ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_requires_a_venue_url ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_body_the_registered_schema_rejects ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_dry_run_digests_match_an_independent_computation ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_rejects_an_unknown_class ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_subcommand_parses ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_signs_under_the_challenger_the_document_names ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_key_that_is_not_the_named_challenger ... ok
+test dispatch_cli::finding_cmd::unit_tests::finding_ids_must_be_lowercase_content_addresses ... ok
+test dispatch_cli::finding_cmd::unit_tests::finding_plain_text_escapes_terminal_controls ... ok
+test dispatch_cli::finding_cmd::unit_tests::live_challenge_requires_service_authorization_before_contacting_the_venue ... ok
+test dispatch_cli::finding_cmd::unit_tests::live_venue_audit_is_reserved_for_the_pinned_scheduler ... ok
+test dispatch_cli::finding_cmd::unit_tests::publish_refuses_an_artifact_above_the_body_bound ... ok
+test dispatch_cli::finding_cmd::unit_tests::publish_requires_a_service_token ... ok
+test dispatch_cli::finding_cmd::unit_tests::publish_requires_a_venue_url ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_venue_audit_subcommand_parses ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_requires_the_class_finding_and_evidence_flags ... ok
+FINDING_ID                                                        TOPIC                                     EXPIRES_AT    ADMISSION
+dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817  repo:backbay/chio#test-failure            1792656000    -
+count:           1
+next_cursor:     -
+test dispatch_cli::finding_cmd::unit_tests::search_encodes_the_index_query_parameters ... ok
+test dispatch_cli::finding_cmd::unit_tests::publish_subcommand_parses ... ok
+test dispatch_cli::finding_cmd::unit_tests::search_rejects_a_malformed_context_digest ... ok
+test dispatch_cli::finding_cmd::unit_tests::search_requires_a_venue_url ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_accepts_every_class_against_a_compatible_finding ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_venue_audit_carries_no_signature ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_refuses_a_class_the_targeted_finding_forbids ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_floor_lock_recovers_from_stale_sidecar_and_excludes_live_writer ... ok
+test dispatch_cli::finding_cmd::unit_tests::search_subcommand_parses ... ok
+{
+  "artifact_sha256": "41102b0f14eafb3af60d8708865a9a7ff07de96db2df962da9014bdfa4adeb2e",
+  "finding_id": "dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817"
+}
+test dispatch_cli::finding_cmd::unit_tests::publish_sends_the_artifact_bytes_verbatim_under_the_service_token ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_floor_persists_trusted_time_before_any_verified_epoch ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_floor_rejects_obsolete_schema_without_mutating_retained_state ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_floor_keeps_retractions_sticky_per_finding ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_rejects_a_projected_digest_that_does_not_hash_the_proof_bytes ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_rejects_oversized_encoded_proof_before_decoding ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_operator_authorization_is_loaded_out_of_band_and_feed_pinned ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_requires_a_venue_url ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_service_bond_is_canonical_operator_bound_and_current ... ok
+challenge_id:           9b1f8e4ca920b3877716c00a32f59410c173647d60f35b95f7b8b555434a3571
+authorization_branch:  buyer_submission
+write:                 inserted
+dispute_fee_intent:    fee-intent-01
+dispute_bond_lock:     dispute-lock-42
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_floor_rejects_rollback_and_same_epoch_equivocation ... ok
+{
+  "artifact_integrity": "verified",
+  "artifact_sha256": "41102b0f14eafb3af60d8708865a9a7ff07de96db2df962da9014bdfa4adeb2e",
+  "facets_not_evaluated": [
+    "receipt_authenticity",
+    "checkpoint_membership",
+    "kernel_and_revocation_trust",
+    "issuer_lineage",
+    "recipe_binding",
+    "intent_binding",
+    "metered_exposure_backing",
+    "settled_spend_backing",
+    "runtime_assurance_backing",
+    "bond_backing",
+    "status_liveness",
+    "guarantee_consistency"
+  ],
+  "finding_id": "dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817",
+  "mode": "integrity_only"
+}
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_floor_requires_a_pinned_operator_key ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_subcommand_parses ... ok
+test dispatch_cli::finding_cmd::unit_tests::challenge_without_dry_run_posts_the_exact_canonical_envelope ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_accepts_the_canonical_artifact_under_integrity_only ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_floor_accepts_same_key_authorization_refresh_and_rejects_key_equivocation ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_integrity_only_parses ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_refuses_both_artifact_sources ... ok
+finding_id:          dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817
+artifact_sha256:     41102b0f14eafb3af60d8708865a9a7ff07de96db2df962da9014bdfa4adeb2e
+mode:                evidence
+evaluation_time:     1784880000
+evidence_bundle:     86ff117e48b1fc4cbd348c0a427ced81c1e356dae50bff90013730bb408734c0
+facets:
+  artifact_integrity            verified      structure, content address, and issuer signature verified
+  receipt_authenticity          failed        recomputed receipt ids do not equal evidence_receipt_ids in order and cardinality
+  checkpoint_membership         failed        receipts did not verify; membership not evaluated
+  kernel_and_revocation_trust   unavailable   revocation freshness evidence not supplied
+  issuer_lineage                unavailable   signed capability snapshot evidence not supplied
+  recipe_binding                unavailable   replay recipe preimage not supplied
+  intent_binding                unavailable   intent commitment ordering evidence not supplied
+  metered_exposure_backing      unavailable   receipts did not verify
+  settled_spend_backing         unavailable   metered exposure floor not established
+  runtime_assurance_backing     unavailable   finding claims no runtime assurance tier
+  bond_backing                  unavailable   no fresh collateral snapshot supplied
+  status_liveness               unavailable   portable status non-inclusion proof not supplied
+  guarantee_consistency         failed        deterministic_replay claimed without a verified recipe binding
+required_facets:     artifact_integrity, receipt_authenticity, checkpoint_membership, recipe_binding, bond_backing, guarantee_consistency
+failed_facets:       receipt_authenticity, checkpoint_membership, guarantee_consistency
+test dispatch_cli::finding_cmd::unit_tests::verify_names_every_required_facet_it_could_not_establish ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_rejects_bytes_that_are_not_the_canonical_serialization ... ok
+{
+  "artifact_integrity": "verified",
+  "artifact_sha256": "41102b0f14eafb3af60d8708865a9a7ff07de96db2df962da9014bdfa4adeb2e",
+  "facets_not_evaluated": [
+    "receipt_authenticity",
+    "checkpoint_membership",
+    "kernel_and_revocation_trust",
+    "issuer_lineage",
+    "recipe_binding",
+    "intent_binding",
+    "metered_exposure_backing",
+    "settled_spend_backing",
+    "runtime_assurance_backing",
+    "bond_backing",
+    "status_liveness",
+    "guarantee_consistency"
+  ],
+  "finding_id": "dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817",
+  "mode": "integrity_only"
+}
+test dispatch_cli::finding_cmd::unit_tests::verify_refuses_evidence_inputs_with_integrity_only ... {
+  "artifact_integrity": "verified",
+  "artifact_sha256": "41102b0f14eafb3af60d8708865a9a7ff07de96db2df962da9014bdfa4adeb2e",
+  "facets_not_evaluated": [
+    "receipt_authenticity",
+    "checkpoint_membership",
+    "kernel_and_revocation_trust",
+    "issuer_lineage",
+    "recipe_binding",
+    "intent_binding",
+    "metered_exposure_backing",
+    "settled_spend_backing",
+    "runtime_assurance_backing",
+    "bond_backing",
+    "status_liveness",
+    "guarantee_consistency"
+  ],
+  "finding_id": "dc721f80b183eb65945ba4754d9ba6b131d3c8309d8a7bff710f4160b9d7d817",
+  "mode": "integrity_only"
+}
+ok
+test dispatch_cli::finding_cmd::unit_tests::verify_refuses_to_call_integrity_alone_evidence_verification ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_resolves_bounded_signed_execution_nonce_evidence ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_requires_exactly_one_artifact_source ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_by_id_rejects_a_different_valid_artifact ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_by_id_runs_the_strict_ingress_over_the_served_bytes ... ok
+test input::boundary_tests::collection_limits_charge_retained_bytes_entries_and_depth ... ok
+test input::boundary_tests::enums_are_literals_and_not_json_fragments ... ok
+test input::boundary_tests::collection_rejects_symlinks_and_nonregular_files ... ok
+test input::boundary_tests::signing_custody_is_existing_private_bounded_and_not_aliased ... ok
+test input::boundary_tests::streams_reject_the_first_byte_over_the_bound ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_caps_every_support_file_before_parsing ... ok
+test input::boundary_tests::selected_formats_never_fall_back_after_ambiguous_json ... ok
+test input::collection::failed_budget_tests::oversized_candidate_exhausts_shared_budget_before_next_open ... ok
+test input::collection::remaining_reader_tests::repeated_members_consume_the_same_actual_byte_budget ... ok
+test input::collection::remaining_reader_tests::directories_and_members_reject_stable_symlink_escapes ... ok
+test dispatch_cli::finding_cmd::unit_tests::verify_subcommand_parses ... ok
+test input::tests::original_document_numbers_and_private_causes_are_preserved ... ok
+test input::time::tests::clock_faults_never_mint_zero_or_reset_high_water ... ok
+test input::time::tests::deadline_checks_zero_overflow_and_exact_maximum ... ok
+test input::tests::regular_file_limit_applies_before_decoding ... ok
+test lineage::tests::query_forward_finds_receipts_from_capability ... ok
+test lineage::tests::roots_handles_empty_dir ... ok
+test lineage::tests::diff_emits_stable_schema ... ok
+test market::tests::catalog_pricing_rejects_non_canonical_currency ... ok
+test market::tests::duplicate_catalog_references_are_rejected ... ok
+test input::private::tests::private_json_rejects_duplicates_unknowns_permissions_and_links ... ok
+test market::tests::info_below_floor_returns_unknown_reference ... ok
+test market::tests::info_unknown_reference_errors ... ok
+test market::tests::info_emits_effective_price_and_credit_limit ... ok
+test market::tests::install_denied_below_floor ... ok
+test market::tests::install_record_path_is_deterministic ... ok
+test market::tests::install_record_path_distinguishes_punctuation_variants ... ok
+test market::tests::install_record_path_traversal_inputs_stay_in_bundle_dir ... ok
+test market::tests::install_denied_when_publisher_revoked ... ok
+test market::tests::list_filters_by_reputation_tier ... ok
+test market::tests::list_includes_higher_floor_for_higher_tier ... ok
+test input::boundary_tests::snapshots_reject_collisions_amplification_and_preserve_captured_bytes ... ok
+test market::tests::install_replay_does_not_rewrite_existing_record ... ok
+test input::boundary_tests::yaml_expansion_and_depth_have_shared_bounds ... ok
+test market::tests::install_is_idempotent_on_replay ... ok
+test market::tests::retained_install_must_bind_requested_tenant_reference_and_schema ... ok
+{"attempt_id":"attempt-1","checks":["policy_signer_pin","enforced_policy","admitted_policy_binding","signed_manifest","receipt_signature","receipt_semantics","receipt_context","execution_identity","helper_binding","target_binding","selected_receipt"],"process_id":42,"receipt_id":"348148dda10ae9361c9dd747561e86a44171a1c3da480ef7b4f81514b6b00f1d","released_at_unix_ms":1300,"schema":"chio.native-start-verification.v1","server_id":"cage-policy-test","target_sha256":"2222222222222222222222222222222222222222222222222222222222222222","trace_session_digest":"7777777777777777777777777777777777777777777777777777777777777777","unchecked":["live_pid_linkage","target_death","call_completion","terminal_outcome","log_inclusion"]}
+test mcp_cli::cage_policy::evidence::tests::native_policy_verification_rejects_legacy_and_mismatched_terminal_commitments ... ok
+test mcp_cli::cage_policy::tests::brokered_profile_without_authenticated_broker_binding_is_rejected ... ok
+test mcp_cli::cage_policy::evidence::tests::native_observation_keeps_missing_exit_distinct_and_rejects_substituted_terminal ... ok
+test mcp_cli::cage_policy::tests::cage_policy_requires_canonical_deny_unknown_json ... ok
+test mcp_cli::cage_policy::tests::inactive_signed_policies_cannot_prepare_native_launches ... ok
+test mcp_cli::cage_policy::tests::independent_operator_ceiling_rejection_precedes_runtime_launch ... ok
+test mcp_cli::cage_policy::tests::launch_factory_pins_verified_policy_bytes_at_construction ... ok
+test mcp_cli::cage_policy::tests::live_registry_rejects_replayed_policy_manifest_before_compilation ... ok
+test mcp_cli::cage_policy::evidence::tests::native_run_evidence_requires_external_policy_pin_and_same_observed_launch ... ok
+test mcp_cli::cage_policy::tests::migration_posture_changes_with_every_authority_component ... ok
+test mcp_cli::cage_policy::tests::operator_runtime_file_cannot_widen_verified_manifest_authority ... ok
+test mcp_cli::provision::authority_paths::tests::authority_is_excluded_before_creation_and_on_restart ... ok
+test mcp_cli::provision::authority_paths::tests::deployed_policy_does_not_require_the_staging_filesystem ... ok
+test mcp_cli::cage_policy::tests::unprotected_wrapper_uses_signed_registry_flow_requirement ... ok
+test mcp_cli::provision::discovery::transport::tests::discovery_rejects_ambiguous_unversioned_and_conflicting_replies ... ok
+test mcp_cli::provision::discovery::transport::tests::expired_launch_deadline_is_not_reset_for_the_mcp_handshake ... ok
+test mcp_cli::provision::linkage::tests::dynamic_images_report_their_interpreter_and_shared_objects ... ok
+test mcp_cli::provision::linkage::tests::malformed_images_are_refused ... ok
+test mcp_cli::provision::linkage::tests::static_images_are_recognized_by_type ... ok
+test mcp_cli::cage_policy::evidence::tests::native_start_verification_binds_original_receipt_without_claiming_exit ... ok
+test mcp_cli::provision::runtime_linkage_tests::elf_loader_alias_requires_the_exact_declared_file ... ok
+test mcp_cli::wrap::wrap_tests::malformed_original_frames_never_reach_the_verdict_gate ... ok
+test mcp_cli::wrap::wrap_tests::wrap_loop_maps_kernel_runtime_errors_to_kernel_denial_code ... ok
+test mcp_cli::wrap::wrap_tests::wrap_loop_rejects_oversized_json_rpc_frame ... ok
+test mcp_cli::provision::discovery::transport::tests::blocked_handshake_and_open_descendant_pipes_respect_the_deadline ... ok
+test runtime_cli::runtime_local_error_domain_tests::in_memory_receipt_store_boots_only_with_the_ephemeral_optin ... ok
+test runtime_cli::runtime_local_error_domain_tests::durable_receipt_path_boots_without_the_ephemeral_optin ... ok
+test runtime_cli::runtime_local_error_domain_tests::in_memory_receipt_store_is_refused_without_ephemeral_optin ... ok
+test runtime_cli::runtime_local_error_domain_tests::in_memory_receipt_store_is_not_carried_through_as_durable ... ok
+test runtime_cli::runtime_local_error_domain_tests::missing_local_receipt_db_uses_cli_domain ... ok
+test runtime_cli::runtime_local_error_domain_tests::partial_credit_loss_lifecycle_amount_uses_cli_domain ... ok
+test runtime_cli::runtime_local_error_domain_tests::remote_mcp_auth_contract_permits_explicit_loopback_auth_url ... ok
+test runtime_cli::runtime_local_error_domain_tests::remote_mcp_auth_contract_is_derived_from_external_auth_urls ... ok
+test runtime_cli::runtime_local_error_domain_tests::tenant_read_token_mapping_rejects_control_characters ... ok
+test runtime_cli::runtime_local_error_domain_tests::tenant_read_token_mapping_rejects_surrounding_whitespace ... ok
+test runtime_cli::trusted_issuer_tests::the_pinned_control_authority_is_a_trusted_issuer ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::staged_worktree_disables_source_repository_hooks ... ok
+test mcp_cli::cage_policy::evidence::tests::native_policy_substitutions_by_the_same_operator_fail_all_verifiers ... ok
+test mcp_cli::cage_policy::tests::cage_migration_revalidates_after_preparation_and_recovers_only_by_rebuild ... ok
+test mcp_cli::provision::linkage::tests::the_test_executable_is_dynamically_linked ... ok
+test mcp_cli::cage_policy::receipt_tests::cage_receipt_persistence_requires_the_independent_anchor ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::sandbox_mounts_only_explicit_runtime_components ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::sandbox::rust_runtime::tests::rust_runtime_keeps_the_selected_tree_entry_bound ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::isolated_test_cannot_read_operator_sibling_and_has_a_deadline ... ok
+test dispatch_cli::finding_cmd::unit_tests::status_floor::status_floor_partitions_retractions_without_growing_the_epoch_document ... ok
+test dispatch_cli::finding_cmd::finding_verified_fix::tests::isolated_test_supports_offline_path_vendored_rust ... ok
+
+test result: ok. 245 passed; 0 failed; 0 ignored; 0 measured; 494 filtered out; finished in 7.04s

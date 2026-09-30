@@ -1,7 +1,6 @@
 use super::*;
 
 use std::collections::BTreeMap;
-use std::io::Read;
 
 use base64::Engine as _;
 use chio_appraisal::SignedRuntimeAttestationAppraisalReport;
@@ -61,7 +60,7 @@ pub(super) fn cmd_finding_verify(
 ) -> Result<(), CliError> {
     let accepted = match (file, id) {
         (Some(path), None) => {
-            let bytes = fs::read(path)?;
+            let bytes = crate::input::read_regular(path, MAX_RAW_FINDING_BYTES)?;
             if bytes.len() > MAX_RAW_FINDING_BYTES {
                 return Err(CliError::cli_other_error(format!(
                     "{} is {} bytes, above the {MAX_RAW_FINDING_BYTES} byte finding bound",
@@ -205,7 +204,9 @@ pub(super) fn cmd_finding_verify(
         let authorization = trust
             .status_operator_authorization
             .as_ref()
-            .ok_or_else(|| CliError::cli_other_error("status authorization is missing".to_string()))?;
+            .ok_or_else(|| {
+                CliError::cli_other_error("status authorization is missing".to_string())
+            })?;
         let freshness = trust.status_freshness_policy.ok_or_else(|| {
             CliError::cli_other_error("status freshness policy is missing".to_string())
         })?;
@@ -235,7 +236,9 @@ pub(super) fn cmd_finding_verify(
         let authorization = trust
             .status_operator_authorization
             .as_ref()
-            .ok_or_else(|| CliError::cli_other_error("status authorization is missing".to_string()))?;
+            .ok_or_else(|| {
+                CliError::cli_other_error("status authorization is missing".to_string())
+            })?;
         let freshness = trust.status_freshness_policy.ok_or_else(|| {
             CliError::cli_other_error("status freshness policy is missing".to_string())
         })?;
@@ -286,8 +289,8 @@ pub(super) fn strict_finding_ingress(
         )));
     }
 
-    let parsed: serde_json::Value = serde_json::from_str(&raw)?;
-    let schema: serde_json::Value = serde_json::from_str(FINDING_SCHEMA_JSON)?;
+    let parsed: serde_json::Value = crate::input::text(&raw)?;
+    let schema: serde_json::Value = crate::input::text(FINDING_SCHEMA_JSON)?;
     chio_spec_validate::validate_value(
         Path::new(FINDING_SCHEMA_LABEL),
         &schema,
@@ -298,7 +301,7 @@ pub(super) fn strict_finding_ingress(
         CliError::cli_other_error(format!("{source} rejected by the finding schema: {error}"))
     })?;
 
-    let finding: Finding = serde_json::from_str(&raw)?;
+    let finding: Finding = crate::input::text(&raw)?;
     let typed_bytes = canonical_json_bytes(&finding)?;
     if typed_bytes != strict_bytes {
         return Err(CliError::cli_other_error(format!(
@@ -461,7 +464,7 @@ fn load_trust_roots(path: &Path) -> Result<(FindingTrustRootsFile, String), CliE
     let raw = String::from_utf8(bytes).map_err(|error| {
         CliError::cli_other_error(format!("{} is not valid UTF-8: {error}", path.display()))
     })?;
-    let roots: FindingTrustRootsFile = serde_json::from_str(&raw)?;
+    let roots: FindingTrustRootsFile = crate::input::text(&raw)?;
     validate_supported_finding_verifier_profile(&roots.profile.body).map_err(|error| {
         CliError::cli_other_error(format!(
             "{} contains an unsupported verifier profile: {error}",
@@ -478,7 +481,7 @@ fn load_trust_roots(path: &Path) -> Result<(FindingTrustRootsFile, String), CliE
 }
 
 fn load_evidence_file(path: &Path) -> Result<FindingEvidenceFile, CliError> {
-    Ok(serde_json::from_slice(&read_bounded_support_file(
+    Ok(crate::input::json(&read_bounded_support_file(
         path, "evidence",
     )?)?)
 }
@@ -546,8 +549,7 @@ fn resolve_status_floor_path(
     match (proof_present, path) {
         (true, Some(path)) => Ok(Some(path)),
         (true, None) => Err(CliError::cli_other_error(
-            "finding status proof requires a durable floor via --status-rollback-floor"
-                .to_string(),
+            "finding status proof requires a durable floor via --status-rollback-floor".to_string(),
         )),
         (false, Some(_)) => Err(CliError::cli_other_error(
             "--status-rollback-floor requires a status proof in the evidence bundle".to_string(),
@@ -605,8 +607,7 @@ fn persist_authenticated_status_retraction(
     {
         return Ok(false);
     }
-    let Ok(epoch) =
-        chio_finding::verify_status_proof_input(&proof, authorization, freshness)
+    let Ok(epoch) = chio_finding::verify_status_proof_input(&proof, authorization, freshness)
     else {
         return Ok(false);
     };
@@ -623,10 +624,7 @@ fn advance_parsed_status_floor(
 ) -> Result<(), CliError> {
     let authorization_sha256 = sha256_hex(&canonical_json_bytes(authorization)?);
     let finding_id = proof.finding_id().to_owned();
-    let is_retracted = matches!(
-        proof,
-        chio_finding::FindingStatusProofInput::Inclusion(_)
-    );
+    let is_retracted = matches!(proof, chio_finding::FindingStatusProofInput::Inclusion(_));
     let _floor_lock = FindingStatusFloorLock::acquire(path)?;
     status_floor::advance_status_floor_locked(
         path,
@@ -646,26 +644,15 @@ fn advance_parsed_status_floor(
 }
 
 fn read_bounded_support_file(path: &Path, kind: &str) -> Result<Vec<u8>, CliError> {
-    let mut reader = std::fs::File::open(path)?
-        .take((FINDING_VERIFY_SUPPORT_MAX_BYTES as u64).saturating_add(1));
-    let mut bytes = Vec::with_capacity(FINDING_VERIFY_SUPPORT_MAX_BYTES.saturating_add(1));
-    reader.read_to_end(&mut bytes)?;
-    if bytes.len() > FINDING_VERIFY_SUPPORT_MAX_BYTES {
-        return Err(CliError::cli_other_error(format!(
-            "{} is above the {FINDING_VERIFY_SUPPORT_MAX_BYTES} byte {kind} bound",
-            path.display()
-        )));
-    }
-    Ok(bytes)
+    let _ = kind;
+    Ok(crate::input::read_regular(
+        path,
+        FINDING_VERIFY_SUPPORT_MAX_BYTES,
+    )?)
 }
 
 fn unix_seconds_now() -> Result<u64, CliError> {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs())
-        .map_err(|error| {
-            CliError::cli_other_error(format!("system clock is before the unix epoch: {error}"))
-        })
+    crate::input::time::seconds()
 }
 
 fn digest_of(value: &serde_json::Value) -> Result<String, CliError> {
@@ -838,10 +825,7 @@ fn emit_evidence_report(
             terminal_safe(&required_labels.join(", "))
         );
         if !failed.is_empty() {
-            println!(
-                "failed_facets:       {}",
-                terminal_safe(&failed.join(", "))
-            );
+            println!("failed_facets:       {}", terminal_safe(&failed.join(", ")));
         }
     }
 
@@ -866,10 +850,10 @@ fn evidence_report_result(unverified: &[String], failed: &[String]) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::status_floor::{
         write_status_floor, FindingStatusCliFloor, TEST_FINDING_STATUS_FLOOR_SCHEMA,
     };
+    use super::*;
 
     const QUALIFIED_STATUS_PROOF: &[u8] = include_bytes!(
         "../../../../../../../fixtures/proof-room/finding/cognition-market-qualified-profile/attachments/status-proof-input.json"
@@ -891,12 +875,11 @@ mod tests {
         use chio_core_types::crypto::Keypair;
         use chio_core_types::receipt::lineage::SignedExportEnvelope;
         use chio_revocation_oracle::{
-            finding_status_empty_leaf_hash, FindingStatusSparseMap,
-            FINDING_STATUS_BRANCH_DOMAIN, FINDING_STATUS_EMPTY_LEAF_DOMAIN,
-            FINDING_STATUS_HASH_ALGORITHM, FINDING_STATUS_KEY_DOMAIN_NONCE,
-            FINDING_STATUS_KEY_HASH_DOMAIN, FINDING_STATUS_MAP_VERSION,
-            FINDING_STATUS_OCCUPIED_LEAF_DOMAIN, FINDING_STATUS_PROOF_SEMANTICS,
-            FINDING_STATUS_SPARSE_DEPTH,
+            finding_status_empty_leaf_hash, FindingStatusSparseMap, FINDING_STATUS_BRANCH_DOMAIN,
+            FINDING_STATUS_EMPTY_LEAF_DOMAIN, FINDING_STATUS_HASH_ALGORITHM,
+            FINDING_STATUS_KEY_DOMAIN_NONCE, FINDING_STATUS_KEY_HASH_DOMAIN,
+            FINDING_STATUS_MAP_VERSION, FINDING_STATUS_OCCUPIED_LEAF_DOMAIN,
+            FINDING_STATUS_PROOF_SEMANTICS, FINDING_STATUS_SPARSE_DEPTH,
         };
 
         let keypair = Keypair::from_seed(&[42_u8; 32]);
@@ -1079,19 +1062,16 @@ mod tests {
     }
 
     #[test]
-    fn finding_verify_persists_an_authenticated_retraction_before_failure() -> Result<(), CliError> {
+    fn finding_verify_persists_an_authenticated_retraction_before_failure() -> Result<(), CliError>
+    {
         let (proof_bytes, authorization, freshness, operator_status_trust) =
             authenticated_inclusion_fixture()?;
         let dir = tempfile::tempdir()?;
         let floor_path = dir.path().join("status-floor.json");
         let proof = chio_finding::parse_status_proof_input(&proof_bytes)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-        let epoch = chio_finding::verify_status_proof_input(
-            &proof,
-            &authorization,
-            freshness,
-        )
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let epoch = chio_finding::verify_status_proof_input(&proof, &authorization, freshness)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         let authorization_sha256 = sha256_hex(&canonical_json_bytes(&authorization)?);
         write_status_floor(
             &floor_path,
@@ -1101,7 +1081,7 @@ mod tests {
                 operator_id: epoch.body.operator_id.clone(),
                 rotation_policy_ref: authorization.operator.rotation_policy_ref.clone(),
                 operator_key_epoch: epoch.body.operator_key_epoch,
-                operator_key: Some(authorization.operator.key.clone()),
+                operator_key: authorization.operator.key.clone(),
                 operator_authorization_sha256: authorization_sha256.clone(),
                 key_domain_nonce: epoch.body.key_domain_nonce,
                 map_epoch: epoch.body.map_epoch.saturating_add(1),
@@ -1197,7 +1177,7 @@ mod tests {
                 operator_id: epoch.body.operator_id.clone(),
                 rotation_policy_ref: authorization.operator.rotation_policy_ref.clone(),
                 operator_key_epoch: epoch.body.operator_key_epoch,
-                operator_key: Some(authorization.operator.key.clone()),
+                operator_key: authorization.operator.key.clone(),
                 operator_authorization_sha256: authorization_sha256,
                 key_domain_nonce: epoch.body.key_domain_nonce,
                 map_epoch: epoch.body.map_epoch.saturating_add(1),
@@ -1219,7 +1199,9 @@ mod tests {
         .err()
         .ok_or_else(|| CliError::cli_other_error("status rollback was accepted".to_string()))?;
         assert!(
-            error.to_string().contains("below the durable rollback floor"),
+            error
+                .to_string()
+                .contains("below the durable rollback floor"),
             "unexpected error: {error}"
         );
         Ok(())

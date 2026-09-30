@@ -619,14 +619,14 @@ where
         if line.trim().is_empty() {
             continue;
         }
-        let frame: serde_json::Value = match serde_json::from_str(&line) {
+        let frame: serde_json::Value = match crate::input::text(&line) {
             Ok(value) => value,
-            Err(error) => {
+            Err(_) => {
                 let frame = json_rpc_error(
                     None,
                     -32700,
                     "urn:chio:error:transport:invalid-request-shape",
-                    &format!("malformed JSON frame: {error}"),
+                    "malformed JSON frame",
                 );
                 writeln!(writer, "{frame}")?;
                 writer.flush()?;
@@ -634,6 +634,30 @@ where
             }
         };
 
+        if frame.get("jsonrpc").and_then(serde_json::Value::as_str) != Some("2.0")
+            || !frame
+                .get("method")
+                .is_some_and(serde_json::Value::is_string)
+            || frame
+                .get("id")
+                .is_some_and(|id| !(id.is_null() || id.is_string() || id.is_number()))
+            || frame
+                .get("params")
+                .is_some_and(|params| !params.is_object())
+        {
+            writeln!(
+                writer,
+                "{}",
+                json_rpc_error(
+                    None,
+                    -32600,
+                    "urn:chio:error:transport:invalid-request-shape",
+                    "invalid JSON-RPC request"
+                )
+            )?;
+            writer.flush()?;
+            continue;
+        }
         let id = frame.get("id").cloned();
         let method = frame
             .get("method")
@@ -867,9 +891,9 @@ pub(crate) fn cmd_mcp_wrap_e2e_fixture(
     _args: &McpWrapArgs,
     path: &std::path::Path,
 ) -> Result<(), CliError> {
-    let raw = std::fs::read_to_string(path)
+    let raw = crate::input::read_text(path)
         .map_err(|e| CliError::cli_io_error(format!("failed to read e2e fixture {path:?}: {e}")))?;
-    let value: serde_json::Value = serde_json::from_str(&raw).map_err(|e| {
+    let value: serde_json::Value = crate::input::text(&raw).map_err(|e| {
         CliError::cli_other_error(format!("failed to parse e2e fixture {path:?}: {e}"))
     })?;
 
@@ -978,6 +1002,37 @@ mod wrap_tests {
     }
 
     #[test]
+    fn malformed_original_frames_never_reach_the_verdict_gate() {
+        struct Never;
+        impl VerdictGate for Never {
+            fn evaluate(&self, _: &str, _: &serde_json::Value) -> WrapVerdict {
+                panic!("invalid request reached gate")
+            }
+        }
+        let transport = FixtureMcpTransport {
+            tools: vec![],
+            responses: Default::default(),
+        };
+        for raw in [
+            r#"{"jsonrpc":"2.0","id":1,"method":"tools/list","method":"tools/call"}"#,
+            r#"{"id":1,"method":"tools/call"}"#,
+            r#"{"jsonrpc":"2.0","id":{},"method":"tools/call"}"#,
+        ] {
+            let mut out = Vec::new();
+            let summary = run_wrap_with_gate(
+                &transport,
+                &Never,
+                std::io::Cursor::new(format!("{raw}\n")),
+                &mut out,
+            )
+            .unwrap();
+            assert_eq!(summary.allowed, 0);
+            let response: serde_json::Value = crate::input::json(&out).unwrap();
+            assert!(response.get("error").is_some());
+        }
+    }
+
+    #[test]
     fn wrap_loop_rejects_oversized_json_rpc_frame() {
         let input = format!("{}\n", "x".repeat(MAX_MCP_WRAP_FRAME_BYTES + 1));
         let transport = FixtureMcpTransport {
@@ -1019,7 +1074,7 @@ mod wrap_tests {
         };
 
         assert_eq!(summary.allowed, 1);
-        let frame: serde_json::Value = match serde_json::from_slice(&output) {
+        let frame: serde_json::Value = match crate::input::json(&output) {
             Ok(frame) => frame,
             Err(error) => panic!("output frame should be JSON: {error}"),
         };

@@ -20,49 +20,49 @@ pub(crate) fn cmd_chio_pheromone_relay_alert_assurance_package(
     now_unix_ms: u64,
     report: &Path,
 ) -> Result<(), CliError> {
-    let alert_report: chio_pheromone_relay::RelayAlertReport = serde_json::from_str(
+    let alert_report: chio_pheromone_relay::RelayAlertReport = crate::input::text(
         &read_utf8_json_file(alert_report, "Chio relay alert report")?,
     )
     .map_err(|error| CliError::cli_other_error(format!("Chio relay alert report: {error}")))?;
-    let trend_report: chio_pheromone_relay::RelayTrendReport = serde_json::from_str(
+    let trend_report: chio_pheromone_relay::RelayTrendReport = crate::input::text(
         &read_utf8_json_file(trend_report, "Chio relay trend report")?,
     )
     .map_err(|error| CliError::cli_other_error(format!("Chio relay trend report: {error}")))?;
-    let handoff_report: chio_pheromone_relay::RelayAlertHandoffReport = serde_json::from_str(
+    let handoff_report: chio_pheromone_relay::RelayAlertHandoffReport = crate::input::text(
         &read_utf8_json_file(handoff_report, "Chio relay alert handoff report")?,
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("Chio relay alert handoff report: {error}"))
     })?;
     let normalization_report: chio_pheromone_relay::RelayAlertNormalizationReport =
-        serde_json::from_str(&read_utf8_json_file(
+        crate::input::text(&read_utf8_json_file(
             normalization_report,
             "Chio relay alert normalization report",
         )?)
         .map_err(|error| {
             CliError::cli_other_error(format!("Chio relay alert normalization report: {error}"))
         })?;
-    let delivery_report: chio_pheromone_relay::RelayAlertDeliveryReport = serde_json::from_str(
+    let delivery_report: chio_pheromone_relay::RelayAlertDeliveryReport = crate::input::text(
         &read_utf8_json_file(delivery_report, "Chio relay alert delivery report")?,
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("Chio relay alert delivery report: {error}"))
     })?;
     let acknowledgement_report: chio_pheromone_relay::RelayAlertAcknowledgementReport =
-        serde_json::from_str(&read_utf8_json_file(
+        crate::input::text(&read_utf8_json_file(
             acknowledgement_report,
             "Chio relay alert acknowledgement report",
         )?)
         .map_err(|error| {
             CliError::cli_other_error(format!("Chio relay alert acknowledgement report: {error}"))
         })?;
-    let drift_report: chio_pheromone_relay::RelayAlertDeliveryDriftReport = serde_json::from_str(
+    let drift_report: chio_pheromone_relay::RelayAlertDeliveryDriftReport = crate::input::text(
         &read_utf8_json_file(drift_report, "Chio relay alert delivery drift report")?,
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("Chio relay alert delivery drift report: {error}"))
     })?;
-    let review_packet: chio_pheromone_relay::RelayAlertRouteReviewPacket = serde_json::from_str(
+    let review_packet: chio_pheromone_relay::RelayAlertRouteReviewPacket = crate::input::text(
         &read_utf8_json_file(review_packet, "Chio relay alert route review packet")?,
     )
     .map_err(|error| {

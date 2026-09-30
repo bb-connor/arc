@@ -1,0 +1,151 @@
+Diff in /tmp/arc-security-launch/crates/products/chio-cli/src/cli/dispatch/finding/unit_tests.rs:1:
+ use super::*;
+
+ use super::finding_challenge::{
+-    FINDING_CHALLENGE_EVIDENCE_MAX_BYTES, load_challenge_evidence_document, prepare_challenge,
++    load_challenge_evidence_document, prepare_challenge, FINDING_CHALLENGE_EVIDENCE_MAX_BYTES,
+ };
+-use super::finding_verify::{AcceptedFinding, CliFindingNonceResolver, strict_finding_ingress};
++use super::finding_verify::{strict_finding_ingress, AcceptedFinding, CliFindingNonceResolver};
+ use crate::cli_entrypoint_support::parse_cli;
+ use chio_core_types::capability::scope::MonetaryAmount;
+-use chio_core_types::crypto::{Keypair, sha256_hex};
++use chio_core_types::crypto::{sha256_hex, Keypair};
+ use chio_core_types::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
+ use chio_core_types::receipt::body::{ChioReceipt, ChioReceiptBody};
+ use chio_core_types::receipt::decision::{Decision, ToolCallAction};
+Diff in /tmp/arc-security-launch/crates/products/chio-cli/src/cli/dispatch/finding/unit_tests.rs:13:
+ use chio_core_types::receipt::kinds::TrustLevel;
+ use chio_core_types::{canonical_json_bytes, canonical_json_string};
+ use chio_finding::{
++    compute_finding_id, derive_purchase_key, sign_finding, verify_signed_challenge, Finding,
++    FindingAffectedDelivery, FindingBuyerSubmission, FindingChallengeAuthorization,
++    FindingChallengeEvidence, FindingChallengeStanding, FindingCheckpointRef,
++    FindingClaimedVerdict, FindingDescriptor, FindingDisputeBondClass, FindingDisputeFeeEvent,
++    FindingDisputeFeeTerminal, FindingDisputeLockRef, FindingEvidenceClass, FindingGuaranteeClass,
++    FindingOutcomeClass, FindingPredicate, FindingPurchaseRecord, FindingReceiptRef,
++    FindingRecipeEnvironment, FindingRecipePhase, FindingRecipePhaseKind, FindingReplayObservation,
++    FindingReplayRecipeInput, FindingReplayReproduction, FindingReplayTerminalResult,
++    FindingResourceCaps, FindingVenueAuditAuthorization, SignedFindingPurchaseRecord,
+     FINDING_PURCHASE_RECORD_SCHEMA_V1, FINDING_REPLAY_OBSERVATION_SCHEMA_V1,
+-    FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1, FINDING_SCHEMA_V1, Finding, FindingAffectedDelivery,
+-    FindingBuyerSubmission, FindingChallengeAuthorization, FindingChallengeEvidence,
+-    FindingChallengeStanding, FindingCheckpointRef, FindingClaimedVerdict, FindingDescriptor,
+-    FindingDisputeBondClass, FindingDisputeFeeEvent, FindingDisputeFeeTerminal,
+-    FindingDisputeLockRef, FindingEvidenceClass, FindingGuaranteeClass, FindingOutcomeClass,
+-    FindingPredicate, FindingPurchaseRecord, FindingReceiptRef, FindingRecipeEnvironment,
+-    FindingRecipePhase, FindingRecipePhaseKind, FindingReplayObservation, FindingReplayRecipeInput,
+-    FindingReplayReproduction, FindingReplayTerminalResult, FindingResourceCaps,
+-    FindingVenueAuditAuthorization, SignedFindingPurchaseRecord, compute_finding_id,
+-    derive_purchase_key, sign_finding, verify_signed_challenge,
++    FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1, FINDING_SCHEMA_V1,
+ };
+ use chio_finding_verifier::FindingNonceResolver;
+ use chio_open_market::purchase_verification::{
+Diff in /tmp/arc-security-launch/crates/products/chio-cli/src/cli/dispatch/finding/unit_tests.rs:769:
+     assert_eq!(resolved.nonce_id(), nonce.nonce_id());
+
+     assert!(CliFindingNonceResolver::new(vec![nonce.clone(), nonce.clone()]).is_err());
+-    assert!(
+-        CliFindingNonceResolver::new(vec![nonce; chio_finding::MAX_FINDING_EVIDENCE_RECEIPTS + 2])
+-            .is_err()
+-    );
++    assert!(CliFindingNonceResolver::new(vec![
++        nonce;
++        chio_finding::MAX_FINDING_EVIDENCE_RECEIPTS + 2
++    ])
++    .is_err());
+ }
+
+ #[test]
+Diff in /tmp/arc-security-launch/crates/products/chio-cli/src/cli/dispatch/finding/unit_tests/status_floor.rs:56:
+
+     let mut rollback = response("non_inclusion");
+     rollback.map_epoch = 7;
+-    assert!(
+-        advance(&floor_path, &rollback)
+-            .unwrap_err()
+-            .to_string()
+-            .contains("rollback floor")
+-    );
++    assert!(advance(&floor_path, &rollback)
++        .unwrap_err()
++        .to_string()
++        .contains("rollback floor"));
+
+     rollback.map_epoch = 8;
+     rollback.root_hash = "5".repeat(64);
+Diff in /tmp/arc-security-launch/crates/products/chio-cli/src/cli/dispatch/finding/unit_tests/status_floor.rs:68:
+-    assert!(
+-        advance(&floor_path, &rollback)
+-            .unwrap_err()
+-            .to_string()
+-            .contains("equivocates")
+-    );
++    assert!(advance(&floor_path, &rollback)
++        .unwrap_err()
++        .to_string()
++        .contains("equivocates"));
+ }
+
+ #[test]
+Diff in /tmp/arc-security-launch/crates/products/chio-cli/src/cli/dispatch/finding/unit_tests/status_floor.rs:115:
+
+     authorization.operator.valid_until = 1_950_000_000;
+     let refreshed_sha256 = sha256_hex(&canonical_json_bytes(&authorization).unwrap());
+-    assert!(
+-        advance_status_floor(
+-            &floor_path,
+-            &status,
+-            &authorization,
+-            &refreshed_sha256,
+-            1_800_000_001,
+-        )
+-        .unwrap_err()
+-        .to_string()
+-        .contains("did not advance")
+-    );
++    assert!(advance_status_floor(
++        &floor_path,
++        &status,
++        &authorization,
++        &refreshed_sha256,
++        1_800_000_001,
++    )
++    .unwrap_err()
++    .to_string()
++    .contains("did not advance"));
+     status.map_epoch = 9;
+     status.epoch_id = "5".repeat(64);
+     status.root_hash = "6".repeat(64);
+Diff in /tmp/arc-security-launch/crates/products/chio-cli/src/cli/dispatch/finding/unit_tests/status_floor.rs:145:
+     authorization.operator.key = Keypair::from_seed(&[92_u8; 32]).public_key();
+     let substituted_sha256 = sha256_hex(&canonical_json_bytes(&authorization).unwrap());
+     status.map_epoch = 10;
+-    assert!(
+-        advance_status_floor(
+-            &floor_path,
+-            &status,
+-            &authorization,
+-            &substituted_sha256,
+-            1_800_000_002,
+-        )
+-        .unwrap_err()
+-        .to_string()
+-        .contains("key equivocated")
+-    );
++    assert!(advance_status_floor(
++        &floor_path,
++        &status,
++        &authorization,
++        &substituted_sha256,
++        1_800_000_002,
++    )
++    .unwrap_err()
++    .to_string()
++    .contains("key equivocated"));
+ }
+
+ #[test]
+
+Changed Rust files: 45; exit: 1

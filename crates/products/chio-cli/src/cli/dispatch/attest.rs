@@ -87,8 +87,9 @@ pub(crate) fn cmd_chio_attest_supply_chain_verify(
     issuer_oidc: &str,
     report: Option<&Path>,
 ) -> Result<(), CliError> {
-    let artifact_bytes = fs::read(artifact)?;
-    let bundle_json = fs::read(bundle)?;
+    // Executables are opaque signed payloads, separate from JSON documents.
+    let artifact_bytes = crate::input::read_regular(artifact, 512 * 1024 * 1024)?;
+    let bundle_json = crate::input::read(bundle)?;
     let expected =
         chio_attest_verify::ExpectedIdentity::doc_hidden_inline(issuer_san_regex, issuer_oidc);
     let verifier = chio_attest_verify::SigstoreVerifier::with_embedded_root()
@@ -249,9 +250,9 @@ pub(crate) fn verify_runtime_quote_with_backend(
 ) -> Result<RuntimeQuoteBackendReport, CliError> {
     use chio_attest_verify::QuoteVerifier;
 
-    let quote_bytes = fs::read(quote)?;
-    let collateral_bytes = fs::read(collateral)?;
-    let collateral: RuntimeQuoteCollateralDocument = serde_json::from_slice(&collateral_bytes)?;
+    let quote_bytes = crate::input::read(quote)?;
+    let collateral_bytes = crate::input::read(collateral)?;
+    let collateral: RuntimeQuoteCollateralDocument = crate::input::json(&collateral_bytes)?;
     let verification_time = collateral
         .verification_time_unix_seconds
         .map(unix_seconds_to_system_time)
@@ -260,7 +261,10 @@ pub(crate) fn verify_runtime_quote_with_backend(
         chio_attest_verify::QuoteVerificationContext::new(kernel_public_key, receipt_root);
     let verified = match tee_kind {
         "intel-tdx" => {
-            let verification_time = verification_time.unwrap_or_else(std::time::SystemTime::now);
+            let verification_time = verification_time.map_or_else(
+                || unix_seconds_to_system_time(crate::input::time::seconds()?),
+                Ok,
+            )?;
             let verifier = chio_attest_verify::tdx::TdxDcapVerifier::with_verification_time(
                 chio_attest_verify::tdx::TdxCollateral::new(
                     decode_hex_required(
@@ -294,7 +298,10 @@ pub(crate) fn verify_runtime_quote_with_backend(
                 .map_err(|error| CliError::cli_other_error(format!("attest verify: {error}")))?
         }
         "amd-sev-snp" => {
-            let verification_time = verification_time.unwrap_or_else(std::time::SystemTime::now);
+            let verification_time = verification_time.map_or_else(
+                || unix_seconds_to_system_time(crate::input::time::seconds()?),
+                Ok,
+            )?;
             let expected_launch_digest = decode_fixed_hex::<48>(
                 collateral_required_str(
                     collateral.expected_launch_digest_hex.as_deref(),
@@ -336,7 +343,10 @@ pub(crate) fn verify_runtime_quote_with_backend(
                 .map_err(|error| CliError::cli_other_error(format!("attest verify: {error}")))?
         }
         "aws-nitro" => {
-            let verification_time = verification_time.unwrap_or_else(std::time::SystemTime::now);
+            let verification_time = verification_time.map_or_else(
+                || unix_seconds_to_system_time(crate::input::time::seconds()?),
+                Ok,
+            )?;
             let expected_pcr0 = decode_fixed_hex::<48>(
                 collateral_required_str(
                     collateral.expected_pcr0_hex.as_deref(),

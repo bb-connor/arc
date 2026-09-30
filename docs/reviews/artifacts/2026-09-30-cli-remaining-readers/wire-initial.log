@@ -1,0 +1,4 @@
+
+Wire schema failures:
+- spec/wire-schemas.lock:2413 chio.finding.status-cli-floor.v1 lists crates/products/chio-cli/src/cli/dispatch/finding/status_floor.rs, which no longer declares it (removed or bumped identifier); acknowledge it with --update in the same change
+Wire schemas: 1324 identifier constants, 1097 distinct values, 163 declared in more than one file, 1098 lock entries; 168 of 511 security-crate constants unpinned

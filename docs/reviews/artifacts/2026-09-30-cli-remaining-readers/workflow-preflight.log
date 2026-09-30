@@ -1,0 +1,11 @@
+
+running 7 tests
+test workflow_preflight_cli_accepts_planning_fixture ... ok
+test workflow_preflight_cli_rejects_parent_budget_over_pool ... ok
+test workflow_preflight_cli_rejects_conflicting_approval_evidence ... ok
+test workflow_preflight_json_reports_rejected_checks ... ok
+test workflow_preflight_cli_rejects_conflicting_route_evidence ... ok
+test workflow_preflight_cli_rejects_planning_artifact_claiming_authority ... ok
+test workflow_preflight_cli_rejects_broader_child_scope ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s

@@ -1,0 +1,123 @@
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `fs`
+   --> crates/products/chio-cli/src/bin/../cli/chio/dispatch/pheromone/alerts.rs:115:5
+    |
+115 |     fs::create_dir_all(out_dir).map_err(|error| {
+    |     ^^ use of unresolved module or unlinked crate `fs`
+    |
+    = help: if you wanted to use a crate named `fs`, use `cargo add fs` to add it to your `Cargo.toml`
+help: consider importing one of these modules
+    |
+  1 + use crate::fs;
+    |
+  1 + use std::fs;
+    |
+  1 + use tokio::fs;
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `fs`
+   --> crates/products/chio-cli/src/bin/../cli/chio/dispatch/pheromone/alerts.rs:115:5
+    |
+115 |     fs::create_dir_all(out_dir).map_err(|error| {
+    |     ^^ use of unresolved module or unlinked crate `fs`
+    |
+    = help: if you wanted to use a crate named `fs`, use `cargo add fs` to add it to your `Cargo.toml`
+help: consider importing one of these modules
+    |
+  1 + use crate::fs;
+    |
+  1 + use std::fs;
+    |
+  1 + use tokio::fs;
+    |
+
+error[E0271]: expected `unix_now_ms` to return `u64`, but it returns `Result<u64, CliError>`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/runtime.rs:143:44
+    |
+143 |                 now_unix_ms.unwrap_or_else(unix_now_ms),
+    |                             -------------- ^^^^^^^^^^^ expected `u64`, found `Result<u64, CliError>`
+    |                             |
+    |                             required by a bound introduced by this call
+    |
+    = note: expected type `u64`
+               found enum `std::result::Result<u64, chio_control_plane::CliError>`
+note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
+   --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/option.rs:1061:4
+
+error[E0271]: expected `unix_now_ms` to return `u64`, but it returns `Result<u64, CliError>`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/runtime.rs:235:44
+    |
+235 |                 now_unix_ms.unwrap_or_else(unix_now_ms),
+    |                             -------------- ^^^^^^^^^^^ expected `u64`, found `Result<u64, CliError>`
+    |                             |
+    |                             required by a bound introduced by this call
+    |
+    = note: expected type `u64`
+               found enum `std::result::Result<u64, chio_control_plane::CliError>`
+note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
+   --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/option.rs:1061:4
+
+error[E0271]: expected `unix_now_ms` to return `u64`, but it returns `Result<u64, CliError>`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/runtime.rs:246:44
+    |
+246 |                 now_unix_ms.unwrap_or_else(unix_now_ms),
+    |                             -------------- ^^^^^^^^^^^ expected `u64`, found `Result<u64, CliError>`
+    |                             |
+    |                             required by a bound introduced by this call
+    |
+    = note: expected type `u64`
+               found enum `std::result::Result<u64, chio_control_plane::CliError>`
+note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
+   --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/option.rs:1061:4
+
+error[E0308]: mismatched types
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/finding/unit_tests/status_floor.rs:136:36
+    |
+136 |     assert_eq!(floor.operator_key, Some(authorization.operator.key.clone()));
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `PublicKey`, found `Option<PublicKey>`
+    |
+    = note: expected struct `chio_core::PublicKey`
+                 found enum `std::option::Option<chio_core::PublicKey>`
+
+error[E0271]: expected `unix_now_ms` to return `u64`, but it returns `Result<u64, CliError>`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/runtime.rs:143:44
+    |
+143 |                 now_unix_ms.unwrap_or_else(unix_now_ms),
+    |                             -------------- ^^^^^^^^^^^ expected `u64`, found `Result<u64, CliError>`
+    |                             |
+    |                             required by a bound introduced by this call
+    |
+    = note: expected type `u64`
+               found enum `std::result::Result<u64, chio_control_plane::CliError>`
+note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
+   --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/option.rs:1061:4
+
+error[E0271]: expected `unix_now_ms` to return `u64`, but it returns `Result<u64, CliError>`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/runtime.rs:235:44
+    |
+235 |                 now_unix_ms.unwrap_or_else(unix_now_ms),
+    |                             -------------- ^^^^^^^^^^^ expected `u64`, found `Result<u64, CliError>`
+    |                             |
+    |                             required by a bound introduced by this call
+    |
+    = note: expected type `u64`
+               found enum `std::result::Result<u64, chio_control_plane::CliError>`
+note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
+   --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/option.rs:1061:4
+
+error[E0271]: expected `unix_now_ms` to return `u64`, but it returns `Result<u64, CliError>`
+   --> crates/products/chio-cli/src/bin/../cli/dispatch/runtime.rs:246:44
+    |
+246 |                 now_unix_ms.unwrap_or_else(unix_now_ms),
+    |                             -------------- ^^^^^^^^^^^ expected `u64`, found `Result<u64, CliError>`
+    |                             |
+    |                             required by a bound introduced by this call
+    |
+    = note: expected type `u64`
+               found enum `std::result::Result<u64, chio_control_plane::CliError>`
+note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
+   --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/option.rs:1061:4
+
+Some errors have detailed explanations: E0271, E0433.
+For more information about an error, try `rustc --explain E0271`.
+Some errors have detailed explanations: E0271, E0308, E0433.
+For more information about an error, try `rustc --explain E0271`.

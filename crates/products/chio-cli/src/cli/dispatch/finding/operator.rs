@@ -6,15 +6,16 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
+use chio_control_plane::trust_control::finding_challenge_coordinator::FindingChallengeCoordinator;
+use chio_control_plane::trust_control::finding_operator_filing_resolver::FindingOperatorFilingResolver;
 use chio_control_plane::trust_control::finding_operator_profile::{
     FindingOperatorBuyerProfile, FindingOperatorPaths, FindingOperatorProfile,
     FindingOperatorSecretSeeds, FindingOperatorSellerProfile, FINDING_OPERATOR_PROFILE_SCHEMA,
 };
-use chio_control_plane::trust_control::finding_operator_filing_resolver::FindingOperatorFilingResolver;
 use chio_control_plane::trust_control::finding_operator_purchase::{
     FindingOperatorPurchaseExecutor, FindingOperatorPurchaseStorage,
 };
@@ -24,7 +25,6 @@ use chio_control_plane::trust_control::finding_operator_seller_routes::{
     FindingVoluntaryRetractionRequest, FindingVoluntaryRetractionResponse,
 };
 use chio_control_plane::trust_control::finding_operator_status::FindingOperatorAuthorityStatusResolver;
-use chio_control_plane::trust_control::finding_challenge_coordinator::FindingChallengeCoordinator;
 use chio_control_plane::trust_control::finding_status_publisher::FindingStatusEpochPublisher;
 use chio_control_plane::trust_control::FindingChallengeSubmissionRuntime;
 use chio_control_plane::trust_control::{
@@ -32,18 +32,18 @@ use chio_control_plane::trust_control::{
     FindingStatusServiceBond, TrustServiceConfig, VenueLedgerRailObserver,
     FINDING_STATUS_OPERATOR_ROLE,
 };
-use chio_core::{canonical_json_bytes, sha256_hex, Keypair, PublicKey};
 use chio_core::receipt::lineage::SignedExportEnvelope;
+use chio_core::{canonical_json_bytes, sha256_hex, Keypair, PublicKey};
 use chio_finding::{
     verify_signed_challenge, FindingChallengeAuthorization, SignedFindingChallenge,
 };
+use chio_store_sqlite::finding_challenge_store::FindingChallengeRepairDatabaseBinding;
 use chio_store_sqlite::{
     FindingChallengeSubmissionRepairInput, FindingDisputeLockDisposition,
     FindingOperatorBundleStoreError, SqliteAuthorityStore, SqliteFindingChallengeStore,
-    SqliteFindingOperatorBundleStore, SqliteFindingOperatorPaymentAdapter, SqliteFindingPayloadStore,
-    SqliteReceiptStore, TenantId, TenantKey,
+    SqliteFindingOperatorBundleStore, SqliteFindingOperatorPaymentAdapter,
+    SqliteFindingPayloadStore, SqliteReceiptStore, TenantId, TenantKey,
 };
-use chio_store_sqlite::finding_challenge_store::FindingChallengeRepairDatabaseBinding;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize as _;
 
@@ -210,11 +210,9 @@ impl OperatorSellerSubmissionExecutor {
             .reports_directory
             .join(format!("{}.seller-submission-job.json", request.request_id));
         let mut job = if job_path.exists() {
-            let stored: FindingSellerSubmissionJob = read_canonical_file(
-                &job_path,
-                SELLER_SUBMISSION_JOB_MAX_BYTES,
-            )
-            .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
+            let stored: FindingSellerSubmissionJob =
+                read_canonical_file(&job_path, SELLER_SUBMISSION_JOB_MAX_BYTES)
+                    .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
             if stored.schema != SELLER_SUBMISSION_JOB_SCHEMA
                 || stored.request_id != request.request_id
                 || stored.request_sha256 != request_sha256
@@ -225,10 +223,7 @@ impl OperatorSellerSubmissionExecutor {
             }
             stored
         } else {
-            require_seller_submission_capacity(
-                &self.reports_directory,
-                &self.packages_directory,
-            )?;
+            require_seller_submission_capacity(&self.reports_directory, &self.packages_directory)?;
             let created = FindingSellerSubmissionJob {
                 schema: SELLER_SUBMISSION_JOB_SCHEMA.to_owned(),
                 request_id: request.request_id.clone(),
@@ -249,10 +244,8 @@ impl OperatorSellerSubmissionExecutor {
             return Ok(result);
         }
 
-        let retained_file_bytes = seller_submission_storage_bytes(
-            &self.reports_directory,
-            &self.packages_directory,
-        )?;
+        let retained_file_bytes =
+            seller_submission_storage_bytes(&self.reports_directory, &self.packages_directory)?;
         self.artifact_store
             .reserve_seller_artifact_capacity(
                 &request.request_id,
@@ -264,96 +257,95 @@ impl OperatorSellerSubmissionExecutor {
             )
             .map_err(seller_artifact_capacity_error)?;
 
-        let outcome: Result<
-            FindingVerifiedFixSubmissionResponse,
-            FindingSellerSubmissionError,
-        > = (|| {
-            if !package_path.exists() {
-                let mut args = vec![
+        let outcome: Result<FindingVerifiedFixSubmissionResponse, FindingSellerSubmissionError> =
+            (|| {
+                if !package_path.exists() {
+                    let mut args = vec![
+                        "finding".to_owned(),
+                        "package".to_owned(),
+                        "verified-fix".to_owned(),
+                        "--profile".to_owned(),
+                        self.profile_path.display().to_string(),
+                        "--repository".to_owned(),
+                        repository.display().to_string(),
+                        "--base".to_owned(),
+                        request.base_revision.clone(),
+                        "--candidate".to_owned(),
+                        request.candidate_revision.clone(),
+                        "--topic".to_owned(),
+                        request.topic.clone(),
+                        "--seller".to_owned(),
+                        principal.to_owned(),
+                        "--price".to_owned(),
+                        request.price_units.to_string(),
+                        "--output".to_owned(),
+                        package_path.display().to_string(),
+                        "--json".to_owned(),
+                    ];
+                    for test in &request.tests {
+                        args.push("--test".to_owned());
+                        args.push(test.clone());
+                    }
+                    run_chio_success(&args)?;
+                }
+                let admission = run_chio_json(&[
                     "finding".to_owned(),
-                    "package".to_owned(),
-                    "verified-fix".to_owned(),
+                    "admit".to_owned(),
                     "--profile".to_owned(),
                     self.profile_path.display().to_string(),
-                    "--repository".to_owned(),
-                    repository.display().to_string(),
-                    "--base".to_owned(),
-                    request.base_revision.clone(),
-                    "--candidate".to_owned(),
-                    request.candidate_revision.clone(),
-                    "--topic".to_owned(),
-                    request.topic.clone(),
-                    "--seller".to_owned(),
-                    principal.to_owned(),
-                    "--price".to_owned(),
-                    request.price_units.to_string(),
-                    "--output".to_owned(),
+                    "--package".to_owned(),
                     package_path.display().to_string(),
                     "--json".to_owned(),
-                ];
-                for test in &request.tests {
-                    args.push("--test".to_owned());
-                    args.push(test.clone());
-                }
-                run_chio_success(&args)?;
-            }
-            let admission = run_chio_json(&[
-                "finding".to_owned(),
-                "admit".to_owned(),
-                "--profile".to_owned(),
-                self.profile_path.display().to_string(),
-                "--package".to_owned(),
-                package_path.display().to_string(),
-                "--json".to_owned(),
-            ])?;
-            let finding_id = admission
-                .get("findingId")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| {
-                    FindingSellerSubmissionError::Internal(
-                        "admission response omitted findingId".to_owned(),
+                ])?;
+                let finding_id = admission
+                    .get("findingId")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        FindingSellerSubmissionError::Internal(
+                            "admission response omitted findingId".to_owned(),
+                        )
+                    })?
+                    .to_owned();
+                self.artifact_store
+                    .commit_seller_artifact_capacity(
+                        &request.request_id,
+                        principal,
+                        &job.request_sha256,
+                        &finding_id,
                     )
-                })?
-                .to_owned();
-            self.artifact_store
-                .commit_seller_artifact_capacity(
-                    &request.request_id,
-                    principal,
-                    &job.request_sha256,
-                    &finding_id,
-                )
-                .map_err(seller_artifact_capacity_error)?;
-            let proof_bundle = admission
-                .get("proofBundle")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| {
+                    .map_err(seller_artifact_capacity_error)?;
+                let proof_bundle = admission
+                    .get("proofBundle")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        FindingSellerSubmissionError::Internal(
+                            "admission response omitted proofBundle".to_owned(),
+                        )
+                    })?
+                    .to_owned();
+                let activation = admission.get("activation").cloned().ok_or_else(|| {
                     FindingSellerSubmissionError::Internal(
-                        "admission response omitted proofBundle".to_owned(),
+                        "admission response omitted activation".to_owned(),
                     )
-                })?
-                .to_owned();
-            let activation = admission.get("activation").cloned().ok_or_else(|| {
-                FindingSellerSubmissionError::Internal(
-                    "admission response omitted activation".to_owned(),
+                })?;
+                let result = FindingVerifiedFixSubmissionResponse {
+                    schema: "chio.finding.verified-fix-submission-result.v1".to_owned(),
+                    request_id: request.request_id.clone(),
+                    seller_principal: principal.to_owned(),
+                    finding_id,
+                    proof_bundle,
+                    activation,
+                };
+                job.result = Some(result.clone());
+                write_private_atomic(
+                    &job_path,
+                    &canonical_json_bytes(&job).map_err(|error| {
+                        FindingSellerSubmissionError::Internal(error.to_string())
+                    })?,
                 )
-            })?;
-            let result = FindingVerifiedFixSubmissionResponse {
-                schema: "chio.finding.verified-fix-submission-result.v1".to_owned(),
-                request_id: request.request_id.clone(),
-                seller_principal: principal.to_owned(),
-                finding_id,
-                proof_bundle,
-                activation,
-            };
-            job.result = Some(result.clone());
-            write_private_atomic(
-                &job_path,
-                &canonical_json_bytes(&job)
-                    .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?,
-            )
-            .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
-            Ok(result)
-        })();
+                .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
+                Ok(result)
+            })();
         match outcome {
             Ok(result) => Ok(result),
             Err(original) => match self.artifact_store.release_seller_artifact_capacity(
@@ -420,11 +412,9 @@ impl FindingSellerSubmissionExecutor for OperatorSellerSubmissionExecutor {
                 .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?,
         );
         let (mut job, create_job) = if job_path.exists() {
-            let stored: FindingSellerRetractionJob = read_canonical_file(
-                &job_path,
-                SELLER_SUBMISSION_JOB_MAX_BYTES,
-            )
-            .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
+            let stored: FindingSellerRetractionJob =
+                read_canonical_file(&job_path, SELLER_SUBMISSION_JOB_MAX_BYTES)
+                    .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
             if stored.schema != SELLER_RETRACTION_JOB_SCHEMA
                 || stored.request_id != request.request_id
                 || stored.request_sha256 != request_sha256
@@ -464,16 +454,13 @@ impl FindingSellerSubmissionExecutor for OperatorSellerSubmissionExecutor {
             .get(&request.finding_id)
             .map_err(retraction_bundle_store_error)?;
         let bundle: chio_control_plane::trust_control::finding_operator_bundle::FindingOperatorBundle =
-            serde_json::from_slice(&bundle.bundle_json)
+            crate::input::json(&bundle.bundle_json)
                 .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
         if bundle.finding.issuer != seller_key.public_key() {
             return Err(FindingSellerSubmissionError::Authentication);
         }
         if create_job {
-            require_seller_submission_capacity(
-                &self.reports_directory,
-                &self.packages_directory,
-            )?;
+            require_seller_submission_capacity(&self.reports_directory, &self.packages_directory)?;
             write_private_atomic(
                 &job_path,
                 &canonical_json_bytes(&job)
@@ -492,7 +479,8 @@ impl FindingSellerSubmissionExecutor for OperatorSellerSubmissionExecutor {
                     "stored voluntary retraction intent is not base64".to_owned(),
                 )
             })?;
-            if bytes.len() > SELLER_SUBMISSION_JOB_MAX_BYTES || STANDARD.encode(&bytes) != *encoded {
+            if bytes.len() > SELLER_SUBMISSION_JOB_MAX_BYTES || STANDARD.encode(&bytes) != *encoded
+            {
                 return Err(FindingSellerSubmissionError::Internal(
                     "stored voluntary retraction intent is invalid".to_owned(),
                 ));
@@ -509,7 +497,7 @@ impl FindingSellerSubmissionExecutor for OperatorSellerSubmissionExecutor {
                 now,
             )
             .map_err(FindingSellerSubmissionError::Internal)?;
-            let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| {
+            let value: serde_json::Value = crate::input::json(&bytes).map_err(|_| {
                 FindingSellerSubmissionError::Internal(
                     "voluntary retraction intent is not valid JSON".to_owned(),
                 )
@@ -539,7 +527,7 @@ impl FindingSellerSubmissionExecutor for OperatorSellerSubmissionExecutor {
                 "stored voluntary retraction intent omitted its id".to_owned(),
             )
         })?;
-        let intent_value: serde_json::Value = serde_json::from_slice(&intent).map_err(|_| {
+        let intent_value: serde_json::Value = crate::input::json(&intent).map_err(|_| {
             FindingSellerSubmissionError::Internal(
                 "stored voluntary retraction intent is not valid JSON".to_owned(),
             )
@@ -646,14 +634,15 @@ fn post_operator_bytes(
 ) -> Result<serde_json::Value, FindingSellerSubmissionError> {
     let endpoint = format!("{}{path}", base_url.trim_end_matches('/'));
     let response = match ureq::post(&endpoint)
+        .timeout(std::time::Duration::from_secs(30))
         .set("authorization", &format!("Bearer {token}"))
         .set("content-type", "application/json")
         .send_bytes(bytes)
     {
         Ok(response) => response,
         Err(ureq::Error::Status(status, response)) => {
-            let body = response.into_string().unwrap_or_default();
-            return Err(operator_status_error(status, &body));
+            let _ = response;
+            return Err(operator_status_error(status, ""));
         }
         Err(ureq::Error::Transport(error)) => {
             return Err(FindingSellerSubmissionError::Pending(format!(
@@ -661,7 +650,12 @@ fn post_operator_bytes(
             )));
         }
     };
-    serde_json::from_reader(response.into_reader()).map_err(|_| {
+    let bytes = crate::input::read_stream(response.into_reader(), 1024 * 1024).map_err(|_| {
+        FindingSellerSubmissionError::Internal(
+            "operator status response exceeds its input boundary".to_owned(),
+        )
+    })?;
+    crate::input::json(&bytes).map_err(|_| {
         FindingSellerSubmissionError::Internal(
             "operator status response was not valid JSON".to_owned(),
         )
@@ -686,8 +680,9 @@ fn run_chio_json(args: &[String]) -> Result<serde_json::Value, FindingSellerSubm
         ChioCommandFailure::Pending,
         SELLER_ADMISSION_COMMAND_TIMEOUT,
     )?;
-    serde_json::from_slice(&output)
-        .map_err(|_| FindingSellerSubmissionError::Internal("chio subprocess returned invalid JSON".to_owned()))
+    crate::input::json(&output).map_err(|_| {
+        FindingSellerSubmissionError::Internal("chio subprocess returned invalid JSON".to_owned())
+    })
 }
 
 fn run_chio_success(args: &[String]) -> Result<(), FindingSellerSubmissionError> {
@@ -907,9 +902,7 @@ pub(super) fn cmd_finding_operator_init(
                 role: FINDING_STATUS_OPERATOR_ROLE.to_owned(),
                 authority: status_authority,
                 rotation_policy_ref: "local/rotation/status-feed".to_owned(),
-                authorization_sha256: sha256_hex(
-                    b"local-cognition-market-status-authorization-v1",
-                ),
+                authorization_sha256: sha256_hex(b"local-cognition-market-status-authorization-v1"),
                 revoked_from: None,
             },
             status_feed_service_bond: FindingStatusServiceBond {
@@ -958,10 +951,8 @@ pub(super) fn cmd_finding_operator_init(
                 payout_destination: seller_payout.to_owned(),
             }],
         };
-        profile
-            .validate()
-            .map_err(CliError::cli_other_error)?;
-        let profile_bytes = canonical_json_bytes(&profile)?;
+        profile.validate().map_err(CliError::cli_other_error)?;
+        let profile_bytes = chio_core::canonical::canonical_json_bytes_zeroizing(&profile)?;
         write_secret_exact_or_new(&profile_path, &profile_bytes)?;
         profile
     };
@@ -970,7 +961,10 @@ pub(super) fn cmd_finding_operator_init(
     client_profile
         .validate()
         .map_err(CliError::cli_other_error)?;
-    write_public_exact_or_new(&client_profile_path, &canonical_json_bytes(&client_profile)?)?;
+    write_public_exact_or_new(
+        &client_profile_path,
+        &canonical_json_bytes(&client_profile)?,
+    )?;
     let buyer_client_path = directory.join(BUYER_CLIENT_FILE);
     let buyer_client = profile
         .buyer_client_profiles()
@@ -978,14 +972,20 @@ pub(super) fn cmd_finding_operator_init(
         .into_iter()
         .next()
         .ok_or_else(|| CliError::cli_other_error("buyer client profile is missing".to_owned()))?;
-    write_secret_exact_or_new(&buyer_client_path, &canonical_json_bytes(&buyer_client)?)?;
+    write_secret_exact_or_new(
+        &buyer_client_path,
+        &chio_core::canonical::canonical_json_bytes_zeroizing(&buyer_client)?,
+    )?;
     let seller_client_path = directory.join(SELLER_CLIENT_FILE);
     let seller_client = profile
         .seller_client_profiles()
         .into_iter()
         .next()
         .ok_or_else(|| CliError::cli_other_error("seller client profile is missing".to_owned()))?;
-    write_secret_exact_or_new(&seller_client_path, &canonical_json_bytes(&seller_client)?)?;
+    write_secret_exact_or_new(
+        &seller_client_path,
+        &chio_core::canonical::canonical_json_bytes_zeroizing(&seller_client)?,
+    )?;
 
     let paths = ResolvedOperatorPaths::new(directory, &profile.paths);
     SqliteAuthorityStore::provision(&paths.authority_database, &paths.authority_lock_root)
@@ -997,7 +997,7 @@ pub(super) fn cmd_finding_operator_init(
     write_public_exact_or_new(
         &completion_path,
         &canonical_json_bytes(&serde_json::json!({
-            "profileSha256": sha256_hex(&canonical_json_bytes(&profile)?),
+            "profileSha256": sha256_hex(&chio_core::canonical::canonical_json_bytes_zeroizing(&profile)?),
             "schema": "chio.finding.operator-init-complete.v1",
         }))?,
     )?;
@@ -1034,11 +1034,8 @@ pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliE
     let (profile, root) = load_profile(profile_path)?;
     let paths = ResolvedOperatorPaths::new(&root, &profile.paths);
     let authority = Arc::new(
-        SqliteAuthorityStore::open_serving(
-            &paths.authority_database,
-            &paths.authority_lock_root,
-        )
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?,
+        SqliteAuthorityStore::open_serving(&paths.authority_database, &paths.authority_lock_root)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     );
     let resolver = Arc::new(
         FindingOperatorAuthorityStatusResolver::new(
@@ -1245,12 +1242,7 @@ pub(super) fn cmd_finding_operator_repair_challenge_retention(
         &bundle_sha256,
         &signing_key,
     )? {
-        return print_challenge_repair_receipt(
-            &database_path,
-            receipt_path,
-            &receipt,
-            json_output,
-        );
+        return print_challenge_repair_receipt(&database_path, receipt_path, &receipt, json_output);
     }
     let before = SqliteFindingChallengeStore::inspect_challenge_repair_database(&database_path)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
@@ -1258,8 +1250,7 @@ pub(super) fn cmd_finding_operator_repair_challenge_retention(
         || u64::try_from(bundle.submissions.len()).ok() != Some(before.challenge_count)
     {
         return Err(CliError::cli_other_error(
-            "challenge repair bundle does not bind the complete database challenge set"
-                .to_owned(),
+            "challenge repair bundle does not bind the complete database challenge set".to_owned(),
         ));
     }
     let mut unique_challenges = std::collections::BTreeSet::new();
@@ -1273,8 +1264,9 @@ pub(super) fn cmd_finding_operator_repair_challenge_retention(
                 ));
             }
             let signed: SignedFindingChallenge =
-                serde_json::from_value(submission.challenge_envelope.clone())
-                    .map_err(|_| CliError::cli_other_error("signed challenge rejected".to_owned()))?;
+                serde_json::from_value(submission.challenge_envelope.clone()).map_err(|_| {
+                    CliError::cli_other_error("signed challenge rejected".to_owned())
+                })?;
             if signed.body.challenge_id != submission.challenge_id {
                 return Err(CliError::cli_other_error(
                     "signed challenge does not bind the repair challenge id".to_owned(),
@@ -1290,14 +1282,13 @@ pub(super) fn cmd_finding_operator_repair_challenge_retention(
                     }
                     &signed.signer_key
                 }
-                FindingChallengeAuthorization::VenueAudit(_) => submission
-                    .audit_authority
-                    .as_ref()
-                    .ok_or_else(|| {
+                FindingChallengeAuthorization::VenueAudit(_) => {
+                    submission.audit_authority.as_ref().ok_or_else(|| {
                         CliError::cli_other_error(
                             "venue-audit repair requires its pinned audit authority".to_owned(),
                         )
-                    })?,
+                    })?
+                }
             };
             verify_signed_challenge(&signed, audit_authority)
                 .map_err(|_| CliError::cli_other_error("signed challenge rejected".to_owned()))?;
@@ -1328,10 +1319,7 @@ pub(super) fn cmd_finding_operator_repair_challenge_retention(
             },
         )
         .collect::<Vec<_>>();
-    let completed_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?
-        .as_secs();
+    let completed_at = crate::input::time::seconds()?;
     let mut staged_receipt = None;
     let report = SqliteFindingChallengeStore::repair_challenge_submissions_with_staging(
         &database_path,
@@ -1549,27 +1537,15 @@ fn trust_config(
 
 pub(super) fn load_profile(path: &Path) -> Result<(FindingOperatorProfile, PathBuf), CliError> {
     require_secret_file(path)?;
-    let raw = fs::read(path)?;
+    let raw = chio_control_plane::read_private_signing_custody(path, PROFILE_MAX_BYTES)?;
     if raw.is_empty() || raw.len() > PROFILE_MAX_BYTES {
         return Err(CliError::cli_other_error(
             "operator profile is empty or exceeds its size bound".to_owned(),
         ));
     }
-    let text = std::str::from_utf8(&raw)
-        .map_err(|_| CliError::cli_other_error("operator profile is not UTF-8".to_owned()))?;
-    let strict = chio_core::canonical::canonical_json_bytes_from_str(text)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    if strict != raw {
-        return Err(CliError::cli_other_error(
-            "operator profile is not strict canonical JSON".to_owned(),
-        ));
-    }
-    let profile: FindingOperatorProfile = serde_json::from_slice(&raw)?;
-    if canonical_json_bytes(&profile)? != raw {
-        return Err(CliError::cli_other_error(
-            "operator profile typed serialization is not byte-stable".to_owned(),
-        ));
-    }
+    let profile: FindingOperatorProfile =
+        chio_core::canonical::UntrustedJsonText::from_wire(&raw, PROFILE_MAX_BYTES)?
+            .decode_canonical()?;
     profile.validate().map_err(CliError::cli_other_error)?;
     let root = path
         .parent()
@@ -1592,10 +1568,7 @@ fn random_token(label: &str) -> String {
 }
 
 fn unix_time() -> Result<u64, CliError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(|error| CliError::cli_other_error(error.to_string()))
+    crate::input::time::seconds()
 }
 
 fn create_secure_directory(path: &Path) -> Result<(), CliError> {
@@ -1705,20 +1678,22 @@ fn seller_submission_storage_bytes(
     reports_directory: &Path,
     packages_directory: &Path,
 ) -> Result<u64, FindingSellerSubmissionError> {
-
-    let maximum_existing_bytes = SELLER_SUBMISSION_STORAGE_CAP_BYTES
-        .saturating_sub(SELLER_SUBMISSION_RESERVED_BYTES);
-    let maximum_existing_entries = SELLER_SUBMISSION_STORAGE_MAX_ENTRIES
-        .saturating_sub(SELLER_SUBMISSION_RESERVED_ENTRIES);
-    let mut pending = vec![reports_directory.to_path_buf(), packages_directory.to_path_buf()];
+    let maximum_existing_bytes =
+        SELLER_SUBMISSION_STORAGE_CAP_BYTES.saturating_sub(SELLER_SUBMISSION_RESERVED_BYTES);
+    let maximum_existing_entries =
+        SELLER_SUBMISSION_STORAGE_MAX_ENTRIES.saturating_sub(SELLER_SUBMISSION_RESERVED_ENTRIES);
+    let mut pending = vec![
+        reports_directory.to_path_buf(),
+        packages_directory.to_path_buf(),
+    ];
     let mut bytes = 0u64;
     let mut entries = 0u64;
     while let Some(directory) = pending.pop() {
         for entry in fs::read_dir(directory)
             .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?
         {
-            let entry = entry
-                .map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
+            let entry =
+                entry.map_err(|error| FindingSellerSubmissionError::Internal(error.to_string()))?;
             entries = entries.saturating_add(1);
             if entries > maximum_existing_entries {
                 return Err(FindingSellerSubmissionError::Pending(
@@ -1767,10 +1742,7 @@ fn reclaim_nonrecoverable_submission_files(
     remove_submission_file(job_path, "failed verified-fix job")
 }
 
-fn remove_submission_file(
-    path: &Path,
-    label: &str,
-) -> Result<(), FindingSellerSubmissionError> {
+fn remove_submission_file(path: &Path, label: &str) -> Result<(), FindingSellerSubmissionError> {
     match fs::remove_file(path) {
         Ok(()) => {}
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -1784,9 +1756,7 @@ fn remove_submission_file(
         FindingSellerSubmissionError::Internal(format!("{label} path has no parent directory"))
     })?;
     sync_directory(parent).map_err(|error| {
-        FindingSellerSubmissionError::Internal(format!(
-            "cannot durably remove {label}: {error}"
-        ))
+        FindingSellerSubmissionError::Internal(format!("cannot durably remove {label}: {error}"))
     })
 }
 
@@ -1806,9 +1776,16 @@ fn write_secret_new(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
 }
 
 fn write_secret_exact_or_new(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
+    write_exact_or_new(path, bytes, require_exact_private_file)
+}
+
+fn write_exact_or_new(
+    path: &Path,
+    bytes: &[u8],
+    validate_existing: fn(&Path, &[u8]) -> Result<(), CliError>,
+) -> Result<(), CliError> {
     if path.exists() {
-        require_exact_regular_file(path, bytes)?;
-        return set_secret_permissions(path);
+        return validate_existing(path, bytes);
     }
     let parent = path.parent().ok_or_else(|| {
         CliError::cli_other_error("operator output path has no parent directory".to_owned())
@@ -1821,8 +1798,7 @@ fn write_secret_exact_or_new(path: &Path, bytes: &[u8]) -> Result<(), CliError> 
     if let Err(error) = fs::hard_link(&temporary, path) {
         let _ = fs::remove_file(&temporary);
         if path.exists() {
-            require_exact_regular_file(path, bytes)?;
-            return set_secret_permissions(path);
+            return validate_existing(path, bytes);
         }
         return Err(CliError::from(error));
     }
@@ -1831,7 +1807,7 @@ fn write_secret_exact_or_new(path: &Path, bytes: &[u8]) -> Result<(), CliError> 
 }
 
 fn write_public_exact_or_new(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
-    write_secret_exact_or_new(path, bytes)?;
+    write_exact_or_new(path, bytes, require_exact_regular_file)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;
@@ -1858,7 +1834,7 @@ fn require_exact_regular_file(path: &Path, expected: &[u8]) -> Result<(), CliErr
             path.display()
         )));
     }
-    let actual = fs::read(path)?;
+    let actual = crate::input::read_regular(path, expected.len())?;
     if actual != expected {
         return Err(CliError::cli_other_error(format!(
             "{} already contains different initialization data",
@@ -1868,14 +1844,14 @@ fn require_exact_regular_file(path: &Path, expected: &[u8]) -> Result<(), CliErr
     Ok(())
 }
 
-fn set_secret_permissions(path: &Path) -> Result<(), CliError> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+fn require_exact_private_file(path: &Path, expected: &[u8]) -> Result<(), CliError> {
+    let actual = chio_control_plane::read_private_signing_custody(path, expected.len())?;
+    if actual.as_slice() != expected {
+        return Err(CliError::cli_other_error(format!(
+            "{} already contains different initialization data",
+            path.display()
+        )));
     }
-    #[cfg(not(unix))]
-    let _ = path;
     Ok(())
 }
 

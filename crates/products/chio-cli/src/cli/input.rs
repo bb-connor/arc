@@ -7,6 +7,8 @@ use std::{io::Read, path::Path};
 pub(crate) mod collection;
 #[path = "input/config.rs"]
 pub(crate) mod config;
+#[path = "input/private.rs"]
+pub(crate) mod private;
 #[path = "input/snapshot.rs"]
 pub(crate) mod snapshot;
 #[path = "input/time.rs"]

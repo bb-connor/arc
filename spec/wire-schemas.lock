@@ -2410,11 +2410,6 @@ files = ["crates/products/chio-cli/src/cli/dispatch/finding/operator.rs"]
 first_seen = "29ec8f809b"
 
 [[schema]]
-value = "chio.finding.status-cli-floor.v1"
-files = ["crates/products/chio-cli/src/cli/dispatch/finding/status_floor.rs"]
-first_seen = "24a23c7356"
-
-[[schema]]
 value = "chio.finding.status-cli-floor.v2"
 files = ["crates/products/chio-cli/src/cli/dispatch/finding/status_floor.rs"]
 first_seen = "39c7713cf3"

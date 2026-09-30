@@ -1,14 +1,14 @@
-use super::{
-    build_peer_directory_bundle_trust, load_chio_verified_workflow_resolver,
-    load_chio_workflow_verifier_trust_bundle, load_relay_peer_directory_from_paths,
-    load_relay_signing_key, read_json_documents_from_dir, read_utf8_json_file, unix_now_ms,
-    write_json_string, write_pretty_json,
-};
 #[cfg(feature = "iroh")]
 use super::{
     build_iroh_outbound_endpoint, build_iroh_router, iroh_transport_metrics_prometheus,
     load_iroh_serve_inputs, note_router_liveness, run_directory_reloader, DirectoryReloadConfig,
     IrohServeInputs,
+};
+use super::{
+    build_peer_directory_bundle_trust, load_chio_verified_workflow_resolver,
+    load_chio_workflow_verifier_trust_bundle, load_relay_peer_directory_from_paths,
+    load_relay_signing_key, read_json_documents_from_dir, read_utf8_json_file, unix_now_ms,
+    write_json_string, write_pretty_json,
 };
 use crate::CliError;
 #[cfg(feature = "iroh")]
@@ -89,11 +89,11 @@ pub(crate) struct RelayTrustedIssuerDocument {
     pub(crate) public_key: chio_core::crypto::PublicKey,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RelaySigningKeyDocument {
     pub(crate) kernel_id: String,
-    pub(crate) seed_hex: String,
+    pub(crate) seed_hex: crate::input::private::Seed,
 }
 
 pub(crate) fn cmd_chio_pheromone_relay_lint(
@@ -103,7 +103,7 @@ pub(crate) fn cmd_chio_pheromone_relay_lint(
     trusted_issuers: Option<&Path>,
     report: &Path,
 ) -> Result<(), CliError> {
-    let now = unix_now_ms();
+    let now = unix_now_ms()?;
     let result = load_relay_peer_directory_from_paths(
         peer_directory,
         peer_directory_state,
@@ -176,7 +176,7 @@ pub(crate) fn cmd_chio_pheromone_relay_serve(
     iroh_relay_url: &[String],
     iroh_lanes: &str,
 ) -> Result<(), CliError> {
-    let now = unix_now_ms();
+    let now = unix_now_ms()?;
     #[cfg(feature = "iroh")]
     let iroh_inputs = load_iroh_serve_inputs(
         iroh_enable,
@@ -359,7 +359,7 @@ pub(crate) fn cmd_chio_pheromone_relay_serve(
                     Some(tokio::spawn(run_directory_reloader(
                         mount.gate.clone(),
                         reload_config,
-                        std::sync::Arc::new(unix_now_ms),
+                        std::sync::Arc::new(|| unix_now_ms().map_err(std::io::Error::other)),
                         std::sync::Arc::clone(&alive),
                     )))
                 }
@@ -425,7 +425,7 @@ pub(crate) fn cmd_chio_pheromone_relay_enqueue(
     )?;
     let batch_json = read_utf8_json_file(batch, "Chio pheromone relay batch")?;
     let batch: chio_federation::pheromone_gossip::PheromoneGossipBatch =
-        serde_json::from_str(&batch_json)
+        crate::input::text(&batch_json)
             .map_err(|error| CliError::cli_other_error(format!("Chio relay batch: {error}")))?;
     let transit_policy_json =
         read_utf8_json_file(transit_policy, "Chio pheromone relay transit policy")?;
@@ -507,7 +507,7 @@ pub(crate) fn cmd_chio_pheromone_relay_tick(
     iroh_peer_addr: &[String],
     iroh_lanes: &str,
 ) -> Result<(), CliError> {
-    let now_unix_ms = now_unix_ms.unwrap_or_else(unix_now_ms);
+    let now_unix_ms = now_unix_ms.map_or_else(unix_now_ms, Ok)?;
     let peer_directory = load_relay_peer_directory_from_paths(
         peer_directory,
         peer_directory_state,
@@ -858,7 +858,7 @@ pub(crate) fn cmd_chio_pheromone_relay_catchup(
     let directory = load_relay_peer_directory_from_paths(
         None,
         Some(state_path),
-        now_unix_ms.unwrap_or_else(unix_now_ms),
+        now_unix_ms.map_or_else(unix_now_ms, Ok)?,
         profile,
         trusted_issuers,
         "Chio peer directory state",
@@ -938,7 +938,7 @@ pub(crate) fn validate_relay_enqueue_batch(
 }
 
 pub(crate) fn cmd_chio_pheromone_relay_status(store: &Path, report: &Path) -> Result<(), CliError> {
-    let now = unix_now_ms();
+    let now = unix_now_ms()?;
     let relay_store =
         chio_pheromone_relay::SqlitePheromoneRelayStore::open(store).map_err(|error| {
             CliError::cli_other_error(format!("Chio pheromone relay store: {error}"))
@@ -960,7 +960,7 @@ pub(crate) fn cmd_chio_pheromone_relay_observe(
     limit: usize,
     report: &Path,
 ) -> Result<(), CliError> {
-    let now = unix_now_ms();
+    let now = unix_now_ms()?;
     std::fs::create_dir_all(report_dir).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to create Chio relay report directory {}: {error}",
@@ -998,7 +998,7 @@ pub(crate) fn cmd_chio_pheromone_relay_metrics(
     format: chio_pheromone_relay::RelayMetricsFormat,
     output: &Path,
 ) -> Result<(), CliError> {
-    let now = unix_now_ms();
+    let now = unix_now_ms()?;
     let relay_store =
         chio_pheromone_relay::SqlitePheromoneRelayStore::open(store).map_err(|error| {
             CliError::cli_other_error(format!("Chio pheromone relay store: {error}"))
@@ -1106,7 +1106,10 @@ mod tests {
             "unexpected error message: {msg}"
         );
         // Fail-closed, not a clap parse error.
-        assert!(!msg.contains("unknown argument"), "must not be a clap error: {msg}");
+        assert!(
+            !msg.contains("unknown argument"),
+            "must not be a clap error: {msg}"
+        );
         // With the flag off, the guard is a no-op.
         assert!(super::reject_iroh_enable_without_feature(false).is_ok());
     }
@@ -1324,6 +1327,12 @@ mod tests {
             )
             .unwrap();
 
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600))
+                    .unwrap();
+            }
             let inputs = load_iroh_serve_inputs(
                 true,
                 Some(&bundle_path),
@@ -1389,7 +1398,7 @@ mod tests {
         ) -> chio_federation_transport_iroh::identity::VerifiedDirectory {
             let (bundle_json, issuer) = signed_bundle_json(admitted_kernel, transport_seed);
             let bundle: TransportDirectoryBundleDocument =
-                serde_json::from_str(&bundle_json).unwrap();
+                crate::input::text(&bundle_json).unwrap();
             let trust = TransportDirectoryBundleTrust {
                 issuers: vec![TrustedTransportDirectoryIssuer {
                     issuer: "did:chio:issuer".to_string(),

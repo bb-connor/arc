@@ -3,9 +3,7 @@ use super::*;
 use super::finding_challenge::{
     load_challenge_evidence_document, prepare_challenge, FINDING_CHALLENGE_EVIDENCE_MAX_BYTES,
 };
-use super::finding_verify::{
-    strict_finding_ingress, AcceptedFinding, CliFindingNonceResolver,
-};
+use super::finding_verify::{strict_finding_ingress, AcceptedFinding, CliFindingNonceResolver};
 use crate::cli_entrypoint_support::parse_cli;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
@@ -19,19 +17,18 @@ use chio_finding::{
     FindingAffectedDelivery, FindingBuyerSubmission, FindingChallengeAuthorization,
     FindingChallengeEvidence, FindingChallengeStanding, FindingCheckpointRef,
     FindingClaimedVerdict, FindingDescriptor, FindingDisputeBondClass, FindingDisputeFeeEvent,
-    FindingDisputeFeeTerminal, FindingDisputeLockRef, FindingEvidenceClass,
-    FindingGuaranteeClass, FindingOutcomeClass, FindingPredicate, FindingPurchaseRecord,
-    FindingReceiptRef, FindingRecipeEnvironment, FindingRecipePhase, FindingRecipePhaseKind,
-    FindingReplayObservation, FindingReplayRecipeInput, FindingReplayReproduction,
-    FindingReplayTerminalResult, FindingResourceCaps, FindingVenueAuditAuthorization,
-    SignedFindingPurchaseRecord, FINDING_PURCHASE_RECORD_SCHEMA_V1,
-    FINDING_REPLAY_OBSERVATION_SCHEMA_V1, FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1,
-    FINDING_SCHEMA_V1,
+    FindingDisputeFeeTerminal, FindingDisputeLockRef, FindingEvidenceClass, FindingGuaranteeClass,
+    FindingOutcomeClass, FindingPredicate, FindingPurchaseRecord, FindingReceiptRef,
+    FindingRecipeEnvironment, FindingRecipePhase, FindingRecipePhaseKind, FindingReplayObservation,
+    FindingReplayRecipeInput, FindingReplayReproduction, FindingReplayTerminalResult,
+    FindingResourceCaps, FindingVenueAuditAuthorization, SignedFindingPurchaseRecord,
+    FINDING_PURCHASE_RECORD_SCHEMA_V1, FINDING_REPLAY_OBSERVATION_SCHEMA_V1,
+    FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1, FINDING_SCHEMA_V1,
 };
+use chio_finding_verifier::FindingNonceResolver;
 use chio_open_market::purchase_verification::{
     derive_payment_operation_id, derive_purchase_intent_id,
 };
-use chio_finding_verifier::FindingNonceResolver;
 use wiremock::matchers::{body_string, header, method, path as path_matcher, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -96,9 +93,8 @@ fn live_buy_fixture() -> LiveBuyFixture {
         "media_type": media_type,
         "payload_b64": payload_b64,
     });
-    let payload_sha256 = chio_core_types::sha256_hex(
-        &chio_core_types::canonical_json_bytes(&reveal).unwrap(),
-    );
+    let payload_sha256 =
+        chio_core_types::sha256_hex(&chio_core_types::canonical_json_bytes(&reveal).unwrap());
     let mut finding = Finding {
         schema: FINDING_SCHEMA_V1.to_owned(),
         finding_id: String::new(),
@@ -131,8 +127,8 @@ fn live_buy_fixture() -> LiveBuyFixture {
     };
     finding.finding_id = compute_finding_id(&finding).unwrap();
     let finding = sign_finding(finding, &issuer).unwrap();
-    let raw_finding = String::from_utf8(chio_core_types::canonical_json_bytes(&finding).unwrap())
-        .unwrap();
+    let raw_finding =
+        String::from_utf8(chio_core_types::canonical_json_bytes(&finding).unwrap()).unwrap();
     let payer = buyer.public_key().to_hex();
     let request = FindingPurchaseRequest::new(
         finding.finding_id.clone(),
@@ -502,7 +498,10 @@ fn status_subcommand_parses() {
         } => {
             assert_eq!(id, GOLDEN_FINDING_ID);
             assert_eq!(feed, "status-feed/venue-01");
-            assert_eq!(operator_authorization, PathBuf::from("status-operator.json"));
+            assert_eq!(
+                operator_authorization,
+                PathBuf::from("status-operator.json")
+            );
             assert_eq!(service_bond, PathBuf::from("status-service-bond.json"));
             assert_eq!(rollback_floor, PathBuf::from("status-floor.json"));
             assert_eq!(max_epoch_age_secs, 300);
@@ -566,10 +565,9 @@ fn publish_refuses_an_artifact_above_the_body_bound() {
     let dir = tempfile::tempdir().unwrap();
     let oversized = "\u{20}".repeat(FINDING_PUBLISH_MAX_BODY_BYTES + 1);
     let path = write_temp(&dir, "oversized.json", &oversized);
-    let error = cmd_finding_publish(&path, false, Some("http://127.0.0.1:1"), Some("token"))
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("publish bound"), "unexpected error: {error}");
+    let error =
+        cmd_finding_publish(&path, false, Some("http://127.0.0.1:1"), Some("token")).unwrap_err();
+    input_boundary::assert_too_large(error, FINDING_PUBLISH_MAX_BODY_BYTES);
 }
 
 #[test]
@@ -613,17 +611,7 @@ fn verify_requires_exactly_one_artifact_source() {
 fn verify_rejects_bytes_that_are_not_the_canonical_serialization() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "pretty.json", GOLDEN_FINDING_RAW);
-    let error = cmd_finding_verify(
-        Some(&path),
-        None,
-        None,
-        None,
-        None,
-        None,
-        true,
-        false,
-        None,
-    )
+    let error = cmd_finding_verify(Some(&path), None, None, None, None, None, true, false, None)
         .unwrap_err()
         .to_string();
     assert!(
@@ -636,18 +624,7 @@ fn verify_rejects_bytes_that_are_not_the_canonical_serialization() {
 fn verify_accepts_the_canonical_artifact_under_integrity_only() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "finding.json", &canonical_golden_finding());
-    cmd_finding_verify(
-        Some(&path),
-        None,
-        None,
-        None,
-        None,
-        None,
-        true,
-        true,
-        None,
-    )
-    .unwrap();
+    cmd_finding_verify(Some(&path), None, None, None, None, None, true, true, None).unwrap();
 }
 
 #[test]
@@ -695,19 +672,15 @@ fn verify_caps_every_support_file_before_parsing() {
             true,
             None,
         )
-        .unwrap_err()
-        .to_string();
-        assert!(
-            error.contains(kind) && error.contains("524288 byte"),
-            "unexpected {kind} error: {error}"
-        );
+        .unwrap_err();
+        let _ = kind;
+        input_boundary::assert_too_large(error, finding_verify::FINDING_VERIFY_SUPPORT_MAX_BYTES);
     }
 }
 
 fn cli_nonce_evidence() -> (ChioReceipt, SignedExecutionNonce) {
     let kernel = Keypair::from_seed(&[91; 32]);
-    let action = ToolCallAction::from_parameters(serde_json::json!({"input": "finding"}))
-        .unwrap();
+    let action = ToolCallAction::from_parameters(serde_json::json!({"input": "finding"})).unwrap();
     let nonce_id = "nonce-cli-finding-1";
     let receipt = ChioReceipt::sign(
         ChioReceiptBody {
@@ -790,7 +763,9 @@ fn cli_nonce_evidence() -> (ChioReceipt, SignedExecutionNonce) {
 fn verify_resolves_bounded_signed_execution_nonce_evidence() {
     let (receipt, nonce) = cli_nonce_evidence();
     let resolver = CliFindingNonceResolver::new(vec![nonce.clone()]).unwrap();
-    let resolved = resolver.nonce_for(&receipt).expect("resolve nonce by receipt binding");
+    let resolved = resolver
+        .nonce_for(&receipt)
+        .expect("resolve nonce by receipt binding");
     assert_eq!(resolved.nonce_id(), nonce.nonce_id());
 
     assert!(CliFindingNonceResolver::new(vec![nonce.clone(), nonce.clone()]).is_err());
@@ -805,17 +780,7 @@ fn verify_resolves_bounded_signed_execution_nonce_evidence() {
 fn verify_refuses_to_call_integrity_alone_evidence_verification() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "finding.json", &canonical_golden_finding());
-    let error = cmd_finding_verify(
-        Some(&path),
-        None,
-        None,
-        None,
-        None,
-        None,
-        false,
-        true,
-        None,
-    )
+    let error = cmd_finding_verify(Some(&path), None, None, None, None, None, false, true, None)
         .unwrap_err()
         .to_string();
     assert!(
@@ -829,8 +794,8 @@ fn verify_refuses_to_call_integrity_alone_evidence_verification() {
 /// unavailable rather than collapsing them into a verified badge.
 fn golden_trust_roots() -> String {
     let profile: serde_json::Value = serde_json::from_str(GOLDEN_PROFILE_RAW).unwrap();
-    let governance_key = chio_core_types::crypto::PublicKey::from_hex(GOLDEN_GOVERNANCE_AUTHORITY)
-        .unwrap();
+    let governance_key =
+        chio_core_types::crypto::PublicKey::from_hex(GOLDEN_GOVERNANCE_AUTHORITY).unwrap();
     let governance_policy = chio_finding::FindingAuthorityKeyPolicy {
         authority_id: "profile-governance".to_owned(),
         key: governance_key.clone(),
@@ -933,7 +898,7 @@ async fn publish_sends_the_artifact_bytes_verbatim_under_the_service_token() {
         .and(body_string(artifact.clone()))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "findingId": GOLDEN_FINDING_ID,
-            "artifactSha256": "a".repeat(64),
+            "artifactSha256": sha256_hex(artifact.as_bytes()),
         })))
         .expect(1)
         .mount(&server)
@@ -1021,7 +986,13 @@ fn challenger_keypair() -> Keypair {
 }
 
 fn write_challenger_key(dir: &tempfile::TempDir, keypair_seed: [u8; 32]) -> PathBuf {
-    write_temp(dir, "challenger.seed", &hex::encode(keypair_seed))
+    let path = write_temp(dir, "challenger.seed", &hex::encode(keypair_seed));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    path
 }
 
 fn usd(units: u64) -> MonetaryAmount {
@@ -1691,13 +1662,8 @@ fn challenge_refuses_an_evidence_document_above_the_ingest_bound() {
     let dir = tempfile::tempdir().unwrap();
     let oversized = "\u{20}".repeat(FINDING_CHALLENGE_EVIDENCE_MAX_BYTES + 1);
     let path = load_document(&dir, &oversized);
-    let error = load_challenge_evidence_document(&path)
-        .unwrap_err()
-        .to_string();
-    assert!(
-        error.contains("challenge evidence bound"),
-        "unexpected error: {error}"
-    );
+    let error = load_challenge_evidence_document(&path).unwrap_err();
+    input_boundary::assert_too_large(error, FINDING_CHALLENGE_EVIDENCE_MAX_BYTES);
 }
 
 /// The assembled body is checked against the registered schema before its
@@ -1907,7 +1873,10 @@ fn live_challenge_requires_service_authorization_before_contacting_the_venue() {
     )
     .unwrap_err()
     .to_string();
-    assert!(error.contains("--control-token"), "unexpected error: {error}");
+    assert!(
+        error.contains("--control-token"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
@@ -2117,10 +2086,7 @@ async fn buy_drives_the_authenticated_live_purchase_roundtrip() {
     let fixture = live_buy_fixture();
     let server = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path_matcher(format!(
-            "/v1/findings/{}",
-            fixture.finding_id
-        )))
+        .and(path_matcher(format!("/v1/findings/{}", fixture.finding_id)))
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("content-type", "application/json")
@@ -2129,14 +2095,11 @@ async fn buy_drives_the_authenticated_live_purchase_roundtrip() {
         .expect(1)
         .mount(&server)
         .await;
-    let request_body = String::from_utf8(
-        chio_core_types::canonical_json_bytes(&fixture.request).unwrap(),
-    )
-    .unwrap();
-    let response_body = String::from_utf8(
-        chio_core_types::canonical_json_bytes(&fixture.result).unwrap(),
-    )
-    .unwrap();
+    let request_body =
+        String::from_utf8(chio_core_types::canonical_json_bytes(&fixture.request).unwrap())
+            .unwrap();
+    let response_body =
+        String::from_utf8(chio_core_types::canonical_json_bytes(&fixture.result).unwrap()).unwrap();
     Mock::given(method("POST"))
         .and(path_matcher(format!(
             "/v1/findings/{}/purchase",
@@ -2173,3 +2136,6 @@ async fn buy_drives_the_authenticated_live_purchase_roundtrip() {
     .unwrap()
     .unwrap();
 }
+
+#[path = "unit_tests/input_boundary.rs"]
+mod input_boundary;

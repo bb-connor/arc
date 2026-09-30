@@ -1,0 +1,138 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling alloy-rlp v0.3.13
+   Compiling k256 v0.13.4
+   Compiling referencing v0.46.0
+   Compiling rusqlite v0.39.0
+   Compiling openidconnect v4.0.1
+   Compiling oci-client v0.17.0
+   Compiling ruint v1.20.0
+   Compiling jsonschema v0.46.0
+   Compiling alloy-primitives v1.5.7
+   Compiling nybbles v0.4.8
+   Compiling chio-sqlite-file-identity v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-sqlite-file-identity)
+   Compiling r2d2_sqlite v0.33.0
+   Compiling gimli v0.33.0
+   Compiling chio-keyring v0.1.0 (/tmp/arc-security-launch/crates/security/chio-keyring)
+   Compiling chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+   Compiling alloy-json-abi v1.5.7
+   Compiling alloy-sol-types v1.5.7
+   Compiling alloy-serde v1.8.3
+   Compiling alloy-eip7702 v0.6.3
+   Compiling alloy-eip7928 v0.3.3
+   Compiling chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+   Compiling alloy-eip2930 v0.2.3
+   Compiling alloy-eip2124 v0.2.0
+   Compiling alloy-trie v0.9.5
+   Compiling alloy-json-rpc v1.8.3
+   Compiling alloy-eips v1.8.3
+   Compiling alloy-signer v1.8.3
+   Compiling alloy-core v1.5.7
+   Compiling alloy-transport v1.8.3
+   Compiling sigstore v0.14.0
+   Compiling chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+   Compiling alloy-transport-http v1.8.3
+   Compiling alloy-chains v0.2.33
+   Compiling alloy-consensus v1.8.3
+   Compiling alloy-rpc-client v1.8.3
+   Compiling alloy v1.8.3
+   Compiling alloy-dyn-abi v1.5.7
+   Compiling chio-web3-bindings v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3-bindings)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-workflow v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow)
+   Compiling alloy-consensus-any v1.8.3
+   Compiling alloy-network-primitives v1.8.3
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+   Compiling alloy-rpc-types-eth v1.8.3
+   Compiling chio-selective-disclosure v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-selective-disclosure)
+   Compiling chio-cage v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage)
+   Compiling chio-metering v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-metering)
+   Compiling chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+   Compiling alloy-rpc-types-any v1.8.3
+   Compiling alloy-network v1.8.3
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+   Compiling alloy-provider v1.8.3
+   Compiling chio-federation-authority v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-authority)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling chio-credentials v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-credentials)
+   Compiling chio-signing-remote v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-signing-remote)
+   Compiling cranelift-codegen v0.133.3
+   Compiling wasmtime-environ v46.0.3
+   Compiling alloy-contract v1.8.3
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-spec-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-spec-validate)
+   Compiling chio-pheromone-runtime v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone-runtime)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling addr2line v0.26.1
+   Compiling chio-pheromone-relay v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone-relay)
+   Compiling chio-attest-loopback v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-loopback)
+   Compiling chio-guard-registry v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guard-registry)
+   Compiling rusty-fork v0.3.1
+   Compiling proptest v1.10.0
+   Compiling wasmtime-internal-fiber v46.0.3
+   Compiling wasmtime-internal-cache v46.0.3
+   Compiling chio-federation-transport-iroh v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-transport-iroh)
+   Compiling cranelift-frontend v0.133.3
+   Compiling wasmtime-internal-unwinder v46.0.3
+   Compiling cranelift-native v0.133.3
+   Compiling wasmtime-internal-cranelift v46.0.3
+   Compiling wasmtime v46.0.3
+   Compiling chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+   Compiling chio-http-session v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-session)
+   Compiling chio-edge-metrics v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-edge-metrics)
+   Compiling chio-trace-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-trace-validate)
+   Compiling chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guards)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+   Compiling chio-mcp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-edge)
+   Compiling chio-mcp-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-adapter)
+   Compiling chio-external-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-external-guards)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+   Compiling chio-policy v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-policy)
+   Compiling chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+   Compiling chio-trust-market-context v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-trust-market-context)
+   Compiling chio-enterprise-export v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-enterprise-export)
+   Compiling chio-data-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+   Compiling chio-finding-challenge v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-challenge)
+   Compiling chio-siem v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-siem)
+   Compiling chio-security-kernel v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-kernel)
+   Compiling chio-runtime-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-core)
+   Compiling chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+   Compiling chio-config v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-config)
+   Compiling chio-openapi v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi)
+   Compiling chio-wasm-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-wasm-guards)
+   Compiling chio-proof-room v0.1.0 (/tmp/arc-security-launch/crates/products/chio-proof-room)
+   Compiling chio-acp-proxy v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-proxy)
+   Compiling chio-attest-buyer v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer)
+   Compiling chio-runtime v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime)
+   Compiling chio-process v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-process)
+   Compiling chio-anchor v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-anchor)
+   Compiling chio-conformance v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-conformance)
+   Compiling chio-tee v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-tee)
+   Compiling chio-secret-broker v0.1.0 (/tmp/arc-security-launch/crates/security/chio-secret-broker)
+   Compiling chio-runtime-harness v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-harness)
+   Compiling chio-replay-corpus v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-replay-corpus)
+   Compiling chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+   Compiling chio-arena v0.1.0 (/tmp/arc-security-launch/crates/core/chio-arena)
+   Compiling chio-mcp-remote v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-remote)
+   Compiling chio-api-protect v0.1.0 (/tmp/arc-security-launch/crates/products/chio-api-protect)
+   Compiling chio-active-response-authority v0.1.0 (/tmp/arc-security-launch/crates/security/chio-active-response-authority)
+   Compiling chio-hosted-mcp v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-hosted-mcp)
+   Compiling chio-cli v0.1.0 (/tmp/arc-security-launch/crates/products/chio-cli)
+error: could not compile `chio-cli` (bin "chio" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

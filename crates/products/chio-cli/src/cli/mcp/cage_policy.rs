@@ -12,14 +12,15 @@ const MAX_CAGE_POLICY_BYTES: usize = 4 * 1024 * 1024;
 
 #[path = "cage_policy/evidence.rs"]
 mod evidence;
-pub(crate) use evidence::{
-    NativeLaunchEvidence, NativeLaunchObservation, verify_broker_native_launch_evidence,
-    verify_native_launch_evidence, verify_native_launch_observation, verify_native_start_file,
-};
 #[cfg(target_os = "linux")]
 pub(crate) use evidence::{
     export_broker_native_launch_evidence, export_native_launch_evidence,
     export_native_launch_observations,
+};
+pub(crate) use evidence::{
+    verify_broker_native_launch_evidence, verify_native_launch_evidence,
+    verify_native_launch_observation, verify_native_start_file, NativeLaunchEvidence,
+    NativeLaunchObservation,
 };
 
 #[cfg(all(test, target_os = "linux"))]
@@ -849,18 +850,9 @@ fn load_native_mcp_launch_from_bytes(
 }
 
 fn read_cage_policy(path: &Path) -> Result<Vec<u8>, CliError> {
-    let file = std::fs::File::open(path)?;
-    let mut bytes = Vec::new();
-    std::io::Read::read_to_end(
-        &mut std::io::Read::take(file, MAX_CAGE_POLICY_BYTES as u64 + 1),
-        &mut bytes,
-    )?;
-    if bytes.is_empty() || bytes.len() > MAX_CAGE_POLICY_BYTES {
-        return Err(CliError::cli_other_error(format!(
-            "cage launch policy {} is empty or exceeds {} bytes",
-            path.display(),
-            MAX_CAGE_POLICY_BYTES
-        )));
+    let bytes = crate::input::read_regular(path, MAX_CAGE_POLICY_BYTES)?;
+    if bytes.is_empty() {
+        return Err(CliError::cli_other_error("cage launch policy is empty"));
     }
     Ok(bytes)
 }
@@ -870,7 +862,7 @@ fn decode_cage_policy(
     bytes: &[u8],
     trusted_policy_signer: &chio_core::PublicKey,
 ) -> Result<McpCageLaunchPolicy, CliError> {
-    let policy: SignedMcpCageLaunchPolicy = serde_json::from_slice(bytes).map_err(|error| {
+    let policy: SignedMcpCageLaunchPolicy = crate::input::json(bytes).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to parse cage launch policy {}: {error}",
             path.display()

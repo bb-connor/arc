@@ -24,7 +24,7 @@ pub(crate) fn cmd_chio_pheromone_relay_directory_inspect(
             "peer-directory state has no active directory".to_string()
         },
         local_kernel_id: state.local_kernel_id.clone(),
-        generated_at_unix_ms: unix_now_ms(),
+        generated_at_unix_ms: unix_now_ms()?,
         previous_version: state.active.as_ref().map(|entry| entry.version),
         promoted_version: None,
         active_bundle_sha256: state
@@ -52,7 +52,7 @@ pub(crate) fn cmd_chio_pheromone_relay_directory_promote(
     now_unix_ms: Option<u64>,
     report: &Path,
 ) -> Result<(), CliError> {
-    let now = now_unix_ms.unwrap_or_else(unix_now_ms);
+    let now = now_unix_ms.map_or_else(unix_now_ms, Ok)?;
     let candidate = load_relay_peer_directory_bundle(candidate)?;
     let mut state_document = load_or_create_peer_directory_state(state, &candidate, now)?;
     let trust = build_peer_directory_bundle_trust(trusted_issuers, now, profile)?;
@@ -85,7 +85,7 @@ pub(crate) fn cmd_chio_pheromone_relay_directory_reject(
     now_unix_ms: Option<u64>,
     report: &Path,
 ) -> Result<(), CliError> {
-    let now = now_unix_ms.unwrap_or_else(unix_now_ms);
+    let now = now_unix_ms.map_or_else(unix_now_ms, Ok)?;
     let candidate = load_relay_peer_directory_bundle(candidate)?;
     let mut state_document = load_or_create_peer_directory_state(state, &candidate, now)?;
     let report_document = chio_pheromone_relay::reject_peer_directory_candidate(
@@ -109,14 +109,14 @@ pub(crate) fn cmd_chio_pheromone_relay_supervisor_lint(
     let lint_report = match chio_pheromone_relay::relay_supervisor_profile_from_json(&profile_json)
     {
         Ok(profile_document) => {
-            chio_pheromone_relay::lint_relay_supervisor_profile(&profile_document, unix_now_ms())
+            chio_pheromone_relay::lint_relay_supervisor_profile(&profile_document, unix_now_ms()?)
         }
         Err(error) => chio_pheromone_relay::RelayDrillReport {
             schema: chio_pheromone_relay::PHEROMONE_RELAY_DRILL_REPORT_SCHEMA.to_string(),
             accepted: false,
             code: error.code().to_string(),
             detail: error.to_string(),
-            generated_at_unix_ms: unix_now_ms(),
+            generated_at_unix_ms: unix_now_ms()?,
             checks: vec![chio_pheromone_relay::RelayDrillCheck {
                 code: error.code().to_string(),
                 accepted: false,
@@ -169,7 +169,7 @@ pub(crate) fn parse_relay_peer_directory_json(
     profile: chio_pheromone_relay::RelayProfile,
     trusted_issuers: Option<(Vec<chio_pheromone_relay::TrustedPeerDirectoryIssuer>, u64)>,
 ) -> Result<chio_pheromone_relay::PeerDirectory, chio_pheromone_relay::PheromoneRelayError> {
-    let value: serde_json::Value = serde_json::from_str(json)
+    let value: serde_json::Value = crate::input::text(json)
         .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Json(error.to_string()))?;
     let schema = value
         .get("schema")
@@ -218,7 +218,7 @@ pub(crate) fn load_relay_trusted_issuers(
     path: &Path,
 ) -> Result<(Vec<chio_pheromone_relay::TrustedPeerDirectoryIssuer>, u64), CliError> {
     let json = read_utf8_json_file(path, "Chio relay trusted issuers")?;
-    let document: RelayTrustedIssuersDocument = serde_json::from_str(&json).map_err(|error| {
+    let document: RelayTrustedIssuersDocument = crate::input::text(&json).map_err(|error| {
         CliError::cli_other_error(format!("Chio relay trusted issuers: {error}"))
     })?;
     let issuers = document
@@ -252,7 +252,7 @@ pub(crate) fn load_relay_peer_directory_bundle(
     path: &Path,
 ) -> Result<chio_pheromone_relay::PeerDirectoryBundleDocument, CliError> {
     let json = read_utf8_json_file(path, "Chio peer-directory bundle")?;
-    serde_json::from_str(&json)
+    crate::input::text(&json)
         .map_err(|error| CliError::cli_other_error(format!("Chio peer-directory bundle: {error}")))
 }
 

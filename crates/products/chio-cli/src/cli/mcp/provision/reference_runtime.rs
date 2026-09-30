@@ -179,7 +179,7 @@ pub(crate) fn cmd_provision_reference_runtime(
             }
             let bytes = super::read_bounded_regular_file(path, 16 * 1024, false, "broker binding")?;
             let binding: ProvisionedBrokerBinding =
-                serde_json::from_slice(&bytes).map_err(|error| {
+                crate::input::json(&bytes).map_err(|error| {
                     CliError::cli_other_error(format!("invalid broker binding: {error}"))
                 })?;
             binding.validate()?;
@@ -246,7 +246,10 @@ pub(crate) fn cmd_provision_reference_runtime(
         cage_init: CageInitSource::Helper(args.cage_init.clone()),
         ceilings,
         broker,
-        syscall_profile: args.syscall_profile.unwrap_or(ProvisionSyscallProfile::NativeMinimalV1).into(),
+        syscall_profile: args
+            .syscall_profile
+            .unwrap_or(ProvisionSyscallProfile::NativeMinimalV1)
+            .into(),
     };
     let inputs = resolve_inputs(
         profile,

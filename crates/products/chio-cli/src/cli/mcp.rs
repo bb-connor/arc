@@ -75,10 +75,10 @@ pub(crate) fn cmd_mcp_wrap(args: &McpWrapArgs) -> Result<(), CliError> {
 pub(crate) fn load_tools_fixture(
     path: &std::path::Path,
 ) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, CliError> {
-    let raw = std::fs::read_to_string(path).map_err(|e| {
+    let raw = crate::input::read_text(path).map_err(|e| {
         CliError::cli_io_error(format!("failed to read tools fixture {path:?}: {e}"))
     })?;
-    let value: serde_json::Value = serde_json::from_str(&raw).map_err(|e| {
+    let value: serde_json::Value = crate::input::text(&raw).map_err(|e| {
         CliError::cli_other_error(format!("failed to parse tools fixture {path:?}: {e}"))
     })?;
     let array = value

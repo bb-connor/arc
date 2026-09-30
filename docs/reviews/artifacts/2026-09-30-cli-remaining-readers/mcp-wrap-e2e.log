@@ -1,0 +1,6 @@
+
+running 2 tests
+test e2e_wrap_round_trip_attestation_and_verdict_gate ... ok
+test e2e_wrap_strict_execution_nonce_allows_call_through_kernel_path ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s

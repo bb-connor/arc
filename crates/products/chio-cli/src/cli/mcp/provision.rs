@@ -4,7 +4,6 @@ use std::collections::BTreeSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_security_types::EnterpriseMigrationStateStore as _;
 use serde::{Deserialize, Serialize};
@@ -15,10 +14,10 @@ use super::cage_policy::{
     ProvisionedCeilings,
 };
 
-#[path = "provision/authority_paths.rs"]
-mod authority_paths;
 #[path = "provision/artifact_io.rs"]
 mod artifact_io;
+#[path = "provision/authority_paths.rs"]
+mod authority_paths;
 use artifact_io::{require_canonical_json, sync_directory, write_report_to_stdout};
 #[path = "provision/discovery.rs"]
 mod discovery;
@@ -593,7 +592,8 @@ mod runtime_linkage_tests {
     use super::*;
 
     #[test]
-    fn elf_loader_alias_requires_the_exact_declared_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn elf_loader_alias_requires_the_exact_declared_file() -> Result<(), Box<dyn std::error::Error>>
+    {
         let root = tempfile::tempdir()?;
         let loader = root.path().join("loader");
         let other = root.path().join("other");
@@ -823,7 +823,7 @@ fn validate_existing_provision(inputs: &ProvisionInputs) -> Result<ProvisionRepo
         true,
         "provision report",
     )?;
-    let report: ProvisionReport = serde_json::from_slice(&report_bytes).map_err(|error| {
+    let report: ProvisionReport = crate::input::json(&report_bytes).map_err(|error| {
         CliError::cli_other_error(format!("invalid demo provision report: {error}"))
     })?;
     require_canonical_json(&report, &report_bytes, "demo provision report")?;
@@ -892,7 +892,7 @@ fn validate_existing_provision(inputs: &ProvisionInputs) -> Result<ProvisionRepo
         "migration genesis",
     )?;
     let transition: chio_security_types::EnterpriseMigrationTransition =
-        serde_json::from_slice(&genesis_bytes).map_err(|error| {
+        crate::input::json(&genesis_bytes).map_err(|error| {
             CliError::cli_other_error(format!("invalid demo migration genesis: {error}"))
         })?;
     require_canonical_json(&transition, &genesis_bytes, "demo migration genesis")?;
@@ -930,7 +930,7 @@ fn validate_existing_provision(inputs: &ProvisionInputs) -> Result<ProvisionRepo
             "migration promotion",
         )?;
         let promotion: chio_security_types::EnterpriseMigrationTransition =
-            serde_json::from_slice(&bytes).map_err(|error| {
+            crate::input::json(&bytes).map_err(|error| {
                 CliError::cli_other_error(format!("invalid migration promotion: {error}"))
             })?;
         require_canonical_json(&promotion, &bytes, "migration promotion")?;
@@ -1423,7 +1423,7 @@ fn decode_tools_fixture(
     bytes: &[u8],
     path: &Path,
 ) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, CliError> {
-    let input: ReviewedToolsInput = serde_json::from_slice(bytes).map_err(|error| {
+    let input: ReviewedToolsInput = crate::input::json(bytes).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to parse reviewed tools fixture {}: {error}",
             path.display()
@@ -1495,15 +1495,7 @@ fn digest32(bytes: &[u8]) -> chio_security_types::ports::Digest32 {
 }
 
 fn current_unix_ms() -> Result<u64, CliError> {
-    let millis = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| {
-            CliError::cli_other_error(format!("system clock precedes the Unix epoch: {error}"))
-        })?
-        .as_millis();
-    u64::try_from(millis).map_err(|_| {
-        CliError::cli_other_error("system clock does not fit Unix milliseconds".to_string())
-    })
+    crate::input::time::millis()
 }
 
 fn validate_text_argument(label: &str, value: &str, max_bytes: usize) -> Result<(), CliError> {
@@ -1736,7 +1728,7 @@ fn open_regular_file(path: &Path, require_private: bool, label: &str) -> Result<
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt as _;
-        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
     let file = options.open(path).map_err(|error| {
         CliError::cli_io_error(format!(
@@ -1799,7 +1791,7 @@ fn write_private_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), CliE
         use std::os::unix::fs::OpenOptionsExt as _;
         options
             .mode(0o600)
-            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
     let mut file = options.open(path).map_err(|error| {
         CliError::cli_io_error(format!(

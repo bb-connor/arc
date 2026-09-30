@@ -210,20 +210,7 @@ pub(super) fn read_relay_report_documents<T: DeserializeOwned>(
     schema: &str,
     label: &str,
 ) -> Result<Vec<T>, CliError> {
-    let mut reports = Vec::new();
-    for path in sorted_files(dir)? {
-        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
-            continue;
-        }
-        let value: serde_json::Value = read_json_file(&path, label)?;
-        if value.get("schema").and_then(serde_json::Value::as_str) == Some(schema) {
-            reports.push(
-                serde_json::from_value(value)
-                    .map_err(|error| CliError::cli_json_error(format!("{label}: {error}")))?,
-            );
-        }
-    }
-    Ok(reports)
+    super::super::read_json_documents_from_dir(dir, label, schema)
 }
 
 #[cfg(test)]

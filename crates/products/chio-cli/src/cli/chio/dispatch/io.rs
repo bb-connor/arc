@@ -4,7 +4,9 @@ use std::path::Path;
 
 pub(crate) fn read_utf8_json_file(path: &Path, label: &str) -> Result<String, CliError> {
     let _ = label;
-    crate::input::read_text(path)
+    let text = crate::input::read_text(path)?;
+    let _: serde::de::IgnoredAny = crate::input::text(&text)?;
+    Ok(text)
 }
 
 pub(crate) fn write_json_string(path: &Path, json: &str) -> Result<(), CliError> {

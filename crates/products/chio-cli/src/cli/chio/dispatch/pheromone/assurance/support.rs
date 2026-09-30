@@ -1,26 +1,14 @@
-use super::super::{read_json_file, write_pretty_json};
+use crate::input::collection::{directory, member, Budget};
 use crate::CliError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub(super) fn sorted_files(dir: &Path) -> Result<Vec<PathBuf>, CliError> {
-    let mut files = Vec::new();
-    for entry in fs::read_dir(dir).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to read directory {}: {error}",
-            dir.display()
-        ))
-    })? {
-        let entry = entry.map_err(|error| {
-            CliError::cli_io_error(format!("failed to read directory entry: {error}"))
-        })?;
-        let path = entry.path();
-        if path.is_file() {
-            files.push(path);
-        }
-    }
-    files.sort();
-    Ok(files)
+    let mut budget = Budget::default();
+    Ok(directory(dir, &mut budget)?
+        .into_iter()
+        .filter(|path| path.is_file())
+        .collect())
 }
 
 pub(super) fn file_name_ends_with(path: &Path, suffix: &str) -> bool {
@@ -77,57 +65,69 @@ pub(super) fn write_relay_alert_assurance_bundle(
     out_dir: &Path,
     bundle: &chio_pheromone_relay::RelayAlertAssuranceExportBundle,
 ) -> Result<(), CliError> {
+    let manifest = chio_core::canonical_json_bytes(&bundle.manifest)?;
+    let report = chio_core::canonical_json_bytes(&bundle.report)?;
+    let entries = std::iter::once(("manifest.json", manifest.as_slice()))
+        .chain(std::iter::once((
+            "relay-alert-assurance-export-report.json",
+            report.as_slice(),
+        )))
+        .chain(
+            bundle
+                .files
+                .iter()
+                .map(|file| (file.path.as_str(), file.bytes.as_slice())),
+        )
+        .collect::<Vec<_>>();
+    let snapshot = crate::input::snapshot::Snapshot::from_entries(entries.iter().copied())?;
     ensure_clean_output_dir(out_dir)?;
-    write_pretty_json(
-        &out_dir.join("manifest.json"),
-        &bundle.manifest,
-        "Chio relay alert assurance export manifest",
-    )?;
-    write_pretty_json(
-        &out_dir.join("relay-alert-assurance-export-report.json"),
-        &bundle.report,
-        "Chio relay alert assurance export report",
-    )?;
-    for file in &bundle.files {
-        let path = safe_bundle_path(out_dir, &file.path)?;
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| {
-                CliError::cli_io_error(format!(
-                    "failed to create Chio relay alert assurance export dir {}: {error}",
-                    parent.display()
-                ))
-            })?;
-        }
-        fs::write(&path, &file.bytes).map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to write Chio relay alert assurance export file {}: {error}",
-                path.display()
-            ))
-        })?;
-    }
-    Ok(())
+    let files = entries
+        .iter()
+        .map(|(path, _)| {
+            Ok(crate::archive::SafeArchiveEntry {
+                path: (*path).to_owned(),
+                bytes: crate::input::read(snapshot.path().join(path))?,
+                mode: 0o600,
+            })
+        })
+        .collect::<Result<Vec<_>, CliError>>()?;
+    crate::archive::write_entries_to_existing_dir(out_dir, "Chio assurance export", &files)
 }
 
 pub(super) fn read_relay_alert_assurance_bundle(
     bundle_dir: &Path,
 ) -> Result<chio_pheromone_relay::RelayAlertAssuranceExportBundle, CliError> {
-    let manifest: chio_pheromone_relay::RelayAlertAssuranceExportManifest = read_json_file(
-        &bundle_dir.join("manifest.json"),
-        "Chio relay alert assurance export manifest",
-    )?;
-    let report: chio_pheromone_relay::RelayAlertAssuranceExportReport = read_json_file(
-        &bundle_dir.join("relay-alert-assurance-export-report.json"),
-        "Chio relay alert assurance export report",
-    )?;
+    read_bundle_budget(bundle_dir, &mut Budget::default())
+}
+
+fn read_bundle_budget(
+    bundle_dir: &Path,
+    budget: &mut Budget,
+) -> Result<chio_pheromone_relay::RelayAlertAssuranceExportBundle, CliError> {
+    budget.enter(0)?;
+    let manifest: chio_pheromone_relay::RelayAlertAssuranceExportManifest =
+        crate::input::json(&budget.read(&member(bundle_dir, "manifest.json")?)?)?;
+    let report: chio_pheromone_relay::RelayAlertAssuranceExportReport =
+        crate::input::json(&budget.read(&member(
+            bundle_dir,
+            "relay-alert-assurance-export-report.json",
+        )?)?)?;
     let mut files = Vec::new();
+    let mut names = std::collections::BTreeSet::new();
     for artifact in &manifest.body.artifacts {
-        let path = safe_bundle_path(bundle_dir, &artifact.path)?;
-        let bytes = fs::read(&path).map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to read Chio relay alert assurance export file {}: {error}",
-                path.display()
-            ))
-        })?;
+        if !names.insert(&artifact.path)
+            || matches!(
+                artifact.path.as_str(),
+                "manifest.json" | "relay-alert-assurance-export-report.json"
+            )
+        {
+            return Err(CliError::cli_other_error(
+                "duplicate or reserved assurance bundle member",
+            ));
+        }
+        budget.enter(artifact.path.split('/').count())?;
+        let path = member(bundle_dir, &artifact.path)?;
+        let bytes = budget.read(&path)?;
         files.push(chio_pheromone_relay::RelayAlertAssuranceExportFile {
             path: artifact.path.clone(),
             bytes,
@@ -143,101 +143,24 @@ pub(super) fn read_relay_alert_assurance_bundle(
 pub(super) fn read_relay_alert_assurance_bundle_root(
     bundle_root: &Path,
 ) -> Result<Vec<chio_pheromone_relay::RelayAlertAssuranceExportBundle>, CliError> {
-    if bundle_root.join("manifest.json").is_file() {
-        return Ok(vec![read_relay_alert_assurance_bundle(bundle_root)?]);
-    }
-    let entries = fs::read_dir(bundle_root).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to read Chio relay alert assurance bundle root {}: {error}",
-            bundle_root.display()
-        ))
-    })?;
-    let mut dirs = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to read Chio relay alert assurance bundle root entry {}: {error}",
-                bundle_root.display()
-            ))
-        })?;
-        let path = entry.path();
-        if path.is_dir() && path.join("manifest.json").is_file() {
-            dirs.push(path);
-        }
-    }
-    dirs.sort();
-    let mut bundles = Vec::new();
-    for dir in dirs {
-        bundles.push(read_relay_alert_assurance_bundle(&dir)?);
-    }
-    if bundles.is_empty() {
-        return Err(CliError::cli_other_error(format!(
-            "Chio relay alert assurance bundle root {} contains no bundles",
-            bundle_root.display()
-        )));
-    }
-    Ok(bundles)
+    let mut budget = Budget::default();
+    let dirs = bundle_directories(bundle_root, &mut budget)?;
+    dirs.into_iter()
+        .map(|dir| read_bundle_budget(&dir, &mut budget))
+        .collect()
 }
 
 pub(super) fn read_relay_alert_assurance_archive_candidates(
     bundle_root: &Path,
 ) -> Result<Vec<chio_pheromone_relay::RelayAlertAssuranceArchiveBundleCandidate>, CliError> {
-    if bundle_root.join("manifest.json").is_file() {
-        return Ok(vec![read_relay_alert_assurance_archive_candidate(
-            bundle_root,
-        )]);
-    }
-    let entries = fs::read_dir(bundle_root).map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to read Chio relay alert assurance bundle root {}: {error}",
-            bundle_root.display()
-        ))
-    })?;
-    let mut dirs = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to read Chio relay alert assurance bundle root entry {}: {error}",
-                bundle_root.display()
-            ))
-        })?;
-        let path = entry.path();
-        if path.is_dir() && path.join("manifest.json").is_file() {
-            dirs.push(path);
-        }
-    }
-    dirs.sort();
+    let mut budget = Budget::default();
+    let dirs = bundle_directories(bundle_root, &mut budget)?;
     let mut candidates = Vec::new();
     for dir in dirs {
-        candidates.push(read_relay_alert_assurance_archive_candidate(&dir));
-    }
-    if candidates.is_empty() {
-        return Err(CliError::cli_other_error(format!(
-            "Chio relay alert assurance bundle root {} contains no bundles",
-            bundle_root.display()
-        )));
+        let bundle = read_bundle_budget(&dir, &mut budget);
+        candidates.push(candidate_from_result(&dir, bundle));
     }
     Ok(candidates)
-}
-
-pub(super) fn read_relay_alert_assurance_archive_candidate(
-    bundle_dir: &Path,
-) -> chio_pheromone_relay::RelayAlertAssuranceArchiveBundleCandidate {
-    let bundle_path = relay_alert_assurance_bundle_label(bundle_dir);
-    match read_relay_alert_assurance_bundle(bundle_dir) {
-        Ok(bundle) => chio_pheromone_relay::RelayAlertAssuranceArchiveBundleCandidate {
-            bundle_path,
-            bundle: Some(bundle),
-            error_code: None,
-            error_detail: None,
-        },
-        Err(error) => chio_pheromone_relay::RelayAlertAssuranceArchiveBundleCandidate {
-            bundle_path,
-            bundle: None,
-            error_code: Some("bundle_read_failed".to_string()),
-            error_detail: Some(error.to_string()),
-        },
-    }
 }
 
 pub(super) fn relay_alert_assurance_bundle_label(bundle_dir: &Path) -> String {
@@ -284,29 +207,6 @@ fn ensure_clean_output_dir(out_dir: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn safe_bundle_path(root: &Path, relative: &str) -> Result<PathBuf, CliError> {
-    if relative.trim() != relative
-        || relative.is_empty()
-        || relative.contains('\\')
-        || relative.contains(':')
-        || Path::new(relative).is_absolute()
-    {
-        return Err(CliError::cli_other_error(format!(
-            "Chio relay alert assurance export path {relative} is not relative"
-        )));
-    }
-    let mut path = root.to_path_buf();
-    for segment in relative.split('/') {
-        if segment.is_empty() || segment == "." || segment == ".." {
-            return Err(CliError::cli_other_error(format!(
-                "Chio relay alert assurance export path {relative} is unsafe"
-            )));
-        }
-        path.push(segment);
-    }
-    Ok(path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::ensure_clean_output_dir;
@@ -321,5 +221,44 @@ mod tests {
             .to_string();
 
         assert!(error.contains("Chio output directory"));
+    }
+}
+
+fn bundle_directories(root: &Path, budget: &mut Budget) -> Result<Vec<PathBuf>, CliError> {
+    if fs::symlink_metadata(root.join("manifest.json")).is_ok() {
+        return Ok(vec![root.to_owned()]);
+    }
+    let mut dirs = Vec::new();
+    for path in directory(root, budget)? {
+        if path.is_dir() && fs::symlink_metadata(path.join("manifest.json")).is_ok() {
+            dirs.push(path);
+        }
+    }
+    if dirs.is_empty() {
+        return Err(CliError::cli_other_error(
+            "Chio assurance bundle root contains no bundles",
+        ));
+    }
+    Ok(dirs)
+}
+
+fn candidate_from_result(
+    dir: &Path,
+    result: Result<chio_pheromone_relay::RelayAlertAssuranceExportBundle, CliError>,
+) -> chio_pheromone_relay::RelayAlertAssuranceArchiveBundleCandidate {
+    let bundle_path = relay_alert_assurance_bundle_label(dir);
+    match result {
+        Ok(bundle) => chio_pheromone_relay::RelayAlertAssuranceArchiveBundleCandidate {
+            bundle_path,
+            bundle: Some(bundle),
+            error_code: None,
+            error_detail: None,
+        },
+        Err(error) => chio_pheromone_relay::RelayAlertAssuranceArchiveBundleCandidate {
+            bundle_path,
+            bundle: None,
+            error_code: Some("bundle_read_failed".to_string()),
+            error_detail: Some(error.to_string()),
+        },
     }
 }

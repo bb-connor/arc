@@ -134,19 +134,26 @@ fn parse_message(line: &[u8]) -> Result<Option<DiscoveryReply>, String> {
     if line.iter().all(u8::is_ascii_whitespace) {
         return Ok(None);
     }
-    let message: Value = serde_json::from_slice(line)
+    let message: Value = crate::input::json(line)
         .map_err(|error| format!("the target sent invalid JSON-RPC: {error}"))?;
     let id = message.get("id").and_then(Value::as_u64);
     if !matches!(id, Some(1 | 2)) {
         return Ok(None);
     }
-    if let Some(error) = message.get("error") {
-        return Err(format!("the target rejected MCP discovery: {error}"));
+    if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0")
+        || message.get("method").is_some()
+        || message.get("result").is_some() == message.get("error").is_some()
+    {
+        return Err("invalid JSON-RPC discovery response".to_string());
+    }
+    if message.get("error").is_some() {
+        return Err("the target rejected MCP discovery".to_string());
     }
     if id == Some(2) {
         return message
             .get("result")
             .and_then(|result| result.get("tools"))
+            .filter(|tools| tools.is_array())
             .cloned()
             .map(|tools| Some(DiscoveryReply::Tools(tools)))
             .ok_or_else(|| "the tools/list response carries no tools array".to_string());
@@ -162,6 +169,22 @@ mod tests {
     use super::*;
     use std::os::fd::OwnedFd;
     use std::os::unix::net::UnixStream;
+
+    #[test]
+    fn discovery_rejects_ambiguous_unversioned_and_conflicting_replies() {
+        for raw in [
+            r#"{"jsonrpc":"2.0","id":1,"id":2,"result":{"tools":[]}}"#,
+            r#"{"id":2,"result":{"tools":[]}}"#,
+            r#"{"jsonrpc":"2.0","id":2,"result":{"tools":[]},"error":null}"#,
+            r#"{"jsonrpc":"2.0","id":2,"result":{"tools":{}}}"#,
+        ] {
+            assert!(parse_message(raw.as_bytes()).is_err(), "{raw}");
+        }
+        assert!(matches!(
+            parse_message(br#"{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}"#),
+            Ok(Some(DiscoveryReply::Tools(_)))
+        ));
+    }
 
     #[test]
     fn blocked_handshake_and_open_descendant_pipes_respect_the_deadline() -> std::io::Result<()> {

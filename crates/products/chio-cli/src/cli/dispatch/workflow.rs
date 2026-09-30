@@ -10,8 +10,8 @@ pub(crate) fn dispatch_workflow(
 }
 
 fn run_workflow_preflight(path: &Path, json_output: bool) -> Result<(), CliError> {
-    let bytes = fs::read(path)?;
-    let plan: chio_workflow::WorkflowPreflightPlan = serde_json::from_slice(&bytes)?;
+    let bytes = crate::input::read(path)?;
+    let plan: chio_workflow::WorkflowPreflightPlan = crate::input::json(&bytes)?;
     let report = chio_workflow::evaluate_workflow_preflight(&plan)
         .map_err(|error| CliError::cli_other_error(format!("workflow preflight: {error}")))?;
 
