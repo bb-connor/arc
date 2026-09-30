@@ -57,10 +57,12 @@ worker with 8 OCPU and 64 GiB RAM. Its retained independent anchor volume is
 mounted at `/mnt/chio-anchor`; neither volume was formatted. Tests ran as the
 non-root operator except for the explicitly privileged discovery probe.
 
-The worker remains running at closeout. The Mac hosting the OCI CLI went offline
-on Tailscale; SSH timed out before the requested stop could execute. Direct
-worker SSH still succeeded. `worker.json` records its identity, retained storage
-and the command to stop or reuse it when management access returns.
+The worker initially remained running because the Mac hosting the OCI CLI went
+offline on Tailscale before the stop command could execute. After the Mac
+reconnected, both retained filesystems and the qualification checkout were
+verified, and OCI confirmed `STOPPED`. The boot/anchor volumes, build cache and
+evidence remain retained. `worker.json` records the terminal state and restart
+instructions; the failed attempt and successful shutdown have separate logs.
 
 The actual campaigns exposed and repaired these boundaries:
 
