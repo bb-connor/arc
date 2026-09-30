@@ -3,13 +3,15 @@
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
-The current batch has its own implementation and verification record below; this queue does not establish hosted or release qualification.
+Updated through the September 30 product-reader batch. Each batch has its own
+implementation and verification record below; this queue does not establish
+hosted or release qualification.
 
 ## Current inventory
 
 | Work | Current recorded scope | Interpretation |
 | --- | --- | --- |
-| Decoder classification | 278 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite and the selected native/remote/A2A protocol owners reviewed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
+| Decoder classification | 250 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, and 28 API-protect/CLI/proof-room files disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
 | Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
 | Negative assertions | Baseline contains 1,257 assertions at 1,175 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
@@ -61,7 +63,7 @@ real contract, not a mass syntactic replacement.
 References: corrections 1D/1F/3A/4A/4B, Packet 8, packets 10.2/10.3, and
 [pass 8 U1](2026-09-26-security-review-pass-8.md). Original proof-type and error
 counts in the reviews are historical; do not quote them as today's unresolved
-defect count. The thirteen registered sealed proof types are bounded delivered work,
+defect count. The fourteen registered sealed proof types are bounded delivered work,
 not a workspace-wide proof-result audit.
 
 The [September 29 protocol batch](2026-09-29-protocol-authority-boundaries-execution.md)
@@ -110,13 +112,19 @@ comparison pass. Its execution record pins source/binary identities and OCI
 lifecycle. Do not repeat the already completed
 consumer migration or treat these focused campaigns as hosted qualification.
 
-Next execute 13 CLI process/evidence baseline files: the seven readers under
-`process_host/`, `process_response_verify/json.rs`, `receipt_verify.rs`, and the
-four `replay/` readers. Include all six `chio-api-protect` baseline files and the
-nine `chio-proof-room` baseline files. Close their original-byte,
-proof-result and typed rejection contracts, then their clock/deadline/accounting
-owners and concrete negative controls. Record semantic dispositions in the
-inventories. The 278-file lexical baseline is not a count of known vulnerabilities.
+The [September 30 product-reader batch](2026-09-30-product-authority-readers-execution.md)
+disposes those 13 CLI process/evidence files, six API-protect files and nine
+proof-room files. Original-byte decoding, bounded reads and cumulative collection
+budgets, typed local causes, safe public errors, shared fenced clocks, owned
+request reservations and sealed proof-result identity are implemented. The unused
+permissive nonce middleware is removed. Its record contains the focused evidence
+and exact per-reader dispositions.
+
+Next execute the 26 CLI proof, authority/admin, runtime signing, passport and
+trust-input readers pinned in that record. There are 55 remaining CLI baseline
+files and 250 across the workspace. These lexical counts describe semantic
+review debt, not known vulnerabilities. Broader clock/deadline/accounting and
+negative-control work remains owner-specific.
 
 Broader semantic error taxonomy, other product/protocol readers, and the
 remaining structural/declaration/assurance queues below remain open.

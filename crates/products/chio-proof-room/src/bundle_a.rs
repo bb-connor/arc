@@ -1,34 +1,28 @@
 use super::*;
 
-pub(crate) fn verify_proof_room_bundle_inner(manifest_path: &Path) -> Result<(), String> {
-    verify_proof_room_bundle_inner_with_options(manifest_path, true, true, true)
-}
-
 pub(crate) fn verify_proof_room_bundle_inner_with_options(
     manifest_path: &Path,
     verify_manifest_negative_cases: bool,
     verify_manifest_signature: bool,
     verify_transaction_passport_signature: bool,
-) -> Result<(), String> {
+) -> Result<(ProofRoomBundleManifest, String), ProofRoomError> {
     let bundle_root = manifest_path
         .parent()
         .ok_or_else(|| "proof-room.bundle.path-invalid: manifest has no parent".to_string())?;
     validate_bundle_tree_file_types(bundle_root)?;
 
-    let manifest_bytes =
-        fs::read(manifest_path).map_err(|error| format!("missing or unreadable: {error}"))?;
-    let manifest_value: serde_json::Value = serde_json::from_slice(&manifest_bytes)
-        .map_err(|error| format!("invalid Proof Room manifest JSON: {error}"))?;
+    let manifest_bytes = input::read(manifest_path)?;
+    let manifest_value: serde_json::Value = input::decode(&manifest_bytes)?;
     validate_proof_room_schema(&manifest_value, PROOF_ROOM_BUNDLE_SCHEMA_JSON, "manifest")?;
-    let manifest: ProofRoomBundleManifest = serde_json::from_value(manifest_value)
-        .map_err(|error| format!("invalid Proof Room manifest JSON: {error}"))?;
+    let manifest: ProofRoomBundleManifest = input::project(manifest_value)?;
     if manifest.schema != PROOF_ROOM_BUNDLE_SCHEMA {
-        return Err(format!(
+        return Err((format!(
             "proof-room.bundle.schema-mismatch: expected {PROOF_ROOM_BUNDLE_SCHEMA}"
-        ));
+        ))
+        .into());
     }
     if manifest.hash_algorithm != "sha256" {
-        return Err("proof-room.hash.unsupported: expected sha256".to_string());
+        return Err(("proof-room.hash.unsupported: expected sha256".to_string()).into());
     }
     let requires_first_run_claims = manifest.fixture_id == "single-call-authority";
 
@@ -60,9 +54,7 @@ pub(crate) fn verify_proof_room_bundle_inner_with_options(
         "verifier_report_ref",
         Some("chio.transaction.verifier-report.v1"),
     )?;
-    let verifier_report_value: serde_json::Value =
-        serde_json::from_slice(&verifier_report.bytes)
-            .map_err(|error| format!("proof-room.report.invalid-json: {error}"))?;
+    let verifier_report_value: serde_json::Value = input::decode(&verifier_report.bytes)?;
     verify_source_verifier_report(
         bundle_root,
         &transaction_passport,
@@ -132,20 +124,15 @@ pub(crate) fn verify_proof_room_bundle_inner_with_options(
         )?;
     }
 
-    Ok(())
+    Ok((manifest, sha256_hex(&manifest_bytes)))
 }
 
-pub(crate) fn write_doctor_report(path: &Path, bundle: &Path) -> Result<(), ProofRoomError> {
-    let manifest_path = bundle.join("manifest.json");
-    let manifest_bytes = fs::read(&manifest_path).map_err(|source| ProofRoomError::Io {
-        context: "proof-room.doctor-report.manifest-read",
-        source,
-    })?;
-    let manifest: ProofRoomBundleManifest =
-        serde_json::from_slice(&manifest_bytes).map_err(|source| ProofRoomError::Json {
-            context: "proof-room.doctor-report.manifest-json",
-            source,
-        })?;
+pub(crate) fn write_doctor_report(
+    path: &Path,
+    bundle: &Path,
+    verified: &VerifiedProofRoomBundle,
+) -> Result<(), ProofRoomError> {
+    let manifest = verified.manifest();
     let report = ProofRoomDoctorReport {
         schema: "chio.proof-room.quickstart-doctor-report.v1",
         verdict: "verified",
@@ -160,10 +147,12 @@ pub(crate) fn write_doctor_report(path: &Path, bundle: &Path) -> Result<(), Proo
         context: "proof-room.doctor-report.encode",
         source,
     })?;
-    fs::write(path, bytes).map_err(|source| ProofRoomError::Io {
-        context: "proof-room.doctor-report.write",
-        source,
-    })
+    fs::write(path, bytes)
+        .map_err(|source| ProofRoomError::Io {
+            context: "proof-room.doctor-report.write",
+            source,
+        })
+        .map_err(ProofRoomError::from)
 }
 
 pub(crate) fn verify_negative_cases(
@@ -171,10 +160,10 @@ pub(crate) fn verify_negative_cases(
     negative_cases: &[ProofRoomNegativeCase],
     require_cases: bool,
     verify_transaction_passport_signature: bool,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     if negative_cases.is_empty() {
         return if require_cases {
-            Err("proof-room.negative-case.missing".to_string())
+            Err(("proof-room.negative-case.missing".to_string()).into())
         } else {
             Ok(())
         };
@@ -182,25 +171,26 @@ pub(crate) fn verify_negative_cases(
     let mut ids = BTreeSet::new();
     for negative_case in negative_cases {
         if negative_case.id.is_empty() {
-            return Err("proof-room.negative-case.id-missing".to_string());
+            return Err(("proof-room.negative-case.id-missing".to_string()).into());
         }
         if !ids.insert(negative_case.id.as_str()) {
-            return Err(format!(
-                "proof-room.negative-case.duplicate: {}",
-                negative_case.id
-            ));
+            return Err(
+                (format!("proof-room.negative-case.duplicate: {}", negative_case.id)).into(),
+            );
         }
         if negative_case.path.is_empty() {
-            return Err(format!(
+            return Err((format!(
                 "proof-room.negative-case.path-missing: {}",
                 negative_case.id
-            ));
+            ))
+            .into());
         }
         if negative_case.expected_failure_code.is_empty() {
-            return Err(format!(
+            return Err((format!(
                 "proof-room.negative-case.expected-failure-missing: {}",
                 negative_case.id
-            ));
+            ))
+            .into());
         }
         let negative_path = resolve_proof_room_bundle_path(bundle_root, &negative_case.path)?;
         let _env_overrides = negative_case.verifier_context.apply();
@@ -211,31 +201,35 @@ pub(crate) fn verify_negative_cases(
             verify_transaction_passport_signature,
         ) {
             Ok(()) => {
-                return Err(format!(
+                return Err((format!(
                     "proof-room.negative-case.unexpected-success: {}",
                     negative_case.id
-                ));
+                ))
+                .into());
             }
             Err(error) => error,
         };
-        if !negative_failure_code_matches(&error, &negative_case.expected_failure_code) {
-            return Err(format!(
+        if !negative_failure_code_matches(&error.to_string(), &negative_case.expected_failure_code)
+        {
+            return Err((format!(
                 "proof-room.negative-case.failure-mismatch: {} expected {} got {error}",
                 negative_case.id, negative_case.expected_failure_code
-            ));
+            ))
+            .into());
         }
         if let Some(observed_failure_code) = negative_case.observed_failure_code.as_deref() {
             if observed_failure_code.is_empty() {
-                return Err(format!(
+                return Err((format!(
                     "proof-room.negative-case.observed-failure-missing: {}",
                     negative_case.id
-                ));
+                ))
+                .into());
             }
-            if !negative_failure_code_matches(&error, observed_failure_code) {
-                return Err(format!(
+            if !negative_failure_code_matches(&error.to_string(), observed_failure_code) {
+                return Err((format!(
                     "proof-room.negative-case.observed-failure-mismatch: {} expected {} got {error}",
                     negative_case.id, observed_failure_code
-                ));
+                )).into());
             }
         }
     }
@@ -355,14 +349,11 @@ pub(crate) fn verify_negative_case_path(
     negative_path: &Path,
     negative_case: &ProofRoomNegativeCase,
     verify_transaction_passport_signature: bool,
-) -> Result<(), String> {
-    let bytes = fs::read(negative_path)
-        .map_err(|error| format!("proof-room.negative-case.unreadable: {error}"))?;
-    let value: serde_json::Value = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("proof-room.negative-case.invalid-json: {error}"))?;
+) -> Result<(), ProofRoomError> {
+    let bytes = input::read(negative_path)?;
+    let value: serde_json::Value = input::decode(&bytes)?;
     if value.get("mutation").is_some() {
-        let descriptor: ProofRoomNegativeDescriptor = serde_json::from_value(value)
-            .map_err(|error| format!("proof-room.negative-case.descriptor-invalid: {error}"))?;
+        let descriptor: ProofRoomNegativeDescriptor = input::project(value)?;
         verify_proof_room_negative_descriptor(bundle_root, &descriptor, negative_case)
     } else {
         verify_negative_transaction_passport(negative_path, verify_transaction_passport_signature)
@@ -374,24 +365,27 @@ pub(crate) fn verify_proof_room_negative_descriptor(
     bundle_root: &Path,
     descriptor: &ProofRoomNegativeDescriptor,
     negative_case: &ProofRoomNegativeCase,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     if !descriptor.schema.is_empty() && descriptor.schema != "chio.proof-room.negative-fixture.v1" {
-        return Err(format!(
+        return Err((format!(
             "proof-room.negative-case.descriptor-schema-unsupported: {}",
             descriptor.schema
-        ));
+        ))
+        .into());
     }
     if descriptor.id != negative_case.id {
-        return Err(format!(
+        return Err((format!(
             "proof-room.negative-case.descriptor-id-mismatch: {}",
             negative_case.id
-        ));
+        ))
+        .into());
     }
     if descriptor.expected_failure_code != negative_case.expected_failure_code {
-        return Err(format!(
+        return Err((format!(
             "proof-room.negative-case.descriptor-expected-failure-mismatch: {}",
             negative_case.id
-        ));
+        ))
+        .into());
     }
 
     let work = create_negative_case_work_dir(&negative_case.id)?;
@@ -399,7 +393,7 @@ pub(crate) fn verify_proof_room_negative_descriptor(
         copy_dir_all(bundle_root, &work)?;
         apply_proof_room_negative_descriptor(&work, descriptor)?;
         let manifest_path = resolve_proof_room_bundle_path(&work, &descriptor.base_manifest)?;
-        verify_proof_room_bundle_inner_with_options(&manifest_path, false, false, false)
+        verify_proof_room_bundle_inner_with_options(&manifest_path, false, false, false).map(|_| ())
     })();
     let _ = fs::remove_dir_all(&work);
     result
@@ -408,7 +402,7 @@ pub(crate) fn verify_proof_room_negative_descriptor(
 pub(crate) fn verify_negative_transaction_passport(
     path: &Path,
     verify_transaction_passport_signature: bool,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     let bundle_root = path
         .parent()
         .ok_or_else(|| "proof-room.negative-case.path-invalid".to_string())?;
@@ -427,9 +421,9 @@ pub(crate) fn verify_manifest_claims(
     proof_room_report_ref: Option<&ProofRoomArtifactRef>,
     source_report: &serde_json::Value,
     require_first_run_claims: bool,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     if claims.is_empty() {
-        return Err("proof-room.claim.missing: manifest has no claims".to_string());
+        return Err(("proof-room.claim.missing: manifest has no claims".to_string()).into());
     }
     let artifact_paths = artifacts
         .iter()
@@ -439,32 +433,32 @@ pub(crate) fn verify_manifest_claims(
         let source_verified = source_report_verifies_claim(source_report, &claim.claim_id);
         let bundle_allowed = ALLOWED_BUNDLE_CLAIMS.contains(&claim.claim_id.as_str());
         if !bundle_allowed && !source_verified {
-            return Err(format!("proof-room.claim.unregistered: {}", claim.claim_id));
+            return Err((format!("proof-room.claim.unregistered: {}", claim.claim_id)).into());
         }
         if source_verified && claim.result != "verified" {
-            return Err(format!(
+            return Err((format!(
                 "proof-room.claim.source-result-mismatch: {}",
                 claim.claim_id
-            ));
+            ))
+            .into());
         }
         if bundle_allowed && claim.result != "verified" {
-            return Err(format!(
-                "proof-room.claim.result-unverified: {}",
-                claim.claim_id
-            ));
+            return Err((format!("proof-room.claim.result-unverified: {}", claim.claim_id)).into());
         }
         if claim.required_artifacts.is_empty() {
-            return Err(format!(
+            return Err((format!(
                 "proof-room.claim.required-artifacts-missing: {}",
                 claim.claim_id
-            ));
+            ))
+            .into());
         }
         for artifact_path in &claim.required_artifacts {
             if !artifact_paths.contains(artifact_path.as_str()) {
-                return Err(format!(
+                return Err((format!(
                     "proof-room.claim.required-artifact-missing: {} -> {}",
                     claim.claim_id, artifact_path
-                ));
+                ))
+                .into());
             }
         }
         match claim.claim_id.as_str() {
@@ -498,17 +492,20 @@ pub(crate) fn verify_manifest_claims(
         }
     }
     if !has_claim(claims, CLAIM_PROOF_ROOM_VERIFIER_REPORT_BOUND) {
-        return Err(format!(
+        return Err((format!(
             "proof-room.claim.missing: {CLAIM_PROOF_ROOM_VERIFIER_REPORT_BOUND}"
-        ));
+        ))
+        .into());
     }
     if require_first_run_claims {
         for required_claim in REQUIRED_FIRST_RUN_PROOF_ROOM_CLAIMS {
             if !has_claim(claims, required_claim) {
                 if *required_claim == CLAIM_PROOF_ROOM_AUTHORITY_EVIDENCE_BOUND {
-                    return Err("proof-room.first-run.authority-evidence-missing".to_string());
+                    return Err(
+                        ("proof-room.first-run.authority-evidence-missing".to_string()).into(),
+                    );
                 }
-                return Err(format!("proof-room.claim.missing: {required_claim}"));
+                return Err((format!("proof-room.claim.missing: {required_claim}")).into());
             }
         }
     }
@@ -547,12 +544,12 @@ pub(crate) fn verify_first_run_authority_evidence(
     bundle_root: &Path,
     claims: &[ProofRoomClaim],
     artifacts: &[ProofRoomArtifactRef],
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     let Some(authority_claim) = claims
         .iter()
         .find(|claim| claim.claim_id == CLAIM_PROOF_ROOM_AUTHORITY_EVIDENCE_BOUND)
     else {
-        return Err("proof-room.first-run.authority-evidence-missing".to_string());
+        return Err(("proof-room.first-run.authority-evidence-missing".to_string()).into());
     };
 
     for (artifact_path, schema) in REQUIRED_AUTHORITY_ARTIFACTS {
@@ -581,7 +578,7 @@ pub(crate) fn verify_first_run_authority_evidence(
 pub(crate) fn verify_first_run_guard_receipt_refs(
     bundle_root: &Path,
     artifacts: &[ProofRoomArtifactRef],
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     let guard_artifact = artifact_ref(
         artifacts,
         "artifacts/authority/guard-report.json",
@@ -593,8 +590,7 @@ pub(crate) fn verify_first_run_guard_receipt_refs(
         "authority_evidence",
         Some(PROOF_ROOM_FIRST_RUN_GUARD_REPORT_SCHEMA),
     )?;
-    let guard: serde_json::Value = serde_json::from_slice(&guard_report.bytes)
-        .map_err(|error| format!("proof-room.first-run.guard-report-invalid: {error}"))?;
+    let guard: serde_json::Value = input::decode(&guard_report.bytes)?;
     let allow_receipt_ref = required_json_string(
         &guard,
         "allow_receipt_ref",
@@ -618,10 +614,10 @@ pub(crate) fn verify_first_run_guard_receipt_refs(
         "proof-room.first-run.denial-missing",
     )?;
     if allow_receipt_ref != allow_receipt_id {
-        return Err("proof-room.first-run.guard-allow-receipt-mismatch".to_string());
+        return Err(("proof-room.first-run.guard-allow-receipt-mismatch".to_string()).into());
     }
     if denial_receipt_ref != denial_receipt_id {
-        return Err("proof-room.first-run.guard-denial-receipt-mismatch".to_string());
+        return Err(("proof-room.first-run.guard-denial-receipt-mismatch".to_string()).into());
     }
     Ok(())
 }
@@ -631,7 +627,7 @@ pub(crate) fn first_run_receipt_id(
     artifacts: &[ProofRoomArtifactRef],
     artifact_path: &str,
     missing_code: &str,
-) -> Result<String, String> {
+) -> Result<String, ProofRoomError> {
     let receipt_artifact = artifact_ref(artifacts, artifact_path, missing_code)?;
     let receipt = verify_manifest_ref(
         bundle_root,
@@ -639,9 +635,7 @@ pub(crate) fn first_run_receipt_id(
         "first_run_receipt",
         Some(PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA),
     )?;
-    let value: serde_json::Value = serde_json::from_slice(&receipt.bytes).map_err(|error| {
-        format!("proof-room.first-run.receipt-invalid: {artifact_path}: {error}")
-    })?;
+    let value: serde_json::Value = input::decode(&receipt.bytes)?;
     required_json_string(
         &value,
         "receipt_id",
@@ -654,23 +648,23 @@ pub(crate) fn artifact_ref<'a>(
     artifacts: &'a [ProofRoomArtifactRef],
     artifact_path: &str,
     missing_code: &str,
-) -> Result<&'a ProofRoomArtifactRef, String> {
+) -> Result<&'a ProofRoomArtifactRef, ProofRoomError> {
     artifacts
         .iter()
         .find(|artifact| artifact.path == artifact_path)
-        .ok_or_else(|| format!("{missing_code}: {artifact_path}"))
+        .ok_or_else(|| ProofRoomError::Validation(format!("{missing_code}: {artifact_path}")))
 }
 
 pub(crate) fn required_json_string<'a>(
     value: &'a serde_json::Value,
     field: &str,
     missing_code: &str,
-) -> Result<&'a str, String> {
+) -> Result<&'a str, ProofRoomError> {
     let Some(field_value) = value.get(field).and_then(serde_json::Value::as_str) else {
-        return Err(missing_code.to_string());
+        return Err(missing_code.into());
     };
     if field_value.is_empty() {
-        return Err(missing_code.to_string());
+        return Err(missing_code.into());
     }
     Ok(field_value)
 }
@@ -678,9 +672,8 @@ pub(crate) fn required_json_string<'a>(
 pub(crate) fn verify_first_run_evidence_graph_binding(
     evidence_graph_bytes: &[u8],
     artifacts: &[ProofRoomArtifactRef],
-) -> Result<(), String> {
-    let graph: serde_json::Value = serde_json::from_slice(evidence_graph_bytes)
-        .map_err(|error| format!("proof-room.evidence-graph.invalid-json: {error}"))?;
+) -> Result<(), ProofRoomError> {
+    let graph: serde_json::Value = input::decode(evidence_graph_bytes)?;
     let nodes = graph
         .get("nodes")
         .and_then(serde_json::Value::as_array)
@@ -709,39 +702,38 @@ pub(crate) fn require_graph_bound_artifact(
     artifacts: &[ProofRoomArtifactRef],
     artifact_path: &str,
     missing_code: &str,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     let artifact = artifacts
         .iter()
         .find(|artifact| artifact.path == artifact_path)
-        .ok_or_else(|| format!("{missing_code}: {artifact_path}"))?;
+        .ok_or_else(|| ProofRoomError::Validation(format!("{missing_code}: {artifact_path}")))?;
     let node = nodes
         .iter()
         .find(|node| node.get("path").and_then(serde_json::Value::as_str) == Some(artifact_path))
-        .ok_or_else(|| format!("{missing_code}: {artifact_path}"))?;
+        .ok_or_else(|| ProofRoomError::Validation(format!("{missing_code}: {artifact_path}")))?;
     let node_schema = node
         .get("schema")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| format!("proof-room.evidence-graph.node-schema-missing: {artifact_path}"))?;
     if node_schema != artifact.schema {
-        return Err(format!(
-            "proof-room.evidence-graph.node-schema-mismatch: {artifact_path}"
-        ));
+        return Err(
+            (format!("proof-room.evidence-graph.node-schema-mismatch: {artifact_path}")).into(),
+        );
     }
     let node_sha256 = node
         .get("sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| format!("proof-room.evidence-graph.node-hash-missing: {artifact_path}"))?;
     if node_sha256 != artifact.sha256 {
-        return Err(format!(
-            "proof-room.evidence-graph.node-hash-mismatch: {artifact_path}"
-        ));
+        return Err(
+            (format!("proof-room.evidence-graph.node-hash-mismatch: {artifact_path}")).into(),
+        );
     }
     Ok(())
 }
 
-pub(crate) fn validate_authority_artifact(path: &str, bytes: &[u8]) -> Result<(), String> {
-    let value: serde_json::Value = serde_json::from_slice(bytes)
-        .map_err(|error| format!("proof-room.authority-evidence.invalid-json: {path}: {error}"))?;
+pub(crate) fn validate_authority_artifact(path: &str, bytes: &[u8]) -> Result<(), ProofRoomError> {
+    let value: serde_json::Value = input::decode(bytes)?;
     match path {
         "artifacts/authority/capability-proof.json" => require_json_fields(
             path,
@@ -781,9 +773,7 @@ pub(crate) fn validate_authority_artifact(path: &str, bytes: &[u8]) -> Result<()
                     format!("proof-room.authority-evidence.field-missing: {path} roots")
                 })?;
             if roots.is_empty() {
-                Err(format!(
-                    "proof-room.authority-evidence.field-missing: {path} roots"
-                ))
+                Err((format!("proof-room.authority-evidence.field-missing: {path} roots")).into())
             } else {
                 Ok(())
             }
@@ -796,17 +786,17 @@ pub(crate) fn require_json_fields(
     path: &str,
     value: &serde_json::Value,
     fields: &[&str],
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     for field in fields {
         let Some(value) = value.get(*field).and_then(serde_json::Value::as_str) else {
-            return Err(format!(
-                "proof-room.authority-evidence.field-missing: {path} {field}"
-            ));
+            return Err(
+                (format!("proof-room.authority-evidence.field-missing: {path} {field}")).into(),
+            );
         };
         if value.is_empty() {
-            return Err(format!(
-                "proof-room.authority-evidence.field-missing: {path} {field}"
-            ));
+            return Err(
+                (format!("proof-room.authority-evidence.field-missing: {path} {field}")).into(),
+            );
         }
     }
     Ok(())
@@ -816,7 +806,7 @@ pub(crate) fn require_claim_artifact(
     claim: &ProofRoomClaim,
     artifact_path: &str,
     error_code: &str,
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     if claim
         .required_artifacts
         .iter()
@@ -824,69 +814,64 @@ pub(crate) fn require_claim_artifact(
     {
         return Ok(());
     }
-    Err(error_code.to_string())
+    Err(error_code.into())
 }
 
 pub(crate) fn verify_bundle_signature(
     bundle_root: &Path,
     manifest: &ProofRoomBundleManifest,
     manifest_bytes: &[u8],
-) -> Result<(), String> {
+) -> Result<(), ProofRoomError> {
     let signature = manifest
         .signature
         .as_ref()
         .ok_or_else(|| "proof-room.signature.missing".to_string())?;
     if signature.kind != PROOF_ROOM_SIGNATURE_KIND {
-        return Err(format!(
-            "proof-room.signature.kind-unsupported: {}",
-            signature.kind
-        ));
+        return Err((format!("proof-room.signature.kind-unsupported: {}", signature.kind)).into());
     }
     if signature.signature_ref.is_empty() {
-        return Err("proof-room.signature.path-missing".to_string());
+        return Err(("proof-room.signature.path-missing".to_string()).into());
     }
 
     let signature_path = resolve_proof_room_bundle_path(bundle_root, &signature.signature_ref)?;
-    let signature_bytes = fs::read(&signature_path)
-        .map_err(|error| format!("proof-room.signature.unreadable: {error}"))?;
-    let detached: ProofRoomDetachedDsse = serde_json::from_slice(&signature_bytes)
-        .map_err(|error| format!("proof-room.signature.invalid-json: {error}"))?;
+    let signature_bytes = input::read(&signature_path)?;
+    let detached: ProofRoomDetachedDsse = input::decode(&signature_bytes)?;
 
     if detached.payload_type != PROOF_ROOM_DSSE_PAYLOAD_TYPE {
-        return Err("proof-room.signature.payload-type-mismatch".to_string());
+        return Err(("proof-room.signature.payload-type-mismatch".to_string()).into());
     }
     if detached.payload_ref.path != "manifest.json" {
-        return Err("proof-room.signature.payload-path-mismatch".to_string());
+        return Err(("proof-room.signature.payload-path-mismatch".to_string()).into());
     }
     if detached.payload_ref.schema != PROOF_ROOM_BUNDLE_SCHEMA {
-        return Err("proof-room.signature.payload-schema-mismatch".to_string());
+        return Err(("proof-room.signature.payload-schema-mismatch".to_string()).into());
     }
     let actual_manifest_sha256 = sha256_hex(manifest_bytes);
     if detached.payload_ref.sha256 != actual_manifest_sha256 {
-        return Err("proof-room.signature.payload-hash-mismatch".to_string());
+        return Err(("proof-room.signature.payload-hash-mismatch".to_string()).into());
     }
     if detached.signatures.is_empty() {
-        return Err("proof-room.signature.signatures-missing".to_string());
+        return Err(("proof-room.signature.signatures-missing".to_string()).into());
     }
     let declared_signer_keys = trusted_bundle_signer_keys(bundle_root, manifest)?;
     let trusted_signer_keys = proof_room_trusted_bundle_signer_keys_from_env()?;
     let signing_payload = dsse_pre_auth_encoding(&detached.payload_type, manifest_bytes);
     for entry in &detached.signatures {
         if entry.keyid.is_empty() || entry.sig.is_empty() {
-            return Err("proof-room.signature.field-missing".to_string());
+            return Err(("proof-room.signature.field-missing".to_string()).into());
         }
         let public_key = PublicKey::from_hex(&entry.keyid)
             .map_err(|error| format!("proof-room.signature.key-invalid: {error}"))?;
         let key_id = public_key.to_hex();
         if !declared_signer_keys.contains(&key_id) || !trusted_signer_keys.contains(&key_id) {
-            return Err(format!(
+            return Err((format!(
                 "proof-room.signature.signer-untrusted: set {PROOF_ROOM_TRUSTED_BUNDLE_SIGNER_KEYS_ENV} to include trusted bundle signer keys"
-            ));
+            )).into());
         }
         let signature = Signature::from_hex(&entry.sig)
             .map_err(|error| format!("proof-room.signature.signature-invalid: {error}"))?;
         if !public_key.verify(&signing_payload, &signature) {
-            return Err("proof-room.signature.verification-failed".to_string());
+            return Err(("proof-room.signature.verification-failed".to_string()).into());
         }
     }
 
@@ -896,13 +881,13 @@ pub(crate) fn verify_bundle_signature(
 pub(crate) fn trusted_bundle_signer_keys(
     bundle_root: &Path,
     manifest: &ProofRoomBundleManifest,
-) -> Result<BTreeSet<String>, String> {
+) -> Result<BTreeSet<String>, ProofRoomError> {
     let Some(reference) = manifest
         .artifacts
         .iter()
         .find(|artifact| artifact.path == "artifacts/authority/trust-roots.json")
     else {
-        return Err("proof-room.signature.trust-roots-missing".to_string());
+        return Err(("proof-room.signature.trust-roots-missing".to_string()).into());
     };
     let artifact = verify_manifest_ref(
         bundle_root,
@@ -910,18 +895,17 @@ pub(crate) fn trusted_bundle_signer_keys(
         "signature_trust_roots_ref",
         Some(PROOF_ROOM_FIRST_RUN_TRUST_ROOTS_SCHEMA),
     )?;
-    let trust_roots: ProofRoomTrustRoots = serde_json::from_slice(&artifact.bytes)
-        .map_err(|error| format!("proof-room.signature.trust-roots-invalid: {error}"))?;
+    let trust_roots: ProofRoomTrustRoots = input::decode(&artifact.bytes)?;
     if trust_roots.roots.is_empty() {
-        return Err("proof-room.signature.trust-roots-missing".to_string());
+        return Err(("proof-room.signature.trust-roots-missing".to_string()).into());
     }
     let mut trusted = BTreeSet::new();
     for root in trust_roots.roots {
         if root.key_id.is_empty() || root.key_digest.is_empty() {
-            return Err("proof-room.signature.trust-root-field-missing".to_string());
+            return Err(("proof-room.signature.trust-root-field-missing".to_string()).into());
         }
         if root.key_digest != sha256_hex(root.key_id.as_bytes()) {
-            return Err("proof-room.signature.trust-root-digest-mismatch".to_string());
+            return Err(("proof-room.signature.trust-root-digest-mismatch".to_string()).into());
         }
         let public_key = PublicKey::from_hex(&root.key_id)
             .map_err(|error| format!("proof-room.signature.trust-root-key-invalid: {error}"))?;
@@ -954,7 +938,7 @@ pub(crate) fn verify_manifest_ref(
     reference: &ProofRoomArtifactRef,
     label: &str,
     expected_schema: Option<&str>,
-) -> Result<VerifiedManifestArtifact, String> {
+) -> Result<VerifiedManifestArtifact, ProofRoomError> {
     verify_manifest_ref_with_json_schema(bundle_root, reference, label, expected_schema, true)
 }
 
@@ -963,7 +947,7 @@ pub(crate) fn verify_manifest_ref_defer_json_schema(
     reference: &ProofRoomArtifactRef,
     label: &str,
     expected_schema: Option<&str>,
-) -> Result<VerifiedManifestArtifact, String> {
+) -> Result<VerifiedManifestArtifact, ProofRoomError> {
     verify_manifest_ref_with_json_schema(bundle_root, reference, label, expected_schema, false)
 }
 
@@ -973,21 +957,17 @@ pub(crate) fn verify_manifest_ref_with_json_schema(
     label: &str,
     expected_schema: Option<&str>,
     validate_json_schema: bool,
-) -> Result<VerifiedManifestArtifact, String> {
+) -> Result<VerifiedManifestArtifact, ProofRoomError> {
     if let Some(expected_schema) = expected_schema {
         if reference.schema != expected_schema {
-            return Err(format!(
+            return Err((format!(
                 "proof-room.schema-mismatch: {label} expected {expected_schema}"
-            ));
+            ))
+            .into());
         }
     }
     let artifact_path = resolve_proof_room_bundle_path(bundle_root, &reference.path)?;
-    let bytes = fs::read(&artifact_path).map_err(|error| {
-        format!(
-            "proof-room.artifact.unreadable: {}: {error}",
-            reference.path
-        )
-    })?;
+    let bytes = input::read(&artifact_path)?;
     let actual_sha256 = sha256_hex(&bytes);
     if actual_sha256 != reference.sha256 {
         let code = if label == "verifier_report_ref" {
@@ -995,10 +975,11 @@ pub(crate) fn verify_manifest_ref_with_json_schema(
         } else {
             "proof-room.artifact.hash-mismatch"
         };
-        return Err(format!(
+        return Err((format!(
             "{code}: {label} expected {} got {actual_sha256}",
             reference.sha256
-        ));
+        ))
+        .into());
     }
     if validate_json_schema {
         validate_json_artifact_schema(&bytes, &reference.schema, label)?;

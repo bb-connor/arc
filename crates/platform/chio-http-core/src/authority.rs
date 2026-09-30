@@ -278,6 +278,7 @@ struct DurableAdmissionStores {
 
 #[derive(Default)]
 pub struct HttpAuthorityBuilder {
+    clock: Option<Arc<dyn chio_security_types::clock::Clock>>,
     approval_store: Option<Arc<dyn ApprovalStore>>,
     receipt_store: Option<Arc<dyn ReceiptStore>>,
     revocation_store: Option<Arc<dyn RevocationStore>>,
@@ -288,6 +289,13 @@ pub struct HttpAuthorityBuilder {
 }
 
 impl HttpAuthorityBuilder {
+    /// Share the service clock and regression fence with the embedded authority.
+    #[must_use]
+    pub fn clock(mut self, clock: Arc<dyn chio_security_types::clock::Clock>) -> Self {
+        self.clock = Some(clock);
+        self
+    }
+
     #[must_use]
     pub fn receipt_store(mut self, store: Arc<dyn ReceiptStore>) -> Self {
         self.receipt_store = Some(store);
@@ -356,13 +364,17 @@ impl HttpAuthorityBuilder {
         let kernel_subject = Keypair::generate().public_key();
         let kernel_agent_id = kernel_subject.to_hex();
 
-        let mut kernel = ChioKernel::new(HttpAuthority::kernel_config(
-            keypair.as_ref().clone(),
-            trusted.clone(),
-            policy_hash.clone(),
-            self.allow_ephemeral_receipt_log,
-            self.allow_ephemeral_revocation_store,
-        ));
+        let mut kernel = ChioKernel::new_with_clock(
+            HttpAuthority::kernel_config(
+                keypair.as_ref().clone(),
+                trusted.clone(),
+                policy_hash.clone(),
+                self.allow_ephemeral_receipt_log,
+                self.allow_ephemeral_revocation_store,
+            ),
+            self.clock
+                .unwrap_or_else(|| Arc::new(chio_security_types::clock::SystemClock)),
+        );
         if let Some(store) = self.receipt_store {
             kernel
                 .set_receipt_store_handle(store)

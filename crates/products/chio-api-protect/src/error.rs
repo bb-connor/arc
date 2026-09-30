@@ -5,6 +5,9 @@ use thiserror::Error;
 /// Errors produced by the protect proxy.
 #[derive(Debug, Error)]
 pub enum ProtectError {
+    #[error("{0}")]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
+
     #[error("failed to load OpenAPI spec: {0}")]
     SpecLoad(String),
 

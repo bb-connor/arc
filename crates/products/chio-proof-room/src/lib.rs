@@ -1,4 +1,6 @@
 #![forbid(unsafe_code)]
+
+mod input;
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
@@ -448,13 +450,11 @@ fn optional_public_settlement_independent_chain_head_from_env(
     proof_bundle: &chio_web3::settlement_proof::PublicSettlementProofBundle,
 ) -> Result<Option<chio_web3::settlement_proof::PublicSettlementIndependentChainHead>, String> {
     let head_from_json = match env::var(PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV) {
-        Ok(value) => serde_json::from_str(value.trim())
-            .map(Some)
-            .map_err(|error| {
-                format!(
+        Ok(value) => crate::input::text(value.trim()).map(Some).map_err(|error| {
+            format!(
                 "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV} must be valid JSON: {error}"
             )
-            }),
+        }),
         Err(env::VarError::NotPresent) => Ok(None),
         Err(env::VarError::NotUnicode(_)) => Err(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV} must be valid UTF-8"
@@ -576,21 +576,7 @@ fn public_settlement_rpc_call(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} returned HTTP {status}"
         ));
     }
-    let body = serde_json::from_slice::<serde_json::Value>(response.body()).map_err(|error| {
-        format!(
-            "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} returned invalid JSON: {error}"
-        )
-    })?;
-    if let Some(error) = body.get("error") {
-        return Err(format!(
-            "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} returned JSON-RPC error: {error}"
-        ));
-    }
-    body.get("result").cloned().ok_or_else(|| {
-        format!(
-            "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} response missing result"
-        )
-    })
+    input::rpc_result(response.body()).map_err(|error| error.to_string())
 }
 
 /// Dispatch one settlement JSON-RPC POST through the pinned-DNS egress helper.
@@ -883,27 +869,10 @@ struct EmbeddedProofFixtureFile {
 
 include!(concat!(env!("OUT_DIR"), "/proof_fixture_files.rs"));
 
-#[derive(Debug, thiserror::Error)]
-pub enum ProofRoomError {
-    #[error("{0}")]
-    Validation(String),
-    #[error("{context}: {source}")]
-    Io {
-        context: &'static str,
-        #[source]
-        source: std::io::Error,
-    },
-    #[error("{context}: {source}")]
-    Json {
-        context: &'static str,
-        #[source]
-        source: serde_json::Error,
-    },
-    #[error("proof-room.listen.invalid: {0}")]
-    ListenAddress(std::net::AddrParseError),
-    #[error("proof-room.serve: {0}")]
-    Serve(std::io::Error),
-}
+mod error;
+pub use error::ProofRoomError;
+mod verified;
+pub use verified::VerifiedProofRoomBundle;
 
 #[derive(Debug, serde::Deserialize)]
 struct ProofRoomBundleManifest {
@@ -1138,14 +1107,16 @@ struct ProofRoomCatalogLoadReport {
     verdict: String,
 }
 
-pub fn verify_proof_room_bundle(manifest_path: &Path) -> Result<(), ProofRoomError> {
-    verify_proof_room_bundle_inner(manifest_path).map_err(ProofRoomError::Validation)
+pub fn verify_proof_room_bundle(
+    manifest_path: &Path,
+) -> Result<VerifiedProofRoomBundle, ProofRoomError> {
+    VerifiedProofRoomBundle::verify(manifest_path)
 }
 
 pub fn build_proof_room_source_verifier_report(
     bundle_root: &Path,
     transaction_passport_path: &Path,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, ProofRoomError> {
     source_verifier::verify_transaction_passport_family_report_with_options(
         bundle_root,
         transaction_passport_path,
@@ -1153,7 +1124,7 @@ pub fn build_proof_room_source_verifier_report(
     )
 }
 
-pub fn validate_proof_room_bundle_relative_path(relative_path: &str) -> Result<(), String> {
+pub fn validate_proof_room_bundle_relative_path(relative_path: &str) -> Result<(), ProofRoomError> {
     validate_bundle_relative_path(relative_path)
 }
 
@@ -1162,9 +1133,9 @@ pub fn verify_proof_room_quickstart(
     doctor_report: Option<&Path>,
 ) -> Result<(), ProofRoomError> {
     let manifest_path = bundle.join("manifest.json");
-    verify_proof_room_bundle(&manifest_path)?;
+    let verified = verify_proof_room_bundle(&manifest_path)?;
     if let Some(report_path) = doctor_report {
-        write_doctor_report(report_path, bundle)?;
+        write_doctor_report(report_path, bundle, &verified)?;
     }
     Ok(())
 }

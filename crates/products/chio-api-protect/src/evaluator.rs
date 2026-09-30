@@ -220,6 +220,7 @@ impl RequestEvaluator {
             revocation_store,
             None,
             allow_ephemeral,
+            Arc::new(chio_security_types::clock::SystemClock),
         )
     }
 
@@ -234,6 +235,7 @@ impl RequestEvaluator {
         revocation_store: Option<Arc<dyn RevocationStore>>,
         durable_admission: Option<DurableAdmissionStores>,
         allow_ephemeral: bool,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, HttpAuthorityError> {
         let receipt_backend = if receipt_store.is_some() {
             BACKEND_DURABLE
@@ -261,6 +263,7 @@ impl RequestEvaluator {
         // an embedder with durable receipts can never silently re-accept a
         // capability revoked before a restart from in-memory revocation state.
         let mut builder = HttpAuthority::builder()
+            .clock(clock)
             .approval_store(approval_store)
             .trusted_capability_issuers(trusted_capability_issuers)
             .allow_ephemeral_receipt_log(allow_ephemeral)
@@ -651,6 +654,7 @@ mod tests {
                 budget_store: Arc::new(authority.budget_store()),
             }),
             false,
+            Arc::new(chio_security_types::clock::SystemClock),
         )?;
         assert_eq!(evaluator.receipt_backend(), "durable");
         assert_eq!(evaluator.revocation_backend(), "durable");

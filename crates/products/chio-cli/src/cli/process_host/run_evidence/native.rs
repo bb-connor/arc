@@ -26,12 +26,11 @@ pub(super) fn verify(
 ) -> Result<(), CliError> {
     let mut used = BTreeSet::new();
     for call in evidence.results.values() {
-        let receipt: ChioReceipt = serde_json::from_str(
+        let receipt: ChioReceipt = crate::input::text(
             call.response["receipt_json"]
                 .as_str()
                 .ok_or_else(|| error("missing completed tool receipt"))?,
-        )
-        .map_err(error)?;
+        )?;
         let metadata = receipt
             .metadata
             .as_ref()
@@ -120,12 +119,11 @@ pub(super) fn export(
 ) -> Result<ExportedLaunches, CliError> {
     let mut references = BTreeMap::<String, BTreeSet<String>>::new();
     for call in results.values() {
-        let receipt: ChioReceipt = serde_json::from_str(
+        let receipt: ChioReceipt = crate::input::text(
             call.response["receipt_json"]
                 .as_str()
                 .ok_or_else(|| error("missing completed tool receipt"))?,
-        )
-        .map_err(error)?;
+        )?;
         if let Some(id) = receipt
             .metadata
             .as_ref()
@@ -150,8 +148,7 @@ pub(super) fn export(
                 .launch_policy_signer
                 .as_deref()
                 .ok_or_else(|| error("missing configured native signer"))?,
-        )
-        .map_err(error)?;
+        )?;
         let policy = server
             .launch_policy
             .as_deref()

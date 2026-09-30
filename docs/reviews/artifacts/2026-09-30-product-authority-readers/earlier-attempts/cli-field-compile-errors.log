@@ -1,0 +1,38 @@
+error[E0026]: variant `reader::ReadError::MalformedJson` does not have a field named `detail`
+   --> crates/products/chio-cli/src/bin/../cli/replay/reader.rs:388:17
+    |
+388 |                 detail,
+    |                 ^^^^^^
+    |                 |
+    |                 variant `reader::ReadError::MalformedJson` does not have this field
+    |                 help: `reader::ReadError::MalformedJson` has a field named `source`
+
+
+error[E0027]: pattern does not mention field `source`
+   --> crates/products/chio-cli/src/bin/../cli/replay/reader.rs:385:13
+    |
+385 | /             ReadError::MalformedJson {
+386 | |                 path: p,
+387 | |                 line,
+388 | |                 detail,
+389 | |             } => {
+    | |_____________^ missing field `source`
+    |
+help: include the missing field in the pattern
+    |
+388 -                 detail,
+389 -             } => {
+388 +                 detail, source } => {
+    |
+help: if you don't care about this missing field, you can explicitly ignore it
+    |
+388 -                 detail,
+389 -             } => {
+388 +                 detail, source: _ } => {
+    |
+help: or always ignore missing fields here
+    |
+388 -                 detail,
+389 -             } => {
+388 +                 detail, .. } => {
+    |

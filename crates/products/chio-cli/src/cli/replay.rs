@@ -169,7 +169,11 @@ fn run_log_replay(
     })?;
     let iter = match reader.iter() {
         Ok(it) => it,
-        Err(ReadError::MalformedJson { line, detail, .. }) => {
+        Err(ReadError::MalformedJson {
+            line,
+            source: detail,
+            ..
+        }) => {
             // The reader buffers the whole file before yielding, so a malformed
             // line surfaces here at iter()-creation time. `receipt_index` is
             // pinned to 0 (the iter never started); the real position lives in
@@ -193,6 +197,11 @@ fn run_log_replay(
                 exit_code_for(DivergenceKind::ParseError),
             ));
         }
+        Err(ReadError::Limit) => {
+            return Err(CliError::replay_trace_error(
+                "receipt corpus exceeds its byte or record bound",
+            ))
+        }
         Err(ReadError::Empty(p)) => {
             return Err(CliError::replay_mismatch_error(format!(
                 "empty receipt log: {}",
@@ -212,7 +221,11 @@ fn run_log_replay(
     for (index, item) in iter.enumerate() {
         let value = match item {
             Ok(v) => v,
-            Err(ReadError::MalformedJson { line, detail, .. }) => {
+            Err(ReadError::MalformedJson {
+                line,
+                source: detail,
+                ..
+            }) => {
                 let divergence = Divergence {
                     kind: DivergenceKind::ParseError,
                     receipt_index: index,
@@ -231,6 +244,11 @@ fn run_log_replay(
                     divergence,
                     exit_code_for(DivergenceKind::ParseError),
                 ));
+            }
+            Err(ReadError::Limit) => {
+                return Err(CliError::replay_trace_error(
+                    "receipt corpus exceeds its byte or record bound",
+                ))
             }
             Err(ReadError::Empty(p)) => {
                 return Err(CliError::replay_mismatch_error(format!(

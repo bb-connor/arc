@@ -75,7 +75,7 @@ pub(crate) fn read_document<T: serde::de::DeserializeOwned>(path: &Path) -> Resu
     // Worker envelopes are ordinary JSON, including integer-valued floats.
     // Reject duplicate keys and lossy number parsing without changing the
     // stricter canonical signed-receipt parser.
-    serde_json::from_value(checked_json::parse(&text)?).map_err(fail)
+    crate::input::project(checked_json::parse(&text)?)
 }
 
 pub(crate) fn cmd_verify_process_response(

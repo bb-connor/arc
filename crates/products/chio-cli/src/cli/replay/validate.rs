@@ -29,6 +29,8 @@ const SUPPORTED_REDACTION_PASS_ID: &str = chio_replay_corpus::DEFAULT_REDACTION_
 /// Categorized validation failure for a single frame.
 #[derive(Debug, thiserror::Error)]
 pub enum ValidateError {
+    #[error("invocation input rejected: {0}")]
+    Input(#[from] chio_core::canonical::UntrustedJsonError),
     /// Frame `schema_version` is not the pinned literal `"1"`, or the
     /// pinned schema name does not match the caller-supplied
     /// `--schema` flag.
@@ -59,7 +61,9 @@ impl ValidateError {
     /// Map this error to the canonical exit code.
     pub fn exit_code(&self) -> i32 {
         match self {
-            Self::SchemaVersion(_) | Self::Schema(_) | Self::Invocation(_) => EXIT_SCHEMA_MISMATCH,
+            Self::Input(_) | Self::SchemaVersion(_) | Self::Schema(_) | Self::Invocation(_) => {
+                EXIT_SCHEMA_MISMATCH
+            }
             Self::TenantSig(_) => EXIT_BAD_TENANT_SIG,
             Self::Redaction(_) => EXIT_REDACTION_MISMATCH,
         }
@@ -227,9 +231,9 @@ pub fn validate_invocation_canonical(frame: &chio_tee_frame::Frame) -> Result<()
             .map_err(|e| ValidateError::Invocation(format!("deserialize ToolInvocation: {e}")))?;
 
     // Canonical-JSON round-trip stability proof. Re-encoding the
-    // typed value yields the canonical bytes; re-encoding the original
-    // `serde_json::Value` MUST match. Mismatch implies the wire bytes
-    // were not in canonical form to begin with.
+    // typed value must agree with the already parsed original value. This
+    // checks the supported field set; it cannot prove original wire formatting.
+    // The nested argument byte string has its own exact canonical check below.
     let typed_bytes = chio_core::canonical::canonical_json_bytes(&invocation)
         .map_err(|e| ValidateError::Invocation(format!("canonicalize typed invocation: {e}")))?;
     let raw_bytes = chio_core::canonical::canonical_json_bytes(&frame.invocation).map_err(|e| {
@@ -240,19 +244,11 @@ pub fn validate_invocation_canonical(frame: &chio_tee_frame::Frame) -> Result<()
             "invocation is not RFC 8785 canonical (typed/raw byte mismatch)".to_string(),
         ));
     }
-    let arguments: serde_json::Value =
-        serde_json::from_slice(&invocation.arguments).map_err(|e| {
-            ValidateError::Invocation(format!("invocation.arguments not valid JSON: {e}"))
-        })?;
-    let canonical_arguments =
-        chio_core::canonical::canonical_json_bytes(&arguments).map_err(|e| {
-            ValidateError::Invocation(format!("canonicalize invocation.arguments: {e}"))
-        })?;
-    if canonical_arguments != invocation.arguments {
-        return Err(ValidateError::Invocation(
-            "invocation.arguments is not RFC 8785 canonical JSON".to_string(),
-        ));
-    }
+    let _: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        &invocation.arguments,
+        super::ndjson::MAX_LINE_BYTES,
+    )?
+    .decode_canonical()?;
     Ok(())
 }
 
@@ -498,8 +494,11 @@ mod replay_validate_tests {
         let frame = good_frame_with_invocation(serde_json::from_slice(&bytes).unwrap());
 
         let err = validate_invocation_canonical(&frame).unwrap_err();
-        assert!(matches!(err, ValidateError::Invocation(_)));
-        assert!(err.to_string().contains("arguments"));
+        assert!(matches!(
+            err,
+            ValidateError::Input(chio_core::canonical::UntrustedJsonError::NonCanonical)
+        ));
+        assert_eq!(err.exit_code(), EXIT_SCHEMA_MISMATCH);
     }
 
     #[test]

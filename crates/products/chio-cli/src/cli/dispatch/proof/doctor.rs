@@ -1493,7 +1493,7 @@ fn check_proof_room_bundle(path: &Path) -> ProofDoctorCheck {
 fn check_proof_room_bundle_with_id(id: impl Into<String>, path: &Path) -> ProofDoctorCheck {
     let id = id.into();
     match chio_proof_room::verify_proof_room_bundle(path) {
-        Ok(()) => passed(id, path, "Proof Room bundle binds verifier report hash"),
+        Ok(_verified) => passed(id, path, "Proof Room bundle binds verifier report hash"),
         Err(error) => failed(id, path, error.to_string()),
     }
 }

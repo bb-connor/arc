@@ -12,6 +12,7 @@ impl EngineDouble {
             .lock()
             .map_err(|_| "engine fixture lock poisoned")?;
         let root = tempfile::tempdir()?;
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700))?;
         let executable = root.path().join("docker.py");
         std::fs::write(
             &executable,

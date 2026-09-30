@@ -5,8 +5,7 @@ const PROOF_ROOM_BUNDLE_SCHEMA: &str = "chio.proof-room.bundle.v1";
 const PROOF_ROOM_VERIFIER_REPORT_SCHEMA: &str = "chio.proof-room.verifier-report.v1";
 const PROOF_ROOM_DSSE_PAYLOAD_TYPE: &str = "application/vnd.chio.proof-room.bundle.v1+json";
 const PROOF_ROOM_BUNDLE_SIGNATURE_PATH: &str = "bundle-signature.dsse.json";
-const PROOF_ROOM_PENDING_BUNDLE_SIGNATURE_PATH: &str =
-    ".bundle-signature.dsse.json.pending";
+const PROOF_ROOM_PENDING_BUNDLE_SIGNATURE_PATH: &str = ".bundle-signature.dsse.json.pending";
 const PROOF_ROOM_TRUST_ROOTS_PATH: &str = "artifacts/authority/trust-roots.json";
 const PROOF_ROOM_TRUST_ROOTS_SCHEMA: &str = "chio.proof.first-run.trust-roots.v1";
 pub(super) const PROOF_COLLECT_BUNDLE_SIGNER_SEED_HEX_ENV: &str =
@@ -183,12 +182,10 @@ fn seal_collected_proof_bundle_with_fixture_id(
             enforce_collect_kind_requirements(kind, &read_only_report)?;
             (read_only_report.clone(), Some(read_only_report))
         }
-        SealVerificationMode::IsolatedFixture => {
-            (
-                fixture::verify_fixture_transaction_passport_file(&passport_path)?,
-                None,
-            )
-        }
+        SealVerificationMode::IsolatedFixture => (
+            fixture::verify_fixture_transaction_passport_file(&passport_path)?,
+            None,
+        ),
     };
     enforce_collect_kind_requirements(kind, &verification_report)?;
     let signature_path = match verification_mode {
@@ -196,9 +193,7 @@ fn seal_collected_proof_bundle_with_fixture_id(
             invalidate_collected_proof_room_bundle(bundle)?;
             bundle.join(PROOF_ROOM_PENDING_BUNDLE_SIGNATURE_PATH)
         }
-        SealVerificationMode::IsolatedFixture => {
-            bundle.join(PROOF_ROOM_BUNDLE_SIGNATURE_PATH)
-        }
+        SealVerificationMode::IsolatedFixture => bundle.join(PROOF_ROOM_BUNDLE_SIGNATURE_PATH),
     };
     let report = collected_verifier_report(bundle, verification_report)?;
     let verifier_report_path = bundle.join("verifier/report.json");
@@ -206,13 +201,7 @@ fn seal_collected_proof_bundle_with_fixture_id(
         fs::create_dir_all(parent)?;
     }
     write_json_line_file(&verifier_report_path, &report)?;
-    write_collected_proof_room_bundle(
-        bundle,
-        &report,
-        kind,
-        public_fixture_id,
-        &signature_path,
-    )?;
+    write_collected_proof_room_bundle(bundle, &report, kind, public_fixture_id, &signature_path)?;
     sync_collected_proof_room_bundle(bundle)?;
     if let Some(read_only_report) = replay_snapshot {
         let pending_signature_path = bundle.join(PROOF_ROOM_PENDING_BUNDLE_SIGNATURE_PATH);
@@ -1115,8 +1104,9 @@ fn collected_receipt_coverage(
         if !is_terminal_receipt_schema(&node.schema) {
             continue;
         }
-        chio_proof_room::validate_proof_room_bundle_relative_path(&node.path)
-            .map_err(CliError::cli_other_error)?;
+        chio_proof_room::validate_proof_room_bundle_relative_path(&node.path).map_err(|error| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_OTHER, error)
+        })?;
         let source_path = bundle.join(&node.path);
         if !source_path.is_file() {
             continue;

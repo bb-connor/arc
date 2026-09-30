@@ -191,10 +191,9 @@ fn verify_with_broker_config(
     let process = evidence.context["process_id"]
         .as_str()
         .ok_or_else(|| error("missing process"))?;
-    let cap: CapabilityToken = serde_json::from_value(
+    let cap: CapabilityToken = crate::input::project(
         evidence.bootstrap.action.parameters["capabilities"][process].clone(),
-    )
-    .map_err(error)?;
+    )?;
     require(
         evidence.context["capability_id"] == cap.id,
         "call capability differs from provisioning",
@@ -296,9 +295,7 @@ fn verify_operation_with_runtime(
         .ok_or_else(|| error("missing call metadata"))?;
     let projection = metadata
         .get("admission_operation")
-        .map(|value| {
-            serde_json::from_value::<AdmissionReceiptMetadataV1>(value.clone()).map_err(error)
-        })
+        .map(|value| crate::input::project::<AdmissionReceiptMetadataV1>(value.clone()))
         .transpose()?;
     let owned = &metadata["chio_runtime"]["operation_owned_replay"];
     let Some(operation) = operation else {
@@ -409,12 +406,9 @@ fn verify_operation_with_runtime(
     let reference = if owned.is_null() {
         None
     } else {
-        Some(
-            serde_json::from_value::<RuntimeParticipantClaimReferenceV1>(
-                owned["reference"].clone(),
-            )
-            .map_err(error)?,
-        )
+        Some(crate::input::project::<RuntimeParticipantClaimReferenceV1>(
+            owned["reference"].clone(),
+        )?)
     };
     let mut episodes = BTreeSet::new();
     let mut retained = 0;
@@ -481,8 +475,7 @@ pub(super) fn verify_file(
 ) -> Result<(), CliError> {
     let key = crate::load_trusted_kernel_pubkey(key).map_err(error)?;
     let signed = crate::receipt_verify::verify_original_receipt(&text(path)?, &key)?;
-    let evidence: Evidence =
-        serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
+    let evidence: Evidence = crate::input::project(signed.action.parameters.clone())?;
     let expected_request: Value = crate::process_response_verify::read_document(request)?;
     let expected_context: Value = crate::process_response_verify::read_document(context)?;
     require(
@@ -507,12 +500,11 @@ pub(super) fn verify_file(
         broker_config.as_ref(),
         keylog.as_ref(),
     )?;
-    let call: ChioReceipt = serde_json::from_str(
+    let call: ChioReceipt = crate::input::text(
         evidence.response["receipt_json"]
             .as_str()
             .ok_or_else(|| error("missing call receipt"))?,
-    )
-    .map_err(error)?;
+    )?;
     let original_custody = call
         .metadata
         .as_ref()

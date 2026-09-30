@@ -29,7 +29,13 @@ pub(crate) async fn spawn_reserved_hold_reaper(state: &Arc<ProxyState>) {
         ticker.tick().await;
         loop {
             ticker.tick().await;
-            let now = chrono::Utc::now().timestamp();
+            let now = match reaper_state.clock.signed_seconds() {
+                Ok(now) => now,
+                Err(error) => {
+                    warn!("reserved-hold reaper clock failed: {error}");
+                    continue;
+                }
+            };
             match reap_expired_reserved_holds_once(&reaper_state, now).await {
                 Ok(0) => {}
                 Ok(released) => {
@@ -185,18 +191,20 @@ impl SqliteReceiptStore {
     pub(crate) fn load_receipts(&self) -> Result<Vec<HttpReceipt>, ProtectError> {
         let mut statement = self
             .connection
-            .prepare("SELECT receipt_json FROM http_receipts ORDER BY rowid ASC")
+            .prepare("SELECT CASE WHEN typeof(receipt_json) = 'text' AND length(CAST(receipt_json AS BLOB)) <= ?1 THEN receipt_json ELSE NULL END FROM http_receipts ORDER BY rowid ASC")
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
         let rows = statement
-            .query_map([], |row| row.get::<_, String>(0))
+            .query_map([input::MAX_RECEIPT_BYTES as i64], |row| {
+                row.get::<_, String>(0)
+            })
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
 
         let mut receipts = Vec::new();
         for row in rows {
             let receipt_json =
                 row.map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-            let receipt: HttpReceipt = serde_json::from_str(&receipt_json)
-                .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+            let receipt: HttpReceipt =
+                input::decode(receipt_json.as_bytes(), input::MAX_RECEIPT_BYTES)?;
             receipts.push(receipt);
         }
         Ok(receipts)
@@ -205,18 +213,20 @@ impl SqliteReceiptStore {
     pub(crate) fn load_tool_receipts(&self) -> Result<Vec<ChioReceipt>, ProtectError> {
         let mut statement = self
             .connection
-            .prepare("SELECT receipt_json FROM tool_receipts ORDER BY rowid ASC")
+            .prepare("SELECT CASE WHEN typeof(receipt_json) = 'text' AND length(CAST(receipt_json AS BLOB)) <= ?1 THEN receipt_json ELSE NULL END FROM tool_receipts ORDER BY rowid ASC")
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
         let rows = statement
-            .query_map([], |row| row.get::<_, String>(0))
+            .query_map([input::MAX_RECEIPT_BYTES as i64], |row| {
+                row.get::<_, String>(0)
+            })
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
 
         let mut receipts = Vec::new();
         for row in rows {
             let receipt_json =
                 row.map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-            let receipt: ChioReceipt = serde_json::from_str(&receipt_json)
-                .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+            let receipt: ChioReceipt =
+                input::decode(receipt_json.as_bytes(), input::MAX_RECEIPT_BYTES)?;
             receipts.push(receipt);
         }
         Ok(receipts)
@@ -225,6 +235,10 @@ impl SqliteReceiptStore {
     pub(crate) fn append(&mut self, receipt: &HttpReceipt) -> Result<(), ProtectError> {
         let receipt_json = serde_json::to_string(receipt)
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            receipt_json.as_bytes(),
+            input::MAX_RECEIPT_BYTES,
+        )?;
         self.connection
             .execute(
                 "INSERT OR REPLACE INTO http_receipts (id, receipt_json) VALUES (?1, ?2)",
@@ -240,6 +254,10 @@ impl SqliteReceiptStore {
     ) -> Result<(), ProtectError> {
         let receipt_json = serde_json::to_string(receipt)
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        chio_core_types::canonical::UntrustedJsonText::from_wire(
+            receipt_json.as_bytes(),
+            input::MAX_RECEIPT_BYTES,
+        )?;
         self.connection
             .execute(
                 "INSERT OR REPLACE INTO tool_receipts (id, receipt_json) VALUES (?1, ?2)",
@@ -278,62 +296,9 @@ impl SqliteReceiptStore {
     }
 }
 
-/// Bounded, TTL-keyed set of request ids claimed for a live reservation window.
-///
-/// A request id must be unique only for the lifetime of the reservation it
-/// backs: the kernel derives the durable budget-hold identity from it, so a
-/// reused id inside the window would collapse into an idempotent authorize with
-/// no fresh reservation and defeat the over-subscription guard. Once the
-/// execution-nonce TTL lapses the hold is reconciled or reaped, so the id may be
-/// reused. Each entry carries that expiry and is pruned lazily on every
-/// mutation, bounding the set to the reservations opened within one TTL window
-/// instead of growing without limit.
-pub(crate) struct MintedRequestIdWindow {
-    ttl_secs: i64,
-    expiries: HashMap<String, i64>,
-}
-
-impl MintedRequestIdWindow {
-    pub(crate) fn new(ttl_secs: u64) -> Self {
-        Self {
-            ttl_secs: ttl_secs as i64,
-            expiries: HashMap::new(),
-        }
-    }
-
-    /// Claim `request_id` for a reservation opening at `now`. Prunes expired
-    /// entries first, then admits the id only when it is not already live inside
-    /// its window. Returns `false` for a reuse inside a live window, which the
-    /// caller maps to a fail-closed 409.
-    pub(crate) fn claim(&mut self, request_id: &str, now: i64) -> bool {
-        self.prune(now);
-        if self.expiries.contains_key(request_id) {
-            return false;
-        }
-        self.expiries
-            .insert(request_id.to_string(), now.saturating_add(self.ttl_secs));
-        true
-    }
-
-    /// Release a claimed id. Called when the authorization placed no durable
-    /// hold (denied, pending, or errored) so a failed attempt does not
-    /// permanently burn the id.
-    pub(crate) fn release(&mut self, request_id: &str) {
-        self.expiries.remove(request_id);
-    }
-
-    fn prune(&mut self, now: i64) {
-        self.expiries.retain(|_, expiry| *expiry > now);
-    }
-
-    #[cfg(test)]
-    pub(crate) fn len(&self) -> usize {
-        self.expiries.len()
-    }
-}
-
 /// Shared proxy state.
 pub(crate) struct ProxyState {
+    pub(crate) clock: clock::ProxyClock,
     pub(crate) evaluator: RequestEvaluator,
     pub(crate) signer_keypair: Keypair,
     pub(crate) upstream: String,
@@ -693,6 +658,7 @@ impl ProtectProxy {
             None => None,
         };
 
+        let clock = clock::ProxyClock::default();
         let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
             routes,
             keypair.clone(),
@@ -703,6 +669,7 @@ impl ProtectProxy {
             revocation_store.clone(),
             durable_admission.clone(),
             self.config.allow_ephemeral_receipts,
+            Arc::new(clock.clone()),
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
         let receipt_backend = evaluator.receipt_backend();
@@ -813,6 +780,7 @@ impl ProtectProxy {
                     Vec::new(),
                     payment_adapter,
                     durable_admission,
+                    Arc::new(clock.clone()),
                 )?;
                 if let Some(executor) = self.caller_executor {
                     if !kernel.has_durable_admission_store() {
@@ -850,6 +818,7 @@ impl ProtectProxy {
         };
 
         let state = Arc::new(ProxyState {
+            clock,
             evaluator,
             signer_keypair: keypair,
             upstream: self.config.upstream.clone(),
@@ -1207,5 +1176,68 @@ mod tests {
             proxy_drain_timeout(DEFAULT_UPSTREAM_REQUEST_TIMEOUT),
             DEFAULT_DRAIN_TIMEOUT
         );
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod reservation_boundary_tests {
+    use super::*;
+
+    #[test]
+    fn reservation_capacity_preserves_live_ids_and_reclaims_only_expired_ids() {
+        let mut window = MintedRequestIdWindow::new(30);
+        for id in 0..MAX_LIVE_REQUEST_IDS {
+            assert_eq!(window.claim(&id.to_string(), 1000).map(|_| ()), Ok(()));
+        }
+        assert_eq!(
+            window.claim("extra", 1000),
+            Err(RequestIdClaimError::Capacity)
+        );
+        assert_eq!(window.claim("0", 1000), Err(RequestIdClaimError::Reused));
+        assert_eq!(window.len(), MAX_LIVE_REQUEST_IDS);
+        assert_eq!(window.claim("extra", 1030).map(|_| ()), Ok(()));
+        assert_eq!(window.len(), 1);
+    }
+
+    #[test]
+    fn invalid_time_cannot_prune_or_claim_reservations() {
+        for (ttl, now) in [(0, 1), (u64::MAX, 1), (30, i64::MAX), (30, -1)] {
+            let mut window = MintedRequestIdWindow::new(ttl);
+            assert_eq!(window.claim("id", now), Err(RequestIdClaimError::Time));
+            assert_eq!(window.len(), 0);
+        }
+        let mut window = MintedRequestIdWindow::new(30);
+        assert_eq!(window.claim("id", 100).map(|_| ()), Ok(()));
+        assert_eq!(window.claim("another", 99), Err(RequestIdClaimError::Time));
+        assert_eq!(window.claim("id", 100), Err(RequestIdClaimError::Reused));
+    }
+
+    #[test]
+    fn stored_receipts_reject_original_duplicates_and_oversized_rows() {
+        let store = SqliteReceiptStore::open(":memory:").unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO http_receipts VALUES ('duplicate', ?1)",
+                [r#"{"private-marker":1,"private-marker":2}"#],
+            )
+            .unwrap();
+        assert!(matches!(store.load_receipts(), Err(ProtectError::Input(_))));
+        store
+            .connection
+            .execute("DELETE FROM http_receipts", [])
+            .unwrap();
+        store
+            .connection
+            .execute(
+                "INSERT INTO http_receipts VALUES ('oversized', ?1)",
+                ["x".repeat(input::MAX_RECEIPT_BYTES + 1)],
+            )
+            .unwrap();
+        assert!(matches!(
+            store.load_receipts(),
+            Err(ProtectError::ReceiptStore(_))
+        ));
     }
 }

@@ -14,8 +14,11 @@ impl StructuredClassifier for BrokerBodyClassifier {
         // The ordinary classifier applies its payload and finding ceilings to
         // the complete original envelope before we allocate a decoded body.
         let envelope = self.0.classify(payload)?;
-        let value: serde_json::Value = serde_json::from_slice(payload)
-            .map_err(|_| StructuredClassificationError::InvalidLocation)?;
+        let value: serde_json::Value = crate::input::decode(
+            payload,
+            chio_security_types::ports::MAX_CLASSIFICATION_PAYLOAD_BYTES,
+        )
+        .map_err(|_| StructuredClassificationError::InvalidLocation)?;
         let field = if value.pointer("/request/body").is_some() {
             "/request/body"
         } else {
@@ -55,7 +58,13 @@ mod tests {
     fn large_broker_body_preserves_complete_classification_and_original_digest(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let classifier = BrokerBodyClassifier(RegexStructuredClassifier::new(
-            "broker-body", "1", vec![RegexClassificationRule::new("private", "PRIVATE_INPUT", 10000)?],
+            "broker-body",
+            "1",
+            vec![RegexClassificationRule::new(
+                "private",
+                "PRIVATE_INPUT",
+                10000,
+            )?],
         )?);
         for output in ["x".repeat(500_000), "\0".repeat(79_000)] {
             let body = serde_json::to_vec(&json!({"output": output, "marker": "PRIVATE_INPUT"}))?;
@@ -63,13 +72,23 @@ mod tests {
             assert!(envelope.len() > 1_048_576);
             let payload = chio_security_types::ports::ClassificationPayload::new(envelope)?;
             let result = classifier.classify(payload.as_bytes())?;
-            assert_eq!(result.payload_digest(), chio_core_types::sha256(payload.as_bytes()).as_bytes());
+            assert_eq!(
+                result.payload_digest(),
+                chio_core_types::sha256(payload.as_bytes()).as_bytes()
+            );
             assert_eq!(result.payload_len(), payload.as_bytes().len() as u64);
             assert_eq!(result.findings().len(), 1);
-            assert_eq!(result.findings()[0].location(), &FindingLocation::FieldPath("/body".into()));
+            assert_eq!(
+                result.findings()[0].location(),
+                &FindingLocation::FieldPath("/body".into())
+            );
         }
-        let oversized = vec![b'x'; chio_security_types::ports::MAX_CLASSIFICATION_PAYLOAD_BYTES + 1];
-        assert!(matches!(classifier.classify(&oversized), Err(StructuredClassificationError::PayloadTooLarge)));
+        let oversized =
+            vec![b'x'; chio_security_types::ports::MAX_CLASSIFICATION_PAYLOAD_BYTES + 1];
+        assert!(matches!(
+            classifier.classify(&oversized),
+            Err(StructuredClassificationError::PayloadTooLarge)
+        ));
         Ok(())
     }
 
@@ -108,6 +127,15 @@ mod tests {
         assert!(classifier.classify(br#"{"body":[256]}"#).is_err());
         assert!(classifier.classify(br#"{"body":"encoded bytes"}"#).is_err());
         assert!(classifier.classify(br#"{}"#).is_err());
+        for bytes in [
+            br#"{"body":[],"body":[65]}"#.as_slice(),
+            br#"{"request":{"body":[],"body":[65]}}"#,
+        ] {
+            assert!(matches!(
+                classifier.classify(bytes),
+                Err(StructuredClassificationError::InvalidLocation)
+            ));
+        }
         Ok(())
     }
 }

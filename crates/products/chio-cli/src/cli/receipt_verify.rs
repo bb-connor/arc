@@ -56,8 +56,7 @@ pub(crate) fn cmd_receipt_verify(
         }
         let text = std::str::from_utf8(&line)
             .map_err(|_| fail(format!("invalid receipt JSON at line {line_number}")))?;
-        verify_original_receipt(text, &key)
-            .map_err(|error| fail(format!("receipt line {line_number}: {error}")))?;
+        verify_original_receipt(text, &key)?;
         count += 1;
     }
     if count == 0 {
@@ -84,14 +83,14 @@ pub(crate) fn verify_original_receipt(
     key: &chio_core::PublicKey,
 ) -> Result<chio_core::receipt::body::ChioReceipt, CliError> {
     let fail = CliError::cli_other_error;
-    let canonical = chio_core::canonical::canonical_json_string_from_str(text)
-        .map_err(|_| fail("non-I-JSON receipt"))?;
-    let value: serde_json::Value =
-        serde_json::from_str(&canonical).map_err(|_| fail("invalid receipt JSON"))?;
-    let receipt: chio_core::receipt::body::ChioReceipt =
-        serde_json::from_value(value.clone()).map_err(|_| fail("invalid receipt schema"))?;
-    let supported = chio_core::canonical::canonical_json_string(&receipt)
-        .map_err(|_| fail("invalid receipt schema"))?;
+    let canonical = chio_core::canonical::UntrustedJsonText::from_wire(
+        text.as_bytes(),
+        MAX_LINE_BYTES as usize,
+    )?
+    .canonicalize()?;
+    let value: serde_json::Value = crate::input::decode(&canonical, MAX_LINE_BYTES as usize)?;
+    let receipt: chio_core::receipt::body::ChioReceipt = crate::input::project(value.clone())?;
+    let supported = chio_core::canonical::canonical_json_bytes(&receipt)?;
     if canonical != supported {
         return Err(fail(
             "receipt fields differ from the supported signed schema",

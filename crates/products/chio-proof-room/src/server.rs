@@ -129,7 +129,7 @@ pub fn proof_room_router_with_optional_ui_root(
     fixture_root: Option<PathBuf>,
 ) -> Result<Router, ProofRoomError> {
     let allowed_bundle_paths = if bundle.join("manifest.json").exists() {
-        proof_room_served_bundle_paths(&bundle).map_err(ProofRoomError::Validation)?
+        proof_room_served_bundle_paths(&bundle)?
     } else {
         BTreeSet::new()
     };
@@ -179,6 +179,19 @@ async fn proof_room_view_redirect() -> Redirect {
     Redirect::temporary("/proof-room?view=proof-room")
 }
 
+#[derive(Debug, thiserror::Error)]
+enum UploadVerificationError {
+    #[error("proof-room.upload.invalid-input")]
+    Upload { status: StatusCode, detail: String },
+    #[error("proof-room.upload.verification-rejected")]
+    Verification(#[from] ProofRoomError),
+}
+impl From<(StatusCode, String)> for UploadVerificationError {
+    fn from((status, detail): (StatusCode, String)) -> Self {
+        Self::Upload { status, detail }
+    }
+}
+
 async fn proof_room_upload_verify(headers: HeaderMap, body: Bytes) -> Response {
     match verify_uploaded_proof_room_bundle(&headers, &body) {
         Ok(bundle_id) => proof_room_upload_verification_response(
@@ -187,19 +200,31 @@ async fn proof_room_upload_verify(headers: HeaderMap, body: Bytes) -> Response {
             None,
             Some(bundle_id),
         ),
-        Err((status, error)) => {
-            proof_room_upload_verification_response(status, "failed", Some(error), None)
+        Err(error) => {
+            let status = match &error {
+                UploadVerificationError::Upload { status, .. } => *status,
+                UploadVerificationError::Verification(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            let mut response = proof_room_upload_verification_response(
+                status,
+                "failed",
+                Some(error.to_string()),
+                None,
+            );
+            response.extensions_mut().insert(std::sync::Arc::new(error));
+            response
         }
     }
 }
 
-fn verify_uploaded_proof_room_bundle(headers: &HeaderMap, body: &[u8]) -> UploadResult<String> {
+fn verify_uploaded_proof_room_bundle(
+    headers: &HeaderMap,
+    body: &[u8],
+) -> Result<String, UploadVerificationError> {
     let upload = UploadedProofRoomBundle::create().map_err(upload_io_error)?;
     write_uploaded_proof_room_bundle(headers, body, upload.path())?;
-    let manifest_path = upload.path().join("manifest.json");
-    super::verify_proof_room_bundle(&manifest_path)
-        .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error.to_string()))?;
-    uploaded_bundle_id(&manifest_path).map_err(upload_io_error)
+    let verified = super::verify_proof_room_bundle(&upload.path().join("manifest.json"))?;
+    Ok(verified.bundle_id().to_owned())
 }
 
 fn write_uploaded_proof_room_bundle(
@@ -207,12 +232,29 @@ fn write_uploaded_proof_room_bundle(
     body: &[u8],
     root: &Path,
 ) -> UploadResult<()> {
+    if body.len() > 32 * 1024 * 1024 {
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "proof-room.upload.byte-limit".into(),
+        ));
+    }
     let mut file_count = 0usize;
     let mut paths = BTreeSet::new();
     let boundary = multipart_boundary(headers)?;
-    for (relative_path, bytes) in parse_uploaded_multipart(body, &boundary)? {
+    let parts = parse_uploaded_multipart(body, &boundary)?;
+    crate::input::validate_upload_paths(&parts)
+        .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
+    for (relative_path, bytes) in parts {
+        if file_count >= crate::input::MAX_BUNDLE_FILES
+            || bytes.len() > crate::input::MAX_ARTIFACT_BYTES
+        {
+            return Err((
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "proof-room.upload.artifact-limit".into(),
+            ));
+        }
         super::validate_bundle_relative_path(&relative_path)
-            .map_err(|error| (StatusCode::BAD_REQUEST, error))?;
+            .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
         if !paths.insert(relative_path.clone()) {
             return Err((
                 StatusCode::BAD_REQUEST,
@@ -364,16 +406,6 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
         .position(|window| window == needle)
-}
-
-fn uploaded_bundle_id(manifest_path: &Path) -> Result<String, std::io::Error> {
-    let manifest: serde_json::Value =
-        serde_json::from_slice(&fs::read(manifest_path)?).map_err(std::io::Error::other)?;
-    Ok(manifest
-        .get("bundle_id")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown")
-        .to_string())
 }
 
 fn proof_room_upload_verification_response(
@@ -549,9 +581,11 @@ async fn proof_room_bundle_asset_response(
         Ok(path) => path,
         Err(error) => return (StatusCode::NOT_FOUND, error).into_response(),
     };
-    let bytes = match tokio::fs::read(path).await {
+    let bytes = match crate::input::read_async(path).await {
         Ok(bytes) => bytes,
-        Err(error) => return (StatusCode::NOT_FOUND, error.to_string()).into_response(),
+        Err(_error) => {
+            return (StatusCode::NOT_FOUND, "proof-room.asset.unavailable").into_response()
+        }
     };
     (
         StatusCode::OK,
@@ -567,7 +601,7 @@ async fn proof_room_ui_asset_response(ui_dir: &Path, asset_path: &str) -> Respon
     };
     if let Ok(path) = resolve_proof_room_served_asset_path(ui_dir, &asset_path) {
         if path.is_file() {
-            if let Ok(bytes) = tokio::fs::read(path).await {
+            if let Ok(bytes) = crate::input::read_async(path).await {
                 return (
                     StatusCode::OK,
                     [(CONTENT_TYPE, proof_room_content_type(&asset_path))],
@@ -578,14 +612,14 @@ async fn proof_room_ui_asset_response(ui_dir: &Path, asset_path: &str) -> Respon
         }
     }
     let index = ui_dir.join("index.html");
-    match tokio::fs::read(index).await {
+    match crate::input::read_async(index).await {
         Ok(bytes) => (
             StatusCode::OK,
             [(CONTENT_TYPE, "text/html; charset=utf-8")],
             bytes,
         )
             .into_response(),
-        Err(error) => (StatusCode::NOT_FOUND, error.to_string()).into_response(),
+        Err(_error) => (StatusCode::NOT_FOUND, "proof-room.asset.unavailable").into_response(),
     }
 }
 
@@ -683,8 +717,8 @@ pub fn parse_listen_addr(value: &str) -> Result<SocketAddr, ProofRoomError> {
 
 pub fn proof_room_served_bundle_paths(static_root: &Path) -> Result<BTreeSet<String>, String> {
     let manifest_path = static_root.join("manifest.json");
-    let manifest: serde_json::Value = serde_json::from_slice(
-        &fs::read(&manifest_path)
+    let manifest: serde_json::Value = crate::input::decode(
+        &crate::input::read(&manifest_path)
             .map_err(|error| format!("proof-room.serve.manifest-read: {error}"))?,
     )
     .map_err(|error| format!("proof-room.serve.manifest-json: {error}"))?;
@@ -795,11 +829,11 @@ fn insert_negative_case_manifest_paths(
     let Some((negative_dir, _passport_file)) = negative_path.rsplit_once('/') else {
         return Ok(());
     };
-    let passport_bytes = fs::read(static_root.join(&negative_path)).map_err(|error| {
+    let passport_bytes = crate::input::read(static_root.join(&negative_path)).map_err(|error| {
         format!("proof-room.serve.negative-passport-read: {negative_path}: {error}")
     })?;
     let passport: chio_transaction_passport::TransactionPassport =
-        serde_json::from_slice(&passport_bytes).map_err(|error| {
+        crate::input::decode(&passport_bytes).map_err(|error| {
             format!("proof-room.serve.negative-passport-json: {negative_path}: {error}")
         })?;
     let evidence_graph_path =
@@ -809,9 +843,10 @@ fn insert_negative_case_manifest_paths(
     insert_served_bundle_path(paths, &evidence_graph_path)?;
     insert_served_bundle_path(paths, &verifier_policy_path)?;
 
-    let graph_bytes = fs::read(static_root.join(&evidence_graph_path)).map_err(|error| {
-        format!("proof-room.serve.negative-evidence-graph-read: {evidence_graph_path}: {error}")
-    })?;
+    let graph_bytes =
+        crate::input::read(static_root.join(&evidence_graph_path)).map_err(|error| {
+            format!("proof-room.serve.negative-evidence-graph-read: {evidence_graph_path}: {error}")
+        })?;
     let graph =
         parse_embedded_evidence_graph(&graph_bytes, "proof-room.serve.negative-evidence-graph")
             .map_err(|error| {

@@ -1,0 +1,27 @@
+{
+  "status": "locally_verified",
+  "tests": {
+    "api_protect_lib": 217,
+    "proof_room_lib": 108,
+    "cli_focused": 196,
+    "http_authority": 35,
+    "sealed_result_compile_fail": 1
+  },
+  "total_passed": 557,
+  "failed": 0,
+  "ignored": 0,
+  "source_gates": {
+    "trust_boundaries": 0,
+    "rust_file_hygiene": 0,
+    "changed_rust_format": 0,
+    "security_clocks": 0,
+    "accounting_arithmetic": 0,
+    "negative_assertions": 0,
+    "wire_schemas": 0
+  },
+  "baseline_files_before": 278,
+  "baseline_files_after": 250,
+  "hosted_qualified": false,
+  "pushed": false,
+  "m5_complete": false
+}

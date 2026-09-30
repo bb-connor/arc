@@ -16,6 +16,7 @@ name = "chio_api_protect"
 public_entrypoint = true
 
 [dependencies]
+chio-security-types = { workspace = true }
 async-trait = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-core-types = { workspace = true }

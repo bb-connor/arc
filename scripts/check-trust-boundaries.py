@@ -173,7 +173,8 @@ def check(root, catalog):
         errors.append("workspace decoder census changed; classify new files and entry points")
     contracts = catalog.get("decoder_file_contracts", {})
     for registry, label in (("reviewed_kernel_sqlite_owners", "kernel/SQLite"),
-                            ("reviewed_authority_owners", "authority")):
+                            ("reviewed_authority_owners", "authority"),
+                            ("reviewed_product_readers", "product reader")):
         for path, review in catalog.get(registry, {}).items():
             if path not in files or path not in catalog["signed_input_files"] or not review.get("contract"):
                 errors.append(f"reviewed {label} owner is unregistered: {path}")

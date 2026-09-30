@@ -197,16 +197,7 @@ pub(crate) async fn proxy_handler(
     };
     let execution_nonce = match extract_execution_nonce_from_maps(&headers) {
         Ok(nonce) => nonce,
-        Err(message) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(serde_json::json!({
-                    "error": "chio_bad_request",
-                    "message": message,
-                })),
-            )
-                .into_response();
-        }
+        Err(error) => return input::rejected(error),
     };
 
     if let Some(response) =

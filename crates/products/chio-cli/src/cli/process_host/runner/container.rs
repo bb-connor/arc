@@ -133,7 +133,10 @@ async fn control_attempt(arguments: &[&str]) -> Result<Vec<u8>, ControlFailure> 
 }
 
 fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, CliError> {
-    serde_json::from_slice(bytes).map_err(|_| error("invalid local Docker response"))
+    Ok(crate::input::decode(
+        bytes,
+        crate::input::MAX_DOCUMENT_BYTES,
+    )?)
 }
 
 #[derive(Deserialize)]

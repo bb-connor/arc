@@ -28,6 +28,7 @@ fn issuing_kernel(
             Vec::new(),
             None,
             None,
+            Arc::new(clock::ProxyClock::default()),
         )
         .test_unwrap(),
     )
@@ -198,9 +199,20 @@ fn mediated_test_state_core(
 /// Provision a fresh admission authority under `directory` for a durable
 /// mediation kernel.
 fn durable_admission_stores(directory: &std::path::Path) -> DurableAdmissionStores {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o700)).test_unwrap();
+    }
     let database = directory.join("admission.db");
     let locks = directory.join("locks");
-    std::fs::create_dir_all(&locks).test_unwrap();
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(&locks).test_unwrap();
     chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks).test_unwrap();
     let authority =
         chio_store_sqlite::SqliteAuthorityStore::open_serving(&database, &locks).test_unwrap();
@@ -253,10 +265,12 @@ fn mediated_test_state_with_durable_admission(
             Vec::new(),
             payment_adapter,
             durable_admission,
+            Arc::new(clock::ProxyClock::default()),
         )
         .test_unwrap(),
     );
     Arc::new(ProxyState {
+        clock: clock::ProxyClock::default(),
         evaluator,
         signer_keypair: signer,
         upstream: "http://127.0.0.1:1".to_string(),
@@ -1241,8 +1255,16 @@ fn mediation_kernel_installs_budget_store_and_strict_nonce_config() {
     let signer = Keypair::generate();
     let budget: Arc<dyn BudgetStore> =
         Arc::new(chio_kernel::budget_store::InMemoryBudgetStore::new());
-    let kernel =
-        build_mediation_kernel(&signer, Arc::clone(&budget), &[], Vec::new(), None, None).unwrap();
+    let kernel = build_mediation_kernel(
+        &signer,
+        Arc::clone(&budget),
+        &[],
+        Vec::new(),
+        None,
+        None,
+        Arc::new(clock::ProxyClock::default()),
+    )
+    .unwrap();
     // Strict nonce mode is what routes every mediated request through the
     // authorization-reserve path. DPoP verification state is installed here
     // too; the `mediated_dpop_capability_requires_valid_proof` integration
@@ -1377,26 +1399,18 @@ async fn mediated_authorization_needs_no_tool_server_registration() {
 #[test]
 fn minted_request_id_window_bounds_reuse_and_expiry() {
     let mut window = MintedRequestIdWindow::new(30);
-    // A fresh id is claimed; an immediate reuse inside the window is rejected.
-    assert!(window.claim("req-a", 1_000));
-    assert!(!window.claim("req-a", 1_000));
-    assert_eq!(window.len(), 1);
-
-    // Releasing an id (a denied/failed authorization) makes it reusable at once.
-    window.release("req-a");
+    let claim = window.claim("req-a", 1000).test_unwrap();
+    assert_eq!(
+        window.claim("req-a", 1000),
+        Err(RequestIdClaimError::Reused)
+    );
+    window.release(&claim);
     assert_eq!(window.len(), 0);
-    assert!(window.claim("req-a", 1_000));
-
-    // Distinct live ids accumulate, but a later claim prunes entries whose
-    // reservation TTL has lapsed, so the set stays bounded and an expired id
-    // is reusable again.
-    assert!(window.claim("req-b", 1_010));
+    window.claim("req-a", 1000).test_unwrap();
+    window.claim("req-b", 1010).test_unwrap();
+    window.claim("req-c", 1031).test_unwrap();
     assert_eq!(window.len(), 2);
-    // At 1_031, "req-a" (expires 1_030) is pruned; "req-b" (expires 1_040)
-    // is still live.
-    assert!(window.claim("req-c", 1_031));
-    assert_eq!(window.len(), 2);
-    assert!(window.claim("req-a", 1_031));
+    window.claim("req-a", 1031).test_unwrap();
     assert_eq!(window.len(), 3);
 }
 

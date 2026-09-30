@@ -20,12 +20,11 @@ pub(super) fn pins(values: &[String]) -> Result<BTreeMap<String, PublicKey>, Cli
 }
 
 fn response(call: &ChioReceipt) -> Result<ChioReceipt, CliError> {
-    serde_json::from_str(
+    crate::input::text(
         call.action.parameters["response"]["receipt_json"]
             .as_str()
             .ok_or_else(|| error("missing observed response receipt"))?,
     )
-    .map_err(error)
 }
 
 pub(super) fn verify(
@@ -176,8 +175,7 @@ pub(super) fn export(
                 .launch_policy_signer
                 .as_deref()
                 .ok_or_else(|| error("missing configured native signer"))?,
-        )
-        .map_err(error)?;
+        )?;
         let policy = server
             .launch_policy
             .as_deref()
@@ -200,8 +198,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn historical_signed_outcomes_do_not_qualify_current_enforcement()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn historical_signed_outcomes_do_not_qualify_current_enforcement(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
             include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
                 .trim(),
@@ -212,7 +210,7 @@ mod tests {
             include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"),
             &key,
         )?;
-        let selected: Value = serde_json::from_str(include_str!(
+        let selected: Value = crate::input::text(include_str!(
             "../../../../tests/fixtures/process-worker-outcomes/v2-budget-pins.json"
         ))?;
         let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]
@@ -242,8 +240,8 @@ mod tests {
     }
 
     #[test]
-    fn retained_crash_outcomes_bind_actual_launches_without_inventing_exits()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn retained_crash_outcomes_bind_actual_launches_without_inventing_exits(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
             include_str!("../../../../tests/fixtures/process-worker-outcomes/current-native-budget-kernel.pub")
                 .trim(),
@@ -254,7 +252,7 @@ mod tests {
             ),
             &key,
         )?;
-        let selected: Value = serde_json::from_str(include_str!(
+        let selected: Value = crate::input::text(include_str!(
             "../../../../tests/fixtures/process-worker-outcomes/current-native-budget-pins.json"
         ))?;
         let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]

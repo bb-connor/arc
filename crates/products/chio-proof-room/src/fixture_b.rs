@@ -105,7 +105,7 @@ pub(crate) fn embedded_risk_comptroller_report_value(
         "chio.risk.comptroller-report.v1",
         "risk comptroller",
     )?;
-    serde_json::from_slice(&bytes)
+    crate::input::decode(&bytes)
         .map_err(|error| format!("risk comptroller report JSON invalid: {error}"))
 }
 
@@ -245,7 +245,7 @@ pub(crate) fn embedded_json_artifact<T: for<'de> serde::Deserialize<'de>>(
     label: &str,
 ) -> Result<T, String> {
     let bytes = embedded_artifact_node_bytes(node, artifacts, expected_schema, label)?;
-    serde_json::from_slice(&bytes)
+    crate::input::decode(&bytes)
         .map_err(|error| format!("{label} artifact JSON invalid for {}: {error}", node.path))
 }
 
@@ -384,7 +384,7 @@ fn embedded_commerce_event_authority_receipts(
 }
 
 fn commerce_event_authority_receipt_refs(event_log_bytes: &[u8]) -> Result<Vec<String>, String> {
-    let event_log: serde_json::Value = serde_json::from_slice(event_log_bytes)
+    let event_log: serde_json::Value = crate::input::decode(event_log_bytes)
         .map_err(|error| format!("commerce event log JSON invalid: {error}"))?;
     let events = event_log
         .get("events")
@@ -438,7 +438,7 @@ fn embedded_commerce_mandate_protocol_payloads(
     mandate_ledger_bytes: &[u8],
 ) -> Result<Vec<chio_commerce_order::CommerceMandateProtocolPayload>, String> {
     let refs: EmbeddedCommerceMandateProtocolPayloadRefs =
-        serde_json::from_slice(mandate_ledger_bytes)
+        crate::input::decode(mandate_ledger_bytes)
             .map_err(|error| format!("commerce mandate payload refs invalid: {error}"))?;
     let mut payloads = Vec::with_capacity(refs.protocol_projections.len());
     for projection in refs.protocol_projections {
@@ -466,7 +466,7 @@ pub(crate) fn embedded_commerce_json_artifact<T: for<'de> serde::Deserialize<'de
 ) -> Result<T, String> {
     let bytes =
         embedded_single_role_artifact_bytes(nodes, artifacts, role, expected_schema, "commerce")?;
-    serde_json::from_slice(&bytes)
+    crate::input::decode(&bytes)
         .map_err(|error| format!("commerce artifact JSON invalid for {role}: {error}"))
 }
 
@@ -591,14 +591,13 @@ fn verify_embedded_disclosure_projection_manifest(
 ) -> Result<(), String> {
     type SelectiveDisclosureProof = chio_selective_disclosure::SelectiveDisclosureProof;
 
-    let proof =
-        serde_json::from_slice::<SelectiveDisclosureProof>(proof_bytes).map_err(|error| {
-            format!(
+    let proof = crate::input::decode::<SelectiveDisclosureProof>(proof_bytes).map_err(|error| {
+        format!(
             "proof-room.fixture.crypto-context-proof-invalid: source-disclosure-lineage: {error}"
         )
-        })?;
+    })?;
     let projection_manifest: chio_selective_disclosure::BbsProjectionManifest =
-        serde_json::from_slice(projection_manifest_bytes).map_err(|error| {
+        crate::input::decode(projection_manifest_bytes).map_err(|error| {
             format!(
                 "proof-room.fixture.projection-manifest-invalid: source-disclosure-lineage: {error}"
             )
@@ -772,7 +771,7 @@ pub(crate) fn embedded_public_settlement_proof_bundle(
         chio_web3::settlement_proof::CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_SCHEMA,
         "public settlement",
     )?;
-    serde_json::from_slice(&bytes)
+    crate::input::decode(&bytes)
         .map_err(|error| format!("public settlement proof bundle JSON invalid: {error}"))
 }
 
@@ -895,19 +894,20 @@ pub(crate) fn build_proof_room_fixture_catalog(
     installed_fixture_root: Option<&Path>,
 ) -> Result<ProofRoomFixtureCatalog, String> {
     let manifest_path = bundle.join("manifest.json");
-    let manifest_bytes = fs::read(&manifest_path)
+    let manifest_bytes = crate::input::read(&manifest_path)
         .map_err(|error| format!("proof-room.catalog.manifest: {error}"))?;
-    let manifest: ProofRoomBundleManifest = serde_json::from_slice(&manifest_bytes)
+    let manifest: ProofRoomBundleManifest = crate::input::decode(&manifest_bytes)
         .map_err(|error| format!("proof-room.catalog.manifest-json: {error}"))?;
     let load_report_path = manifest
         .proof_room_verifier_report_ref
         .as_ref()
         .map(|reference| reference.path.clone())
         .unwrap_or_else(|| "ui/proof-room-static/load-report.json".to_string());
-    let resolved_load_report_path = resolve_proof_room_bundle_path(bundle, &load_report_path)?;
-    let load_report_bytes = fs::read(&resolved_load_report_path)
+    let resolved_load_report_path = resolve_proof_room_bundle_path(bundle, &load_report_path)
+        .map_err(|error| error.to_string())?;
+    let load_report_bytes = crate::input::read(&resolved_load_report_path)
         .map_err(|error| format!("proof-room.catalog.load-report: {error}"))?;
-    let load_report: ProofRoomCatalogLoadReport = serde_json::from_slice(&load_report_bytes)
+    let load_report: ProofRoomCatalogLoadReport = crate::input::decode(&load_report_bytes)
         .map_err(|error| format!("proof-room.catalog.load-report-json: {error}"))?;
     let negative_cases = manifest
         .negative_cases
@@ -975,7 +975,7 @@ pub(crate) fn available_proof_room_fixture_negative_cases(
         Err((_status, error)) => return Err(error),
     };
     let manifest: ProofRoomBundleManifest =
-        serde_json::from_slice(&manifest_bytes).map_err(|error| {
+        crate::input::decode(&manifest_bytes).map_err(|error| {
             format!(
                 "proof-room.fixture.manifest-invalid: {}: {error}",
                 fixture.id
@@ -1068,7 +1068,7 @@ pub(crate) fn available_fixture_negative_descriptor(
             None => return Ok(None),
         },
     };
-    serde_json::from_slice(&descriptor_bytes)
+    crate::input::decode(&descriptor_bytes)
         .map(Some)
         .map_err(|error| {
             format!(
@@ -1114,7 +1114,7 @@ pub(crate) fn installed_available_fixture_descriptor_bytes(
             fixture.id, descriptor_path
         ));
     }
-    fs::read(&path).map_err(|error| {
+    crate::input::read(&path).map_err(|error| {
         format!(
             "proof-room.fixture.negative-descriptor-missing: {}: {}: {error}",
             fixture.id, descriptor_path
@@ -1243,13 +1243,15 @@ pub(crate) fn verify_available_proof_room_fixture_bundle(
         return Ok(());
     };
     verify_proof_room_bundle_inner_with_options(&manifest_path, false, true, true)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 pub(crate) fn proof_room_available_fixture_report_from_contents(
     path: String,
     contents: &[u8],
 ) -> ProofRoomAvailableFixtureReport {
-    let report = match serde_json::from_slice::<serde_json::Value>(contents) {
+    let report = match crate::input::decode::<serde_json::Value>(contents) {
         Ok(report) => report,
         Err(error) => {
             return ProofRoomAvailableFixtureReport {
@@ -1282,7 +1284,7 @@ pub(crate) fn proof_room_available_fixture_report_from_contents(
 }
 
 pub fn proof_room_fixture_report_status(contents: &[u8]) -> StatusCode {
-    let Ok(report) = serde_json::from_slice::<serde_json::Value>(contents) else {
+    let Ok(report) = crate::input::decode::<serde_json::Value>(contents) else {
         return StatusCode::UNPROCESSABLE_ENTITY;
     };
     let Some(verdict) = proof_room_fixture_report_string(&report, "verdict") else {
@@ -1311,9 +1313,8 @@ pub(crate) fn proof_room_fixture_report_string(
 }
 
 pub(crate) fn parse_available_proof_fixtures() -> Result<Vec<ProofRoomAvailableFixture>, String> {
-    let catalog: ProofRoomAvailableFixtureCatalog =
-        serde_json::from_str(PROOF_FIXTURE_CATALOG_JSON)
-            .map_err(|error| format!("proof-room.catalog.available-fixtures-json: {error}"))?;
+    let catalog: ProofRoomAvailableFixtureCatalog = crate::input::text(PROOF_FIXTURE_CATALOG_JSON)
+        .map_err(|error| format!("proof-room.catalog.available-fixtures-json: {error}"))?;
     parse_available_fixture_catalog(catalog)
 }
 
@@ -1332,9 +1333,13 @@ pub(crate) fn parse_installed_available_proof_fixtures(
     installed_fixture_root: &Path,
 ) -> Result<Option<Vec<ProofRoomAvailableFixture>>, String> {
     let catalog_path = installed_fixture_root.join("catalog.json");
-    let catalog_bytes = match fs::read(&catalog_path) {
+    let catalog_bytes = match crate::input::read(&catalog_path) {
         Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(ProofRoomError::Io { source: error, .. })
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
+            return Ok(None)
+        }
         Err(error) => {
             return Err(format!(
                 "proof-room.catalog.available-fixtures-file: {}: {error}",
@@ -1342,8 +1347,8 @@ pub(crate) fn parse_installed_available_proof_fixtures(
             ));
         }
     };
-    let catalog: ProofRoomAvailableFixtureCatalog = serde_json::from_slice(&catalog_bytes)
-        .map_err(|error| {
+    let catalog: ProofRoomAvailableFixtureCatalog =
+        crate::input::decode(&catalog_bytes).map_err(|error| {
             format!(
                 "proof-room.catalog.available-fixtures-json: {}: {error}",
                 catalog_path.display()

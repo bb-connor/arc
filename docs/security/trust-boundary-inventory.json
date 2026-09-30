@@ -208,6 +208,38 @@
     "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs",
     "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs",
+    "crates/products/chio-api-protect/src/proxy/http.rs",
+    "crates/products/chio-api-protect/src/proxy/input.rs",
+    "crates/products/chio-api-protect/src/proxy/mediated.rs",
+    "crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs",
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs",
+    "crates/products/chio-api-protect/src/proxy/state.rs",
+    "crates/products/chio-cli/src/cli/input.rs",
+    "crates/products/chio-cli/src/cli/process_host/call_evidence.rs",
+    "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs",
+    "crates/products/chio-cli/src/cli/process_host/diagnostics.rs",
+    "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs",
+    "crates/products/chio-cli/src/cli/process_host/run_evidence/native.rs",
+    "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
+    "crates/products/chio-cli/src/cli/process_host/state.rs",
+    "crates/products/chio-cli/src/cli/process_response_verify.rs",
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs",
+    "crates/products/chio-cli/src/cli/receipt_verify.rs",
+    "crates/products/chio-cli/src/cli/replay.rs",
+    "crates/products/chio-cli/src/cli/replay/execute.rs",
+    "crates/products/chio-cli/src/cli/replay/ndjson.rs",
+    "crates/products/chio-cli/src/cli/replay/reader.rs",
+    "crates/products/chio-cli/src/cli/replay/validate.rs",
+    "crates/products/chio-proof-room/src/bundle_a.rs",
+    "crates/products/chio-proof-room/src/bundle_b.rs",
+    "crates/products/chio-proof-room/src/crypto_context.rs",
+    "crates/products/chio-proof-room/src/fixture_a.rs",
+    "crates/products/chio-proof-room/src/fixture_b.rs",
+    "crates/products/chio-proof-room/src/input.rs",
+    "crates/products/chio-proof-room/src/lib.rs",
+    "crates/products/chio-proof-room/src/receipt_coverage.rs",
+    "crates/products/chio-proof-room/src/server.rs",
+    "crates/products/chio-proof-room/src/source_verifier.rs",
     "crates/protocol/chio-a2a-adapter/src/auth.rs",
     "crates/protocol/chio-a2a-adapter/src/invoke.rs",
     "crates/protocol/chio-a2a-adapter/src/mapping.rs",
@@ -1108,6 +1140,15 @@
     "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs::load_verified_projection::from_wire",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_evaluation_connection::from_wire",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_outcome_connection::from_wire",
+    "crates/products/chio-api-protect/src/proxy/input.rs::decode::from_wire",
+    "crates/products/chio-api-protect/src/proxy/state.rs::append::from_wire",
+    "crates/products/chio-api-protect/src/proxy/state.rs::append_tool_receipt::from_wire",
+    "crates/products/chio-cli/src/cli/input.rs::decode::from_wire",
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse::from_wire",
+    "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire",
+    "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire",
+    "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_wire",
+    "crates/products/chio-proof-room/src/input.rs::decode::from_wire",
     "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire",
     "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire",
@@ -1826,6 +1867,19 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/state_converters.rs::parse_underwriting_lifecycle_state::from_value",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value",
+    "crates/products/chio-cli/src/cli/input.rs::project::from_value",
+    "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs::classify::from_value",
+    "crates/products/chio-cli/src/cli/process_response_verify.rs::response_nonce::from_value",
+    "crates/products/chio-cli/src/cli/process_response_verify.rs::verify_values::from_value",
+    "crates/products/chio-cli/src/cli/process_response_verify.rs::verify_values::from_value",
+    "crates/products/chio-cli/src/cli/process_response_verify.rs::verify_values::from_value",
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse_at::Deserializer::from_str",
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse_at::from_str",
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse_at::from_str",
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse_at::from_str",
+    "crates/products/chio-cli/src/cli/replay.rs::run_log_replay::from_value",
+    "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_value",
+    "crates/products/chio-proof-room/src/input.rs::project::from_value",
     "crates/protocol/chio-a2a-adapter/src/invoke.rs::invoke_stream_jsonrpc::from_value",
     "crates/protocol/chio-a2a-adapter/src/invoke.rs::subscribe_task_jsonrpc::from_value",
     "crates/protocol/chio-a2a-adapter/src/mapping.rs::parse_tool_input::from_value",
@@ -4111,26 +4165,20 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/state_converters.rs::parse_underwriting_lifecycle_state::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
-    "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice": "This-process canonical serialization replay; no external raw bytes.",
-    "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
-    "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
-    "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
-    "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes.",
-    "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-    "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/financial.rs::decode_versioned_agent_passport_value::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/financial.rs::deserialize::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/financial.rs::from::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/financial.rs::serialize::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/financial/validation.rs::validate_bundled_source_signers::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/oid4vp.rs::inspect_chio_passport_sd_jwt_vc_unverified::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/oid4vp.rs::inspect_oid4vp_direct_post_response::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/oid4vp.rs::verify_oid4vp_direct_post_response::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/oid4vp.rs::verify_signed_oid4vp_request_object::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/portable_sd_jwt.rs::verify_chio_passport_sd_jwt_vc::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/products/chio-cli/src/cli/input.rs::project::from_value": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads.",
+    "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs::classify::from_value": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest.",
+    "crates/products/chio-cli/src/cli/process_response_verify.rs::response_nonce::from_value": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them.",
+    "crates/products/chio-cli/src/cli/process_response_verify.rs::verify_values::from_value": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them.",
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse_at::Deserializer::from_str": "Bounded ordinary worker JSON parser checks original nested key uniqueness and exact decimal equivalence (including 1e0 and trailing zeros), with typed redacted parser sources. It deliberately preserves the ordinary JSON numeric contract separately from native signed JSON and I-JSON.",
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse_at::from_str": "Bounded ordinary worker JSON parser checks original nested key uniqueness and exact decimal equivalence (including 1e0 and trailing zeros), with typed redacted parser sources. It deliberately preserves the ordinary JSON numeric contract separately from native signed JSON and I-JSON.",
+    "crates/products/chio-cli/src/cli/replay.rs::run_log_replay::from_value": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them.",
+    "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_value": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority.",
+    "crates/products/chio-proof-room/src/input.rs::project::from_value": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads.",
     "crates/protocol/chio-a2a-adapter/src/invoke.rs::invoke_stream_jsonrpc::from_value": "SSE Values become typed A2A envelopes only after the bounded duplicate-aware transport reader. Protocol version, error precedence, task binding and kernel admission remain separate required checks.",
     "crates/protocol/chio-a2a-adapter/src/invoke.rs::subscribe_task_jsonrpc::from_value": "SSE Values become typed A2A envelopes only after the bounded duplicate-aware transport reader. Protocol version, error precedence, task binding and kernel admission remain separate required checks.",
     "crates/protocol/chio-a2a-adapter/src/mapping.rs::parse_tool_input::from_value": "Tool arguments are already decoded untrusted Values projected into explicit A2A operation shapes. Caller capabilities remain the kernel responsibility; the projected invocation is not a proof.",
+    "crates/protocol/chio-a2a-edge/src/bridge.rs::extract_capability_ref::from_value": "Capability-ref DTO conversion preserves parser causes. The kernel validates capability, peer and execution bindings before dispatch; projection alone establishes no authority.",
+    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::parse_jsonrpc_send_message_params::from_value": "Envelope and SendMessage conversions operate on Values already admitted by the bounded original-byte JSON-RPC reader. Conversion errors retain typed JSON causes, and parameters never mint authority.",
     "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs::respond_to_upstream_nested_flow::from_value": "Sampling requests are shape conversions of bounded duplicate-checked frames. NestedFlowBridge performs the authenticated flow decision, and deferred tasks retain finite local deadlines and bounded capacity.",
     "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs::parse_requested_task::from_value": "Requested task metadata is untrusted, bounded to a finite TTL, and cannot authorize the bridge. Local private task state binds the actual owner request and operation; expiry and clock faults refuse before dispatch.",
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::call_tool_with_params::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
@@ -4156,17 +4204,32 @@
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
-    "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_slice": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation.",
-    "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness.",
-    "crates/protocol/chio-a2a-edge/src/bridge.rs::extract_capability_ref::from_value": "Capability-ref DTO conversion preserves parser causes. The kernel validates capability, peer and execution bindings before dispatch; projection alone establishes no authority.",
-    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::parse_jsonrpc_send_message_params::from_value": "Envelope and SendMessage conversions operate on Values already admitted by the bounded original-byte JSON-RPC reader. Conversion errors retain typed JSON causes, and parameters never mint authority.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_authorization_details_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::validate_chio_oauth_authorization_profile_metadata::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::acknowledge_call::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::finish_at::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs::verified_completed_response::from_value": "Credential exchange bodies, persisted credential records and call arguments pass bounded duplicate-aware parsing before typed projection. Parsing does not establish capability or session authority.",
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs::load_resume_hmac_keyring_at::Deserializer::from_slice": "The HMAC keyring has a 64 KiB nofollow file bound and uses strict deny_unknown_fields typed DTO deserialization plus end-of-input validation. This rejects duplicate and unknown keys without copying secrets into Value; secret material retains zeroizing ownership."
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs::load_resume_hmac_keyring_at::Deserializer::from_slice": "The HMAC keyring has a 64 KiB nofollow file bound and uses strict deny_unknown_fields typed DTO deserialization plus end-of-input validation. This rejects duplicate and unknown keys without copying secrets into Value; secret material retains zeroizing ownership.",
+    "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_slice": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation.",
+    "crates/protocol/chio-openai-adapter/src/lib.rs::extract_tool_calls::from_value": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness.",
+    "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice": "This-process canonical serialization replay; no external raw bytes.",
+    "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes.",
+    "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+    "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/financial.rs::decode_versioned_agent_passport_value::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/financial.rs::deserialize::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/financial.rs::from::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/financial.rs::serialize::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/financial/validation.rs::validate_bundled_source_signers::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/oid4vp.rs::inspect_chio_passport_sd_jwt_vc_unverified::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/oid4vp.rs::inspect_oid4vp_direct_post_response::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/oid4vp.rs::verify_oid4vp_direct_post_response::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/oid4vp.rs::verify_signed_oid4vp_request_object::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/portable_sd_jwt.rs::verify_chio_passport_sd_jwt_vc::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result."
   },
   "proofs": [
     {
@@ -4221,6 +4284,10 @@
     {
       "type": "CageRequiredLaunch",
       "path": "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc"
+    },
+    {
+      "type": "VerifiedProofRoomBundle",
+      "path": "crates/products/chio-proof-room/src/verified.rs"
     }
   ],
   "frost_secret_owner": "crates/platform/chio-store-sqlite/src/frost_store/ceremony/inbox.rs",
@@ -5474,35 +5541,6 @@
     "crates/platform/chio-trust-market-context/src/policy.rs": [
       "parse_policy::from_slice"
     ],
-    "crates/products/chio-api-protect/src/proxy/http.rs": [
-      "extract_execution_nonce_from_maps::from_str",
-      "presented_capability_id::from_str"
-    ],
-    "crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs": [
-      "parse::from_slice"
-    ],
-    "crates/products/chio-api-protect/src/proxy/mediated.rs": [
-      "sidecar_evaluate_tool_call_mediated_handler::from_slice",
-      "sidecar_reconcile_handler::from_slice"
-    ],
-    "crates/products/chio-api-protect/src/proxy/nonce_middleware.rs": [
-      "require_tool_server_execution_nonce::from_str"
-    ],
-    "crates/products/chio-api-protect/src/proxy/sidecar.rs": [
-      "sidecar_capabilities_alias_handler::from_slice",
-      "sidecar_evaluate_handler::from_slice",
-      "sidecar_evaluate_tool_call_handler::from_slice",
-      "sidecar_mint_handler::from_slice",
-      "sidecar_release_handler::from_slice",
-      "sidecar_submit_receipt_handler::from_slice",
-      "sidecar_validate_capability_handler::from_slice",
-      "sidecar_verify_handler::from_slice",
-      "sidecar_verify_receipt_handler::from_slice"
-    ],
-    "crates/products/chio-api-protect/src/proxy/state.rs": [
-      "load_receipts::from_str",
-      "load_tool_receipts::from_str"
-    ],
     "crates/products/chio-cli/src/active_defense_migration.rs": [
       "parse_shadow_migration_input::from_slice",
       "strict_typed_value::from_value"
@@ -5762,6 +5800,9 @@
     "crates/products/chio-cli/src/cli/dispatch/workflow.rs": [
       "run_workflow_preflight::from_slice"
     ],
+    "crates/products/chio-cli/src/cli/input.rs": [
+      "project::from_value"
+    ],
     "crates/products/chio-cli/src/cli/mcp/cage_policy.rs": [
       "decode_cage_policy::from_slice"
     ],
@@ -5803,20 +5844,6 @@
     "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_export.rs": [
       "export::from_value"
     ],
-    "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs": [
-      "response::from_str"
-    ],
-    "crates/products/chio-cli/src/cli/process_host/call_evidence.rs": [
-      "verify_file::from_str",
-      "verify_file::from_value",
-      "verify_operation_with_runtime::from_value",
-      "verify_operation_with_runtime::from_value",
-      "verify_with_broker_config::from_value"
-    ],
-    "crates/products/chio-cli/src/cli/process_host/diagnostics.rs": [
-      "open::from_slice",
-      "run_status::from_slice"
-    ],
     "crates/products/chio-cli/src/cli/process_host/lifecycle/settlement.rs": [
       "settle::from_value"
     ],
@@ -5825,7 +5852,6 @@
       "dispatch::from_value"
     ],
     "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs": [
-      "classify::from_slice",
       "classify::from_value"
     ],
     "crates/products/chio-cli/src/cli/process_host/native_broker/payload.rs": [
@@ -5840,20 +5866,9 @@
       "export::from_value",
       "verify::from_value"
     ],
-    "crates/products/chio-cli/src/cli/process_host/run_evidence/native.rs": [
-      "export::from_str",
-      "verify::from_str"
-    ],
     "crates/products/chio-cli/src/cli/process_host/run_evidence.rs": [
       "capabilities::from_value",
       "verify_file::from_value"
-    ],
-    "crates/products/chio-cli/src/cli/process_host/runner/container.rs": [
-      "decode::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/process_host/state.rs": [
-      "read_current_record::from_value",
-      "read_json::from_slice"
     ],
     "crates/products/chio-cli/src/cli/process_response_verify/json.rs": [
       "parse_at::Deserializer::from_str",
@@ -5862,29 +5877,12 @@
       "parse_at::from_str"
     ],
     "crates/products/chio-cli/src/cli/process_response_verify.rs": [
-      "read_document::from_value",
       "response_nonce::from_value",
       "verify_values::from_value",
       "verify_values::from_value",
       "verify_values::from_value"
     ],
-    "crates/products/chio-cli/src/cli/receipt_verify.rs": [
-      "verify_original_receipt::from_str",
-      "verify_original_receipt::from_value"
-    ],
-    "crates/products/chio-cli/src/cli/replay/execute.rs": [
-      "recompute_decision::from_slice",
-      "recompute_decision::from_value"
-    ],
-    "crates/products/chio-cli/src/cli/replay/ndjson.rs": [
-      "next::from_slice"
-    ],
-    "crates/products/chio-cli/src/cli/replay/reader.rs": [
-      "read_directory::from_str",
-      "read_ndjson_file::from_str"
-    ],
     "crates/products/chio-cli/src/cli/replay/validate.rs": [
-      "validate_invocation_canonical::from_slice",
       "validate_invocation_canonical::from_value"
     ],
     "crates/products/chio-cli/src/cli/replay/verify.rs": [
@@ -5988,95 +5986,8 @@
     "crates/products/chio-mercury-core/src/receipt_metadata.rs": [
       "from_metadata_value::from_value"
     ],
-    "crates/products/chio-proof-room/src/bundle_a.rs": [
-      "first_run_receipt_id::from_slice",
-      "trusted_bundle_signer_keys::from_slice",
-      "validate_authority_artifact::from_slice",
-      "verify_bundle_signature::from_slice",
-      "verify_first_run_evidence_graph_binding::from_slice",
-      "verify_first_run_guard_receipt_refs::from_slice",
-      "verify_negative_case_path::from_slice",
-      "verify_negative_case_path::from_value",
-      "verify_proof_room_bundle_inner_with_options::from_slice",
-      "verify_proof_room_bundle_inner_with_options::from_slice",
-      "verify_proof_room_bundle_inner_with_options::from_value",
-      "write_doctor_report::from_slice"
-    ],
-    "crates/products/chio-proof-room/src/bundle_b.rs": [
-      "apply_proof_room_negative_descriptor::from_slice",
-      "mutate_json_artifact_and_rehash::from_slice",
-      "refresh_bundle_signature::from_slice",
-      "refresh_roots_and_manifest_after_evidence_graph_change::from_slice",
-      "refresh_roots_and_manifest_after_evidence_graph_change::from_slice",
-      "refresh_roots_and_manifest_after_evidence_graph_change::from_slice",
-      "remove_graph_node_and_rehash::from_slice",
-      "update_graph_node_hash_and_rehash::from_slice",
-      "validate_json_artifact_schema::from_slice",
-      "validate_proof_room_schema::from_str",
-      "verify_proof_room_report::from_slice",
-      "verify_proof_room_report::from_value"
-    ],
-    "crates/products/chio-proof-room/src/crypto_context.rs": [
-      "crypto_context_rejected_report_bytes_with_bbs::from_slice",
-      "crypto_context_rejected_report_bytes_with_bbs::from_slice",
-      "crypto_context_rejected_report_bytes_with_bbs::from_slice",
-      "crypto_context_verified_report_bytes_with_bbs::from_slice",
-      "crypto_context_verified_report_bytes_with_bbs::from_slice",
-      "crypto_context_verified_report_bytes_with_bbs::from_slice",
-      "crypto_context_verified_report_bytes_with_bbs::from_slice"
-    ],
-    "crates/products/chio-proof-room/src/fixture_a.rs": [
-      "insert_proof_room_fixture_bundle_assets::from_slice",
-      "insert_proof_room_negative_case_asset_refs::from_slice",
-      "insert_transaction_fixture_assets::from_slice",
-      "parse_embedded_evidence_graph::from_slice",
-      "proof_room_fixture_verifier_report::from_slice",
-      "proof_room_workflow_preflight_report::from_slice"
-    ],
-    "crates/products/chio-proof-room/src/fixture_b.rs": [
-      "available_fixture_negative_descriptor::from_slice",
-      "available_proof_room_fixture_negative_cases::from_slice",
-      "build_proof_room_fixture_catalog::from_slice",
-      "build_proof_room_fixture_catalog::from_slice",
-      "commerce_event_authority_receipt_refs::from_slice",
-      "embedded_commerce_json_artifact::from_slice",
-      "embedded_commerce_mandate_protocol_payloads::from_slice",
-      "embedded_json_artifact::from_slice",
-      "embedded_public_settlement_proof_bundle::from_slice",
-      "embedded_risk_comptroller_report_value::from_slice",
-      "parse_available_proof_fixtures::from_str",
-      "parse_installed_available_proof_fixtures::from_slice",
-      "proof_room_available_fixture_report_from_contents::from_slice",
-      "proof_room_fixture_report_status::from_slice",
-      "verify_embedded_disclosure_projection_manifest::from_slice",
-      "verify_embedded_disclosure_projection_manifest::from_slice"
-    ],
-    "crates/products/chio-proof-room/src/lib.rs": [
-      "optional_public_settlement_independent_chain_head_from_env::from_str",
-      "public_settlement_rpc_call::from_slice"
-    ],
-    "crates/products/chio-proof-room/src/receipt_coverage.rs": [
-      "verify_covered_category::from_slice"
-    ],
-    "crates/products/chio-proof-room/src/server.rs": [
-      "insert_negative_case_manifest_paths::from_slice",
-      "proof_room_served_bundle_paths::from_slice",
-      "uploaded_bundle_id::from_slice"
-    ],
-    "crates/products/chio-proof-room/src/source_verifier.rs": [
-      "ensure_source_runtime_regeneration_records_bind_workflow_steps::from_slice",
-      "ensure_source_runtime_regeneration_records_bind_workflow_steps::from_slice",
-      "enterprise_export_sidecar_paths::from_slice",
-      "load_enterprise_export_sidecar_artifacts::from_slice",
-      "load_standalone_evidence_graph_artifacts::from_slice",
-      "source_runtime_artifact_canonical_sha256::from_slice",
-      "source_runtime_proof_parity_report::from_slice",
-      "source_runtime_proof_parity_report::from_slice",
-      "source_scoped_evidence_graph_bytes::from_slice",
-      "source_verifier_claim_requirements::from_slice",
-      "source_verifier_context_with_options::from_slice",
-      "validate_source_runtime_proof_regeneration_artifacts::from_slice",
-      "verify_transaction_passport_file_with_options::from_slice"
+    "crates/products/chio-proof-room/src/input.rs": [
+      "project::from_value"
     ],
     "crates/products/chio-wall/src/commands.rs": [
       "read_json_file::from_slice"
@@ -6703,6 +6614,10 @@
       "kind": "parser-internal-or-typed",
       "contract": "Generated schema Deserialize implementations validate field shapes and convert already decoded values. Source is the wire schema/code generator; no independent original-byte ingress here."
     },
+    "crates/core/chio-core-types/src/canonical.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Strict I-JSON canonicalization implementation. Original token validation and numeric normalization live here; this is not an independent authority constructor."
+    },
     "crates/core/chio-core-types/src/canonical/signed_json.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse."
@@ -6710,10 +6625,6 @@
     "crates/core/chio-core-types/src/canonical/untrusted.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Constrained reader implementation. Signed mode delegates original-token validation; canonical mode compares exact original bytes with canonical typed serialization."
-    },
-    "crates/core/chio-core-types/src/canonical.rs": {
-      "kind": "parser-internal-or-typed",
-      "contract": "Strict I-JSON canonicalization implementation. Original token validation and numeric normalization live here; this is not an independent authority constructor."
     },
     "crates/core/chio-core-types/src/capability/caveat.rs": {
       "kind": "parser-internal-or-typed",
@@ -6763,11 +6674,11 @@
       "kind": "example-or-fuzz",
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
     },
-    "crates/economy/chio-anchor/src/witness/rekor.rs": {
+    "crates/economy/chio-anchor/src/witness.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/economy/chio-anchor/src/witness.rs": {
+    "crates/economy/chio-anchor/src/witness/rekor.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -6819,13 +6730,13 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/economy/chio-market/src/parametric/lifecycle.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
     "crates/economy/chio-market/src/parametric.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/economy/chio-market/src/parametric/lifecycle.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
     "crates/economy/chio-metering/src/budget_hierarchy.rs": {
       "kind": "typed-value-conversion",
@@ -6943,6 +6854,30 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
+    "crates/kernel/chio-kernel-browser/src/pure.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/kernel/chio-kernel-browser/src/wasm.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/kernel/chio-kernel-core/src/fuzz.rs": {
+      "kind": "example-or-fuzz",
+      "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
+    },
+    "crates/kernel/chio-kernel-core/src/passport_verify.rs": {
+      "kind": "reviewed-signed-owner",
+      "contract": "Constrained original-byte input; residual decoder sites require individual raw_decoder_contracts."
+    },
+    "crates/kernel/chio-kernel-mobile/src/lib.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/kernel/chio-kernel/src/admission_operation.rs": {
+      "kind": "reviewed-signed-owner",
+      "contract": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first."
+    },
     "crates/kernel/chio-kernel/src/admission_operation/identity.rs": {
       "kind": "reviewed-signed-owner",
       "contract": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first."
@@ -6962,10 +6897,6 @@
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs": {
       "kind": "reviewed-signed-owner",
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority."
-    },
-    "crates/kernel/chio-kernel/src/admission_operation.rs": {
-      "kind": "reviewed-signed-owner",
-      "contract": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first."
     },
     "crates/kernel/chio-kernel/src/caller_delivery.rs": {
       "kind": "reviewed-signed-owner",
@@ -6995,11 +6926,11 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/kernel/chio-kernel/src/kernel/session_ops/threshold_continuation.rs": {
+    "crates/kernel/chio-kernel/src/kernel/session_ops.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/kernel/chio-kernel/src/kernel/session_ops.rs": {
+    "crates/kernel/chio-kernel/src/kernel/session_ops/threshold_continuation.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
@@ -7018,26 +6949,6 @@
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs": {
       "kind": "reviewed-signed-owner",
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority."
-    },
-    "crates/kernel/chio-kernel-browser/src/pure.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/kernel/chio-kernel-browser/src/wasm.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/kernel/chio-kernel-core/src/fuzz.rs": {
-      "kind": "example-or-fuzz",
-      "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
-    },
-    "crates/kernel/chio-kernel-core/src/passport_verify.rs": {
-      "kind": "reviewed-signed-owner",
-      "contract": "Constrained original-byte input; residual decoder sites require individual raw_decoder_contracts."
-    },
-    "crates/kernel/chio-kernel-mobile/src/lib.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/kernel/chio-process/examples/langgraph_report.rs": {
       "kind": "example-or-fuzz",
@@ -7067,6 +6978,10 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
+    "crates/kernel/chio-process/src/store.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
     "crates/kernel/chio-process/src/store/children.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -7075,9 +6990,9 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/kernel/chio-process/src/store.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    "crates/kernel/chio-process/src/store/prepared.rs": {
+      "kind": "durable-internal-state",
+      "contract": "Decodes only the original canonical host-prepared bytes retained under the process owner and operation key. An immediate transaction checks the immutable preparation binding, verifies the content digest, and never reissues retained authority. Downstream admission still authenticates the signed invocation."
     },
     "crates/kernel/chio-process/src/worker.rs": {
       "kind": "raw-input-baseline",
@@ -7319,6 +7234,10 @@
       "kind": "reviewed-signed-owner",
       "contract": "Strict I-JSON canonical preflight rejects duplicate keys and aliases before the closed DTO read; identity, canonical equality, manifest and digest checks remain mandatory."
     },
+    "crates/platform/chio-store-sqlite/src/receipt_store.rs": {
+      "kind": "reviewed-signed-owner",
+      "contract": "Checkpoint head verification uses closed signed columns and signature, root and chain checks; other raw receipt readers use the constrained native decoder."
+    },
     "crates/platform/chio-store-sqlite/src/receipt_store/reports.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
@@ -7355,10 +7274,6 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/platform/chio-store-sqlite/src/receipt_store.rs": {
-      "kind": "reviewed-signed-owner",
-      "contract": "Checkpoint head verification uses closed signed columns and signature, root and chain checks; other raw receipt readers use the constrained native decoder."
-    },
     "crates/platform/chio-transaction-passport/src/cognition_market.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -7388,30 +7303,6 @@
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/platform/chio-trust-market-context/src/policy.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-api-protect/src/proxy/http.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-api-protect/src/proxy/mediated.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-api-protect/src/proxy/nonce_middleware.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-api-protect/src/proxy/sidecar.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-api-protect/src/proxy/state.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -7499,6 +7390,10 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
+    "crates/products/chio-cli/src/cli/dispatch/finding.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
     "crates/products/chio-cli/src/cli/dispatch/finding/challenge.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -7523,7 +7418,7 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/cli/dispatch/finding.rs": {
+    "crates/products/chio-cli/src/cli/dispatch/proof.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -7563,11 +7458,15 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/cli/dispatch/proof.rs": {
+    "crates/products/chio-cli/src/cli/dispatch/workflow.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/cli/dispatch/workflow.rs": {
+    "crates/products/chio-cli/src/cli/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads."
+    },
+    "crates/products/chio-cli/src/cli/mcp.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -7575,7 +7474,7 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs": {
+    "crates/products/chio-cli/src/cli/mcp/provision.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -7583,19 +7482,15 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
+    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
     "crates/products/chio-cli/src/cli/mcp/provision/reference_runtime.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/cli/mcp/provision.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/products/chio-cli/src/cli/mcp/wrap.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/mcp.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -7611,31 +7506,27 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/process_host/call_evidence.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/process_host/diagnostics.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    "crates/products/chio-cli/src/cli/process_host/lifecycle.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
     "crates/products/chio-cli/src/cli/process_host/lifecycle/settlement.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/products/chio-cli/src/cli/process_host/lifecycle.rs": {
+    "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    "crates/products/chio-cli/src/cli/process_host/native_broker/payload.rs": {
+      "kind": "validated-worker-input",
+      "contract": "Decodes an already bounded worker JSON Value into deny_unknown_fields ModelQuery. Checks the fixed host-selected model ID, schema, positive turn and bounded message count, strips worker metadata, then constructs provider options exclusively from validated host configuration. This mapping does not mint dispatch authority."
+    },
+    "crates/products/chio-cli/src/cli/process_host/nonce_evidence.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/process_host/nonce_evidence.rs": {
+    "crates/products/chio-cli/src/cli/process_host/run_evidence.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
@@ -7643,55 +7534,23 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/products/chio-cli/src/cli/process_host/run_evidence/native.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/process_host/run_evidence.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
-    "crates/products/chio-cli/src/cli/process_host/runner/container.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/process_host/state.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    "crates/products/chio-cli/src/cli/process_response_verify.rs": {
+      "kind": "bounded-original-and-typed-projection",
+      "contract": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them."
     },
     "crates/products/chio-cli/src/cli/process_response_verify/json.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/process_response_verify.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
-    "crates/products/chio-cli/src/cli/receipt_verify.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/replay/execute.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/replay/ndjson.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/replay/reader.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/replay/validate.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-cli/src/cli/replay/verify.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded ordinary worker JSON parser checks original nested key uniqueness and exact decimal equivalence (including 1e0 and trailing zeros), with typed redacted parser sources. It deliberately preserves the ordinary JSON numeric contract separately from native signed JSON and I-JSON."
     },
     "crates/products/chio-cli/src/cli/replay.rs": {
+      "kind": "bounded-original-and-typed-projection",
+      "contract": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them."
+    },
+    "crates/products/chio-cli/src/cli/replay/validate.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    "crates/products/chio-cli/src/cli/replay/verify.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
@@ -7735,11 +7594,11 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/passport/verifier.rs": {
+    "crates/products/chio-cli/src/passport.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-cli/src/passport.rs": {
+    "crates/products/chio-cli/src/passport/verifier.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -7755,6 +7614,10 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
+    "crates/products/chio-mercury-core/src/receipt_metadata.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+    },
     "crates/products/chio-mercury/src/commands/core_cli/commands.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
@@ -7763,45 +7626,9 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/products/chio-mercury-core/src/receipt_metadata.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
-    "crates/products/chio-proof-room/src/bundle_a.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-proof-room/src/bundle_b.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-proof-room/src/crypto_context.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-proof-room/src/fixture_a.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-proof-room/src/fixture_b.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-proof-room/src/lib.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-proof-room/src/receipt_coverage.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-proof-room/src/server.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/products/chio-proof-room/src/source_verifier.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    "crates/products/chio-proof-room/src/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads."
     },
     "crates/products/chio-wall/src/commands.rs": {
       "kind": "raw-input-baseline",
@@ -7967,6 +7794,10 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
+    "crates/protocol/chio-openai-adapter/src/input.rs": {
+      "kind": "reviewed-protocol-reader",
+      "contract": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation."
+    },
     "crates/protocol/chio-openai-adapter/src/lib.rs": {
       "kind": "reviewed-protocol-reader",
       "contract": "Native execution parses original argument text through the bounded I-JSON object reader. Existing Values are converted to untrusted tool-call shapes. Capabilities, peer features, nonces and approvals are checked by the kernel before dispatch; ToolCallResult is a transport DTO, not a verification witness."
@@ -7974,6 +7805,10 @@
     "crates/protocol/chio-openapi/src/extensions.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
+    },
+    "crates/protocol/chio-openapi/src/input.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "OpenApiSpec::parse passes original bytes bounded at 8 MiB before UTF-8 and format detection. JSON uses duplicate-aware signed decoding. The YAML seed rejects duplicate or nonstring keys and multiple documents while enforcing depth 64, 100000 nodes and 8 MiB cumulative expanded strings before projection. Bridge and fuzz callers pass original bytes; native decoder sources remain local."
     },
     "crates/protocol/chio-provider-adapter-core/src/http.rs": {
       "kind": "raw-input-baseline",
@@ -8063,14 +7898,6 @@
       "kind": "reviewed-signed-owner",
       "contract": "Constrained original-byte input; residual decoder sites require individual raw_decoder_contracts."
     },
-    "crates/security/chio-cage/src/launch/linux.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/security/chio-cage/src/receipt.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
-    },
     "crates/security/chio-cage-init/src/bootstrap.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -8078,6 +7905,14 @@
     "crates/security/chio-cage-plan/src/model.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/security/chio-cage/src/launch/linux.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/security/chio-cage/src/receipt.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
     "crates/security/chio-decoy/src/materialize.rs": {
       "kind": "raw-input-baseline",
@@ -8219,14 +8054,6 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/trust/chio-attest-buyer/src/api.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/trust/chio-attest-buyer/src/runtime_manifest.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/trust/chio-attest-buyer-core/src/context.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -8247,6 +8074,14 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
+    "crates/trust/chio-attest-buyer/src/api.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/trust/chio-attest-buyer/src/runtime_manifest.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
     "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -8259,11 +8094,11 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/trust/chio-credentials/src/financial/validation.rs": {
+    "crates/trust/chio-credentials/src/financial.rs": {
       "kind": "reviewed-signed-owner",
       "contract": "Constrained original-byte input; residual decoder sites require individual raw_decoder_contracts."
     },
-    "crates/trust/chio-credentials/src/financial.rs": {
+    "crates/trust/chio-credentials/src/financial/validation.rs": {
       "kind": "reviewed-signed-owner",
       "contract": "Constrained original-byte input; residual decoder sites require individual raw_decoder_contracts."
     },
@@ -8307,10 +8142,6 @@
       "kind": "example-or-fuzz",
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
     },
-    "crates/trust/chio-federation/src/treaty.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/trust/chio-federation-authority/src/frost_ceremony/packages.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
@@ -8320,6 +8151,10 @@
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
     },
     "crates/trust/chio-federation-transport-iroh/src/lanes/pheromone.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/trust/chio-federation/src/treaty.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -8399,33 +8234,17 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/trust/chio-tee/src/runner.rs": {
+    "crates/trust/chio-tee-frame/src/frame.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/trust/chio-tee-frame/src/frame.rs": {
+    "crates/trust/chio-tee/src/runner.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/trust/chio-weights/src/card.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/protocol/chio-openai-adapter/src/input.rs": {
-      "kind": "reviewed-protocol-reader",
-      "contract": "Owner of 16 MiB provider JSON and 1 MiB tool-argument bounds. The retained from_slice converts canonicalized original I-JSON bytes into an object. It cannot discard duplicate keys or round an unsafe integer before validation."
-    },
-    "crates/protocol/chio-openapi/src/input.rs": {
-      "kind": "reviewed-bounded-input",
-      "contract": "OpenApiSpec::parse passes original bytes bounded at 8 MiB before UTF-8 and format detection. JSON uses duplicate-aware signed decoding. The YAML seed rejects duplicate or nonstring keys and multiple documents while enforcing depth 64, 100000 nodes and 8 MiB cumulative expanded strings before projection. Bridge and fuzz callers pass original bytes; native decoder sources remain local."
-    },
-    "crates/kernel/chio-process/src/store/prepared.rs": {
-      "kind": "durable-internal-state",
-      "contract": "Decodes only the original canonical host-prepared bytes retained under the process owner and operation key. An immediate transaction checks the immutable preparation binding, verifies the content digest, and never reissues retained authority. Downstream admission still authenticates the signed invocation."
-    },
-    "crates/products/chio-cli/src/cli/process_host/native_broker/payload.rs": {
-      "kind": "validated-worker-input",
-      "contract": "Decodes an already bounded worker JSON Value into deny_unknown_fields ModelQuery. Checks the fixed host-selected model ID, schema, positive turn and bounded message count, strips worker metadata, then constructs provider options exclusively from validated host configuration. This mapping does not mint dispatch authority."
     }
   },
   "tenant_runtime_families": {
@@ -11973,5 +11792,135 @@
       "crates/tooling/chio-conformance/tests/ssrf_oversize_response_rejected.rs"
     ],
     "contract": "Original-byte validation precedes projection. from_value is a typed programmatic constructor and carries no original-byte validation claim."
+  },
+  "reviewed_product_readers": {
+    "crates/products/chio-api-protect/src/proxy/http.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
+    },
+    "crates/products/chio-api-protect/src/proxy/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads."
+    },
+    "crates/products/chio-api-protect/src/proxy/mediated.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
+    },
+    "crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
+    },
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
+    },
+    "crates/products/chio-api-protect/src/proxy/state.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "SQLite receipt text is byte-capped in SQL before materialization and decoded from original text. Writers apply the same per-receipt cap. Request-id reservations use generation ownership, bounded expiry indices, the shared fenced clock and kernel-serialized durable reuse checks."
+    },
+    "crates/products/chio-cli/src/cli/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads."
+    },
+    "crates/products/chio-cli/src/cli/process_host/call_evidence.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    "crates/products/chio-cli/src/cli/process_host/diagnostics.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    "crates/products/chio-cli/src/cli/process_host/run_evidence/native.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    "crates/products/chio-cli/src/cli/process_host/runner/container.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    "crates/products/chio-cli/src/cli/process_host/state.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    "crates/products/chio-cli/src/cli/process_response_verify.rs": {
+      "kind": "bounded-original-and-typed-projection",
+      "contract": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them."
+    },
+    "crates/products/chio-cli/src/cli/process_response_verify/json.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded ordinary worker JSON parser checks original nested key uniqueness and exact decimal equivalence (including 1e0 and trailing zeros), with typed redacted parser sources. It deliberately preserves the ordinary JSON numeric contract separately from native signed JSON and I-JSON."
+    },
+    "crates/products/chio-cli/src/cli/receipt_verify.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Original receipts are capped at 8 MiB, strict I-JSON checked, projected to the supported receipt schema, compared with that full schema and verified against the caller-pinned signer and action hash before use."
+    },
+    "crates/products/chio-cli/src/cli/replay.rs": {
+      "kind": "bounded-original-and-typed-projection",
+      "contract": "Worker document parsing preserves the bounded ordinary numeric contract; replay readers preserve original-byte rejection before downstream diagnostic projection. Typed conversion of already validated values does not authenticate them."
+    },
+    "crates/products/chio-cli/src/cli/replay/execute.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    "crates/products/chio-cli/src/cli/replay/ndjson.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    "crates/products/chio-cli/src/cli/replay/reader.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    "crates/products/chio-cli/src/cli/replay/validate.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    "crates/products/chio-proof-room/src/bundle_a.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    "crates/products/chio-proof-room/src/bundle_b.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    "crates/products/chio-proof-room/src/crypto_context.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Embedded fixture construction decodes bounded original JSON and grants no execution authority. Installed fixture collection has shared entry/depth and actual-byte budgets; installed documents and disclosure inputs reject duplicate or lossy original JSON before any field selection. Fixture report errors are diagnostic projections."
+    },
+    "crates/products/chio-proof-room/src/fixture_a.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Embedded fixture construction decodes bounded original JSON and grants no execution authority. Installed fixture collection has shared entry/depth and actual-byte budgets; installed documents and disclosure inputs reject duplicate or lossy original JSON before any field selection. Fixture report errors are diagnostic projections."
+    },
+    "crates/products/chio-proof-room/src/fixture_b.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Embedded fixture construction decodes bounded original JSON and grants no execution authority. Installed fixture collection has shared entry/depth and actual-byte budgets; installed documents and disclosure inputs reject duplicate or lossy original JSON before any field selection. Fixture report errors are diagnostic projections."
+    },
+    "crates/products/chio-proof-room/src/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Bounded original-byte decoder delegates to the shared duplicate-aware lossless native JSON owner. Typed projection retains parser sources and grants no authority. File and collection bounds precede retained allocation; public error rendering excludes raw parser payloads."
+    },
+    "crates/products/chio-proof-room/src/lib.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    "crates/products/chio-proof-room/src/receipt_coverage.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    "crates/products/chio-proof-room/src/server.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    "crates/products/chio-proof-room/src/source_verifier.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    }
   }
 }

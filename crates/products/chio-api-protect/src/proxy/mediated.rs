@@ -112,6 +112,7 @@ pub(crate) fn build_mediation_kernel(
     tool_servers: Vec<Box<dyn ToolServerConnection>>,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
     durable_admission: Option<DurableAdmissionStores>,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<ChioKernel, ProtectError> {
     let mut ca_public_keys = vec![signer.public_key()];
     for issuer in trusted_capability_issuers {
@@ -119,35 +120,38 @@ pub(crate) fn build_mediation_kernel(
             ca_public_keys.push(issuer.clone());
         }
     }
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: signer.clone(),
-        ca_public_keys,
-        max_delegation_depth: 5,
-        // Durable admission binds every operation to a canonical SHA-256 policy
-        // digest, so the mediation policy is named by its digest.
-        policy_hash: chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1"),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        // A money-bearing mediated deployment should enable durable admission (the
-        // durable receipt db path wired through evaluator.rs and proxy/state.rs) so
-        // that an ambiguous post-dispatch outcome has its retained budget or payment
-        // hold reconciled by the recovery sweep. The ephemeral log has no sweep, so
-        // any hold retained on this non-durable kernel is surfaced instead by
-        // chio_ambiguous_dispatch_retained_hold_total{reconciliation="none"}.
-        allow_ephemeral_receipt_log: true,
-        // Revocation is enforced sidecar-side over the durable revoked set (the
-        // revoked-ancestor walk below); this kernel's internal store is
-        // intentionally empty, so its durability gate must not deny mediation.
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: signer.clone(),
+            ca_public_keys,
+            max_delegation_depth: 5,
+            // Durable admission binds every operation to a canonical SHA-256 policy
+            // digest, so the mediation policy is named by its digest.
+            policy_hash: chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1"),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            // A money-bearing mediated deployment should enable durable admission (the
+            // durable receipt db path wired through evaluator.rs and proxy/state.rs) so
+            // that an ambiguous post-dispatch outcome has its retained budget or payment
+            // hold reconciled by the recovery sweep. The ephemeral log has no sweep, so
+            // any hold retained on this non-durable kernel is surfaced instead by
+            // chio_ambiguous_dispatch_retained_hold_total{reconciliation="none"}.
+            allow_ephemeral_receipt_log: true,
+            // Revocation is enforced sidecar-side over the durable revoked set (the
+            // revoked-ancestor walk below); this kernel's internal store is
+            // intentionally empty, so its durability gate must not deny mediation.
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        },
+        clock.clone(),
+    );
     match durable_admission {
         Some(durable) => {
             // Durable operations, their preflight holds and their executable
@@ -171,8 +175,9 @@ pub(crate) fn build_mediation_kernel(
     };
     kernel.set_execution_nonce_store(
         nonce_cfg,
-        Box::new(InMemoryExecutionNonceStore::from_config(
-            &ExecutionNonceConfig::default(),
+        Box::new(InMemoryExecutionNonceStore::with_clock(
+            ExecutionNonceConfig::default().nonce_store_capacity,
+            clock.clone(),
         )),
     );
     // Install DPoP verification state so a grant with `dpop_required` can verify
@@ -180,9 +185,12 @@ pub(crate) fn build_mediation_kernel(
     // fail-closed with no way to present a proof.
     kernel
         .set_dpop_store(
-            DpopNonceStore::new(
+            DpopNonceStore::with_clock(
                 DpopConfig::default().nonce_store_capacity,
+                DpopConfig::default().nonce_store_capacity,
+                chio_kernel::dpop::DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
                 std::time::Duration::from_secs(DpopConfig::default().proof_ttl_secs),
+                clock,
             )
             .map_err(|error| ProtectError::Config(error.to_string()))?,
             DpopConfig::default(),
@@ -277,12 +285,9 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         }
     };
     let mut parsed: SidecarEvaluateToolCallMediatedRequest =
-        match serde_json::from_slice(&body_bytes) {
+        match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
             Ok(parsed) => parsed,
-            Err(error) => {
-                return sidecar_bad_request(&format!("invalid mediated payload: {error}"))
-                    .into_response();
-            }
+            Err(error) => return input::rejected(error),
         };
     if parsed.supplemental_authorization.is_some() {
         return sidecar_bad_request(
@@ -312,7 +317,10 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // approved retry presents the nonce the strict preflight issued. The
     // legacy reservation mints nonces and never accepts one: a presented nonce
     // would be consumed here instead of by the tool server that expects it.
-    let durable_reservation = mediation_kernel.lock().await.has_durable_admission_store();
+    // The kernel mutex also owns the reuse check/claim/authorization/cleanup sequence.
+    // No request-id claim can age out while its owner waits for this lock.
+    let kernel = mediation_kernel.lock().await;
+    let durable_reservation = kernel.has_durable_admission_store();
     let presented_nonce = parsed.execution_nonce.take();
     if presented_nonce.is_some() && !durable_reservation {
         return sidecar_bad_request(
@@ -484,23 +492,33 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // no durable hold, so a denied or failed attempt does not permanently burn
     // the id; claimed ids expire with the reservation TTL, keeping the set
     // bounded.
-    let now_unix = chrono::Utc::now().timestamp();
-    if !state
+    let now_unix = match state.clock.signed_seconds() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
+    let request_claim = match state
         .minted_request_ids
         .lock()
         .await
         .claim(&request_id, now_unix)
     {
-        return (
-            StatusCode::CONFLICT,
-            axum::Json(serde_json::json!({
-                "error": "chio_request_id_reused",
-                "message":
-                    "request_id has already been used for a reservation; choose a fresh request_id",
-            })),
-        )
-            .into_response();
-    }
+        Ok(claim) => claim,
+        Err(error) => {
+            let status = match error {
+                RequestIdClaimError::Reused => StatusCode::CONFLICT,
+                RequestIdClaimError::Shape => StatusCode::BAD_REQUEST,
+                _ => StatusCode::SERVICE_UNAVAILABLE,
+            };
+            return input::with_source(
+                (
+                    status,
+                    axum::Json(serde_json::json!({"error": error.to_string()})),
+                )
+                    .into_response(),
+                error,
+            );
+        }
+    };
     let kernel_request = ToolCallRequest {
         request_id: request_id.clone(),
         capability: parsed.capability,
@@ -530,7 +548,6 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // before any await, so authorizations serialize without holding the kernel
     // across receipt-persistence I/O.
     let response = {
-        let kernel = mediation_kernel.lock().await;
         // Under durable admission the reservation is the operation's own: the
         // strict preflight issues the operation-bound nonce and the execution's
         // first half reserves the executable hold and nonce. Only the separate
@@ -545,7 +562,11 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             Err(error) => {
                 // The reservation did not open; release the claimed id so a
                 // failed authorization does not permanently burn it.
-                state.minted_request_ids.lock().await.release(&request_id);
+                state
+                    .minted_request_ids
+                    .lock()
+                    .await
+                    .release(&request_claim);
                 warn!("mediated authorization error: {error}");
                 return internal_json_error_response("chio_mediation_failed", &error.to_string());
             }
@@ -555,8 +576,20 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // denied or pending verdict placed no durable hold, so release the id to let
     // the caller retry it without a spurious 409.
     if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
-        state.minted_request_ids.lock().await.release(&request_id);
+        state
+            .minted_request_ids
+            .lock()
+            .await
+            .release(&request_claim);
     }
+    if let Some(nonce) = response.execution_nonce.as_deref() {
+        state
+            .minted_request_ids
+            .lock()
+            .await
+            .retain_until(&request_claim, nonce.nonce.expires_at);
+    }
+    drop(kernel);
     if let Err(error) = record_tool_receipt(&state, &response.receipt).await {
         // The reserve receipt persisted here is a local audit entry, not the
         // authoritative record. When the reserve SUCCEEDED (Verdict::Allow with a
@@ -647,12 +680,9 @@ pub(crate) async fn sidecar_reconcile_handler(
             return sidecar_bad_request("failed to read reconcile body").into_response();
         }
     };
-    let parsed: SidecarReconcileRequest = match serde_json::from_slice(&body_bytes) {
+    let parsed: SidecarReconcileRequest = match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
         Ok(parsed) => parsed,
-        Err(error) => {
-            return sidecar_bad_request(&format!("invalid reconcile payload: {error}"))
-                .into_response();
-        }
+        Err(error) => return input::rejected(error),
     };
     let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
         return internal_json_error_response(

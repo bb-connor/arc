@@ -4,9 +4,10 @@
 // signature verification are layered on top in `cli/replay/validate.rs`.
 
 /// Default capacity of the per-line buffer (8 KiB). NDJSON lines are
-/// expected to fit comfortably; pathologically long lines cause the
-/// underlying `BufReader::read_until` call to grow the buffer.
+/// expected to fit comfortably; every read also enforces MAX_LINE_BYTES.
 const DEFAULT_LINE_CAPACITY: usize = 8 * 1024;
+pub(super) const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_STREAM_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Errors surfaced by [`FrameIter`] / [`read_frame_line`].
 #[derive(Debug, thiserror::Error)]
@@ -19,8 +20,12 @@ pub enum NdjsonError {
         source: std::io::Error,
     },
     /// A non-blank line failed `serde_json::from_slice`.
-    #[error("ndjson parse error on line {line}: {message}")]
-    Parse { line: u64, message: String },
+    #[error("ndjson parse error on line {line}: {source}")]
+    Parse {
+        line: u64,
+        #[source]
+        source: chio_core::canonical::UntrustedJsonError,
+    },
 }
 
 impl NdjsonError {
@@ -57,6 +62,7 @@ pub struct FrameIter<R: std::io::BufRead> {
     line: u64,
     buf: Vec<u8>,
     finished: bool,
+    remaining: u64,
 }
 
 impl<R: std::io::BufRead> FrameIter<R> {
@@ -67,6 +73,7 @@ impl<R: std::io::BufRead> FrameIter<R> {
             line: 0,
             buf: Vec::with_capacity(DEFAULT_LINE_CAPACITY),
             finished: false,
+            remaining: MAX_STREAM_BYTES,
         }
     }
 }
@@ -80,8 +87,13 @@ impl<R: std::io::BufRead> Iterator for FrameIter<R> {
         }
         loop {
             self.buf.clear();
-            self.line = self.line.saturating_add(1);
-            let read = match self.inner.read_until(b'\n', &mut self.buf) {
+            self.line += 1; // At most MAX_STREAM_BYTES nonempty reads.
+            use std::io::{BufRead, Read};
+            let mut bounded = self
+                .inner
+                .by_ref()
+                .take((MAX_LINE_BYTES as u64 + 1).min(self.remaining + 1));
+            let read = match bounded.read_until(b'\n', &mut self.buf) {
                 Ok(n) => n,
                 Err(source) => {
                     self.finished = true;
@@ -95,6 +107,17 @@ impl<R: std::io::BufRead> Iterator for FrameIter<R> {
                 self.finished = true;
                 return None;
             }
+            if read > MAX_LINE_BYTES || read as u64 > self.remaining {
+                self.finished = true;
+                return Some(Err(NdjsonError::Parse {
+                    line: self.line,
+                    source: chio_core::canonical::UntrustedJsonError::TooLarge {
+                        bytes: read,
+                        bound: MAX_LINE_BYTES.min(self.remaining as usize),
+                    },
+                }));
+            }
+            self.remaining -= read as u64;
             // Strip trailing newline (and CR if present, for tolerance
             // against captures emitted on Windows-style hosts).
             let mut slice = self.buf.as_slice();
@@ -108,12 +131,12 @@ impl<R: std::io::BufRead> Iterator for FrameIter<R> {
             if slice.iter().all(|b| b.is_ascii_whitespace()) {
                 continue;
             }
-            let frame: chio_tee_frame::Frame = match serde_json::from_slice(slice) {
+            let frame: chio_tee_frame::Frame = match crate::input::decode(slice, MAX_LINE_BYTES) {
                 Ok(f) => f,
                 Err(error) => {
                     return Some(Err(NdjsonError::Parse {
                         line: self.line,
-                        message: error.to_string(),
+                        source: error,
                     }));
                 }
             };
@@ -235,9 +258,9 @@ mod replay_ndjson_tests {
         assert_eq!(first.line, 1);
         let second = iter.next().expect("second yields error");
         match second {
-            Err(NdjsonError::Parse { line, message }) => {
+            Err(NdjsonError::Parse { line, source }) => {
                 assert_eq!(line, 2);
-                assert!(!message.is_empty(), "parse error carries serde detail");
+                assert!(std::error::Error::source(&source).is_some());
             }
             other => panic!("expected NdjsonError::Parse, got {other:?}"),
         }
@@ -270,7 +293,7 @@ mod replay_ndjson_tests {
     fn ndjson_error_exposes_line_number() {
         let err = NdjsonError::Parse {
             line: 42,
-            message: "boom".to_string(),
+            source: chio_core::canonical::UntrustedJsonError::NonCanonical,
         };
         assert_eq!(err.line(), 42);
         let io = NdjsonError::Io {
@@ -278,5 +301,36 @@ mod replay_ndjson_tests {
             source: std::io::Error::other("eio"),
         };
         assert_eq!(io.line(), 7);
+    }
+    #[test]
+    fn oversized_or_ambiguous_frames_are_rejected_at_original_boundary() {
+        use chio_core::canonical::UntrustedJsonError;
+        let mut iter = FrameIter::new(std::io::Cursor::new(vec![b' '; MAX_LINE_BYTES + 1]));
+        assert!(matches!(
+            iter.next(),
+            Some(Err(NdjsonError::Parse {
+                source: UntrustedJsonError::TooLarge { .. },
+                ..
+            }))
+        ));
+        assert!(iter.next().is_none());
+        let mut iter = FrameIter::new(std::io::Cursor::new(b"\n \n"));
+        iter.remaining = 2;
+        assert!(matches!(
+            iter.next(),
+            Some(Err(NdjsonError::Parse {
+                source: UntrustedJsonError::TooLarge { bound: 1, .. },
+                ..
+            }))
+        ));
+        assert!(iter.next().is_none());
+        let mut iter = FrameIter::new(std::io::Cursor::new(br#"{"invocation":{"x":1,"x":2}}"#));
+        assert!(matches!(
+            iter.next(),
+            Some(Err(NdjsonError::Parse {
+                source: UntrustedJsonError::SignedInput(_),
+                ..
+            }))
+        ));
     }
 }

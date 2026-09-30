@@ -176,7 +176,7 @@ pub(super) fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T
     if bytes.len() as u64 > MAX_CONFIG_BYTES {
         return Err(error("configuration exceeds one MiB"));
     }
-    serde_json::from_slice(&bytes).map_err(error)
+    Ok(crate::input::decode(&bytes, MAX_CONFIG_BYTES as usize)?)
 }
 
 pub(super) fn read_current_record(path: &Path) -> Result<Record, CliError> {
@@ -189,7 +189,7 @@ pub(super) fn read_current_record(path: &Path) -> Result<Record, CliError> {
     // Check the version before decoding manifest or configuration fields that
     // changed between ABIs. Legacy state cannot be silently upgraded on open.
     require_abi(&abi, "host state")?;
-    serde_json::from_value(value).map_err(error)
+    crate::input::project(value)
 }
 
 pub(super) fn identifier(id: &str) -> Result<(), CliError> {

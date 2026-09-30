@@ -11,6 +11,10 @@ use serde_json::{value::RawValue, Value};
 use super::{fail, CliError};
 
 pub(super) fn parse(text: &str) -> Result<Value, CliError> {
+    chio_core::canonical::UntrustedJsonText::from_wire(
+        text.as_bytes(),
+        crate::input::MAX_DOCUMENT_BYTES,
+    )?;
     parse_at(text, 0)
 }
 
@@ -18,12 +22,18 @@ fn parse_at(text: &str, depth: usize) -> Result<Value, CliError> {
     if depth > 64 {
         return Err(fail("process document nesting exceeds 64 levels"));
     }
-    let raw: &RawValue = serde_json::from_str(text).map_err(fail)?;
+    let raw: &RawValue = serde_json::from_str(text).map_err(|source| {
+        CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+    })?;
     let text = raw.get();
     match text.as_bytes().first() {
         Some(b'{') => {
             let mut deserializer = serde_json::Deserializer::from_str(text);
-            let entries = deserializer.deserialize_map(UniqueObject).map_err(fail)?;
+            let entries = deserializer
+                .deserialize_map(UniqueObject)
+                .map_err(|source| {
+                    CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+                })?;
             let mut object = serde_json::Map::new();
             for (key, value) in entries {
                 object.insert(key, parse_at(value.get(), depth + 1)?);
@@ -31,7 +41,9 @@ fn parse_at(text: &str, depth: usize) -> Result<Value, CliError> {
             Ok(Value::Object(object))
         }
         Some(b'[') => {
-            let entries: Vec<Box<RawValue>> = serde_json::from_str(text).map_err(fail)?;
+            let entries: Vec<Box<RawValue>> = serde_json::from_str(text).map_err(|source| {
+                CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+            })?;
             entries
                 .iter()
                 .map(|value| parse_at(value.get(), depth + 1))
@@ -39,9 +51,13 @@ fn parse_at(text: &str, depth: usize) -> Result<Value, CliError> {
                 .map(Value::Array)
         }
         _ => {
-            let value: Value = serde_json::from_str(text).map_err(fail)?;
+            let value: Value = serde_json::from_str(text).map_err(|source| {
+                CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+            })?;
             if value.is_number() {
-                let rendered = serde_json::to_string(&value).map_err(fail)?;
+                let rendered = serde_json::to_string(&value).map_err(|source| {
+                    CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+                })?;
                 if decimal_identity(text)? != decimal_identity(&rendered)? {
                     return Err(fail("process document contains a precision-losing number"));
                 }
@@ -77,7 +93,12 @@ fn decimal_identity(text: &str) -> Result<(bool, String, i64), CliError> {
     let negative = text.starts_with('-');
     let unsigned = text.strip_prefix('-').unwrap_or(text);
     let (mantissa, exponent) = match unsigned.split_once(['e', 'E']) {
-        Some((mantissa, exponent)) => (mantissa, exponent.parse::<i64>().map_err(fail)?),
+        Some((mantissa, exponent)) => (
+            mantissa,
+            exponent.parse::<i64>().map_err(|source| {
+                CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+            })?,
+        ),
         None => (unsigned, 0),
     };
     let fractional = mantissa
@@ -90,8 +111,33 @@ fn decimal_identity(text: &str) -> Result<(bool, String, i64), CliError> {
     }
     let significant = digits.trim_end_matches('0');
     let power = exponent
-        .checked_sub(i64::try_from(fractional).map_err(fail)?)
+        .checked_sub(i64::try_from(fractional).map_err(|source| {
+            CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
+        })?)
         .and_then(|power| power.checked_add((digits.len() - significant.len()) as i64))
         .ok_or_else(|| fail("process document number exponent overflow"))?;
     Ok((negative, significant.to_string(), power))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    #[test]
+    fn ordinary_worker_numbers_accept_equivalent_decimal_spellings_without_rounding() {
+        for source in ["1e0", "1.00", "0e10", "100e-2"] {
+            let value = parse(source).unwrap();
+            assert_eq!(
+                value.as_f64(),
+                Some(if source == "0e10" { 0.0 } else { 1.0 })
+            );
+        }
+        assert!(matches!(
+            parse("0.123456789012345678901"),
+            Err(CliError::Chio(_))
+        ));
+        let error = parse(r#"{"private-marker":1,"private-marker":2}"#).unwrap_err();
+        assert!(matches!(error, CliError::RegisteredSource(_)));
+        assert!(!error.to_string().contains("private-marker"));
+    }
 }

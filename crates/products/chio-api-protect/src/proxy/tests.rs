@@ -223,6 +223,7 @@ fn test_state_with_receipt_db(
         .build()
         .test_unwrap();
     Arc::new(ProxyState {
+        clock: clock::ProxyClock::default(),
         evaluator,
         signer_keypair: keypair,
         upstream,
@@ -1575,13 +1576,6 @@ async fn sidecar_submit_receipt_accepts_controller_job_receipts() {
     let receipt: SidecarSubmitReceiptResponse = serde_json::from_slice(&bytes).test_unwrap();
     assert!(receipt.accepted);
     assert!(!receipt.receipt_id.is_empty());
-}
-
-#[test]
-fn ttl_seconds_from_wire_accepts_seconds_and_nanoseconds() {
-    assert_eq!(ttl_seconds_from_wire(None, None), 3600);
-    assert_eq!(ttl_seconds_from_wire(Some(3600), None), 3600);
-    assert_eq!(ttl_seconds_from_wire(None, Some(500_000_000)), 1);
 }
 
 #[test]

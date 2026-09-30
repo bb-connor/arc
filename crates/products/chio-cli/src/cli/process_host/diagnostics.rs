@@ -89,12 +89,10 @@ impl Observer {
             Err(TryLockError::WouldBlock) => true,
             Err(TryLockError::Error(failure)) => return Err(error(failure)),
         };
-        let record: RecordHeader = serde_json::from_slice(&read_private(
-            &directory,
-            Path::new("host.json"),
-            MAX_CONFIG_BYTES,
-        )?)
-        .map_err(error)?;
+        let record: RecordHeader = crate::input::decode(
+            &read_private(&directory, Path::new("host.json"), MAX_CONFIG_BYTES)?,
+            MAX_CONFIG_BYTES as usize,
+        )?;
         if record.config.schema != SCHEMA {
             return Err(error("unsupported process host configuration"));
         }
@@ -111,9 +109,10 @@ impl Observer {
         let path = Path::new(STATUS_FILE);
         match self.directory.path().join(path).symlink_metadata() {
             Ok(_) => {
-                let snapshot: RunStatus =
-                    serde_json::from_slice(&read_private(&self.directory, path, MAX_CONFIG_BYTES)?)
-                        .map_err(error)?;
+                let snapshot: RunStatus = crate::input::decode(
+                    &read_private(&self.directory, path, MAX_CONFIG_BYTES)?,
+                    MAX_CONFIG_BYTES as usize,
+                )?;
                 if snapshot.schema != RUN_SCHEMA || snapshot.workers.len() > 128 {
                     return Err(error("unsupported or oversized run status snapshot"));
                 }

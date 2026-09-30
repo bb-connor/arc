@@ -56,6 +56,8 @@ use crate::spec_discovery::{default_upstream_egress_contract, discover_spec, loa
 mod approval;
 #[path = "proxy/attenuation.rs"]
 mod attenuation;
+#[path = "proxy/clock.rs"]
+mod clock;
 #[path = "proxy/config.rs"]
 mod config;
 #[path = "proxy/control.rs"]
@@ -66,12 +68,14 @@ mod decision;
 mod errors;
 #[path = "proxy/http.rs"]
 mod http;
+#[path = "proxy/input.rs"]
+mod input;
 #[path = "proxy/mediated.rs"]
 pub(crate) mod mediated;
-#[path = "proxy/nonce_middleware.rs"]
-mod nonce_middleware;
 #[path = "proxy/receipts.rs"]
 mod receipts;
+#[path = "proxy/request_ids.rs"]
+mod request_ids;
 #[path = "proxy/router.rs"]
 mod router;
 #[path = "proxy/scope_subset.rs"]
@@ -80,6 +84,7 @@ mod scope_subset;
 mod sidecar;
 #[path = "proxy/state.rs"]
 mod state;
+use request_ids::*;
 
 pub(crate) use self::approval::*;
 pub(crate) use self::attenuation::*;

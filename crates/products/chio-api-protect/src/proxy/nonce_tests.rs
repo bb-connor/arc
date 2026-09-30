@@ -30,6 +30,7 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
         .test_unwrap();
 
     Arc::new(ProxyState {
+        clock: clock::ProxyClock::default(),
         evaluator,
         signer_keypair: keypair,
         upstream,

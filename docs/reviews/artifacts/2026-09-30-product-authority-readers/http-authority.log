@@ -1,0 +1,67 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling jsonschema v0.46.0
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+   Compiling chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+    Finished `test` profile [unoptimized] target(s) in 1m 36s
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_http_core-86eba060c30fccab)
+
+running 35 tests
+test authority::tests::deny_by_default_requires_capability ... ok
+test authority::tests::configured_external_issuer_allows_deny_by_default ... ok
+test authority::tests::deny_by_default_tools_path_rejects_malformed_percent_encoding ... ok
+test authority::tests::deny_by_default_requires_matching_tool_grant ... ok
+test authority::tests::deny_by_default_tools_path_binds_to_path_identity ... ok
+test authority::tests::deny_by_default_proxy_path_requires_http_authority_grant ... ok
+test authority::tests::deny_by_default_proxy_path_ignores_spoofed_tool_identity ... ok
+test authority::tests::deny_by_default_tools_path_decodes_percent_encoded_identity ... ok
+test authority::tests::deny_by_default_tools_path_honors_path_identity ... ok
+test authority::tests::capability_hint_mismatch_becomes_denial ... ok
+test authority::tests::extract_approval_id_parses_resume_path ... ok
+test authority::tests::pending_approval_id_reads_nested_metadata ... ok
+test authority::tests::deny_by_default_tools_path_rejects_malformed_percent_encoding_before_wildcard_grant ... ok
+test authority::tests::approval_store_constructor_fails_closed_without_durable_stores ... ok
+test authority::tests::pending_approval_is_not_a_dispatch_failure ... ok
+test authority::tests::failclosed_authority_surfaces_durability_error_for_denied_projection ... ok
+test authority::tests::new_is_failclosed_without_a_durable_store ... ok
+test authority::tests::direct_v2_capability_denies_without_http_trust_root_resolver ... ok
+test authority::tests::deny_by_default_unmatched_http_path_does_not_trust_synthetic_pattern ... ok
+test authority::tests::finalized_receipt_links_decision_receipt_and_kernel_receipt ... ok
+test authority::tests::invalid_presented_capability_denies_even_safe_route ... ok
+test authority::tests::sign_transport_deny_receipt_rejects_non_deny_verdict ... ok
+test authority::tests::deny_by_default_tools_path_with_arguments_only_binds_to_path_identity ... ok
+test authority::tests::deny_by_default_tools_path_without_sidecar_fields_binds_to_path_identity ... ok
+test authority::tests::reserved_tools_path_safe_policy_requires_capability_without_sidecar_fields ... ok
+test authority::tests::reserved_tools_path_safe_policy_requires_capability ... ok
+test authority::tests::policy_deny_is_not_recorded_as_a_dispatch_failure ... ok
+test authority::tests::safe_policy_allows_without_capability ... ok
+test authority::tests::sign_transport_deny_receipt_signs_final_scope_deny ... ok
+test authority::tests::reserved_tools_path_safe_policy_binds_to_path_identity ... ok
+test authority::tests::untrusted_capability_denies_deny_by_default ... ok
+test authority::tests::valid_capability_allows_deny_by_default ... ok
+test authority::tests::strict_execution_nonce_preflight_round_trips_before_authorizing_http ... ok
+test authority::tests::revoked_presented_capability_denies_deny_by_default ... ok
+test authority::tests::builder_with_durable_stores_evaluates_without_persistence_deny ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 67 filtered out; finished in 2.05s

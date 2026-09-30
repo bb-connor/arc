@@ -31,8 +31,22 @@ async fn parse<T: serde::de::DeserializeOwned>(request: Request<Body>) -> Result
         .map_err(|_| {
             sidecar_bad_request("caller delivery request exceeds its bound").into_response()
         })?;
-    serde_json::from_slice(&bytes)
-        .map_err(|_| sidecar_bad_request("invalid caller delivery request").into_response())
+    input::decode(&bytes, MAX_REQUEST_BYTES).map_err(input::rejected)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod input_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn caller_delivery_rejects_original_nested_duplicate_keys() {
+        let request = Request::new(Body::from(
+            r#"{"arguments":{"credential":"private-marker","credential":"replacement"}}"#,
+        ));
+        let response = parse::<serde_json::Value>(request).await.unwrap_err();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
 }
 
 fn rejected() -> Response {

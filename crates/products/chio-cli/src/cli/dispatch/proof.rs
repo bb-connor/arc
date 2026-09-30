@@ -1,3 +1,5 @@
+#[path = "proof/room.rs"]
+mod room;
 use super::*;
 use chio_errors::_generated::error_codes::{
     TRANSACTION_ARTIFACT_HASH_MISMATCH, TRANSACTION_AUTHORIZATION_NOT_BOUND,
@@ -22,8 +24,8 @@ use proof_env::{
     enterprise_trusted_risk_comptroller_signer_keys_from_env,
     public_settlement_verifier_trust_from_env, runtime_trust_from_env,
     swarm_trusted_witness_keys_for_bundle, transaction_trusted_checkpoint_keys_from_env,
-    transaction_trusted_root_keys_from_env,
-    trust_market_trusted_authority_keys_from_env, AgentWebReplayMode,
+    transaction_trusted_root_keys_from_env, trust_market_trusted_authority_keys_from_env,
+    AgentWebReplayMode,
 };
 
 const REQUIRED_RUNTIME_AUTHORITY_CLAIMS: [&str; 6] = [
@@ -513,8 +515,7 @@ pub(super) fn verify_static_proof_bundle(bundle: &Path) -> Result<(), CliError> 
             manifest_path.display()
         )));
     }
-    chio_proof_room::verify_proof_room_bundle(&manifest_path)
-        .map_err(|error| CliError::cli_other_error(format!("proof room bundle: {error}")))
+    room::verify_manifest(&manifest_path)
 }
 
 fn verify_transaction_passport(
@@ -850,8 +851,7 @@ fn verify_proof_room_bundle_if_present(input_path: &Path) -> Result<(), CliError
     let Some(manifest_path) = proof_room_bundle_manifest_path_for_input(input_path) else {
         return Ok(());
     };
-    chio_proof_room::verify_proof_room_bundle(&manifest_path)
-        .map_err(|error| CliError::cli_other_error(format!("proof room bundle: {error}")))
+    room::verify_manifest(&manifest_path)
 }
 
 pub(super) fn verify_transaction_passport_file(path: &Path) -> Result<serde_json::Value, CliError> {
@@ -916,14 +916,12 @@ static FAIL_BEFORE_ROOT_CLAIM_SET_VERIFICATION_ONCE: std::sync::atomic::AtomicBo
 
 #[cfg(test)]
 fn fail_before_root_claim_set_verification_once() {
-    FAIL_BEFORE_ROOT_CLAIM_SET_VERIFICATION_ONCE
-        .store(true, std::sync::atomic::Ordering::SeqCst);
+    FAIL_BEFORE_ROOT_CLAIM_SET_VERIFICATION_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
 fn enforce_pre_root_claim_set_test_hook() -> Result<(), CliError> {
     #[cfg(test)]
-    if FAIL_BEFORE_ROOT_CLAIM_SET_VERIFICATION_ONCE
-        .swap(false, std::sync::atomic::Ordering::SeqCst)
+    if FAIL_BEFORE_ROOT_CLAIM_SET_VERIFICATION_ONCE.swap(false, std::sync::atomic::Ordering::SeqCst)
     {
         return Err(CliError::cli_other_error(
             "injected failure before root claim set verification",
@@ -1152,7 +1150,8 @@ fn verify_transaction_passport_file_with_mode(
         )?;
         push_family_report(&mut family_reports, report)?;
     }
-    let finding_claim_set_path = resolve_bundle_artifact_path(bundle_dir, &passport.claim_set_path)?;
+    let finding_claim_set_path =
+        resolve_bundle_artifact_path(bundle_dir, &passport.claim_set_path)?;
     let finding_claim_set = fs::read(finding_claim_set_path)?;
     let finding_claims_advertised =
         claim_set_bytes_advertise_verified_prefix(&finding_claim_set, CLAIM_PREFIX_FINDING)?;
@@ -1187,11 +1186,10 @@ fn verify_transaction_passport_file_with_mode(
     }
     if !family_reports.is_empty() {
         enforce_pre_root_claim_set_test_hook()?;
-        let trust_anchors =
-            chio_control_plane::transaction_passport::TransactionTrustAnchors {
-                passport_root_signers: &trusted_transaction_root_keys,
-                checkpoint_signers: &trusted_transaction_checkpoint_keys,
-            };
+        let trust_anchors = chio_control_plane::transaction_passport::TransactionTrustAnchors {
+            passport_root_signers: &trusted_transaction_root_keys,
+            checkpoint_signers: &trusted_transaction_checkpoint_keys,
+        };
         let externally_verified_claims = verified_claims_from_family_reports(&family_reports);
         chio_control_plane::transaction_passport::verify_passport_root_and_claim_set_artifacts_with_transparency_anchors(
             &passport,

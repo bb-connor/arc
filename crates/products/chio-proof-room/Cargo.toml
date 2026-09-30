@@ -19,6 +19,7 @@ name = "chio-proof-room"
 path = "src/main.rs"
 
 [dependencies]
+libc = { workspace = true }
 axum = "0.8"
 chio-agent-web-interop = { workspace = true }
 chio-commerce-order = { workspace = true }

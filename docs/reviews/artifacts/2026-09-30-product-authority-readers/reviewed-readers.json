@@ -1,0 +1,147 @@
+{
+  "base": "7525fcdf0c83adf6fddb88063dd75485d91b2554",
+  "baseline_before": 278,
+  "baseline_after": 250,
+  "readers": [
+    {
+      "path": "crates/products/chio-api-protect/src/proxy/http.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
+    },
+    {
+      "path": "crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
+    },
+    {
+      "path": "crates/products/chio-api-protect/src/proxy/mediated.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
+    },
+    {
+      "path": "crates/products/chio-api-protect/src/proxy/nonce_middleware.rs",
+      "kind": "retired",
+      "contract": "Unused private permissive nonce middleware had no production consumers and was removed. The mediated production owner validates original bounded nonce bytes and enforces the authority checks."
+    },
+    {
+      "path": "crates/products/chio-api-protect/src/proxy/sidecar.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Original HTTP bodies are stream-bounded, then duplicate-aware native JSON is decoded through proxy/input.rs. Parser causes stay local; HTTP rejections expose stable codes. Signed capability/nonce/receipt verification remains with its existing authority owner."
+    },
+    {
+      "path": "crates/products/chio-api-protect/src/proxy/state.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "SQLite receipt text is byte-capped in SQL before materialization and decoded from original text. Writers apply the same per-receipt cap. Request-id reservations use generation ownership, bounded expiry indices, the shared fenced clock and kernel-serialized durable reuse checks."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_native.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_host/call_evidence.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_host/diagnostics.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_host/native_broker/classification.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_host/run_evidence/native.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_host/runner/container.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_host/state.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Private host files, bounded Docker responses and nested receipt strings use bounded original native JSON readers with typed causes; worker documents retain their ordinary lossless JSON parser. Projected evidence is used only after outer receipt, signer pin, action and runtime/call bindings are verified; classification keeps the original full payload digest."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_response_verify/json.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Bounded ordinary worker JSON parser checks original nested key uniqueness and exact decimal equivalence (including 1e0 and trailing zeros), with typed redacted parser sources. It deliberately preserves the ordinary JSON numeric contract separately from native signed JSON and I-JSON."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/receipt_verify.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Original receipts are capped at 8 MiB, strict I-JSON checked, projected to the supported receipt schema, compared with that full schema and verified against the caller-pinned signer and action hash before use."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/replay/execute.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/replay/ndjson.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/replay/reader.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/replay/validate.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Replay file/corpus and NDJSON readers enforce original byte and record budgets before projection. Invocation argument byte strings must equal canonical JSON; value projections are shape checks, not claims about original formatting. Replay outputs remain diagnostic and do not grant execution authority."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/bundle_a.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/bundle_b.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/crypto_context.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Embedded fixture construction decodes bounded original JSON and grants no execution authority. Installed fixture collection has shared entry/depth and actual-byte budgets; installed documents and disclosure inputs reject duplicate or lossy original JSON before any field selection. Fixture report errors are diagnostic projections."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/fixture_a.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Embedded fixture construction decodes bounded original JSON and grants no execution authority. Installed fixture collection has shared entry/depth and actual-byte budgets; installed documents and disclosure inputs reject duplicate or lossy original JSON before any field selection. Fixture report errors are diagnostic projections."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/fixture_b.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Embedded fixture construction decodes bounded original JSON and grants no execution authority. Installed fixture collection has shared entry/depth and actual-byte budgets; installed documents and disclosure inputs reject duplicate or lossy original JSON before any field selection. Fixture report errors are diagnostic projections."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/lib.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/receipt_coverage.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/server.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    },
+    {
+      "path": "crates/products/chio-proof-room/src/source_verifier.rs",
+      "kind": "reviewed-bounded-input",
+      "contract": "Proof artifacts are capped before reads and duplicate-aware decoded before projection; core verification retains typed parser causes. Signature and digest verification uses original bytes and pinned trust. Successful public bundle verification returns a sealed manifest identity used directly for doctor and upload results. Upload paths are budgeted before writes; standalone graph and sidecar collection shares actual-byte and entry budgets."
+    }
+  ]
+}
