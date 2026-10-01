@@ -166,7 +166,8 @@ fn signed_artifacts_verify_and_strictly_decode_canonical_bytes() {
     noncanonical.push(b'\n');
     assert!(matches!(
         VerifiedFiscalCharter::from_canonical_bytes(&noncanonical),
-        Err(FiscalError::Canonicalization(_))
+        Err(FiscalError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
 }
 

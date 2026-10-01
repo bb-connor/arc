@@ -19,6 +19,7 @@ web3 = [
     "dep:alloy-sol-types",
     "dep:async-trait",
     "dep:chio-core",
+    "dep:chio-security-types",
     "dep:chio-egress-contract",
     "dep:chio-kernel",
     "dep:chio-web3-bindings",
@@ -50,6 +51,7 @@ fuzz = ["web3", "dep:arbitrary"]
 kani = ["web3"]
 
 [dependencies]
+chio-security-types = { workspace = true, features = ["std"], optional = true }
 chio-core = { workspace = true, optional = true }
 chio-egress-contract = { workspace = true, features = ["reqwest-egress"], optional = true }
 chio-kernel = { workspace = true, optional = true }

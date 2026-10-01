@@ -1,0 +1,111 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-anchor v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-anchor)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+    Finished `test` profile [unoptimized] target(s) in 1m 01s
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_anchor-223e69c543cfdea9)
+
+running 6 tests
+test witness::rekor::original_input_tests::original_nested_rekor_body_rejects_ignored_duplicate_keys ... ok
+test witness::rekor::ingress_tests::original_rekor_hash_shape_precedes_public_mismatch_diagnostics ... FAILED
+test witness::rekor::ingress_tests::original_witness_proof_decode_is_bounded ... ok
+test witness::rekor::ingress_tests::original_rekor_receipt_timestamp_is_bound_to_signed_entry ... ok
+test witness::rekor::ingress_tests::original_rekor_rejects_authenticated_future_time ... ok
+test witness::rekor::ingress_tests::original_rekor_response_budget_precedes_projection ... ok
+
+failures:
+
+---- witness::rekor::ingress_tests::original_rekor_hash_shape_precedes_public_mismatch_diagnostics stdout ----
+
+thread 'witness::rekor::ingress_tests::original_rekor_hash_shape_precedes_public_mismatch_diagnostics' (3931885) panicked at crates/economy/chio-anchor/src/witness/rekor/ingress_tests.rs:236:9:
+assertion failed: matches!(extract_lane_body_hash(&entry),
+    Err(AnchorWitnessError::Decode(message)) if message ==
+    "Rekor entry hash is not SHA-256 hex")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    witness::rekor::ingress_tests::original_rekor_hash_shape_precedes_public_mismatch_diagnostics
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out; finished in 0.27s
+
+error: test failed, to rerun pass `-p chio-anchor --lib`
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_credit-1766d829a1ff7a50)
+
+running 1 test
+test factor::original_input_tests::original_factor_input_preserves_native_cause ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_fiscal-506ace82a32e9dc1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_link-854d545cd4f596c7)
+
+running 2 tests
+test chainlink::tests::original_rpc_ignored_duplicate_keys_fail_before_raw_value_projection ... FAILED
+test chainlink::tests::original_rpc_failure_keeps_native_cause_and_hides_payload ... ok
+
+failures:
+
+---- chainlink::tests::original_rpc_ignored_duplicate_keys_fail_before_raw_value_projection stdout ----
+
+thread 'chainlink::tests::original_rpc_ignored_duplicate_keys_fail_before_raw_value_projection' (3931896) panicked at crates/economy/chio-link/src/chainlink.rs:381:17:
+assertion failed: matches!(result, Ok(_))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    chainlink::tests::original_rpc_ignored_duplicate_keys_fail_before_raw_value_projection
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 51 filtered out; finished in 0.16s
+
+error: test failed, to rerun pass `-p chio-link --lib`
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_listing-bef73684d206d427)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_market-179afb500c6438ae)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_open_market-706de0c36e04e4df)
+
+running 2 tests
+test purchase_verification::original_input_tests::original_purchase_member_cannot_normalize_duplicate_fields ... ok
+test recovery::original_input_tests::original_recovery_member_preserves_external_contract_and_cause ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_settle-28aade0c6cdc1f53)
+
+running 3 tests
+test finding_enforcement::observation_source::original_input_tests::original_observation_failure_preserves_native_source ... ok
+test retry::original_record_tests::original_dead_letter_rejects_zero_attempts ... ok
+test finding_enforcement::publish::remote_tests::original_alternate_transport_response_is_bounded ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 252 filtered out; finished in 0.05s
+
+error: 2 targets failed:
+    `-p chio-anchor --lib`
+    `-p chio-link --lib`

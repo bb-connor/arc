@@ -1,0 +1,41 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+   Compiling chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+error[E0599]: no function or associated item named `from_canonical_bytes` found for struct `SignedAssignmentAgreementV1` in the current scope
+   --> crates/economy/chio-credit/tests/original_input.rs:24:69
+    |
+ 24 |     assert_native_cause(&require_error(SignedAssignmentAgreementV1::from_canonical_bytes(bytes)));
+    |                                                                     ^^^^^^^^^^^^^^^^^^^^ function or associated item not found in `SignedAssignmentAgreementV1`
+    |
+note: if you're trying to build a new `SignedAssignmentAgreementV1`, consider using `SignedAssignmentAgreementV1::sign` which returns `Result<SignedAssignmentAgreementV1, FactorError>`
+   --> crates/economy/chio-credit/src/factor/authorization.rs:740:5
+    |
+740 | /     pub fn sign(
+741 | |         body: AssignmentAgreementBodyV1,
+742 | |         seller_key_epoch: u64,
+743 | |         seller: &Keypair,
+744 | |         buyer_key_epoch: u64,
+745 | |         buyer: &Keypair,
+746 | |     ) -> Result<Self, FactorError> {
+    | |__________________________________^
+help: there is a method `canonical_bytes` with a similar name, but with different arguments
+   --> crates/economy/chio-credit/src/factor/authorization.rs:770:5
+    |
+770 |     pub fn canonical_bytes(&self) -> Result<Vec<u8>, FactorError> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `chio-credit` (test "original_input") due to 1 previous error

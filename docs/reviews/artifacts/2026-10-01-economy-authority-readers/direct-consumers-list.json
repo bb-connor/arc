@@ -1,0 +1,21 @@
+[
+  "chio-appraisal",
+  "chio-autonomy",
+  "chio-cli",
+  "chio-conformance",
+  "chio-control-plane",
+  "chio-core",
+  "chio-credentials",
+  "chio-federation",
+  "chio-finding-challenge",
+  "chio-finding-market-store-postgres",
+  "chio-finding-verifier",
+  "chio-formal-diff-tests",
+  "chio-governance",
+  "chio-kernel",
+  "chio-store-sqlite",
+  "chio-transaction-passport",
+  "chio-underwriting",
+  "chio-web3",
+  "chio-web3-bindings"
+]

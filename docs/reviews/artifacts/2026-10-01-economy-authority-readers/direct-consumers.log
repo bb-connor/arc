@@ -1,0 +1,222 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on build directory
+    Checking chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+    Checking alloy-rlp v0.3.13
+    Checking k256 v0.13.4
+    Checking referencing v0.46.0
+    Checking ruint v1.20.0
+    Checking rusqlite v0.39.0
+    Checking jsonschema v0.46.0
+    Checking alloy-primitives v1.5.7
+    Checking nybbles v0.4.8
+    Checking openidconnect v4.0.1
+    Checking alloy-json-abi v1.5.7
+    Checking chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+    Checking alloy-sol-types v1.5.7
+    Checking alloy-serde v1.8.3
+    Checking alloy-eip7928 v0.3.3
+    Checking alloy-eip7702 v0.6.3
+    Checking chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+    Checking chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+    Checking alloy-eip2124 v0.2.0
+    Checking alloy-eip2930 v0.2.3
+    Checking alloy-trie v0.9.5
+    Checking alloy-eips v1.8.3
+    Checking alloy-json-rpc v1.8.3
+    Checking chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+    Checking chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+    Checking alloy-consensus v1.8.3
+    Checking alloy-transport v1.8.3
+    Checking alloy-transport-http v1.8.3
+    Checking alloy-signer v1.8.3
+    Checking alloy-rpc-client v1.8.3
+    Checking alloy-core v1.5.7
+    Checking alloy-chains v0.2.33
+    Checking alloy v1.8.3
+    Checking alloy-dyn-abi v1.5.7
+    Checking alloy-network-primitives v1.8.3
+    Checking alloy-consensus-any v1.8.3
+    Checking oci-client v0.17.0
+    Checking chio-web3-bindings v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3-bindings)
+    Checking alloy-rpc-types-eth v1.8.3
+    Checking chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+    Checking chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+    Checking sigstore v0.14.0
+    Checking chio-sqlite-file-identity v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-sqlite-file-identity)
+    Checking r2d2_sqlite v0.33.0
+    Checking rusty-fork v0.3.1
+    Checking alloy-rpc-types-any v1.8.3
+    Checking alloy-network v1.8.3
+    Checking proptest v1.10.0
+    Checking alloy-provider v1.8.3
+    Checking chio-spec-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-spec-validate)
+    Checking chio-finding-market-port v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-port)
+    Checking chio-finding-market-store-postgres v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-store-postgres)
+    Checking chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+    Checking alloy-contract v1.8.3
+    Checking chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+    Checking chio-decoy v0.1.0 (/tmp/arc-security-launch/crates/security/chio-decoy)
+    Checking chio-keyring v0.1.0 (/tmp/arc-security-launch/crates/security/chio-keyring)
+    Checking gimli v0.33.0
+    Checking chio-finding-worker v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-worker)
+    Checking plotters-backend v0.3.7
+    Checking cast v0.3.0
+    Checking plotters-svg v0.3.7
+    Checking criterion-plot v0.5.0
+    Checking plotters v0.3.7
+    Checking tinytemplate v1.2.1
+    Checking chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+    Checking chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+    Checking cranelift-codegen v0.133.3
+    Checking wasmtime-environ v46.0.3
+    Checking addr2line v0.26.1
+    Checking anes v0.1.6
+    Checking oorandom v11.1.5
+    Checking criterion v0.5.1
+    Checking chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+    Checking generator v0.8.8
+    Checking scoped-tls v1.0.1
+    Checking loom v0.7.2
+    Checking chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+    Checking chio-guard-registry v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guard-registry)
+    Checking chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+    Checking chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+    Checking chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+    Checking chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+    Checking chio-workflow v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow)
+    Checking chio-credentials v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-credentials)
+    Checking chio-selective-disclosure v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-selective-disclosure)
+    Checking chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+    Checking chio-federation-authority v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-authority)
+    Checking chio-cage v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage)
+    Checking chio-metering v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-metering)
+    Checking chio-signing-remote v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-signing-remote)
+    Checking chio-pheromone-runtime v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone-runtime)
+    Checking wasmtime-internal-fiber v46.0.3
+    Checking chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+    Checking wasmtime-internal-cache v46.0.3
+    Checking chio-pheromone-relay v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone-relay)
+    Checking cranelift-native v0.133.3
+    Checking cranelift-frontend v0.133.3
+    Checking wasmtime-internal-unwinder v46.0.3
+    Checking chio-attest-loopback v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-loopback)
+    Checking wasmtime-internal-cranelift v46.0.3
+    Checking chio-kernel-browser v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-browser)
+    Checking chio-adversarial-suite v0.1.0 (/tmp/arc-security-launch/crates/core/chio-adversarial-suite)
+    Checking gimli v0.32.3
+    Checking wasmtime v46.0.3
+    Checking addr2line v0.25.1
+    Checking object v0.37.3
+    Checking chio-federation-transport-iroh v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-transport-iroh)
+    Checking thousands v0.2.0
+    Checking rustc-hash v1.1.0
+    Checking mintex v0.1.4
+    Checking backtrace v0.3.76
+    Checking dhat v0.3.3
+    Checking chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+    Checking chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+    Checking chio-trace-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-trace-validate)
+    Checking chio-edge-metrics v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-edge-metrics)
+    Checking chio-http-session v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-session)
+    Checking chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+    Checking chio-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guards)
+    Checking chio-mcp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-edge)
+    Checking chio-finding-challenge v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-challenge)
+    Checking chio-security-kernel v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-kernel)
+    Checking chio-mcp-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-mcp-adapter)
+    Checking chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+    Checking chio-siem v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-siem)
+    Checking chio-policy v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-policy)
+    Checking chio-external-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-external-guards)
+    Checking chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+    Checking chio-data-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards)
+    Checking chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+    Checking chio-trust-market-context v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-trust-market-context)
+    Checking chio-enterprise-export v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-enterprise-export)
+    Checking chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+    Checking chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+    Checking chio-config v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-config)
+    Checking chio-runtime-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-core)
+    Checking chio-wasm-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-wasm-guards)
+    Checking chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+    Checking chio-openapi v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi)
+    Checking chio-anchor v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-anchor)
+    Checking chio-proof-room v0.1.0 (/tmp/arc-security-launch/crates/products/chio-proof-room)
+    Checking chio-acp-proxy v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-proxy)
+    Checking chio-process v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-process)
+    Checking chio-runtime v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime)
+    Checking chio-attest-buyer v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer)
+    Checking chio-openapi-mcp-bridge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-openapi-mcp-bridge)
+    Checking chio-acp-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-acp-edge)
+    Checking chio-a2a-edge v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-a2a-edge)
+    Checking chio-a2a-adapter v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-a2a-adapter)
+    Checking chio-formal-diff-tests v0.1.0 (/tmp/arc-security-launch/formal/diff-tests)
+    Checking chio-conformance v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-conformance)
+    Checking chio-secret-broker v0.1.0 (/tmp/arc-security-launch/crates/security/chio-secret-broker)
+    Checking chio-tee v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-tee)
+    Checking chio-replay-corpus v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-replay-corpus)
+    Checking chio-arena v0.1.0 (/tmp/arc-security-launch/crates/core/chio-arena)
+    Checking chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+    Checking chio-runtime-harness v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-harness)
+error[E0004]: non-exhaustive patterns: `&PurchaseVerificationError::MemberInput { .. }` not covered
+  --> crates/platform/chio-control-plane/src/trust_control/finding_purchase_verifier.rs:24:22
+   |
+24 |     let code = match &error {
+   |                      ^^^^^^ pattern `&PurchaseVerificationError::MemberInput { .. }` not covered
+   |
+note: `PurchaseVerificationError` defined here
+  --> crates/economy/chio-open-market/src/purchase_verification.rs:53:1
+   |
+53 | pub enum PurchaseVerificationError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+54 |     #[error("purchase context member {member} rejected: {source}")]
+55 |     MemberInput {
+   |     ----------- not covered
+   = note: the matched value is of type `&PurchaseVerificationError`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+   |
+39 ~         | E::ArgumentMismatch => FindingDenialCode::BindingMismatch,
+40 ~         &PurchaseVerificationError::MemberInput { .. } => todo!(),
+   |
+
+error[E0004]: non-exhaustive patterns: `&RecoveryVerificationError::MemberInput { .. }` and `&RecoveryVerificationError::CarrierInput(_)` not covered
+  --> crates/platform/chio-control-plane/src/trust_control/finding_recovery_verifier.rs:22:22
+   |
+22 |     let code = match &error {
+   |                      ^^^^^^ patterns `&RecoveryVerificationError::MemberInput { .. }` and `&RecoveryVerificationError::CarrierInput(_)` not covered
+   |
+note: `RecoveryVerificationError` defined here
+  --> crates/economy/chio-open-market/src/recovery.rs:36:1
+   |
+36 | pub enum RecoveryVerificationError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 |     #[error("recovery member {member} rejected: {source}")]
+38 |     MemberInput {
+   |     ----------- not covered
+...
+44 |     CarrierInput(#[source] chio_finding::FindingError),
+   |     ------------ not covered
+   = note: the matched value is of type `&RecoveryVerificationError`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern, a match arm with multiple or-patterns as shown, or multiple match arms
+   |
+34 ~         | E::SubjectMismatch => FindingDenialCode::BindingMismatch,
+35 ~         &RecoveryVerificationError::MemberInput { .. } | &RecoveryVerificationError::CarrierInput(_) => todo!(),
+   |
+
+For more information about this error, try `rustc --explain E0004`.
+error: could not compile `chio-control-plane` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `chio-control-plane` (lib test) due to 2 previous errors

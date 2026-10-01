@@ -15,10 +15,40 @@
     "crates/core/chio-core-types/src/merkle.rs",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc",
     "crates/core/chio-core-types/src/wire_text.rs",
+    "crates/economy/chio-anchor/src/witness.rs",
+    "crates/economy/chio-anchor/src/witness/rekor.rs",
+    "crates/economy/chio-anchor/src/witness/rekor/clock.rs",
+    "crates/economy/chio-anchor/src/witness/rekor/input.rs",
+    "crates/economy/chio-credit/src/factor/claim.rs",
+    "crates/economy/chio-credit/src/factor/mod.rs",
+    "crates/economy/chio-credit/src/financial_credentials.rs",
+    "crates/economy/chio-credit/src/input.rs",
+    "crates/economy/chio-credit/src/iou_v2.rs",
+    "crates/economy/chio-credit/src/obligation/credit_facility_bind.rs",
+    "crates/economy/chio-credit/src/obligation/status.rs",
     "crates/economy/chio-finding/src/purchase_context.rs",
     "crates/economy/chio-finding/src/recovery_context.rs",
     "crates/economy/chio-finding/src/status.rs",
     "crates/economy/chio-finding/src/validate.rs",
+    "crates/economy/chio-fiscal/src/fiscal.rs",
+    "crates/economy/chio-fiscal/src/input.rs",
+    "crates/economy/chio-fiscal/src/lifecycle/continuity.rs",
+    "crates/economy/chio-fiscal/src/lifecycle/readiness.rs",
+    "crates/economy/chio-link/src/chainlink.rs",
+    "crates/economy/chio-link/src/source.rs",
+    "crates/economy/chio-listing/src/outcome/mod.rs",
+    "crates/economy/chio-listing/src/outcome/predicate.rs",
+    "crates/economy/chio-market/src/parametric.rs",
+    "crates/economy/chio-open-market/src/purchase_verification.rs",
+    "crates/economy/chio-open-market/src/recovery.rs",
+    "crates/economy/chio-settle/src/ccip.rs",
+    "crates/economy/chio-settle/src/channel/replay.rs",
+    "crates/economy/chio-settle/src/config.rs",
+    "crates/economy/chio-settle/src/finding_enforcement/observation_source.rs",
+    "crates/economy/chio-settle/src/finding_enforcement/publish.rs",
+    "crates/economy/chio-settle/src/hook.rs",
+    "crates/economy/chio-settle/src/input.rs",
+    "crates/economy/chio-settle/src/retry.rs",
     "crates/guards/chio-data-guards/src/structured_classification.rs",
     "crates/guards/chio-external-guards/src/external/azure_content_safety.rs",
     "crates/guards/chio-external-guards/src/external/bedrock.rs",
@@ -1087,10 +1117,23 @@
   },
   "constructors": [
     "crates/core/chio-core-types/src/capability/attenuation.rs::validate_attenuation_proof::from_wire",
+    "crates/economy/chio-anchor/src/witness/rekor.rs::extract_lane_body_hash::from_wire",
+    "crates/economy/chio-anchor/src/witness/rekor/input.rs::response::from_wire",
+    "crates/economy/chio-credit/src/input.rs::canonical::from_wire",
     "crates/economy/chio-finding/src/purchase_context.rs::parse_purchase_context::new",
     "crates/economy/chio-finding/src/recovery_context.rs::parse_finding_recovery_context::new",
     "crates/economy/chio-finding/src/status.rs::parse_exact_canonical::new",
     "crates/economy/chio-finding/src/validate.rs::parse_canonical_json_text::new",
+    "crates/economy/chio-fiscal/src/input.rs::canonical::from_wire",
+    "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_wire",
+    "crates/economy/chio-listing/src/outcome/mod.rs::load_canonical_outcome_json::from_wire",
+    "crates/economy/chio-listing/src/outcome/predicate.rs::evaluate_outcome_predicate::from_wire",
+    "crates/economy/chio-market/src/parametric.rs::from_canonical_bytes::from_wire",
+    "crates/economy/chio-open-market/src/purchase_verification.rs::parse_member::from_wire",
+    "crates/economy/chio-open-market/src/recovery.rs::strict_member::from_wire",
+    "crates/economy/chio-settle/src/config.rs::from_path::from_wire",
+    "crates/economy/chio-settle/src/input.rs::canonical::from_wire",
+    "crates/economy/chio-settle/src/input.rs::external_canonical::from_wire",
     "crates/guards/chio-data-guards/src/structured_classification.rs::from_payload::from_wire",
     "crates/guards/chio-external-guards/src/external/input.rs::arguments::from_wire",
     "crates/guards/chio-external-guards/src/external/input.rs::response::from_wire",
@@ -2124,6 +2167,11 @@
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize",
     "crates/core/chio-core-types/src/wire_text.rs::schema::custom_deserialize",
+    "crates/economy/chio-anchor/src/witness.rs::serialize::custom_deserialize",
+    "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_slice",
+    "crates/economy/chio-open-market/src/recovery.rs::verify_finding_recovery_context::from_value",
+    "crates/economy/chio-settle/src/ccip.rs::sample_receipt::from_str",
+    "crates/economy/chio-settle/src/retry.rs::classify_attempt::custom_deserialize",
     "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::serialize::custom_deserialize",
     "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_str",
@@ -4524,6 +4572,11 @@
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::from::custom_deserialize": "Validated security receipt DTO field deserializers; containing signed receipt readers and trusted producer checks establish provenance.",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize": "Validated security receipt DTO field deserializers; containing signed receipt readers and trusted producer checks establish provenance.",
     "crates/core/chio-core-types/src/wire_text.rs::schema::custom_deserialize": "Validated wire text field deserializers; containing original-byte readers establish the document contract.",
+    "crates/economy/chio-anchor/src/witness.rs::serialize::custom_deserialize": "Opaque witness proof serialization and base64 decode have a 1 MiB decoded budget; encoded length is checked before allocating decoded proof bytes. Wire receipt shape remains unverified until the pinned lane verifier and batch bindings succeed.",
+    "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_slice": "Contract-backed HTTP bounds retention; original unsigned JSON rejects duplicates before Alloy RawValue projection of the same bytes, preserving native integers and ordinary float spellings. Native transport and parser causes survive the public oracle error; public errors never echo provider bodies. Chain, feed, configured decimals, round, price and freshness checks remain.",
+    "crates/economy/chio-open-market/src/recovery.rs::verify_finding_recovery_context::from_value": "Recovery members preserve the existing strict external I-JSON and exact typed canonical contract under the carrier limit. Parser causes survive member/context/metadata projection. Original kernel receipt signature, purchase and capability identity, subject and recovery authority binding remain unchanged.",
+    "crates/economy/chio-settle/src/ccip.rs::sample_receipt::from_str": "The only lexical decoder is a repository-owned include_str receipt fixture inside cfg(test). Production CCIP accepts typed validated receipts and checks lane, receipt, payload and replay identity. No redundant production parser introduced.",
+    "crates/economy/chio-settle/src/retry.rs::classify_attempt::custom_deserialize": "Dead-letter custom Deserialize accepts only the closed typed reason schema and a nonzero attempt count. The legacy string-reason fallback is removed. Terminal reason digests remain bounded, and unsupported schema/unknown fields fail closed.",
     "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value": "The complete 16 MiB-bounded original native guard manifest is duplicate-aware before marketplace Value and typed projection. Full-width native prices survive; nested duplicate keys reject. Existing price and reputation checks remain separate.",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::serialize::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_str": "The mobile receipt inspection seam now uses bounded original parsing and no verifier alias. Other public capability and passport JSON readers in this file remain outside this batch and require semantic disposition; do not count the complete file as closed.",
@@ -5403,67 +5456,22 @@
       "fuzz_anchor_bundle_verify::from_slice",
       "fuzz_anchor_bundle_verify::from_slice"
     ],
-    "crates/economy/chio-anchor/src/witness/rekor.rs": [
-      "extract_lane_body_hash::from_slice",
-      "publish::from_str",
-      "verify_inclusion::from_str"
-    ],
     "crates/economy/chio-anchor/src/witness.rs": [
       "serialize::custom_deserialize"
     ],
     "crates/economy/chio-credit/src/clearing/lifecycle.rs": [
       "decode_inline::from_value"
     ],
-    "crates/economy/chio-credit/src/factor/mod.rs": [
-      "parse_canonical::from_slice"
-    ],
-    "crates/economy/chio-credit/src/financial_credentials.rs": [
-      "parse_canonical_source_artifact::from_str"
-    ],
-    "crates/economy/chio-credit/src/iou_v2.rs": [
-      "from_canonical_bytes::from_slice"
-    ],
-    "crates/economy/chio-credit/src/obligation/credit_facility_bind.rs": [
-      "from_canonical_bytes::from_slice"
-    ],
-    "crates/economy/chio-credit/src/obligation/status.rs": [
-      "from_canonical_bytes::from_slice"
-    ],
-    "crates/economy/chio-fiscal/src/fiscal.rs": [
-      "from_canonical_bytes::from_slice",
-      "from_canonical_bytes::from_slice"
-    ],
-    "crates/economy/chio-fiscal/src/lifecycle/continuity.rs": [
-      "from_canonical_bytes::from_slice"
-    ],
-    "crates/economy/chio-fiscal/src/lifecycle/readiness.rs": [
-      "from_canonical_bytes::from_slice",
-      "from_canonical_bytes::from_slice"
-    ],
     "crates/economy/chio-link/src/chainlink.rs": [
       "send_json_rpc::from_slice"
-    ],
-    "crates/economy/chio-listing/src/outcome/mod.rs": [
-      "load_canonical_outcome_json::from_slice"
-    ],
-    "crates/economy/chio-listing/src/outcome/predicate.rs": [
-      "evaluate::from_slice"
     ],
     "crates/economy/chio-market/src/parametric/lifecycle.rs": [
       "retained_opening_state::from_value"
     ],
-    "crates/economy/chio-market/src/parametric.rs": [
-      "from_canonical_bytes::from_slice"
-    ],
     "crates/economy/chio-metering/src/budget_hierarchy.rs": [
       "deserialize::from_value"
     ],
-    "crates/economy/chio-open-market/src/purchase_verification.rs": [
-      "canonical_digest_of::from_str",
-      "parse_member::from_str"
-    ],
     "crates/economy/chio-open-market/src/recovery.rs": [
-      "strict_member::from_str",
       "verify_finding_recovery_context::from_value"
     ],
     "crates/economy/chio-settle/src/ccip.rs": [
@@ -5475,24 +5483,11 @@
     "crates/economy/chio-settle/src/channel/projection/cancellation.rs": [
       "decode_content::from_value"
     ],
-    "crates/economy/chio-settle/src/channel/replay.rs": [
-      "from_canonical_bytes::from_slice",
-      "from_canonical_bytes::from_slice"
-    ],
     "crates/economy/chio-settle/src/channel/reservation.rs": [
       "decode_effect_head::from_value"
     ],
     "crates/economy/chio-settle/src/channel/terminal.rs": [
       "decode_head::from_value"
-    ],
-    "crates/economy/chio-settle/src/config.rs": [
-      "from_path::from_str"
-    ],
-    "crates/economy/chio-settle/src/finding_enforcement/observation_source.rs": [
-      "decode_response::from_slice"
-    ],
-    "crates/economy/chio-settle/src/finding_enforcement/publish.rs": [
-      "execute::from_slice"
     ],
     "crates/economy/chio-settle/src/retry.rs": [
       "classify_attempt::custom_deserialize"
@@ -6453,64 +6448,16 @@
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
     },
     "crates/economy/chio-anchor/src/witness.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-anchor/src/witness/rekor.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Opaque witness proof serialization and base64 decode have a 1 MiB decoded budget; encoded length is checked before allocating decoded proof bytes. Wire receipt shape remains unverified until the pinned lane verifier and batch bindings succeed."
     },
     "crates/economy/chio-credit/src/clearing/lifecycle.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/economy/chio-credit/src/factor/mod.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-credit/src/financial_credentials.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-credit/src/iou_v2.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-credit/src/obligation/credit_facility_bind.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-credit/src/obligation/status.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-fiscal/src/fiscal.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-fiscal/src/lifecycle/continuity.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-fiscal/src/lifecycle/readiness.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/economy/chio-link/src/chainlink.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-listing/src/outcome/mod.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-listing/src/outcome/predicate.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-market/src/parametric.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Contract-backed HTTP bounds retention; original unsigned JSON rejects duplicates before Alloy RawValue projection of the same bytes, preserving native integers and ordinary float spellings. Native transport and parser causes survive the public oracle error; public errors never echo provider bodies. Chain, feed, configured decimals, round, price and freshness checks remain."
     },
     "crates/economy/chio-market/src/parametric/lifecycle.rs": {
       "kind": "typed-value-conversion",
@@ -6520,17 +6467,13 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/economy/chio-open-market/src/purchase_verification.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/economy/chio-open-market/src/recovery.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Recovery members preserve the existing strict external I-JSON and exact typed canonical contract under the carrier limit. Parser causes survive member/context/metadata projection. Original kernel receipt signature, purchase and capability identity, subject and recovery authority binding remain unchanged."
     },
     "crates/economy/chio-settle/src/ccip.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "The only lexical decoder is a repository-owned include_str receipt fixture inside cfg(test). Production CCIP accepts typed validated receipts and checks lane, receipt, payload and replay identity. No redundant production parser introduced."
     },
     "crates/economy/chio-settle/src/channel/lifecycle.rs": {
       "kind": "typed-value-conversion",
@@ -6540,10 +6483,6 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/economy/chio-settle/src/channel/replay.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/economy/chio-settle/src/channel/reservation.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
@@ -6552,21 +6491,9 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
-    "crates/economy/chio-settle/src/config.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-settle/src/finding_enforcement/observation_source.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/economy/chio-settle/src/finding_enforcement/publish.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/economy/chio-settle/src/retry.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Dead-letter custom Deserialize accepts only the closed typed reason schema and a nonzero attempt count. The legacy string-reason fallback is removed. Terminal reason digests remain bounded, and unsupported schema/unknown fields fail closed."
     },
     "crates/guards/chio-guard-registry/src/marketplace.rs": {
       "kind": "parser-internal-or-typed",
@@ -11020,6 +10947,126 @@
       "kind": "parser-internal-or-typed",
       "contract": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records."
     },
+    "crates/economy/chio-anchor/src/witness.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Opaque witness proof serialization and base64 decode have a 1 MiB decoded budget; encoded length is checked before allocating decoded proof bytes. Wire receipt shape remains unverified until the pinned lane verifier and batch bindings succeed."
+    },
+    "crates/economy/chio-anchor/src/witness/rekor.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "HTTP retention has a 4 MiB budget; nested original base64 JSON has a 1 MiB decoded budget and duplicate/loss-aware native projection. A single response entry, body hash, SET signature, optional Merkle proof and signed receipt timestamp are required. Shared fallible clock fences reject unavailable, future and regressing time; publication validates time before receipt custody. Native causes and HTTP failures have safe public diagnostics."
+    },
+    "crates/economy/chio-anchor/src/witness/rekor/clock.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Clock sampling and high-water observation share a mutex across client clones. Native failure, wall regression and monotonic regression deny before effects."
+    },
+    "crates/economy/chio-anchor/src/witness/rekor/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Bounded actual HTTP retention and nested base64 custody precede duplicate-aware original native JSON projection. Response cardinality is exact; HTTP bodies are excluded from public failures."
+    },
+    "crates/economy/chio-credit/src/factor/claim.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "IOU parsing causes are forwarded into factor input errors without erasure; authority and semantic rejections retain their existing classes."
+    },
+    "crates/economy/chio-credit/src/factor/mod.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Factor evidence uses original native typed canonical equality under a 4 MiB bound. Native input causes survive factor and IOU conversion; existing factor I-JSON monetary/time constraints, signatures, exact bindings and explicit trusted time remain."
+    },
+    "crates/economy/chio-credit/src/financial_credentials.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Embedded source artifacts preserve the existing 512 KiB budget, now enforced at original native canonical parsing before typed projection. Existing collection, member completeness, signature and authenticated source-subject checks remain; parser causes are retained."
+    },
+    "crates/economy/chio-credit/src/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Shared bounded native typed canonical original-byte reader; source error is retained through the existing shared redacted owner."
+    },
+    "crates/economy/chio-credit/src/iou_v2.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Native IOU canonical imports have a 4 MiB cap and exact typed original-byte equality with preserved body validation and native causes. Issuer, receipt and committed credit admission verification still determine authority."
+    },
+    "crates/economy/chio-credit/src/obligation/credit_facility_bind.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Native signed facility-bind imports have a 4 MiB cap and exact typed canonical equality before body validation. Configured authority, debtor/creditor signatures, validity and semantic bindings remain mandatory; input causes survive."
+    },
+    "crates/economy/chio-credit/src/obligation/status.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Signed obligation status bytes have a 4 MiB native typed canonical contract. Original aliases and alternate encoding fail with a native source; trusted signer, status, digest and explicit-time verification remain separate."
+    },
+    "crates/economy/chio-fiscal/src/fiscal.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Charter and schedule original bytes use their existing 1 MiB native canonical bounds before verification. Body, signer, self identity, charter binding and predecessor lineage verification remain unchanged; local parsing causes are retained."
+    },
+    "crates/economy/chio-fiscal/src/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Shared original native typed canonical reader with each fiscal owner bound and retained native causes."
+    },
+    "crates/economy/chio-fiscal/src/lifecycle/continuity.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Continuity bytes use the existing lifecycle bound and exact native typed canonical equality before genesis policy, charter, signature and checkpoint verification. Original parser causes survive."
+    },
+    "crates/economy/chio-fiscal/src/lifecycle/readiness.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Runtime registry and signed readiness use existing lifecycle bounds and exact native canonical bytes before registry and policy/readiness verification. Supported adapter shape, signer, digest and authority requirements remain; causes are preserved."
+    },
+    "crates/economy/chio-link/src/chainlink.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Contract-backed HTTP bounds retention; original unsigned JSON rejects duplicates before Alloy RawValue projection of the same bytes, preserving native integers and ordinary float spellings. Native transport and parser causes survive the public oracle error; public errors never echo provider bodies. Chain, feed, configured decimals, round, price and freshness checks remain."
+    },
+    "crates/economy/chio-link/src/source.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Cloneable native HTTP/RPC cause ownership with fixed public Debug/Display and explicit Error::source for trusted diagnostics."
+    },
+    "crates/economy/chio-listing/src/outcome/mod.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Outcome artifacts have a 4 MiB original strict external I-JSON canonical contract. Exact original-byte equality and native local parser causes precede typed projection; owner signature/digest/lifecycle checks remain."
+    },
+    "crates/economy/chio-listing/src/outcome/predicate.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Output JSON is bounded to 4 MiB before original strict I-JSON projection. Invalid input stays a closed Unevaluable verdict while the local evaluation retains its parser cause. Deterministic equality excludes diagnostic object identity; the exact original output digest is retained even for rejected output."
+    },
+    "crates/economy/chio-market/src/parametric.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Signed policies retain their 1 MiB native typed canonical contract, now before policy signature and authority verification with preserved native cause. Coverage, currency, payout and trusted evidence registry validation remain."
+    },
+    "crates/economy/chio-open-market/src/purchase_verification.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Original purchase members are bounded by the existing carrier limit and losslessly native-decoded before projection or canonical digest construction. Ignored nested duplicates cannot acquire a normalized identity. Configured finding, venue, seller, handshake, reservation and capability bindings remain mandatory."
+    },
+    "crates/economy/chio-open-market/src/recovery.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Recovery members preserve the existing strict external I-JSON and exact typed canonical contract under the carrier limit. Parser causes survive member/context/metadata projection. Original kernel receipt signature, purchase and capability identity, subject and recovery authority binding remain unchanged."
+    },
+    "crates/economy/chio-settle/src/ccip.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "The only lexical decoder is a repository-owned include_str receipt fixture inside cfg(test). Production CCIP accepts typed validated receipts and checks lane, receipt, payload and replay identity. No redundant production parser introduced."
+    },
+    "crates/economy/chio-settle/src/channel/replay.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Replay pins and descriptors retain 256 KiB and 4 MiB native typed canonical bounds. Pins validate before authority use; descriptor reconstruction retains exact configured pins, signatures, economic state, proposal and reservation identity. Input causes remain native."
+    },
+    "crates/economy/chio-settle/src/config.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Local deployment files use a bounded actual read (1 MiB plus one sentinel byte), regular-file check and original lossless native JSON before closed typed projection. Native file and parser failures survive; chain and egress validation still own dispatch authority."
+    },
+    "crates/economy/chio-settle/src/finding_enforcement/observation_source.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Observation responses retain their 64 KiB original strict external canonical contract with native causes. Bounds apply at the decoding owner for custom transports too. Schema, exact request digest, chain hashes, operator key epoch and finality shape validation remain."
+    },
+    "crates/economy/chio-settle/src/finding_enforcement/publish.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Publisher responses now enforce the 1 MiB bound at the consumer, including alternate transports, before original strict external canonical projection. Native input causes survive; schema and exact request digest remain required. No failure manufactures a settlement outcome."
+    },
+    "crates/economy/chio-settle/src/hook.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "New native input and file errors retain permanent closed settlement failure classes. Input codes are safe diagnostic identities; no parser text enters wire reasons."
+    },
+    "crates/economy/chio-settle/src/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Separate native typed canonical and strict external canonical contracts preserve each settlement owner numeric and equality requirements with bounded original bytes and native causes."
+    },
+    "crates/economy/chio-settle/src/retry.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Dead-letter custom Deserialize accepts only the closed typed reason schema and a nonzero attempt count. The legacy string-reason fallback is removed. Terminal reason digests remain bounded, and unsupported schema/unknown fields fail closed."
+    },
     "crates/guards/chio-data-guards/src/structured_classification.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Field-path classification validates the original native JSON document once before Value/path projection. Duplicate keys reject with a source-bearing redacted input error; full-width u64 values remain exact. Range and UTF-8 location checks still own non-JSON locations."
@@ -11112,6 +11159,42 @@
       "kind": "parser-internal-or-typed",
       "contract": "Wasm module files are capped at the existing 10 MiB module limit before retention. Structured guest denial JSON validates original bounded native bytes before typed projection and no longer reinterprets malformed JSON as plaintext. Existing Wasmtime fuel/memory/import/result constraints remain; a denial cannot become Allow."
     },
+    "crates/platform/chio-agent-web-interop/src/artifacts.rs": {
+      "contract": "External subject bytes are bounded and original-token checked before value projection; exact subject digest, signature/HMAC, manifest scope and receipt authority checks remain.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-agent-web-interop/src/evidence.rs": {
+      "contract": "Original graph and artifact bytes are bounded before typed projection. Schema, graph references, exact digests and signature custody remain; native projection causes survive.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-agent-web-interop/src/interop.rs": {
+      "contract": "The verifier bounds every graph, policy and artifact plus aggregate bytes/count before signature work and consuming replay admission. Receipt, payment and order-context original input checks precede existing claim bindings. Replay reservation still follows complete verification.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-agent-web-interop/src/policy.rs": {
+      "contract": "Verifier policy uses bounded original native JSON with duplicate/loss rejection and native source. Supported/required claim validation still owns policy authority.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-commerce-order/src/input.rs": {
+      "contract": "Commerce-owned original native decoder, native typed projection causes and complete pre-hash document/count/byte budget.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-commerce-order/src/lib.rs": {
+      "contract": "Commerce bundle admission budgets all retained evidence, receipts and mandate payloads before hashing. Original native JSON and projection errors retain local causes; digest, event, provider, payment and coverage verification remain mandatory.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-commerce-order/src/mandate.rs": {
+      "contract": "Mandate protocol payloads decode original bounded native JSON before protocol/purpose, order, amount and allowance comparisons. No payload can gain authority through duplicate-key projection.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-commerce-order/src/replay.rs": {
+      "contract": "Receipt original bytes validate before Value/schema/ChioReceipt projection. Issuer, signature, event sequencing and action bindings remain; duplicate root fields cannot disappear into signed receipt verification.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-commerce-order/src/settlement.rs": {
+      "contract": "Settlement dispatch receipt bytes validate before schema and typed projection. Receipt signature and exact order/settlement transition bindings remain independent authority gates.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
     "crates/platform/chio-control-plane/src/error.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "CLI error adapters preserve typed native causes and signed JSON reasons. The static public-source adapter retains actionable proof rejection and exit classification without formatting attacker-controlled source diagnostics."
@@ -11132,9 +11215,145 @@
       "kind": "parser-internal-or-typed",
       "contract": "Private profile Deserialize implementations own seed/token strings in wiping guards even before all fields have parsed. Successful conversion transfers allocations into wiping owner types; serde errors retain no surviving partial secret fields."
     },
+    "crates/platform/chio-enterprise-export/src/artifacts.rs": {
+      "contract": "Receipts and signed risk documents use bounded original native input. Fallible auxiliary risk, graph-reference and receipt lookups preserve native parsing causes; absent or unauthenticated references remain fail closed. Schema, digest and signer/claim verification remain mandatory.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-enterprise-export/src/evidence.rs": {
+      "contract": "Bounded original graph and artifact validation precedes schema/projection. Native decoding causes survive. Graph reference, receipt/risk signer and exact artifact digest checks remain.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-enterprise-export/src/policy.rs": {
+      "contract": "Bounded original native policy parsing preserves unknown-field and supported-claim validation, with safe display and native local causes.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-hosted-edge/src/error.rs": {
+      "contract": "Source-bearing local errors project fixed existing HTTP code/status/message classifications; borrowed projection methods avoid consuming retained native causes.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-hosted-edge/src/input.rs": {
+      "contract": "Strict original external canonical byte equality and bounded projection; returns SharedUntrustedJsonError with safe display and native source.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-hosted-edge/src/server.rs": {
+      "contract": "Request bodies retain the 4 MiB strict original external canonical contract; credentials retain 64 KiB decoded and 128 KiB encoded limits. Request, authentication and durable parser failures preserve native sources behind stable HTTP classes. All route time observations share a state-owned clock fence; durable findings retain signature/digest/aggregate binding.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-port/src/backend.rs": {
+      "contract": "Backend input and integrity failures preserve native JSON causes for the explicit edge wire projection.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-port/src/lib.rs": {
+      "contract": "Auth/job/lifecycle port errors preserve invalid-input and durable-input native causes through store adapters.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-store-postgres/src/catalog.rs": {
+      "contract": "Catalog projection readback keeps row tenant/digest/domain validation before bounded canonical typed artifact decoding. Retraction and enforcement subject identity checks remain.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-store-postgres/src/checkpoints.rs": {
+      "contract": "Checkpoint bytes are bounded and canonical before hashing/typed use. Stored digest, exact typed canonical equality, requested aggregate identity, tenant and expected signer checks remain. Native signed full-width integers accepted by the writer survive readback; the external I-JSON restriction does not apply to this owner.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-store-postgres/src/domain.rs": {
+      "contract": "Domain ingress retains exact typed canonical equality, original external numeric limits and native parser causes. Durable subject readback is bounded/canonical. Delivery metadata projection follows authenticated original receipt validation; tenant/seller/status bindings remain.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-store-postgres/src/http.rs": {
+      "contract": "HTTP projection decodes bounded canonical durable payload bytes and preserves native input causes through backend and edge errors. Existing tenant-scoped store transactions own row/digest/domain authentication.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-store-postgres/src/ports.rs": {
+      "contract": "Store port adapters forward shared native input causes while retaining existing error classification vocabulary.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-store-postgres/src/replication.rs": {
+      "contract": "Principal lifecycle outbox bytes are bounded and canonical before projection. Exact typed bytes, event digest, signer, tenant/principal/operation/role and signed envelope checks remain. Native signed full-width integers retain the writer contract independently from external I-JSON ingress.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-market-store-postgres/src/validation.rs": {
+      "contract": "Strict bounded original external canonical ingress and native canonical checkpoint/principal readback keep separate numeric contracts. Submitted input and durable corruption retain distinct error classifications with native local causes.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-worker/src/executor.rs": {
+      "contract": "Framed result bytes use the original canonical decoder and request/result binding before output delivery. Native protocol causes survive worker errors. Host cgroup reads bound actual retention; completion time uses the fenced system clock without epoch fallback. Existing process/cancellation/resource cleanup remains.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-finding-worker/src/protocol.rs": {
+      "contract": "Stored job JSON must be bounded and exactly canonical before digest, signature and tenant/job/request/capability binding. Original bytes cannot be normalized into an accepted job digest. Result input validates exact canonical bytes and request binding before outputs. Explicit now and checked deadline ownership remain.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-http-core/src/authority.rs": {
+      "contract": "Presented capabilities are bounded to 64 KiB and original-token validated. Typed input causes stay local in prepared/final evaluation while receipts contain safe denial text. Issuer, signature, revocation and scope checks remain. Token time, retry expiry and receipt time share the kernel fenced clock; internal guard Value projection follows kernel-owned request construction.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-http-core/src/compliance.rs": {
+      "contract": "Original request bytes are bounded to 1 MiB before projection or source access. Semantic agent checks and explicit caller-owned now remain; parser causes stay local behind a fixed HTTP 400 body.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-http-core/src/emergency.rs": {
+      "contract": "Admin authorization still precedes bounded 1 MiB original request parsing; ambiguity or oversize rejects before kernel state mutation. Resume intentionally accepts an ignored body. Native input causes remain behind a fixed HTTP 400 body.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-http-core/src/input.rs": {
+      "contract": "Shared original native HTTP decoder; callers choose explicit request or capability bound before any effect.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-http-core/src/plan.rs": {
+      "contract": "Plan bytes are bounded to 1 MiB and duplicate-aware unsigned document parsing preserves ordinary argument floats. The original borrowed capability subtree independently satisfies the 64 KiB lossless native signed contract before kernel evaluation. Native local causes project a fixed HTTP 400 body; the kernel retains aggregate capability and plan authority.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
     "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
       "kind": "parser-internal-or-typed",
       "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only."
+    },
+    "crates/platform/chio-risk-comptroller/src/evidence_refs.rs": {
+      "contract": "Shared risk-reference traversal accepts fallible lookups so auxiliary reader causes reach callers. The existing infallible typed lookup API delegates to the same validation algorithm.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-transaction-passport/src/cognition_market.rs": {
+      "contract": "All six original artifact readers use bounded native input. Exact artifact hashes, capability/purchase/settlement schemas, signatures and identity relationships remain independent verification requirements.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-transaction-passport/src/evidence_graph.rs": {
+      "contract": "Original graph/artifact JSON uses bounded lossless native parsing. Graph size is capped at 4096 nodes and 16384 edges; iterative cycle traversal keeps attacker graph depth off the stack. Artifact budgets precede hashing, with existing reference, digest, issuer and advisory-authority edge checks retained.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-transaction-passport/src/input.rs": {
+      "contract": "Shared original native decoder (16 MiB/document), 64 MiB total and 4096-document preflight; typed projection only follows original validation. No parser result claims authentication.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-transaction-passport/src/minimal.rs": {
+      "contract": "Original graph, policy, claim, receipt and proof documents validate before projection; bundle and document budgets precede hashes in entry points. Transparency proofs retain strict external I-JSON, pinned signer and exact typed body checks; native projection causes survive anchor classification. Signature, scoped-root, graph, claim and transparency authority gates remain.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-transaction-passport/src/runtime_security.rs": {
+      "contract": "Bundle bytes/count preflight runs before runtime graph/artifact cloning and verification.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-transaction-passport/src/runtime_security/evidence.rs": {
+      "contract": "Graph/artifact original inputs are bounded and validated before typed projection. Schema and claim evidence relations remain; native projection sources survive. The parent runtime bundle entry budgets original documents before cloning artifacts. Shared graph cardinality limits apply before reference traversal.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-transaction-passport/src/runtime_security/policy.rs": {
+      "contract": "Bounded original native policy decoding rejects ambiguity/loss before supported/required security-claim validation. No policy parsing grants authority.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-transaction-passport/src/verifier_policy.rs": {
+      "contract": "Generic verifier-policy artifacts validate bounded original native bytes before checking schema, identifiers and required/omitted claim vocabulary.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-trust-market-context/src/evidence.rs": {
+      "contract": "Original graphs, receipts and signed context artifacts use bounded native input. Graph cardinality is bounded before traversal. Fallible auxiliary receipt and risk lookups preserve native parsing causes. Selected signatures, signer roles, digests, terminal state and claim bindings remain mandatory.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-trust-market-context/src/policy.rs": {
+      "contract": "Original bounded native policy parsing precedes supported/required claim and trust-authority checks, with native local input causes.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/products/chio-api-protect/src/error.rs": {
+      "contract": "HTTP authority clock rejection preserves the native ClockError source and the existing evaluation failure HTTP class.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
     },
     "crates/products/chio-api-protect/src/proxy/http.rs": {
       "kind": "reviewed-bounded-input",
@@ -11704,6 +11923,10 @@
       "kind": "parser-internal-or-typed",
       "contract": "Normalized invocation validation rejects original duplicate-key, lossy I-JSON, non-object or noncanonical argument bytes under a 1 MiB limit before accepting the invocation. Provider/principal/version and sidecar checks retain their own meaning; structural decoding grants no authority."
     },
+    "crates/protocol/chio-tower/src/error.rs": {
+      "contract": "HTTP authority clock rejection preserves the native ClockError source in the middleware error.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
     "crates/security/chio-cage-init/src/bootstrap.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Reviewed existing bootstrap contract: sealed descriptor input uses MAX_ENVELOPE_BYTES bounded read, typed native decode then exact canonical re-encoding equality before envelope authentication, peer, binding and enforcement checks. No redundant parser or heavyweight core dependency added to the lightweight init binary."
@@ -11955,182 +12178,6 @@
     "crates/trust/chio-weights/src/card.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding."
-    },
-    "crates/platform/chio-agent-web-interop/src/artifacts.rs": {
-      "contract": "External subject bytes are bounded and original-token checked before value projection; exact subject digest, signature/HMAC, manifest scope and receipt authority checks remain.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-agent-web-interop/src/evidence.rs": {
-      "contract": "Original graph and artifact bytes are bounded before typed projection. Schema, graph references, exact digests and signature custody remain; native projection causes survive.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-agent-web-interop/src/interop.rs": {
-      "contract": "The verifier bounds every graph, policy and artifact plus aggregate bytes/count before signature work and consuming replay admission. Receipt, payment and order-context original input checks precede existing claim bindings. Replay reservation still follows complete verification.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-agent-web-interop/src/policy.rs": {
-      "contract": "Verifier policy uses bounded original native JSON with duplicate/loss rejection and native source. Supported/required claim validation still owns policy authority.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-commerce-order/src/lib.rs": {
-      "contract": "Commerce bundle admission budgets all retained evidence, receipts and mandate payloads before hashing. Original native JSON and projection errors retain local causes; digest, event, provider, payment and coverage verification remain mandatory.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-commerce-order/src/mandate.rs": {
-      "contract": "Mandate protocol payloads decode original bounded native JSON before protocol/purpose, order, amount and allowance comparisons. No payload can gain authority through duplicate-key projection.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-commerce-order/src/replay.rs": {
-      "contract": "Receipt original bytes validate before Value/schema/ChioReceipt projection. Issuer, signature, event sequencing and action bindings remain; duplicate root fields cannot disappear into signed receipt verification.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-commerce-order/src/settlement.rs": {
-      "contract": "Settlement dispatch receipt bytes validate before schema and typed projection. Receipt signature and exact order/settlement transition bindings remain independent authority gates.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-enterprise-export/src/artifacts.rs": {
-      "contract": "Receipts and signed risk documents use bounded original native input. Fallible auxiliary risk, graph-reference and receipt lookups preserve native parsing causes; absent or unauthenticated references remain fail closed. Schema, digest and signer/claim verification remain mandatory.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-enterprise-export/src/evidence.rs": {
-      "contract": "Bounded original graph and artifact validation precedes schema/projection. Native decoding causes survive. Graph reference, receipt/risk signer and exact artifact digest checks remain.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-enterprise-export/src/policy.rs": {
-      "contract": "Bounded original native policy parsing preserves unknown-field and supported-claim validation, with safe display and native local causes.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-hosted-edge/src/server.rs": {
-      "contract": "Request bodies retain the 4 MiB strict original external canonical contract; credentials retain 64 KiB decoded and 128 KiB encoded limits. Request, authentication and durable parser failures preserve native sources behind stable HTTP classes. All route time observations share a state-owned clock fence; durable findings retain signature/digest/aggregate binding.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-store-postgres/src/catalog.rs": {
-      "contract": "Catalog projection readback keeps row tenant/digest/domain validation before bounded canonical typed artifact decoding. Retraction and enforcement subject identity checks remain.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-store-postgres/src/checkpoints.rs": {
-      "contract": "Checkpoint bytes are bounded and canonical before hashing/typed use. Stored digest, exact typed canonical equality, requested aggregate identity, tenant and expected signer checks remain. Native signed full-width integers accepted by the writer survive readback; the external I-JSON restriction does not apply to this owner.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-store-postgres/src/domain.rs": {
-      "contract": "Domain ingress retains exact typed canonical equality, original external numeric limits and native parser causes. Durable subject readback is bounded/canonical. Delivery metadata projection follows authenticated original receipt validation; tenant/seller/status bindings remain.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-store-postgres/src/http.rs": {
-      "contract": "HTTP projection decodes bounded canonical durable payload bytes and preserves native input causes through backend and edge errors. Existing tenant-scoped store transactions own row/digest/domain authentication.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-store-postgres/src/replication.rs": {
-      "contract": "Principal lifecycle outbox bytes are bounded and canonical before projection. Exact typed bytes, event digest, signer, tenant/principal/operation/role and signed envelope checks remain. Native signed full-width integers retain the writer contract independently from external I-JSON ingress.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-worker/src/executor.rs": {
-      "contract": "Framed result bytes use the original canonical decoder and request/result binding before output delivery. Native protocol causes survive worker errors. Host cgroup reads bound actual retention; completion time uses the fenced system clock without epoch fallback. Existing process/cancellation/resource cleanup remains.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-worker/src/protocol.rs": {
-      "contract": "Stored job JSON must be bounded and exactly canonical before digest, signature and tenant/job/request/capability binding. Original bytes cannot be normalized into an accepted job digest. Result input validates exact canonical bytes and request binding before outputs. Explicit now and checked deadline ownership remain.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-http-core/src/authority.rs": {
-      "contract": "Presented capabilities are bounded to 64 KiB and original-token validated. Typed input causes stay local in prepared/final evaluation while receipts contain safe denial text. Issuer, signature, revocation and scope checks remain. Token time, retry expiry and receipt time share the kernel fenced clock; internal guard Value projection follows kernel-owned request construction.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-http-core/src/compliance.rs": {
-      "contract": "Original request bytes are bounded to 1 MiB before projection or source access. Semantic agent checks and explicit caller-owned now remain; parser causes stay local behind a fixed HTTP 400 body.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-http-core/src/emergency.rs": {
-      "contract": "Admin authorization still precedes bounded 1 MiB original request parsing; ambiguity or oversize rejects before kernel state mutation. Resume intentionally accepts an ignored body. Native input causes remain behind a fixed HTTP 400 body.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-http-core/src/plan.rs": {
-      "contract": "Plan bytes are bounded to 1 MiB and duplicate-aware unsigned document parsing preserves ordinary argument floats. The original borrowed capability subtree independently satisfies the 64 KiB lossless native signed contract before kernel evaluation. Native local causes project a fixed HTTP 400 body; the kernel retains aggregate capability and plan authority.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-transaction-passport/src/cognition_market.rs": {
-      "contract": "All six original artifact readers use bounded native input. Exact artifact hashes, capability/purchase/settlement schemas, signatures and identity relationships remain independent verification requirements.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-transaction-passport/src/evidence_graph.rs": {
-      "contract": "Original graph/artifact JSON uses bounded lossless native parsing. Graph size is capped at 4096 nodes and 16384 edges; iterative cycle traversal keeps attacker graph depth off the stack. Artifact budgets precede hashing, with existing reference, digest, issuer and advisory-authority edge checks retained.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-transaction-passport/src/minimal.rs": {
-      "contract": "Original graph, policy, claim, receipt and proof documents validate before projection; bundle and document budgets precede hashes in entry points. Transparency proofs retain strict external I-JSON, pinned signer and exact typed body checks; native projection causes survive anchor classification. Signature, scoped-root, graph, claim and transparency authority gates remain.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-transaction-passport/src/runtime_security/evidence.rs": {
-      "contract": "Graph/artifact original inputs are bounded and validated before typed projection. Schema and claim evidence relations remain; native projection sources survive. The parent runtime bundle entry budgets original documents before cloning artifacts. Shared graph cardinality limits apply before reference traversal.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-transaction-passport/src/runtime_security/policy.rs": {
-      "contract": "Bounded original native policy decoding rejects ambiguity/loss before supported/required security-claim validation. No policy parsing grants authority.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-transaction-passport/src/verifier_policy.rs": {
-      "contract": "Generic verifier-policy artifacts validate bounded original native bytes before checking schema, identifiers and required/omitted claim vocabulary.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-trust-market-context/src/evidence.rs": {
-      "contract": "Original graphs, receipts and signed context artifacts use bounded native input. Graph cardinality is bounded before traversal. Fallible auxiliary receipt and risk lookups preserve native parsing causes. Selected signatures, signer roles, digests, terminal state and claim bindings remain mandatory.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-trust-market-context/src/policy.rs": {
-      "contract": "Original bounded native policy parsing precedes supported/required claim and trust-authority checks, with native local input causes.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-transaction-passport/src/input.rs": {
-      "contract": "Shared original native decoder (16 MiB/document), 64 MiB total and 4096-document preflight; typed projection only follows original validation. No parser result claims authentication.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-transaction-passport/src/runtime_security.rs": {
-      "contract": "Bundle bytes/count preflight runs before runtime graph/artifact cloning and verification.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-commerce-order/src/input.rs": {
-      "contract": "Commerce-owned original native decoder, native typed projection causes and complete pre-hash document/count/byte budget.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-http-core/src/input.rs": {
-      "contract": "Shared original native HTTP decoder; callers choose explicit request or capability bound before any effect.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-hosted-edge/src/input.rs": {
-      "contract": "Strict original external canonical byte equality and bounded projection; returns SharedUntrustedJsonError with safe display and native source.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-store-postgres/src/validation.rs": {
-      "contract": "Strict bounded original external canonical ingress and native canonical checkpoint/principal readback keep separate numeric contracts. Submitted input and durable corruption retain distinct error classifications with native local causes.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-port/src/backend.rs": {
-      "contract": "Backend input and integrity failures preserve native JSON causes for the explicit edge wire projection.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-port/src/lib.rs": {
-      "contract": "Auth/job/lifecycle port errors preserve invalid-input and durable-input native causes through store adapters.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-market-store-postgres/src/ports.rs": {
-      "contract": "Store port adapters forward shared native input causes while retaining existing error classification vocabulary.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-finding-hosted-edge/src/error.rs": {
-      "contract": "Source-bearing local errors project fixed existing HTTP code/status/message classifications; borrowed projection methods avoid consuming retained native causes.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/platform/chio-risk-comptroller/src/evidence_refs.rs": {
-      "contract": "Shared risk-reference traversal accepts fallible lookups so auxiliary reader causes reach callers. The existing infallible typed lookup API delegates to the same validation algorithm.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/protocol/chio-tower/src/error.rs": {
-      "contract": "HTTP authority clock rejection preserves the native ClockError source in the middleware error.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
-    },
-    "crates/products/chio-api-protect/src/error.rs": {
-      "contract": "HTTP authority clock rejection preserves the native ClockError source and the existing evaluation failure HTTP class.",
-      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
     }
   }
 }

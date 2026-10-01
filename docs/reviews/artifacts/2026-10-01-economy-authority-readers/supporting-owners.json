@@ -1,0 +1,10 @@
+{
+  "crates/economy/chio-anchor/src/witness/rekor/input.rs": "Bounded actual HTTP retention and nested base64 custody precede duplicate-aware original native JSON projection. Response cardinality is exact; HTTP bodies are excluded from public failures.",
+  "crates/economy/chio-anchor/src/witness/rekor/clock.rs": "Clock sampling and high-water observation share a mutex across client clones. Native failure, wall regression and monotonic regression deny before effects.",
+  "crates/economy/chio-credit/src/input.rs": "Shared bounded native typed canonical original-byte reader; source error is retained through the existing shared redacted owner.",
+  "crates/economy/chio-fiscal/src/input.rs": "Shared original native typed canonical reader with each fiscal owner bound and retained native causes.",
+  "crates/economy/chio-settle/src/input.rs": "Separate native typed canonical and strict external canonical contracts preserve each settlement owner numeric and equality requirements with bounded original bytes and native causes.",
+  "crates/economy/chio-credit/src/factor/claim.rs": "IOU parsing causes are forwarded into factor input errors without erasure; authority and semantic rejections retain their existing classes.",
+  "crates/economy/chio-link/src/source.rs": "Cloneable native HTTP/RPC cause ownership with fixed public Debug/Display and explicit Error::source for trusted diagnostics.",
+  "crates/economy/chio-settle/src/hook.rs": "New native input and file errors retain permanent closed settlement failure classes. Input codes are safe diagnostic identities; no parser text enters wire reasons."
+}

@@ -1,0 +1,12 @@
+{
+  "reviewed_pinned_paths": 22,
+  "remaining_raw_baseline": 45,
+  "remaining_by_group": {
+    "core": 2,
+    "kernel": 12,
+    "observability": 3,
+    "products": 5,
+    "sdk": 9,
+    "tooling": 14
+  }
+}

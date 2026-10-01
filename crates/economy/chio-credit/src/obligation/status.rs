@@ -586,13 +586,7 @@ impl SignedObligationStatusProofV1 {
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ObligationError> {
-        let signed: Self = serde_json::from_slice(bytes)
-            .map_err(|error| ObligationError::Canonicalization(error.to_string()))?;
-        if signed.canonical_bytes()?.as_slice() != bytes {
-            return Err(ObligationError::Canonicalization(
-                "obligation status proof is not canonical".to_owned(),
-            ));
-        }
+        let signed: Self = crate::input::canonical(bytes, crate::input::MAX_EVIDENCE_BYTES)?;
         Ok(signed)
     }
 

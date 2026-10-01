@@ -1,0 +1,34 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--no-fail-fast",
+    "-p",
+    "chio-credit",
+    "-p",
+    "chio-fiscal",
+    "-p",
+    "chio-settle",
+    "-p",
+    "chio-listing",
+    "-p",
+    "chio-market",
+    "-p",
+    "chio-open-market",
+    "-p",
+    "chio-anchor",
+    "-p",
+    "chio-link",
+    "--lib",
+    "original_rpc"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 69.58,
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/connor/chio-security-target-6d-final",
+    "CARGO_INCREMENTAL": "0",
+    "CHIO_CHECKOUT_ROOT": "/tmp/arc-security-launch",
+    "CARGO_BUILD_JOBS": "4"
+  }
+}

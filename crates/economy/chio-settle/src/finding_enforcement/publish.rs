@@ -7,7 +7,7 @@ use std::net::{IpAddr, ToSocketAddrs as _};
 use std::sync::Arc;
 use std::time::Duration;
 
-use chio_core::{canonical::canonical_json_bytes_from_str, canonical_json_bytes, sha256_hex};
+use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_egress_contract::HttpEgressContract;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -405,27 +405,8 @@ impl RemoteFindingImpairmentPublisher {
         }
         let request_sha256 = sha256_hex(&request_bytes);
         let response_bytes = self.transport.post(operation, &request_bytes)?;
-        let response_text = std::str::from_utf8(&response_bytes).map_err(|_| {
-            FindingImpairmentPublishError::Permanent(
-                "remote impairment publisher response is not UTF-8".to_owned(),
-            )
-        })?;
-        let canonical = canonical_json_bytes_from_str(response_text).map_err(|_| {
-            FindingImpairmentPublishError::Permanent(
-                "remote impairment publisher response is not canonical JSON".to_owned(),
-            )
-        })?;
-        if canonical != response_bytes {
-            return Err(FindingImpairmentPublishError::Permanent(
-                "remote impairment publisher response is not canonical JSON".to_owned(),
-            ));
-        }
-        let response: FindingImpairmentPublisherResponse = serde_json::from_slice(&response_bytes)
-            .map_err(|_| {
-                FindingImpairmentPublishError::Permanent(
-                    "remote impairment publisher response schema is invalid".to_owned(),
-                )
-            })?;
+        let response: FindingImpairmentPublisherResponse =
+            crate::input::external_canonical(&response_bytes, MAX_PUBLISHER_RESPONSE_BYTES)?;
         if response.schema != FINDING_IMPAIRMENT_PUBLISHER_RESPONSE_SCHEMA
             || response.request_sha256 != request_sha256
         {
@@ -444,6 +425,9 @@ impl RemoteFindingImpairmentPublisher {
 /// where it was; it never manufactures an attempt.
 #[derive(Debug, Error)]
 pub enum FindingImpairmentPublishError {
+    /// Invalid original response; replay cannot authorize it.
+    #[error("invalid impairment publisher response: {0}")]
+    Input(#[from] chio_core::canonical::SharedUntrustedJsonError),
     /// The intent was not durably fenced before dispatch was attempted.
     #[error("impairment intent is not durably fenced: {0}")]
     IntentNotFenced(String),
@@ -550,6 +534,48 @@ mod remote_tests {
     use super::*;
     use crate::{FindingImpairmentDestination, FindingVaultRejection, StoredImpairmentTransaction};
     use chio_core::capability::scope::MonetaryAmount;
+
+    struct OversizedTransport;
+
+    impl FindingImpairmentTransport for OversizedTransport {
+        fn post(
+            &self,
+            operation: FindingImpairmentPublisherOperation,
+            body: &[u8],
+        ) -> Result<Vec<u8>, FindingImpairmentPublishError> {
+            let bytes = ResponseTransport {
+                corrupt_binding: false,
+                append_newline: false,
+            }
+            .post(operation, body)?;
+            let mut response: FindingImpairmentPublisherResponse = serde_json::from_slice(&bytes)
+                .unwrap_or_else(|error| panic!("valid fixture: {error}"));
+            response.attempt = FindingImpairmentAttempt::Observed {
+                stored: StoredImpairmentTransaction {
+                    chain_id: "eip155:1".to_owned(),
+                    tx_hash: format!("0x{}", "7".repeat(64)),
+                    to_address: "0x1000000000000000000000000000000000000001".to_owned(),
+                    input_data: Some("0".repeat(MAX_PUBLISHER_RESPONSE_BYTES)),
+                    receipt: None,
+                    finality: None,
+                },
+            };
+            Ok(canonical_json_bytes(&response)
+                .unwrap_or_else(|error| panic!("valid fixture: {error}")))
+        }
+    }
+
+    #[test]
+    fn original_alternate_transport_response_is_bounded() {
+        let publisher =
+            RemoteFindingImpairmentPublisher::with_transport(Arc::new(OversizedTransport));
+        let error = match publisher.observe(&intent(), &call()) {
+            Ok(_) => panic!("oversized alternate response accepted"),
+            Err(error) => error,
+        };
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(error.to_string().contains("signed-json-too-large"));
+    }
 
     struct ResponseTransport {
         corrupt_binding: bool,
@@ -677,8 +703,8 @@ mod remote_tests {
 
         assert!(matches!(
             error,
-            Err(FindingImpairmentPublishError::Permanent(message))
-                if message.contains("canonical JSON")
+            Err(FindingImpairmentPublishError::Input(source))
+                if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
         ));
     }
 

@@ -1,0 +1,404 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+    Finished `test` profile [unoptimized] target(s) in 1m 05s
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_credit-83975816428117a2)
+
+running 58 tests
+test clearing::lifecycle::tests::finalized_round_cannot_satisfy_without_zero_intent_reconciliation ... ok
+test financial_credentials::tests::settlement_reliability_ratio_uses_exact_u128_floor_division ... ok
+test clearing::lifecycle::tests::round_transition_count_rejects_input_padding_overflow ... ok
+test financial_credentials::tests::settlement_reliability_ratio_rejects_zero_inconsistent_or_unsafe_counts ... ok
+test factor::original_input_tests::original_factor_input_preserves_native_cause ... ok
+test financial_credentials::tests::completeness_proof_rejects_window_shrink_substitution ... ok
+test formal_economy::tests::conversion_rejects_zero_rates_and_narrowing_overflow ... ok
+test financial_credentials::tests::completeness_attestation_rejects_body_schema_substitution ... ok
+test formal_economy::tests::conversion_rounding_examples_are_exact ... ok
+test financial_credentials::tests::loss_history_rejects_an_omitted_newest_member_inside_the_declared_window ... ok
+test financial_credentials::tests::source_member_and_resolver_boundaries_fail_closed ... ok
+test factor::claim::tests::claim_causality_rejects_each_reversed_edge ... ok
+test formal_economy::tests::zero_units_have_zero_rounded_value ... ok
+test financial_credentials::tests::premium_history_rejects_an_omitted_oldest_member_inside_the_declared_window ... ok
+test hook::tests::iou_envelope_schema_is_stable ... ok
+test financial_credentials::tests::exact_window_end_is_rejected_as_a_member_and_accepted_as_upper_adjacent ... ok
+test financial_credentials::tests::exposure_completeness_rejects_summary_counts_that_do_not_match_rows ... ok
+test financial_credentials::tests::checkpoint_qualification_rejects_older_sequence_and_rollback_generation ... ok
+test local_account::tests::allow_without_financial_metadata_mints_zero_iou ... ok
+test local_account::tests::allow_with_zero_cost_metadata_mints_zero_iou ... ok
+test local_account::tests::allow_with_priced_metadata_mints_one_iou ... ok
+test obligation::credit_admission::tests::sealed_credit_no_effect_proof_is_operation_bound ... ok
+test local_account::tests::tampered_signature_returns_signature_invalid ... ok
+test local_account::tests::deny_decision_mints_zero_iou_even_with_price ... ok
+test local_account::tests::mismatched_action_hash_returns_signature_invalid ... ok
+test local_account::tests::untrusted_kernel_key_returns_signer_untrusted ... ok
+test local_account::tests::iou_id_is_deterministic_across_re_evaluation ... ok
+test tests::bonded_execution_control_policy_defaults_fail_closed ... ok
+test tests::capital_book_query_clamps_limits ... ok
+test tests::capital_book_query_requires_subject_scope ... ok
+test tests::bonded_execution_simulation_query_requires_bond_id ... ok
+test tests::bounded_limit_helper_preserves_default_and_clamps_edges ... ok
+test financial_credentials::tests::unresolved_signed_sources_cannot_overclaim_assurance ... ok
+test tests::capital_execution_envelope_rejects_stale_authority ... ok
+test tests::capital_execution_instruction_rejects_authority_proof_principal_mismatch ... ok
+test tests::capital_execution_instruction_rejects_tampered_authority_proof_body ... ok
+test tests::capital_execution_instruction_requires_source_owner_authority ... ok
+test tests::capital_execution_envelope_rejects_future_dated_authority_approval ... ok
+test tests::credit_backtest_query_requires_subject_scope ... ok
+test tests::capital_book_round_trip_signature_verifies ... ok
+test tests::credit_backtest_query_clamps_limits ... ok
+test tests::exposure_ledger_query_clamps_limits ... ok
+test tests::credit_bond_list_query_clamps_limit ... ok
+test tests::capital_execution_instruction_artifact_validates_authority_and_reconciliation ... ok
+test tests::exposure_ledger_query_rejects_blank_filter_values ... ok
+test tests::exposure_ledger_query_rejects_inverted_time_window ... ok
+test tests::exposure_ledger_query_requires_tool_server_when_tool_name_present ... ok
+test tests::exposure_ledger_query_requires_anchor ... ok
+test tests::provider_risk_package_query_clamps_recent_loss_limit ... ok
+test tests::provider_risk_package_query_requires_subject_scope ... ok
+test tests::capital_instruction_artifact_rejects_transfer_without_completion_flow ... ok
+test tests::capital_allocation_decision_round_trip_signature_verifies ... ok
+test tests::capital_execution_instruction_rejects_control_character_identities ... ok
+test tests::capital_instruction_artifact_rejects_observed_execution_amount_mismatch ... ok
+test tests::credit_bond_round_trip_signature_verifies ... ok
+test tests::capital_execution_instruction_round_trip_signature_verifies ... ok
+test tests::provider_risk_package_round_trip_signature_verifies ... ok
+test formal_economy::tests::converted_values_stay_inside_the_rounding_envelope ... ok
+
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/clearing.rs (/home/connor/chio-security-target-6d-final/debug/deps/clearing-c228829f6c11d06c)
+
+running 8 tests
+test netting_edge_cases::aggregate_that_cannot_fit_the_wire_amount_rejects ... ok
+test netting_edge_cases::reverse_bilateral_flows_cancel_before_matching ... ok
+test netting_edge_cases::balanced_cycle_emits_no_settlement_intent ... ok
+test acyclic_chain_reduces_to_one_direct_intent ... ok
+test signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence ... ok
+test zero_intent::zero_intent_round_requires_typed_reconciliation_before_satisfaction ... ok
+test netting_edge_cases::duplicate_mixed_currency_and_incomplete_inputs_reject ... ok
+test participant_acceptances_bind_every_affected_statement_after_the_dispute_window ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/clearing_lifecycle.rs (/home/connor/chio-security-target-6d-final/debug/deps/clearing_lifecycle-51bfe145261347f2)
+
+running 6 tests
+test aborted_round_releases_every_reservation_in_the_winning_batch ... ok
+test terminal_clearing_transitions_require_a_dedicated_projection ... ok
+test no_effect_retries_and_unknown_outcomes_remain_effect_slot_fenced ... ok
+test settled_reconciliation_terminalizes_the_slot_and_round_attempt_together ... ok
+test finalization_and_abort_compete_on_one_complete_external_projection ... ok
+test finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.61s
+
+     Running tests/credit_admission.rs (/home/connor/chio-security-target-6d-final/debug/deps/credit_admission-f37e4e897cdf701f)
+
+running 5 tests
+test resolver_uses_literal_capability_wildcards_and_wide_money_arithmetic ... ok
+test configured_resolver_rejects_incomplete_conflicting_expired_and_tampered_sets ... ok
+test configured_resolver_seals_the_complete_minimum_authority_set_deterministically ... ok
+test reservation_identity_rejects_nonce_and_digest_tampering ... ok
+test reservation_contract_checks_capacity_and_all_terminal_states ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/credit_facility_bind.rs (/home/connor/chio-security-target-6d-final/debug/deps/credit_facility_bind-4aae420fc452ba2d)
+
+running 5 tests
+test facility_bind_rejects_pairwise_role_aliases_and_signature_slot_swaps ... ok
+test facility_bind_rejects_noncanonical_unknown_and_semantically_substituted_bytes ... FAILED
+test facility_bind_enforces_current_time_and_configured_lifetime ... ok
+test facility_bind_requires_each_configured_role_key_epoch_and_signature ... ok
+test facility_bind_round_trips_and_verifies_exact_terms ... ok
+
+failures:
+
+---- facility_bind_rejects_noncanonical_unknown_and_semantically_substituted_bytes stdout ----
+
+thread 'facility_bind_rejects_noncanonical_unknown_and_semantically_substituted_bytes' (3912962) panicked at crates/economy/chio-credit/tests/credit_facility_bind.rs:232:5:
+assertion failed: matches!(SignedCreditFacilityBindV1::from_canonical_bytes(&noncanonical),
+    Err(CreditFacilityBindError::Canonicalization(_)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    facility_bind_rejects_noncanonical_unknown_and_semantically_substituted_bytes
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p chio-credit --test credit_facility_bind`
+     Running tests/factor_authorization.rs (/home/connor/chio-security-target-6d-final/debug/deps/factor_authorization-7a06f5792cfa97f7)
+
+running 4 tests
+test bind_authorization_rejects_tampering_and_unknown_schema ... ok
+test agreement_rejects_noncanonical_tampered_and_unknown_artifacts ... FAILED
+test bind_authorization_requires_exact_canonical_bytes_and_configured_authority ... FAILED
+test bilateral_agreement_and_composite_set_pin_both_parties ... ok
+
+failures:
+
+---- agreement_rejects_noncanonical_tampered_and_unknown_artifacts stdout ----
+
+thread 'agreement_rejects_noncanonical_tampered_and_unknown_artifacts' (3912967) panicked at crates/economy/chio-credit/tests/factor_authorization.rs:348:5:
+assertion failed: matches!(verify_agreement(&fixture, &bind, &noncanonical),
+    Err(FactorError::Canonicalization(_)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- bind_authorization_requires_exact_canonical_bytes_and_configured_authority stdout ----
+
+thread 'bind_authorization_requires_exact_canonical_bytes_and_configured_authority' (3912970) panicked at crates/economy/chio-credit/tests/factor_authorization.rs:218:5:
+assertion failed: matches!(verify_bind(&fixture, &noncanonical),
+    Err(FactorError::Canonicalization(_)))
+
+
+failures:
+    agreement_rejects_noncanonical_tampered_and_unknown_artifacts
+    bind_authorization_requires_exact_canonical_bytes_and_configured_authority
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p chio-credit --test factor_authorization`
+     Running tests/factor_claim.rs (/home/connor/chio-security-target-6d-final/debug/deps/factor_claim-701dc2a0202aa17b)
+
+running 6 tests
+test claim_trust_is_deterministic_and_role_separated ... ok
+test sealed_claim_rejects_expiry_and_nonpending_state ... ok
+test sealed_claim_retains_exact_verified_evidence ... ok
+test sealed_claim_rejects_tampered_receipt_and_iou ... ok
+test sealed_claim_rejects_legacy_and_untrusted_evidence ... FAILED
+test sealed_claim_rejects_mixed_status_trust_and_premature_build ... ok
+
+failures:
+
+---- sealed_claim_rejects_legacy_and_untrusted_evidence stdout ----
+
+thread 'sealed_claim_rejects_legacy_and_untrusted_evidence' (3912974) panicked at crates/economy/chio-credit/tests/factor_claim.rs:310:5:
+assertion failed: matches!(verify_with(&evidence, &evidence.receipt_bytes,
+    &evidence.legacy_iou_bytes, &evidence.trust, TRUSTED_NOW,),
+    Err(FactorError::Canonicalization(_)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    sealed_claim_rejects_legacy_and_untrusted_evidence
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `-p chio-credit --test factor_claim`
+     Running tests/factor_contract.rs (/home/connor/chio-security-target-6d-final/debug/deps/factor_contract-529c87ffe7093965)
+
+running 4 tests
+test quote_arithmetic_is_checked_integer_flooring ... ok
+test claims_offers_quotes_and_requests_fail_closed_on_invalid_terms ... ok
+test derived_ids_and_request_digest_cover_economic_terms ... ok
+test factor_artifacts_are_strict_canonical_and_schema_valid ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/factor_results.rs (/home/connor/chio-security-target-6d-final/debug/deps/factor_results-0cda2f36e204405f)
+
+running 8 tests
+test not_applied_rejects_tampering_noncanonical_bytes_and_wrong_authority ... FAILED
+test not_applied_rejects_an_unrelated_expired_offer ... ok
+test acknowledgement_rejects_tampering_noncanonical_bytes_and_wrong_authority ... FAILED
+test not_applied_rejects_a_status_proof_for_another_obligation ... ok
+test assignment_results_are_canonical_schema_valid_and_retain_exact_evidence ... ok
+test acknowledgement_rejects_every_cross_artifact_cas_mismatch ... ok
+test not_applied_rejects_every_cross_artifact_cas_mismatch ... ok
+test not_applied_reasons_require_matching_observed_state_or_time ... ok
+
+failures:
+
+---- not_applied_rejects_tampering_noncanonical_bytes_and_wrong_authority stdout ----
+
+thread 'not_applied_rejects_tampering_noncanonical_bytes_and_wrong_authority' (3912991) panicked at crates/economy/chio-credit/tests/factor_results.rs:730:5:
+assertion failed: matches!(verify_not_applied(&fixture, &noncanonical,
+    &fixture.prior_disposition, &fixture.settlement_lifecycle,
+    SNAPSHOT_VERSION + 1, RESOURCE_FENCE,),
+    Err(FactorError::Canonicalization(_)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- acknowledgement_rejects_tampering_noncanonical_bytes_and_wrong_authority stdout ----
+
+thread 'acknowledgement_rejects_tampering_noncanonical_bytes_and_wrong_authority' (3912985) panicked at crates/economy/chio-credit/tests/factor_results.rs:564:5:
+assertion failed: matches!(verify_acknowledgement(&fixture, &noncanonical),
+    Err(FactorError::Canonicalization(_)))
+
+
+failures:
+    acknowledgement_rejects_tampering_noncanonical_bytes_and_wrong_authority
+    not_applied_rejects_tampering_noncanonical_bytes_and_wrong_authority
+
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+error: test failed, to rerun pass `-p chio-credit --test factor_results`
+     Running tests/integration_smoke.rs (/home/connor/chio-security-target-6d-final/debug/deps/integration_smoke-561c1e98a325da95)
+
+running 2 tests
+test exposure_ledger_query_normalizes_limits ... ok
+test exposure_ledger_query_requires_an_anchor ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/iou_invariants.rs (/home/connor/chio-security-target-6d-final/debug/deps/iou_invariants-26a95a489ced53c3)
+
+running 3 tests
+test hook_does_not_mutate_receipt_bytes ... ok
+test tampered_receipt_mints_zero_iou ... ok
+test one_receipt_mints_zero_or_one_iou ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+     Running tests/iou_v2.rs (/home/connor/chio-security-target-6d-final/debug/deps/iou_v2-43e137d9400f760d)
+
+running 8 tests
+test v2_rejects_source_receipt_key_reused_for_iou_minting ... ok
+test v2_rejects_creditor_key_reused_under_an_issuer_alias ... ok
+test v2_verifier_rejects_source_receipt_key_reused_by_valid_iou_signature ... ok
+test v2_rejects_missing_or_mismatched_receipt_request_id ... ok
+test v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes ... ok
+test v2_requires_the_exact_committed_credit_admission ... ok
+test v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades ... ok
+test obligation_led_v2_mints_and_verifies_exact_evidence ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+     Running tests/obligation.rs (/home/connor/chio-security-target-6d-final/debug/deps/obligation-5de5a501602b94ea)
+
+running 9 tests
+test assignment_requires_the_guarded_compare_and_swap ... ok
+test conflicting_atom_payload_keeps_identity_but_changes_digest ... ok
+test deserialized_assign_transition_cannot_bypass_the_guarded_path ... ok
+test payee_binding_digest_commits_exact_beneficiary_and_destination ... ok
+test obligation_atom_rejects_substituted_payee_binding_digest ... ok
+test obligation_identity_uses_the_fixed_source_claim_preimage ... ok
+test obligation_disposition_rejects_impossible_serialized_heads ... ok
+test persisted_successor_validation_requires_the_exact_transition ... ok
+test obligation_disposition_is_exclusive_and_round_release_is_exact ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/obligation_status.rs (/home/connor/chio-security-target-6d-final/debug/deps/obligation_status-3dc796bb9d3d1d97)
+
+running 6 tests
+test status_proof_rejects_issue_before_atom_creation ... ok
+test status_proof_rejects_schema_tampering_and_mixed_snapshots ... ok
+test status_proof_rejects_untrusted_stale_future_and_overlong_authority ... ok
+test assignment_cas_rejects_stale_disposition_and_nonpending_settlement ... ok
+test assignment_cas_requires_exact_authorization_and_has_one_winner ... ok
+test settlement_lifecycle_and_status_proof_are_canonical_and_exact ... FAILED
+
+failures:
+
+---- settlement_lifecycle_and_status_proof_are_canonical_and_exact stdout ----
+
+thread 'settlement_lifecycle_and_status_proof_are_canonical_and_exact' (3913031) panicked at crates/economy/chio-credit/tests/obligation_status.rs:417:5:
+assertion failed: matches!(SignedObligationStatusProofV1::from_canonical_bytes(&noncanonical),
+    Err(ObligationError::Canonicalization(_)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    settlement_lifecycle_and_status_proof_are_canonical_and_exact
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.51s
+
+error: test failed, to rerun pass `-p chio-credit --test obligation_status`
+     Running tests/original_input.rs (/home/connor/chio-security-target-6d-final/debug/deps/original_input-9fb4150c9f3cbd50)
+
+running 2 tests
+test original_credit_readers_preserve_native_causes ... ok
+test original_credit_input_is_bounded_before_typed_projection ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_fiscal-43c7f944d54f5113)
+
+running 31 tests
+test lifecycle_tests::committed_activation_authority_is_not_clone ... ok
+test fee_schedule::tests::fee_schedule_rejects_duplicate_bond_classes ... ok
+test lifecycle_tests::genesis_policy_rejects_a_charter_signed_by_an_unpinned_authority ... ok
+test lifecycle_tests::continuity_advance_retains_reverifiable_canonical_evidence ... ok
+test lifecycle_tests::duplicate_nonmember_and_below_threshold_approvals_reject ... ok
+test lifecycle_tests::external_anchor_port_reads_authentically_and_cas_advances ... ok
+test lifecycle_tests::activation_requires_the_exact_current_runtime_readiness ... ok
+test lifecycle_tests::runtime_adapter_registry_is_exact_sorted_and_canonical ... ok
+test lifecycle_tests::published_fiscal_fixtures_match_runtime_types_and_signatures ... ok
+test lifecycle_tests::continuity_binds_exact_schedule_domain_predecessor_and_charter_lineage ... ok
+test tests::builders_produce_deterministic_ids_and_canonical_vectors ... ok
+test lifecycle_tests::external_checkpoint_prevents_database_restore_from_reopening_fallback ... ok
+test lifecycle_tests::clock_rollback_anchor_outage_and_divergence_deny ... ok
+test tests::params_reject_currency_and_numeric_contract_violations ... ok
+test lifecycle_tests::checkpoint_strict_decode_and_expiry_boundary_fail_closed ... ok
+test lifecycle_tests::activation_history_rebuilds_only_from_the_complete_checkpoint_chain ... ok
+test lifecycle_tests::successor_charter_cannot_self_authorize_rotation ... ok
+test tests::signer_key_id_hashes_raw_public_key_bytes ... ok
+test tests::open_market_schedule_requires_exact_operator_and_time_binding ... ok
+test tests::charter_rejects_invalid_threshold_durations_expiry_and_lineage ... ok
+test lifecycle_tests::fallback_is_anchor_attested_and_cannot_reappear_after_activation ... ok
+test lifecycle_tests::valid_amendment_requires_local_admission_and_current_charter_threshold ... ok
+test tests::signed_artifacts_verify_and_strictly_decode_canonical_bytes ... FAILED
+test tests::unknown_schema_self_id_and_signature_tamper_fail_closed ... ok
+test tests::schedule_rejects_domain_charter_expiry_and_currency_mismatch ... ok
+test lifecycle_tests::continuity_rejects_marker_clock_and_sequence_rollback ... ok
+test tests::strict_charter_rejects_unsorted_duplicate_and_misbound_signers ... ok
+test lifecycle_tests::timelock_approval_expiry_and_untrusted_admission_reject ... ok
+test tests::schedule_rejects_lineage_gaps_and_cross_domain_predecessors ... ok
+test lifecycle_tests::resolver_enforces_lineage_currency_expiry_and_last_known_good ... ok
+test lifecycle_tests::resolver_selects_activated_predecessor_digest_from_duplicate_schedule_ids ... ok
+
+failures:
+
+---- tests::signed_artifacts_verify_and_strictly_decode_canonical_bytes stdout ----
+
+thread 'tests::signed_artifacts_verify_and_strictly_decode_canonical_bytes' (3913066) panicked at crates/economy/chio-fiscal/src/tests.rs:167:5:
+assertion failed: matches!(VerifiedFiscalCharter::from_canonical_bytes(&noncanonical),
+    Err(FiscalError::Canonicalization(_)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::signed_artifacts_verify_and_strictly_decode_canonical_bytes
+
+test result: FAILED. 30 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `-p chio-fiscal --lib`
+     Running tests/original_input.rs (/home/connor/chio-security-target-6d-final/debug/deps/original_input-5cd4aaed1473eb67)
+
+running 1 test
+test original_fiscal_readers_preserve_native_causes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_credit
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_fiscal
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 6 targets failed:
+    `-p chio-credit --test credit_facility_bind`
+    `-p chio-credit --test factor_authorization`
+    `-p chio-credit --test factor_claim`
+    `-p chio-credit --test factor_results`
+    `-p chio-credit --test obligation_status`
+    `-p chio-fiscal --lib`

@@ -1609,3 +1609,52 @@ fn representative_artifacts_match_strict_schemas_and_versions() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn original_outcome_reader_is_bounded_and_keeps_native_cause() {
+    let bytes = format!("\"{}\"", "x".repeat(4 * 1024 * 1024));
+    let error = match load_canonical_outcome_json::<serde_json::Value>(bytes.as_bytes()) {
+        Err(error) => error,
+        Ok(_) => panic!("oversized outcome accepted"),
+    };
+    assert!(std::error::Error::source(&error).is_some());
+    assert!(error.to_string().contains("signed-json-too-large"));
+}
+
+#[test]
+fn original_predicate_output_is_bounded_before_projection() -> TestResult {
+    let fixture = fixture()?;
+    let mut output: serde_json::Value = serde_json::from_slice(DELIVERED_OUTPUT)?;
+    output["padding"] = serde_json::Value::String("x".repeat(4 * 1024 * 1024));
+    let output = serde_json::to_vec(&output)?;
+    assert!(matches!(
+        evaluate_outcome_predicate(&fixture.predicate, &output).evaluation(),
+        OutcomeEvaluationV1::Unevaluable {
+            reason: OutcomeEvaluationReasonV1::InvalidOutputJson
+        }
+    ));
+    Ok(())
+}
+
+#[test]
+fn rejected_predicate_retains_local_cause_and_deterministic_identity() -> TestResult {
+    let fixture = fixture()?;
+    let output = br#"{"private-marker":1,"private-marker":2}"#;
+    let first = evaluate_outcome_predicate(&fixture.predicate, output);
+    let second = evaluate_outcome_predicate(&fixture.predicate, output);
+    assert_eq!(first, second);
+    assert!(matches!(
+        first.evaluation(),
+        OutcomeEvaluationV1::Unevaluable {
+            reason: OutcomeEvaluationReasonV1::InvalidOutputJson
+        }
+    ));
+    let source = first.input_error().ok_or("missing original input cause")?;
+    assert!(std::error::Error::source(source).is_some());
+    assert!(!format!("{first:?}").contains("private-marker"));
+    assert_eq!(
+        first.output_digest(),
+        chio_core_types::crypto::sha256_hex(output)
+    );
+    Ok(())
+}

@@ -1,0 +1,51 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling ahash v0.8.12
+   Compiling rand_chacha v0.3.1
+   Compiling rusty-fork v0.3.1
+   Compiling referencing v0.46.0
+   Compiling rand v0.8.6
+   Compiling proptest v1.10.0
+   Compiling jsonschema v0.46.0
+   Compiling num-bigint-dig v0.8.6
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling chio-spec-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-spec-validate)
+   Compiling oauth2 v5.0.0
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+error[E0425]: cannot find value `FINDING_PURCHASE_CONTEXT_MAX_CANONICAL_BYTES` in crate `chio_finding`
+   --> crates/economy/chio-open-market/src/purchase_verification.rs:140:65
+    |
+140 |     UntrustedJsonText::from_wire(text.as_bytes(), chio_finding::FINDING_PURCHASE_CONTEXT_MAX_CANONICAL_BYTES)
+    |                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: crates/economy/chio-finding/src/recovery_context.rs:18:1
+    |
+ 18 | pub const FINDING_RECOVERY_CONTEXT_MAX_CANONICAL_BYTES: usize = 1_048_576;
+    | ------------------------------------------------------------- similarly named constant `FINDING_RECOVERY_CONTEXT_MAX_CANONICAL_BYTES` defined here
+    |
+help: a constant with a similar name exists
+    |
+140 -     UntrustedJsonText::from_wire(text.as_bytes(), chio_finding::FINDING_PURCHASE_CONTEXT_MAX_CANONICAL_BYTES)
+140 +     UntrustedJsonText::from_wire(text.as_bytes(), chio_finding::FINDING_RECOVERY_CONTEXT_MAX_CANONICAL_BYTES)
+    |
+
+   Compiling chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+   Compiling rsa v0.9.10
+   Compiling openidconnect v4.0.1
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `chio-open-market` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `chio-open-market` (lib test) due to 1 previous error

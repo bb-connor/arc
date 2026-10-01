@@ -1947,7 +1947,8 @@ fn parametric_policy_verification_fails_closed_on_signer_schema_and_encoding() {
     padded.extend_from_slice(&canonical);
     assert!(matches!(
         VerifiedParametricPolicy::from_canonical_bytes(&padded, &fixture.context()),
-        Err(ParametricContractError::Canonicalization(_))
+        Err(ParametricContractError::Input(source))
+            if source.code() == "urn:chio:error:attest:signed-json-noncanonical"
     ));
 }
 

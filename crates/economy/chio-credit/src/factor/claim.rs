@@ -445,6 +445,7 @@ fn validate_claim_causality(
 
 fn map_iou_error(error: IouEnvelopeV2Error) -> FactorError {
     match error {
+        IouEnvelopeV2Error::Input(source) => FactorError::Input(source),
         IouEnvelopeV2Error::ReceiptVerification
         | IouEnvelopeV2Error::ReceiptSignerUntrusted
         | IouEnvelopeV2Error::CreditAuthorityVerification

@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 INVENTORY = ROOT / "scripts/security-clock-inventory.json"
 ROOTS = (
     "crates/security/",
+    "crates/economy/chio-anchor/src/witness/rekor.rs",
+    "crates/economy/chio-anchor/src/witness/rekor/",
     "crates/kernel/",
     "crates/guards/",
     "crates/platform/chio-control-plane/",

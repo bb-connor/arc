@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use chio_core_types::canonical::canonical_json_bytes_from_str;
+use chio_core_types::canonical::{SharedUntrustedJsonError, UntrustedJsonText};
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use serde::{Deserialize, Serialize};
@@ -264,15 +264,33 @@ pub enum OutcomeEvaluationV1 {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct VerifiedOutcomeEvaluationV1 {
     evaluation: OutcomeEvaluationV1,
     output_digest: String,
     predicate_id: String,
     predicate_digest: String,
+    input_error: Option<SharedUntrustedJsonError>,
 }
 
+// Local diagnostic identity does not change the deterministic evaluation identity.
+impl PartialEq for VerifiedOutcomeEvaluationV1 {
+    fn eq(&self, other: &Self) -> bool {
+        self.evaluation == other.evaluation
+            && self.output_digest == other.output_digest
+            && self.predicate_id == other.predicate_id
+            && self.predicate_digest == other.predicate_digest
+    }
+}
+impl Eq for VerifiedOutcomeEvaluationV1 {}
+
 impl VerifiedOutcomeEvaluationV1 {
+    /// Original parser cause for local diagnostics; never part of the wire verdict.
+    #[must_use]
+    pub fn input_error(&self) -> Option<&SharedUntrustedJsonError> {
+        self.input_error.as_ref()
+    }
+
     #[must_use]
     pub const fn evaluation(&self) -> &OutcomeEvaluationV1 {
         &self.evaluation
@@ -298,35 +316,30 @@ pub fn evaluate_outcome_predicate(
     predicate: &VerifiedOutcomePredicateV1,
     output: &[u8],
 ) -> VerifiedOutcomeEvaluationV1 {
+    let (evaluation, input_error) =
+        match UntrustedJsonText::from_wire(output, super::MAX_OUTCOME_JSON_BYTES)
+            .and_then(|input| input.decode_external::<Value>())
+        {
+            Ok(document) => (evaluate(predicate, &document), None),
+            Err(error) => (
+                OutcomeEvaluationV1::Unevaluable {
+                    reason: OutcomeEvaluationReasonV1::InvalidOutputJson,
+                },
+                Some(error.into()),
+            ),
+        };
     VerifiedOutcomeEvaluationV1 {
-        evaluation: evaluate(predicate, output),
+        evaluation,
+        input_error,
         output_digest: sha256_hex(output),
         predicate_id: predicate.body().predicate_id().to_owned(),
         predicate_digest: predicate.envelope_digest().to_owned(),
     }
 }
 
-fn evaluate(predicate: &VerifiedOutcomePredicateV1, output: &[u8]) -> OutcomeEvaluationV1 {
-    let Ok(output_text) = std::str::from_utf8(output) else {
-        return OutcomeEvaluationV1::Unevaluable {
-            reason: OutcomeEvaluationReasonV1::InvalidOutputJson,
-        };
-    };
-    if canonical_json_bytes_from_str(output_text).is_err() {
-        return OutcomeEvaluationV1::Unevaluable {
-            reason: OutcomeEvaluationReasonV1::InvalidOutputJson,
-        };
-    }
-    let document: Value = match serde_json::from_slice(output) {
-        Ok(document) => document,
-        Err(_) => {
-            return OutcomeEvaluationV1::Unevaluable {
-                reason: OutcomeEvaluationReasonV1::InvalidOutputJson,
-            };
-        }
-    };
+fn evaluate(predicate: &VerifiedOutcomePredicateV1, document: &Value) -> OutcomeEvaluationV1 {
     for (index, assertion) in predicate.body().assertions.iter().enumerate() {
-        let Some(target) = select_pointer(&document, &assertion.pointer) else {
+        let Some(target) = select_pointer(document, &assertion.pointer) else {
             return OutcomeEvaluationV1::Failed {
                 assertion_index: u32::try_from(index).unwrap_or(u32::MAX),
                 reason: OutcomeEvaluationReasonV1::MissingTarget,

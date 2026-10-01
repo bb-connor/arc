@@ -31,7 +31,11 @@
 //! `crates/tooling/chio-conformance/tests/anchor_batch_witness_impersonation_rejected.rs`
 //! exercises the full surface against a `tiny_http` mock server.
 
+use chio_security_types::clock::{Clock, ClockError, SystemClock};
+use std::sync::Arc;
 use std::time::Duration;
+mod clock;
+mod input;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
@@ -70,6 +74,7 @@ pub struct RekorClient {
     /// production set defaults to [`REKOR_PUBLIC_KEY_PEM`]; tests
     /// substitute their own ephemeral key via [`Self::with_trusted_keys`].
     trusted_keys: Vec<String>,
+    clock: clock::AuthorityClock,
 }
 
 impl RekorClient {
@@ -81,6 +86,15 @@ impl RekorClient {
     pub fn new(
         endpoint: impl Into<String>,
         max_witness_age_seconds: i64,
+    ) -> Result<Self, AnchorWitnessError> {
+        Self::new_with_clock(endpoint, max_witness_age_seconds, Arc::new(SystemClock))
+    }
+
+    /// Construct with an explicit authority clock. Client clones share its fence.
+    pub fn new_with_clock(
+        endpoint: impl Into<String>,
+        max_witness_age_seconds: i64,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, AnchorWitnessError> {
         let endpoint = endpoint.into();
         if endpoint.is_empty() {
@@ -98,6 +112,8 @@ impl RekorClient {
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
             .https_only(false)
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
             .build()
             .map_err(|error| AnchorWitnessError::Config(error.to_string()))?;
         Ok(RekorClient {
@@ -105,6 +121,7 @@ impl RekorClient {
             http,
             max_witness_age_seconds,
             trusted_keys: vec![REKOR_PUBLIC_KEY_PEM.to_string()],
+            clock: clock::AuthorityClock::new(clock),
         })
     }
 
@@ -115,6 +132,24 @@ impl RekorClient {
     pub fn with_trusted_keys(mut self, keys: Vec<String>) -> Self {
         self.trusted_keys = keys;
         self
+    }
+
+    fn validate_time(&self, published_at: i64) -> Result<(), AnchorWitnessError> {
+        let now = self.clock.now()?;
+        if published_at < 0 {
+            return Err(ClockError::BeforeEpoch.into());
+        }
+        if published_at > now {
+            return Err(ClockError::NotYetValid.into());
+        }
+        if self.max_witness_age_seconds > 0 && now - published_at > self.max_witness_age_seconds {
+            return Err(AnchorWitnessError::Stale {
+                published_at,
+                now,
+                max_age_seconds: self.max_witness_age_seconds,
+            });
+        }
+        Ok(())
     }
 
     fn entries_url(&self) -> String {
@@ -252,7 +287,7 @@ fn rekor_dsse_signature_material(batch: &AnchorBatch) -> RekorIntotoSignatureMat
 }
 
 /// Returned by `POST /api/v1/log/entries`. Rekor's real response is a
-/// map keyed by UUID; we treat the first key as the canonical UUID.
+/// map keyed by UUID; exactly one entry is required.
 #[derive(Debug, Deserialize)]
 struct RekorPublishResponse {
     #[serde(flatten)]
@@ -319,11 +354,10 @@ struct RekorHashOwned {
 }
 
 fn extract_lane_body_hash(entry: &RekorEntry) -> Result<String, AnchorWitnessError> {
-    let raw = BASE64_STANDARD
-        .decode(entry.body.as_bytes())
-        .map_err(|error| AnchorWitnessError::Decode(format!("rekor body base64: {error}")))?;
-    let parsed: RekorEntryBody = serde_json::from_slice(&raw)
-        .map_err(|error| AnchorWitnessError::Decode(format!("rekor body json: {error}")))?;
+    let raw = input::decode_body(&entry.body)?;
+    let parsed: RekorEntryBody =
+        chio_core::canonical::UntrustedJsonText::from_wire(&raw, input::MAX_BODY_BYTES)?
+            .decode_signed()?;
     if !parsed
         .spec
         .content
@@ -331,12 +365,17 @@ fn extract_lane_body_hash(entry: &RekorEntry) -> Result<String, AnchorWitnessErr
         .algorithm
         .eq_ignore_ascii_case("sha256")
     {
-        return Err(AnchorWitnessError::Decode(format!(
-            "rekor entry hash algorithm {} is not sha256",
-            parsed.spec.content.hash.algorithm
-        )));
+        return Err(AnchorWitnessError::Decode(
+            "Rekor entry hash algorithm is not sha256".to_owned(),
+        ));
     }
-    Ok(parsed.spec.content.hash.value.to_ascii_lowercase())
+    let hash = parsed.spec.content.hash.value;
+    if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(AnchorWitnessError::Decode(
+            "Rekor entry hash is not SHA-256 hex".to_owned(),
+        ));
+    }
+    Ok(hash.to_ascii_lowercase())
 }
 
 /// Re-canonicalize the SET-signed envelope per Rekor's spec.
@@ -605,11 +644,7 @@ fn verify_inclusion_proof(entry: &RekorEntry) -> Result<(), AnchorWitnessError> 
         .map(|hash_hex| decode_proof_hash(hash_hex, "audit path hash"))
         .collect::<Result<Vec<Hash>, AnchorWitnessError>>()?;
 
-    let leaf_bytes = BASE64_STANDARD
-        .decode(entry.body.as_bytes())
-        .map_err(|error| {
-            AnchorWitnessError::Decode(format!("rekor inclusion proof body base64: {error}"))
-        })?;
+    let leaf_bytes = input::decode_body(&entry.body)?;
     let leaf_hash = rfc6962_leaf_hash(&leaf_bytes);
 
     let computed_root =
@@ -627,6 +662,7 @@ fn verify_inclusion_proof(entry: &RekorEntry) -> Result<(), AnchorWitnessError> 
 #[async_trait::async_trait]
 impl AnchorWitnessClient for RekorClient {
     async fn publish(&self, batch: &AnchorBatch) -> Result<WitnessReceipt, AnchorWitnessError> {
+        self.clock.now()?;
         let body_hash = batch_body_hash(batch)?;
         let body_hash_hex = body_hash.to_hex();
         let body_bytes = canonical_json_bytes(&batch.body)
@@ -658,20 +694,8 @@ impl AnchorWitnessClient for RekorClient {
             // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()
             .await
-            .map_err(|error| AnchorWitnessError::Network(error.to_string()))?;
-        let status = response.status();
-        let raw_body = response
-            .text()
-            .await
-            .map_err(|error| AnchorWitnessError::Network(error.to_string()))?;
-        if !status.is_success() {
-            return Err(AnchorWitnessError::Http {
-                status: status.as_u16(),
-                body: raw_body,
-            });
-        }
-        let parsed: RekorPublishResponse = serde_json::from_str(&raw_body)
-            .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
+            .map_err(AnchorWitnessError::transport)?;
+        let parsed = input::response(response).await?;
         let (uuid, entry) = parsed.entries.into_iter().next().ok_or_else(|| {
             AnchorWitnessError::Decode("rekor publish returned no entries".to_string())
         })?;
@@ -691,11 +715,14 @@ impl AnchorWitnessClient for RekorClient {
         // the entry as witnessed. Absent proof leaves the SET as the
         // authoritative authentication.
         verify_inclusion_proof(&entry)?;
+        self.validate_time(entry.integrated_time)?;
         let inclusion_proof_bytes = entry
             .verification
             .as_ref()
             .and_then(|verification| verification.inclusion_proof.as_ref())
-            .and_then(|proof| serde_json::to_vec(proof).ok())
+            .map(serde_json::to_vec)
+            .transpose()
+            .map_err(chio_core::canonical::UntrustedJsonError::Decode)?
             .unwrap_or_default();
         Ok(WitnessReceipt {
             kind: AnchorBatchWitnessKind::Rekor,
@@ -708,6 +735,14 @@ impl AnchorWitnessClient for RekorClient {
     }
 
     async fn verify_inclusion(&self, receipt: &WitnessReceipt) -> Result<(), AnchorWitnessError> {
+        self.clock.now()?;
+        if receipt.inclusion_proof.len() > crate::witness::MAX_WITNESS_PROOF_BYTES {
+            return Err(chio_core::canonical::UntrustedJsonError::TooLarge {
+                bytes: receipt.inclusion_proof.len(),
+                bound: crate::witness::MAX_WITNESS_PROOF_BYTES,
+            }
+            .into());
+        }
         if receipt.kind != AnchorBatchWitnessKind::Rekor {
             return Err(AnchorWitnessError::Config(format!(
                 "RekorClient asked to verify {:?} receipt",
@@ -720,20 +755,8 @@ impl AnchorWitnessClient for RekorClient {
             // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()
             .await
-            .map_err(|error| AnchorWitnessError::Network(error.to_string()))?;
-        let status = response.status();
-        let raw_body = response
-            .text()
-            .await
-            .map_err(|error| AnchorWitnessError::Network(error.to_string()))?;
-        if !status.is_success() {
-            return Err(AnchorWitnessError::Http {
-                status: status.as_u16(),
-                body: raw_body,
-            });
-        }
-        let parsed: RekorPublishResponse = serde_json::from_str(&raw_body)
-            .map_err(|error| AnchorWitnessError::Decode(error.to_string()))?;
+            .map_err(AnchorWitnessError::transport)?;
+        let parsed = input::response(response).await?;
         let entry = parsed.entries.get(&receipt.external_uuid).ok_or_else(|| {
             AnchorWitnessError::Decode(format!(
                 "rekor returned no entry for uuid {}",
@@ -759,26 +782,14 @@ impl AnchorWitnessClient for RekorClient {
         // logIndex. Fails closed on any malformed or mismatched proof.
         verify_inclusion_proof(entry)?;
 
-        let now = chrono_now_unix();
-        if self.max_witness_age_seconds > 0
-            && now.saturating_sub(entry.integrated_time) > self.max_witness_age_seconds
-        {
-            return Err(AnchorWitnessError::Stale {
-                published_at: entry.integrated_time,
-                now,
-                max_age_seconds: self.max_witness_age_seconds,
-            });
+        if receipt.published_at != entry.integrated_time {
+            return Err(AnchorWitnessError::Decode(
+                "receipt timestamp differs from the signed entry".to_owned(),
+            ));
         }
+        self.validate_time(entry.integrated_time)?;
         Ok(())
     }
-}
-
-fn chrono_now_unix() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
 }
 
 /// Build the canonical Rekor "body" payload that a real Rekor server
@@ -1423,3 +1434,34 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod original_input_tests {
+    use super::*;
+    #[test]
+    fn original_nested_rekor_body_rejects_ignored_duplicate_keys() {
+        let mut entry = RekorEntry {
+            body: BASE64_STANDARD
+                .encode(br#"{"spec":{"content":{"hash":{"algorithm":"sha256","value":"abc"}}}}"#),
+            integrated_time: 1,
+            log_id: "0".repeat(64),
+            log_index: 0,
+            verification: None,
+        };
+        entry.body = BASE64_STANDARD.encode(serde_json::to_vec(&serde_json::json!({"spec":{"content":{"hash":{"algorithm":"sha256","value":"0".repeat(64)}}}})).unwrap_or_else(|error| panic!("valid fixture: {error}")));
+        assert_eq!(
+            extract_lane_body_hash(&entry).ok().as_deref(),
+            Some("0".repeat(64).as_str())
+        );
+        entry.body = BASE64_STANDARD.encode(br#"{"spec":{"content":{"hash":{"algorithm":"sha256","value":"abc"}}},"ignored":{"private-marker":1,"private-marker":2}}"#);
+        let error = match extract_lane_body_hash(&entry) {
+            Err(error) => error,
+            Ok(_) => panic!("ambiguous original Rekor body accepted"),
+        };
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains("private-marker"));
+    }
+}
+
+#[cfg(test)]
+mod ingress_tests;

@@ -1,0 +1,66 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+    Finished `test` profile [unoptimized] target(s) in 2m 19s
+     Running tests/original_input.rs (/home/connor/chio-security-target-6d-final/debug/deps/original_input-9fb4150c9f3cbd50)
+
+running 2 tests
+test original_credit_readers_preserve_native_causes ... FAILED
+test original_credit_input_is_bounded_before_typed_projection ... FAILED
+
+failures:
+
+---- original_credit_readers_preserve_native_causes stdout ----
+
+thread 'original_credit_readers_preserve_native_causes' (3908641) panicked at crates/economy/chio-credit/tests/original_input.rs:13:5:
+native parser cause was discarded: v2 iou canonicalization failed: unknown field `private-marker`, expected one of `body`, `signerKey`, `algorithm`, `signature` at line 1 column 17
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- original_credit_input_is_bounded_before_typed_projection stdout ----
+
+thread 'original_credit_input_is_bounded_before_typed_projection' (3908640) panicked at crates/economy/chio-credit/tests/original_input.rs:35:52:
+bounded input cause was discarded
+
+
+failures:
+    original_credit_input_is_bounded_before_typed_projection
+    original_credit_readers_preserve_native_causes
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+error: test failed, to rerun pass `-p chio-credit --test original_input`
+     Running tests/original_input.rs (/home/connor/chio-security-target-6d-final/debug/deps/original_input-5cd4aaed1473eb67)
+
+running 1 test
+test original_fiscal_readers_preserve_native_causes ... FAILED
+
+failures:
+
+---- original_fiscal_readers_preserve_native_causes stdout ----
+
+thread 'original_fiscal_readers_preserve_native_causes' (3908643) panicked at crates/economy/chio-fiscal/tests/original_input.rs:18:9:
+native parser cause was discarded: fiscal canonicalization failed: unknown field `private-marker`, expected one of `body`, `signerKey`, `signature` at line 1 column 17
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    original_fiscal_readers_preserve_native_causes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p chio-fiscal --test original_input`
+error: 2 targets failed:
+    `-p chio-credit --test original_input`
+    `-p chio-fiscal --test original_input`

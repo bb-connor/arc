@@ -1,0 +1,57 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+warning: unused import: `SettlementFailureCode`
+  --> crates/economy/chio-settle/src/retry.rs:23:29
+   |
+23 |     SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementSkipReason,
+   |                             ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-settle` (lib) generated 1 warning (run `cargo fix --lib -p chio-settle` to apply 1 suggestion)
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-anchor v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-anchor)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+  --> crates/economy/chio-anchor/src/witness/rekor.rs:36:5
+   |
+36 | use chio_security_types::clock::{Clock, ClockError, SystemClock};
+   |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+   |
+   = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+ --> crates/economy/chio-anchor/src/witness/rekor/clock.rs:3:5
+  |
+3 | use chio_security_types::clock::{Clock, ClockError, ClockFence};
+  |     ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+  |
+  = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `chio_security_types`
+   --> crates/economy/chio-anchor/src/witness.rs:123:19
+    |
+123 |     Clock(#[from] chio_security_types::clock::ClockError),
+    |                   ^^^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `chio_security_types`
+    |
+    = help: if you wanted to use a crate named `chio_security_types`, use `cargo add chio_security_types` to add it to your `Cargo.toml`
+note: module `crate::witness::rekor::clock` exists but is inaccessible
+   --> crates/economy/chio-anchor/src/witness/rekor.rs:37:1
+    |
+ 37 | mod clock;
+    | ^^^^^^^^^^ not accessible
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `chio-anchor` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

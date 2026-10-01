@@ -2687,6 +2687,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-security-types",
  "chio-spec-validate",
  "chio-test-support",
  "chio-web3-bindings",

@@ -40,6 +40,8 @@ const MAX_SOURCE_ARTIFACT_BYTES: usize = 512 * 1024;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum FinancialCredentialProjectionError {
+    #[error("invalid canonical evidence: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("settlement reliability window contains no authenticated obligations")]
     EmptyWindow,
     #[error("settlement reliability counts are inconsistent")]
@@ -673,14 +675,7 @@ fn inspect_financial_source_member(
 fn parse_canonical_source_artifact<T: DeserializeOwned + Serialize>(
     canonical: &str,
 ) -> Result<T, FinancialCredentialProjectionError> {
-    let value = serde_json::from_str::<T>(canonical)
-        .map_err(|error| FinancialCredentialProjectionError::InvalidSource(error.to_string()))?;
-    let round_trip = canonical_json_bytes(&value)
-        .map_err(|error| FinancialCredentialProjectionError::InvalidSource(error.to_string()))?;
-    if round_trip != canonical.as_bytes() {
-        return Err(FinancialCredentialProjectionError::InvalidSourceSchema);
-    }
-    Ok(value)
+    crate::input::canonical(canonical.as_bytes(), MAX_SOURCE_ARTIFACT_BYTES).map_err(Into::into)
 }
 
 fn validate_exposure_report_members(

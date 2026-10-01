@@ -68,17 +68,8 @@ impl FiscalRuntimeAdapterRegistry {
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, FiscalError> {
-        if bytes.is_empty() || bytes.len() > MAX_SIGNED_LIFECYCLE_BYTES {
-            return Err(FiscalError::InvalidField("runtime_registry.size"));
-        }
-        let registry: Self = serde_json::from_slice(bytes)
-            .map_err(|error| FiscalError::Canonicalization(error.to_string()))?;
+        let registry: Self = crate::input::canonical(bytes, MAX_SIGNED_LIFECYCLE_BYTES)?;
         registry.validate()?;
-        if registry.canonical_bytes()?.as_slice() != bytes {
-            return Err(FiscalError::Canonicalization(
-                "fiscal runtime adapter registry is not canonical".to_owned(),
-            ));
-        }
         Ok(registry)
     }
 
@@ -266,18 +257,9 @@ impl VerifiedFiscalRuntimeReadiness {
         policy: &FiscalGenesisPolicy,
         runtime_registry: FiscalRuntimeAdapterRegistry,
     ) -> Result<Self, FiscalError> {
-        if bytes.is_empty() || bytes.len() > MAX_SIGNED_LIFECYCLE_BYTES {
-            return Err(FiscalError::InvalidField("signed_readiness.size"));
-        }
-        let signed: SignedFiscalRuntimeReadiness = serde_json::from_slice(bytes)
-            .map_err(|error| FiscalError::Canonicalization(error.to_string()))?;
-        let verified = Self::verify(signed, policy, runtime_registry)?;
-        if verified.canonical_bytes()?.as_slice() != bytes {
-            return Err(FiscalError::Canonicalization(
-                "signed fiscal runtime readiness is not canonical".to_owned(),
-            ));
-        }
-        Ok(verified)
+        let signed: SignedFiscalRuntimeReadiness =
+            crate::input::canonical(bytes, MAX_SIGNED_LIFECYCLE_BYTES)?;
+        Self::verify(signed, policy, runtime_registry)
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, FiscalError> {

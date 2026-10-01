@@ -21,6 +21,8 @@ const BIND_TRUST_CONFIGURATION_DOMAIN: &[u8] =
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum CreditFacilityBindError {
+    #[error("invalid canonical evidence: {0}")]
+    Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("invalid credit facility bind field `{0}`")]
     InvalidField(&'static str),
     #[error("credit facility bind does not match `{0}`")]
@@ -495,14 +497,8 @@ impl SignedCreditFacilityBindV1 {
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, CreditFacilityBindError> {
-        let signed: Self = serde_json::from_slice(bytes)
-            .map_err(|error| CreditFacilityBindError::Canonicalization(error.to_string()))?;
+        let signed: Self = crate::input::canonical(bytes, crate::input::MAX_EVIDENCE_BYTES)?;
         signed.body.validate()?;
-        if signed.canonical_bytes()?.as_slice() != bytes {
-            return Err(CreditFacilityBindError::Canonicalization(
-                "credit facility bind is not canonical".to_owned(),
-            ));
-        }
         Ok(signed)
     }
 

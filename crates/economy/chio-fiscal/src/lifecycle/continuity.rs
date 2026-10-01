@@ -513,18 +513,9 @@ impl VerifiedFiscalContinuityCheckpoint {
         policy: &FiscalGenesisPolicy,
         charters: &FiscalCharterRegistry,
     ) -> Result<Self, FiscalError> {
-        if bytes.is_empty() || bytes.len() > MAX_SIGNED_LIFECYCLE_BYTES {
-            return Err(FiscalError::InvalidField("signed_continuity.size"));
-        }
-        let signed: SignedFiscalContinuityCheckpoint = serde_json::from_slice(bytes)
-            .map_err(|error| FiscalError::Canonicalization(error.to_string()))?;
-        let verified = Self::verify(signed, policy, charters)?;
-        if verified.canonical_bytes()?.as_slice() != bytes {
-            return Err(FiscalError::Canonicalization(
-                "signed fiscal continuity checkpoint is not canonical".to_owned(),
-            ));
-        }
-        Ok(verified)
+        let signed: SignedFiscalContinuityCheckpoint =
+            crate::input::canonical(bytes, MAX_SIGNED_LIFECYCLE_BYTES)?;
+        Self::verify(signed, policy, charters)
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, FiscalError> {
