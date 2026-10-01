@@ -22,10 +22,11 @@ pub(crate) async fn sidecar_evaluate_handler(
         }
     };
 
-    let chio_request: ChioHttpRequest = match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
-        Ok(request) => request,
-        Err(error) => return input::rejected(error),
-    };
+    let chio_request: ChioHttpRequest =
+        match input::decode_arguments(&body_bytes, input::MAX_BODY_BYTES) {
+            Ok(request) => request,
+            Err(error) => return input::rejected(error),
+        };
 
     if let Some(response) =
         revoked_sidecar_evaluate_response(&state, &chio_request, presented_capability.as_deref())
@@ -1075,7 +1076,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
     };
 
     let evaluate_request: SidecarEvaluateToolCallRequest =
-        match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
+        match input::decode_arguments(&body_bytes, input::MAX_BODY_BYTES) {
             Ok(request) => request,
             Err(error) => return input::rejected(error),
         };

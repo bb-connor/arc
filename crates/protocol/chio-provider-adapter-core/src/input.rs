@@ -18,8 +18,7 @@ pub fn json_bounded<T: DeserializeOwned>(
     bytes: &[u8],
     bound: usize,
 ) -> Result<T, UntrustedJsonError> {
-    let canonical = UntrustedJsonText::from_wire(bytes, bound)?.canonicalize()?;
-    serde_json::from_slice(&canonical).map_err(UntrustedJsonError::Decode)
+    UntrustedJsonText::from_wire(bytes, bound)?.decode_document()
 }
 /// Projection is allowed only after the original document has passed ingress.
 pub fn typed<T: DeserializeOwned>(value: Value) -> Result<T, UntrustedJsonError> {
@@ -37,7 +36,7 @@ pub fn argument_object(value: Value) -> Result<Value, chio_tool_call_fabric::Pro
     }
     let bytes =
         chio_core::canonical_json_bytes(&value).map_err(UntrustedJsonError::Canonicalization)?;
-    UntrustedJsonText::from_wire(&bytes, MAX_ARGUMENT_BYTES)?.canonicalize()?;
+    UntrustedJsonText::from_wire(&bytes, MAX_ARGUMENT_BYTES)?;
     Ok(value)
 }
 pub fn append_arguments(
@@ -71,11 +70,7 @@ mod tests {
 
     #[test]
     fn original_json_and_nested_arguments_reject_ambiguity() {
-        for document in [
-            r#"{"tool":"one","tool":"two"}"#,
-            r#"{"x":1e9999}"#,
-            r#"{"x":9007199254740993}"#,
-        ] {
+        for document in [r#"{"tool":"one","tool":"two"}"#, r#"{"x":1e9999}"#] {
             let error = text::<Value>(document).unwrap_err();
             assert!(error.source().is_some());
             assert!(!format!("{error:?} {error}").contains(document));

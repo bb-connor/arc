@@ -30,7 +30,7 @@ pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Val
             trimmed.as_bytes(),
             MAX_STDIO_MCP_RESPONSE_BYTES,
         )?
-        .decode_signed()
+        .decode_document()
         .map(Some)
         .map_err(Into::into);
     }
@@ -94,6 +94,17 @@ mod tests {
     use std::io::BufReader;
 
     use super::*;
+
+    #[test]
+    fn producer_numbers_survive_stdio_frames() -> Result<(), Box<dyn std::error::Error>> {
+        let wire = b"{\"jsonrpc\":\"2.0\",\"params\":{\"n\":0.50,\"tiny\":1e-05,\"id\":9007199254740993}}\n";
+        let value =
+            read_jsonrpc_frame(&mut BufReader::new(wire.as_slice()))?.ok_or("missing frame")?;
+        assert_eq!(value["params"]["n"].as_f64(), Some(0.5));
+        assert_eq!(value["params"]["tiny"].as_f64(), Some(0.00001));
+        assert_eq!(value["params"]["id"].as_u64(), Some(9007199254740993));
+        Ok(())
+    }
 
     #[test]
     fn protocol_boundary_rejects_duplicate_authority_keys() {

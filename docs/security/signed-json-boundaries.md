@@ -5,17 +5,36 @@ records the actual input check before signature verification or digesting. It is
 not a claim that the whole TCB migration is complete. Production simulation now
 uses the signed receipt boundary described below.
 
-The input contract follows the payload's numeric domain:
+Choose the decoder from the producer and its numeric contract. Every entry first
+uses `UntrustedJsonText::from_wire` with the original byte limit and UTF-8 check.
+Parsing alone never authenticates a signature, issuer, tenant or authority window.
 
-- External I-JSON text uses `canonical_json_bytes_from_str` before typed
-  deserialization. Duplicate keys, rounded numeric aliases and integers outside
-  the I-JSON range reject. Whitespace and key ordering can be canonicalized.
-- Native signed typed JSON includes full-width financial and lifecycle `u64`
-  values. `UntrustedJsonText::decode_signed` reads tokens directly, rejects duplicate
-  keys at every depth, and rejects lossy numeric lexemes before returning a value.
-  Typed and canonical serializers preserve the same signed data. The verifier
-  then reconstructs the typed signing body and verifies its signature. This is
-  the production numeric contract, not a backwards-compatibility decoder.
+| Method | Contract and intended producer |
+| --- | --- |
+| `canonicalize` | Validate original I-JSON and return canonical bytes. Reject duplicate keys and numeric aliases outside that strict external signing profile. |
+| `decode_external` | Apply `canonicalize`, then project into a DTO. Use only when the producer promises the external I-JSON signing profile. |
+| `decode_document` | Reject original duplicate keys, then use ordinary Serde numeric conversion. Unsigned provider responses, tool arguments, MCP requests, OpenAPI documents and operator policy JSON accept finite floats and full-width native integers. |
+| `decode_signed` | Parse native signed JSON without losing numeric information. Preserve native `u64`, reject duplicate keys and unsupported numeric lexemes, then run the owner's signature and authorization checks. |
+| `decode_canonical` | Decode a complete typed native document, serialize it canonically and require exact original-byte equality. Intended for Chio-owned canonical wire and storage formats. |
+| `decode_canonical_with` | The same exact-byte contract using an owner-supplied canonical serializer, including serializers for private types. |
+
+Ordinary producers may emit `21.0`, `0.0`, `0.50` or `1e-05`; unsigned document
+readers accept these spellings. They also preserve `9007199254740993` as an integer.
+These examples are not interchangeable with signing-profile acceptance tests.
+Normalized tool invocations use the native canonical encoder and validator, with
+exact bytes and object shape checked before evaluation. Streaming gates retain
+the original forwarding bytes while evaluating the normalized invocation.
+
+API-protect request bodies contain unsigned `arguments` or `parameters` alongside
+signed credentials. Governed intent context and normalized runtime evidence are
+also unsigned. The reader validates credential slices before document projection,
+including the reserved call-chain proof and continuation keys inside context.
+Signed plan/outcome fields, headers, delivery reports, receipts and nonces retain
+their signed reader. CLI operator policies and normalized runtime evidence use
+an explicit document reader; signed appraisal and mixed imports remain strict.
+Private relay/iroh seed DTOs have a separate closed, direct typed reader so secret
+strings enter zeroizing fields without an intermediate JSON value tree. Formatting
+is permitted; duplicate/unknown fields and insecure file custody are rejected.
 
 | Boundary | Current entry point and protection | Disposition |
 |---|---|---|

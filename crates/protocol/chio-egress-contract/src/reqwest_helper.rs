@@ -46,10 +46,8 @@ impl ContractResponse {
     pub async fn json<T: DeserializeOwned>(
         self,
     ) -> Result<T, chio_core::canonical::UntrustedJsonError> {
-        let bytes =
-            chio_core::canonical::UntrustedJsonText::from_wire(&self.body, self.body.len())?
-                .canonicalize()?;
-        serde_json::from_slice(&bytes).map_err(chio_core::canonical::UntrustedJsonError::Decode)
+        chio_core::canonical::UntrustedJsonText::from_wire(&self.body, self.body.len())?
+            .decode_document()
     }
 }
 
@@ -360,4 +358,34 @@ impl PartialEq for RequestFailure {
 impl Eq for RequestFailure {}
 fn map_reqwest_error(error: reqwest::Error) -> HttpEgressError {
     RequestFailure::new(error.without_url()).into()
+}
+
+#[cfg(test)]
+mod producer_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn ordinary_response_numbers_survive_and_duplicates_refuse() -> Result<(), Box<dyn Error>>
+    {
+        let response = |body: &[u8]| -> Result<ContractResponse, url::ParseError> {
+            Ok(ContractResponse {
+                status: StatusCode::OK,
+                url: Url::parse("https://example.test/")?,
+                headers: HeaderMap::new(),
+                body: body.to_vec(),
+            })
+        };
+        let value: serde_json::Value =
+            response(br#"{"n":21.0,"small":1e-05,"id":9007199254740993}"#)?
+                .json()
+                .await?;
+        assert_eq!(value["n"].as_f64(), Some(21.0));
+        assert_eq!(value["small"].as_f64(), Some(0.00001));
+        assert_eq!(value["id"].as_u64(), Some(9007199254740993));
+        assert!(response(br#"{"n":1,"n":2}"#)?
+            .json::<serde_json::Value>()
+            .await
+            .is_err());
+        Ok(())
+    }
 }

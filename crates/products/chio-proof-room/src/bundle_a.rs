@@ -147,12 +147,10 @@ pub(crate) fn write_doctor_report(
         context: "proof-room.doctor-report.encode",
         source,
     })?;
-    fs::write(path, bytes)
-        .map_err(|source| ProofRoomError::Io {
-            context: "proof-room.doctor-report.write",
-            source,
-        })
-        .map_err(ProofRoomError::from)
+    fs::write(path, bytes).map_err(|source| ProofRoomError::Io {
+        context: "proof-room.doctor-report.write",
+        source,
+    })
 }
 
 pub(crate) fn verify_negative_cases(

@@ -25,13 +25,16 @@ struct ReportRequest {
     report: SignedCallerDeliveryReportV1,
 }
 
-async fn parse<T: serde::de::DeserializeOwned>(request: Request<Body>) -> Result<T, Response> {
+async fn parse<T: serde::de::DeserializeOwned>(
+    request: Request<Body>,
+    decode: impl FnOnce(&[u8], usize) -> Result<T, chio_core_types::canonical::UntrustedJsonError>,
+) -> Result<T, Response> {
     let bytes = axum::body::to_bytes(request.into_body(), MAX_REQUEST_BYTES)
         .await
         .map_err(|_| {
             sidecar_bad_request("caller delivery request exceeds its bound").into_response()
         })?;
-    input::decode(&bytes, MAX_REQUEST_BYTES).map_err(input::rejected)
+    decode(&bytes, MAX_REQUEST_BYTES).map_err(input::rejected)
 }
 
 fn rejected() -> Response {
@@ -49,7 +52,7 @@ pub(crate) async fn start(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
-    let request: StartRequest = match parse(request).await {
+    let request: StartRequest = match parse(request, input::decode_arguments).await {
         Ok(request) => request,
         Err(response) => return response,
     };
@@ -92,7 +95,7 @@ pub(crate) async fn report(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
-    let request: ReportRequest = match parse(request).await {
+    let request: ReportRequest = match parse(request, input::decode).await {
         Ok(request) => request,
         Err(response) => return response,
     };
@@ -148,7 +151,9 @@ mod input_tests {
         let request = Request::new(Body::from(
             r#"{"arguments":{"credential":"private-marker","credential":"replacement"}}"#,
         ));
-        let response = parse::<serde_json::Value>(request).await.unwrap_err();
+        let response = parse::<serde_json::Value>(request, input::decode)
+            .await
+            .unwrap_err();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }

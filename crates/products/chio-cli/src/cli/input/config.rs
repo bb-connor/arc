@@ -6,7 +6,22 @@ use std::{fmt, path::Path};
 const MAX_NODES: usize = 100_000;
 const MAX_DEPTH: usize = 64;
 
+/// Signed evidence keeps its lossless original-number contract.
 pub(crate) fn load<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
+    load_with(path, super::json)
+}
+
+/// Operator-authored policy documents accept ordinary JSON and YAML numbers.
+pub(crate) fn load_document<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
+    load_with(path, |bytes| {
+        super::UntrustedJsonText::from_wire(bytes, super::MAX_DOCUMENT_BYTES)?.decode_document()
+    })
+}
+
+fn load_with<T: DeserializeOwned>(
+    path: &Path,
+    json: impl FnOnce(&[u8]) -> Result<T, super::UntrustedJsonError>,
+) -> Result<T, CliError> {
     let bytes = super::read(path)?;
     if path
         .extension()
@@ -15,7 +30,7 @@ pub(crate) fn load<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
     {
         super::project(yaml(&bytes)?)
     } else {
-        Ok(super::json(&bytes)?)
+        Ok(json(&bytes)?)
     }
 }
 

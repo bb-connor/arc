@@ -3448,3 +3448,6 @@ async fn sidecar_evaluate_tool_call_denies_parameter_hash_mismatch() {
         .and_then(|v| v.as_str());
     assert_eq!(alias_outcome, Some("parameter_hash_mismatch"));
 }
+
+#[path = "tests/producer_numbers.rs"]
+mod producer_numbers;

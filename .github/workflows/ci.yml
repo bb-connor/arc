@@ -101,100 +101,103 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         run: |
-          ./scripts/check-release-inputs.sh
-          python3 scripts/tests/check-release-source-gates.test.py
-          python3 scripts/tests/check-release-draft-assets.test.py
-          python3 scripts/tests/release-provenance.test.py
-          python3 scripts/tests/check-release-binary-sbom.test.py
-          python3 scripts/tests/release-sbom-rescan.test.py
-          python3 scripts/tests/macos-release-portability.test.py
-          python3 scripts/tests/msrv-cache-target.test.py
-          python3 -m unittest discover -s integrations/required-agents/qualification -p 'test_*.py'
-          ./scripts/check-web3-contract-parity.sh
-          ./scripts/check-workspace-layering.sh
-          python3 scripts/check-review-slices.py
-          bash ./scripts/check-regression-tests.sh
-          bash ./scripts/tests/check-regression-tests.test.sh
-          python3 ./scripts/check-rust-toolchain-parity.py
-          bash ./scripts/tests/check-rust-toolchain-parity.test.sh
-          bash ./deploy/docker/chio-workspace/regenerate.sh --check
-          python3 scripts/check-docker-build-contexts.py
-          python3 scripts/tests/check-docker-build-contexts.test.py
-          bash ./scripts/tests/check-sidecar-docker-context.test.sh
-          bash ./scripts/tests/check-sidecar-image-workflow.test.sh
-          python3 scripts/check-mutants-examine-globs.py
-          bash scripts/tests/check-mutants-examine-globs.test.sh
-          python3 scripts/check-rust-public-surface.py
-          bash scripts/tests/check-rust-public-surface.test.sh
-          python3 scripts/check-architecture-docs.py
-          bash ./scripts/check-security-provenance.sh
-          python3 ./scripts/check-enterprise-provenance.py
-          python3 ./scripts/check-linux-enforcement-stack.py
-          bash ./scripts/check-security-dependencies.sh
-          bash ./scripts/tests/check-security-provenance.test.sh
-          bash ./scripts/tests/check-enterprise-provenance.test.sh
-          bash ./scripts/tests/check-linux-enforcement-stack.test.sh
-          bash ./scripts/tests/check-security-dependencies.test.sh
-          bash ./scripts/check-sre-metrics-registry.sh
-          bash ./scripts/check-log-redaction.sh
-          python3 ./scripts/tests/check-log-redaction.test.py
-          bash ./scripts/check-http-egress-contract.sh
-          bash ./scripts/tests/check-http-egress-contract.test.sh
-          bash ./scripts/check-chio-proof-room-release-truth.sh
-          bash ./scripts/tests/check-chio-proof-room-release-truth.test.sh
-          bash ./scripts/check-chio-schema-registry.sh
-          bash ./scripts/tests/check-chio-schema-registry.test.sh
-          bash ./scripts/check-agent-web-proof-envelope-schema.sh
-          bash ./scripts/tests/check-agent-web-proof-envelope-schema.test.sh
-          bash ./scripts/tests/check-protocol-peer-negotiation.test.sh
-          bash ./scripts/tests/check-consumer-boundaries.test.sh
-          python3 scripts/tests/check-consumer-sdk-inventory.test.py
-          python3 scripts/tests/check-fuzz-manifest-selection.test.py
-          bash scripts/tests/check-drogon-consumer-gate.test.sh
-          bash ./scripts/tests/check-flow-security.test.sh
-          bash ./scripts/tests/check-deception-security.test.sh
-          /bin/bash -p ./scripts/tests/check-temporal-security.test.sh
-          bash ./scripts/tests/check-response-recovery.test.sh
-          bash ./scripts/tests/check-cage-enforcement.test.sh
-          python3 ./scripts/check-mcp-admin-credential-contract.py
-          python3 ./scripts/tests/check-mcp-admin-credential-contract.test.py
-          python3 ./scripts/check-security-ci-contract.py
-          python3 ./scripts/tests/check-security-ci-contract.test.py
-          python3 ./scripts/tests/check-fips-ci-contract.test.py
-          python3 ./scripts/tests/check-required-evidence-binding.test.py
-          bash ./scripts/tests/check-rust-verification-gates.test.sh
-          bash ./scripts/tests/formal-workflow-wiring.test.sh
-          cargo metadata --manifest-path fuzz/Cargo.toml --locked --no-deps --format-version 1 >/dev/null
-          bash ./scripts/check-corpus-metadata.sh
-          bash ./scripts/tests/fuzz-budget-hard-halt.test.sh
-          bash ./scripts/tests/check-proof-report.test.sh
-          bash ./scripts/tests/lane-gate.test.sh
-          bash ./scripts/check-liability-roster-enforcement.sh
-          bash ./scripts/tests/check-liability-roster-enforcement.test.sh
-          bash ./scripts/check-no-eip3009-broadcast.sh
-          python3 scripts/check-accounting-arithmetic.py
-          bash scripts/tests/check-accounting-arithmetic.test.sh
-          python3 scripts/check-domain-separation.py
-          bash scripts/tests/check-domain-separation.test.sh
-          python3 scripts/check-security-clocks.py
-          python3 scripts/tests/check-security-clocks.test.py
-          python3 scripts/check-trust-boundaries.py
-          python3 scripts/tests/check-trust-boundaries.test.py
-          python3 scripts/check-negative-assertions.py
-          bash scripts/tests/check-negative-assertions.test.sh
-          python3 scripts/check-lint-parity.py
-          bash scripts/tests/check-lint-parity.test.sh
-          python3 scripts/check-rust-hardening.py
-          python3 scripts/tests/check-rust-hardening.test.py
-          python3 scripts/tests/rust-hardening-compiler-probes.py
-          python3 scripts/check-wire-schemas.py
-          bash scripts/tests/check-wire-schemas.test.sh
-          python3 scripts/check-dependency-budget.py
-          bash scripts/tests/check-dependency-budget.test.sh
-          bash scripts/run-miri-crates.sh --list
-          bash scripts/tests/run-miri-crates.test.sh
-          bash ./scripts/check-release-overflow.sh
-          bash ./scripts/tests/check-release-overflow.test.sh
+          source scripts/structural-gates.sh
+          run_gate bash scripts/tests/run-structural-gates.test.sh
+          run_gate ./scripts/check-release-inputs.sh
+          run_gate python3 scripts/tests/check-release-source-gates.test.py
+          run_gate python3 scripts/tests/check-release-draft-assets.test.py
+          run_gate python3 scripts/tests/release-provenance.test.py
+          run_gate python3 scripts/tests/check-release-binary-sbom.test.py
+          run_gate python3 scripts/tests/release-sbom-rescan.test.py
+          run_gate python3 scripts/tests/macos-release-portability.test.py
+          run_gate python3 scripts/tests/msrv-cache-target.test.py
+          run_gate python3 -m unittest discover -s integrations/required-agents/qualification -p 'test_*.py'
+          run_gate ./scripts/check-web3-contract-parity.sh
+          run_gate ./scripts/check-workspace-layering.sh
+          run_gate python3 scripts/check-review-slices.py
+          run_gate bash ./scripts/check-regression-tests.sh
+          run_gate bash ./scripts/tests/check-regression-tests.test.sh
+          run_gate python3 ./scripts/check-rust-toolchain-parity.py
+          run_gate bash ./scripts/tests/check-rust-toolchain-parity.test.sh
+          run_gate bash ./deploy/docker/chio-workspace/regenerate.sh --check
+          run_gate python3 scripts/check-docker-build-contexts.py
+          run_gate python3 scripts/tests/check-docker-build-contexts.test.py
+          run_gate bash ./scripts/tests/check-sidecar-docker-context.test.sh
+          run_gate bash ./scripts/tests/check-sidecar-image-workflow.test.sh
+          run_gate python3 scripts/check-mutants-examine-globs.py
+          run_gate bash scripts/tests/check-mutants-examine-globs.test.sh
+          run_gate python3 scripts/check-rust-public-surface.py
+          run_gate bash scripts/tests/check-rust-public-surface.test.sh
+          run_gate python3 scripts/check-architecture-docs.py
+          run_gate bash ./scripts/check-security-provenance.sh
+          run_gate python3 ./scripts/check-enterprise-provenance.py
+          run_gate python3 ./scripts/check-linux-enforcement-stack.py
+          run_gate bash ./scripts/check-security-dependencies.sh
+          run_gate bash ./scripts/tests/check-security-provenance.test.sh
+          run_gate bash ./scripts/tests/check-enterprise-provenance.test.sh
+          run_gate bash ./scripts/tests/check-linux-enforcement-stack.test.sh
+          run_gate bash ./scripts/tests/check-security-dependencies.test.sh
+          run_gate bash ./scripts/check-sre-metrics-registry.sh
+          run_gate bash ./scripts/check-log-redaction.sh
+          run_gate python3 ./scripts/tests/check-log-redaction.test.py
+          run_gate bash ./scripts/check-http-egress-contract.sh
+          run_gate bash ./scripts/tests/check-http-egress-contract.test.sh
+          run_gate bash ./scripts/check-chio-proof-room-release-truth.sh
+          run_gate bash ./scripts/tests/check-chio-proof-room-release-truth.test.sh
+          run_gate bash ./scripts/check-chio-schema-registry.sh
+          run_gate bash ./scripts/tests/check-chio-schema-registry.test.sh
+          run_gate bash ./scripts/check-agent-web-proof-envelope-schema.sh
+          run_gate bash ./scripts/tests/check-agent-web-proof-envelope-schema.test.sh
+          run_gate bash ./scripts/tests/check-protocol-peer-negotiation.test.sh
+          run_gate bash ./scripts/tests/check-consumer-boundaries.test.sh
+          run_gate python3 scripts/tests/check-consumer-sdk-inventory.test.py
+          run_gate python3 scripts/tests/check-fuzz-manifest-selection.test.py
+          run_gate bash scripts/tests/check-drogon-consumer-gate.test.sh
+          run_gate bash ./scripts/tests/check-flow-security.test.sh
+          run_gate bash ./scripts/tests/check-deception-security.test.sh
+          run_gate /bin/bash -p ./scripts/tests/check-temporal-security.test.sh
+          run_gate bash ./scripts/tests/check-response-recovery.test.sh
+          run_gate bash ./scripts/tests/check-cage-enforcement.test.sh
+          run_gate python3 ./scripts/check-mcp-admin-credential-contract.py
+          run_gate python3 ./scripts/tests/check-mcp-admin-credential-contract.test.py
+          run_gate python3 ./scripts/check-security-ci-contract.py
+          run_gate python3 ./scripts/tests/check-security-ci-contract.test.py
+          run_gate python3 ./scripts/tests/check-fips-ci-contract.test.py
+          run_gate python3 ./scripts/tests/check-required-evidence-binding.test.py
+          run_gate bash ./scripts/tests/check-rust-verification-gates.test.sh
+          run_gate bash ./scripts/tests/formal-workflow-wiring.test.sh
+          run_gate cargo metadata --manifest-path fuzz/Cargo.toml --locked --no-deps --format-version 1
+          run_gate bash ./scripts/check-corpus-metadata.sh
+          run_gate bash ./scripts/tests/fuzz-budget-hard-halt.test.sh
+          run_gate bash ./scripts/tests/check-proof-report.test.sh
+          run_gate bash ./scripts/tests/lane-gate.test.sh
+          run_gate bash ./scripts/check-liability-roster-enforcement.sh
+          run_gate bash ./scripts/tests/check-liability-roster-enforcement.test.sh
+          run_gate bash ./scripts/check-no-eip3009-broadcast.sh
+          run_gate python3 scripts/check-accounting-arithmetic.py
+          run_gate bash scripts/tests/check-accounting-arithmetic.test.sh
+          run_gate python3 scripts/check-domain-separation.py
+          run_gate bash scripts/tests/check-domain-separation.test.sh
+          run_gate python3 scripts/check-security-clocks.py
+          run_gate python3 scripts/tests/check-security-clocks.test.py
+          run_gate python3 scripts/check-trust-boundaries.py
+          run_gate python3 scripts/tests/check-trust-boundaries.test.py
+          run_gate python3 scripts/check-negative-assertions.py
+          run_gate bash scripts/tests/check-negative-assertions.test.sh
+          run_gate python3 scripts/check-lint-parity.py
+          run_gate bash scripts/tests/check-lint-parity.test.sh
+          run_gate python3 scripts/check-rust-hardening.py
+          run_gate python3 scripts/tests/check-rust-hardening.test.py
+          run_gate python3 scripts/tests/rust-hardening-compiler-probes.py
+          run_gate python3 scripts/check-wire-schemas.py
+          run_gate bash scripts/tests/check-wire-schemas.test.sh
+          run_gate python3 scripts/check-dependency-budget.py
+          run_gate bash scripts/tests/check-dependency-budget.test.sh
+          run_gate bash scripts/run-miri-crates.sh --list
+          run_gate bash scripts/tests/run-miri-crates.test.sh
+          run_gate bash ./scripts/check-release-overflow.sh
+          run_gate bash ./scripts/tests/check-release-overflow.test.sh
+          finish_gates
 
       - name: Formal traceability gate
         run: bash scripts/check-mapping.sh

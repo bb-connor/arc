@@ -222,7 +222,7 @@ fn parse_sse_frame(
                 data_text.as_bytes(),
                 MAX_FRAME_BYTES,
             )?
-            .decode_signed::<Value>()?,
+            .decode_document::<Value>()?,
         )
     };
 
@@ -261,6 +261,20 @@ fn parse_sse_frame(
 #[cfg(test)]
 mod boundary_tests {
     use super::*;
+    #[test]
+    fn producer_numbers_survive_sse_with_original_forwarding_bytes(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let wire = b"data: {\"n\":0.50,\"tiny\":1e-05,\"id\":9007199254740993}\n\n";
+        let frames = parse_sse_frames(wire, SseParseOptions::ignoring_unknown("test"))?;
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].raw, wire);
+        let value = frames[0].data.as_ref().ok_or("missing SSE data")?;
+        assert_eq!(value["n"].as_f64(), Some(0.5));
+        assert_eq!(value["tiny"].as_f64(), Some(0.00001));
+        assert_eq!(value["id"].as_u64(), Some(9007199254740993));
+        Ok(())
+    }
+
     #[test]
     fn protocol_boundary_sse_frame_quota_and_ambiguous_payload_refuse() {
         let bytes = "data: {}\n\n".repeat(MAX_STREAM_FRAMES + 1);

@@ -544,7 +544,7 @@ impl SqlitePheromoneRelayStore {
                 }
                 break;
             }
-            let batch: PheromoneGossipBatch = crate::input::decode(&batch_json.as_bytes())?;
+            let batch: PheromoneGossipBatch = crate::input::decode(batch_json.as_bytes())?;
             let batch_frame_count = batch.frames.len();
             if served_frame_count.saturating_add(batch_frame_count) > limit {
                 if frames.is_empty() {

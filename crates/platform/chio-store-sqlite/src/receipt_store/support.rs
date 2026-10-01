@@ -11,6 +11,9 @@ pub(crate) use checkpoint_schema::*;
 
 #[path = "support/checkpoint_projection.rs"]
 mod checkpoint_projection;
+#[path = "support/checkpoint_read.rs"]
+mod checkpoint_read;
+pub(crate) use checkpoint_read::*;
 #[path = "support/checkpoint_validate.rs"]
 mod checkpoint_validate;
 #[path = "support/claim_log.rs"]

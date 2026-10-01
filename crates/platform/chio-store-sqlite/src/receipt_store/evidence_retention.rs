@@ -1426,7 +1426,7 @@ fn verify_co_archival_complete(
                  AND a.batch_end_seq IS m.batch_end_seq AND a.tree_size IS m.tree_size \
                  AND a.merkle_root IS m.merkle_root AND a.issued_at IS m.issued_at \
                  AND a.statement_json IS m.statement_json AND a.signature IS m.signature \
-                 AND a.kernel_key IS m.kernel_key)"
+                 AND a.kernel_key IS m.kernel_key AND a.previous_checkpoint_sha256 IS m.previous_checkpoint_sha256)"
             ),
         ),
         (

@@ -111,3 +111,57 @@ async fn mediated_presented_execution_nonce_is_rejected() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_ne!(json["status"], "reserved");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn mediated_governed_context_accepts_producer_numbers_but_not_signed_aliases() {
+    let signer = Keypair::generate();
+    let agent = Keypair::generate();
+    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+    let cap =
+        issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+    let state = mediated_test_state(signer, budget, Vec::new());
+    let template = serde_json::json!({
+        "capability": cap, "tool_server": "cost-srv", "tool_name": "compute",
+        "parameters": {},
+        "governed_intent": {
+            "id": "numeric-intent", "server_id": "cost-srv", "tool_name": "compute",
+            "purpose": "ordinary SDK context", "context": "RAW_CONTEXT"
+        }
+    })
+    .to_string();
+    for (context, expected) in [
+        (
+            r#"{"learning_rate":1e-05,"confidence":0.50}"#,
+            StatusCode::OK,
+        ),
+        (r#"{"n":1,"n":2}"#, StatusCode::BAD_REQUEST),
+        (
+            r#"{"callChainUpstreamProof":{"signed_number":0.50}}"#,
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"callChainContinuation":{"signed_number":1e-05}}"#,
+            StatusCode::BAD_REQUEST,
+        ),
+    ] {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/evaluate")
+            .header("content-type", "application/json")
+            .body(Body::from(template.replace("\"RAW_CONTEXT\"", context)))
+            .test_unwrap();
+        let response =
+            sidecar_evaluate_tool_call_mediated_handler(State(state.clone()), request).await;
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap();
+        assert_eq!(
+            status,
+            expected,
+            "context {context}: {}",
+            String::from_utf8_lossy(&bytes)
+        );
+    }
+}

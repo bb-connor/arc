@@ -10,6 +10,22 @@ CAPPED='chio.fincred.source-artifact.v1\0'
 work="$(mktemp -d -t chio-domain-separation-XXXXXX)"
 trap 'rm -rf "$work"' EXIT
 
+# Debt controls own their fixtures; retiring production debt must not disable
+# coverage of live, stale, over-cap or expired entries.
+fixture_checker="$work/fixture-checker.py"
+python3 - "$CHECKER" "$fixture_checker" <<'PYFIXTURE'
+import ast
+import sys
+from pathlib import Path
+source = Path(sys.argv[1]).read_text()
+node = next(node for node in ast.parse(source).body
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+            and node.target.id == 'DEBT')
+lines = source.splitlines(keepends=True)
+lines[node.lineno - 1:node.end_lineno] = ['DEBT = {r"chio.fincred.source-artifact.v1\\0": allow("2099-01-01", "self-test duplicate", declarations=2)}' + "\n"]
+Path(sys.argv[2]).write_text("".join(lines))
+PYFIXTURE
+
 init_case() {
   mkdir -p "$1"
   git -C "$1" init -q
@@ -103,7 +119,7 @@ pub const FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source
 EOF
 done
 track_case "$over_cap"
-assert_rc "$(run_checker "$CHECKER" "$over_cap" "$work/over-cap.out" "$work/over-cap.err")" 1 \
+assert_rc "$(run_checker "$fixture_checker" "$over_cap" "$work/over-cap.out" "$work/over-cap.err")" 1 \
   "a recorded duplicate cannot gain another declaration"
 grep -F "$CAPPED: declared in 3 places, cap is 2" "$work/over-cap.err" >/dev/null
 
@@ -113,7 +129,7 @@ write_source "$stale_debt/crates/trust/chio-credentials/src/financial.rs" <<'EOF
 pub const FINANCIAL_SOURCE_ARTIFACT_DIGEST_DOMAIN: &[u8] = b"chio.fincred.source-artifact.v1\0";
 EOF
 track_case "$stale_debt"
-assert_rc "$(run_checker "$CHECKER" "$stale_debt" "$work/stale-debt.out" "$work/stale-debt.err")" 1 \
+assert_rc "$(run_checker "$fixture_checker" "$stale_debt" "$work/stale-debt.out" "$work/stale-debt.err")" 1 \
   "a debt entry that no longer excuses a violation fails"
 grep -F "$CAPPED: debt entry no longer excuses a violation" "$work/stale-debt.err" >/dev/null
 
@@ -158,7 +174,7 @@ pub const RESPONSE_PLAN_DOMAIN: &[u8] = b"chio.example.response-plan.v1\0";
 EOF
 track_case "$expired"
 expired_checker="$work/expired-check-domain-separation.py"
-sed -E 's/"20[0-9]{2}-[0-9]{2}-[0-9]{2}"/"2000-01-01"/g' "$CHECKER" > "$expired_checker"
+sed -E 's/"20[0-9]{2}-[0-9]{2}-[0-9]{2}"/"2000-01-01"/g' "$fixture_checker" > "$expired_checker"
 assert_rc "$(run_checker "$expired_checker" "$expired" "$work/expired.out" "$work/expired.err")" 1 \
   "an expired debt entry fails"
 grep -F "debt entry expired on 2000-01-01" "$work/expired.err" >/dev/null

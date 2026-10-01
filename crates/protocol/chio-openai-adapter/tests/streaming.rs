@@ -357,13 +357,11 @@ fn malformed_done_tool_call_arguments_fail_closed() {
 
     assert!(matches!(
         err,
-        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Canonicalization(
-            _
-        ))
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
     ));
     assert_eq!(
         err.to_string(),
-        "urn:chio:error:attest:signed-json-canonicalization"
+        "urn:chio:error:attest:signed-json-invalid-input"
     );
 }
 

@@ -117,7 +117,7 @@ async fn send_chat_completion_rejects_invalid_request_body_before_transport_call
         (
             "not-json",
             b"not-json".to_vec(),
-            "urn:chio:error:attest:signed-json-canonicalization",
+            "urn:chio:error:attest:signed-json-invalid-input",
         ),
         (
             "not-object",

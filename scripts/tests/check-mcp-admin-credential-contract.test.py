@@ -239,7 +239,7 @@ assert_rejected(
     "CI omits the credential gate",
     ".github/workflows/ci.yml",
     replace_once(
-        "          python3 ./scripts/check-mcp-admin-credential-contract.py\n",
+        "          run_gate python3 ./scripts/check-mcp-admin-credential-contract.py\n",
         "",
     ),
     "CI must run exactly once",

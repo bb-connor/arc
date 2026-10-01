@@ -285,7 +285,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         }
     };
     let mut parsed: SidecarEvaluateToolCallMediatedRequest =
-        match input::decode(&body_bytes, input::MAX_BODY_BYTES) {
+        match input::decode_arguments(&body_bytes, input::MAX_BODY_BYTES) {
             Ok(parsed) => parsed,
             Err(error) => return input::rejected(error),
         };

@@ -452,7 +452,7 @@ fn write_pheromone_fixtures(
         .map_err(|error| ChioPackageError::Json(error.to_string()))?;
 
     let trust_floor_state = PheromoneRuntimeTrustFloorState {
-        schema: chio_pheromone::RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string(),
+        schema: chio_pheromone::CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA.to_string(),
         entries: vec![chio_pheromone::PheromoneRuntimeTrustFloorEntry {
             verifier_id: "did:chio:dataco-cost-verifier".to_string(),
             key_id: "cost-root-key-1".to_string(),

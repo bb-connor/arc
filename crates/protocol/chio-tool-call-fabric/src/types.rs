@@ -93,10 +93,18 @@ impl ToolInvocation {
         validate_identity_field("provenance.request_id", &self.provenance.request_id)?;
         validate_identity_field("provenance.api_version", &self.provenance.api_version)?;
 
-        let canonical =
+        // These are normalized native JSON values, including full-width integers.
+        // Decode original bytes before comparing against the same native encoder
+        // used by adapters, so duplicates and noncanonical spellings still refuse.
+        let value: serde_json::Value =
             chio_core::canonical::UntrustedJsonText::from_wire(&self.arguments, 1024 * 1024)
-                .and_then(|text| text.canonicalize())
+                .and_then(|text| text.decode_document())
                 .map_err(|source| ToolInvocationValidationError::InvalidArgumentJson { source })?;
+        let canonical = chio_core::canonical_json_bytes(&value).map_err(|error| {
+            ToolInvocationValidationError::InvalidArgumentJson {
+                source: chio_core::canonical::UntrustedJsonError::Canonicalization(error),
+            }
+        })?;
         if canonical != self.arguments {
             return Err(ToolInvocationValidationError::NonCanonicalArguments);
         }

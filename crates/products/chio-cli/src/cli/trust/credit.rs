@@ -427,5 +427,5 @@ pub(crate) fn parse_credit_loss_lifecycle_event_kind(
 pub(crate) fn load_credit_bonded_execution_control_policy(
     path: &Path,
 ) -> Result<chio_kernel::CreditBondedExecutionControlPolicy, CliError> {
-    crate::input::config::load(path)
+    crate::input::config::load_document(path)
 }

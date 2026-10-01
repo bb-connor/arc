@@ -19,14 +19,17 @@ impl Serialize for Seed {
     }
 }
 
-pub(crate) fn read<T: serde::de::DeserializeOwned + Serialize>(
+/// Only closed seed DTOs with wiping fields use this reader. Serde's derived
+/// struct decoder rejects duplicate fields and `deny_unknown_fields` rejects
+/// additions without ever constructing a non-wiping Value tree.
+pub(crate) fn read<T: serde::de::DeserializeOwned>(
     path: &std::path::Path,
 ) -> Result<T, crate::CliError> {
     let bytes = chio_control_plane::read_private_signing_custody(path, 16 * 1024)?;
-    Ok(
-        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 16 * 1024)?
-            .decode_canonical()?,
-    )
+    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 16 * 1024)?;
+    serde_json::from_slice(&bytes)
+        .map_err(chio_core::canonical::UntrustedJsonError::Decode)
+        .map_err(Into::into)
 }
 
 #[cfg(test)]

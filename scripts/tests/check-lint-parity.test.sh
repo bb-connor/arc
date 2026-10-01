@@ -11,6 +11,22 @@ ALLOWLISTED="examples/hello-a2a/Cargo.toml"
 work="$(mktemp -d -t chio-lint-parity-XXXXXX)"
 trap 'rm -rf "$work"' EXIT
 
+# Debt controls own their fixtures; retiring production debt must not disable
+# coverage of live, stale, over-cap or expired entries.
+fixture_checker="$work/fixture-checker.py"
+python3 - "$CHECKER" "$fixture_checker" <<'PYFIXTURE'
+import ast
+import sys
+from pathlib import Path
+source = Path(sys.argv[1]).read_text()
+node = next(node for node in ast.parse(source).body
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+            and node.target.id == 'UNREACHED')
+lines = source.splitlines(keepends=True)
+lines[node.lineno - 1:node.end_lineno] = ['UNREACHED = {"examples/hello-a2a/Cargo.toml": allow("2099-01-01", "self-test missing lint table")}' + "\n"]
+Path(sys.argv[2]).write_text("".join(lines))
+PYFIXTURE
+
 # A bare workspace: the root sets one Rust lint and two Clippy lints, and every
 # case adds member crates under it.
 init_workspace() {
@@ -191,14 +207,14 @@ grep -F 'crates/gamma/Cargo.toml:1 no [lints] table; the workspace policy does n
 allowlisted="$work/allowlisted"
 init_workspace "$allowlisted" "$(dirname "$ALLOWLISTED")"
 write_crate "$allowlisted" "$(dirname "$ALLOWLISTED")" hello-a2a </dev/null
-assert_rc "$(run_checker "$CHECKER" "$allowlisted" "$work/allowlisted.out" "$work/allowlisted.err")" 0 \
+assert_rc "$(run_checker "$fixture_checker" "$allowlisted" "$work/allowlisted.out" "$work/allowlisted.err")" 0 \
   "a recorded unreached manifest passes while the entry is live"
 grep -F "1 member manifests, 0 inherit, 0 mirror, 1 unreached" "$work/allowlisted.out" >/dev/null
 
 stale_debt="$work/stale-debt"
 init_workspace "$stale_debt" "$(dirname "$ALLOWLISTED")"
 inherit_lints | write_crate "$stale_debt" "$(dirname "$ALLOWLISTED")" hello-a2a
-assert_rc "$(run_checker "$CHECKER" "$stale_debt" "$work/stale-debt.out" "$work/stale-debt.err")" 1 \
+assert_rc "$(run_checker "$fixture_checker" "$stale_debt" "$work/stale-debt.out" "$work/stale-debt.err")" 1 \
   "a debt entry whose manifest now inherits fails until it is removed"
 grep -F "$ALLOWLISTED: debt entry no longer excuses a missing [lints] table" "$work/stale-debt.err" >/dev/null
 
@@ -206,7 +222,7 @@ expired="$work/expired"
 init_workspace "$expired" crates/alpha
 inherit_lints | write_crate "$expired" crates/alpha alpha
 expired_checker="$work/expired-check-lint-parity.py"
-sed -E 's/"20[0-9]{2}-[0-9]{2}-[0-9]{2}"/"2000-01-01"/g' "$CHECKER" > "$expired_checker"
+sed -E 's/"20[0-9]{2}-[0-9]{2}-[0-9]{2}"/"2000-01-01"/g' "$fixture_checker" > "$expired_checker"
 assert_rc "$(run_checker "$expired_checker" "$expired" "$work/expired.out" "$work/expired.err")" 1 \
   "an expired debt entry fails"
 grep -F "debt entry expired on 2000-01-01" "$work/expired.err" >/dev/null

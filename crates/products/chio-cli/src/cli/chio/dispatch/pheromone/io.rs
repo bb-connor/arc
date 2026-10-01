@@ -69,6 +69,36 @@ pub(crate) fn unix_now_ms() -> Result<u64, CliError> {
 mod tests {
     use super::{load_relay_signing_key, read_json_documents_from_dir};
 
+    #[cfg(unix)]
+    #[test]
+    fn private_seed_accepts_pretty_json_and_rejects_ambiguous_fields(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("seed.json");
+        let seed = "01".repeat(32);
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{ "kernelId":"did:chio:test", "seedHex": "{seed}" }}
+"#
+            ),
+        )?;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        load_relay_signing_key(&path)?;
+        for tail in [
+            format!(r#", "seedHex":"{seed}""#),
+            r#", "extra":"secret""#.into(),
+        ] {
+            std::fs::write(
+                &path,
+                format!(r#"{{ "kernelId":"did:chio:test", "seedHex":"{seed}"{tail} }}"#),
+            )?;
+            assert!(load_relay_signing_key(&path).is_err());
+        }
+        Ok(())
+    }
+
     #[test]
     fn directory_read_errors_use_chio_boundary_label() {
         let tempdir = tempfile::tempdir().expect("tempdir");

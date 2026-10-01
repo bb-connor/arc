@@ -392,6 +392,113 @@ fn checkpoint_archive_upgrades_and_reopens_with_exact_typed_predecessors() -> Te
 }
 
 #[test]
+fn checkpoint_v6_retained_prefix_reopens_and_appends_without_archive_writes() -> TestResult {
+    for old_archive in [false, true] {
+        let directory = tempfile::tempdir()?;
+        let live = directory.path().join("live.db");
+        let archive = directory.path().join("archive.db");
+        seed_checkpoint_chain(&live)?;
+        let store = SqliteReceiptStore::open(&live)?;
+        assert_eq!(
+            store.archive_receipts_before(2, archive.to_str().ok_or("path")?)?,
+            2
+        );
+        drop(store);
+        downgrade_checkpoint_column_to_v6(&Connection::open(&live)?)?;
+        if old_archive {
+            downgrade_checkpoint_column_to_v6(&Connection::open(&archive)?)?;
+        }
+        let archive_before = std::fs::read(&archive)?;
+        let store = SqliteReceiptStore::open(&live)?;
+        store.append_chio_receipt(&sample_receipt_with_id("after-retained-upgrade"))?;
+        store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
+        drop(store);
+        let store = SqliteReceiptStore::open(&live)?;
+        store.append_chio_receipt(&sample_receipt_with_id("after-retained-restart"))?;
+        store.flush_receipt_writes()?;
+        assert_eq!(std::fs::read(&archive)?, archive_before);
+    }
+    Ok(())
+}
+
+#[test]
+fn checkpoint_v6_retained_prefix_rejects_corruption_and_unknown_schema() -> TestResult {
+    for (legacy, corruption) in [
+        (true, "UPDATE kernel_checkpoints SET signature = lower(hex(zeroblob(64))) WHERE checkpoint_seq = 2"),
+        (true, "UPDATE kernel_checkpoints SET merkle_root = lower(hex(zeroblob(32))) WHERE checkpoint_seq = 2"),
+        (true, "UPDATE chio_store_schema_versions SET version = 7 WHERE store_key = 'receipt'"),
+        (false, "UPDATE chio_store_schema_versions SET version = 8 WHERE store_key = 'receipt'"),
+        (false, "DELETE FROM chio_store_schema_versions WHERE store_key = 'receipt'"),
+    ] {
+        let directory = tempfile::tempdir()?;
+        let live = directory.path().join("live.db");
+        let archive = directory.path().join("archive.db");
+        seed_checkpoint_chain(&live)?;
+        let store = SqliteReceiptStore::open(&live)?;
+        store.archive_receipts_before(2, archive.to_str().ok_or("path")?)?;
+        drop(store);
+        downgrade_checkpoint_column_to_v6(&Connection::open(&live)?)?;
+        let connection = Connection::open(&archive)?;
+        if legacy {
+            downgrade_checkpoint_column_to_v6(&connection)?;
+        }
+        connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+        connection.execute_batch(corruption)?;
+        drop(connection);
+        let store = SqliteReceiptStore::open(&live)?;
+        assert!(store.append_chio_receipt(&sample_receipt_with_id("must-refuse")).is_err());
+    }
+    Ok(())
+}
+
+#[test]
+fn co_archival_refuses_divergent_checkpoint_predecessor_before_deletion() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let live = directory.path().join("live.db");
+    let archive = directory.path().join("archive.db");
+    seed_checkpoint_chain(&live)?;
+    // Copy the exact checkpoint rows to a reusable archive, then change only
+    // the predecessor mirror while leaving the signed statement untouched.
+    let mut connection = Connection::open(&live)?;
+    connection.execute(
+        "ATTACH DATABASE ?1 AS archive",
+        [archive.to_str().ok_or("path")?],
+    )?;
+    evidence_retention::create_archive_schema(&mut connection)?;
+    connection.execute_batch(
+        "INSERT INTO archive.kernel_checkpoints SELECT * FROM main.kernel_checkpoints;
+         DROP TRIGGER IF EXISTS archive.kernel_checkpoints_reject_update;
+         DROP TRIGGER IF EXISTS archive.kernel_checkpoints_enforce_append_only;
+         UPDATE archive.kernel_checkpoints SET previous_checkpoint_sha256 = lower(hex(zeroblob(32)))
+         WHERE checkpoint_seq = 2;
+         DETACH DATABASE archive;",
+    )?;
+    drop(connection);
+    let store = SqliteReceiptStore::open(&live)?;
+    let error = store
+        .archive_receipts_before(2, archive.to_str().ok_or("path")?)
+        .err()
+        .ok_or("divergent checkpoint archive accepted")?;
+    assert!(
+        error
+            .to_string()
+            .contains("co-archival incomplete for kernel_checkpoints"),
+        "{error}"
+    );
+    let connection = Connection::open(&live)?;
+    let retained: i64 =
+        connection.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+            row.get(0)
+        })?;
+    assert_eq!(
+        retained, 2,
+        "rotation must refuse before deleting live evidence"
+    );
+    assert_eq!(support::retention_watermark(&connection)?, None);
+    Ok(())
+}
+
+#[test]
 fn overflowing_retention_duration_refuses_before_archiving_or_deleting() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("live.sqlite");

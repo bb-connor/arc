@@ -35,6 +35,9 @@ include!("remote_mcp/session_identity.rs");
 include!("remote_mcp/session_resume.rs");
 include!("remote_mcp/session_shared_upstream.rs");
 include!("remote_mcp/session_forms.rs");
+#[path = "remote_mcp/session_recovery.rs"]
+mod session_recovery;
+use session_recovery::{restore_persisted_sessions, resume_deadline};
 include!("remote_mcp/http_service.rs");
 include!("remote_mcp/http_service_auth.rs");
 include!("remote_mcp/oauth.rs");

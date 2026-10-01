@@ -398,9 +398,7 @@ fn lift_fails_closed_for_malformed_arguments() {
 
     assert!(matches!(
         err,
-        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Canonicalization(
-            _
-        ))
+        ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::SignedInput(_))
     ));
 }
 
@@ -417,12 +415,7 @@ fn protocol_boundary_rejects_duplicate_arguments() {
 #[test]
 fn protocol_boundary_provider_payload_and_nested_arguments_fail_precisely() {
     let adapter = OpenAiAdapter::new("org-test");
-    for arguments in [
-        "{\"x\":1,\"x\":2}",
-        "{\"x\":9007199254740993}",
-        "[]",
-        "null",
-    ] {
+    for arguments in ["{\"x\":1,\"x\":2}", "{\"x\":1e9999}", "[]", "null"] {
         let error = adapter.lift_batch(raw(json!({"output":[{"type":"function_call", "call_id":"1", "name":"read", "arguments":arguments}]}))).unwrap_err();
         assert!(matches!(error, ProviderError::UntrustedInput(_)));
         assert!(std::error::Error::source(&error).is_some());
@@ -442,6 +435,23 @@ fn protocol_boundary_provider_payload_and_nested_arguments_fail_precisely() {
         error,
         ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::TooLarge { .. })
     ));
+}
+
+#[test]
+fn protocol_boundary_native_integer_arguments_remain_exact() {
+    let adapter = OpenAiAdapter::new("org-test");
+    let invocations = adapter
+        .lift_batch(raw(json!({"output":[{
+            "type":"function_call", "call_id":"1", "name":"read",
+            "arguments":"{\"x\":9007199254740993}"
+        }]})))
+        .unwrap();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(
+        invocations[0].arguments.as_slice(),
+        br#"{"x":9007199254740993}"#
+    );
+    invocations[0].validate().unwrap();
 }
 
 #[test]

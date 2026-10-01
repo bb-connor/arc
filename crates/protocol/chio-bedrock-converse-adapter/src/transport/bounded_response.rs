@@ -93,7 +93,7 @@ impl Body for ValidatedBody {
                     self.finished = true;
                     if let Err(error) =
                         UntrustedJsonText::from_wire(&self.bytes, MAX_DOCUMENT_BYTES)
-                            .and_then(|text| text.canonicalize())
+                            .and_then(|text| text.decode_document::<serde_json::Value>())
                     {
                         self.bytes.clear();
                         self.trailers = None;

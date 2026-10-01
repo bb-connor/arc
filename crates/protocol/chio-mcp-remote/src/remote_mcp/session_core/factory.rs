@@ -466,6 +466,8 @@ impl RemoteSessionFactory {
             record,
             self.config.clock.millis()?,
         )?;
+        // Validate the session window before creating the upstream or edge worker.
+        resume_deadline(record, self.config.clock.read()?)?;
         if record.runtime_contract_fingerprint != self.runtime_contract_fingerprint {
             return Ok(None);
         }

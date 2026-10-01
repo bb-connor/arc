@@ -300,7 +300,7 @@ pub(crate) fn parse_underwriting_appeal_resolution(
 pub(crate) fn load_underwriting_decision_policy(
     path: &Path,
 ) -> Result<chio_kernel::UnderwritingDecisionPolicy, CliError> {
-    crate::input::config::load(path)
+    crate::input::config::load_document(path)
 }
 
 pub(crate) fn cmd_trust_underwriting_decision_issue(

@@ -23,7 +23,7 @@ pub(crate) fn decode(input: &[u8]) -> crate::Result<Value> {
             input,
             MAX_OPENAPI_BYTES,
         )?
-        .decode_signed()?);
+        .decode_document()?);
     }
     let mut budget = Budget {
         nodes: MAX_NODES,
@@ -136,6 +136,16 @@ impl<'de> Visitor<'de> for Seed<'_> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    #[test]
+    fn producer_numbers_have_the_same_json_and_yaml_contract(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let json = decode(br#"{"multipleOf":0.50,"minimum":1e-05,"maximum":9007199254740993}"#)?;
+        let yaml = decode(b"multipleOf: 0.50\nminimum: 1e-05\nmaximum: 9007199254740993")?;
+        assert_eq!(json, yaml);
+        assert_eq!(json["maximum"].as_u64(), Some(9007199254740993));
+        Ok(())
+    }
+
     #[test]
     fn original_duplicates_and_whitespace_oversize_are_rejected() {
         assert!(matches!(

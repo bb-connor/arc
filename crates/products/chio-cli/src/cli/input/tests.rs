@@ -176,3 +176,58 @@ fn signing_custody_is_existing_private_bounded_and_not_aliased() {
     std::os::unix::fs::symlink(&path, &alias).unwrap();
     assert!(crate::load_existing_authority_keypair(&alias).is_err());
 }
+
+#[test]
+fn operator_policy_accepts_producer_numbers_in_json_and_yaml(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    let policy = chio_kernel::UnderwritingDecisionPolicy {
+        reduce_ceiling_factor: 0.5,
+        ..Default::default()
+    };
+    let document = serde_json::to_string(&policy)?.replace("0.5", "0.50");
+    let json = dir.path().join("policy.json");
+    std::fs::write(&json, document)?;
+    let actual = crate::load_underwriting_decision_policy(&json)?;
+    assert_eq!(actual, policy);
+    let yaml = dir.path().join("policy.yaml");
+    std::fs::write(&yaml, serde_yml::to_string(&policy)?)?;
+    assert_eq!(crate::load_underwriting_decision_policy(&yaml)?, policy);
+    Ok(())
+}
+
+#[test]
+fn unsigned_runtime_attestation_evidence_accepts_operator_numbers(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let json = directory.path().join("evidence.json");
+    let yaml = directory.path().join("evidence.yaml");
+    for (number, yaml_number) in [("0.50", "0.5"), ("1e-05", "0.00001")] {
+        let body = format!(
+            r#"{{"schema":"test.evidence.v1","verifier":"test","tier":"basic","issued_at":1,"expires_at":2,"evidence_sha256":"{}","claims":{{"measurement":{number}}}}}"#,
+            "a".repeat(64)
+        );
+        std::fs::write(&json, &body)?;
+        std::fs::write(&yaml, format!("schema: test.evidence.v1\nverifier: test\ntier: basic\nissued_at: 1\nexpires_at: 2\nevidence_sha256: {}\nclaims:\n  measurement: {yaml_number}\n", "a".repeat(64)))?;
+        // The separate signed-appraisal route still rejects the original
+        // numeric spelling, before attempting any typed appraisal projection.
+        assert!(matches!(
+            crate::load_signed_runtime_attestation_appraisal_result(&json),
+            Err(crate::CliError::SignedJson(
+                UntrustedJsonError::SignedInput(_)
+            ))
+        ));
+        let from_json = crate::load_runtime_attestation_evidence(&json)?;
+        let from_yaml = crate::load_runtime_attestation_evidence(&yaml)?;
+        assert_eq!(from_json, from_yaml);
+        std::fs::write(
+            &json,
+            body.replace(
+                &format!("\"measurement\":{number}"),
+                "\"measurement\":1,\"measurement\":2",
+            ),
+        )?;
+        assert!(crate::load_runtime_attestation_evidence(&json).is_err());
+    }
+    Ok(())
+}

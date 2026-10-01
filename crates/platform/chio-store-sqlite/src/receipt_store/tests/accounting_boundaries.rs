@@ -55,7 +55,9 @@ fn cost_attribution_refuses_charged_and_attempted_overflow() -> TestResult {
 fn underwriting_refuses_premium_overflow_within_one_currency() -> TestResult {
     let (_directory, path) = temp_db("premium-overflow")?;
     let mut store = SqliteReceiptStore::open(&path)?;
-    for (index, units) in [u64::MAX, 1].into_iter().enumerate() {
+    // Each persisted INTEGER is representable; their report total is not.
+    let largest_stored = i64::MAX as u64;
+    for (index, units) in [largest_stored, largest_stored, 2].into_iter().enumerate() {
         let decision = signed_underwriting_decision_fixture(
             "premium-subject",
             &format!("premium-{index}"),
@@ -73,7 +75,7 @@ fn underwriting_refuses_premium_overflow_within_one_currency() -> TestResult {
                     .query_underwriting_decisions(&UnderwritingDecisionQuery::default())?
                     .summary
                     .total_quoted_premium_units,
-                u64::MAX
+                largest_stored
             );
         }
     }

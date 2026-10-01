@@ -19,6 +19,14 @@ pub(crate) fn decode<T: DeserializeOwned>(
     UntrustedJsonText::from_wire(bytes, bound)?.decode_signed()
 }
 
+/// Peer requests carry ordinary JSON numbers, while persisted/auth records use decode.
+pub(crate) fn document<T: DeserializeOwned>(
+    bytes: &[u8],
+    bound: usize,
+) -> Result<T, UntrustedJsonError> {
+    UntrustedJsonText::from_wire(bytes, bound)?.decode_document()
+}
+
 /// Keep the typed parser cause available to local middleware without rendering payload text.
 pub(crate) fn with_source<E>(mut response: Response, error: E) -> Response
 where
@@ -48,7 +56,7 @@ where
         let bytes = axum::body::to_bytes(request.into_body(), MAX_CONTROL_JSON_BYTES)
             .await
             .map_err(|_| StatusCode::PAYLOAD_TOO_LARGE.into_response())?;
-        decode(&bytes, MAX_CONTROL_JSON_BYTES)
+        document(&bytes, MAX_CONTROL_JSON_BYTES)
             .map(Self)
             .map_err(|error| {
                 with_source(

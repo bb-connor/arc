@@ -15,7 +15,7 @@ pub(crate) fn parse_runtime_assurance_tier(value: &str) -> Result<RuntimeAssuran
 pub(crate) fn load_runtime_attestation_evidence(
     path: &Path,
 ) -> Result<RuntimeAttestationEvidence, CliError> {
-    crate::input::config::load(path)
+    crate::input::config::load_document(path)
 }
 
 pub(crate) fn load_signed_runtime_attestation_appraisal_result(
@@ -27,7 +27,7 @@ pub(crate) fn load_signed_runtime_attestation_appraisal_result(
 pub(crate) fn load_runtime_attestation_import_policy(
     path: &Path,
 ) -> Result<RuntimeAttestationImportedAppraisalPolicy, CliError> {
-    load_json_or_yaml(path)
+    crate::input::config::load_document(path)
 }
 
 pub(crate) fn cmd_trust_runtime_attestation_appraisal_export(
