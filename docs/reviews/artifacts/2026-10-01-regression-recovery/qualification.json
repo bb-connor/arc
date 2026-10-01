@@ -53,7 +53,7 @@
     "docs/release/CHIO_PHEROMONE_RELAY_RUNBOOK.md": "4f4ee98f9752cfcdb940898582213b2f698c4ad338ddb7c0e91c4c54f09b7a24",
     "docs/security/signed-json-boundaries.md": "f2828d6dd975fda35931c385215b2871a96c3a46ee6514cc001fc02687b142d6",
     "docs/security/trust-boundary-inventory.json": "570ca207e181d21fd031a96b0a48133aa21931b924db28e34f9cc00df34b7b5a",
-    "docs/superpowers/plans/2026-10-01-review-regression-recovery.md": "76e107a7066ccf3a1ba5fe7b739706fff0c6e581d858031c444f58af1ac37ff1",
+    "docs/superpowers/plans/2026-10-01-review-regression-recovery.md": "6faac82b98da4137bc2694e3bc2bc9def65a1c1f98260dccf0469997ca618ca1",
     "examples/chio-3vendor/src/commands.rs": "fdd981bd6bde2141371d42548b5f40f3d5844ec58e7634b5c61f159e5776381a",
     "scripts/check-review-slices.py": "78179618e282f54a7df0a432b1b574857f21260e7f72c5365dd655770e13a540",
     "scripts/structural-gates.sh": "aa4d24741bd9bbcea0bafbe9eeca261794f607aab4ec514461d621bc634d5ef5",

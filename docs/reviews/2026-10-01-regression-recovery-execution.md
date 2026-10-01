@@ -6,6 +6,12 @@ and PR6 before the queued reader campaign. The starting source is
 It also repairs the original GT1/CA1 classifiers and self-tests and makes the
 structural CI step report every gate before returning failure.
 
+The implementation is published as `58cc1b55bc73341d490fb5d5ef6d234eedf850ec`
+on `packet/3-retention-accounting`. The remote SHA was verified after push.
+GitHub returned no pull request for this branch and no hosted runs for that exact
+implementation commit during the publication check. Hosted qualification remains
+open. This follow-up record changes documentation only.
+
 ## Changes and acceptance boundaries
 
 | Work | Implementation | Required evidence |

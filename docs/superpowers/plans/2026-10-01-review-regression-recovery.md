@@ -118,6 +118,6 @@ assurance fixtures, relay runbook and production-linked fixture tests.
   unchanged-source Clippy failures are retained in the execution report.
 - [x] Record exact review finding dispositions, retained failures, source hashes
   and remaining priorities. No reader-census completion claim for this batch.
-- [ ] Commit/push authorized security source and concise evidence; verify the
+- [x] Commit/push authorized security source and concise evidence; verify the
   remote SHA. Obtain exact-candidate hosted results where the environment allows,
   preserving any actual external blocker without claiming green CI.
