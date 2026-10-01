@@ -75,45 +75,7 @@ pub struct FindingCheckpointSignerStatusTrust {
     pub max_age_secs: u64,
 }
 
-/// Terminal verifier failures: conditions under which no report draft can
-/// be produced at all (facet-level failures are report content instead).
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub enum FindingVerifierError {
-    #[error("raw finding exceeds the size bound")]
-    RawTooLarge,
-    #[error("raw finding is not strict canonical I-JSON")]
-    RawNotCanonical,
-    #[error("raw finding bytes are not the canonical serialization")]
-    RawBytesNotCanonical,
-    #[error("raw finding failed typed deserialization")]
-    Deserialization,
-    #[error("verifier profile envelope failed pinned verification")]
-    ProfileInvalid,
-    #[error("report evaluation is outside the Finding validity window")]
-    FindingInactive,
-    #[error("no admitted kernel keys configured")]
-    NoAdmittedKernelKeys,
-    #[error("runtime attestation and appraisal authorities must be independent")]
-    AliasedRuntimeAssuranceAuthorities,
-    #[error("verifier report and collateral authorities must be independent")]
-    AliasedVerifierAndCollateralAuthorities,
-    #[error("fee schedule and collateral authorities must be independent")]
-    AliasedFeeScheduleAndCollateralAuthorities,
-    #[error("verifier report and status operator authorities must be independent")]
-    AliasedVerifierAndStatusOperatorAuthorities,
-    #[error("verifier report and authority-status signers must be independent")]
-    AliasedVerifierAndStatusAuthority,
-    #[error("report body construction failed canonicalization")]
-    Canonicalization,
-    #[error("report profile does not match the profile used for evaluation")]
-    ReportProfileMismatch,
-    #[error("report signer does not match the pinned verifier authority")]
-    ReportSignerMismatch,
-    #[error("report evaluation is outside the profile-authorized signer window")]
-    ReportSignerInactive,
-    #[error("report signing failed")]
-    ReportSigning,
-}
+pub use crate::error::FindingVerifierError;
 
 /// Externally pinned trust inputs. Every list is a positive allowlist:
 /// empty means nothing is trusted, never everything.
@@ -616,15 +578,21 @@ pub fn verify_finding_evidence(
     if raw_finding.len() > MAX_RAW_FINDING_BYTES {
         return Err(FindingVerifierError::RawTooLarge);
     }
-    let strict_bytes = canonical_json_bytes_from_str(raw_finding)
-        .map_err(|_| FindingVerifierError::RawNotCanonical)?;
+    let strict_bytes = canonical_json_bytes_from_str(raw_finding).map_err(|error| {
+        FindingVerifierError::RawNotCanonical(
+            chio_core_types::canonical::UntrustedJsonError::Canonicalization(error).into(),
+        )
+    })?;
     if strict_bytes.as_slice() != raw_finding.as_bytes() {
         return Err(FindingVerifierError::RawBytesNotCanonical);
     }
-    let finding: Finding =
-        serde_json::from_str(raw_finding).map_err(|_| FindingVerifierError::Deserialization)?;
+    let finding: Finding = serde_json::from_str(raw_finding).map_err(|error| {
+        FindingVerifierError::Deserialization(
+            chio_core_types::canonical::UntrustedJsonError::Decode(error).into(),
+        )
+    })?;
     let typed_bytes =
-        canonical_json_bytes(&finding).map_err(|_| FindingVerifierError::Canonicalization)?;
+        canonical_json_bytes(&finding).map_err(FindingVerifierError::canonicalization)?;
     if typed_bytes != strict_bytes {
         return Err(FindingVerifierError::RawBytesNotCanonical);
     }
@@ -696,7 +664,7 @@ pub fn verify_finding_evidence(
     }
     let profile = &trust.profile.body;
     let profile_envelope_bytes =
-        canonical_json_bytes(&trust.profile).map_err(|_| FindingVerifierError::Canonicalization)?;
+        canonical_json_bytes(&trust.profile).map_err(FindingVerifierError::canonicalization)?;
     let profile_envelope_sha256 = sha256_hex(&profile_envelope_bytes);
 
     let mut facets = Vec::with_capacity(FindingFacetKind::ALL.len());
@@ -1868,7 +1836,7 @@ fn bundle_digest(
     for evidence in &bundle.receipts {
         if let Some(nonce) = bundle.nonce_resolver.nonce_for(&evidence.receipt) {
             let bytes =
-                canonical_json_bytes(nonce).map_err(|_| FindingVerifierError::Canonicalization)?;
+                canonical_json_bytes(nonce).map_err(FindingVerifierError::canonicalization)?;
             execution_nonce_envelope_sha256s.push(sha256_hex(&bytes));
         }
     }
@@ -1878,16 +1846,16 @@ fn bundle_digest(
         .and_then(|delivery| bundle.nonce_resolver.nonce_for(&delivery.receipt.receipt))
         .map(canonical_json_bytes)
         .transpose()
-        .map_err(|_| FindingVerifierError::Canonicalization)?
+        .map_err(FindingVerifierError::canonicalization)?
         .map(|bytes| sha256_hex(&bytes));
     let mut checkpoint_sha256s = Vec::with_capacity(bundle.checkpoints.len());
     for checkpoint in &bundle.checkpoints {
         let bytes =
-            canonical_json_bytes(checkpoint).map_err(|_| FindingVerifierError::Canonicalization)?;
+            canonical_json_bytes(checkpoint).map_err(FindingVerifierError::canonicalization)?;
         checkpoint_sha256s.push(sha256_hex(&bytes));
     }
     let checkpoint_transparency_bytes = canonical_json_bytes(&bundle.checkpoint_transparency)
-        .map_err(|_| FindingVerifierError::Canonicalization)?;
+        .map_err(FindingVerifierError::canonicalization)?;
     let mut checkpoint_signer_status_sha256s = trust
         .checkpoint_signer_status
         .as_ref()
@@ -1899,13 +1867,13 @@ fn bundle_digest(
                 .collect::<Result<Vec<_>, _>>()
         })
         .transpose()
-        .map_err(|_| FindingVerifierError::Canonicalization)?
+        .map_err(FindingVerifierError::canonicalization)?
         .unwrap_or_default();
     checkpoint_signer_status_sha256s.sort();
     let mut inclusion_proof_sha256s = Vec::with_capacity(bundle.receipts.len());
     for evidence in &bundle.receipts {
         let bytes = canonical_json_bytes(&evidence.inclusion_proof)
-            .map_err(|_| FindingVerifierError::Canonicalization)?;
+            .map_err(FindingVerifierError::canonicalization)?;
         inclusion_proof_sha256s.push(sha256_hex(&bytes));
     }
     let (
@@ -1916,15 +1884,15 @@ fn bundle_digest(
     ) = match bundle.finding_delivery.as_ref() {
         Some(delivery) => {
             let proof_bytes = canonical_json_bytes(&delivery.receipt.inclusion_proof)
-                .map_err(|_| FindingVerifierError::Canonicalization)?;
+                .map_err(FindingVerifierError::canonicalization)?;
             let mut checkpoint_digests = Vec::with_capacity(delivery.checkpoints.len());
             for checkpoint in &delivery.checkpoints {
                 let bytes = canonical_json_bytes(checkpoint)
-                    .map_err(|_| FindingVerifierError::Canonicalization)?;
+                    .map_err(FindingVerifierError::canonicalization)?;
                 checkpoint_digests.push(sha256_hex(&bytes));
             }
             let transparency_bytes = canonical_json_bytes(&delivery.checkpoint_transparency)
-                .map_err(|_| FindingVerifierError::Canonicalization)?;
+                .map_err(FindingVerifierError::canonicalization)?;
             (
                 Some(sha256_hex(&delivery.receipt.canonical_receipt_bytes)),
                 Some(sha256_hex(&proof_bytes)),
@@ -1937,7 +1905,7 @@ fn bundle_digest(
     let backing_envelope_sha256 = match bundle.bond_snapshot.as_ref() {
         Some(snapshot) => {
             let bytes = canonical_json_bytes(&snapshot.backing)
-                .map_err(|_| FindingVerifierError::Canonicalization)?;
+                .map_err(FindingVerifierError::canonicalization)?;
             Some(sha256_hex(&bytes))
         }
         None => None,
@@ -1947,19 +1915,19 @@ fn bundle_digest(
         .as_ref()
         .map(|snapshot| signed_envelope_sha256(&snapshot.store_snapshot))
         .transpose()
-        .map_err(|_| FindingVerifierError::Canonicalization)?;
+        .map_err(FindingVerifierError::canonicalization)?;
     let fee_schedule_envelope_sha256 = bundle
         .bond_snapshot
         .as_ref()
         .map(|snapshot| signed_envelope_sha256(&snapshot.fee_schedule))
         .transpose()
-        .map_err(|_| FindingVerifierError::Canonicalization)?;
+        .map_err(FindingVerifierError::canonicalization)?;
     let status_operator_authorization_sha256 = trust
         .status_operator_authorization
         .as_ref()
         .map(canonical_json_bytes)
         .transpose()
-        .map_err(|_| FindingVerifierError::Canonicalization)?
+        .map_err(FindingVerifierError::canonicalization)?
         .map(|bytes| sha256_hex(&bytes));
     let status_freshness_policy_sha256 = trust
         .status_freshness_policy
@@ -1970,7 +1938,7 @@ fn bundle_digest(
             }))
         })
         .transpose()
-        .map_err(|_| FindingVerifierError::Canonicalization)?
+        .map_err(FindingVerifierError::canonicalization)?
         .map(|bytes| sha256_hex(&bytes));
     let commitment = BundleCommitment {
         receipt_sha256s,
@@ -1984,7 +1952,7 @@ fn bundle_digest(
             .as_ref()
             .map(|status| canonical_json_bytes(&status.status_authority))
             .transpose()
-            .map_err(|_| FindingVerifierError::Canonicalization)?
+            .map_err(FindingVerifierError::canonicalization)?
             .map(|bytes| sha256_hex(&bytes)),
         checkpoint_status_max_age_secs: trust
             .checkpoint_signer_status
@@ -1992,7 +1960,7 @@ fn bundle_digest(
             .map(|status| status.max_age_secs),
         governance_authority_policy_sha256: sha256_hex(
             &canonical_json_bytes(&trust.governance_authority_policy)
-                .map_err(|_| FindingVerifierError::Canonicalization)?,
+                .map_err(FindingVerifierError::canonicalization)?,
         ),
         finding_delivery_execution_nonce_envelope_sha256,
         finding_delivery_receipt_sha256,
@@ -2008,36 +1976,36 @@ fn bundle_digest(
             .as_ref()
             .map(signed_envelope_sha256)
             .transpose()
-            .map_err(|_| FindingVerifierError::Canonicalization)?,
+            .map_err(FindingVerifierError::canonicalization)?,
         runtime_appraisal_sha256: bundle
             .runtime_appraisal
             .as_ref()
             .map(signed_envelope_sha256)
             .transpose()
-            .map_err(|_| FindingVerifierError::Canonicalization)?,
+            .map_err(FindingVerifierError::canonicalization)?,
         runtime_attestation_authority_policy_sha256: trust
             .runtime_attestation_authority
             .as_ref()
             .map(canonical_json_bytes)
             .transpose()
-            .map_err(|_| FindingVerifierError::Canonicalization)?
+            .map_err(FindingVerifierError::canonicalization)?
             .map(|bytes| sha256_hex(&bytes)),
         appraisal_authority_policy_sha256: trust
             .appraisal_authority
             .as_ref()
             .map(canonical_json_bytes)
             .transpose()
-            .map_err(|_| FindingVerifierError::Canonicalization)?
+            .map_err(FindingVerifierError::canonicalization)?
             .map(|bytes| sha256_hex(&bytes)),
         attestation_trust_policy_sha256: trust
             .attestation_trust_policy
             .as_ref()
             .map(canonical_json_bytes)
             .transpose()
-            .map_err(|_| FindingVerifierError::Canonicalization)?
+            .map_err(FindingVerifierError::canonicalization)?
             .map(|bytes| sha256_hex(&bytes)),
         collateral_authority_policy_sha256: canonical_json_bytes(&trust.collateral_authority)
-            .map_err(|_| FindingVerifierError::Canonicalization)
+            .map_err(FindingVerifierError::canonicalization)
             .map(|bytes| sha256_hex(&bytes))?,
         backing_allocation_id: bundle
             .bond_snapshot
@@ -2048,7 +2016,7 @@ fn bundle_digest(
         backing_store_snapshot_envelope_sha256,
     };
     let bytes =
-        canonical_json_bytes(&commitment).map_err(|_| FindingVerifierError::Canonicalization)?;
+        canonical_json_bytes(&commitment).map_err(FindingVerifierError::canonicalization)?;
     Ok(sha256_hex(&bytes))
 }
 
@@ -2064,7 +2032,7 @@ pub fn sign_finding_verifier_report(
     let profile = &trust.profile.body;
     validate_supported_finding_verifier_profile(profile)?;
     let profile_envelope_bytes =
-        canonical_json_bytes(&trust.profile).map_err(|_| FindingVerifierError::Canonicalization)?;
+        canonical_json_bytes(&trust.profile).map_err(FindingVerifierError::canonicalization)?;
     let profile_envelope_sha256 = sha256_hex(&profile_envelope_bytes);
     if profile_envelope_sha256 != draft.verifier_profile_envelope_sha256 {
         return Err(FindingVerifierError::ReportProfileMismatch);
@@ -2098,7 +2066,7 @@ pub fn sign_finding_verifier_report(
         evaluation_time: draft.evaluation_time,
     };
     report.report_id =
-        compute_report_id(&report).map_err(|_| FindingVerifierError::Canonicalization)?;
+        compute_report_id(&report).map_err(FindingVerifierError::canonicalization)?;
     report
         .validate()
         .map_err(|_| FindingVerifierError::ReportSigning)?;

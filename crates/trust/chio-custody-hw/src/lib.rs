@@ -43,9 +43,9 @@ pub mod revocation;
 pub mod verifier;
 
 pub use attestation::{
-    verify_app_attest, verify_mobile_receipt_chain, verify_play_integrity,
-    AppAttestVerificationInput, AttestationError, PlayIntegrityVerificationInput,
-    VerifiedAppAttest, VerifiedMobileReceiptChain, VerifiedPlayIntegrity, APP_ATTEST_FORMAT,
+    parse_mobile_receipt_envelopes, verify_app_attest, verify_play_integrity,
+    AppAttestVerificationInput, AttestationError, ParsedMobileReceiptEnvelopes,
+    PlayIntegrityVerificationInput, VerifiedAppAttest, VerifiedPlayIntegrity, APP_ATTEST_FORMAT,
     MEETS_DEVICE_INTEGRITY, PLAY_RECOGNIZED,
 };
 pub use capability::{PasskeyCapability, ScopeSet};

@@ -66,7 +66,7 @@ pub struct VerifierReport {
 }
 
 pub fn verifier_report_from_json(json: &str) -> Result<VerifierReport, ChioPackageError> {
-    serde_json::from_str(json).map_err(|error| ChioPackageError::Json(error.to_string()))
+    crate::input::decode(json.as_bytes()).map_err(ChioPackageError::from)
 }
 
 pub fn report_json(report: &VerifierReport) -> Result<String, ChioPackageError> {
@@ -374,6 +374,7 @@ fn rejected_report(
 
 fn failure_code(error: &ChioPackageError) -> &'static str {
     match error {
+        ChioPackageError::Input(error) => error.code(),
         ChioPackageError::Canonical(_) => "canonical_json",
         ChioPackageError::UnsupportedSchema(_) => "package.schema",
         ChioPackageError::UnsupportedClaim(_) => "package.claim",
@@ -396,7 +397,9 @@ fn failure_code(error: &ChioPackageError) -> &'static str {
 
 fn failure_phase(error: &ChioPackageError) -> &'static str {
     match error {
-        ChioPackageError::Canonical(_) | ChioPackageError::Json(_) => "parse",
+        ChioPackageError::Input(_) | ChioPackageError::Canonical(_) | ChioPackageError::Json(_) => {
+            "parse"
+        }
         ChioPackageError::UnsupportedSchema(_)
         | ChioPackageError::UnsupportedClaim(_)
         | ChioPackageError::Inconsistent(_) => "package",

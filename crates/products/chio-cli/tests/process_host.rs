@@ -1,5 +1,6 @@
 #![cfg(unix)]
 
+use chio_core::receipt::body::ChioReceipt;
 use std::path::Path;
 use std::process::Command;
 

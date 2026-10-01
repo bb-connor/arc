@@ -13,6 +13,9 @@
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum WeightsError {
+    /// Rejected bounded original JSON, retaining its local cause.
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     /// Canonical-JSON encoding or decoding failed. Fatal: do not retry until
     /// the encoding bug is resolved.
     #[error("model card canonical-json encode/decode failed: {0}")]
@@ -74,6 +77,7 @@ impl WeightsError {
     #[must_use]
     pub fn urn(&self) -> &'static str {
         match self {
+            Self::Input(error) => error.code(),
             Self::Encoding(_) => "urn:chio:error:weights:internal-encoding",
             Self::MissingField(_) | Self::SchemaRejected(_) => {
                 "urn:chio:error:weights:schema-rejected"

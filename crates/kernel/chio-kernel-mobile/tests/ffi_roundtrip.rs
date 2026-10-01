@@ -27,9 +27,9 @@ use chio_kernel_core::passport_verify::{
     PortablePassportBody, PortablePassportEnvelope, PORTABLE_PASSPORT_SCHEMA,
 };
 use chio_kernel_mobile::{
-    attest_app_attest, attest_play_integrity, evaluate, sign_receipt,
-    sign_receipt_relaying_trusted_body, verify_app_attest_evidence, verify_capability,
-    verify_capability_with_context, verify_mobile_receipt, verify_passport,
+    attest_app_attest, attest_play_integrity, evaluate, inspect_mobile_receipt_envelopes,
+    sign_receipt, sign_receipt_relaying_trusted_body, verify_app_attest_evidence,
+    verify_capability, verify_capability_with_context, verify_passport,
     verify_play_integrity_evidence, ChioMobileError,
 };
 
@@ -813,18 +813,14 @@ fn verify_play_integrity_evidence_rejects_bad_jws_fail_closed() {
 }
 
 #[test]
-fn verify_mobile_receipt_rejects_bad_json() {
-    let err = verify_mobile_receipt("not-json".to_string(), "{}".to_string()).unwrap_err();
-    match err {
-        ChioMobileError::InvalidJson { message } => {
-            assert!(message.contains("mobile receipt"));
-        }
-        other => panic!("expected InvalidJson, got {other:?}"),
-    }
+fn inspect_mobile_receipt_envelopes_rejects_bad_json() {
+    let err =
+        inspect_mobile_receipt_envelopes("not-json".to_string(), "{}".to_string()).unwrap_err();
+    assert!(matches!(err, ChioMobileError::AttestationRejected { .. }));
 }
 
 #[test]
-fn verify_mobile_receipt_accepts_known_attestation_platform_shape() {
+fn inspect_mobile_receipt_envelopes_accepts_known_attestation_platform_shape() {
     let receipt_json = serde_json::json!({
         "schema": "chio.mobile.receipt.v1",
         "receipt_id": "mobile-receipt-1"
@@ -836,9 +832,9 @@ fn verify_mobile_receipt_accepts_known_attestation_platform_shape() {
     })
     .to_string();
 
-    let raw = verify_mobile_receipt(receipt_json, evidence_json).unwrap();
+    let raw = inspect_mobile_receipt_envelopes(receipt_json, evidence_json).unwrap();
     let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
-    assert_eq!(value["schema"], "chio.mobile.receipt-verification.v1");
+    assert_eq!(value["schema"], "chio.mobile.receipt-inspection.v1");
     assert_eq!(value["status"], "shape_only");
     assert_eq!(value["receipt_kind"], "trace_observation");
     assert_eq!(value["boundary_class"], "detect_only");

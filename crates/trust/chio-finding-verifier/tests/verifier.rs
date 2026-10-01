@@ -2003,10 +2003,10 @@ fn raw_ingress_rejects_noncanonical_and_oversized_findings() -> TestResult {
     let trust = trust_roots(&fx);
 
     let duplicate_keys = r#"{"schema":"chio.finding.v1","schema":"chio.finding.v1"}"#;
-    assert_eq!(
+    assert!(matches!(
         verify_finding_evidence(duplicate_keys, &trust, &bundle(&fx, clone_receipts(&fx))).err(),
-        Some(FindingVerifierError::RawNotCanonical)
-    );
+        Some(FindingVerifierError::RawNotCanonical(_))
+    ));
 
     let padded = format!(" {}", fx.raw_finding);
     assert_eq!(

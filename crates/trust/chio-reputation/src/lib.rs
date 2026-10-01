@@ -77,6 +77,7 @@ fn receipt_authority_valid(receipt: &ChioReceipt, config: &ReputationConfig) -> 
     receipt_integrity_valid(receipt, config) && receipt.is_allowed()
 }
 
+mod input;
 include!("model.rs");
 include!("score.rs");
 include!("compare.rs");

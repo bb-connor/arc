@@ -257,6 +257,9 @@ pub struct VerifiedAttestation {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AttestError {
+    /// Rejected bounded original JSON, retaining its local cause.
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("signature does not verify")]

@@ -59,7 +59,7 @@ mod tests {
     fn bridge_surfaces_frame_error() {
         let bad = b"{\"schema_version\":\"1\"}";
         let result = parse(bad);
-        assert!(matches!(result, Err(FrameError::Json(_))));
+        assert!(matches!(result, Err(FrameError::Input(_))));
     }
 
     #[test]

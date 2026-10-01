@@ -1,0 +1,174 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling smallvec v1.15.1
+   Compiling serde_json v1.0.149
+   Compiling semver v1.0.27
+   Compiling either v1.15.0
+   Compiling tempfile v3.27.0
+   Compiling indexmap v2.14.1
+   Compiling icu_normalizer v2.1.1
+   Compiling rustc_version v0.4.1
+   Compiling parking_lot_core v0.9.12
+   Compiling itertools v0.14.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling parking_lot v0.12.5
+   Compiling heapless v0.7.17
+   Compiling url v2.5.8
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling ed25519-dalek v2.2.0
+   Compiling postcard v1.1.3
+   Compiling tokio v1.50.0
+   Compiling referencing v0.46.0
+   Compiling toml_edit v0.22.27
+   Compiling frost-core v3.0.0
+   Compiling jsonschema v0.46.0
+   Compiling frost-rerandomized v3.0.0
+   Compiling frost-ed25519 v3.0.0
+   Compiling itertools v0.10.5
+   Compiling toml v0.8.23
+   Compiling rusqlite v0.39.0
+   Compiling uuid v1.22.0
+   Compiling prost v0.14.3
+   Compiling olpc-cjson v0.1.4
+   Compiling prost-types v0.14.3
+   Compiling num-bigint-dig v0.8.6
+   Compiling tokio-util v0.7.18
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper v1.8.1
+   Compiling tower v0.5.3
+   Compiling oci-spec v0.9.0
+   Compiling prost-reflect v0.16.3
+   Compiling hyper-util v0.1.20
+   Compiling tower-http v0.6.8
+   Compiling rsa v0.9.10
+   Compiling serde_with v3.18.0
+   Compiling oauth2 v5.0.0
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling jsonwebtoken v10.4.0
+   Compiling tough v0.22.0
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling oci-client v0.17.0
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling sigstore_protobuf_specs v0.5.1
+   Compiling x509-cert v0.2.5
+   Compiling openidconnect v4.0.1
+   Compiling webbrowser v1.2.2
+   Compiling rusty-fork v0.3.1
+   Compiling openssl-sys v0.9.114
+   Compiling proptest v1.10.0
+   Compiling foreign-types-shared v0.1.1
+   Compiling pastey v0.1.1
+   Compiling openssl v0.10.78
+   Compiling foreign-types v0.3.2
+   Compiling openssl-macros v0.1.1
+   Compiling base64urlsafedata v0.5.2
+   Compiling webauthn-attestation-ca v0.5.2
+   Compiling webauthn-rs-core v0.5.2
+   Compiling half v1.8.3
+   Compiling webauthn-rs-proto v0.5.2
+   Compiling serde_cbor_2 v0.12.0-dev
+   Compiling sigstore v0.14.0
+   Compiling jsonwebtoken v9.3.1
+   Compiling chio-sqlite-file-identity v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-sqlite-file-identity)
+   Compiling chio-workflow-preflight v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow-preflight)
+   Compiling ruint v1.20.0
+   Compiling const-hex v1.18.1
+   Compiling tracing-subscriber v0.3.23
+   Compiling alloy-sol-type-parser v1.5.7
+   Compiling alloy-primitives v1.5.7
+   Compiling ureq v2.12.1
+   Compiling alloy-json-abi v1.5.7
+   Compiling chio-data-guards-redactors-default v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards/redactors/default)
+   Compiling alloy-sol-macro-input v1.5.7
+   Compiling dashmap v6.1.0
+   Compiling alloy-sol-macro-expander v1.5.7
+   Compiling chio-log-redact v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-log-redact)
+   Compiling webauthn-rs v0.5.2
+   Compiling winnow v1.0.1
+   Compiling serde_derive_internals v0.29.1
+   Compiling schemars v0.8.22
+   Compiling clap_builder v4.6.0
+   Compiling regress v0.10.5
+   Compiling schemars_derive v0.8.22
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+   Compiling chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+   Compiling chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-disclosure-lineage v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-disclosure-lineage)
+error[E0599]: no variant or associated item named `Input` found for enum `MobileAttestationBinding` in the current scope
+  --> crates/trust/chio-custody-hw/src/mobile_challenge.rs:92:19
+   |
+77 | pub enum MobileAttestationBinding {
+   | --------------------------------- variant or associated item `Input` not found for this enum
+...
+92 |             Self::Input(error) => error.code(),
+   |                   ^^^^^ variant or associated item not found in `MobileAttestationBinding`
+
+error[E0599]: no variant or associated item named `Input` found for enum `MobileAttestationBinding` in the current scope
+   --> crates/trust/chio-custody-hw/src/mobile_challenge.rs:114:19
+    |
+ 77 | pub enum MobileAttestationBinding {
+    | --------------------------------- variant or associated item `Input` not found for this enum
+...
+114 |             Self::Input(error) => error.code(),
+    |                   ^^^^^ variant or associated item not found in `MobileAttestationBinding`
+
+error[E0308]: `?` operator has incompatible types
+   --> crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs:341:79
+    |
+341 |               let (challenge_json, stored_consumed_at): (String, Option<i64>) = transaction
+    |  _______________________________________________________________________________^
+342 | |                 .query_row(
+343 | |                     "SELECT challenge_json, consumed_at_unix_seconds
+344 | |                      FROM chio_mobile_attestation_challenges
+...   |
+350 | |                 .map_err(|error| unavailable("load challenge for consumption", error))?
+351 | |                 .ok_or_else(|| MobileChallengeError::Invalid("challenge is unknown".to_string()))?;
+    | |__________________________________________________________________________________________________^ expected `(String, Option<i64>)`, found `(Result<..., ...>, ...)`
+    |
+    = note: `?` operator cannot convert from `(Result<mobile_challenge::IssuedMobileChallenge, mobile_challenge::MobileChallengeError>, std::option::Option<_>)` to `(std::string::String, std::option::Option<_>)`
+    = note: expected tuple `(std::string::String, std::option::Option<_>)`
+               found tuple `(Result<mobile_challenge::IssuedMobileChallenge, mobile_challenge::MobileChallengeError>, std::option::Option<_>)`
+note: return type inferred to be `(std::string::String, std::option::Option<i64>)` here
+   --> crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs:338:31
+    |
+338 |               let transaction = connection
+    |  _______________________________^
+339 | |                 .transaction_with_behavior(TransactionBehavior::Immediate)
+340 | |                 .map_err(|error| unavailable("begin challenge consumption", error))?;
+    | |____________________________________________________________________________________^
+
+error[E0277]: the `?` operator can only be applied to values that implement `Try`
+   --> crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs:352:26
+    |
+352 |             let stored = challenge_json?;
+    |                          ^^^^^^^^^^^^^^^ the `?` operator cannot be applied to type `std::string::String`
+    |
+    = help: the nightly-only, unstable trait `Try` is not implemented for `std::string::String`
+
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+Some errors have detailed explanations: E0277, E0308, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `chio-custody-hw` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...

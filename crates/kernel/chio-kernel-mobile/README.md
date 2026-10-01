@@ -51,7 +51,7 @@ with a matching UDL declaration.
 | `verify_app_attest_evidence(key_id, challenge_hex, app_id, attestation_cbor_hex, previous_counter)` | Verify an Apple App Attest attestation object via `chio-custody-hw`. |
 | `attest_play_integrity(nonce_hex)` | Build the Play Integrity challenge envelope platform evidence must bind to. |
 | `verify_play_integrity_evidence(token, expected_nonce, expected_package_name, expected_audience, jwks_json)` | Verify a Play Integrity JWS against the pinned Google JWKS. |
-| `verify_mobile_receipt(receipt_json, evidence_json)` | Shape-check a receipt against attestation evidence; returns a non-authoritative status. |
+| `inspect_mobile_receipt_envelopes(receipt_json, evidence_json)` | Shape-check a receipt against attestation evidence; returns a non-authoritative status. |
 
 Also exported: the `CapabilityVerificationRecord` and `PortablePassportMetadata` UDL
 records, the `ChioMobileError` error enum, and the `MobileClock` / `MobileRng`

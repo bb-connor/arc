@@ -260,15 +260,10 @@ impl ModelCard {
     /// Decode from canonical JSON bytes. Round-trip with
     /// [`Self::to_canonical_json`]. Validates after deserialisation.
     pub fn from_canonical_json(bytes: &[u8]) -> Result<Self, WeightsError> {
-        let card: Self = serde_json::from_slice(bytes)
-            .map_err(|err| WeightsError::Encoding(format!("canonical-json decode: {err}")))?;
+        let card: Self =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, 1024 * 1024)?
+                .decode_canonical()?;
         card.validate()?;
-        let canonical = card.to_canonical_json()?;
-        if canonical.as_slice() != bytes {
-            return Err(WeightsError::Encoding(
-                "model card bytes are not RFC 8785 canonical JSON".to_string(),
-            ));
-        }
         Ok(card)
     }
 }
@@ -473,7 +468,7 @@ mod tests {
         }
         let bytes = value_to_bytes(&value);
         let res = ModelCard::from_canonical_json(&bytes);
-        assert!(matches!(res, Err(WeightsError::Encoding(_))));
+        assert!(matches!(res, Err(WeightsError::Input(_))));
     }
 
     #[test]
@@ -490,7 +485,7 @@ mod tests {
         }
         let bytes = value_to_bytes(&value);
         let res = ModelCard::from_canonical_json(&bytes);
-        assert!(matches!(res, Err(WeightsError::Encoding(_))));
+        assert!(matches!(res, Err(WeightsError::Input(_))));
     }
 
     #[test]
@@ -507,7 +502,7 @@ mod tests {
         }
         let bytes = value_to_bytes(&value);
         let res = ModelCard::from_canonical_json(&bytes);
-        assert!(matches!(res, Err(WeightsError::Encoding(_))));
+        assert!(matches!(res, Err(WeightsError::Input(_))));
     }
 
     #[test]
@@ -592,7 +587,7 @@ mod tests {
         };
         let res = ModelCard::from_canonical_json(&pretty);
         assert!(
-            matches!(res, Err(WeightsError::Encoding(_))),
+            matches!(res, Err(WeightsError::Input(_))),
             "signed model cards must be presented as RFC 8785 canonical bytes"
         );
     }

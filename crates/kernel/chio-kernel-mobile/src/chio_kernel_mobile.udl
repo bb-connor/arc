@@ -152,7 +152,7 @@ namespace chio_kernel_mobile {
     // Returns an explicit non-authoritative status until full receipt-chain
     // verification is wired to trusted issuer pins and challenge binding.
     [Throws=ChioMobileError]
-    string verify_mobile_receipt(string receipt_json, string evidence_json);
+    string inspect_mobile_receipt_envelopes(string receipt_json, string evidence_json);
 };
 
 // Verified capability snapshot returned by `verify_capability`.

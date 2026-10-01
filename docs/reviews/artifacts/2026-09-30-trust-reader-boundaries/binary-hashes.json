@@ -1,0 +1,502 @@
+{
+  "/home/connor/chio-security-target-6d-final/debug/deps/_generated_check-de923699a611df21": {
+    "sha256": "bfd7eb689f6dbee7df5c8a370382b795af46c0effbcbfb68b4040a4eecdaccc9",
+    "bytes": 1277216
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/admission-a04773d501d94d30": {
+    "sha256": "e15692054df2748424ccc495e5870c836da3f98432989d4f444336360ddf90cb",
+    "bytes": 6758688
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/adversarial_suite-0f616574eb32b4ac": {
+    "sha256": "609ece69ec461d76282745e195422cfe0d67f47b51aece0bc9ab5dd5dfe1cf7f",
+    "bytes": 1966840
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/attestation_app_attest-adf77472f1680757": {
+    "sha256": "bc003ab6db4f8082a4a7a2913e327818a8d71f77af900d828ffebdcbaaf9ab6b",
+    "bytes": 4196552
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/attestation_play_integrity-89fe9984a1d9f49e": {
+    "sha256": "f4aa83400cdd8bf2ce7fb67500a250aff40b0a7487a9cc3f577f5ea6aa86c5cd",
+    "bytes": 5104728
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/audience_confusion-e8784595b57a1117": {
+    "sha256": "e6543943801ffa4574d81dc00b6e7eb2900bd2ef3c3d28e507a4f54064c6d426",
+    "bytes": 5255456
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/audit_log_entry-80c2c0bed19d8d32": {
+    "sha256": "1a72f202d2961d957a934e8978bac5c1c064a3beb3debaf00b71ec4ab6571de2",
+    "bytes": 8581200
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/bilateral_signing-c085e050c4c93ea0": {
+    "sha256": "ea7e3e8f93b8e5a4f3f944ee15da30155641d81d2e2390cc868af30f5c32f65e",
+    "bytes": 3189480
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/bundle_verify-74480d6b82cc22ff": {
+    "sha256": "974d294ccebac882479d3ac5d9bae825ecfb7147983b5c192b6696aace425a6b",
+    "bytes": 2493784
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/buyer_packet-4b67fe3ff949943f": {
+    "sha256": "783a3557187ce35ed545f628bea3059eec8ddcf39c0c2fbcae9de8ad3e0afe31",
+    "bytes": 2742584
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/buyer_review-731c22da403bcd83": {
+    "sha256": "ee6589d3b750c84b359e1427ff52fc41b3233d229f9d43f5c38b76be1cf95bc9",
+    "bytes": 9304048
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/canonical_bytes_vectors-90c5c06fbe5fa24b": {
+    "sha256": "ebe40f0412b719f627a2562ff56c9d087db1e1af45b60571fb784ea1933ce281",
+    "bytes": 1878456
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/canonical_json-5d7f529c6eb4ff6f": {
+    "sha256": "0a5f06acc78ebe57981b51e36cc8cd3a6b1fc6558a210986fd6eb263eed7fc3e",
+    "bytes": 2486696
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/canonical_signature_boundary-dafed44458e10022": {
+    "sha256": "aef27163a2cbcbbdbaab0ecd9f7f1009abfb4567259d16a504059b31a55a7033",
+    "bytes": 3163976
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/capability_canonical_json-0bb7ce05e0af9c84": {
+    "sha256": "389aa70bc067dd187d3a051f7345c04dd2a38f84b876884b6530e10906740e74",
+    "bytes": 2340048
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/capability_constraint_variants-6555ec01d25bb39c": {
+    "sha256": "1df125860b081945509457c107c65d10f602278d53d03a9188f8de4de0f88f01",
+    "bytes": 3118784
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/capability_hybrid-86ec627d0562ce2f": {
+    "sha256": "70286dad06b3b2883e1b58c26d8718535b4fddcef39e64fc29201d17a69ad373",
+    "bytes": 1057304
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_attest_buyer-7e09d049b578f209": {
+    "sha256": "f8cc66b61a0305adbe5337e1d1d971df7784da5f83dbf3cf8e4f733d551d2562",
+    "bytes": 1715416
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_attest_buyer_core-4c1fe4713c433486": {
+    "sha256": "8009161c68256b107143e50865bef51469c33a1b88dd874231d34db635ade0ca",
+    "bytes": 8238544
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_attest_verify-cd51d074018dba23": {
+    "sha256": "b6331018225f9ad74cd2649afab4ab8197f2c66073e10c43f1223f126d546720",
+    "bytes": 10730736
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_core_types-e5cf30da7578164e": {
+    "sha256": "415b89965bfaf21149536742f9b9ad0bfd9bfdf7ea56998af0b78e576f4248d9",
+    "bytes": 31071456
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_credentials-bf146ca38c5d2394": {
+    "sha256": "53ca550f1d92495315ead95190cf720beb4e9371e084ddd645e4c9cda08c3520",
+    "bytes": 14355656
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_custody_hw-626d62178a5ea123": {
+    "sha256": "91321c1f986add4772d3ebead3973478f38804c328d109d1baa2c71c7892d26b",
+    "bytes": 11091824
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_federation-90d52ff8f0fb217c": {
+    "sha256": "ea30f9d35fd145151addc285417d24e9b462ecf905b193c0069e8b46bf1ff7d4",
+    "bytes": 5888616
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_federation_authority-f6b458ce111c334a": {
+    "sha256": "8403744e61b53b4dd46119b223ca4d4717be7bd9497c83ea8cc5313b9d8133a4",
+    "bytes": 8855960
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_federation_transport_iroh-ad87757d0823877d": {
+    "sha256": "334041b21cf2444b24a487cc77fa199391325dbb1c351737059bc7425dcd93d4",
+    "bytes": 67191008
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_challenge-81a1451d2c54d226": {
+    "sha256": "fb59b76c2b50e55e3f717ec16b95880d251241bfee1a17c61710d5f114f060b2",
+    "bytes": 1269408
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_verifier-090857ae7a734c79": {
+    "sha256": "afddcd0c186d789c404318177f9b101b5c142b262342839efa8e682ecf197910",
+    "bytes": 2901000
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel_mobile-9cb1aa7781897c87": {
+    "sha256": "42f823f595485ba1b366de2dddc5498dd2ad9715e59b2609effec92568319c3d",
+    "bytes": 1216216
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_pheromone_relay-63230f15c17015e5": {
+    "sha256": "1d0363c8d2bc700fc63431a0ae73eb493e00dbc5b9e52211b31bc87dd94475b7",
+    "bytes": 7114336
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_pheromone_runtime-e3be899dc39e8ecd": {
+    "sha256": "419dce69ed2af5d5c053728bc1a0a49f7ceb7a7c73ad2179b9878f6b7af4139f",
+    "bytes": 4521712
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_replay_corpus-499e31528ad8f7dc": {
+    "sha256": "16daf00bcbf455eff2e978fb37231dcd60666bcd0dd44d32dfee5f46e967a5c9",
+    "bytes": 7865448
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_reputation-83681b292cbeb464": {
+    "sha256": "0c7d4018573d49254f64cc9f9d7f861f7a39bb857f15a77d8cefca8a842e7dc7",
+    "bytes": 4468016
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_signing_remote-92100997c3291e76": {
+    "sha256": "95380c37b1d03d49c39ce39cd6f2cdc803b5810a18897045a7646aed07031564",
+    "bytes": 8922328
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_tee-5de3f6fe5baf9cb3": {
+    "sha256": "5174571f927baf364161a670435653c080b472ec66a861d02e314093694b2339",
+    "bytes": 17835616
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_tee-fd01e3c56596f97d": {
+    "sha256": "bbd4db1fa5109a1a7e29bc9f3c54e3f4709cdf5ee456a3feea18b61168c8214e",
+    "bytes": 1057472
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_tee_frame-6203de34082006bc": {
+    "sha256": "24a3d9fd581ad1dace03bd39b63c8a1b01bcced7b52cb80af0b595f225fca5c1",
+    "bytes": 2805624
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/chio_weights-c15ff9bea19f26a7": {
+    "sha256": "3ed55ae05000ec1a43ecf0c5c6634b6ad8a7195a22f5e6d56a27122aaf37d9d8",
+    "bytes": 2799952
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/claim_registry_integrity-24bc597d1c9763b8": {
+    "sha256": "63efb05474109cc49b14cae96e4a8f757ee842f31f056edb7e0bb51a2e861b2e",
+    "bytes": 2035208
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/cli-a7edced3018f31cf": {
+    "sha256": "d3317093d708caff28fe11d6049393f8d4218d31c8f0d811346fd9ba629a3485",
+    "bytes": 5532584
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/cross_backend_conformance-d005fe64becd03e0": {
+    "sha256": "c9c370e0f397df0bf343c3ca58e3550a7c77f38d9a02c82331f1215abf4fd77b",
+    "bytes": 1057320
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/cross_ffi_parity-d884e0acc577efe2": {
+    "sha256": "c94bddd7034f0e2d069f9ce2aa4cb192fc71dc81b006a71256ad03d612fc50d9",
+    "bytes": 7906432
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/crypto_wire_bounds-d257a009f4797fa9": {
+    "sha256": "4b7a8a4067136600b73d7a667b43ee63d3b917b728985a74e9a53815f2919af6",
+    "bytes": 3289744
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/dedupe_lastwins-f126b93aaa798caa": {
+    "sha256": "db30d550e4ef438c8c4dab826fa523d644f2bd7323c8e3c811864168153507fa",
+    "bytes": 2046000
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/delivery_contract_metadata-2f4126bf01259fe7": {
+    "sha256": "d5ca438f6b10b30dab6a5d4f85ea88a8500db3c4c2c2b48a7d9ff502fc9c972d",
+    "bytes": 14107024
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/digest_mismatch-e53df21f90c6fd27": {
+    "sha256": "7bcdbc87bd5617bb7170bf9861a76b86d88bbf795f535a7fd3fc704f6b075e0c",
+    "bytes": 6510496
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/distributed_revocation_refinement-a6b64c1b6fe743bc": {
+    "sha256": "dc8d29045a440cc20665c915dca65c91b87a2185b80be350bd88b2046e1784c4",
+    "bytes": 2856072
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/e2e_bless_to_replay_gate-25f267bae5c3c81d": {
+    "sha256": "9623f05ebb8e98e9a8e943c74392742831366bc6364cf27a4faa5e5c4f29ab05",
+    "bytes": 8060648
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/end_to_end-9a6a9ed9c266cf28": {
+    "sha256": "7dc143b7eba9eee3a2b038f958786c5f5967eedba6125c1c60588a090de2cf8f",
+    "bytes": 2760792
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/equivalence-44c0a33b79ca4e51": {
+    "sha256": "9a2a7c0e4a539c47a6f4af6a938a49c51f2196b9701f05f74573b50331893b20",
+    "bytes": 1057288
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/evidence_invalid-11bbe56cdd11dd09": {
+    "sha256": "6edb6fb3c400b8a6a8d2a14fa5b5488c22fb4f0f741c8206e87dfaad0fb27070",
+    "bytes": 6666464
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/expect_report_data-f1216b065171e2e3": {
+    "sha256": "4c53680b2a0fafb3926834eaabdd2a6e976d1a40787df9e4e5f59b62498a7326",
+    "bytes": 1509280
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/feed_monotonicity-0a2ad76de8ae9587": {
+    "sha256": "a139af869b9f6a503678851fd0a37c5490da5ad2bbdecbb88004b4ec971c565c",
+    "bytes": 2744664
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/ffi_roundtrip-c95cd7c7e12ede0f": {
+    "sha256": "70b128150454f5cf368d33daa57a9f9f38b21b90d74ae5eeb7f3e1b9b1e3d384",
+    "bytes": 11486608
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/financial_passport_v2-981142105999f8c2": {
+    "sha256": "b472ac8cdb8edeb03fa836f5ecd24ffd7cb56b550e66b20d93a9c2a61ab8050a",
+    "bytes": 22061696
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/fixture_corpus-04cff3736726b777": {
+    "sha256": "5fe76f7aad836c2c0c5c2fd4ff9a6e323d9742ab36a2c9bc805cc343ea9a0c62",
+    "bytes": 1589912
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/frost_authorization-839b385bdb6808fc": {
+    "sha256": "8fd98a346769b785077b2ce386db0d8ea7a142b57248b02acca5ea40cafba1bb",
+    "bytes": 2223960
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/frost_ceremony-4621d987f0a8d345": {
+    "sha256": "033de388861b5227779bd9e350a2a1ffaeda581428d37e1539325cd657fe1832",
+    "bytes": 6839984
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/frost_coordinator-21bd6f761f1844b7": {
+    "sha256": "1245efa780fd69d47834250f8d02a526ef1c63ebcfa100b2e8bfba796c5e2dc4",
+    "bytes": 4203264
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/frost_roster-2725abaf766d51f4": {
+    "sha256": "934ba1bfc35033ecebd37b0bf9b96b43c339d16f4cb63bfc4abb756baa267cf5",
+    "bytes": 14130312
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/frost_rotation-9306407f9d64742e": {
+    "sha256": "1af7503b633bc3d92d5c649fb5e684bbe950a78fd7021954cd45d615bd2027a3",
+    "bytes": 3656000
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/frost_signer-f355b5a2d37d28fa": {
+    "sha256": "c522ceb28703454753f340b6131ee7652e648d2f0e3a80119036d5c369485e64",
+    "bytes": 2589784
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/frost_vectors-b137b9ec87653021": {
+    "sha256": "049cf24090b9bcd1e3b0fb9ffdfe538dbdbb8891012d654c776cee03fb4eb389",
+    "bytes": 14315120
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/generated_sources-b7b72313242b64b5": {
+    "sha256": "2e506d0b09215a3e98098ea601530ea3f8743cff37710e8142b2b26d7a2ff829",
+    "bytes": 1150192
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/governed_active_response_intent-f7db15ef3f9e44cc": {
+    "sha256": "9099d095a3c75019e3cf5622aeaa94403869a0cfc34ef21b47283fbcd7ce3d83",
+    "bytes": 3177624
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/hybrid_bitflip-c06221ba36d1094f": {
+    "sha256": "dbbeb597b183d52bc5ddf20abc9dc4fd4a62e16e413e06a9e420190cd29aa22c",
+    "bytes": 1057296
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/integration-d78d17aae065f86e": {
+    "sha256": "8e1a6b5a7a3bd976de41b5497879f29dd0401d89d2f52a15c2ec6f6b4eac3675",
+    "bytes": 24041912
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/integration_smoke-580ab895d2bb5693": {
+    "sha256": "809a7652be23810ca9696f2fd558ba18cafa9437492af9346610e17286a89672",
+    "bytes": 4116720
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/integration_smoke-c047195f20089719": {
+    "sha256": "1f033c039afe4c49c12c02c66707721097c357b6613f3e8dcee27f0df1d98d18",
+    "bytes": 1091704
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/issuer_roundtrip-a1fd5257e33a566a": {
+    "sha256": "ecd761ce83917a9d2f8eab645363b55690e18d6a95bb782c62ba3368ab844ecc",
+    "bytes": 2756736
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/lineage_anchor-2978ebaa7f95c126": {
+    "sha256": "8fb44a3a9cdc73f94b1890fc784ddfe13399ac2b0d8b750f46befeb6db0d1a02",
+    "bytes": 2820064
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/local_reputation-d2694afeda8771be": {
+    "sha256": "97f7b38f5a9a3f702d79b07f34206b827d6c6a9dd145bc0c1db892d37d86413b",
+    "bytes": 3306648
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/merkle_walk-0163bf5699c75d9a": {
+    "sha256": "3be3f709ddaadca2cdd5a56b3db6547297cdd5a77a00478cbef5078ef883e155",
+    "bytes": 1286984
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/mint_signed-83a91498f47e0828": {
+    "sha256": "6655a2f8786206739d0e57ff194a5af6b264a972fdfb2d66833ebeb4267fd3fe",
+    "bytes": 2541952
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/mode_precedence-053c6940c2fd7d59": {
+    "sha256": "2df9a2c78f14b80f30ddaf5baa3dead69307fce04d9524b604b716e9da95dde0",
+    "bytes": 3183120
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/nitro_root_rotation-e8942c5f321dcc0a": {
+    "sha256": "ae11d97564d1f316c6ed7b14a1c503ecdba1f0fa188b3a00ea5a54c341b8d04b",
+    "bytes": 1057304
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/nitro_unit-1accb1fe3da884b2": {
+    "sha256": "ecb835f6cd806220a1943697263df46b6df781710db9ca45ccef10a2daaaf422",
+    "bytes": 1057288
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/no_std_build-03bb71b5b2dc90e5": {
+    "sha256": "b26455da7f26ef104ceebfb1d50b82942b5707242bfeed896487ea3779efcd36",
+    "bytes": 2307800
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/oracle_gossip_e2e-daa1caf43052ed94": {
+    "sha256": "8a2b0f8336cafa6857fba8e377fb05754f8e24e13c0b88dd02d3db4aaba50a06",
+    "bytes": 2337968
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/oracle_round_trip-8921ecbaec2aff02": {
+    "sha256": "7f761f62848a6fbd4cffb54c01042c13a66a1df02846cbf9c65c9dd33b4588e6",
+    "bytes": 3498752
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/persistence_blob_encryption-dc81cc0b66ba7158": {
+    "sha256": "1253db89b935f91f18d39756cfbfd62f236d405a3add37637f99c4952e9126b7",
+    "bytes": 4818352
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/pheromone_gossip-249c14c7771d3ccd": {
+    "sha256": "bb7f07fbf892e72d0455649300cc7664ce5b293e8b00c13276047b915968d283",
+    "bytes": 2608608
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/policy_loader-8fb5b396db40b7a8": {
+    "sha256": "a5bb4580107e874d4993cfffa47732c3c67fa12be8e84a7b2f987c233a09f680",
+    "bytes": 8327208
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/policy_schema-b9d6065ef99b716e": {
+    "sha256": "15ae197ab5d49df484a12db93644b1095630eb5a2dd7eda21c17f7382212aa17",
+    "bytes": 8414624
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/property_capability_algebra-7115411306d7fa34": {
+    "sha256": "7a1d2ec1ac5aa3385871b9dcfc9f0c682d7d41582420fbc8140c78fbdfd7c015",
+    "bytes": 4891024
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/property_passport-f837f100b2e287f4": {
+    "sha256": "059998cf1e784b88763583478763e3e3e2e103735f5acfa94afcf4f5884ff805",
+    "bytes": 4324504
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/property_roundtrip-995875e97fa5b5be": {
+    "sha256": "d924d2f87f4f67ab7967ca3504462051d83d889831a4c6cac0a868710171a758",
+    "bytes": 3904952
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/protocol_error_registry-bc0bf1c05f7dbbc0": {
+    "sha256": "6c9c45d9299ea9925d6ef448aee571ad61ccc4725fd3bb2df8a3338c00282b31",
+    "bytes": 2008672
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/protocol_primitives_generated-9fe3951a833c3d6e": {
+    "sha256": "f2412f755a55616d665ff27502e5665b6a9b8fcef8606b80736bd604a0f58c4b",
+    "bytes": 8685248
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/public_surface-2a4b2ca84c79d34b": {
+    "sha256": "45f2a50b6ecc365a3948d99680f357a5a26c5af4d13bb2265eea84442f3d90d1",
+    "bytes": 1286664
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/public_surface-5664bb8dc830bf88": {
+    "sha256": "8bc5593f196701addf9f95c5f79027a6c1f1c9b31c088ad35636ff6b1f29f990",
+    "bytes": 1072928
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/reader_boundaries-8db2f06520632c39": {
+    "sha256": "a40331342f54b7e87aaedeadd5854695c16967510b742970efe2faae77af747c",
+    "bytes": 4346640
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/receipt_tenant_id-1320b7959b12ced5": {
+    "sha256": "804f0c5e2ffdf3aec56c4f41b18629bc3c4903e195f1ceed6e0e9fa2144c16cb",
+    "bytes": 3048952
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/redact_determinism-674088104e746c64": {
+    "sha256": "dc438308f0a79ef7e21320611f0f8b6949ff37b5f62e27f9496ce6ee24b01f3e",
+    "bytes": 8105008
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/redact_failclosed-6ee98c6832990e86": {
+    "sha256": "8704435eae06a68f8bcfdf8aa4280e70cc8d386af8d0876e82a58c3d5bf537f9",
+    "bytes": 6376560
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/relay-be21cc8916f56e13": {
+    "sha256": "3af9d24c5d680d6dfc04092a2a9af48f13145796799f87af48d676e250afd172",
+    "bytes": 25860496
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/replay_contradiction-033239801eee8853": {
+    "sha256": "74f6c01fdc1bbd5fcc5cb55272552cbd05081b1bab84114eea771cf793f0f626",
+    "bytes": 6550720
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/replay_resistance-5a629d5a6c277e3d": {
+    "sha256": "5ac2ff291cde07477f453ca96552c1ce8abc98043958ede01608ccede2a592c2",
+    "bytes": 4870032
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/reredact_stable-a2943e52339210e1": {
+    "sha256": "afa3bf4961bafe46222e6c4a2a91ae12629736be9beb51c9366ce728638d47aa",
+    "bytes": 6467184
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/revocation_cascade-b7501afe183a2ea2": {
+    "sha256": "65b72420eb54c0446d98dd54c031f68ca1c621da253949948d73f82ed59f7372",
+    "bytes": 2740440
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/runtime_manifest-1bea3aa45c83317f": {
+    "sha256": "95e9490cbaf410587550b4c62f2ed5ec1688e7a5f0396c902a5ea3b5017fd4e0",
+    "bytes": 2541184
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/runtime_receiver-10421685360cdf48": {
+    "sha256": "7ad773ae7ee26a863b7f95d892bd76906b508d06cea3df74c0bf67dd9b8e04fe",
+    "bytes": 22693688
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/schema_negative-af83a2db007fea92": {
+    "sha256": "65a7e1fb4b0afa585de8d14b5ef1963cc4a3533b1dce5c3e764ab73b22884a30",
+    "bytes": 4078000
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/security_generated_vectors-ffc4d36e645263db": {
+    "sha256": "79ffe71e5fd97e66301ab9094da45c566ec63741b11c08fa075f5d2319d14915",
+    "bytes": 13200624
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/security_receipts-04ad49fefe242515": {
+    "sha256": "a897350fc317a903d39af7c6f91b4680b9d0ee99b73d4255d9548fe5a8470b30",
+    "bytes": 5877320
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/sev_snp_integration-68c1489ae25f1083": {
+    "sha256": "4d617f6880ee96f1ebdb1a8aadea7d6359a27620da3284a6fae510a0370f03c5",
+    "bytes": 1057304
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/sev_snp_unit-c9f19dab9494ecff": {
+    "sha256": "c5739ad1cf57fe3952bf02416ab2ae033f212740e2e259f039177a012e618d4c",
+    "bytes": 1057288
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/signed_artifact_schema-06140fbbb91248db": {
+    "sha256": "72c82587783802736aecbabb4898f349cc07c11b4c15324d5dcd2c7e5cd08c69",
+    "bytes": 3264248
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/signed_json-43e1e9d1061ed345": {
+    "sha256": "cd8ec6e194822a9613581886a8b45f89f8c8f729eca3cb33706977b362b3f35b",
+    "bytes": 1996384
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/signed_security_event-2c2db95b951a18fe": {
+    "sha256": "7c45bb17e05cb8dbaa88b5bcae07b2b17bbb4aac8f5c4293c60d0c206e7fe102",
+    "bytes": 2943176
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/signer_binding-19d9264421748069": {
+    "sha256": "3396094b4c96e95e95a1d5b52ad39e0f54ebaefb3f39c3d35864011ef0617bc3",
+    "bytes": 4558608
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/sigstore_negative-ba4eeb7beec93c7d": {
+    "sha256": "6b6f578e6eb27fdfd9f118bb1dd9dd94af90d143d36733f82083106c278d7362",
+    "bytes": 23919528
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/spool_backpressure-e42f3bf0b8bf11ea": {
+    "sha256": "440fce4e49523039105d79f3518f49b29a61afb7fb456a77769893e63d193253",
+    "bytes": 4803744
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/tdx_integration-ca054fecbe3e11a5": {
+    "sha256": "c102b55b805876ed1d0fe813b2fde65e5977f962b4573e731a60578125fe2e80",
+    "bytes": 1057296
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/tdx_unit-56bd59334b1cdf09": {
+    "sha256": "14467a35d20514b3a40da82b8a48a4b7fd38913f41a270b4b714f86fe3fff968",
+    "bytes": 1057280
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/tenant_policy_resolver-e8f98712995febcd": {
+    "sha256": "2a3192dc2b72b2dfe0018b41695d8b7ef3986802516a63cac9fb11d7f57e0a5b",
+    "bytes": 7705120
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/threat_model_artifacts-56e89a782eea3bd7": {
+    "sha256": "8fa92bcd3bd48c45c824779a94be78847ee2a9cc1dacdddba95b689a39fc554a",
+    "bytes": 1821608
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/treaty-af561f292d3b4f0e": {
+    "sha256": "7ece575ad0a8ddb78d694fb82623476a0cf8336cfb7bc4f3fec7b61f94075004",
+    "bytes": 2754048
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/trust_establishment-b34d18e908df4886": {
+    "sha256": "f0ee06176044889279c1e56e777fdc226398fc001cc40a2039c649338a7b239f",
+    "bytes": 2522496
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/trust_tier-cce1bd8bb1faf3f7": {
+    "sha256": "9773e019555be0e9b537bde4dd77b233c8f431102fea1aeacde0890f2a1cbb37",
+    "bytes": 4038272
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/tuf_rebake-876d85c0973228c2": {
+    "sha256": "1b1b1c19fd70127bbaaa4d1a81fb0b31b3b96f3eda0e04ae7c36b263012ca8e2",
+    "bytes": 6898536
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/untrusted_json-c11c3f7e28a66ef3": {
+    "sha256": "25a14043064405ae4d3d1580532b3177ef5ce16f9f789ee301078ad8d5f3349b",
+    "bytes": 2029600
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/verified_outcome_request-7ed47c8b3da6c25a": {
+    "sha256": "3b7e1fc429d32bddc55fe99f73e4fbbca58e4eae25412de270a14129de7f8a5a",
+    "bytes": 2139280
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/verifier-47a4e6277f01351a": {
+    "sha256": "9db1edada4c8ee9f125a5ed003ec60c40f10756a5a284f008b4ac3326d714042",
+    "bytes": 9998968
+  },
+  "/home/connor/chio-security-target-6d-final/debug/deps/wire_protocol_schema-0491e02cb3de57d1": {
+    "sha256": "2b29ce168da80ee879f907b72c6307081af833824fbf0cd3f7edcfba28dd1d6b",
+    "bytes": 16331240
+  }
+}

@@ -44,9 +44,9 @@ Every item below is also re-exported at the crate root
 - `verifier::{PasskeyVerifier, VerifiedAssertion}` - WebAuthn assertion
   verification (`PasskeyVerifier` requires feature `passkey`).
 - `attestation::{verify_app_attest, verify_play_integrity,
-  verify_mobile_receipt_chain, AppAttestVerificationInput,
+  parse_mobile_receipt_envelopes, AppAttestVerificationInput,
   PlayIntegrityVerificationInput, VerifiedAppAttest, VerifiedPlayIntegrity,
-  VerifiedMobileReceiptChain, AttestationError, APP_ATTEST_FORMAT,
+  ParsedMobileReceiptEnvelopes, AttestationError, APP_ATTEST_FORMAT,
   MEETS_DEVICE_INTEGRITY, PLAY_RECOGNIZED}` - mobile device-attestation
   verifiers.
 - `mobile_challenge::{MobileChallengeAuthority, MobileAttestationBinding,

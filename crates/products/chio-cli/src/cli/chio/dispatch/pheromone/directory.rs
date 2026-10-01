@@ -169,8 +169,7 @@ pub(crate) fn parse_relay_peer_directory_json(
     profile: chio_pheromone_relay::RelayProfile,
     trusted_issuers: Option<(Vec<chio_pheromone_relay::TrustedPeerDirectoryIssuer>, u64)>,
 ) -> Result<chio_pheromone_relay::PeerDirectory, chio_pheromone_relay::PheromoneRelayError> {
-    let value: serde_json::Value = crate::input::text(json)
-        .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Json(error.to_string()))?;
+    let value: serde_json::Value = crate::input::json(json.as_bytes())?;
     let schema = value
         .get("schema")
         .and_then(serde_json::Value::as_str)

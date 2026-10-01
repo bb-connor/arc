@@ -68,9 +68,9 @@ a caller-supplied one:
 - Play Integrity validates the ES256 JWS against the pinned Google JWKS
   (`google_root`), then checks `aud`, `exp`, nonce, package name, and the
   app/device integrity verdicts.
-- `verify_mobile_receipt_chain` is a shape-only shell (schema and
-  platform-string checks only); it is reachable from the crate root but not
-  consulted by any capability-mint path.
+- `parse_mobile_receipt_envelopes` bounds and parses original receipt/evidence
+  JSON before checking schema and platform shape. Its parsed result carries no
+  cryptographic verification or capability-mint authority.
 
 ## Invariants and failure modes
 

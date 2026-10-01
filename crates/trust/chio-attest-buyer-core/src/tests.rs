@@ -193,7 +193,7 @@ fn proof_package_parser_rejects_treaty_bilateral_side_channel() {
     package["treatyBilateralEnvelopes"] = serde_json::json!([]);
     let err = proof_package_from_json(&package.to_string())
         .expect_err("canonical proof package parser must reject unknown side-channel fields");
-    assert!(err.to_string().contains("treatyBilateralEnvelopes"));
+    assert_input_field(&err, "treatyBilateralEnvelopes");
 }
 
 #[test]
@@ -207,7 +207,7 @@ fn verifier_trust_bundle_parser_rejects_unknown_fields() {
         &serde_json::to_string(&document).expect("trust bundle json serializes"),
     )
     .expect_err("trust bundle parser accepted unknown top-level trust field");
-    assert!(error.to_string().contains("ignoredTrustRoot"));
+    assert_input_field(&error, "ignoredTrustRoot");
 
     let mut nested = serde_json::to_value(trust_bundle_document_from_fixture())
         .expect("trust bundle serializes");
@@ -216,7 +216,7 @@ fn verifier_trust_bundle_parser_rejects_unknown_fields() {
         &serde_json::to_string(&nested).expect("trust bundle json serializes"),
     )
     .expect_err("trust bundle parser accepted unknown nested authority field");
-    assert!(error.to_string().contains("shadowStatus"));
+    assert_input_field(&error, "shadowStatus");
 }
 
 #[test]
@@ -281,7 +281,10 @@ fn verifier_trust_bundle_requires_signed_fresh_revocation_checkpoint() {
         &serde_json::to_string(&unsigned).expect("trust bundle json serializes"),
     )
     .unwrap_err();
-    assert!(error.to_string().contains("revocation") || error.to_string().contains("JSON"));
+    assert!(matches!(
+        error,
+        ChioPackageError::Input(chio_core_types::canonical::UntrustedJsonError::Decode(_))
+    ));
 }
 
 #[test]
@@ -647,4 +650,75 @@ fn wrong_verifier_context_nonce_fails_and_report_keeps_prior_checks() {
         .checks
         .iter()
         .any(|check| check.code == "trust.bbs_issuer"));
+}
+
+#[test]
+fn trust_readers_reject_duplicates_before_projection_and_keep_sources() {
+    let raw = r#"{"schema":"secret-sentinel","schema":"replacement"}"#;
+    for result in [
+        verification_context_from_json(raw).map(|_| ()),
+        trusted_issuer_registry_from_json(raw).map(|_| ()),
+        proof_package_from_json(raw).map(|_| ()),
+        verifier_report_from_json(raw).map(|_| ()),
+        verifier_trust_bundle_from_json(raw).map(|_| ()),
+    ] {
+        let error = result.expect_err("duplicate input must fail");
+        assert!(matches!(
+            error,
+            ChioPackageError::Input(chio_core_types::canonical::UntrustedJsonError::SignedInput(
+                _
+            ))
+        ));
+        assert!(!format!("{error} {error:?}").contains("secret-sentinel"));
+        assert!(std::error::Error::source(&error).is_some());
+    }
+}
+
+#[test]
+fn trust_context_preserves_full_width_native_time_and_applies_bound_first() {
+    let mut context = verification_context_from_fixture();
+    context.issued_at_unix_ms = u64::MAX - 1;
+    context.expires_at_unix_ms = u64::MAX;
+    let parsed =
+        verification_context_from_json(&verification_context_json(&context).unwrap()).unwrap();
+    assert_eq!(parsed.expires_at_unix_ms, u64::MAX);
+    assert_eq!(
+        verification_context_sha256(&parsed).unwrap(),
+        verification_context_sha256(&context).unwrap()
+    );
+    let raw = " ".repeat(crate::input::MAX_DOCUMENT_BYTES + 1);
+    assert!(matches!(
+        proof_package_from_json(&raw),
+        Err(ChioPackageError::Input(
+            chio_core_types::canonical::UntrustedJsonError::TooLarge { .. }
+        ))
+    ));
+}
+
+#[test]
+fn proof_package_rejects_ambiguous_nested_receipt_parameters() {
+    let raw =
+        include_str!("../../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json");
+    let ambiguous = raw.replacen(
+        "\"parameters\": {",
+        "\"parameters\": {\"shadow\":1,\"shadow\":2,",
+        1,
+    );
+    assert_ne!(ambiguous, raw);
+    assert!(matches!(
+        proof_package_from_json(&ambiguous),
+        Err(ChioPackageError::Input(
+            chio_core_types::canonical::UntrustedJsonError::SignedInput(_)
+        ))
+    ));
+}
+
+fn assert_input_field(error: &ChioPackageError, field: &str) {
+    let ChioPackageError::Input(chio_core_types::canonical::UntrustedJsonError::Decode(cause)) =
+        error
+    else {
+        panic!("expected typed JSON rejection: {error:?}");
+    };
+    assert!(cause.to_string().contains(field));
+    assert!(!format!("{error} {error:?}").contains(field));
 }

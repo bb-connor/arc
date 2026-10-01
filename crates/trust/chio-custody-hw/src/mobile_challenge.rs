@@ -46,6 +46,9 @@ const MOBILE_CHALLENGE_ID_DOMAIN: &[u8] = b"chio.mobile-attestation.challenge-id
 
 #[derive(Debug, Error)]
 pub enum MobileChallengeError {
+    /// Rejected bounded original JSON, retaining its local cause.
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     #[error("mobile attestation challenge is invalid: {0}")]
     Invalid(String),
     #[error("mobile attestation challenge `{challenge_id}` was already consumed")]
@@ -60,6 +63,7 @@ impl MobileChallengeError {
     #[must_use]
     pub fn urn(&self) -> &'static str {
         match self {
+            Self::Input(error) => error.code(),
             Self::Invalid(_) => URN_MOBILE_CHALLENGE_INVALID,
             Self::Replayed { .. } => URN_MOBILE_CHALLENGE_REPLAYED,
             Self::StoreUnavailable(_) => URN_MOBILE_CHALLENGE_STORE_UNAVAILABLE,

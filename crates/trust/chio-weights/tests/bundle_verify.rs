@@ -186,7 +186,7 @@ fn verify_rejects_malformed_card_bytes() {
         fixed_now(),
     )
     .unwrap_err();
-    assert!(matches!(err, WeightsError::Encoding(_)));
+    assert!(matches!(err, WeightsError::Input(_)));
 }
 
 #[test]

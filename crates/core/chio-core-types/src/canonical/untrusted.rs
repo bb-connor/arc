@@ -46,6 +46,12 @@ impl<'a> UntrustedJsonText<'a> {
             .map_err(UntrustedJsonError::Canonicalization)
     }
 
+    /// External I-JSON: validate original keys and numeric values before typed projection.
+    pub fn decode_external<T: DeserializeOwned>(&self) -> Result<T, UntrustedJsonError> {
+        let canonical = self.canonicalize()?;
+        serde_json::from_slice(&canonical).map_err(UntrustedJsonError::Decode)
+    }
+
     /// Lossless native signed JSON, before the owner's signature and authorization checks.
     pub fn decode_signed<T: DeserializeOwned>(&self) -> Result<T, UntrustedJsonError> {
         let value = super::signed_json::parse_signed_json(self.text)
@@ -163,5 +169,28 @@ impl fmt::Display for SharedUntrustedJsonError {
 impl core::error::Error for SharedUntrustedJsonError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         Some(self.0.as_ref())
+    }
+}
+
+#[cfg(test)]
+mod external_tests {
+    use super::*;
+    #[test]
+    fn external_numeric_contract_does_not_narrow_native_signed_input(
+    ) -> Result<(), UntrustedJsonError> {
+        let text = r#"{"counter":18446744073709551615}"#;
+        let input = UntrustedJsonText::from_wire(text.as_bytes(), 1024)?;
+        let native: serde_json::Value = input.decode_signed()?;
+        assert_eq!(native["counter"].as_u64(), Some(u64::MAX));
+        assert!(matches!(
+            input.decode_external::<serde_json::Value>(),
+            Err(UntrustedJsonError::Canonicalization(_))
+        ));
+        let input = UntrustedJsonText::new(r#"{"extension":{"x":1,"x":2}}"#);
+        assert!(matches!(
+            input.decode_external::<serde_json::Value>(),
+            Err(UntrustedJsonError::Canonicalization(_))
+        ));
+        Ok(())
     }
 }

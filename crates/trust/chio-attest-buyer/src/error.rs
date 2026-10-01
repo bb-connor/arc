@@ -2,7 +2,6 @@ use std::fmt;
 
 pub(crate) type RuntimeBuyerError = chio_runtime_core::ChioRuntimeError;
 
-#[derive(Debug)]
 pub struct BuyerAttestationError {
     code: String,
     source: Box<dyn std::error::Error + Send + Sync>,
@@ -30,7 +29,15 @@ impl fmt::Display for BuyerAttestationError {
         if let Some(context) = &self.context {
             write!(formatter, "{context}: ")?;
         }
-        fmt::Display::fmt(&self.source, formatter)
+        formatter.write_str(&self.code)
+    }
+}
+
+impl fmt::Debug for BuyerAttestationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BuyerAttestationError")
+            .field("code", &self.code)
+            .finish()
     }
 }
 

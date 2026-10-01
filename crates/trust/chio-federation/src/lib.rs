@@ -31,6 +31,8 @@ pub mod treaty;
 pub mod trust_establishment;
 pub(crate) mod validation;
 
+mod input;
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;

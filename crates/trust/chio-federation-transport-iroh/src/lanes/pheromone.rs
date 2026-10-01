@@ -103,6 +103,9 @@ pub type InboundBatchScopeCheck =
 /// into the durable outbox retry/dead-letter path via [`IrohLaneError::code`]).
 #[derive(Debug, thiserror::Error)]
 pub enum IrohLaneError {
+    /// Rejected original batch or receipt JSON.
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     /// An endpoint that the admission gate should already have rejected reached
     /// the handler and did not resolve to an admitted, non-removed `kernel_id`.
     /// Unreachable past the gate; treated as a defense-in-depth reset.
@@ -153,6 +156,7 @@ impl IrohLaneError {
             Self::FrameTooLarge(_) => "frame_too_large",
             Self::Io(_) => "io",
             Self::Codec(_) => "codec",
+            Self::Input(error) => error.code(),
             Self::CanonicalJson(_) => "canonical_json",
             Self::Transport(_) => "transport",
             Self::Relay(error) => error.code(),
@@ -458,7 +462,9 @@ impl PheromoneBatchHandler {
                 read_len_delimited(&mut recv, self.max_batch_bytes),
             )
             .await??;
-        let batch: PheromoneGossipBatch = serde_json::from_slice(&raw)?;
+        let batch: PheromoneGossipBatch =
+            chio_core_types::canonical::UntrustedJsonText::from_wire(&raw, self.max_batch_bytes)?
+                .decode_signed()?;
 
         // ENFORCE INBOUND PEER SCOPE (fail-closed): mirror the HTTP handle_batch_relay,
         // which runs enforce_peer_batch_directory_scope BEFORE receive_batch. A sender
@@ -835,42 +841,6 @@ pub struct BatchDeliveryOutcome {
     pub report_json: Vec<u8>,
 }
 
-/// The batch-level verdict enum mirrored from the runtime `PheromoneReceiveReport`,
-/// so an unknown or absent outcome string is rejected fail-closed alongside a missing
-/// field when a receive report is validated.
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum ReceiveReportOutcome {
-    Accepted,
-    Partial,
-    Rejected,
-}
-
-/// The set of fields a COMPLETE `PheromoneReceiveReport` (the runtime relay's receive
-/// verdict) carries on the wire, deserialized on the dial side to REJECT a partial or
-/// malformed report BEFORE a batch is marked durably delivered (see
-/// [`deliver_batch_over_iroh_with_limits`]). Every field is required, so serde rejects
-/// a report that omits any of them (for example a buggy or misrouted ALPN handler
-/// answering `{"accepted":true}`); it is deliberately NOT `deny_unknown_fields` so a
-/// forward-compatible report that ADDS fields still verifies. This crate mirrors the
-/// runtime report's shape rather than depending on the runtime type (the same reason
-/// the batch itself is exchanged as canonical bytes).
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-struct ReceiveReportShape {
-    schema: String,
-    accepted: bool,
-    batch_outcome: ReceiveReportOutcome,
-    accepted_frame_count: u64,
-    rejected_frame_count: u64,
-    batch_sha256: String,
-    recipient_kernel_id: String,
-    authenticated_sender_kernel_id: String,
-    received_at_unix_ms: u64,
-    frames: Vec<serde_json::Value>,
-}
-
 /// Bound one peer-dependent client await by the phase's timeout, mirroring the
 /// accept-side [`AcceptLimiter::bounded`]. On timeout this fails closed with the
 /// same [`AcceptLimitError::Timeout`] the accept side raises, so a stalled dial
@@ -968,17 +938,9 @@ pub async fn deliver_batch_over_iroh_with_limits(
     .await??;
     conn.close(LANE_OK_CODE.into(), b"ok");
 
-    // Fail-closed durable-delivery gate: a batch is only ever marked delivered (and
-    // its durable outbox row discarded by `drain_outbox_over_iroh`) once the recipient
-    // returns a COMPLETE, well-typed receive report - not merely any JSON carrying
-    // `accepted: true`. A buggy or misrouted ALPN handler answering `{"accepted":true}`
-    // deserializes here as a PARTIAL report (missing the required fields) and is
-    // REJECTED with a typed [`IrohLaneError::Codec`], so the drain retries or
-    // dead-letters the batch rather than dropping it. This mirrors the HTTP relay tick,
-    // which deserializes the full `PheromoneReceiveReport` type before trusting
-    // `accepted`. `report_json` is still surfaced verbatim for callers that hold the
-    // runtime report type.
-    let report: ReceiveReportShape = serde_json::from_slice(&report_json)?;
+    // The shared HTTP/Iroh gate checks original bytes, full report shape and
+    // exact batch identity before a positive verdict can retire durable work.
+    let report = chio_pheromone_relay::decode_delivery_report(&report_json, batch, None)?;
 
     Ok(BatchDeliveryOutcome {
         accepted: report.accepted,
@@ -1147,8 +1109,29 @@ fn record_delivery_failure(
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
+    use chio_pheromone_runtime::PheromoneReceiveReport as ReceiveReportShape;
 
     use super::*;
+    fn fixture_frame_reports(
+        batch: &PheromoneGossipBatch,
+        accepted: bool,
+    ) -> Vec<chio_pheromone_runtime::PheromoneFrameReport> {
+        batch
+            .frames
+            .iter()
+            .enumerate()
+            .map(
+                |(frame_index, _)| chio_pheromone_runtime::PheromoneFrameReport {
+                    frame_index,
+                    accepted,
+                    code: if accepted { "accepted" } else { "rejected" }.into(),
+                    detail: "fixture".into(),
+                    deposit_nonce: None,
+                },
+            )
+            .collect()
+    }
+
     use crate::identity::transport_endorsement_preimage;
     use crate::identity::TransportDirectoryBundleBody;
     use crate::identity::TransportDirectoryBundleDocument;
@@ -1773,16 +1756,18 @@ mod tests {
             // report (for example only `accepted`) is rejected on the dial side before
             // a batch is marked delivered, so the double must carry every field.
             let report = serde_json::json!({
-                "schema": "chio.pheromone-receive-report.v1",
+                "schema": chio_pheromone_runtime::PHEROMONE_RECEIVE_REPORT_SCHEMA,
                 "accepted": true,
                 "batchOutcome": "accepted",
                 "acceptedFrameCount": batch.frames.len() as u64,
                 "rejectedFrameCount": 0,
-                "batchSha256": "0".repeat(64),
+                "batchSha256": chio_core_types::crypto::sha256_hex(&canonical_json_bytes(&batch).unwrap()),
                 "recipientKernelId": batch.recipient_kernel_id,
                 "authenticatedSenderKernelId": sender,
                 "receivedAtUnixMs": 0u64,
-                "frames": [],
+                "frames": batch.frames.iter().enumerate().map(|(index, _)| serde_json::json!({
+                    "frameIndex": index, "accepted": true, "code": "accepted", "detail": "fixture"
+                })).collect::<Vec<_>>(),
             });
             let bytes = serde_json::to_vec(&report).map_err(AcceptError::from_err)?;
             write_len_delimited(&mut send, &bytes)
@@ -1852,7 +1837,7 @@ mod tests {
             _received_at_unix_ms: u64,
         ) -> Result<chio_pheromone_runtime::PheromoneReceiveReport, PheromoneRelayError> {
             self.received.store(true, Ordering::SeqCst);
-            Err(PheromoneRelayError::Json(
+            Err(PheromoneRelayError::TransportError(
                 "receiver must not run after a deny-all swap".to_string(),
             ))
         }
@@ -1985,7 +1970,7 @@ mod tests {
         // by the receiver double. Its batch_sha256 matches the handler's lookup key
         // (canonical_sha256 of the batch), though the double returns it regardless.
         let canned = chio_pheromone_runtime::PheromoneReceiveReport {
-            schema: "chio.pheromone-receive-report.v1".to_string(),
+            schema: chio_pheromone_runtime::PHEROMONE_RECEIVE_REPORT_SCHEMA.to_string(),
             accepted: true,
             batch_outcome: chio_pheromone_runtime::PheromoneBatchOutcome::Accepted,
             accepted_frame_count: batch.frames.len() as u64,
@@ -1994,7 +1979,7 @@ mod tests {
             recipient_kernel_id: RECIPIENT.to_string(),
             authenticated_sender_kernel_id: sender.to_string(),
             received_at_unix_ms: NOW,
-            frames: Vec::new(),
+            frames: fixture_frame_reports(&batch, true),
         };
 
         let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(RecoveringReceiver { report: canned });
@@ -2104,7 +2089,7 @@ mod tests {
         // the receiver double. Its batch_sha256 matches the handler's lookup key
         // (canonical sha256 of the batch), though the double returns it regardless.
         let canned = chio_pheromone_runtime::PheromoneReceiveReport {
-            schema: "chio.pheromone-receive-report.v1".to_string(),
+            schema: chio_pheromone_runtime::PHEROMONE_RECEIVE_REPORT_SCHEMA.to_string(),
             accepted: true,
             batch_outcome: chio_pheromone_runtime::PheromoneBatchOutcome::Accepted,
             accepted_frame_count: batch.frames.len() as u64,
@@ -2113,7 +2098,7 @@ mod tests {
             recipient_kernel_id: RECIPIENT.to_string(),
             authenticated_sender_kernel_id: sender.to_string(),
             received_at_unix_ms: NOW,
-            frames: Vec::new(),
+            frames: fixture_frame_reports(&batch, true),
         };
 
         // The SHARED double: receive_batch PANICS (teeth), recorded_report_for_batch
@@ -2224,7 +2209,7 @@ mod tests {
     ) -> chio_pheromone_runtime::PheromoneReceiveReport {
         let frame_count = batch.frames.len() as u64;
         chio_pheromone_runtime::PheromoneReceiveReport {
-            schema: "chio.pheromone-receive-report.v1".to_string(),
+            schema: chio_pheromone_runtime::PHEROMONE_RECEIVE_REPORT_SCHEMA.to_string(),
             accepted,
             batch_outcome: if accepted {
                 chio_pheromone_runtime::PheromoneBatchOutcome::Accepted
@@ -2237,7 +2222,7 @@ mod tests {
             recipient_kernel_id: RECIPIENT.to_string(),
             authenticated_sender_kernel_id: sender.to_string(),
             received_at_unix_ms: NOW,
-            frames: Vec::new(),
+            frames: fixture_frame_reports(batch, accepted),
         }
     }
 
@@ -2441,7 +2426,7 @@ mod tests {
         let batch = direct_batch("did:chio:bob");
         let batch_bytes = canonical_json_bytes(&batch).unwrap();
         let report = chio_pheromone_runtime::PheromoneReceiveReport {
-            schema: "chio.pheromone-receive-report.v1".to_string(),
+            schema: chio_pheromone_runtime::PHEROMONE_RECEIVE_REPORT_SCHEMA.to_string(),
             accepted: true,
             batch_outcome: chio_pheromone_runtime::PheromoneBatchOutcome::Accepted,
             accepted_frame_count: batch.frames.len() as u64,
@@ -2450,7 +2435,7 @@ mod tests {
             recipient_kernel_id: RECIPIENT.to_string(),
             authenticated_sender_kernel_id: "did:chio:bob".to_string(),
             received_at_unix_ms: NOW,
-            frames: Vec::new(),
+            frames: fixture_frame_reports(&batch, true),
         };
 
         let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
@@ -2556,16 +2541,18 @@ mod tests {
             // delivered (see [`ReceiveReportShape`]).
             let frame_count = batch.frames.len() as u64;
             let report = serde_json::json!({
-                "schema": "chio.pheromone-receive-report.v1",
+                "schema": chio_pheromone_runtime::PHEROMONE_RECEIVE_REPORT_SCHEMA,
                 "accepted": accepted,
                 "batchOutcome": if accepted { "accepted" } else { "rejected" },
                 "acceptedFrameCount": if accepted { frame_count } else { 0 },
                 "rejectedFrameCount": if accepted { 0 } else { frame_count },
-                "batchSha256": "0".repeat(64),
+                "batchSha256": chio_core_types::crypto::sha256_hex(&canonical_json_bytes(&batch).unwrap()),
                 "recipientKernelId": batch.recipient_kernel_id,
                 "authenticatedSenderKernelId": sender,
                 "receivedAtUnixMs": self.now_unix_ms,
-                "frames": [],
+                "frames": batch.frames.iter().enumerate().map(|(index, _)| serde_json::json!({
+                    "frameIndex": index, "accepted": accepted, "code": "accepted", "detail": "fixture"
+                })).collect::<Vec<_>>(),
             });
             let bytes = serde_json::to_vec(&report).map_err(AcceptError::from_err)?;
             write_len_delimited(&mut send, &bytes)

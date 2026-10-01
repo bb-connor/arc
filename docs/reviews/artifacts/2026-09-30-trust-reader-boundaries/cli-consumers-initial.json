@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "check",
+    "--locked",
+    "--offline",
+    "-p",
+    "chio-cli",
+    "--tests",
+    "--features",
+    "iroh"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 284.36
+}

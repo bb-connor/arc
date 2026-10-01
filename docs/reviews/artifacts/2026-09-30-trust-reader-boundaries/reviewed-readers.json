@@ -1,0 +1,142 @@
+{
+  "crates/trust/chio-attest-buyer-core/src/context.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Buyer proof, context, issuer and report imports are bounded to 16 MiB, duplicate-aware and lossless for native signed Chio integers. Existing typed shape, semantic validation and proof/trust replay gates remain owners of authority. Parser causes are retained behind redacted input errors."
+  },
+  "crates/trust/chio-attest-buyer-core/src/issuer.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Buyer proof, context, issuer and report imports are bounded to 16 MiB, duplicate-aware and lossless for native signed Chio integers. Existing typed shape, semantic validation and proof/trust replay gates remain owners of authority. Parser causes are retained behind redacted input errors."
+  },
+  "crates/trust/chio-attest-buyer-core/src/proof_package.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Buyer proof, context, issuer and report imports are bounded to 16 MiB, duplicate-aware and lossless for native signed Chio integers. Existing typed shape, semantic validation and proof/trust replay gates remain owners of authority. Parser causes are retained behind redacted input errors."
+  },
+  "crates/trust/chio-attest-buyer-core/src/report.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Buyer proof, context, issuer and report imports are bounded to 16 MiB, duplicate-aware and lossless for native signed Chio integers. Existing typed shape, semantic validation and proof/trust replay gates remain owners of authority. Parser causes are retained behind redacted input errors."
+  },
+  "crates/trust/chio-attest-buyer-core/src/trust_bundle.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Buyer proof, context, issuer and report imports are bounded to 16 MiB, duplicate-aware and lossless for native signed Chio integers. Existing typed shape, semantic validation and proof/trust replay gates remain owners of authority. Parser causes are retained behind redacted input errors."
+  },
+  "crates/trust/chio-attest-buyer/src/api.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Buyer and runtime-manifest imports validate bounded original native JSON before shape projection and retain package/runtime validation. Buyer errors expose stable codes/context, with native parser causes available only through source. Decoding is not proof replay."
+  },
+  "crates/trust/chio-attest-buyer/src/runtime_manifest.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Buyer and runtime-manifest imports validate bounded original native JSON before shape projection and retain package/runtime validation. Buyer errors expose stable codes/context, with native parser causes available only through source. Decoding is not proof replay."
+  },
+  "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Root metadata and trusted-root targets are bounded to 4 MiB before file/stream retention; both original JSON documents pass strict I-JSON before version/root projection. Tough signature/expiry verification remains the trust gate, including verified target streaming. Upstream Tough internal fetch custody is not replaced."
+  },
+  "crates/trust/chio-attest-verify/src/sigstore/core.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Sigstore bundle JSON has a 16 MiB cap and original strict I-JSON gate before upstream Bundle projection. Artifact/signature bytes remain unchanged; existing Fulcio identity, issuer, validity and Rekor verification still determine acceptance."
+  },
+  "crates/trust/chio-credentials/src/artifact.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Reviewed existing ReputationCredential custom Deserialize: deny-unknown-fields wire reconstruction creates an unverified credential, not proof of authority. Native JSON/JWT ingress is already bounded and duplicate-aware in financial.rs and jwt_decode.rs; verify_reputation_credential validates issuer proof separately. No redundant decoder introduced."
+  },
+  "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Compact token and JWKS size limits precede decoding/cloning. Original header/payload and JWKS JSON pass strict I-JSON before JWT/JWK field projection; duplicate key IDs reject. JWT causes remain native behind redacted diagnostics. Pinned production root readiness, ES256/P-256, issuer/audience, expiry, nonce and device/app gates remain. Production still rejects the committed fixture root."
+  },
+  "crates/trust/chio-custody-hw/src/attestation/receipt_chain.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Renamed shape-only API to parse_mobile_receipt_envelopes / ParsedMobileReceiptEnvelopes with no verifier alias. Bounded 1 MiB native receipt/evidence input rejects duplicates before discarded envelope fields. Shape success grants no device, issuer or capability authority; mobile FFI explicitly reports inspection only."
+  },
+  "crates/trust/chio-custody-hw/src/capability.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "PasskeyCapability canonical import requires bounded 64 KiB original-byte equality with canonical typed native encoding. Unknown fields and alternate spellings cannot silently normalize. Signature/audience/expiry/revocation enforcement stays in issuer/verifier."
+  },
+  "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "SQLite challenge cells are borrowed without an unbounded String copy; a 16 KiB native canonical decode and existing challenge validation precede replay/counter consumption. Native parser causes survive outside SQLite conversion. Transactional snapshot equality and one-time consumption remain."
+  },
+  "crates/trust/chio-custody-hw/src/verifier.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "WebAuthn clientDataJSON has a 64 KiB original strict I-JSON gate before extracting its replay challenge. Original assertion bytes remain untouched for WebAuthn verification and nonce recording remains after authentication. Test fixture deserialization is internal."
+  },
+  "crates/trust/chio-federation-authority/src/frost_ceremony/packages.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Reviewed existing round-one custom Deserialize: exact DKG schema/round/broadcast checks, denied unknown fields, nonempty bounded hex package and native FROST package validation. It creates transport material; ceremony signature, roster and epoch verification remain mandatory before authority. No compatibility decoder added."
+  },
+  "crates/trust/chio-federation-transport-iroh/src/lanes/pheromone.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Iroh requests use bounded original native JSON before scope/admission/inbox mutation. Positive delivery uses the shared complete runtime report parser and exact sent batch digest/recipient/frame binding before outbox retirement; permissive mirrored report type removed. Length/deadline bounds and authenticated peer re-resolution remain."
+  },
+  "crates/trust/chio-federation/src/treaty.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Ladder, treaty-scope and intersection imports are bounded to 1 MiB and validate duplicate-aware native JSON before projection, with typed redacted input errors. Existing treaty/authority validation is separate from decoding."
+  },
+  "crates/trust/chio-finding-challenge/src/ingress.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Existing strict external I-JSON ingress retains family byte cap, exact original canonical spelling and typed canonical equality. Parser/canonical causes now survive in redacted source-bearing variants; typed drift remains a semantic rejection. No native signed integer domain was substituted."
+  },
+  "crates/trust/chio-finding-verifier/src/verify.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Finding/recipe ingress retains existing bounded strict I-JSON and exact canonical/typed equality; signed delivery overlay projection follows strict receipt verification and byte binding. Terminal raw/typed/canonical errors now retain native local causes with safe formatting. Facet reports remain explicit failed/unavailable evidence, not error-based authority."
+  },
+  "crates/trust/chio-pheromone-relay/src/archive/package.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native relay directories, profiles, evidence and nested archive/export JSON reject duplicate original fields under a 16 MiB bound before projection. Existing schema, signed directory, archive digest/signature and delivery policy checks remain. Store cells are borrowed/bounded before decode; positive transport acknowledgements bind complete sent batch identity."
+  },
+  "crates/trust/chio-pheromone-relay/src/archive/report/generators.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native relay directories, profiles, evidence and nested archive/export JSON reject duplicate original fields under a 16 MiB bound before projection. Existing schema, signed directory, archive digest/signature and delivery policy checks remain. Store cells are borrowed/bounded before decode; positive transport acknowledgements bind complete sent batch identity."
+  },
+  "crates/trust/chio-pheromone-relay/src/assurance/export.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native relay directories, profiles, evidence and nested archive/export JSON reject duplicate original fields under a 16 MiB bound before projection. Existing schema, signed directory, archive digest/signature and delivery policy checks remain. Store cells are borrowed/bounded before decode; positive transport acknowledgements bind complete sent batch identity."
+  },
+  "crates/trust/chio-pheromone-relay/src/delivery/evaluators.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native relay directories, profiles, evidence and nested archive/export JSON reject duplicate original fields under a 16 MiB bound before projection. Existing schema, signed directory, archive digest/signature and delivery policy checks remain. Store cells are borrowed/bounded before decode; positive transport acknowledgements bind complete sent batch identity."
+  },
+  "crates/trust/chio-pheromone-relay/src/directory.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native relay directories, profiles, evidence and nested archive/export JSON reject duplicate original fields under a 16 MiB bound before projection. Existing schema, signed directory, archive digest/signature and delivery policy checks remain. Store cells are borrowed/bounded before decode; positive transport acknowledgements bind complete sent batch identity."
+  },
+  "crates/trust/chio-pheromone-relay/src/service.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native relay directories, profiles, evidence and nested archive/export JSON reject duplicate original fields under a 16 MiB bound before projection. Existing schema, signed directory, archive digest/signature and delivery policy checks remain. Store cells are borrowed/bounded before decode; positive transport acknowledgements bind complete sent batch identity."
+  },
+  "crates/trust/chio-pheromone-relay/src/store.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native relay directories, profiles, evidence and nested archive/export JSON reject duplicate original fields under a 16 MiB bound before projection. Existing schema, signed directory, archive digest/signature and delivery policy checks remain. Store cells are borrowed/bounded before decode; positive transport acknowledgements bind complete sent batch identity."
+  },
+  "crates/trust/chio-pheromone-runtime/src/lib.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers."
+  },
+  "crates/trust/chio-pheromone-runtime/src/store.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Native passport/deposit/receive-report SQLite cells are borrowed and bounded before decoding. Parse failures retain sources rather than becoming last-key-wins report recovery. Persisted writers enforce matching size bounds; existing replay, deposit and report selection semantics remain."
+  },
+  "crates/trust/chio-replay-corpus/src/fixture_writer.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Redacted invocation bytes are bounded to the 16 MiB frame limit and reparse with duplicate-aware native integer preservation. Invalid redactor output retains a safe typed cause and aborts before fixture publication. Redaction and fixture manifest/receipt generation remain separate from authority."
+  },
+  "crates/trust/chio-reputation/src/model.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Persisted capability lineage scope JSON is bounded to 1 MiB and duplicate-aware with native integer preservation before typed scope projection. Native errors remain sources behind redacted formatting; record construction does not verify a capability."
+  },
+  "crates/trust/chio-signing-remote/src/lib.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Remote signer response custody retains 64 KiB actual-read cap and validates original external I-JSON before projection. Parser causes use the core redacted source wrapper. Exact-message local signature verification, pinned public key and key version/binding checks remain mandatory."
+  },
+  "crates/trust/chio-tee-frame/src/frame.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Frame input is bounded to 16 MiB and duplicate-aware native JSON before shape validation; invocation integers remain exact. Parsing creates an unverified Frame. Tenant signature verification is an explicit separate API, never granted by decode."
+  },
+  "crates/trust/chio-tee/src/runner.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Observation NDJSON is read under a 16 MiB per-line take bound including newline before whitespace or JSON processing. Native duplicate-aware parsing precedes capture/persistence. Re-redacted invocation bytes use the same native gate; mandatory redaction and signing remain. Capture records observed kernel decisions, not independent authorization."
+  },
+  "crates/trust/chio-weights/src/card.rs": {
+    "kind": "parser-internal-or-typed",
+    "contract": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding."
+  }
+}

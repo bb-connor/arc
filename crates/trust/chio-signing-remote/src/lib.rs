@@ -513,7 +513,9 @@ fn read_json<T: DeserializeOwned>(
     if bytes.len() as u64 > MAX_RESPONSE_BYTES {
         return Err(signing_error("remote signer response is too large"));
     }
-    serde_json::from_slice(&bytes).map_err(|_| signing_error("remote signer response is invalid"))
+    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_RESPONSE_BYTES as usize)
+        .and_then(|input| input.decode_external())
+        .map_err(|error| Error::UntrustedInput(error.into()))
 }
 
 fn signing_error(message: &str) -> Error {
@@ -788,5 +790,20 @@ mod tests {
             stream.write_all(response.as_bytes()).test_unwrap();
         });
         (format!("http://{address}"), request_rx, server)
+    }
+
+    #[test]
+    fn remote_response_rejects_duplicate_and_lossy_original_fields() {
+        for body in [
+            r#"{"signature":"secret-sentinel","signature":"other"}"#,
+            r#"{"extension":9007199254740993}"#,
+        ] {
+            let response = ureq::Response::new(200, "OK", body).test_unwrap();
+            let error = read_json::<serde_json::Value>(Ok(response))
+                .test_expect_err("response must reject");
+            assert!(matches!(error, Error::UntrustedInput(_)));
+            assert!(!format!("{error} {error:?}").contains("secret-sentinel"));
+            assert!(std::error::Error::source(&error).is_some());
+        }
     }
 }

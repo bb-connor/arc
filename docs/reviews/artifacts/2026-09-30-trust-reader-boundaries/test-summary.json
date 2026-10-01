@@ -1,0 +1,10 @@
+{
+  "test_result_blocks": 145,
+  "passed": 1964,
+  "failed": 0,
+  "ignored": 3,
+  "measured": 0,
+  "filtered": 0,
+  "test_binaries": 125,
+  "doc_test_blocks": 20
+}

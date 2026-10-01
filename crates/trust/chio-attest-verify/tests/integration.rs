@@ -29,19 +29,7 @@ fn verify_bundle_rejects_malformed_json() {
     let expected = github_release_identity();
 
     let result = verifier.verify_bundle(b"hello world", b"this is not json", &expected);
-    match result {
-        Err(AttestError::Malformed(msg)) => {
-            assert!(
-                msg.to_ascii_lowercase().contains("bundle"),
-                "expected bundle parse error, got: {msg}"
-            );
-        }
-        // Test-only panic: surfaces a test failure with diagnostic
-        // context. The trust-boundary `panic!()` ban applies under
-        // `src/` only; this file lives under `tests/` and is compiled
-        // solely by `cargo test`.
-        other => panic!("expected Malformed bundle error, got {other:?}"),
-    }
+    assert!(matches!(result, Err(AttestError::Input(_))));
 }
 
 #[test]
@@ -56,7 +44,8 @@ fn verify_bundle_rejects_empty_bundle_object() {
     assert!(
         matches!(
             result,
-            Err(AttestError::Malformed(_))
+            Err(AttestError::Input(_))
+                | Err(AttestError::Malformed(_))
                 | Err(AttestError::TrustRoot)
                 | Err(AttestError::SignatureMismatch)
                 | Err(AttestError::IssuerMismatch)
@@ -80,7 +69,10 @@ fn verify_bytes_rejects_random_garbage() {
         &expected,
     );
     assert!(
-        matches!(result, Err(AttestError::Malformed(_))),
+        matches!(
+            result,
+            Err(AttestError::Input(_)) | Err(AttestError::Malformed(_))
+        ),
         "garbage cert must surface a Malformed error; got {result:?}"
     );
 }
@@ -138,7 +130,8 @@ mnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789=\n\
     assert!(
         matches!(
             result,
-            Err(AttestError::Malformed(_))
+            Err(AttestError::Input(_))
+                | Err(AttestError::Malformed(_))
                 | Err(AttestError::TrustRoot)
                 | Err(AttestError::CertificateExpired)
         ),
@@ -163,4 +156,19 @@ fn verify_blob_returns_io_error_for_missing_artifact() {
         matches!(result, Err(AttestError::Io(_))),
         "missing artifact path must surface as Io error; got {result:?}"
     );
+}
+
+#[test]
+fn bundle_rejects_duplicates_and_bounds_before_trust_evaluation() {
+    let verifier = SigstoreVerifier::with_embedded_root().expect("embedded root");
+    for bytes in [
+        br#"{"extension":{"x":"secret-sentinel","x":2}}"#.to_vec(),
+        vec![b' '; 16 * 1024 * 1024 + 1],
+    ] {
+        let error = verifier
+            .verify_bundle(b"artifact", &bytes, &github_release_identity())
+            .unwrap_err();
+        assert!(matches!(error, AttestError::Input(_)));
+        assert!(!format!("{error} {error:?}").contains("secret-sentinel"));
+    }
 }

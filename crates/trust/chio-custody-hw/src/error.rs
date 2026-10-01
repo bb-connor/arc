@@ -39,6 +39,9 @@ pub const URN_INTERNAL_ENCODING: &str = "urn:chio:error:custody:internal-encodin
 /// All custody-side failure modes. Fail-closed: every variant denies access.
 #[derive(Debug, Error)]
 pub enum CustodyError {
+    /// Rejected bounded original JSON, retaining its local cause.
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     /// The WebAuthn assertion did not verify against the registered
     /// credential. Includes structural failures (malformed CBOR, missing
     /// fields) and signature failures.
@@ -112,6 +115,7 @@ impl CustodyError {
     #[must_use]
     pub fn urn(&self) -> &'static str {
         match self {
+            Self::Input(error) => error.code(),
             Self::AssertionRejected(_) => URN_ASSERTION_REJECTED,
             Self::AudienceMismatch { .. } => URN_AUDIENCE_MISMATCH,
             Self::ReplayDetected { .. } => URN_REPLAY_DETECTED,

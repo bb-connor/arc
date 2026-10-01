@@ -83,7 +83,7 @@ pub fn trusted_issuer_registry_from_json(
     json: &str,
 ) -> Result<TrustedIssuerRegistry, ChioPackageError> {
     let document: TrustedIssuerRegistryDocument =
-        serde_json::from_str(json).map_err(|error| ChioPackageError::Json(error.to_string()))?;
+        crate::input::decode(json.as_bytes()).map_err(ChioPackageError::from)?;
     TrustedIssuerRegistry::from_document(document)
 }
 

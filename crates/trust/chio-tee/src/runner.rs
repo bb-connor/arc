@@ -69,6 +69,12 @@ const DEFAULT_API_VERSION: &str = "unknown";
 /// Errors the runner surfaces to the host through the [`TrafficTap`] hooks.
 #[derive(Debug, thiserror::Error)]
 pub enum RunnerError {
+    /// Read failure while consuming observation input.
+    #[error("observation input read failed")]
+    InputIo(#[source] std::io::Error),
+    /// Rejected bounded original JSON, retaining its local cause.
+    #[error(transparent)]
+    Input(#[from] chio_core::canonical::UntrustedJsonError),
     /// A payload could not be serialized to canonical JSON before redaction.
     #[error("canonical serialization failed: {0}")]
     Canonical(String),
@@ -258,15 +264,9 @@ impl ShadowRunner {
     /// Fail-closed: a malformed line, a tap error (redactor failure, persist
     /// failure), or an enforce-mode block aborts the run and returns `Err`.
     /// Frames already appended before the error remain on disk for audit.
-    pub fn run<R: BufRead>(&self, reader: R) -> Result<RunSummary, RunnerError> {
+    pub fn run<R: BufRead>(&self, mut reader: R) -> Result<RunSummary, RunnerError> {
         let mut summary = RunSummary::default();
-        for line in reader.lines() {
-            let line = line.map_err(|error| RunnerError::Canonical(error.to_string()))?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            let observation: Observation = serde_json::from_str(&line)
-                .map_err(|error| RunnerError::Canonical(error.to_string()))?;
+        while let Some(observation) = crate::observation_input::next(&mut reader)? {
             summary.observed += 1;
             self.observe(&observation.request, &observation.receipt)?;
             summary.captured += 1;
@@ -330,8 +330,11 @@ impl ShadowRunner {
         // re-parses as a JSON value for the inline `invocation` field. If it
         // somehow does not, fail closed rather than emit a plaintext fallback.
         let redacted_invocation: serde_json::Value =
-            serde_json::from_slice(&redacted_invocation_bytes)
-                .map_err(|error| RunnerError::Canonical(error.to_string()))?;
+            chio_core::canonical::UntrustedJsonText::from_wire(
+                &redacted_invocation_bytes,
+                crate::observation_input::MAX_OBSERVATION_BYTES,
+            )?
+            .decode_signed()?;
 
         // 3. Persist redacted blobs encrypted, then hash the redacted bytes.
         self.spool
@@ -764,5 +767,31 @@ mod tests {
         assert_eq!(sanitize_identifier("123abc"), "abc");
         assert_eq!(normalize_operation(""), "tool.call");
         assert_eq!(normalize_deny_reason("!!!"), "guard:tee.denied");
+    }
+
+    #[test]
+    fn rejected_observation_never_reaches_capture() {
+        let dir = tempfile::tempdir().test_unwrap();
+        let runner = ShadowRunner::with_in_memory_store(
+            config(),
+            Mode::VerdictOnly,
+            keypair(),
+            dir.path(),
+            "rejected",
+        )
+        .test_unwrap();
+        for raw in [
+            b"{\"request\":{},\"request\":{}}".to_vec(),
+            vec![b' '; crate::observation_input::MAX_OBSERVATION_BYTES + 1],
+        ] {
+            assert!(matches!(
+                runner.run(std::io::Cursor::new(raw)),
+                Err(RunnerError::Input(_))
+            ));
+            assert_eq!(
+                std::fs::metadata(runner.capture_path()).test_unwrap().len(),
+                0
+            );
+        }
     }
 }

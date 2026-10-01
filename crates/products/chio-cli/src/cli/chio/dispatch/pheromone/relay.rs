@@ -40,14 +40,12 @@ impl chio_pheromone_relay::RelayBatchReceiver for CliRelayBatchReceiver {
         config.authenticated_sender_kernel_id = authenticated_sender_kernel_id;
         config.validation_context.now_unix_ms = received_at_unix_ms;
         let store = chio_pheromone_runtime::store::SqlitePheromoneRuntimeStore::open(&self.store)
-            .map_err(|error| {
-            chio_pheromone_relay::PheromoneRelayError::Json(error.to_string())
-        })?;
+            .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Runtime(error))?;
         let receiver =
             chio_pheromone_runtime::PheromoneReceiver::new(store, self.resolver.clone(), config);
         receiver
             .receive_batch(&batch, &self.transit_policy)
-            .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Json(error.to_string()))
+            .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Runtime(error))
     }
 
     async fn recorded_report_for_batch(
@@ -62,15 +60,13 @@ impl chio_pheromone_relay::RelayBatchReceiver for CliRelayBatchReceiver {
         // durably-committed verdict for this (batch, sender) pair without re-running
         // receive_batch. The sender scope is applied at the query
         // level so a cross-sender verdict for the same bytes is never returned. Store
-        // errors map to the Json variant, the same internal-error shape receive_batch
+        // errors retain the runtime cause, the same internal-error shape receive_batch
         // uses for a store-open failure above.
         let store = chio_pheromone_runtime::store::SqlitePheromoneRuntimeStore::open(&self.store)
-            .map_err(|error| {
-            chio_pheromone_relay::PheromoneRelayError::Json(error.to_string())
-        })?;
+            .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Runtime(error))?;
         store
             .lookup_receive_report_by_batch(batch_sha256, authenticated_sender_kernel_id)
-            .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Json(error.to_string()))
+            .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Runtime(error))
     }
 }
 

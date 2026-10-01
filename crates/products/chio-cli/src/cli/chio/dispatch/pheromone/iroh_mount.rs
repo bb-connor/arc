@@ -1395,7 +1395,7 @@ mod tests {
             _authenticated_sender_kernel_id: String,
             _received_at_unix_ms: u64,
         ) -> Result<PheromoneReceiveReport, PheromoneRelayError> {
-            Err(PheromoneRelayError::Json(
+            Err(PheromoneRelayError::TransportError(
                 "test receiver never accepts".to_string(),
             ))
         }
@@ -1418,7 +1418,7 @@ mod tests {
             _received_at_unix_ms: u64,
         ) -> Result<PheromoneReceiveReport, PheromoneRelayError> {
             self.called.store(true, Ordering::SeqCst);
-            Err(PheromoneRelayError::Json(
+            Err(PheromoneRelayError::TransportError(
                 "receiver must not be reached for an out-of-scope sender".to_string(),
             ))
         }

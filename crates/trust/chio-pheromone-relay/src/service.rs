@@ -85,7 +85,7 @@ pub struct RelayDrillReport {
 pub fn relay_supervisor_profile_from_json(
     json: &str,
 ) -> Result<RelaySupervisorProfileDocument, PheromoneRelayError> {
-    let profile: RelaySupervisorProfileDocument = serde_json::from_str(json)?;
+    let profile: RelaySupervisorProfileDocument = crate::input::decode(json.as_bytes())?;
     if profile.schema != PHEROMONE_RELAY_SUPERVISOR_PROFILE_SCHEMA {
         return Err(PheromoneRelayError::UnsupportedSchema(profile.schema));
     }
@@ -450,8 +450,10 @@ async fn handle_metrics(
 
 async fn handle_batch_relay(
     State(service): State<Arc<PheromoneRelayService>>,
-    Json(request): Json<PheromoneRelayHttpRequest>,
+    body: axum::body::Bytes,
 ) -> Result<Json<PheromoneReceiveReport>, (StatusCode, Json<RelayOperatorReport>)> {
+    let request: PheromoneRelayHttpRequest =
+        crate::input::decode(&body).map_err(|error| relay_http_error(&service, error.into()))?;
     let now = service.request_now_unix_ms();
     let context = RelayHttpVerificationContext {
         local_kernel_id: service.config.local_kernel_id.clone(),
@@ -530,8 +532,10 @@ pub fn enforce_peer_batch_directory_scope(
 
 async fn handle_catchup_relay(
     State(service): State<Arc<PheromoneRelayService>>,
-    Json(request): Json<PheromoneRelayHttpRequest>,
+    body: axum::body::Bytes,
 ) -> Result<Json<CatchupResponse>, (StatusCode, Json<RelayOperatorReport>)> {
+    let request: PheromoneRelayHttpRequest =
+        crate::input::decode(&body).map_err(|error| relay_http_error(&service, error.into()))?;
     let now = service.request_now_unix_ms();
     let context = RelayHttpVerificationContext {
         local_kernel_id: service.config.local_kernel_id.clone(),

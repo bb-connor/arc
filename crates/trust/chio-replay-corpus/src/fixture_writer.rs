@@ -98,8 +98,11 @@ pub enum WriterError {
     #[error("default redactor failed: {0}")]
     Redact(#[from] chio_tee::RedactError),
     /// Re-redacted invocation bytes were no longer valid JSON.
-    #[error("redacted invocation for frame {event_id} is not JSON: {detail}")]
-    RedactedInvocationJson { event_id: String, detail: String },
+    #[error("redacted invocation is invalid: {source}")]
+    RedactedInvocationJson {
+        #[source]
+        source: chio_core::canonical::UntrustedJsonError,
+    },
     /// Filesystem error while staging or committing fixture files.
     #[error("I/O error at {path}: {source}")]
     Io {
@@ -287,12 +290,12 @@ struct StrippedReceipt {
 fn stripped_receipt(frame: &Frame) -> Result<StrippedReceipt, WriterError> {
     let invocation_bytes = canonical_json_bytes(&frame.invocation)?;
     let redacted = reredact_default(&invocation_bytes)?;
-    let invocation: Value = serde_json::from_slice(&redacted.bytes).map_err(|error| {
-        WriterError::RedactedInvocationJson {
-            event_id: frame.event_id.clone(),
-            detail: error.to_string(),
-        }
-    })?;
+    let invocation: Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        &redacted.bytes,
+        chio_tee_frame::frame::MAX_FRAME_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|source| WriterError::RedactedInvocationJson { source })?;
     let receipt = json!({
         "invocation": invocation,
         "verdict": verdict_label(frame.verdict),

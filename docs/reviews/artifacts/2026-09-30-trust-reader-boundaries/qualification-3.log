@@ -1,0 +1,186 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling iroh v1.0.1
+   Compiling inplace-vec-builder v0.1.1
+   Compiling irpc v0.17.0
+   Compiling uniffi_bindgen v0.32.0
+   Compiling range-collections v0.4.6
+   Compiling uniffi_macros v0.32.0
+   Compiling chio-federation-authority v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-authority)
+   Compiling chio-pheromone-runtime v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone-runtime)
+   Compiling uniffi_pipeline v0.32.0
+   Compiling chio-pheromone-relay v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone-relay)
+   Compiling iroh-io v0.6.2
+   Compiling cargo-platform v0.3.3
+   Compiling bao-tree v0.16.0
+   Compiling cargo_metadata v0.23.1
+   Compiling futures-concurrency v7.7.1
+   Compiling uniffi_meta v0.32.0
+   Compiling uniffi_core v0.32.0
+   Compiling iroh-tickets v1.0.0
+   Compiling nested_enum_utils v0.2.3
+   Compiling camino v1.2.2
+   Compiling reflink-copy v0.1.30
+   Compiling uniffi_udl v0.32.0
+   Compiling goblin v0.8.2
+   Compiling chio-provider-adapter-core v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-provider-adapter-core)
+   Compiling chio-runtime-proof-parity v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-proof-parity)
+   Compiling loom v0.7.2
+   Compiling chio-provider-conformance v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-provider-conformance)
+   Compiling chio-credentials v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-credentials)
+   Compiling iroh-util v0.6.0
+   Compiling iroh-gossip v0.101.0
+   Compiling iroh-blobs v0.103.0
+   Compiling chio-signing-remote v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-signing-remote)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling chio-federation-transport-iroh v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-transport-iroh)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+   Compiling chio-runtime-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-runtime-core)
+error[E0631]: type mismatch in function arguments
+    --> crates/trust/chio-finding-verifier/src/verify.rs:1870:18
+     |
+1870 |         .map_err(FindingVerifierError::canonicalization)?
+     |          ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |          |
+     |          required by a bound introduced by this call
+     |
+    ::: crates/trust/chio-finding-verifier/src/error.rs:42:5
+     |
+  42 |     pub(crate) fn canonicalization(error: chio_core_types::Error) -> Self {
+     |     --------------------------------------------------------------------- found signature defined here
+     |
+     = note: expected function signature `fn(FindingError) -> _`
+                found function signature `fn(chio_core_types::Error) -> _`
+note: required by a bound in `Result::<T, E>::map_err`
+    --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:962:4
+help: consider wrapping the function in a closure
+     |
+1870 |         .map_err(|arg0: FindingError| FindingVerifierError::canonicalization(/* chio_core_types::Error */))?
+     |                  ++++++++++++++++++++                                       ++++++++++++++++++++++++++++++
+
+error[E0631]: type mismatch in function arguments
+    --> crates/trust/chio-finding-verifier/src/verify.rs:1918:18
+     |
+1918 |         .map_err(FindingVerifierError::canonicalization)?;
+     |          ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |          |
+     |          required by a bound introduced by this call
+     |
+    ::: crates/trust/chio-finding-verifier/src/error.rs:42:5
+     |
+  42 |     pub(crate) fn canonicalization(error: chio_core_types::Error) -> Self {
+     |     --------------------------------------------------------------------- found signature defined here
+     |
+     = note: expected function signature `fn(FindingError) -> _`
+                found function signature `fn(chio_core_types::Error) -> _`
+note: required by a bound in `Result::<T, E>::map_err`
+    --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:962:4
+help: consider wrapping the function in a closure
+     |
+1918 |         .map_err(|arg0: FindingError| FindingVerifierError::canonicalization(/* chio_core_types::Error */))?;
+     |                  ++++++++++++++++++++                                       ++++++++++++++++++++++++++++++
+
+error[E0631]: type mismatch in function arguments
+    --> crates/trust/chio-finding-verifier/src/verify.rs:1924:18
+     |
+1924 |         .map_err(FindingVerifierError::canonicalization)?;
+     |          ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |          |
+     |          required by a bound introduced by this call
+     |
+    ::: crates/trust/chio-finding-verifier/src/error.rs:42:5
+     |
+  42 |     pub(crate) fn canonicalization(error: chio_core_types::Error) -> Self {
+     |     --------------------------------------------------------------------- found signature defined here
+     |
+     = note: expected function signature `fn(FindingError) -> _`
+                found function signature `fn(chio_core_types::Error) -> _`
+note: required by a bound in `Result::<T, E>::map_err`
+    --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:962:4
+help: consider wrapping the function in a closure
+     |
+1924 |         .map_err(|arg0: FindingError| FindingVerifierError::canonicalization(/* chio_core_types::Error */))?;
+     |                  ++++++++++++++++++++                                       ++++++++++++++++++++++++++++++
+
+error[E0631]: type mismatch in function arguments
+    --> crates/trust/chio-finding-verifier/src/verify.rs:1979:22
+     |
+1979 |             .map_err(FindingVerifierError::canonicalization)?,
+     |              ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |              |
+     |              required by a bound introduced by this call
+     |
+    ::: crates/trust/chio-finding-verifier/src/error.rs:42:5
+     |
+  42 |     pub(crate) fn canonicalization(error: chio_core_types::Error) -> Self {
+     |     --------------------------------------------------------------------- found signature defined here
+     |
+     = note: expected function signature `fn(FindingError) -> _`
+                found function signature `fn(chio_core_types::Error) -> _`
+note: required by a bound in `Result::<T, E>::map_err`
+    --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:962:4
+help: consider wrapping the function in a closure
+     |
+1979 |             .map_err(|arg0: FindingError| FindingVerifierError::canonicalization(/* chio_core_types::Error */))?,
+     |                      ++++++++++++++++++++                                       ++++++++++++++++++++++++++++++
+
+error[E0631]: type mismatch in function arguments
+    --> crates/trust/chio-finding-verifier/src/verify.rs:1985:22
+     |
+1985 |             .map_err(FindingVerifierError::canonicalization)?,
+     |              ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |              |
+     |              required by a bound introduced by this call
+     |
+    ::: crates/trust/chio-finding-verifier/src/error.rs:42:5
+     |
+  42 |     pub(crate) fn canonicalization(error: chio_core_types::Error) -> Self {
+     |     --------------------------------------------------------------------- found signature defined here
+     |
+     = note: expected function signature `fn(FindingError) -> _`
+                found function signature `fn(chio_core_types::Error) -> _`
+note: required by a bound in `Result::<T, E>::map_err`
+    --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:962:4
+help: consider wrapping the function in a closure
+     |
+1985 |             .map_err(|arg0: FindingError| FindingVerifierError::canonicalization(/* chio_core_types::Error */))?,
+     |                      ++++++++++++++++++++                                       ++++++++++++++++++++++++++++++
+
+error[E0631]: type mismatch in function arguments
+    --> crates/trust/chio-finding-verifier/src/verify.rs:2069:44
+     |
+2069 |         compute_report_id(&report).map_err(FindingVerifierError::canonicalization)?;
+     |                                    ------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected due to this
+     |                                    |
+     |                                    required by a bound introduced by this call
+     |
+    ::: crates/trust/chio-finding-verifier/src/error.rs:42:5
+     |
+  42 |     pub(crate) fn canonicalization(error: chio_core_types::Error) -> Self {
+     |     --------------------------------------------------------------------- found signature defined here
+     |
+     = note: expected function signature `fn(FindingError) -> _`
+                found function signature `fn(chio_core_types::Error) -> _`
+note: required by a bound in `Result::<T, E>::map_err`
+    --> /rustc/e408947bfd200af42db322daf0fadfe7e26d3bd1/library/core/src/result.rs:962:4
+help: consider wrapping the function in a closure
+     |
+2069 |         compute_report_id(&report).map_err(|arg0: FindingError| FindingVerifierError::canonicalization(/* chio_core_types::Error */))?;
+     |                                            ++++++++++++++++++++                                       ++++++++++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0631`.
+error: could not compile `chio-finding-verifier` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...

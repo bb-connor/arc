@@ -1,0 +1,3 @@
+constructors removed ['crates/trust/chio-reputation/src/model.rs::from_scope_json::from_wire'] added ['crates/trust/chio-reputation/src/input.rs::from_scope_json::from_wire']
+raw_decoders removed [] added []
+catalog errors: []

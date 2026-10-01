@@ -351,7 +351,7 @@ impl SqlitePheromoneRelayStore {
                 recipient_kernel_id,
                 treaty_id,
                 i64_from_u64(queued_at_unix_ms, "queued_at_unix_ms")?,
-                serde_json::to_string(batch)?,
+                crate::input::encode(batch)?,
             ],
         )?;
         Ok(outbox_id)
@@ -396,7 +396,7 @@ impl SqlitePheromoneRelayStore {
                     row.get::<_, String>(2)?,
                     row.get::<_, String>(3)?,
                     row.get::<_, i64>(4)?,
-                    row.get::<_, String>(5)?,
+                    crate::input::row_decode(row, 5)?,
                 ))
             },
         )?;
@@ -412,7 +412,7 @@ impl SqlitePheromoneRelayStore {
                 attempts: u64::try_from(attempts).map_err(|_| {
                     PheromoneRelayError::Sqlite("attempt count is negative".to_string())
                 })?,
-                batch: serde_json::from_str(&batch_json)?,
+                batch: batch_json?,
             });
         }
         drop(stmt);
@@ -526,7 +526,7 @@ impl SqlitePheromoneRelayStore {
                     "catch-up limit is too large".to_string()
                 ))?
             ],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            |row| Ok((row.get::<_, i64>(0)?, crate::input::row_text(row, 1)?)),
         )?;
         let mut frames = Vec::new();
         let mut bytes = 0usize;
@@ -534,6 +534,7 @@ impl SqlitePheromoneRelayStore {
         let mut next_cursor = after_rowid;
         for row in rows {
             let (rowid, batch_json) = row?;
+            let batch_json = batch_json?;
             let batch_bytes = batch_json.len();
             if bytes.saturating_add(batch_bytes) > max_bytes {
                 if frames.is_empty() {
@@ -543,7 +544,7 @@ impl SqlitePheromoneRelayStore {
                 }
                 break;
             }
-            let batch: PheromoneGossipBatch = serde_json::from_str(&batch_json)?;
+            let batch: PheromoneGossipBatch = crate::input::decode(&batch_json.as_bytes())?;
             let batch_frame_count = batch.frames.len();
             if served_frame_count.saturating_add(batch_frame_count) > limit {
                 if frames.is_empty() {
@@ -769,7 +770,7 @@ impl SqlitePheromoneRelayStore {
                 if report.accepted { 1 } else { 0 },
                 &report.code,
                 i64_from_u64(report.generated_at_unix_ms, "recorded_at_unix_ms")?,
-                serde_json::to_string(report)?,
+                crate::input::encode(report)?,
             ],
         )?;
         Ok(())
@@ -887,7 +888,7 @@ impl SqlitePheromoneRelayStore {
                 sender_kernel_id,
                 nonce,
                 canonical_sha256(batch)?,
-                serde_json::to_string(report)?,
+                crate::input::encode(report)?,
             ],
         )?;
         Ok(InboxRecordResult {
@@ -911,7 +912,7 @@ impl SqlitePheromoneRelayStore {
         nonce: &str,
     ) -> Result<Option<PheromoneReceiveReport>, PheromoneRelayError> {
         let conn = self.conn.lock()?;
-        let report_json: Option<String> = conn
+        let report_json = conn
             .query_row(
                 r#"
                 SELECT report_json
@@ -919,11 +920,11 @@ impl SqlitePheromoneRelayStore {
                 WHERE sender_kernel_id = ?1 AND nonce = ?2
                 "#,
                 params![sender_kernel_id, nonce],
-                |row| row.get::<_, String>(0),
+                |row| crate::input::row_decode(row, 0),
             )
             .optional()?;
         match report_json {
-            Some(json) => Ok(Some(serde_json::from_str(&json)?)),
+            Some(report) => Ok(Some(report?)),
             None => Ok(None),
         }
     }
@@ -1314,5 +1315,51 @@ mod inbox_lookup_tests {
                 .expect("the durable verdict is recorded exactly once"),
             report
         );
+    }
+
+    #[test]
+    fn corrupt_or_oversized_inbox_cells_cannot_recover_an_acceptance() {
+        let store = SqlitePheromoneRelayStore::open_in_memory().unwrap();
+        store
+            .record_inbox(
+                "did:chio:sender",
+                "nonce-bad",
+                &sample_batch(),
+                &sample_report(),
+            )
+            .unwrap();
+        let ambiguous = serde_json::to_string(&sample_report()).unwrap().replacen(
+            "\"accepted\":true",
+            "\"accepted\":false,\"accepted\":true",
+            1,
+        );
+        store
+            .conn
+            .lock()
+            .unwrap()
+            .execute(
+                "UPDATE chio_pheromone_relay_inbox SET report_json = ?1",
+                [&ambiguous],
+            )
+            .unwrap();
+        assert!(matches!(
+            store.lookup_inbox_report("did:chio:sender", "nonce-bad"),
+            Err(PheromoneRelayError::Input(_))
+        ));
+        store
+            .conn
+            .lock()
+            .unwrap()
+            .execute(
+                "UPDATE chio_pheromone_relay_inbox SET report_json = CAST(zeroblob(?1) AS TEXT)",
+                [i64::try_from(crate::input::MAX_DOCUMENT_BYTES + 1).unwrap()],
+            )
+            .unwrap();
+        assert!(matches!(
+            store.lookup_inbox_report("did:chio:sender", "nonce-bad"),
+            Err(PheromoneRelayError::Input(
+                chio_core_types::canonical::UntrustedJsonError::TooLarge { .. }
+            ))
+        ));
     }
 }

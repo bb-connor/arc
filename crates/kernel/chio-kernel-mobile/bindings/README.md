@@ -99,7 +99,7 @@ The remaining five are mobile-attestation entries:
 - `verify_play_integrity_evidence(token, expected_nonce, expected_package_name, expected_audience, jwks_json)`:
   verify a Play Integrity JWS against the pinned Google JWKS and the
   expected nonce, package name, and audience claims.
-- `verify_mobile_receipt(receipt_json, evidence_json)`: shape-check a
+- `inspect_mobile_receipt_envelopes(receipt_json, evidence_json)`: shape-check a
   mobile receipt against App Attest or Play Integrity evidence before it
   is handed to the hosted oracle. Returns an explicit non-authoritative
   status; it does not authorize a capability or prove device integrity.

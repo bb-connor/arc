@@ -288,18 +288,18 @@ impl MobileChallengeStore for SqliteMobileChallengeStore {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Deferred)
                 .map_err(|error| unavailable("begin challenge read", error))?;
-            let (challenge_json, consumed_at): (String, Option<i64>) = transaction
+            let (challenge_json, consumed_at) = transaction
                 .query_row(
                     "SELECT challenge_json, consumed_at_unix_seconds
                      FROM chio_mobile_attestation_challenges
                      WHERE challenge_id = ?1",
                     [challenge_id],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
+                    |row| Ok((decode_challenge_row(row)?, row.get::<_, Option<i64>>(1)?)),
                 )
                 .optional()
                 .map_err(|error| unavailable("load mobile challenge", error))?
                 .ok_or_else(|| MobileChallengeError::Invalid("challenge is unknown".to_string()))?;
-            let challenge = decode_challenge_json(&challenge_json)?;
+            let challenge = challenge_json?;
             ensure_sqlite_record_active(&challenge, consumed_at, now_unix_seconds)?;
             let previous_app_attest_counter = match challenge.binding.app_attest_counter_key() {
                 Some((key_id, app_id)) => transaction
@@ -338,18 +338,18 @@ impl MobileChallengeStore for SqliteMobileChallengeStore {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(|error| unavailable("begin challenge consumption", error))?;
-            let (challenge_json, stored_consumed_at): (String, Option<i64>) = transaction
+            let (challenge_json, stored_consumed_at) = transaction
                 .query_row(
                     "SELECT challenge_json, consumed_at_unix_seconds
                      FROM chio_mobile_attestation_challenges
                      WHERE challenge_id = ?1",
                     [snapshot.challenge.challenge_id.as_str()],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
+                    |row| Ok((decode_challenge_row(row)?, row.get::<_, Option<i64>>(1)?)),
                 )
                 .optional()
                 .map_err(|error| unavailable("load challenge for consumption", error))?
                 .ok_or_else(|| MobileChallengeError::Invalid("challenge is unknown".to_string()))?;
-            let stored = decode_challenge_json(&challenge_json)?;
+            let stored = challenge_json?;
             if stored != snapshot.challenge {
                 return Err(MobileChallengeError::Invalid(
                     "challenge snapshot does not match stored state".to_string(),
@@ -486,20 +486,25 @@ fn canonical_challenge_json(
     })
 }
 
-fn decode_challenge_json(value: &str) -> Result<IssuedMobileChallenge, MobileChallengeError> {
-    let challenge: IssuedMobileChallenge = serde_json::from_str(value).map_err(|error| {
-        MobileChallengeError::StoreUnavailable(format!("stored challenge decoding failed: {error}"))
+fn decode_challenge_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<Result<IssuedMobileChallenge, MobileChallengeError>> {
+    let raw = row.get_ref(0)?;
+    let text = raw.as_str().map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(0, raw.data_type(), Box::new(error))
     })?;
+    Ok(decode_challenge_json(text))
+}
+
+fn decode_challenge_json(value: &str) -> Result<IssuedMobileChallenge, MobileChallengeError> {
+    let challenge: IssuedMobileChallenge =
+        chio_core_types::canonical::UntrustedJsonText::from_wire(value.as_bytes(), 16 * 1024)?
+            .decode_canonical()?;
     challenge.validate().map_err(|error| {
         MobileChallengeError::StoreUnavailable(format!(
             "stored challenge validation failed: {error}"
         ))
     })?;
-    if canonical_challenge_json(&challenge)?.as_bytes() != value.as_bytes() {
-        return Err(MobileChallengeError::StoreUnavailable(
-            "stored challenge is not canonical JSON".to_string(),
-        ));
-    }
     Ok(challenge)
 }
 

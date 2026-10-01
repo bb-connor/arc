@@ -1,0 +1,74 @@
+{
+  "source_base": "6ef28e8f4ddccb7f344a179d2415844a3410f815",
+  "branch": "packet/3-retention-accounting",
+  "checkout": "/tmp/arc-security-launch",
+  "host": "Linux aarch64",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8",
+  "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+  "package_campaign": "qualification-final.json",
+  "cli_consumer_compile": "cli-consumers.json",
+  "test_totals": {
+    "passed": 1964,
+    "failed": 0,
+    "ignored": 3,
+    "measured": 0,
+    "filtered": 0
+  },
+  "test_binaries": 125,
+  "source_files_hashed": 113,
+  "pinned_readers_dispositioned": 35,
+  "remaining_raw_baseline": 131,
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "/tmp/trust-census-refresh.py"
+      ],
+      "exit_code": 0,
+      "log": "trust-check-final.log",
+      "scope": "Current source scanned once; constructors reconciled and scripts/check-trust-boundaries.py check run on that exact snapshot."
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "log": "hygiene-final.log"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "log": "negative-final.log"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "exit_code": 0,
+      "log": "wire-check.log"
+    },
+    {
+      "record": "format-final.json",
+      "exit_code": 0,
+      "log": "format-final.log"
+    }
+  ],
+  "post_campaign_rust_change": "crates/products/chio-cli/tests/process_host.rs: missing ChioReceipt import, covered by final CLI consumer check",
+  "claim": "Local scoped package tests and direct-consumer compile qualification only",
+  "excluded": [
+    "full workspace tests/clippy",
+    "all-feature matrix",
+    "Apple packaged artifact rebuild",
+    "live device attestation",
+    "hosted exact-candidate CI",
+    "native enforcement",
+    "supply-chain audit",
+    "M5/operator acceptance",
+    "merge/publication/activation"
+  ]
+}

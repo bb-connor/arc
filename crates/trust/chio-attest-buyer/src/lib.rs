@@ -16,6 +16,7 @@ pub mod schemas;
 pub mod types;
 
 mod conversions;
+mod input;
 mod runtime_manifest;
 mod validation;
 

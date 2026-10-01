@@ -1,0 +1,155 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+   Compiling chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+   Compiling chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+   Compiling alloy-sol-macro v1.5.7
+   Compiling alloy-sol-types v1.5.7
+   Compiling chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+   Compiling chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+   Compiling chio-swarm-authority v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-swarm-authority)
+   Compiling alloy-core v1.5.7
+   Compiling alloy v1.8.3
+   Compiling chio-web3-bindings v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3-bindings)
+   Compiling clap v4.6.0
+   Compiling schemars v0.8.22
+   Compiling toml_parser v1.1.1+spec-1.1.0
+   Compiling syn v2.0.117
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+   Compiling typify-impl v0.4.3
+   Compiling serde_tokenstream v0.2.3
+   Compiling prettyplease v0.2.37
+   Compiling chio-spec-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-spec-validate)
+   Compiling scheduled-thread-pool v0.2.7
+   Compiling r2d2 v0.8.10
+   Compiling uniffi_internal_macros v0.32.0
+   Compiling chio-tee-frame v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-tee-frame)
+   Compiling chio-adversarial-suite v0.1.0 (/tmp/arc-security-launch/crates/core/chio-adversarial-suite)
+   Compiling r2d2_sqlite v0.33.0
+   Compiling curve25519-dalek v5.0.0-rc.0
+   Compiling camino v1.2.2
+   Compiling criterion-plot v0.5.0
+   Compiling toml_edit v0.25.9+spec-1.1.0
+   Compiling rayon v1.11.0
+   Compiling n0-future v0.3.2
+   Compiling typify-macro v0.4.3
+   Compiling prefix-trie v0.8.4
+   Compiling tinytemplate v1.2.1
+   Compiling hickory-proto v0.26.1
+   Compiling criterion v0.5.1
+   Compiling ed25519-dalek v3.0.0-rc.0
+   Compiling proc-macro-crate v3.5.0
+   Compiling askama_parser v0.16.0
+   Compiling typify v0.4.3
+   Compiling chio-spec-codegen v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-spec-codegen)
+   Compiling basic-toml v0.1.10
+   Compiling h2 v0.4.16
+   Compiling fs-err v3.3.1
+   Compiling scroll_derive v0.12.1
+   Compiling smawk v0.3.2
+   Compiling textwrap v0.16.2
+   Compiling askama_derive v0.16.0
+   Compiling scroll v0.12.0
+   Compiling moka v0.12.15
+   Compiling chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+   Compiling iroh-base v1.0.1
+   Compiling hickory-net v0.26.1
+   Compiling uniffi_pipeline v0.32.0
+   Compiling weedle2 v5.0.0
+   Compiling tokio-stream v0.1.18
+   Compiling netlink-sys v0.8.8
+   Compiling plain v0.2.3
+   Compiling hickory-resolver v0.26.1
+   Compiling noq v1.0.1
+   Compiling axum v0.8.8
+   Compiling askama_macros v0.16.0
+   Compiling chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+   Compiling uniffi_meta v0.32.0
+   Compiling num_enum_derive v0.7.6
+   Compiling serde_spanned v1.1.1
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling tokio-websockets v0.13.3
+   Compiling netdev v0.45.0
+   Compiling chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling num_enum v0.7.6
+   Compiling iroh-dns v1.0.1
+   Compiling askama v0.16.0
+   Compiling netlink-proto v0.12.0
+   Compiling chio-http-serve v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-http-serve)
+   Compiling n0-watcher v1.0.0
+   Compiling netwatch v0.19.1
+   Compiling backon v1.6.0
+   Compiling chio-workflow v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-selective-disclosure v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling static_assertions v1.1.0
+   Compiling uniffi_udl v0.32.0
+   Compiling goblin v0.8.2
+   Compiling iroh-relay v1.0.1
+   Compiling chio-reputation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-reputation)
+error[E0004]: non-exhaustive patterns: `&ChioPackageError::Input(_)` not covered
+   --> crates/trust/chio-attest-buyer-core/src/report.rs:376:11
+    |
+376 |     match error {
+    |           ^^^^^ pattern `&ChioPackageError::Input(_)` not covered
+    |
+note: `ChioPackageError` defined here
+   --> crates/trust/chio-attest-buyer-core/src/error.rs:2:10
+    |
+  2 | pub enum ChioPackageError {
+    |          ^^^^^^^^^^^^^^^^
+  3 |     #[error(transparent)]
+  4 |     Input(#[from] chio_core_types::canonical::UntrustedJsonError),
+    |     ----- not covered
+    = note: the matched value is of type `&ChioPackageError`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+393 ~         ChioPackageError::Json(_) => "json",
+394 ~         &ChioPackageError::Input(_) => todo!(),
+    |
+
+error[E0004]: non-exhaustive patterns: `&ChioPackageError::Input(_)` not covered
+   --> crates/trust/chio-attest-buyer-core/src/report.rs:398:11
+    |
+398 |     match error {
+    |           ^^^^^ pattern `&ChioPackageError::Input(_)` not covered
+    |
+note: `ChioPackageError` defined here
+   --> crates/trust/chio-attest-buyer-core/src/error.rs:2:10
+    |
+  2 | pub enum ChioPackageError {
+    |          ^^^^^^^^^^^^^^^^
+  3 |     #[error(transparent)]
+  4 |     Input(#[from] chio_core_types::canonical::UntrustedJsonError),
+    |     ----- not covered
+    = note: the matched value is of type `&ChioPackageError`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+411 ~         ChioPackageError::SelectiveDisclosure(_) => "bbs",
+412 ~         &ChioPackageError::Input(_) => todo!(),
+    |
+
+For more information about this error, try `rustc --explain E0004`.
+error: could not compile `chio-attest-buyer-core` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

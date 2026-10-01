@@ -1,0 +1,18 @@
+{
+  "reviewed_pinned_paths": 35,
+  "remaining_raw_baseline": 130,
+  "remaining_by_group": {
+    "core": 2,
+    "economy": 22,
+    "guards": 15,
+    "kernel": 11,
+    "observability": 3,
+    "platform": 31,
+    "products": 5,
+    "sdk": 9,
+    "security": 18,
+    "tooling": 14
+  },
+  "next_guard_and_security_paths": 33
+}
+catalog errors: []

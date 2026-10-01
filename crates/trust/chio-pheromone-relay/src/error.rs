@@ -2,6 +2,10 @@ use std::sync::PoisonError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PheromoneRelayError {
+    #[error("pheromone runtime rejected relay operation")]
+    Runtime(#[from] chio_pheromone_runtime::PheromoneRuntimeError),
+    #[error(transparent)]
+    Input(#[from] chio_core_types::canonical::UntrustedJsonError),
     #[error("unsupported_schema: {0}")]
     UnsupportedSchema(String),
     #[error("duplicate_peer: {0}")]
@@ -61,7 +65,7 @@ pub enum PheromoneRelayError {
     #[error("path_mismatch: {0}")]
     PathMismatch(String),
     #[error("json: {0}")]
-    Json(String),
+    Json(#[source] chio_core_types::canonical::UntrustedJsonError),
     #[error("canonical_json: {0}")]
     CanonicalJson(String),
     #[error("sqlite: {0}")]
@@ -107,6 +111,8 @@ impl PheromoneRelayError {
             Self::RecipientMismatch(_) => "recipient_mismatch",
             Self::MethodMismatch(_) => "method_mismatch",
             Self::PathMismatch(_) => "path_mismatch",
+            Self::Input(error) => error.code(),
+            Self::Runtime(error) => error.code(),
             Self::Json(_) => "json",
             Self::CanonicalJson(_) => "canonical_json",
             Self::Sqlite(_) => "sqlite",
@@ -125,7 +131,9 @@ impl From<rusqlite::Error> for PheromoneRelayError {
 
 impl From<serde_json::Error> for PheromoneRelayError {
     fn from(error: serde_json::Error) -> Self {
-        Self::Json(error.to_string())
+        Self::Json(chio_core_types::canonical::UntrustedJsonError::Decode(
+            error,
+        ))
     }
 }
 

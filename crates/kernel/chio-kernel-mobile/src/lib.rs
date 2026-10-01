@@ -42,7 +42,7 @@
 //! - [`verify_app_attest_evidence`] -- App Attest evidence verifier.
 //! - [`attest_play_integrity`] -- Play Integrity challenge entry point.
 //! - [`verify_play_integrity_evidence`] -- Play Integrity JWS verifier.
-//! - [`verify_mobile_receipt`] -- mobile attestation receipt verifier.
+//! - [`inspect_mobile_receipt_envelopes`] -- non-authoritative mobile envelope inspection.
 //!
 //! # Offline guarantees
 //!
@@ -91,7 +91,7 @@ use chio_core_types::capability::{
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::body::ChioReceiptBody;
 use chio_custody_hw::{
-    verify_app_attest, verify_mobile_receipt_chain, verify_play_integrity,
+    parse_mobile_receipt_envelopes, verify_app_attest, verify_play_integrity,
     AppAttestVerificationInput, AttestationError, PlayIntegrityVerificationInput,
 };
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
@@ -922,23 +922,14 @@ pub fn verify_play_integrity_evidence(
 /// This does not authorize a capability or prove device integrity. It returns
 /// an explicit non-authoritative status until full receipt-chain verification
 /// is wired to trusted issuer pins and challenge binding.
-pub fn verify_mobile_receipt(
+pub fn inspect_mobile_receipt_envelopes(
     receipt_json: String,
     evidence_json: String,
 ) -> Result<String, ChioMobileError> {
-    let _: serde_json::Value =
-        serde_json::from_str(&receipt_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("mobile receipt: {error}"),
-        })?;
-    let _: serde_json::Value =
-        serde_json::from_str(&evidence_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("mobile attestation evidence: {error}"),
-        })?;
-
-    let verified = verify_mobile_receipt_chain(&receipt_json, &evidence_json)
+    let verified = parse_mobile_receipt_envelopes(&receipt_json, &evidence_json)
         .map_err(map_attestation_error)?;
     serde_json::to_string(&serde_json::json!({
-        "schema": "chio.mobile.receipt-verification.v1",
+        "schema": "chio.mobile.receipt-inspection.v1",
         "status": "shape_only",
         "receipt_kind": "trace_observation",
         "boundary_class": "detect_only",

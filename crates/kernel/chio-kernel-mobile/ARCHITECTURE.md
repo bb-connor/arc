@@ -38,8 +38,9 @@ generated bindings.
 4. The call dispatches into `chio-kernel-core` (`evaluate_with_full_floor`,
    `verify_capability_full`, `sign_receipt` /
    `sign_receipt_relaying_trusted_body`, `passport_verify::verify_passport`)
-   or `chio-custody-hw` (`verify_app_attest`, `verify_play_integrity`,
-   `verify_mobile_receipt_chain`) for the actual decision.
+   or `chio-custody-hw` (`verify_app_attest`, `verify_play_integrity`) for
+   verification. `inspect_mobile_receipt_envelopes` separately calls the bounded
+   envelope parser and returns an explicitly non-authoritative inspection.
 5. Errors from either dependency are mapped onto `ChioMobileError` variants;
    the result is serialized back to JSON (or a UDL record) and returned, or
    thrown as `ChioMobileError` on parse or verification failure.
@@ -74,7 +75,7 @@ generated bindings.
   (`production: true`, `allow_development_fixture: false`,
   `allow_caller_supplied_jwks: false`); development fixtures and
   caller-supplied JWKS are never reachable through this crate.
-- `verify_mobile_receipt` is shape-only: it validates both JSON envelopes and
+- `inspect_mobile_receipt_envelopes` is shape-only: it validates both JSON envelopes and
   the evidence `platform` tag, but the response is always
   `"authoritative": false, "authorized": false`. It is not proof of device
   integrity.

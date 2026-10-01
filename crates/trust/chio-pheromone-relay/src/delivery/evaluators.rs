@@ -4,7 +4,7 @@ pub fn relay_alert_routing_profile_from_json(
     json: &str,
     now_unix_ms: u64,
 ) -> Result<RelayAlertRoutingProfileDocument, PheromoneRelayError> {
-    let profile: RelayAlertRoutingProfileDocument = serde_json::from_str(json)?;
+    let profile: RelayAlertRoutingProfileDocument = crate::input::decode(json.as_bytes())?;
     validate_alert_profile(&profile, now_unix_ms)?;
     Ok(profile)
 }
@@ -13,7 +13,7 @@ pub fn relay_alert_suppression_state_from_json(
     json: &str,
     profile: &RelayAlertRoutingProfileDocument,
 ) -> Result<RelayAlertSuppressionStateDocument, PheromoneRelayError> {
-    let state: RelayAlertSuppressionStateDocument = serde_json::from_str(json)?;
+    let state: RelayAlertSuppressionStateDocument = crate::input::decode(json.as_bytes())?;
     validate_suppression_state(&state, profile)?;
     Ok(state)
 }
@@ -22,7 +22,7 @@ pub fn relay_alert_handoff_profile_from_json(
     json: &str,
     now_unix_ms: u64,
 ) -> Result<RelayAlertHandoffProfileDocument, PheromoneRelayError> {
-    let profile: RelayAlertHandoffProfileDocument = serde_json::from_str(json)?;
+    let profile: RelayAlertHandoffProfileDocument = crate::input::decode(json.as_bytes())?;
     validate_handoff_profile(&profile, now_unix_ms)?;
     Ok(profile)
 }
@@ -31,7 +31,7 @@ pub fn relay_alert_delivery_profile_from_json(
     json: &str,
     now_unix_ms: u64,
 ) -> Result<RelayAlertDeliveryProfileDocument, PheromoneRelayError> {
-    let profile: RelayAlertDeliveryProfileDocument = serde_json::from_str(json)?;
+    let profile: RelayAlertDeliveryProfileDocument = crate::input::decode(json.as_bytes())?;
     validate_delivery_profile(&profile, now_unix_ms)?;
     Ok(profile)
 }
@@ -39,7 +39,7 @@ pub fn relay_alert_delivery_profile_from_json(
 pub fn relay_alert_delivery_evidence_from_json(
     json: &str,
 ) -> Result<RelayAlertDeliveryEvidence, PheromoneRelayError> {
-    let evidence: RelayAlertDeliveryEvidence = serde_json::from_str(json)?;
+    let evidence: RelayAlertDeliveryEvidence = crate::input::decode(json.as_bytes())?;
     validate_delivery_evidence_shape(&evidence)?;
     Ok(evidence)
 }
