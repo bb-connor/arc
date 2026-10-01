@@ -61,3 +61,20 @@
 - [x] Add fixed canonical digest fixtures for moved domains and schema pins; run existing canonical/replay tests and affected dependency checks. Expected: byte identities unchanged and no cycles.
 - [x] Refresh wire lock and domain debt via their scripts; run gates and strict Clippy for changed owners. Expected: duplicate counts shrink with no new exceptions.
 - [x] Commit source, gate updates and evidence; reconcile remaining queue and propose the next substantive batch.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [module ownership review](../../reviews/2026-10-01-execution-review-module-ownership.md), [accounting and clocks review](../../reviews/2026-10-01-execution-review-accounting-clocks.md), [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Test ownership conforms on bodies, inventories and selectors: 845 bodies and the 1,491-name multiset preserved, all 219 selectors resolve; fixture separation is partial. On the clock half the fixtures are done, production bypass repair is partial, and this plan's own constraint against production test clocks was broken.
+
+Open findings against this plan:
+
+- **AC1, Medium.** A public thread-local fixed-time setting now precedes every kernel authority-time read and skips its regression check (`a8b5f11d3e`).
+- **AC2, Medium.** Several kernel and SQLite production paths still read the process `SystemClock` instead of the injected clock.
+- **CA11, Low.** The emergency stop failed open between `a8b5f11d3e` and `f965330c2a`; the record presents the repair of that regression as a delivered fix.
+- **AC6, Note.** The emergency stop is held in process memory only, so a restart resumes execution.
+- **MO7, Low.** The kernel test split deleted the comments stating what each suite proves and left sentence fragments.
+- **MO8, Low.** 32 fixtures from ten scenario modules are still shared through the root glob.
+
+**Next:** Remove the thread-local override from production builds (AC1) before reducing the clock count further.

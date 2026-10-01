@@ -54,3 +54,16 @@
 Status: Packet 9.3/9.5 is locally implemented and measured. Retention issue 1045
 root cause/repair and the complete 256-case slow-sync gate remain open. See
 [execution evidence](../../reviews/2026-09-29-sqlite-performance-retention-execution.md).
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [store and retention review](../../reviews/2026-10-01-execution-review-store-retention.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Conformant; open items stay honestly open. The plan's own measurements surfaced the largest per-call cost in the store and did not rank it.
+
+Open findings against this plan:
+
+- **SR2, Medium.** The suspension check on every tool call scans every suspension set the tenant has ever held, under the store's only connection lock: about 62 ms at 2,000 sets. Statement caching does not address it.
+- **SR12, Note.** The duplicate-read fix and most cached budget reads sit on a legacy path that production refuses.
+
+**Next:** Index or materialize active suspensions so the per-call check is independent of history (SR2).

@@ -62,3 +62,15 @@ Interfaces: original Revoke/Propagate/Attenuate/Evaluate actions and fairness.
       capabilities, with nonvacuous negative controls and explicit fairness.
 - [x] Run the complete bounded acceptance set, record exact scope and update the
       original timeout disposition without calling a different check the old run.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [store and retention review](../../reviews/2026-10-01-execution-review-store-retention.md), [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Conformant and honestly scoped. The formal check matches the TLA+ source, and CI regenerates the trace rather than trusting a committed copy. The Apalache workflows run on schedule and dispatch only, so they execute `main`, not this branch.
+
+Open findings against this plan:
+
+- **SR13, Note.** The volume of committed SMT-LIB, trace and VFS-shim material mostly documents that the retention hang did not reproduce, and CI regenerates most of it.
+
+**Next:** Keep the regenerated artifacts out of the tree and commit only their manifests.

@@ -60,3 +60,17 @@ sources, original versus canonical bytes, and fixture/subprocess resource custod
   menu, workspace-wide rebuild or external action is needed for this batch.
 - Evidence: `docs/reviews/artifacts/2026-09-30-provider-reader-boundaries/README.md`.
 - Next queue: 35 trust readers pinned in that artifact directory.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [product, CLI and provider readers review](../../reviews/2026-10-01-execution-review-product-cli-provider-readers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** The transport work is done and sound: bounded chunked reads, disabled redirects, the Gemini key kept out of errors, streamed tool calls assembled before evaluation. The task "preserve valid provider behavior" is not met.
+
+Open findings against this plan:
+
+- **PR1, High.** Seven provider adapters parse responses, streamed arguments and tool results with the signing canonicalizer, so `21.0`, `0.0` and integers above 2^53-1 fail valid calls, including tool results Chio's own serializer produced. Independently verified by probe test.
+- **PR8, Low.** Oversized request bodies are reported as response-too-large, and the missing-credential error no longer names the variable.
+- **PR9, Note.** Several custody and capture mechanisms cost more than they protect.
+
+**Next:** Give provider ingress its own contract (duplicate-key rejection, size bound, ordinary floats), leave host-produced tool results lenient, and add fixtures with `1.0`, `0.0`, `1e-05` and a 19-digit integer (PR1).

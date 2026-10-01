@@ -31,3 +31,19 @@ Use existing shared UntrustedJsonText, clock ports and manifest authority APIs.
 No compatibility aliases or permissive decoder fallbacks. Peripheral source
 changes must support the four owners and be verified at their consumer boundary.
 Record any material deviation and its cost in the execution ledger.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [protocol boundaries review](../../reviews/2026-10-01-execution-review-protocol-boundaries.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** All four tasks are done, three of them with a defect. The A2A OAuth cache custody is verified clean, and the record's 889-test count matches its logs.
+
+Open findings against this plan:
+
+- **PB2, Medium.** Unsigned documents (provider SSE, OpenAI responses and tool results, MCP and remote frames) are parsed with signed-record number rules, rejecting valid `10.00` and `1e-05`.
+- **PB3, Medium.** Any clock fault, including a backward wall-clock step, ends every live MCP edge session at its next 25 ms idle poll.
+- **PB4, Medium.** The per-session remote input queue is unbounded, and nested-flow waits on the client have no deadline.
+- **PB5, Medium.** The A2A task registry bounds reads at 16 MiB but not writes, so once the file passes that size the adapter cannot start.
+- **PB12, Low.** Six test names use `review_regression_*`, and a module is named `oauth_cache_review`.
+
+**Next:** Decide the numeric contract by producer (PB2) and make clock faults degrade rather than terminate sessions (PB3).

@@ -49,3 +49,21 @@ final large-output campaign passes exact ASCII/escaped output, restart replay an
 offline patch proof. Source overlays and binary generations are explicitly pinned.
 Historical failed operations remain retained without redispatch. Hosted exact-
 candidate, M5 and the broader roadmap remain separate open gates.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [native consumers review](../../reviews/2026-10-01-execution-review-native-consumers.md), [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Tasks 1 to 3 conform; route bounds, duplicate rejection and the pinned route set are verified. Task 4's native campaigns are real, but its claim of updated CI inputs is contradicted: the lane cannot pass.
+
+Open findings against this plan:
+
+- **NC1, Medium.** The native fixture action calls its script with no read grants and uses `rg`, which the runner lacks; the lane is not required and has never run.
+- **NC2, Medium.** A provider response with a repeated header such as `Vary` is refused after the provider acted, leaving an unknown outcome and a consumed capability.
+- **NC3, Medium.** The MCP read limit rose from 1 to 4 MiB for every native tool, raising the worst-case unread notification queue to about 8 GiB of host memory.
+- **NC4, Low.** Docker output over 512 KiB turns a finished command into an unknown outcome.
+- **NC5, Low.** The repository adapter's hash pin covers only the pip launcher script.
+- **NC8, Low.** Broker capability issuance reads the system clock directly and has no unit tests.
+- **CA6, Medium.** This plan's commits added 63 cause-discarding `map_err(|_| ...)` sites to the secret broker, against the dispatch plan's rule.
+
+**Next:** Repair the CI fixture action and run it once on GitHub (NC1); accept repeated list-valued headers (NC2).

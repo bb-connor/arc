@@ -51,3 +51,16 @@ and packaged Apple artifacts require separate rebuild/qualification.
 The existing isolated branch is retained with a local conventional commit.
 The next pinned chunk is 33 guard/security readers. No push, merge, publication
 or live activation is included in this delivery.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [trust, guard, platform and economy readers review](../../reviews/2026-10-01-execution-review-trust-guard-platform-economy-readers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** All four tasks are done. Delivery reports now bind the batch digest, recipient, schema and frame verdicts.
+
+Open findings against this plan:
+
+- **TR7, Low.** The Iroh delivery path does not pin the sender; the HTTP path does.
+- **TR9, Low.** The mobile FFI rename left the Swift, JVM and TypeScript SDKs and the binding docs calling the old function name.
+
+**Next:** Pin the sender on the Iroh path (TR7) and update the mobile SDKs (TR9).

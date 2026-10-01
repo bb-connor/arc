@@ -44,3 +44,17 @@ Linux x86_64 execution, Docker/provider campaign qualification and hosted CI
 remain open. This host is aarch64 with uid 1000; no native qualification is
 claimed. Remaining mini-SWE dependencies require broker integration, not
 broader filesystem or network authority.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [protocol boundaries review](../../reviews/2026-10-01-execution-review-protocol-boundaries.md), [native consumers review](../../reviews/2026-10-01-execution-review-native-consumers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** ACP direct-invocation removal and ACP original-byte ingress are done and clean. The shared fenced clock for remote owners is done but introduced a restart failure. The native CI wiring is present but cannot pass.
+
+Open findings against this plan:
+
+- **PB1, High.** A remote MCP host that crashed holding a Ready session cannot restart once that session's idle deadline passes, and the retained row makes every later restart fail; recovery needs manual SQLite surgery. Independently verified.
+- **NC1, Medium.** The enforced native fixture action cannot succeed and has never run.
+- **PB10, Low.** When the ACP capability check errors, the request's capability context is not cleared (Plausible).
+
+**Next:** Expire or tombstone Ready rows whose idle deadline passed before restoring them, with a startup test that seeds one (PB1).

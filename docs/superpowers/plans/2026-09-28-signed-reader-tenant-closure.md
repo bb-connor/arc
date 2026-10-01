@@ -179,3 +179,19 @@ for changed owners, commands, runtime results and calibration limits.
 
 The scope proved by this batch is the implemented named-reader migration and
 expanded local tenant/principal evidence, not full correction 1F or 10.2/10.3 closure.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [reader closures review](../../reviews/2026-10-01-execution-review-reader-closures.md), [signed input and FROST review](../../reviews/2026-10-01-execution-review-signed-input-frost.md), [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Conforms with gaps. The decoder-gate broadening is lexical and cannot see which decode method a reader calls (SF1) or resist an inventory-only edit (CA2). The calibration was weaker than planned: an isolated helper compiled with `rustc` and SQL run in Python, with no mutation of a repaired crate reader. The tenant matrix is done as recorded.
+
+Open findings against this plan:
+
+- **RC6, Low.** A noncanonical embedded DSSE receipt reports `canonical_json.invalid`, outside the error codes spec section 7.1 requires.
+- **RC7, Low.** Of four JWT verifiers only SD-JWT checks `alg`; third-party tokens are parsed under native rules rather than external I-JSON.
+- **RC8, Low.** The certification registry still accepts zero timestamps.
+- **SF1, Medium.** The gate pins constructor sites, not decode methods; three signed readers switched to `decode_document` still pass.
+- **CA2, Medium.** The gate passes after editing only its JSON inventory.
+
+**Next:** Make the gate pin the decode method per reader and reject inventory-only status changes (SF1, CA2).

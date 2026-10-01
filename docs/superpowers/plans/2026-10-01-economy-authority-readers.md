@@ -95,3 +95,16 @@ Merkle authentication, bounded transport/nested input and a fenced clock.
 
 The per-task ledger and terminal evidence live in
 `docs/reviews/artifacts/2026-10-01-economy-authority-readers/`.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [trust, guard, platform and economy readers review](../../reviews/2026-10-01-execution-review-trust-guard-platform-economy-readers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** At the review tip, Task 1 was done, Tasks 2 and 3 were done apart from their consumer-compilation boxes (honestly open), and Task 4 was partly done with no review artifact. `66e9ecc5bd` and `f6c8c39067` then closed the consumer boxes and Task 4: `direct-consumers-2.json` compiles every direct consumer, `chio-cli` included, with exit 0.
+
+Open findings against this plan:
+
+- **TR1, High.** `a2630c20a1` did not compile `chio-control-plane`: two exhaustive matches missed the new `MemberInput` and `CarrierInput` variants. Repaired in `66e9ecc5bd`; the consumer check through `chio-cli` passed in `f6c8c39067`. Closed.
+- **TR8, Low.** Rekor publication allows no clock skew after Rekor has already logged the entry (not yet wired into production).
+
+**Next:** Make a consumer check part of each commit's qualification rather than a later step, so no committed tip is unbuildable (TR1). Allow bounded skew on the post-log Rekor check (TR8).

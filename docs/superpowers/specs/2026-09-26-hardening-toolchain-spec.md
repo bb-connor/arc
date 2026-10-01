@@ -502,3 +502,20 @@ about what it is. The type-design work in the
 [unrepresentable-defects design](2026-09-26-unrepresentable-defects-design.md)
 addresses the last point and comes first. This spec is everything that can be done
 mechanically alongside it.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [gates and toolchain review](../../reviews/2026-10-01-execution-review-gates-toolchain.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Partial. H0, H5, H10 and H11 are built (the H0 self-test is red); H1, H3 and H4 work locally only; H2 and H9 exist as configuration and have never run; H6 is honestly incomplete; H7 is partial; H8 is deferred as planned.
+
+Open findings against this plan:
+
+- **GT1, Medium.** None of these gates runs in hosted CI, because the required job fails before reaching them.
+- **GT2, Medium.** The Lambda extension ships as its own workspace with overflow checks off in release; the overflow gate cannot see nested workspaces or per-package overrides.
+- **GT3, Medium.** The Miri lane is not on `main` and has never run; two of its six crates execute no unsafe code under Miri.
+- **GT6, GT7 and GT8, Low.** The hardening, wire-schema and hygiene gates each have lexical bypasses.
+- **GT9, Low.** The TSan lane covers none of the concurrent code H9 named.
+- **GT10, Low.** The FV-E5 runbook says the Kani pull-request job is required; it is not.
+
+**Next:** Make the structural step green on a hosted run (GT1), then add the Lambda extension's profile to the overflow gate (GT2).

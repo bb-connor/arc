@@ -58,3 +58,18 @@ that task complete from the static fixture or the broker provisioning API.
 
 See [the execution record](../../reviews/2026-09-29-native-consumers-acp-errors-openapi-execution.md)
 for terminal checks, bounded native source identity and the remaining queue.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [protocol boundaries review](../../reviews/2026-10-01-execution-review-protocol-boundaries.md), [native consumers review](../../reviews/2026-10-01-execution-review-native-consumers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** The native consumer half was honestly partial when recorded and was closed by the multi-route plan. The ACP clock owner is done and clean. Domain errors are partial and over-redacted. OpenAPI original-byte reading is done for the named callers, misses `chio-api-protect`, and uses the signed numeric rules.
+
+Open findings against this plan:
+
+- **PB6, Medium.** Peer redaction was applied to operator-local errors: compliance refusals print as "signing failed" and OpenAPI spec errors lose all detail.
+- **PB2, Medium.** The OpenAPI JSON path uses `decode_signed`, which rejects valid `10.00` and `1e-05`.
+- **PB9, Low.** `chio-api-protect` OpenAPI discovery buffers 64 MiB before its 8 MiB check.
+- **PB7, Low.** Remote MCP and ACP still send internal error text to peers.
+
+**Next:** Decode OpenAPI JSON with ordinary numbers and duplicate-key rejection (PB2), and restore operator diagnostics (PB6).

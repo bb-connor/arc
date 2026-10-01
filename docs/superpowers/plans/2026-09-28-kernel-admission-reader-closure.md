@@ -272,3 +272,18 @@ This does not close the other 374 current baseline files, remaining arithmetic
 and ambient-clock inventories, broader error/mutation cleanup, retention issue
 #1045, large temporal-model timeout, module/performance work, native/scale/hosted
 qualification, supply-chain/trusted-delivery gates or operational acceptance.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [reader closures review](../../reviews/2026-10-01-execution-review-reader-closures.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Conforms on the code. The semantic dispositions this plan required are boilerplate (63 of 73 entries identical), the v4-only break is undocumented, and the last tenant table is covered only through a test-built projection.
+
+Open findings against this plan:
+
+- **RC2, Medium.** Dispositions are one repeated sentence; terminal records are parsed before their 1 MiB check.
+- **RC3, Low.** The hardened authorization-consumption check has no production producer.
+- **RC4, Low.** A second use of the same authorization receipt reports `Unavailable` (retryable), and the test matches SQLite error text.
+- **RC5, Low.** A database holding a pre-v4 retained request fails to open; there is no schema-version step and the break is not documented.
+
+**Next:** Document or migrate the v4 break (RC5) and give double consumption its own error (RC4).

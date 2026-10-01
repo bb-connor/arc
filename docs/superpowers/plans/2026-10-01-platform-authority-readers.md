@@ -100,3 +100,20 @@ The tracked execution ledger and evidence belong under
 `docs/reviews/artifacts/2026-10-01-platform-authority-readers/`.
 The [execution report](../../reviews/2026-10-01-platform-authority-readers-execution.md)
 and its qualification record state each task's actual terminal result.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [trust, guard, platform and economy readers review](../../reviews/2026-10-01-execution-review-trust-guard-platform-economy-readers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Done. Bundle budgets precede hashing and replay admission in production order, and the evidence-graph walk is now iterative. Causes are carried but never logged, artifact labels were lost, and helpers were duplicated as this plan required.
+
+Open findings against this plan:
+
+- **TR3, Medium.** Retained causes are dropped unlogged at the HTTP boundaries, and hosted edge maps `CorruptInput` three ways (401, 400, 503).
+- **TR4, Medium.** The per-crate helper rule duplicates limits and readers; the CLI loads bundles up to 128 MiB while the library rejects anything over 64 MiB.
+- **TR5, Low.** `project`'s "already validated" contract is only a comment; it is lossless today because `arbitrary_precision` is off and values beyond 64 bits reject.
+- **TR6, Low.** Six artifact-label parameters are dead, and two commerce tests no longer check which field was missing.
+- **TR11, Low.** `chio-agent-web-interop` is built through `include!`, so the format gate never sees its new code.
+- **TR13, Note.** About 35 of 121 readers in these batches read operator-owned data; the bundle budgets limit work, not input memory.
+
+**Next:** Log the retained cause at each HTTP boundary and settle one status mapping per error (TR3).

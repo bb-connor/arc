@@ -313,3 +313,16 @@ sealing primitive with vectors, the transition and verifier changes, the
 negative suite. The hardening spec's H7 acceptance (no secret-bearing struct
 derives `Debug` or `Serialize` on the secret field; `expose_secret()` sites are
 the complete inventory) applies to every type this note introduces.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [signed input and FROST review](../../reviews/2026-10-01-execution-review-signed-input-frost.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Conforms, including the full negative-test matrix and durable replay handling; the independent Python vector check passes.
+
+Open findings against this plan:
+
+- **SF4, Low.** Sealed envelopes are verified with non-strict Ed25519 and roster validation accepts low-order transport keys, so anyone can forge an envelope from such a participant and durably fail a recipient's ceremony.
+- **SF5, Low.** The plaintext share leaves its type at a third site, the exit into DKG completion, which the inventory and gate do not see.
+
+**Next:** Use strict verification and reject low-order transport keys at roster validation (SF4).

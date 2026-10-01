@@ -158,3 +158,17 @@ Touched local parser errors preserve structured causes with redacted display
 and debug output. String-only external adapters retain registered redacted
 projections. The [execution record](../reviews/2026-09-28-kernel-admission-reader-execution.md)
 records runtime checks and the deliberate parser and tenant-binding mutations.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [signed input and FROST review](../reviews/2026-10-01-execution-review-signed-input-frost.md), [trust, guard, platform and economy readers review](../reviews/2026-10-01-execution-review-trust-guard-platform-economy-readers.md), [campaign audit](../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Stale since September 28: ten later reader batches are not reflected, and three methods added to `UntrustedJsonText` since (`decode_external`, `decode_document`, `decode_canonical_with`) are not described. The numeric contract of each strict mode, measured against the real functions, is in the pass 9 index.
+
+Open findings against this plan:
+
+- **TR10, Low.** This document still describes three of the six decode methods.
+- **SF1, Medium.** Nothing checks that a reader uses the mode this document assigns it.
+- **CA8, Medium.** Its counts disagree with the inventory and the working queue.
+
+**Next:** Describe all six methods with their measured numeric behavior and state which producer each serves.

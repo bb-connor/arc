@@ -94,3 +94,21 @@ The control-plane qualification uses the focused owner selection, three native
 ledger cases and exact compiler privacy probes. The slow parallel native-flow
 campaign remains explicitly unqualified after its diagnosed wall-clock expiry;
 no full-workspace, native x86 or hosted acceptance is inferred from this batch.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [module ownership review](../../reviews/2026-10-01-execution-review-module-ownership.md), [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Tasks 1 to 4 conform: after normalizing moves, imports and visibility the four cuts leave 2, 13, 0 and 47 lines, all explained; no test was dropped or ignored and nothing was widened to `pub`. Task 5 is partial. The compiler now checks owner privacy that textual includes used to leave open.
+
+Open findings against this plan:
+
+- **MO1, Low.** The "minimal" helper crate's 72-package graph has 49 packages reached only through `chio-core-types`, used for two functions; the budget gate does not block `url`, `idna` or `ed25519`.
+- **MO2, Low.** Removing upstream `nono` left nine unused `[patch.crates-io]` trees.
+- **MO3, Low.** `c5ca13ddd3` mixes the move, visibility, API, dependency surgery and gate rewrites in one 62-file commit, which this plan forbids; behavior was preserved.
+- **MO4, Low.** `chio-cage` fragments were pasted into their parents rather than made modules; `launch/linux.rs` sits 13 lines under its cap.
+- **MO5, Low.** The reservation-sealing fix copies the store's publication validator and runs it after recovery has acted.
+- **MO6, Low.** The hygiene ratchet pushed back eight unrelated allowlist deadlines.
+- **CA9, Medium.** This structural work ran on the candidate branch before the freeze, against the addendum's sequencing.
+
+**Next:** Cut the helper's dependency on `chio-core-types` (MO1) and drop the dead patch entries (MO2).

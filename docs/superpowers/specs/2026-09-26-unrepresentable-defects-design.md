@@ -499,3 +499,20 @@ Ordered by what unblocks what, then by blast radius.
   exit. Count of all-`pub` types that also derive `Deserialize`: 4 today, 0 at
   exit.
 - One error-code registry.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [response path review](../../reviews/2026-10-01-execution-review-response-path.md), [signed input and FROST review](../../reviews/2026-10-01-execution-review-signed-input-frost.md), [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Partly met. Mechanism A landed for the response path and the sealed proofs; mechanism B landed as a borrowed wrapper whose permissive method sits on the same type as the strictest one; mechanism C regressed at the kernel seam; mechanism D was never started.
+
+Open findings against this plan:
+
+- **CA5 and RP8, Medium.** The `Verified*`/`Authorized*` acceptance count was met partly by renaming; under the campaign's census all-pub types went 29 to 18 and the `Deserialize` subset 11 to 7, against a target of 0 and 0.
+- **CA12, Low.** Compile-fail tests cover 8 of 17 sealed types, none pins its failure reason, and `ActiveResponseExecutionRequest` has none (RP6).
+- **RP2, Medium.** `DispatchRejection` becomes a plain string on the kernel path production dispatch uses.
+- **SF1 and SF8, Medium.** `UntrustedJsonText` names the parsing choice but does not make a wrong choice impossible, and the gate cannot see the choice.
+- **CA7, Low.** One error registry is not achieved; two unregistered URNs were added.
+- **RP6, Low.** No escape-hatch gate exists; escape hatches went from seven to eight.
+
+**Next:** Split the decode contracts into distinct types (SF8), carry `DispatchRejection` through the kernel seam (RP2), and build the escape-hatch gate before adding more sealed types.

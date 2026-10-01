@@ -19,3 +19,17 @@
 ## Verification
 
 Use focused regression failures where they distinguish a security property, followed by owning suites and affected consumers. Preserve terminal outputs. No full-workspace build, lint or test campaign in this batch. Check changed Rust formatting, applicable source gates and strict owning-package lints. Do not claim hosted, release or M5 completion.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [native consumers review](../../reviews/2026-10-01-execution-review-native-consumers.md), [protocol boundaries review](../../reviews/2026-10-01-execution-review-protocol-boundaries.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** The native half conforms: the legacy launch types are gone, Shadow discovery refuses before the target runs, and all four consumers require Enforced inputs. On the protocol half both passthroughs are removed and the provisioning discovery bypass is fully closed; redacted external errors are partial.
+
+Open findings against this plan:
+
+- **PB7, Low.** A2A, remote MCP and ACP still send peer input or internal error text to peers.
+- **PB8, Low.** A2A envelope rejections keep no local cause, and invalid notifications are dropped silently.
+- **NC7, Low.** The broker operator document still shows the single-route configuration the loader now rejects.
+
+**Next:** Finish peer-facing redaction (PB7) with local causes retained (PB8).

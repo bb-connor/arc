@@ -307,3 +307,27 @@ The [engineering plan](../superpowers/plans/2026-09-26-security-engineering-exce
 and [assurance closeout plan](../superpowers/plans/2026-09-25-security-assurance-closeout.md)
 remain the parent acceptance contracts. A reproduced P0/P1 takes priority over
 this grouping. The kernel/SQLite execution record contains the local checks for this continuation; broader candidate qualification remains open.
+
+## Execution review (October 1, 2026)
+
+The [pass 9 execution review](2026-10-01-execution-review.md) reviewed every batch above at `a2630c20a1`, in twelve slice reviews linked
+from it. It found 128 issues: 5 High (one, TR1, since closed), 41 Medium, 67 Low, 15 Note. The decoder figure in
+the inventory table is a count of a lexical pattern: the gate passes after an inventory-only edit
+(CA2) and cannot see axum `Json<T>` ingress (CA3). The reader census demonstrated no pre-existing
+defect after September 28 (CA value tally).
+
+Before another batch, in order:
+
+1. Make the required `Build, lint, test` job green on a pull request for this branch (GT1, CA1).
+2. Fix the High regressions: SR1, PB1, PR1 with PB2 and PR2, PR6. TR1 is closed
+   (`66e9ecc5bd`, `f6c8c39067`).
+3. Fix the authority-time regressions RC1 and AC1, then the other Medium regressions listed in the
+   index.
+4. Make the trust-boundary gate pin the decode method per reader and reject inventory-only edits
+   (SF1, CA2).
+5. Decide what to do about committed evidence identifiers before pushing again (CA10, NC6).
+6. Split the branch into stacked pull requests by plan (CA9).
+7. Reconcile the status documents with the inventories (CA8, TR10).
+
+Item 2 of this queue changes scope: finish the 13 baseline files inside TCB libraries, reclassify
+the 22 tooling and observability files, and stop the census for the remainder (CA4).

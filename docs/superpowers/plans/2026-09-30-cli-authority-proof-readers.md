@@ -37,3 +37,18 @@ proof export substitution, literal enum injection, exact session selection,
 clock faults and deadline overflow, plus existing changed-owner scenarios.
 Batch implementation before expensive compilation; use focused CLI/library
 checks and existing source gates. No push, merge, release or cloud activation.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [product, CLI and provider readers review](../../reviews/2026-10-01-execution-review-product-cli-provider-readers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Done, but it breaks the working queue's rule of "real contract, not a mass syntactic replacement": 208 added CLI lines call strict signed decoding regardless of who produced the input, with copied disposition text.
+
+Open findings against this plan:
+
+- **PR2, Medium.** JSON policies and request files now use `decode_signed`, which rejects hand-written `0.50` and Python's `1e-05`. Independently verified; the YAML guard policy loader is unaffected.
+- **PR4, Medium.** The shared CLI input owners copy proof-room's limits and readers, and three older CLI readers remain.
+- **PR5, Medium.** Compliance certificates fail for sessions with more than 4,096 receipts, and one oversized row fails every session.
+- **PR7, Low.** Manifest v1 was removed, but `spec/PROTOCOL.md` and the crate README still name v1 as the only schema.
+
+**Next:** Decode operator-written files with duplicate-key rejection and ordinary numbers (PR2), and page certificate collection (PR5).

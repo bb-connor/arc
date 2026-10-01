@@ -29,3 +29,15 @@ The user authorizes action-first implementation and batched focused checks. Exis
 - Final implementer review: private initialization replay now validates the opened file under wiping custody and rejects unsafe permissions rather than repairing them; public replay uses its own exact-content contract.
 
 - All four scoped tasks are complete: the 29 reader owners and supporting custody/clock/archive repairs; final 266-test focused qualification; ratchets and semantic inventories; bounded execution record, source/binary hashes and next 28-reader protocol handoff. Local commit is the delivery boundary.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [product, CLI and provider readers review](../../reviews/2026-10-01-execution-review-product-cli-provider-readers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Done, with one breaking change. The xtask fixture facets that exercise the changed key readers were not run as part of qualification.
+
+Open findings against this plan:
+
+- **PR6, High.** Relay and iroh key files must now be byte-canonical JSON at mode 0600; the committed fixture key and the xtask writer are pretty-printed at 0644, so five relay workflows fail. Independently verified with the real `chio` binary.
+
+**Next:** Update the committed key and `write_signing_key`, or relax canonical equality for unsigned seed files, and run the relay facets (PR6).

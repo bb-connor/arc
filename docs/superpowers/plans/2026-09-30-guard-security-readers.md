@@ -28,3 +28,16 @@ and [terminal evidence](../../reviews/artifacts/2026-09-30-guard-security-reader
 record the implemented repairs, retained existing contracts, review resolutions,
 failed attempts, focused reruns, consumer compilation and remaining acceptance
 boundaries. The next implementation batch is the 31 pinned platform readers.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [trust, guard, platform and economy readers review](../../reviews/2026-10-01-execution-review-trust-guard-platform-economy-readers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Done, plus an unplanned policy change. The batch's strongest catch, a Vertex guard that allowed content Vertex had blocked, came from reviewing the guard rather than from the reader census.
+
+Open findings against this plan:
+
+- **TR2, Medium.** A VirusTotal 404 ("never seen") is now an error that denies and counts as a circuit-breaker failure; five unseen URLs in a minute open the breaker, and under `CircuitOpenVerdict::Allow` every request then passes. This plan never mentions the change. Independently verified.
+- **TR4, Medium.** Input helpers and limits are copied per crate (`chio-guard-registry`, `chio-guards`, `chio-wasm-guards`).
+
+**Next:** Treat a 404 as a definitive answer, not a breaker failure, and record the unknown-URL policy as a decision (TR2).

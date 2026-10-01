@@ -294,3 +294,18 @@ follow-up review observed B and C serializing on the shared directory's lock.
 3. Wave 1 runs all five lanes, staggered: E and A first, then B and C, then D.
 4. Native x86_64 work is deferred to the designated CI runner for Waves 1 and 2;
    no local native lane.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md), [response path review](../../reviews/2026-10-01-execution-review-response-path.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Superseding the lanes with inline execution was authorized and recorded. Two of this plan's principles were not kept, and the "independent review" in the records is an executor-dispatched subagent with no re-review of fixes.
+
+Open findings against this plan:
+
+- **CA6, Medium.** "No new `map_err(|_| ...)`" was broken: the secret broker went from 164 to 226 cause-discarding sites, mostly in the native consumer batches.
+- **RP3, Medium.** The response simulator added 24 such sites and unregistered `simulation.*` codes.
+- **CA9, Medium.** Packet 7 restructuring and the 666-file compiler-policy commit ran on the candidate branch before the freeze.
+- **CA13, Note.** Review independence is weaker than the records state.
+
+**Next:** Add a gate that counts cause-discarding `map_err` in TCB crates, and split the branch into stacked pull requests by plan (CA9).

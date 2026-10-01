@@ -983,3 +983,36 @@ field is re-derived by a second parser.
   scheduled, because it determines whether S3 is severe.
 - Independent review still required for every P0 and P1, per standard rule 12.1.
   Both quality passes were written by a reviewer, not an independent one.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1`. The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md); the program-level
+conformance table for every packet is in the [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md).
+
+| Item | Verified status | Review |
+| --- | --- | --- |
+| 0.1 hygiene gate | Done | [gates and toolchain review](../../reviews/2026-10-01-execution-review-gates-toolchain.md) |
+| 0.2 overflow checks | Partial; the Lambda extension ships with overflow checks off (GT2) | [gates and toolchain review](../../reviews/2026-10-01-execution-review-gates-toolchain.md) |
+| 0.3 accounting lint | Done (49 files), box still unchecked | [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md) |
+| 0.4 domain gate | Partial; zero duplicate domains, 32 shape exceptions, self-test red (GT1) | [gates and toolchain review](../../reviews/2026-10-01-execution-review-gates-toolchain.md) |
+| 0.5 assertion gate | Done; catches one spelling of a weak assertion (GT13) | [gates and toolchain review](../../reviews/2026-10-01-execution-review-gates-toolchain.md) |
+| 1A, 1C, 1E | Done; no simulated or unbound plan reaches live dispatch | [response path review](../../reviews/2026-10-01-execution-review-response-path.md) |
+| 1B | Types done; the recovery-side runtime guards have no negative tests (RP1) | [response path review](../../reviews/2026-10-01-execution-review-response-path.md) |
+| 1D | Partial and regressed: `DispatchRejection` is stringified on the production kernel path (RP2); the simulator added 24 cause discards (RP3) | [response path review](../../reviews/2026-10-01-execution-review-response-path.md) |
+| 1F | Done in substance, boxes unchecked; the strict form was replaced by the native parser without amending this plan (SF6) | [signed input and FROST review](../../reviews/2026-10-01-execution-review-signed-input-frost.md) |
+| 2A, 2B | Done in source; the native probe has never run | [gates and toolchain review](../../reviews/2026-10-01-execution-review-gates-toolchain.md) |
+| 3A | Partial as recorded: 85 of 638 pending, 320 rows are fixtures | [accounting and clocks review](../../reviews/2026-10-01-execution-review-accounting-clocks.md) |
+| 4A | Partial and overstated: a production thread-local clock override (AC1), production `SystemClock` reads (AC2, RC9), gate blind to several forms (AC3) | [accounting and clocks review](../../reviews/2026-10-01-execution-review-accounting-clocks.md) |
+| 4B | 41 of 1,298 weak assertions converted (CA12) | [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md) |
+| Packet 7 | Ranks 1 to 5 done and behavior-preserving; run out of sequence (CA9) | [module ownership review](../../reviews/2026-10-01-execution-review-module-ownership.md) |
+| Packet 8 | Checklist done and tested on real write paths; the exit claim is not met because the types are opt-in | [accounting and clocks review](../../reviews/2026-10-01-execution-review-accounting-clocks.md) |
+| Packet 9 | Done to the letter; missed the largest measured cost (SR2); the analytics integrity check costs 3.5x to 15x for protection it does not give (SR3); 9.2 reworded before ticked (SR9) | [store and retention review](../../reviews/2026-10-01-execution-review-store-retention.md) |
+| 10.1 | Done and sound; the fence cannot be bypassed | [store and retention review](../../reviews/2026-10-01-execution-review-store-retention.md) |
+| 10.2 | Partial: 45 baseline files; the gate is blind to decode method (SF1) and self-certifiable (CA2); the census cannot see axum `Json<T>` (CA3); strict modes applied to unsigned input broke providers and fixtures (PR1, PB2, PR2, PR6) | [signed input and FROST review](../../reviews/2026-10-01-execution-review-signed-input-frost.md), [product, CLI and provider readers review](../../reviews/2026-10-01-execution-review-product-cli-provider-readers.md), [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md) |
+| 10.3 | Partial as recorded; the gate checks only that a named test exists | [signed input and FROST review](../../reviews/2026-10-01-execution-review-signed-input-frost.md) |
+| 10.4 | Done for the live database; archives were not migrated, so a store that used retention cannot accept receipts after the upgrade (SR1, High) | [store and retention review](../../reviews/2026-10-01-execution-review-store-retention.md) |
+| Parent Packets 5 and 6 | Not started; no hosted CI has run since `f25cd61f49` (CA1) | [campaign audit](../../reviews/2026-10-01-execution-review-campaign-audit.md) |
+
+**Next:** finish the 13 Packet 10.2 baseline files inside TCB libraries and stop the census for the
+rest (CA4); fix SR1 and the decode-mode regressions; get the required job green on a pull request
+before another batch.

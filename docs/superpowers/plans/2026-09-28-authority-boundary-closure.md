@@ -75,3 +75,17 @@ their separate acceptance boundaries in the remaining-work queue.
 Implemented and locally qualified. See the [execution record](../../reviews/2026-09-28-authority-boundary-closure.md)
 for exact scope, terminal tests, four killed production bypasses, restored-source
 controls, original failures and the unchanged successor-work boundaries.
+
+## Execution review (October 1, 2026)
+
+Reviewed at `a2630c20a1` in the [reader closures review](../../reviews/2026-10-01-execution-review-reader-closures.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
+
+**Verdict:** Readers and the four bypass mutations are verified: each mutant fails its named test at runtime. The migration was mechanical, though: 51 of 77 owner dispositions share one sentence and 100 of 114 migrations use the 64 MiB literal rather than the owner's real bound.
+
+Open findings against this plan:
+
+- **RC1, Medium.** Challenge submission now reads trusted time before a body upload the client can stretch to 30 s, so a filing signed after the deadline can be recorded as submitted before it.
+- **RC2, Medium.** Owner dispositions are mostly one repeated sentence, and most migrated calls use a blanket 64 MiB bound.
+- **RC9, Low.** The clock repair is seven file-local `SystemClock` helpers that are not injected and are invisible to the clock gate; six tests pass when the clock fails.
+
+**Next:** Move the time read after body collection (RC1) before any further clock work.
