@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "broker-execution-overspend-001",
+  "class": "broker_execution_overspend",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_execution_overspend_detected",
+  "threat_id": "resource_exhaustion_dos",
+  "pending": true,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "execution_ceiling_control",
+        "package": "chio-store-sqlite",
+        "test_source": "crates/platform/chio-store-sqlite/src/budget_store/tests/composite.rs",
+        "target_kind": "lib",
+        "test_name": "budget_store::tests::composite::every_quota_participant_exhausts_atomically_and_maximum_is_immutable"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_execution_overspend",
+        "control_id": "execution_ceiling_control",
+        "package": "chio-store-sqlite",
+        "source": "crates/platform/chio-store-sqlite/src/budget_store/composite.rs",
+        "function": "SqliteBudgetStore::authorize_composite_hold_inner",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "<",
+          "replacement": ">",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_execution_overspend/mutants.out/outcomes.json"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage.",
+    "Quota authorization, capture and compensation now belong to the original composite SQLite authority. This case exercises that owner and its existing restart and accounting assertions."
+  ]
+}

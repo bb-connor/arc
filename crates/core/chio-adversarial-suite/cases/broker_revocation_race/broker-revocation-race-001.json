@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "broker-revocation-race-001",
+  "class": "broker_revocation_race",
+  "expected_verdict": "DENY",
+  "expected_reason": "broker_revocation_race_detected",
+  "threat_id": "capability_token_theft",
+  "pending": true,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "revocation_capture_control",
+        "package": "chio-secret-broker",
+        "test_source": "crates/security/chio-secret-broker/src/budget.rs",
+        "target_kind": "lib",
+        "test_name": "budget::tests::capture_rejects_omitted_reordered_or_misbound_revocation_members"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "broker_revocation_race",
+        "control_id": "revocation_capture_control",
+        "package": "chio-secret-broker",
+        "source": "crates/security/chio-secret-broker/src/budget.rs",
+        "function": "CaptureExecutionHoldRequest::validate",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/broker_revocation_race/mutants.out/outcomes.json"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

@@ -1,5 +1,6 @@
 //! Real kernel collection and execution with separate durable collector/admission stores.
 #[path = "threshold_kernel_lifecycle/support.rs"]
+#[allow(dead_code)]
 mod support;
 
 use chio_kernel::admission_operation::{AdmissionIdentifier, AdmissionOperationStore};
