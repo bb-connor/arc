@@ -19,6 +19,29 @@
     "crates/economy/chio-finding/src/recovery_context.rs",
     "crates/economy/chio-finding/src/status.rs",
     "crates/economy/chio-finding/src/validate.rs",
+    "crates/guards/chio-data-guards/src/structured_classification.rs",
+    "crates/guards/chio-external-guards/src/external/azure_content_safety.rs",
+    "crates/guards/chio-external-guards/src/external/bedrock.rs",
+    "crates/guards/chio-external-guards/src/external/http_egress.rs",
+    "crates/guards/chio-external-guards/src/external/input.rs",
+    "crates/guards/chio-external-guards/src/external/threat_intel/safe_browsing.rs",
+    "crates/guards/chio-external-guards/src/external/threat_intel/snyk.rs",
+    "crates/guards/chio-external-guards/src/external/threat_intel/virustotal.rs",
+    "crates/guards/chio-external-guards/src/external/vertex_safety.rs",
+    "crates/guards/chio-guard-registry/src/cache.rs",
+    "crates/guards/chio-guard-registry/src/download.rs",
+    "crates/guards/chio-guard-registry/src/input.rs",
+    "crates/guards/chio-guard-registry/src/marketplace.rs",
+    "crates/guards/chio-guard-registry/src/oci.rs",
+    "crates/guards/chio-guard-registry/src/pull.rs",
+    "crates/guards/chio-guard-registry/src/verify.rs",
+    "crates/guards/chio-guards/src/embedding_anomaly.rs",
+    "crates/guards/chio-guards/src/input.rs",
+    "crates/guards/chio-wasm-guards/src/blocklist.rs",
+    "crates/guards/chio-wasm-guards/src/hot_reload.rs",
+    "crates/guards/chio-wasm-guards/src/input.rs",
+    "crates/guards/chio-wasm-guards/src/manifest.rs",
+    "crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs",
     "crates/kernel/chio-kernel-mobile/src/lib.rs",
     "crates/kernel/chio-kernel/src/admission_operation.part2.inc",
@@ -396,12 +419,25 @@
     "crates/protocol/chio-tool-call-fabric/src/types.rs",
     "crates/security/chio-active-response-authority/src/config.rs",
     "crates/security/chio-active-response-authority/src/store.rs",
+    "crates/security/chio-cage-init/src/bootstrap.rs",
+    "crates/security/chio-cage-plan/src/model.rs",
+    "crates/security/chio-cage/src/launch/linux.rs",
+    "crates/security/chio-decoy/src/materialize.rs",
+    "crates/security/chio-decoy/src/registry.rs",
+    "crates/security/chio-decoy/src/watermark.rs",
     "crates/security/chio-flow/src/classification.rs",
     "crates/security/chio-flow/src/declassification.rs",
+    "crates/security/chio-keyring/src/checkpoint.rs",
     "crates/security/chio-keyring/src/enterprise_receipt.rs",
+    "crates/security/chio-keyring/src/event.rs",
     "crates/security/chio-keyring/src/ipc.rs",
     "crates/security/chio-keyring/src/lib.rs",
     "crates/security/chio-keyring/src/service.rs",
+    "crates/security/chio-quarantine/src/correlation.rs",
+    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc",
+    "crates/security/chio-quarantine/src/rules.rs",
+    "crates/security/chio-quarantine/src/simulation.rs",
+    "crates/security/chio-quarantine/src/state_machine.rs",
     "crates/security/chio-secret-broker/src/audit.rs",
     "crates/security/chio-secret-broker/src/authority_ipc.rs",
     "crates/security/chio-secret-broker/src/daemon.rs",
@@ -416,6 +452,11 @@
     "crates/security/chio-secret-broker/src/service/ipc/prepared.rs",
     "crates/security/chio-secret-broker/src/service/ipc/response.rs",
     "crates/security/chio-secret-broker/src/sqlite.rs",
+    "crates/security/chio-security-types/src/deception.rs",
+    "crates/security/chio-security-types/src/declassification.rs",
+    "crates/security/chio-security-types/src/flow.rs",
+    "crates/security/chio-security-types/src/ports/bounded.rs",
+    "crates/security/chio-security-types/src/ports/identifiers.rs",
     "crates/trust/chio-attest-buyer-core/src/context.rs",
     "crates/trust/chio-attest-buyer-core/src/input.rs",
     "crates/trust/chio-attest-buyer-core/src/issuer.rs",
@@ -1006,7 +1047,16 @@
     "crates/economy/chio-finding/src/recovery_context.rs::parse_finding_recovery_context::new",
     "crates/economy/chio-finding/src/status.rs::parse_exact_canonical::new",
     "crates/economy/chio-finding/src/validate.rs::parse_canonical_json_text::new",
+    "crates/guards/chio-data-guards/src/structured_classification.rs::from_payload::from_wire",
+    "crates/guards/chio-external-guards/src/external/input.rs::arguments::from_wire",
+    "crates/guards/chio-external-guards/src/external/input.rs::response::from_wire",
+    "crates/guards/chio-guard-registry/src/input.rs::external::from_wire",
+    "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_wire",
     "crates/guards/chio-guards/src/action/extractor.rs::extract_shell_action::from_wire",
+    "crates/guards/chio-guards/src/embedding_anomaly.rs::from_json::from_wire",
+    "crates/guards/chio-guards/src/embedding_anomaly.rs::from_json_file::from_wire",
+    "crates/guards/chio-wasm-guards/src/blocklist.rs::store::from_wire",
+    "crates/guards/chio-wasm-guards/src/input.rs::decode::from_wire",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation.part2.inc::validate_cleanup_payload::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::from_canonical_bytes::from_wire",
@@ -1353,6 +1403,7 @@
     "crates/security/chio-keyring/src/lib.rs::from_bounded_json::from_wire",
     "crates/security/chio-keyring/src/service.rs::load_key_log_policy::from_wire",
     "crates/security/chio-keyring/src/service.rs::read_bounded_json_line::from_wire",
+    "crates/security/chio-quarantine/src/rules.rs::parse_json::from_wire",
     "crates/security/chio-secret-broker/src/audit.rs::from_canonical_bytes::from_wire",
     "crates/security/chio-secret-broker/src/audit.rs::from_canonical_bytes::from_wire",
     "crates/security/chio-secret-broker/src/authority_ipc.rs::call_with_exchange::from_wire",
@@ -1999,8 +2050,10 @@
     "crates/core/chio-core-types/src/canonical.rs::write_canonical::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::from_str",
+    "crates/core/chio-core-types/src/canonical/signed_json.rs::parse_document::from_str",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::validate_number_tokens::from_str",
     "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_canonical_with::from_str",
+    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_document::from_value",
     "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_external::from_slice",
     "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_signed::from_value",
     "crates/core/chio-core-types/src/capability/caveat.rs::security_binding::from_slice",
@@ -2017,6 +2070,7 @@
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize",
     "crates/core/chio-core-types/src/wire_text.rs::schema::custom_deserialize",
+    "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::serialize::custom_deserialize",
     "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_str",
     "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_value",
@@ -2160,9 +2214,48 @@
     "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice",
     "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value",
     "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value",
+    "crates/security/chio-cage-init/src/bootstrap.rs::child_main::from_slice",
+    "crates/security/chio-cage-plan/src/model.rs::for_native_architecture::custom_deserialize",
+    "crates/security/chio-cage/src/launch/linux.rs::read_status::from_slice",
+    "crates/security/chio-decoy/src/materialize.rs::serialize::custom_deserialize",
+    "crates/security/chio-decoy/src/registry.rs::decode_materialization_receipt::from_slice",
+    "crates/security/chio-decoy/src/registry.rs::open_envelope::from_slice",
+    "crates/security/chio-decoy/src/registry.rs::serialize::custom_deserialize",
+    "crates/security/chio-decoy/src/registry.rs::validate_materialization_binding::from_slice",
+    "crates/security/chio-decoy/src/watermark.rs::decode_token::from_slice",
+    "crates/security/chio-keyring/src/checkpoint.rs::from_canonical_bytes::custom_deserialize",
+    "crates/security/chio-keyring/src/event.rs::as_str::custom_deserialize",
+    "crates/security/chio-keyring/src/event.rs::fmt::custom_deserialize",
+    "crates/security/chio-keyring/src/event.rs::is_recovery_only::custom_deserialize",
+    "crates/security/chio-quarantine/src/correlation.rs::load_capacity_state::from_slice",
+    "crates/security/chio-quarantine/src/correlation.rs::load_durable_outcome::from_slice",
+    "crates/security/chio-quarantine/src/correlation.rs::load_partition_state::from_slice",
+    "crates/security/chio-quarantine/src/correlation.rs::parse_verified_event::from_slice",
+    "crates/security/chio-quarantine/src/correlation.rs::validate_stored_body::from_slice",
+    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc::decode_journal::from_slice",
+    "crates/security/chio-quarantine/src/simulation.rs::decode::from_slice",
+    "crates/security/chio-quarantine/src/state_machine.rs::decode_response_record::from_slice",
+    "crates/security/chio-quarantine/src/state_machine.rs::validate_effect_contribution::from_slice",
+    "crates/security/chio-quarantine/src/state_machine.rs::validate_effect_plan_binding::from_slice",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value",
+    "crates/security/chio-security-types/src/deception.rs::checked_next::custom_deserialize",
+    "crates/security/chio-security-types/src/declassification.rs::authority_key_id::custom_deserialize",
+    "crates/security/chio-security-types/src/flow.rs::serialize::custom_deserialize",
+    "crates/security/chio-security-types/src/flow.rs::serialize::custom_deserialize",
+    "crates/security/chio-security-types/src/flow.rs::validate::custom_deserialize",
+    "crates/security/chio-security-types/src/flow.rs::visit_map::custom_deserialize",
+    "crates/security/chio-security-types/src/flow.rs::visit_seq::custom_deserialize",
+    "crates/security/chio-security-types/src/flow.rs::visit_seq::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/bounded.rs::fmt::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/bounded.rs::fmt::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/bounded.rs::fmt::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/bounded.rs::is_empty::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/bounded.rs::is_empty::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/bounded.rs::is_empty::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/identifiers.rs::fmt::custom_deserialize",
+    "crates/security/chio-security-types/src/ports/identifiers.rs::fmt::custom_deserialize",
     "crates/trust/chio-credentials/src/artifact.rs::from::custom_deserialize",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value",
     "crates/trust/chio-credentials/src/financial.rs::decode_versioned_agent_passport_value::from_value",
@@ -4346,12 +4439,14 @@
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize": "Generated schema Deserialize implementations validate field shapes and convert already decoded values. Source is the wire schema/code generator; no independent original-byte ingress here.",
     "crates/core/chio-core-types/src/canonical.rs::from_str::Deserializer::from_str": "Strict I-JSON canonicalization implementation. Original token validation and numeric normalization live here; this is not an independent authority constructor.",
     "crates/core/chio-core-types/src/canonical.rs::write_canonical::custom_deserialize": "Strict I-JSON canonicalization implementation. Original token validation and numeric normalization live here; this is not an independent authority constructor.",
-    "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse.",
-    "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::from_str": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse.",
-    "crates/core/chio-core-types/src/canonical/signed_json.rs::validate_number_tokens::from_str": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse.",
-    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_canonical_with::from_str": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication.",
-    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_external::from_slice": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication.",
-    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_signed::from_value": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication.",
+    "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
+    "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::from_str": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
+    "crates/core/chio-core-types/src/canonical/signed_json.rs::parse_document::from_str": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
+    "crates/core/chio-core-types/src/canonical/signed_json.rs::validate_number_tokens::from_str": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
+    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_canonical_with::from_str": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
+    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_document::from_value": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
+    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_external::from_slice": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
+    "crates/core/chio-core-types/src/canonical/untrusted.rs::decode_signed::from_value": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records.",
     "crates/core/chio-core-types/src/capability/caveat.rs::security_binding::from_slice": "Security binding verifies strict I-JSON canonical bytes equal original predicate before typed reparse and binding validation.",
     "crates/core/chio-core-types/src/capability/governance.rs::explicit_continuation_token::from_value": "Typed Value conversions and validating custom deserializers for governance DTOs. Signed outer readers and authority verification remain mandatory.",
     "crates/core/chio-core-types/src/capability/governance.rs::tool_name::custom_deserialize": "Typed Value conversions and validating custom deserializers for governance DTOs. Signed outer readers and authority verification remain mandatory.",
@@ -4364,6 +4459,7 @@
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::from::custom_deserialize": "Validated security receipt DTO field deserializers; containing signed receipt readers and trusted producer checks establish provenance.",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize": "Validated security receipt DTO field deserializers; containing signed receipt readers and trusted producer checks establish provenance.",
     "crates/core/chio-core-types/src/wire_text.rs::schema::custom_deserialize": "Validated wire text field deserializers; containing original-byte readers establish the document contract.",
+    "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value": "The complete 16 MiB-bounded original native guard manifest is duplicate-aware before marketplace Value and typed projection. Full-width native prices survive; nested duplicate keys reject. Existing price and reputation checks remain separate.",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::serialize::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_str": "The mobile receipt inspection seam now uses bounded original parsing and no verifier alias. Other public capability and passport JSON readers in this file remain outside this batch and require semantic disposition; do not count the complete file as closed.",
     "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_value": "The mobile receipt inspection seam now uses bounded original parsing and no verifier alias. Other public capability and passport JSON readers in this file remain outside this batch and require semantic disposition; do not count the complete file as closed.",
@@ -4486,9 +4582,41 @@
     "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice": "This-process canonical serialization replay; no external raw bytes.",
     "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
+    "crates/security/chio-cage-init/src/bootstrap.rs::child_main::from_slice": "Reviewed existing bootstrap contract: sealed descriptor input uses MAX_ENVELOPE_BYTES bounded read, typed native decode then exact canonical re-encoding equality before envelope authentication, peer, binding and enforcement checks. No redundant parser or heavyweight core dependency added to the lightweight init binary.",
+    "crates/security/chio-cage-plan/src/model.rs::for_native_architecture::custom_deserialize": "Reviewed existing FdPurpose custom deserializer: closed tagged wire variants reject unknown sibling fields even for unit purposes, then map into the public enum. Full launch envelope authority is established only by bounded canonical bootstrap and plan validation, not by this value decoder.",
+    "crates/security/chio-cage/src/launch/linux.rs::read_status::from_slice": "Reviewed existing bounded status-pipe decoder: line bytes are capped before decode and exact canonical StatusRecord equality precedes protocol stage handling and prepared enforcement validation. Parsing status alone cannot mint launch authority. No native host enforcement qualification is inferred.",
+    "crates/security/chio-decoy/src/materialize.rs::serialize::custom_deserialize": "Persisted Unix path bytes now decode through BoundedVec with a 4096-byte maximum. Live materialization rejects longer relative paths before filesystem mutation, matching the persisted reader. Existing relative-component, symlink, ownership, inode and receipt binding checks remain.",
+    "crates/security/chio-decoy/src/registry.rs::decode_materialization_receipt::from_slice": "Reviewed existing decoy custody: bounded EncryptedDecoyEnvelope and authenticated decryption precede canonical plaintext decoding; exact typed re-encoding, schema, tenant/artifact and materialization receipt identity validation follow. Nested receipt input also requires canonical equality. Shape parsing alone does not authenticate a decoy.",
+    "crates/security/chio-decoy/src/registry.rs::open_envelope::from_slice": "Reviewed existing decoy custody: bounded EncryptedDecoyEnvelope and authenticated decryption precede canonical plaintext decoding; exact typed re-encoding, schema, tenant/artifact and materialization receipt identity validation follow. Nested receipt input also requires canonical equality. Shape parsing alone does not authenticate a decoy.",
+    "crates/security/chio-decoy/src/registry.rs::serialize::custom_deserialize": "Reviewed existing decoy custody: bounded EncryptedDecoyEnvelope and authenticated decryption precede canonical plaintext decoding; exact typed re-encoding, schema, tenant/artifact and materialization receipt identity validation follow. Nested receipt input also requires canonical equality. Shape parsing alone does not authenticate a decoy.",
+    "crates/security/chio-decoy/src/registry.rs::validate_materialization_binding::from_slice": "Reviewed existing decoy custody: bounded EncryptedDecoyEnvelope and authenticated decryption precede canonical plaintext decoding; exact typed re-encoding, schema, tenant/artifact and materialization receipt identity validation follow. Nested receipt input also requires canonical equality. Shape parsing alone does not authenticate a decoy.",
+    "crates/security/chio-decoy/src/watermark.rs::decode_token::from_slice": "Reviewed existing token contract: 16 KiB token and bounded base64 bytes, canonical base64 and original typed canonical JSON equality, exact encoded-payload binding and shape validation precede separate watermark signature/time/context verification. It creates a candidate, not VerifiedWatermark.",
+    "crates/security/chio-keyring/src/checkpoint.rs::from_canonical_bytes::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
+    "crates/security/chio-keyring/src/event.rs::as_str::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
+    "crates/security/chio-keyring/src/event.rs::fmt::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
+    "crates/security/chio-keyring/src/event.rs::is_recovery_only::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
+    "crates/security/chio-quarantine/src/correlation.rs::load_capacity_state::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/correlation.rs::load_durable_outcome::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/correlation.rs::load_partition_state::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/correlation.rs::parse_verified_event::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/correlation.rs::validate_stored_body::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc::decode_journal::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/simulation.rs::decode::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/state_machine.rs::decode_response_record::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/state_machine.rs::validate_effect_contribution::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/security/chio-quarantine/src/state_machine.rs::validate_effect_plan_binding::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes.",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
+    "crates/security/chio-security-types/src/deception.rs::checked_next::custom_deserialize": "Reviewed existing registry-version decoder constructs through the validated nonzero/range owner. Encrypted envelope and export-page collections use BoundedVec; record semantic validation and authenticated registry decryption remain separate.",
+    "crates/security/chio-security-types/src/declassification.rs::authority_key_id::custom_deserialize": "Reviewed existing deny-unknown-fields wire decoder reconstructs and validates grant schema, scope, lifetime and replay identity fields. A decoded grant body remains unverified until its signature and application policy checks succeed.",
+    "crates/security/chio-security-types/src/flow.rs::serialize::custom_deserialize": "Reviewed existing identifier visitors reject blank, padded and oversized values; tool-flow wire decoding preserves field-presence/nonempty contracts and reconstructs validated declarations. Label set deserializers enforce owner limits, uniqueness and canonical order. Input decoding does not perform declassification or grant authority.",
+    "crates/security/chio-security-types/src/flow.rs::validate::custom_deserialize": "Reviewed existing identifier visitors reject blank, padded and oversized values; tool-flow wire decoding preserves field-presence/nonempty contracts and reconstructs validated declarations. Label set deserializers enforce owner limits, uniqueness and canonical order. Input decoding does not perform declassification or grant authority.",
+    "crates/security/chio-security-types/src/flow.rs::visit_map::custom_deserialize": "Reviewed existing identifier visitors reject blank, padded and oversized values; tool-flow wire decoding preserves field-presence/nonempty contracts and reconstructs validated declarations. Label set deserializers enforce owner limits, uniqueness and canonical order. Input decoding does not perform declassification or grant authority.",
+    "crates/security/chio-security-types/src/flow.rs::visit_seq::custom_deserialize": "Reviewed existing identifier visitors reject blank, padded and oversized values; tool-flow wire decoding preserves field-presence/nonempty contracts and reconstructs validated declarations. Label set deserializers enforce owner limits, uniqueness and canonical order. Input decoding does not perform declassification or grant authority.",
+    "crates/security/chio-security-types/src/ports/bounded.rs::fmt::custom_deserialize": "BoundedVec visitor enforces MAX and inspects any overflow with IgnoredAny, never constructing an extra T. CanonicalBody and specialized set wrappers retain size, order, uniqueness and nonempty invariants. Native full-width integers remain unchanged; size checks do not grant authority.",
+    "crates/security/chio-security-types/src/ports/bounded.rs::is_empty::custom_deserialize": "BoundedVec visitor enforces MAX and inspects any overflow with IgnoredAny, never constructing an extra T. CanonicalBody and specialized set wrappers retain size, order, uniqueness and nonempty invariants. Native full-width integers remain unchanged; size checks do not grant authority.",
+    "crates/security/chio-security-types/src/ports/identifiers.rs::fmt::custom_deserialize": "Reviewed existing borrowed-string visitors validate identifiers before owned allocation; constructors retain 256-byte, nonblank, unpadded and nonzero variant invariants across deserialize entry points.",
     "crates/trust/chio-credentials/src/artifact.rs::from::custom_deserialize": "Reviewed existing ReputationCredential custom Deserialize: deny-unknown-fields wire reconstruction creates an unverified credential, not proof of authority. Native JSON/JWT ingress is already bounded and duplicate-aware in financial.rs and jwt_decode.rs; verify_reputation_credential validates issuer proof separately. No redundant decoder introduced.",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial.rs::decode_versioned_agent_passport_value::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
@@ -5143,10 +5271,12 @@
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
       "parse::custom_deserialize",
       "parse::from_str",
+      "parse_document::from_str",
       "validate_number_tokens::from_str"
     ],
     "crates/core/chio-core-types/src/canonical/untrusted.rs": [
       "decode_canonical_with::from_str",
+      "decode_document::from_value",
       "decode_external::from_slice",
       "decode_signed::from_value"
     ],
@@ -5291,64 +5421,12 @@
     "crates/economy/chio-settle/src/retry.rs": [
       "classify_attempt::custom_deserialize"
     ],
-    "crates/guards/chio-data-guards/src/structured_classification.rs": [
-      "from_payload::from_slice"
-    ],
-    "crates/guards/chio-external-guards/src/external/azure_content_safety.rs": [
-      "eval::from_str"
-    ],
-    "crates/guards/chio-external-guards/src/external/bedrock.rs": [
-      "eval::from_str"
-    ],
-    "crates/guards/chio-external-guards/src/external/threat_intel/safe_browsing.rs": [
-      "cache_key::from_str",
-      "eval::from_str",
-      "eval::from_str"
-    ],
-    "crates/guards/chio-external-guards/src/external/threat_intel/snyk.rs": [
-      "cache_key::from_str",
-      "eval::from_str",
-      "eval::from_str"
-    ],
-    "crates/guards/chio-external-guards/src/external/threat_intel/virustotal.rs": [
-      "cache_key::from_str",
-      "eval::from_str",
-      "eval::from_str"
-    ],
-    "crates/guards/chio-external-guards/src/external/vertex_safety.rs": [
-      "eval::from_str"
-    ],
-    "crates/guards/chio-guard-registry/src/cache.rs": [
-      "validate_cache_admission::from_slice"
-    ],
     "crates/guards/chio-guard-registry/src/marketplace.rs": [
-      "from_manifest_bytes::from_slice",
       "from_manifest_bytes::from_value"
-    ],
-    "crates/guards/chio-guard-registry/src/oci.rs": [
-      "registry_bearer_token::from_slice",
-      "sigstore_bundle_descriptor_from_manifest::from_slice",
-      "sigstore_referrer_descriptor::from_slice"
-    ],
-    "crates/guards/chio-guards/src/embedding_anomaly.rs": [
-      "from_json::from_str"
-    ],
-    "crates/guards/chio-wasm-guards/src/blocklist.rs": [
-      "load::from_slice"
     ],
     "crates/guards/chio-wasm-guards/src/fuzz.rs": [
       "fuzz_wit_host_call_boundary::from_slice",
       "fuzz_wit_host_call_boundary::from_slice"
-    ],
-    "crates/guards/chio-wasm-guards/src/hot_reload.rs": [
-      "from_dir::from_slice",
-      "from_dir::from_slice"
-    ],
-    "crates/guards/chio-wasm-guards/src/manifest.rs": [
-      "load_signature_sidecar::from_str"
-    ],
-    "crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs": [
-      "read_structured_deny_reason::from_slice"
     ],
     "crates/kernel/chio-kernel/src/admission_operation/identity.rs": [
       "as_str::custom_deserialize",
@@ -6153,9 +6231,6 @@
     "crates/security/chio-quarantine/src/fuzz.rs": [
       "drive::from_slice"
     ],
-    "crates/security/chio-quarantine/src/rules.rs": [
-      "parse_json::from_slice"
-    ],
     "crates/security/chio-quarantine/src/simulation.rs": [
       "decode::from_slice"
     ],
@@ -6361,11 +6436,11 @@
     },
     "crates/core/chio-core-types/src/canonical/signed_json.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse."
+      "contract": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records."
     },
     "crates/core/chio-core-types/src/canonical/untrusted.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication."
+      "contract": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records."
     },
     "crates/core/chio-core-types/src/capability/caveat.rs": {
       "kind": "parser-internal-or-typed",
@@ -6531,69 +6606,13 @@
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
-    "crates/guards/chio-data-guards/src/structured_classification.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-external-guards/src/external/azure_content_safety.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-external-guards/src/external/bedrock.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-external-guards/src/external/threat_intel/safe_browsing.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-external-guards/src/external/threat_intel/snyk.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-external-guards/src/external/threat_intel/virustotal.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-external-guards/src/external/vertex_safety.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-guard-registry/src/cache.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/guards/chio-guard-registry/src/marketplace.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-guard-registry/src/oci.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-guards/src/embedding_anomaly.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-wasm-guards/src/blocklist.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "The complete 16 MiB-bounded original native guard manifest is duplicate-aware before marketplace Value and typed projection. Full-width native prices survive; nested duplicate keys reject. Existing price and reputation checks remain separate."
     },
     "crates/guards/chio-wasm-guards/src/fuzz.rs": {
       "kind": "example-or-fuzz",
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
-    },
-    "crates/guards/chio-wasm-guards/src/hot_reload.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-wasm-guards/src/manifest.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
     "crates/kernel/chio-kernel-browser/src/pure.rs": {
       "kind": "raw-input-baseline",
@@ -7340,64 +7359,60 @@
       "contract": "Constrained original-byte input; residual decoder sites require individual raw_decoder_contracts."
     },
     "crates/security/chio-cage-init/src/bootstrap.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing bootstrap contract: sealed descriptor input uses MAX_ENVELOPE_BYTES bounded read, typed native decode then exact canonical re-encoding equality before envelope authentication, peer, binding and enforcement checks. No redundant parser or heavyweight core dependency added to the lightweight init binary."
     },
     "crates/security/chio-cage-plan/src/model.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing FdPurpose custom deserializer: closed tagged wire variants reject unknown sibling fields even for unit purposes, then map into the public enum. Full launch envelope authority is established only by bounded canonical bootstrap and plan validation, not by this value decoder."
     },
     "crates/security/chio-cage/src/launch/linux.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing bounded status-pipe decoder: line bytes are capped before decode and exact canonical StatusRecord equality precedes protocol stage handling and prepared enforcement validation. Parsing status alone cannot mint launch authority. No native host enforcement qualification is inferred."
     },
     "crates/security/chio-cage/src/receipt.rs": {
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority."
     },
     "crates/security/chio-decoy/src/materialize.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Persisted Unix path bytes now decode through BoundedVec with a 4096-byte maximum. Live materialization rejects longer relative paths before filesystem mutation, matching the persisted reader. Existing relative-component, symlink, ownership, inode and receipt binding checks remain."
     },
     "crates/security/chio-decoy/src/registry.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing decoy custody: bounded EncryptedDecoyEnvelope and authenticated decryption precede canonical plaintext decoding; exact typed re-encoding, schema, tenant/artifact and materialization receipt identity validation follow. Nested receipt input also requires canonical equality. Shape parsing alone does not authenticate a decoy."
     },
     "crates/security/chio-decoy/src/watermark.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing token contract: 16 KiB token and bounded base64 bytes, canonical base64 and original typed canonical JSON equality, exact encoded-payload binding and shape validation precede separate watermark signature/time/context verification. It creates a candidate, not VerifiedWatermark."
     },
     "crates/security/chio-keyring/src/checkpoint.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates."
     },
     "crates/security/chio-keyring/src/event.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates."
     },
     "crates/security/chio-quarantine/src/correlation.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },
     "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },
     "crates/security/chio-quarantine/src/fuzz.rs": {
       "kind": "example-or-fuzz",
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
     },
-    "crates/security/chio-quarantine/src/rules.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
     "crates/security/chio-quarantine/src/simulation.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },
     "crates/security/chio-quarantine/src/state_machine.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },
     "crates/security/chio-secret-broker/src/ipc_client.rs": {
       "kind": "reviewed-signed-owner",
@@ -7420,24 +7435,24 @@
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO."
     },
     "crates/security/chio-security-types/src/deception.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing registry-version decoder constructs through the validated nonzero/range owner. Encrypted envelope and export-page collections use BoundedVec; record semantic validation and authenticated registry decryption remain separate."
     },
     "crates/security/chio-security-types/src/declassification.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing deny-unknown-fields wire decoder reconstructs and validates grant schema, scope, lifetime and replay identity fields. A decoded grant body remains unverified until its signature and application policy checks succeed."
     },
     "crates/security/chio-security-types/src/flow.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing identifier visitors reject blank, padded and oversized values; tool-flow wire decoding preserves field-presence/nonempty contracts and reconstructs validated declarations. Label set deserializers enforce owner limits, uniqueness and canonical order. Input decoding does not perform declassification or grant authority."
     },
     "crates/security/chio-security-types/src/ports/bounded.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "BoundedVec visitor enforces MAX and inspects any overflow with IgnoredAny, never constructing an extra T. CanonicalBody and specialized set wrappers retain size, order, uniqueness and nonempty invariants. Native full-width integers remain unchanged; size checks do not grant authority."
     },
     "crates/security/chio-security-types/src/ports/identifiers.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing borrowed-string visitors validate identifiers before owned allocation; constructors retain 256-byte, nonblank, unpadded and nonzero variant invariants across deserialize entry points."
     },
     "crates/tooling/chio-conformance/src/bin/chio_econsim_runner.rs": {
       "kind": "raw-input-baseline",
@@ -11123,9 +11138,105 @@
     "contract": "Original-byte validation precedes projection. from_value is a typed programmatic constructor and carries no original-byte validation claim."
   },
   "reviewed_product_readers": {
+    "crates/core/chio-core-types/src/canonical/signed_json.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Original-token parser implementation, including duplicate object keys, lossy numeric lexemes and native full-width integer handling. Wrapping it in itself would recurse. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records."
+    },
     "crates/core/chio-core-types/src/canonical/untrusted.rs": {
       "kind": "parser-internal-or-typed",
-      "contract": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication."
+      "contract": "Shared wrapper keeps original text until its chosen contract is enforced: strict external I-JSON before typed projection, duplicate-aware lossless native decode, or exact canonical typed equality. Safe Debug/Display retain native local sources. Callers own byte limits and authentication. Unsigned document decoding shares the original duplicate-aware value visitor but permits ordinary Serde numeric coercions for approximate embedding vectors. Existing signed, external and canonical numeric contracts are unchanged and explicitly required for authoritative records."
+    },
+    "crates/guards/chio-data-guards/src/structured_classification.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Field-path classification validates the original native JSON document once before Value/path projection. Duplicate keys reject with a source-bearing redacted input error; full-width u64 values remain exact. Range and UTF-8 location checks still own non-JSON locations."
+    },
+    "crates/guards/chio-external-guards/src/external/azure_content_safety.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Production HTTP response retention is capped at 1 MiB by the shared egress contract; original strict external I-JSON is checked before typed provider projection. Parser causes survive behind redacted errors and failure bodies are not echoed. Every requested category must appear exactly once with a required severity in 0..=6; omitted, repeated, unexpected or incomplete category verdicts reject."
+    },
+    "crates/guards/chio-external-guards/src/external/bedrock.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Production HTTP response retention is capped at 1 MiB by the shared egress contract; original strict external I-JSON is checked before typed provider projection. Parser causes survive behind redacted errors and failure bodies are not echoed. Action is required and only NONE or GUARDRAIL_INTERVENED is accepted; unknown actions cannot become Allow."
+    },
+    "crates/guards/chio-external-guards/src/external/http_egress.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "All six provider guards use the egress contract actual-response retention bound and one strict original JSON response parser. HTTP status errors expose status/provider, not response body text."
+    },
+    "crates/guards/chio-external-guards/src/external/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Shared 1 MiB original JSON owner: native arguments preserve full-width integers; provider responses use strict external I-JSON before projection. Typed parser causes are redacted by core wrappers."
+    },
+    "crates/guards/chio-external-guards/src/external/threat_intel/safe_browsing.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Production HTTP response retention is capped at 1 MiB by the shared egress contract; original strict external I-JSON is checked before typed provider projection. Parser causes survive behind redacted errors and failure bodies are not echoed. Native arguments have a 1 MiB original duplicate-aware gate shared by cache-key extraction and evaluation, so ambiguous arguments cannot reuse a valid cache entry. The provider-defined empty no-match document remains a valid Allow; malformed or ambiguous input does not."
+    },
+    "crates/guards/chio-external-guards/src/external/threat_intel/snyk.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Production HTTP response retention is capped at 1 MiB by the shared egress contract; original strict external I-JSON is checked before typed provider projection. Parser causes survive behind redacted errors and failure bodies are not echoed. Native arguments have a 1 MiB original duplicate-aware gate shared by cache-key extraction and evaluation, so ambiguous arguments cannot reuse a valid cache entry. A vulnerability collection is explicitly required (empty is valid); each vulnerability requires severity and an upgrade disposition when upgrade-only policy is enabled."
+    },
+    "crates/guards/chio-external-guards/src/external/threat_intel/virustotal.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Production HTTP response retention is capped at 1 MiB by the shared egress contract; original strict external I-JSON is checked before typed provider projection. Parser causes survive behind redacted errors and failure bodies are not echoed. Native arguments have a 1 MiB original duplicate-aware gate shared by cache-key extraction and evaluation, so ambiguous arguments cannot reuse a valid cache entry. Required malicious/suspicious analysis statistics distinguish a valid zero-threat verdict from absent response data."
+    },
+    "crates/guards/chio-external-guards/src/external/vertex_safety.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Production HTTP response retention is capped at 1 MiB by the shared egress contract; original strict external I-JSON is checked before typed provider projection. Parser causes survive behind redacted errors and failure bodies are not echoed. Safety ratings must be present with nonempty categories and known probabilities. Prompt blocks, explicit safety finish reasons and blocked ratings deny even below the configured probability threshold."
+    },
+    "crates/guards/chio-guard-registry/src/cache.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Cached files use regular-file bounded reads (64 MiB maximum per file, final symlinks rejected on Unix). Original OCI manifest JSON is capped at 16 MiB and strict external I-JSON before descriptor projection. Manifest digest, exact layer count/media and each descriptor digest/size gate admission. JSON decode does not replace Sigstore verification; ancestor custody and write atomicity remain separate."
+    },
+    "crates/guards/chio-guard-registry/src/download.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "All guard artifact downloads use digest-pinned 16 MiB manifest transport and preflight exact three-layer descriptor shapes/digests, 64 MiB aggregate config/layer size, and 16 MiB JSON-layer limits. Each actual streamed blob body is capped to its descriptor, then checked for exact size and hash before construction. SDK unbounded pull paths are removed."
+    },
+    "crates/guards/chio-guard-registry/src/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Regular-file reader checks metadata and bounded actual read; Unix final symlinks and nonregular files reject. External JSON helper gates original 16 MiB data before typed projection."
+    },
+    "crates/guards/chio-guard-registry/src/marketplace.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "The complete 16 MiB-bounded original native guard manifest is duplicate-aware before marketplace Value and typed projection. Full-width native prices survive; nested duplicate keys reject. Existing price and reputation checks remain separate."
+    },
+    "crates/guards/chio-guard-registry/src/oci.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Referrer index, artifact manifest and token responses use strict original external I-JSON under a 16 MiB transport cap. Guard download delegates to descriptor-bounded transport, including digest-pinned manifests; Sigstore blobs preflight descriptor size/digest and cap actual retention. Errors do not echo response bodies. Registry Basic credentials cannot be delegated to a different token-realm authority. Sigstore authenticity remains a distinct gate."
+    },
+    "crates/guards/chio-guard-registry/src/pull.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Cache pull obtains raw manifest bytes through the bounded digest-verified transport and uses the same bounded artifact reader. Cache admission and separate Sigstore verification gates remain."
+    },
+    "crates/guards/chio-guard-registry/src/verify.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Cached Sigstore bundle and artifact bytes use bounded regular-file custody before existing attestation verification. Native Sigstore JSON input causes are forwarded without string flattening. No input decoding is treated as proof."
+    },
+    "crates/guards/chio-guards/src/embedding_anomaly.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Unsigned patterns are bounded to 16 MiB before duplicate-aware original document decoding and embedding projection; ordinary float spellings such as 0.10 and 1.0 remain valid; file input is a regular-file bounded read with Unix final-symlink rejection. Native IO and parser sources survive without input echo. Existing dimensions/finite-number and model checks remain."
+    },
+    "crates/guards/chio-guards/src/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Regular-file helper caps metadata and actual read before retention and rejects Unix final symlinks/nonregular files. Parent directory custody remains a deployment boundary."
+    },
+    "crates/guards/chio-wasm-guards/src/blocklist.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "The persisted blocklist uses a 1 MiB bounded regular-file read and native original JSON validation before its closed wire type. Digests must be explicitly present and already canonical. Writer size matches reader size; corrupt or missing-shape state cannot silently become an empty blocklist."
+    },
+    "crates/guards/chio-wasm-guards/src/hot_reload.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Canary manifest and fixture files use 1 MiB bounded regular reads, with at most 32 declared/discovered canaries before file loading. Original native fixture and nested verdict JSON is duplicate-aware. IO and parser causes remain source-bearing, and failed evaluation still prevents swap."
+    },
+    "crates/guards/chio-wasm-guards/src/input.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Shared regular-file custody caps metadata and actual retention; original native JSON decoder preserves native integers and rejects duplicates. ManifestYamlError keeps the native YAML cause behind redacted Debug/Display."
+    },
+    "crates/guards/chio-wasm-guards/src/manifest.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Manifest YAML and integrity sidecars use 1 MiB bounded regular reads. YAML Value parsing rejects duplicate mappings before typed projection; JSON sidecars validate original native JSON. Only actual NotFound can mean optional sidecar absence; other IO failures reject. WIT, digest and signature validation remain separate."
+    },
+    "crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Wasm module files are capped at the existing 10 MiB module limit before retention. Structured guest denial JSON validates original bounded native bytes before typed projection and no longer reinterprets malformed JSON as plaintext. Existing Wasmtime fuel/memory/import/result constraints remain; a denial cannot become Allow."
     },
     "crates/platform/chio-control-plane/src/error.rs": {
       "kind": "parser-internal-or-typed",
@@ -11718,6 +11829,78 @@
     "crates/protocol/chio-tool-call-fabric/src/types.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Normalized invocation validation rejects original duplicate-key, lossy I-JSON, non-object or noncanonical argument bytes under a 1 MiB limit before accepting the invocation. Provider/principal/version and sidecar checks retain their own meaning; structural decoding grants no authority."
+    },
+    "crates/security/chio-cage-init/src/bootstrap.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing bootstrap contract: sealed descriptor input uses MAX_ENVELOPE_BYTES bounded read, typed native decode then exact canonical re-encoding equality before envelope authentication, peer, binding and enforcement checks. No redundant parser or heavyweight core dependency added to the lightweight init binary."
+    },
+    "crates/security/chio-cage-plan/src/model.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing FdPurpose custom deserializer: closed tagged wire variants reject unknown sibling fields even for unit purposes, then map into the public enum. Full launch envelope authority is established only by bounded canonical bootstrap and plan validation, not by this value decoder."
+    },
+    "crates/security/chio-cage/src/launch/linux.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing bounded status-pipe decoder: line bytes are capped before decode and exact canonical StatusRecord equality precedes protocol stage handling and prepared enforcement validation. Parsing status alone cannot mint launch authority. No native host enforcement qualification is inferred."
+    },
+    "crates/security/chio-decoy/src/materialize.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Persisted Unix path bytes now decode through BoundedVec with a 4096-byte maximum. Live materialization rejects longer relative paths before filesystem mutation, matching the persisted reader. Existing relative-component, symlink, ownership, inode and receipt binding checks remain."
+    },
+    "crates/security/chio-decoy/src/registry.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing decoy custody: bounded EncryptedDecoyEnvelope and authenticated decryption precede canonical plaintext decoding; exact typed re-encoding, schema, tenant/artifact and materialization receipt identity validation follow. Nested receipt input also requires canonical equality. Shape parsing alone does not authenticate a decoy."
+    },
+    "crates/security/chio-decoy/src/watermark.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing token contract: 16 KiB token and bounded base64 bytes, canonical base64 and original typed canonical JSON equality, exact encoded-payload binding and shape validation precede separate watermark signature/time/context verification. It creates a candidate, not VerifiedWatermark."
+    },
+    "crates/security/chio-keyring/src/checkpoint.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates."
+    },
+    "crates/security/chio-keyring/src/event.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates."
+    },
+    "crates/security/chio-quarantine/src/correlation.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
+    },
+    "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
+    },
+    "crates/security/chio-quarantine/src/rules.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Temporal rule input has a 1 MiB original duplicate-aware native JSON gate before its closed typed rule projection. Parser errors retain redacted native sources; rule schema, action and window validation still run."
+    },
+    "crates/security/chio-quarantine/src/simulation.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
+    },
+    "crates/security/chio-quarantine/src/state_machine.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
+    },
+    "crates/security/chio-security-types/src/deception.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing registry-version decoder constructs through the validated nonzero/range owner. Encrypted envelope and export-page collections use BoundedVec; record semantic validation and authenticated registry decryption remain separate."
+    },
+    "crates/security/chio-security-types/src/declassification.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing deny-unknown-fields wire decoder reconstructs and validates grant schema, scope, lifetime and replay identity fields. A decoded grant body remains unverified until its signature and application policy checks succeed."
+    },
+    "crates/security/chio-security-types/src/flow.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing identifier visitors reject blank, padded and oversized values; tool-flow wire decoding preserves field-presence/nonempty contracts and reconstructs validated declarations. Label set deserializers enforce owner limits, uniqueness and canonical order. Input decoding does not perform declassification or grant authority."
+    },
+    "crates/security/chio-security-types/src/ports/bounded.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "BoundedVec visitor enforces MAX and inspects any overflow with IgnoredAny, never constructing an extra T. CanonicalBody and specialized set wrappers retain size, order, uniqueness and nonempty invariants. Native full-width integers remain unchanged; size checks do not grant authority."
+    },
+    "crates/security/chio-security-types/src/ports/identifiers.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing borrowed-string visitors validate identifiers before owned allocation; constructors retain 256-byte, nonblank, unpadded and nonzero variant invariants across deserialize entry points."
     },
     "crates/trust/chio-attest-buyer-core/src/context.rs": {
       "kind": "parser-internal-or-typed",

@@ -23,7 +23,6 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::external::bedrock::classify_status_error;
 use crate::external::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
 
 /// Guard name reported by [`SnykGuard::name`].
@@ -133,13 +132,13 @@ struct SnykResponse {
     #[serde(default)]
     issues: Option<SnykIssues>,
     #[serde(default)]
-    vulnerabilities: Vec<SnykVuln>,
+    vulnerabilities: Option<Vec<SnykVuln>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 struct SnykIssues {
     #[serde(default)]
-    vulnerabilities: Vec<SnykVuln>,
+    vulnerabilities: Option<Vec<SnykVuln>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -220,7 +219,7 @@ impl ExternalGuard for SnykGuard {
     }
 
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {
-        let args: SnykArgs = serde_json::from_str(&ctx.arguments_json).ok()?;
+        let args: SnykArgs = super::super::input::arguments(&ctx.arguments_json).ok()?;
         let mut hasher = Sha256::new();
         hasher.update(args.ecosystem.as_bytes());
         hasher.update(b":");
@@ -236,8 +235,7 @@ impl ExternalGuard for SnykGuard {
     }
 
     async fn eval(&self, ctx: &GuardCallContext) -> Result<Verdict, ExternalGuardError> {
-        let args: SnykArgs = serde_json::from_str(&ctx.arguments_json)
-            .map_err(|e| ExternalGuardError::Permanent(format!("invalid snyk arguments: {e}")))?;
+        let args: SnykArgs = super::super::input::arguments(&ctx.arguments_json)?;
 
         let endpoint = format!(
             "{}/test/{}/{}/{}?orgId={}",
@@ -265,33 +263,42 @@ impl ExternalGuard for SnykGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
+        let parsed: SnykResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
-        if !status.is_success() {
-            return Err(classify_status_error("snyk", status, &text));
+        let nested = parsed
+            .issues
+            .as_ref()
+            .and_then(|issues| issues.vulnerabilities.as_ref());
+        if parsed.vulnerabilities.is_none() && nested.is_none() {
+            return Err(ExternalGuardError::Permanent(
+                "missing Snyk vulnerability results".into(),
+            ));
         }
-
-        let parsed: SnykResponse = serde_json::from_str(&text)
-            .map_err(|e| ExternalGuardError::Transient(format!("parse snyk response: {e}")))?;
-
-        let mut vulns: Vec<&SnykVuln> = parsed.vulnerabilities.iter().collect();
-        if let Some(issues) = parsed.issues.as_ref() {
-            vulns.extend(issues.vulnerabilities.iter());
-        }
+        let vulns = parsed
+            .vulnerabilities
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .chain(nested.map(Vec::as_slice).unwrap_or(&[]));
 
         let threshold = self.cfg.severity_threshold.rank();
         let mut denied = false;
         let mut count_at_or_above = 0_usize;
         for v in vulns {
-            let Some(sev) = v.severity else {
-                continue;
-            };
+            let sev = v
+                .severity
+                .ok_or_else(|| ExternalGuardError::Permanent("missing Snyk severity".into()))?;
             if sev.rank() < threshold {
                 continue;
             }
             count_at_or_above += 1;
-            let upgradable = v.is_upgradable.unwrap_or(false);
+            let upgradable = if self.cfg.fail_on_upgradable_only {
+                v.is_upgradable.ok_or_else(|| {
+                    ExternalGuardError::Permanent("missing Snyk upgrade verdict".into())
+                })?
+            } else {
+                false
+            };
             if self.cfg.fail_on_upgradable_only {
                 if upgradable {
                     denied = true;

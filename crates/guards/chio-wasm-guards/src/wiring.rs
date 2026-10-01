@@ -367,13 +367,15 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         match err {
-            WasmGuardError::ManifestLoad { path, .. } => {
+            WasmGuardError::InputFile { path, source } => {
                 assert!(
-                    path.contains("guard-manifest.yaml"),
-                    "error should identify the manifest path, got: {path}"
+                    path.ends_with("guard-manifest.yaml"),
+                    "error should identify the manifest path, got: {}",
+                    path.display()
                 );
+                assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
             }
-            other => panic!("expected ManifestLoad, got: {other:?}"),
+            other => panic!("expected InputFile, got: {other:?}"),
         }
     }
 

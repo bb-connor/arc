@@ -182,7 +182,6 @@ impl BedrockGuardrailConfig {
 #[derive(Debug, Clone, Deserialize)]
 struct ApplyGuardrailResponse {
     /// `NONE` or `GUARDRAIL_INTERVENED`.
-    #[serde(default)]
     action: String,
     /// Opaque assessment records - captured verbatim for evidence.
     #[serde(default)]
@@ -323,17 +322,17 @@ impl ExternalGuard for BedrockGuardrailGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
+        let parsed: ApplyGuardrailResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
-        if !status.is_success() {
-            return Err(classify_status_error("bedrock", status, &text));
-        }
-
-        let parsed: ApplyGuardrailResponse = serde_json::from_str(&text)
-            .map_err(|e| ExternalGuardError::Transient(format!("parse bedrock response: {e}")))?;
-
-        let intervened = parsed.action.eq_ignore_ascii_case("GUARDRAIL_INTERVENED");
+        let intervened = match parsed.action.as_str() {
+            "NONE" => false,
+            "GUARDRAIL_INTERVENED" => true,
+            _ => {
+                return Err(ExternalGuardError::Permanent(
+                    "invalid Bedrock guard action".into(),
+                ))
+            }
+        };
         tracing::info!(
             guard = GUARD_NAME,
             action = %parsed.action,
@@ -354,12 +353,10 @@ impl ExternalGuard for BedrockGuardrailGuard {
 pub(crate) fn classify_status_error(
     provider: &'static str,
     status: StatusCode,
-    body: &str,
 ) -> ExternalGuardError {
-    let snippet = body.chars().take(256).collect::<String>();
     if status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS {
-        ExternalGuardError::Transient(format!("{provider} HTTP {}: {}", status.as_u16(), snippet))
+        ExternalGuardError::Transient(format!("{provider} HTTP {}", status.as_u16()))
     } else {
-        ExternalGuardError::Permanent(format!("{provider} HTTP {}: {}", status.as_u16(), snippet))
+        ExternalGuardError::Permanent(format!("{provider} HTTP {}", status.as_u16()))
     }
 }

@@ -75,13 +75,17 @@ pub(crate) async fn send_request_with_contract(
         })
 }
 
-pub(crate) async fn response_text(
+pub(crate) fn response_json<T: serde::de::DeserializeOwned>(
+    provider: &'static str,
     response: ContractResponse,
-) -> Result<String, ExternalGuardError> {
-    response
-        .text()
-        .await
-        .map_err(|error| ExternalGuardError::Transient(format!("read body: {error}")))
+) -> Result<T, ExternalGuardError> {
+    if !response.status().is_success() {
+        return Err(super::bedrock::classify_status_error(
+            provider,
+            response.status(),
+        ));
+    }
+    super::input::response(response.body())
 }
 
 fn normalized_authority(url: &Url) -> Result<String, ExternalGuardError> {

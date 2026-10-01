@@ -152,7 +152,7 @@ async fn threat_intel_rechecks_runtime_endpoints_before_send() {
 }
 
 #[tokio::test]
-async fn virustotal_allows_on_404() {
+async fn virustotal_denies_unknown_404_result() {
     let server = MockServer::start().await;
 
     Mock::given(method("GET"))
@@ -173,7 +173,7 @@ async fn virustotal_allows_on_404() {
         adapter
             .evaluate(&make_ctx("w", json!({"hash": KNOWN_BAD_HASH})))
             .await,
-        Verdict::Allow
+        Verdict::Deny
     );
 }
 

@@ -20,6 +20,14 @@ pub(super) fn parse_signed_json(input: &str) -> crate::error::Result<Value> {
     parse(input).map_err(crate::error::Error::CanonicalJson)
 }
 
+/// Unsigned documents keep ordinary Serde numeric coercions, including float
+/// spellings. They must still reject duplicate keys before typed projection.
+pub(super) fn parse_document(input: &str) -> crate::error::Result<Value> {
+    serde_json::from_str::<StoredValue>(input)
+        .map(|value| value.0)
+        .map_err(crate::error::Error::from)
+}
+
 fn parse(input: &str) -> Result<Value, String> {
     // Deserialize directly from tokens so nested duplicate keys remain visible.
     let value: StoredValue = serde_json::from_str(input).map_err(|error| error.to_string())?;

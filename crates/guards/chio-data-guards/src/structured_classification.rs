@@ -175,9 +175,15 @@ impl StructuredClassificationResult {
         let document = findings
             .iter()
             .any(|finding| matches!(finding.location, FindingLocation::FieldPath(_)))
-            .then(|| serde_json::from_slice::<serde_json::Value>(payload))
+            .then(|| {
+                chio_core::canonical::UntrustedJsonText::from_wire(
+                    payload,
+                    MAX_CLASSIFICATION_PAYLOAD_BYTES,
+                )
+                .and_then(|input| input.decode_signed::<serde_json::Value>())
+            })
             .transpose()
-            .map_err(|_| StructuredClassificationError::InvalidLocation)?;
+            .map_err(|error| StructuredClassificationError::Input(error.into()))?;
         for finding in &findings {
             validate_location(&finding.location, payload.len(), document.as_ref())?;
         }
@@ -315,8 +321,10 @@ impl StructuredClassifier for RegexStructuredClassifier {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum StructuredClassificationError {
+    #[error("classification JSON rejected: {0}")]
+    Input(#[source] chio_core::canonical::SharedUntrustedJsonError),
     #[error("classifier identifier is invalid")]
     InvalidIdentifier,
     #[error("classifier confidence is invalid")]
@@ -677,5 +685,38 @@ mod tests {
             classifier.classify(b"secret"),
             Err(StructuredClassificationError::InvalidLocation)
         );
+    }
+}
+
+#[cfg(test)]
+mod reader_boundary_tests {
+    use super::*;
+    #[test]
+    fn field_locations_bind_unambiguous_original_values(
+    ) -> Result<(), StructuredClassificationError> {
+        let identity = ClassifierIdentity::new("classifier.local", "1")?;
+        let finding = StructuredClassificationFinding::at_field_path(
+            "classifier.local",
+            "1",
+            "sensitive",
+            9000,
+            "/x",
+        )?;
+        let result = StructuredClassificationResult::from_payload(
+            identity.clone(),
+            br#"{"x":"first","x":"second"}"#,
+            vec![finding.clone()],
+        );
+        assert!(matches!(
+            result,
+            Err(StructuredClassificationError::Input(_))
+        ));
+        let native = StructuredClassificationResult::from_payload(
+            identity,
+            br#"{"x":18446744073709551615}"#,
+            vec![finding],
+        )?;
+        assert_eq!(native.findings().len(), 1);
+        Ok(())
     }
 }

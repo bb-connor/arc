@@ -7,6 +7,8 @@
 #![forbid(unsafe_code)]
 
 pub mod cache;
+mod download;
+mod input;
 #[cfg(feature = "marketplace")]
 pub mod marketplace;
 pub mod oci;

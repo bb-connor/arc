@@ -71,11 +71,18 @@ impl GuardDigestBlocklist {
     }
 
     fn load(&self) -> Result<BlocklistFile, BlocklistError> {
-        match fs::read(&self.path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|source| BlocklistError::Json {
-                path: self.path.clone(),
-                source,
-            }),
+        match crate::input::read_file(&self.path, crate::input::MAX_DOCUMENT_BYTES) {
+            Ok(bytes) => {
+                let file: BlocklistFile = crate::input::decode(&bytes)?;
+                for digest in &file.digests {
+                    if normalize_digest(digest)? != *digest {
+                        return Err(BlocklistError::InvalidDigest {
+                            digest: digest.clone(),
+                        });
+                    }
+                }
+                Ok(file)
+            }
             Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
                 Ok(BlocklistFile::default())
             }
@@ -99,6 +106,10 @@ impl GuardDigestBlocklist {
             path: self.path.clone(),
             source,
         })?;
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            &bytes,
+            crate::input::MAX_DOCUMENT_BYTES,
+        )?;
         fs::write(&self.path, bytes).map_err(|source| BlocklistError::Io {
             operation: "write",
             path: self.path.clone(),
@@ -120,14 +131,17 @@ pub fn normalize_digest(digest: &str) -> Result<String, BlocklistError> {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BlocklistFile {
-    #[serde(default)]
     digests: BTreeSet<String>,
 }
 
 /// Blocklist persistence and validation errors.
 #[derive(Debug, thiserror::Error)]
 pub enum BlocklistError {
+    /// Original blocklist JSON was ambiguous or exceeded its contract.
+    #[error("guard blocklist input rejected: {0}")]
+    Input(#[from] chio_core::canonical::UntrustedJsonError),
     /// Digest does not have a valid sha256 form.
     #[error("guard digest must be sha256:<64-hex> or <64-hex>, got {digest:?}")]
     InvalidDigest {

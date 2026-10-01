@@ -52,6 +52,17 @@ impl<'a> UntrustedJsonText<'a> {
         serde_json::from_slice(&canonical).map_err(UntrustedJsonError::Decode)
     }
 
+    /// Unsigned JSON documents: reject original duplicate keys, then apply the
+    /// target's ordinary Serde numeric conversions. This accepts float spellings
+    /// such as `0.10` and is suitable for approximate embedding vectors.
+    /// Signed or authoritative records must use their signed/external/canonical
+    /// contract instead; this does not enforce lossless numeric spelling.
+    pub fn decode_document<T: DeserializeOwned>(&self) -> Result<T, UntrustedJsonError> {
+        let value = super::signed_json::parse_document(self.text)
+            .map_err(UntrustedJsonError::SignedInput)?;
+        serde_json::from_value(value).map_err(UntrustedJsonError::Decode)
+    }
+
     /// Lossless native signed JSON, before the owner's signature and authorization checks.
     pub fn decode_signed<T: DeserializeOwned>(&self) -> Result<T, UntrustedJsonError> {
         let value = super::signed_json::parse_signed_json(self.text)
@@ -191,6 +202,38 @@ mod external_tests {
             input.decode_external::<serde_json::Value>(),
             Err(UntrustedJsonError::Canonicalization(_))
         ));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod document_tests {
+    use super::*;
+
+    #[test]
+    fn unsigned_floats_do_not_relax_signed_numeric_or_duplicate_contracts(
+    ) -> Result<(), UntrustedJsonError> {
+        let text = UntrustedJsonText::from_wire(b"[0.10,1.00,1e-2]", 128)?;
+        assert_eq!(
+            text.decode_document::<Vec<f32>>()?,
+            alloc::vec![0.1, 1.0, 0.01]
+        );
+        assert!(matches!(
+            text.decode_signed::<Vec<f32>>(),
+            Err(UntrustedJsonError::SignedInput(_))
+        ));
+        assert!(matches!(
+            text.decode_external::<Vec<f32>>(),
+            Err(UntrustedJsonError::Canonicalization(_))
+        ));
+        let ambiguous =
+            UntrustedJsonText::from_wire(br#"{"ignored":{"secret":1,"secret":2}}"#, 128)?;
+        match ambiguous.decode_document::<serde_json::Value>() {
+            Err(UntrustedJsonError::SignedInput(error)) => {
+                assert!(core::error::Error::source(&error).is_some());
+            }
+            other => panic!("expected original duplicate rejection, got {other:?}"),
+        }
         Ok(())
     }
 }

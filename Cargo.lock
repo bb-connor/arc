@@ -4054,8 +4054,10 @@ name = "chio-guard-registry"
 version = "0.1.0"
 dependencies = [
  "chio-attest-verify",
+ "chio-core-types",
  "chio-egress-contract",
  "chio-reputation",
+ "libc",
  "oci-distribution",
  "reqwest 0.13.2",
  "serde",
@@ -4096,6 +4098,7 @@ dependencies = [
  "chio-security-types",
  "chio-store-sqlite",
  "glob",
+ "libc",
  "lru 0.18.2",
  "rand 0.8.6",
  "regex",
@@ -5488,6 +5491,7 @@ dependencies = [
  "criterion",
  "ed25519-dalek 2.2.0",
  "hex",
+ "libc",
  "loom",
  "notify",
  "pollster",

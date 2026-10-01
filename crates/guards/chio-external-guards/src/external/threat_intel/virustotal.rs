@@ -21,7 +21,6 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::external::bedrock::classify_status_error;
 use crate::external::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
 
 /// Guard name reported by [`VirusTotalGuard::name`].
@@ -123,9 +122,7 @@ struct VirusTotalAttributes {
 
 #[derive(Debug, Clone, Deserialize)]
 struct VirusTotalStats {
-    #[serde(default)]
     malicious: u64,
-    #[serde(default)]
     suspicious: u64,
 }
 
@@ -206,7 +203,7 @@ impl ExternalGuard for VirusTotalGuard {
     }
 
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {
-        let args: VirusTotalArgs = serde_json::from_str(&ctx.arguments_json).ok()?;
+        let args: VirusTotalArgs = super::super::input::arguments(&ctx.arguments_json).ok()?;
         if let Some(h) = args.hash.as_deref().and_then(normalize_sha256_hex) {
             return Some(format!("vt:file:{h}"));
         }
@@ -224,9 +221,7 @@ impl ExternalGuard for VirusTotalGuard {
     }
 
     async fn eval(&self, ctx: &GuardCallContext) -> Result<Verdict, ExternalGuardError> {
-        let args: VirusTotalArgs = serde_json::from_str(&ctx.arguments_json).map_err(|e| {
-            ExternalGuardError::Permanent(format!("invalid virustotal arguments: {e}"))
-        })?;
+        let args: VirusTotalArgs = super::super::input::arguments(&ctx.arguments_json)?;
 
         let endpoint = if let Some(raw_hash) = args.hash.as_deref() {
             let Some(hash) = normalize_sha256_hex(raw_hash) else {
@@ -262,30 +257,16 @@ impl ExternalGuard for VirusTotalGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
-
-        // 404 -> not found in VT database. We allow-by-default so that a
-        // previously-unseen hash/URL doesn't block benign traffic. Upstream
-        // callers can layer additional controls.
-        if status.as_u16() == 404 {
-            tracing::info!(guard = GUARD_NAME, "virustotal: target not found");
-            return Ok(Verdict::Allow);
-        }
-
-        if !status.is_success() {
-            return Err(classify_status_error("virustotal", status, &text));
-        }
-
-        let parsed: VirusTotalResponse = serde_json::from_str(&text)
-            .map_err(|e| ExternalGuardError::Transient(format!("parse vt response: {e}")))?;
+        let parsed: VirusTotalResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
         let (malicious, suspicious) = parsed
             .data
             .and_then(|d| d.attributes)
             .and_then(|a| a.last_analysis_stats)
             .map(|s| (s.malicious, s.suspicious))
-            .unwrap_or((0, 0));
+            .ok_or_else(|| {
+                ExternalGuardError::Permanent("missing VirusTotal analysis statistics".into())
+            })?;
 
         let detections = malicious.saturating_add(suspicious);
         tracing::info!(

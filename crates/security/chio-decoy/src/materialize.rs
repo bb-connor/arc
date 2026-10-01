@@ -148,6 +148,7 @@ impl fmt::Debug for OwnershipKey {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PathViolation {
+    TooLong,
     Empty,
     Absolute,
     EmptyComponent,
@@ -161,6 +162,7 @@ pub enum PathViolation {
 impl fmt::Display for PathViolation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
+            Self::TooLong => "path exceeds the byte limit",
             Self::Empty => "empty path",
             Self::Absolute => "absolute path",
             Self::EmptyComponent => "empty path component",
@@ -219,7 +221,11 @@ impl fmt::Display for MaterializeError {
 impl std::error::Error for MaterializeError {}
 
 #[cfg(unix)]
+const MAX_MATERIALIZATION_PATH_BYTES: usize = 4096;
+
+#[cfg(unix)]
 mod unix_path_serde {
+    use super::MAX_MATERIALIZATION_PATH_BYTES;
     use std::ffi::OsString;
     use std::os::unix::ffi::{OsStrExt, OsStringExt};
     use std::path::{Path, PathBuf};
@@ -237,8 +243,8 @@ mod unix_path_serde {
     where
         D: Deserializer<'de>,
     {
-        let bytes = Vec::<u8>::deserialize(deserializer)?;
-        Ok(PathBuf::from(OsString::from_vec(bytes)))
+        let bytes = chio_security_types::ports::BoundedVec::<u8, MAX_MATERIALIZATION_PATH_BYTES>::deserialize(deserializer)?;
+        Ok(PathBuf::from(OsString::from_vec(bytes.into_vec())))
     }
 }
 
@@ -881,6 +887,9 @@ mod unix {
 
     fn parse_relative_path(path: &std::path::Path) -> Result<ParsedPath<'_>, MaterializeError> {
         let bytes = path.as_os_str().as_bytes();
+        if bytes.len() > super::MAX_MATERIALIZATION_PATH_BYTES {
+            return Err(MaterializeError::InvalidPath(PathViolation::TooLong));
+        }
         if bytes.is_empty() {
             return Err(MaterializeError::InvalidPath(PathViolation::Empty));
         }
@@ -1114,6 +1123,19 @@ mod unix {
         MaterializeError::Io {
             operation,
             kind: error.kind(),
+        }
+    }
+
+    #[cfg(test)]
+    mod reader_boundary_tests {
+        use super::*;
+        #[test]
+        fn materialized_paths_obey_the_persisted_path_limit() {
+            let path = "a/".repeat(super::super::MAX_MATERIALIZATION_PATH_BYTES / 2 + 1);
+            assert!(matches!(
+                parse_relative_path(std::path::Path::new(&path)),
+                Err(MaterializeError::InvalidPath(PathViolation::TooLong))
+            ));
         }
     }
 }

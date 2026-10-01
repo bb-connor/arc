@@ -131,7 +131,9 @@ pub struct TemporalRule {
 impl TemporalRule {
     pub fn parse_json(bytes: &[u8], limits: &RuleLimits) -> Result<Self, RuleError> {
         let document: TemporalRuleDocument =
-            serde_json::from_slice(bytes).map_err(RuleError::Parse)?;
+            chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, 1024 * 1024)
+                .and_then(|input| input.decode_signed())
+                .map_err(RuleError::Parse)?;
         Self::from_document(document, limits)
     }
 
@@ -284,7 +286,7 @@ pub enum RuleError {
     #[error("non-first stage is missing its window")]
     MissingWindow,
     #[error("rule JSON is invalid: {0}")]
-    Parse(serde_json::Error),
+    Parse(#[source] chio_core_types::canonical::UntrustedJsonError),
     #[error("rule state estimate exceeds the configured limit")]
     StateEstimateExceeded,
     #[error("rule state estimate overflowed")]
@@ -293,4 +295,24 @@ pub enum RuleError {
     StageCountWidth(#[source] core::num::TryFromIntError),
     #[error("rule exceeds the stage limit")]
     TooManyStages,
+}
+
+#[cfg(test)]
+mod reader_boundary_tests {
+    use super::*;
+    #[test]
+    fn rules_reject_ambiguous_original_input_and_oversize_before_projection() {
+        assert!(matches!(
+            TemporalRule::parse_json(br#"{"secret":{"x":1,"x":2}}"#, &RuleLimits::default()),
+            Err(RuleError::Parse(
+                chio_core_types::canonical::UntrustedJsonError::SignedInput(_)
+            ))
+        ));
+        assert!(matches!(
+            TemporalRule::parse_json(&vec![b' '; 1024 * 1024 + 1], &RuleLimits::default()),
+            Err(RuleError::Parse(
+                chio_core_types::canonical::UntrustedJsonError::TooLarge { .. }
+            ))
+        ));
+    }
 }

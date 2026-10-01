@@ -1,0 +1,290 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling zeroize v1.9.0
+   Compiling smallvec v1.15.1
+   Compiling serde_json v1.0.149
+   Compiling hashbrown v0.17.0
+   Compiling itertools v0.14.0
+   Compiling postcard v1.1.3
+   Compiling generic-array v0.14.7
+   Compiling icu_normalizer v2.1.1
+   Compiling der v0.7.10
+   Compiling idna_adapter v1.2.1
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling idna v1.1.0
+   Compiling digest v0.10.7
+   Compiling block-padding v0.3.3
+   Compiling inout v0.1.4
+   Compiling sha2 v0.10.9
+   Compiling cipher v0.4.4
+   Compiling hmac v0.12.1
+   Compiling salsa20 v0.10.2
+   Compiling pbkdf2 v0.12.2
+   Compiling spki v0.7.3
+   Compiling aes v0.8.4
+   Compiling cbc v0.1.2
+   Compiling scrypt v0.11.0
+   Compiling url v2.5.8
+   Compiling signature v2.2.0
+   Compiling pkcs5 v0.7.1
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling curve25519-dalek v4.1.3
+   Compiling parking_lot_core v0.9.12
+   Compiling indexmap v2.14.1
+   Compiling parking_lot v0.12.5
+   Compiling pkcs8 v0.10.2
+   Compiling ed25519 v2.2.3
+   Compiling tokio v1.50.0
+   Compiling rustls-pki-types v1.14.0
+   Compiling ed25519-dalek v2.2.0
+   Compiling aws-lc-rs v1.18.1 (/tmp/arc-security-launch/third_party/aws-lc-rs-chio)
+   Compiling num v0.4.3
+   Compiling universal-hash v0.5.1
+   Compiling poly1305 v0.8.0
+   Compiling aead v0.5.2
+   Compiling rs_merkle v1.5.0
+   Compiling sha3 v0.10.8
+   Compiling webpki-roots v1.0.6
+   Compiling frost-core v3.0.0
+   Compiling alloy-primitives v1.5.7
+   Compiling sec1 v0.7.3
+   Compiling hkdf v0.12.4
+   Compiling rustls-webpki v0.103.15
+   Compiling crypto-bigint v0.5.5
+   Compiling frost-rerandomized v3.0.0
+   Compiling rustls v0.23.45
+   Compiling rusqlite v0.39.0
+   Compiling frost-ed25519 v3.0.0
+   Compiling elliptic-curve v0.13.8
+   Compiling ahash v0.8.12
+   Compiling rustls-native-certs v0.8.3
+   Compiling referencing v0.46.0
+   Compiling fraction v0.15.3
+   Compiling deranged v0.5.8
+   Compiling tokio-util v0.7.18
+   Compiling h2 v0.4.16
+   Compiling tower v0.5.3
+   Compiling jsonschema v0.46.0
+   Compiling tokio-rustls v0.26.4
+   Compiling tower-http v0.6.8
+   Compiling time-macros v0.2.27
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling serde v1.0.228
+   Compiling rfc6979 v0.4.0
+   Compiling ecdsa v0.16.9
+   Compiling olpc-cjson v0.1.4
+   Compiling time v0.3.47
+   Compiling primeorder v0.13.6
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling serde_with v3.18.0
+   Compiling hyper v1.8.1
+   Compiling num-bigint-dig v0.8.6
+   Compiling pkcs1 v0.7.5
+   Compiling oci-spec v0.9.0
+   Compiling oauth2 v5.0.0
+   Compiling tls_codec v0.4.2
+   Compiling hyper-util v0.1.20
+   Compiling rsa v0.9.10
+   Compiling p256 v0.13.2
+   Compiling p384 v0.13.1
+   Compiling jsonwebtoken v10.4.0
+   Compiling sha1 v0.10.6
+   Compiling toml_edit v0.22.27
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling tough v0.22.0
+   Compiling sigstore_protobuf_specs v0.5.1
+   Compiling x509-cert v0.2.5
+   Compiling oci-client v0.17.0
+   Compiling openidconnect v4.0.1
+   Compiling crypto_secretbox v0.1.1
+   Compiling webbrowser v1.2.2
+   Compiling toml v0.8.23
+   Compiling bytes v1.11.1
+   Compiling ruint v1.20.0
+   Compiling const-hex v1.18.1
+   Compiling alloy-sol-type-parser v1.5.7
+   Compiling alloy-json-abi v1.5.7
+   Compiling asn1-rs v0.6.2
+   Compiling sigstore v0.14.0
+   Compiling ciborium v0.2.2
+   Compiling tracing-subscriber v0.3.23
+   Compiling der-parser v9.0.0
+   Compiling oid-registry v0.7.1
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+   Compiling chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+   Compiling chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+   Compiling chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling alloy-sol-macro-input v1.5.7
+   Compiling simple_asn1 v0.6.4
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+   Compiling alloy-sol-macro-expander v1.5.7
+   Compiling secrecy v0.10.3
+   Compiling jsonwebtoken v9.3.1
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+   Compiling x509-parser v0.16.0
+   Compiling chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+   Compiling chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+   Compiling alloy-sol-macro v1.5.7
+   Compiling coset v0.4.2
+   Compiling alloy-sol-types v1.5.7
+   Compiling webpki-roots v0.26.11
+   Compiling chio-data-guards-redactors-default v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-data-guards/redactors/default)
+   Compiling dashmap v6.1.0
+   Compiling chio-log-redact v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-log-redact)
+   Compiling ureq v2.12.1
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling alloy-core v1.5.7
+   Compiling chio-swarm-authority v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-swarm-authority)
+   Compiling alloy v1.8.3
+   Compiling chio-web3-bindings v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3-bindings)
+   Compiling chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+   Compiling lru v0.18.2
+   Compiling wasmtime-internal-core v46.0.3
+   Compiling semver v1.0.27
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+   Compiling cranelift-bitset v0.133.3
+   Compiling cranelift-entity v0.133.3
+   Compiling wasmparser v0.251.0
+   Compiling gimli v0.33.0
+   Compiling cranelift-bforest v0.133.3
+   Compiling object v0.39.1
+   Compiling zstd-sys v2.0.16+zstd.1.5.7
+   Compiling regalloc2 v0.15.1
+   Compiling pulley-interpreter v46.0.3
+   Compiling zstd-safe v7.2.4
+   Compiling wit-parser v0.251.0
+   Compiling petgraph v0.6.5
+   Compiling wasm-encoder v0.251.0
+   Compiling wasmprinter v0.251.0
+   Compiling chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+   Compiling wasmtime-environ v46.0.3
+   Compiling cranelift-codegen v0.133.3
+   Compiling chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+   Compiling wasmtime-internal-wit-bindgen v46.0.3
+   Compiling zstd v0.13.3
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+   Compiling rayon v1.11.0
+   Compiling chacha20 v0.9.1
+   Compiling hashbrown v0.15.5
+   Compiling serde_yaml_ng v0.10.0
+   Compiling chacha20poly1305 v0.10.1
+   Compiling fxprof-processed-profile v0.8.1
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling wasm-compose v0.251.0
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling wasmtime-internal-jit-debug v46.0.3
+   Compiling wasmtime-internal-component-macro v46.0.3
+   Compiling addr2line v0.26.1
+   Compiling wasmtime-internal-jit-icache-coherence v46.0.3
+   Compiling wasmparser v0.221.3
+   Compiling wasmtime-internal-cache v46.0.3
+   Compiling wasmtime-internal-fiber v46.0.3
+   Compiling tinytemplate v1.2.1
+   Compiling loom v0.7.2
+   Compiling criterion v0.5.1
+   Compiling rusty-fork v0.3.1
+   Compiling bls12_381_plus v0.8.13
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling proptest v1.10.0
+   Compiling wasmtime-internal-unwinder v46.0.3
+   Compiling cranelift-frontend v0.133.3
+   Compiling cranelift-native v0.133.3
+   Compiling chio-workflow-preflight v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow-preflight)
+   Compiling wasmtime-internal-cranelift v46.0.3
+   Compiling chio-secure-ipc v0.1.0 (/tmp/arc-security-launch/crates/security/chio-secure-ipc)
+   Compiling chio-workflow v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow)
+   Compiling affinidi-bbs v0.1.0
+   Compiling chio-disclosure-lineage v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-disclosure-lineage)
+   Compiling chio-keyring v0.1.0 (/tmp/arc-security-launch/crates/security/chio-keyring)
+   Compiling scheduled-thread-pool v0.2.7
+   Compiling r2d2 v0.8.10
+   Compiling chio-selective-disclosure v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-selective-disclosure)
+   Compiling r2d2_sqlite v0.33.0
+   Compiling tokio-stream v0.1.18
+   Compiling chio-sqlite-file-identity v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-sqlite-file-identity)
+   Compiling wasmtime v46.0.3
+   Compiling chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-authority)
+   Compiling axum-core v0.5.6
+   Compiling axum v0.8.8
+   Compiling hyper-timeout v0.5.2
+   Compiling ureq-proto v0.6.0
+   Compiling portable-atomic v1.13.1
+   Compiling bollard-buildkit-proto v0.7.0
+   Compiling utf8-zero v0.8.1
+   Compiling ureq v3.3.0
+   Compiling regex-automata v0.4.14
+   Compiling structmeta-derive v0.3.0
+   Compiling structmeta v0.3.0
+   Compiling tonic v0.14.5
+   Compiling jwt v0.16.0
+   Compiling stacker v0.1.23
+   Compiling regex v1.12.3
+   Compiling chio-cage-init v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-init)
+   Compiling reqwest v0.12.28
+   Compiling parse-display-derive v0.9.1
+   Compiling hyperlocal v0.9.1
+   Compiling tonic-prost v0.14.5
+   Compiling recursive v0.1.1
+   Compiling astral-tokio-tar v0.6.2
+   Compiling parse-display v0.9.1
+   Compiling oci-distribution v0.11.0
+   Compiling ferroid v2.0.0
+   Compiling chio-decoy v0.1.0 (/tmp/arc-security-launch/crates/security/chio-decoy)
+error[E0433]: failed to resolve: could not find `BoundedVec` in `chio_security_types`
+   --> crates/security/chio-decoy/src/materialize.rs:240:42
+    |
+240 |         let bytes = chio_security_types::BoundedVec::<u8, 4096>::deserialize(deserializer)?;
+    |                                          ^^^^^^^^^^ could not find `BoundedVec` in `chio_security_types`
+    |
+help: consider importing this struct
+    |
+223 +     use chio_security_types::ports::BoundedVec;
+    |
+help: if you import `BoundedVec`, refer to it directly
+    |
+240 -         let bytes = chio_security_types::BoundedVec::<u8, 4096>::deserialize(deserializer)?;
+240 +         let bytes = BoundedVec::<u8, 4096>::deserialize(deserializer)?;
+    |
+
+warning: unused import: `Deserialize`
+   --> crates/security/chio-decoy/src/materialize.rs:227:17
+    |
+227 |     use serde::{Deserialize, Deserializer, Serializer};
+    |                 ^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling chio-reputation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-reputation)
+For more information about this error, try `rustc --explain E0433`.
+warning: `chio-decoy` (lib) generated 1 warning
+error: could not compile `chio-decoy` (lib) due to 1 previous error; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...

@@ -15,7 +15,6 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::external::bedrock::classify_status_error;
 use crate::external::{http_egress, ExternalGuard, ExternalGuardError, GuardCallContext};
 
 /// Guard name reported by [`SafeBrowsingGuard::name`].
@@ -206,7 +205,7 @@ impl ExternalGuard for SafeBrowsingGuard {
     }
 
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {
-        let args: SafeBrowsingArgs = serde_json::from_str(&ctx.arguments_json).ok()?;
+        let args: SafeBrowsingArgs = super::super::input::arguments(&ctx.arguments_json).ok()?;
         let mut hasher = Sha256::new();
         hasher.update(args.url.as_bytes());
         let digest = hasher.finalize();
@@ -222,9 +221,7 @@ impl ExternalGuard for SafeBrowsingGuard {
             "safe-browsing base_url",
             &self.base_url,
         )?;
-        let args: SafeBrowsingArgs = serde_json::from_str(&ctx.arguments_json).map_err(|e| {
-            ExternalGuardError::Permanent(format!("invalid safe-browsing arguments: {e}"))
-        })?;
+        let args: SafeBrowsingArgs = super::super::input::arguments(&ctx.arguments_json)?;
 
         let endpoint = format!(
             "{}/threatMatches:find?key={}",
@@ -255,16 +252,7 @@ impl ExternalGuard for SafeBrowsingGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
-
-        if !status.is_success() {
-            return Err(classify_status_error("safe-browsing", status, &text));
-        }
-
-        let parsed: FindResponse = serde_json::from_str(&text).map_err(|e| {
-            ExternalGuardError::Transient(format!("parse safe browsing response: {e}"))
-        })?;
+        let parsed: FindResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
         let matched = !parsed.matches.is_empty();
         tracing::info!(

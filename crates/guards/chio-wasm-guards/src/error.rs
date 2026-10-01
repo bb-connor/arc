@@ -3,6 +3,19 @@
 /// Errors that can occur during WASM guard loading and execution.
 #[derive(Debug, thiserror::Error)]
 pub enum WasmGuardError {
+    /// Guard JSON input rejected before projection.
+    #[error("guard JSON input rejected: {0}")]
+    Input(#[from] chio_core::canonical::UntrustedJsonError),
+    /// Guard input file could not be read under its byte/type contract.
+    #[error("guard input file rejected: {path}")]
+    InputFile {
+        path: std::path::PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// Guard YAML input failed its original-document contract.
+    #[error("{0}")]
+    ManifestYaml(#[from] crate::ManifestYamlError),
     /// The `.wasm` module could not be read from disk.
     #[error("failed to read WASM module at {path}: {reason}")]
     ModuleLoad { path: String, reason: String },

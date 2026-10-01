@@ -176,11 +176,14 @@ where
             {
                 let capacity = sequence.size_hint().unwrap_or(0).min(MAX);
                 let mut values = Vec::with_capacity(capacity);
-                while let Some(value) = sequence.next_element::<T>()? {
-                    if values.len() == MAX {
-                        return Err(de::Error::custom("collection exceeds the item limit"));
+                while values.len() < MAX {
+                    match sequence.next_element::<T>()? {
+                        Some(value) => values.push(value),
+                        None => return Ok(BoundedVec(values)),
                     }
-                    values.push(value);
+                }
+                if sequence.next_element::<de::IgnoredAny>()?.is_some() {
+                    return Err(de::Error::custom("collection exceeds the item limit"));
                 }
                 Ok(BoundedVec(values))
             }
@@ -378,5 +381,34 @@ impl<'de> Deserialize<'de> for EgressRestrictionEffectIds {
     {
         let values = BoundedVec::<EffectId, 256>::deserialize(deserializer)?.into_vec();
         Self::new(values).map_err(de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+mod reader_boundary_tests {
+    use super::*;
+    use core::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn collection_limit_does_not_construct_overflow_elements() -> Result<(), serde_json::Error> {
+        static DECODED: AtomicUsize = AtomicUsize::new(0);
+        struct Counted;
+        impl<'de> Deserialize<'de> for Counted {
+            fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                DECODED.fetch_add(1, Ordering::SeqCst);
+                let _ = <u64 as Deserialize>::deserialize(deserializer)?;
+                Ok(Self)
+            }
+        }
+        let result = serde_json::from_str::<BoundedVec<Counted, 1>>("[1,2]");
+        assert_eq!(DECODED.load(Ordering::SeqCst), 1);
+        assert!(
+            matches!(result, Err(error) if error.to_string().contains("collection exceeds the item limit"))
+        );
+        assert_eq!(
+            serde_json::from_str::<BoundedVec<u64, 1>>("[18446744073709551615]")?.into_vec(),
+            alloc::vec![u64::MAX]
+        );
+        Ok(())
     }
 }

@@ -273,12 +273,7 @@ fn validate_cache_admission(
     artifact: &GuardCacheArtifact<'_>,
 ) -> Result<()> {
     ensure_manifest_digest_matches(digest, artifact.manifest_json)?;
-    let manifest =
-        serde_json::from_slice::<OciImageManifest>(artifact.manifest_json).map_err(|err| {
-            GuardRegistryError::VerifyFailedClosed {
-                message: format!("failed to parse pulled OCI manifest JSON: {err}"),
-            }
-        })?;
+    let manifest: OciImageManifest = crate::input::external(artifact.manifest_json)?;
     validate_top_level_manifest_shape(&manifest)?;
     validate_descriptor(
         "config.json",
@@ -320,7 +315,7 @@ fn validate_cache_admission(
     Ok(())
 }
 
-fn validate_top_level_manifest_shape(manifest: &OciImageManifest) -> Result<()> {
+pub(crate) fn validate_top_level_manifest_shape(manifest: &OciImageManifest) -> Result<()> {
     if manifest.media_type.as_deref() != Some(GUARD_OCI_MANIFEST_MEDIA_TYPE) {
         return Err(GuardRegistryError::DescriptorMediaTypeMismatch {
             artifact: "manifest.json",
@@ -344,7 +339,7 @@ fn validate_top_level_manifest_shape(manifest: &OciImageManifest) -> Result<()> 
     Ok(())
 }
 
-fn descriptor_for_layer<'a>(
+pub(crate) fn descriptor_for_layer<'a>(
     layers: &'a [OciDescriptor],
     artifact_name: &'static str,
     expected_media_type: &'static str,
@@ -379,7 +374,7 @@ fn descriptor_for_layer<'a>(
     Ok(descriptor)
 }
 
-fn validate_descriptor(
+pub(crate) fn validate_descriptor(
     artifact_name: &'static str,
     descriptor: &OciDescriptor,
     expected_media_type: &'static str,
@@ -412,6 +407,13 @@ fn validate_descriptor(
 }
 
 fn write_cache_file(path: &Path, bytes: &[u8]) -> Result<()> {
+    if bytes.len() > crate::input::MAX_ARTIFACT_BYTES {
+        return Err(chio_core_types::canonical::UntrustedJsonError::TooLarge {
+            bytes: bytes.len(),
+            bound: crate::input::MAX_ARTIFACT_BYTES,
+        }
+        .into());
+    }
     fs::write(path, bytes).map_err(|source| GuardRegistryError::CacheIo {
         operation: "write",
         path: path.to_path_buf(),
@@ -420,10 +422,12 @@ fn write_cache_file(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 fn read_cache_file(path: &Path) -> Result<Vec<u8>> {
-    fs::read(path).map_err(|source| GuardRegistryError::CacheIo {
-        operation: "read",
-        path: path.to_path_buf(),
-        source,
+    crate::input::read_file(path, crate::input::MAX_ARTIFACT_BYTES).map_err(|source| {
+        GuardRegistryError::CacheIo {
+            operation: "read",
+            path: path.to_path_buf(),
+            source,
+        }
     })
 }
 

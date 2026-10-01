@@ -1,0 +1,84 @@
+{
+  "source_base": "90e8f0683b251b49cccbaa6d94d554c53eb88932",
+  "branch": "packet/3-retention-accounting",
+  "checkout": "/tmp/arc-security-launch",
+  "host": "Linux aarch64",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8",
+  "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+  "test_summary": "test-summary.json",
+  "accepted_test_binaries": 106,
+  "source_files_hashed": 77,
+  "checks": [
+    {
+      "command": [
+        "python",
+        "/tmp/guard-inventory-update.py"
+      ],
+      "exit_code": 0,
+      "log": "trust-check-final.log"
+    },
+    {
+      "command": [
+        "python",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "log": "hygiene-final.log"
+    },
+    {
+      "command": [
+        "python",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "log": "negative-final.log"
+    },
+    {
+      "command": [
+        "python",
+        "scripts/check-wire-schemas.py"
+      ],
+      "exit_code": 0,
+      "log": "wire-check.log"
+    },
+    {
+      "record": "unsigned-document-control.json",
+      "exit_code": 0
+    },
+    {
+      "record": "guards-final.json",
+      "exit_code": 0
+    },
+    {
+      "record": "cli-consumers.json",
+      "exit_code": 0
+    },
+    {
+      "record": "format-final.json",
+      "exit_code": 0
+    }
+  ],
+  "test_composition": "qualification-4 excluding chio-guards, replaced with terminal guards-final; plus one new core numeric/duplicate contract control. Failed campaigns remain failures, not reclassified. Harness pass totals include optional early-return fixtures.",
+  "optional_early_returns": {
+    "count": 12,
+    "owners": [
+      "go_guard_integration",
+      "py_guard_integration"
+    ],
+    "reason": "Built SDK WASM artifacts absent. Harness reports ok after early return; not runtime qualification."
+  },
+  "post_batch_source_changes": "After qualification-4: added unsigned document parser and changed its embedding consumer, qualified by core control and complete guards rerun. CLI sidecar IO classification and optional fuzz exhaustive error mapping compile in cli-consumers. Two new test modules moved intact to owner ends after their executions; no test bodies changed.",
+  "inventory_snapshot": "Fresh full source scan and check at inventory update, before the two intact test-module relocations. Production entry points unchanged by those relocations.",
+  "claim": "Local scoped tests plus final direct-consumer/fuzz compilation; no single all-green combined 12-package invocation is claimed.",
+  "excluded": [
+    "full workspace tests/clippy",
+    "all-feature/backend matrix",
+    "live-provider interoperability",
+    "optional SDK WASM execution",
+    "Docker OCI registry",
+    "native x86_64 enforcement",
+    "hosted exact-candidate CI",
+    "M5 and operator acceptance",
+    "merge/publication/activation"
+  ]
+}

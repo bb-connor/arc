@@ -91,6 +91,12 @@ pub struct GuardCallContext {
 /// Errors surfaced from an [`ExternalGuard`] call.
 #[derive(Debug, Error)]
 pub enum ExternalGuardError {
+    /// Original request JSON failed its bounded native input contract.
+    #[error("external guard request JSON rejected: {0}")]
+    InvalidInput(#[source] chio_core::canonical::UntrustedJsonError),
+    /// Original service JSON failed its bounded external input contract.
+    #[error("external guard response JSON rejected: {0}")]
+    InvalidResponse(#[source] chio_core::canonical::UntrustedJsonError),
     /// The downstream service timed out.
     #[error("external guard timeout")]
     Timeout,
@@ -109,7 +115,10 @@ impl ExternalGuardError {
     /// Returns true for errors that should count as a circuit-breaker
     /// failure and be retried.
     pub fn is_retryable(&self) -> bool {
-        matches!(self, Self::Timeout | Self::Transient(_))
+        matches!(
+            self,
+            Self::Timeout | Self::Transient(_) | Self::InvalidResponse(_)
+        )
     }
 }
 

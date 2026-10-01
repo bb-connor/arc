@@ -77,9 +77,13 @@ lives in `chio-guards`, and dispatch-time egress enforcement lives in
   guard's. Blank and whitespace-only patterns are trimmed and dropped at
   construction, and the resulting empty list matches every tool, not
   none.
-- `VirusTotalGuard` alone does not fail closed on a non-2xx status: HTTP
-  404 (not indexed) maps to `Allow` so an unseen hash or URL does not
-  block traffic.
+- `VirusTotalGuard` fails closed on non-2xx status, including HTTP 404
+  (not indexed). An indexed result must include explicit malicious and
+  suspicious counts before it can allow the call.
+- Provider responses pass original duplicate-aware external JSON validation
+  before projection. Missing verdict evidence cannot become `Allow`; explicit
+  Vertex safety finish reasons and blocked ratings deny below local thresholds.
+  Safe Browsing's explicit empty no-match document remains valid.
 - `block_on` fails closed (`KernelError::GuardDenied`) on an unrecognized
   runtime flavor or if the current-thread fallback thread panics.
 

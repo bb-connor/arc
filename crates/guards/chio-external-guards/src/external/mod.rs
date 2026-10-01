@@ -6,6 +6,7 @@ pub use chio_guards::external::{
 };
 
 mod endpoint_security;
+mod input;
 pub use endpoint_security::{
     denied_external_guard_ip, validate_external_guard_url,
     validate_external_guard_url_with_resolver, validate_external_guard_url_without_dns,

@@ -86,14 +86,19 @@ impl GuardMarketplaceBlock {
     /// `GuardMarketplaceBlock::default()`. Manifests with a malformed
     /// block fail closed via `GuardRegistryError::ConfigSerialize`.
     pub fn from_manifest_bytes(bytes: &[u8]) -> Result<Self, GuardRegistryError> {
-        let value: serde_json::Value = serde_json::from_slice(bytes)?;
+        let value: serde_json::Value = chio_core_types::canonical::UntrustedJsonText::from_wire(
+            bytes,
+            crate::input::MAX_JSON_BYTES,
+        )?
+        .decode_signed()?;
         let Some(object) = value.as_object() else {
             return Ok(Self::default());
         };
         let Some(block) = object.get(MARKETPLACE_BLOCK_KEY) else {
             return Ok(Self::default());
         };
-        let parsed: GuardMarketplaceBlock = serde_json::from_value(block.clone())?;
+        let parsed: GuardMarketplaceBlock = serde_json::from_value(block.clone())
+            .map_err(chio_core_types::canonical::UntrustedJsonError::Decode)?;
         Ok(parsed)
     }
 
@@ -177,5 +182,23 @@ mod tests {
     fn guard_price_zero_is_free() {
         assert!(GuardPrice::zero("USD").is_free());
         assert!(!GuardPrice::new(1, "USD").is_free());
+    }
+}
+
+#[cfg(test)]
+mod reader_boundary_tests {
+    use super::*;
+    #[test]
+    fn marketplace_checks_original_input_and_preserves_native_prices(
+    ) -> Result<(), GuardRegistryError> {
+        let block = GuardMarketplaceBlock::from_manifest_bytes(
+            br#"{"marketplace":{"price":{"currency":"USD","units":18446744073709551615}}}"#,
+        )?;
+        assert_eq!(block.price.units, u64::MAX);
+        assert!(matches!(
+            GuardMarketplaceBlock::from_manifest_bytes(br#"{"marketplace":{},"marketplace":{}}"#),
+            Err(GuardRegistryError::Input(_))
+        ));
+        Ok(())
     }
 }

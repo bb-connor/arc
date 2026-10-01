@@ -1,0 +1,42 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--no-fail-fast",
+    "--features",
+    "chio-guard-registry/marketplace",
+    "-p",
+    "chio-guards",
+    "-p",
+    "chio-data-guards",
+    "-p",
+    "chio-external-guards",
+    "-p",
+    "chio-wasm-guards",
+    "-p",
+    "chio-guard-registry",
+    "-p",
+    "chio-cage",
+    "-p",
+    "chio-cage-init",
+    "-p",
+    "chio-cage-plan",
+    "-p",
+    "chio-decoy",
+    "-p",
+    "chio-keyring",
+    "-p",
+    "chio-quarantine",
+    "-p",
+    "chio-security-types"
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/connor/chio-security-target-6d-final",
+    "CARGO_INCREMENTAL": "0",
+    "CHIO_CHECKOUT_ROOT": "/tmp/arc-security-launch"
+  },
+  "exit_code": 101,
+  "elapsed_seconds": 225.82
+}

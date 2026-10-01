@@ -25,7 +25,6 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::bedrock::classify_status_error;
 use super::http_egress;
 use super::{ExternalGuard, ExternalGuardError, GuardCallContext};
 
@@ -148,15 +147,13 @@ struct AnalyzeRequest<'a> {
 
 #[derive(Debug, Clone, Deserialize)]
 struct AnalyzeResponse {
-    #[serde(default, rename = "categoriesAnalysis")]
+    #[serde(rename = "categoriesAnalysis")]
     categories_analysis: Vec<CategoryResult>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct CategoryResult {
-    #[serde(default)]
     category: String,
-    #[serde(default)]
     severity: u32,
 }
 
@@ -283,17 +280,29 @@ impl ExternalGuard for AzureContentSafetyGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
+        let parsed: AnalyzeResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
-        if !status.is_success() {
-            return Err(classify_status_error("azure-content-safety", status, &text));
+        let expected = body
+            .categories
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        let actual = parsed
+            .categories_analysis
+            .iter()
+            .map(|entry| entry.category.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        if actual != expected
+            || actual.len() != parsed.categories_analysis.len()
+            || parsed
+                .categories_analysis
+                .iter()
+                .any(|entry| entry.severity > 6)
+        {
+            return Err(ExternalGuardError::Permanent(
+                "incomplete or invalid Azure category verdicts".into(),
+            ));
         }
-
-        let parsed: AnalyzeResponse = serde_json::from_str(&text).map_err(|e| {
-            ExternalGuardError::Transient(format!("parse azure content safety response: {e}"))
-        })?;
-
         let mut max_severity = 0_u32;
         for entry in &parsed.categories_analysis {
             if entry.severity > max_severity {

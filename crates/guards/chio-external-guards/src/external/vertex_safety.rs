@@ -25,7 +25,6 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::bedrock::classify_status_error;
 use super::http_egress;
 use super::{ExternalGuard, ExternalGuardError, GuardCallContext};
 
@@ -45,7 +44,7 @@ pub enum VertexProbability {
     Medium,
     High,
     /// Anything not recognized (e.g. `PROBABILITY_UNSPECIFIED`) is
-    /// treated as [`VertexProbability::Low`] for threshold purposes.
+    /// rejected when it appears in a service verdict.
     #[serde(other)]
     Unknown,
 }
@@ -173,7 +172,6 @@ struct Candidate {
     #[serde(default, rename = "safetyRatings")]
     safety_ratings: Vec<SafetyRating>,
     #[serde(default, rename = "finishReason")]
-    #[allow(dead_code)]
     finish_reason: Option<String>,
 }
 
@@ -181,8 +179,9 @@ struct Candidate {
 struct SafetyRating {
     #[serde(default)]
     category: String,
-    #[serde(default)]
     probability: VertexProbabilityDefault,
+    #[serde(default)]
+    blocked: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -327,16 +326,26 @@ impl ExternalGuard for VertexSafetyGuard {
         )
         .await?;
 
-        let status = resp.status();
-        let text = http_egress::response_text(resp).await?;
+        let parsed: GenerateResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
-        if !status.is_success() {
-            return Err(classify_status_error("vertex-safety", status, &text));
+        if parsed.candidates.iter().any(|candidate| {
+            matches!(
+                candidate.finish_reason.as_deref(),
+                Some(
+                    "SAFETY"
+                        | "RECITATION"
+                        | "BLOCKLIST"
+                        | "PROHIBITED_CONTENT"
+                        | "SPII"
+                        | "IMAGE_SAFETY"
+                        | "MODEL_ARMOR"
+                        | "IMAGE_PROHIBITED_CONTENT"
+                        | "IMAGE_RECITATION"
+                )
+            )
+        }) {
+            return Ok(Verdict::Deny);
         }
-
-        let parsed: GenerateResponse = serde_json::from_str(&text)
-            .map_err(|e| ExternalGuardError::Transient(format!("parse vertex response: {e}")))?;
-
         if let Some(pf) = parsed.prompt_feedback.as_ref() {
             if pf.block_reason.is_some() {
                 tracing::info!(
@@ -348,6 +357,16 @@ impl ExternalGuard for VertexSafetyGuard {
             }
         }
 
+        if matches!(self.cfg.probability_threshold, VertexProbability::Unknown)
+            || parsed
+                .candidates
+                .iter()
+                .any(|candidate| candidate.safety_ratings.is_empty())
+        {
+            return Err(ExternalGuardError::Permanent(
+                "missing Vertex candidate safety verdict".into(),
+            ));
+        }
         let threshold_rank = self.cfg.probability_threshold.rank();
         let mut max_rank = 0_u8;
         let candidate_ratings = parsed
@@ -360,13 +379,30 @@ impl ExternalGuard for VertexSafetyGuard {
             .map(|p| p.safety_ratings.as_slice())
             .unwrap_or(&[])
             .iter();
+        let mut rating_count = 0_usize;
         for rating in candidate_ratings.chain(pf_ratings) {
+            if rating.blocked {
+                return Ok(Verdict::Deny);
+            }
+            if rating.category.is_empty()
+                || matches!(rating.probability.0, VertexProbability::Unknown)
+            {
+                return Err(ExternalGuardError::Permanent(
+                    "invalid Vertex safety rating".into(),
+                ));
+            }
+            rating_count += 1;
             let rank = rating.probability.0.rank();
             if rank > max_rank {
                 max_rank = rank;
             }
         }
 
+        if rating_count == 0 {
+            return Err(ExternalGuardError::Permanent(
+                "missing Vertex safety ratings".into(),
+            ));
+        }
         tracing::info!(
             guard = GUARD_NAME,
             max_rank,

@@ -1,0 +1,714 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling tokio v1.50.0
+   Compiling hyper v1.8.1
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.4
+   Compiling tokio-util v0.7.18
+   Compiling tower-http v0.6.8
+   Compiling tough v0.22.0
+   Compiling hyper-util v0.1.20
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling oci-client v0.17.0
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling sigstore v0.14.0
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+   Compiling chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+   Compiling chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+   Compiling chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+   Compiling chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling chio-swarm-authority v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-swarm-authority)
+   Compiling chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+   Compiling chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+   Compiling chio-disclosure-lineage v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-disclosure-lineage)
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+   Compiling chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+   Compiling chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-workflow v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow)
+   Compiling chio-selective-disclosure v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-selective-disclosure)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+   Compiling chio-http-session v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-session)
+   Compiling chio-guards v0.1.0 (/tmp/arc-security-launch/crates/guards/chio-guards)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 2m 42s
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_guards-676f00d7e0b65a56)
+
+running 381 tests
+test action::tests::acp_fs_read_text_file_classifies_as_file_access ... ok
+test action::tests::acp_fs_write_text_file_classifies_as_file_write ... ok
+test action::tests::extract_code_execution_python ... ok
+test action::tests::extract_browser_navigate ... ok
+test action::tests::extract_browser_click_with_selector ... ok
+test action::tests::extract_code_execution_explicit_language ... ok
+test action::tests::extract_database_query ... ok
+test action::tests::extract_memory_read_with_key ... ok
+test action::tests::extract_memory_write ... ok
+test action::tests::extract_memory_read_without_key ... ok
+test action::tests::extract_file_write ... ok
+test action::tests::extract_database_query_default_db ... ok
+test action::tests::extract_file_access ... ok
+test action::tests::extract_network_with_scheme_relative_url ... ok
+test action::tests::extract_shell_command ... ok
+test action::tests::file_tool_alias ... ok
+test action::tests::extract_network_egress ... ok
+test action::tests::filesystem_tool_actions_expose_target_path ... ok
+test action::tests::extract_network_with_mixed_case_scheme ... ok
+test action::tests::filesystem_tool_explicit_read_action ... ok
+test action::tests::extract_network_with_port ... ok
+test action::tests::filesystem_tool_read_by_default ... ok
+test action::tests::filesystem_tool_rejects_malformed_action ... ok
+test action::tests::filesystem_tool_rejects_malformed_primary_path_alias ... ok
+test action::tests::filesystem_tool_rejects_missing_path ... ok
+test action::tests::filesystem_tool_write_action ... ok
+test action::tests::filesystem_tool_write_inferred_from_content ... ok
+test action::tests::filesystem_write_rejects_malformed_content ... ok
+test action::tests::fs_prefix_stat_classifies_as_file_access ... ok
+test action::tests::fs_tool_alias ... ok
+test action::tests::extract_network_strips_userinfo_and_ipv6_brackets ... ok
+test action::tests::network_rejects_ambiguous_unbracketed_ipv6 ... ok
+test action::tests::network_rejects_invalid_explicit_port ... ok
+test action::tests::network_rejects_malformed_primary_alias ... ok
+test action::tests::network_rejects_unparseable_url ... ok
+test action::tests::network_tool_with_filesystem_shaped_arguments_stays_network_egress ... ok
+test action::tests::patch_tool_rejects_malformed_diff_alias ... ok
+test action::tests::extract_network_strips_query_and_fragment_from_authority ... ok
+test action::tests::extract_external_api_call_stripe_default_endpoint ... ok
+test action::tests::shell_command_rejects_malformed_primary_alias ... ok
+test action::tests::recognized_extractors_reject_malformed_higher_priority_aliases ... ok
+test action::tests::string_arg_preserves_key_priority_and_rejects_non_strings ... ok
+test action::tests::tool_action_dispatch_is_exhaustive ... ok
+test action::tests::unknown_tool_becomes_mcp_tool ... ok
+test action::tests::unknown_tool_with_path_still_becomes_mcp_tool ... ok
+test action::tests::extract_external_api_call_slack ... ok
+test advisory::tests::advisory_signal_serde_roundtrip ... ok
+test advisory::tests::advisory_pipeline_no_guards_allows ... ok
+test advisory::tests::advisory_pipeline_returns_signal_evidence ... ok
+test advisory::tests::advisory_pipeline_collects_multiple_signals ... ok
+test advisory::tests::advisory_pipeline_allows_without_promotion ... ok
+test advisory::tests::anomaly_advisory_no_signal_below_threshold ... ok
+test advisory::tests::anomaly_advisory_signals_deep_delegation ... ok
+test advisory::tests::anomaly_advisory_signals_excessive_invocations ... ok
+test advisory::tests::data_transfer_advisory_escalating_severity ... ok
+test advisory::tests::advisory_pipeline_denies_with_promotion ... ok
+test advisory::tests::advisory_pipeline_guard_output_types ... ok
+test advisory::tests::guard_output_distinguishes_types ... ok
+test advisory::tests::len_and_is_empty ... ok
+test advisory::tests::promotion_policy_does_not_promote_below_threshold ... ok
+test advisory::tests::promotion_policy_does_not_promote_wrong_guard ... ok
+test advisory::tests::promotion_policy_empty_never_promotes ... ok
+test advisory::tests::promotion_policy_promotes_matching_signal ... ok
+test advisory::tests::promotion_policy_serde_roundtrip ... ok
+test advisory::tests::data_transfer_advisory_no_signal_below_threshold ... ok
+test agent_velocity::tests::guard_name ... ok
+test advisory::tests::data_transfer_advisory_signals_above_threshold ... ok
+test advisory::tests::dispatch_revalidation_preserves_admission_signals_without_re_evaluating ... ok
+test agent_velocity::tests::both_limits_applied ... ok
+test advisory::tests::promoted_anomaly_denies_request ... ok
+test agent_velocity::tests::per_agent_limit_enforced ... ok
+test agent_velocity::tests::different_sessions_get_separate_buckets ... ok
+test agent_velocity::tests::per_session_limit_enforced ... ok
+test agent_velocity::tests::returns_verdict_deny_not_err ... ok
+test behavioral_profile::tests::ema_baseline_stabilizes_under_steady_sample ... ok
+test agent_velocity::tests::unlimited_config_allows_all ... ok
+test agent_velocity::tests::different_agents_get_separate_buckets ... ok
+test behavioral_profile::tests::spike_fifty_x_triggers_anomaly ... ok
+test behavioral_sequence::tests::guard_name ... ok
+test behavioral_profile::tests::cold_baseline_does_not_flag ... ok
+test behavioral_sequence::tests::empty_policy_allows_all ... ok
+test behavioral_sequence::tests::forbidden_transition_enforced_at_zero_entry_cap ... ok
+test behavioral_sequence::tests::forbidden_transition_enforced ... ok
+test behavioral_sequence::tests::max_consecutive_resets_on_different_tool ... ok
+test behavioral_sequence::tests::max_consecutive_enforced ... ok
+test behavioral_sequence::tests::required_first_tool_only_applies_to_first ... ok
+test behavioral_sequence::tests::required_predecessor_denies_when_predecessor_overflowed_tool_counts_cap ... ok
+test behavioral_sequence::tests::required_first_tool_enforced ... ok
+test behavioral_sequence::tests::required_predecessor_survives_journal_ring_eviction ... ok
+test behavioral_sequence::tests::required_predecessor_enforced ... ok
+test behavioral_sequence::tests::required_predecessor_within_tool_counts_cap_still_allows ... ok
+test behavioral_sequence::tests::max_consecutive_survives_journal_ring_eviction ... ok
+test browser_automation::tests::check_navigation_blocks_bracketed_ipv6_hosts ... ok
+test browser_automation::tests::check_navigation_blocks_scheme_relative_urls ... ok
+test browser_automation::tests::check_navigation_blocks_mixed_case_scheme_urls ... ok
+test browser_automation::tests::is_selector_like_classifies ... ok
+test browser_automation::tests::check_navigation_blocks_urls_with_userinfo ... ok
+test browser_automation::tests::extract_host_basic ... ok
+test browser_automation::tests::check_navigation_blocks_query_and_fragment_only_urls ... ok
+test browser_automation::tests::matches_domain_wildcard ... ok
+test computer_use::tests::check_navigation_blocks_bracketed_ipv6_hosts ... ok
+test computer_use::tests::check_navigation_blocks_mixed_case_scheme_urls ... ok
+test computer_use::tests::check_navigation_blocks_query_and_fragment_only_urls ... ok
+test computer_use::tests::check_navigation_blocks_scheme_relative_urls ... ok
+test computer_use::tests::check_navigation_blocks_urls_with_userinfo ... ok
+test computer_use::tests::extract_cua_action_type_reads_args ... ok
+test computer_use::tests::extract_host_handles_common_urls ... ok
+test computer_use::tests::is_screenshot_verb_matches_common_names ... ok
+test computer_use::tests::matches_domain_exact_and_wildcard ... ok
+test content_review::tests::extract_outbound_text_joins_chunks ... ok
+test content_review::tests::truncate_utf8_honors_boundaries ... ok
+test data_flow::tests::allows_when_under_limit ... ok
+test data_flow::tests::denies_when_bytes_read_exceeded ... ok
+test data_flow::tests::cumulative_across_multiple_entries ... ok
+test data_flow::tests::denies_when_bytes_written_exceeded ... ok
+test data_flow::tests::guard_name ... ok
+test egress_allowlist::tests::block_list_takes_precedence ... ok
+test egress_allowlist::tests::allows_default_domains ... ok
+test egress_allowlist::tests::blocks_unknown_domains ... ok
+test egress_allowlist::tests::rejects_invalid_block_pattern ... ok
+test action::tests::broker_shell_guards_classify_exact_body_and_refuse_malformed_envelopes ... ok
+test egress_allowlist::tests::wildcard_subdomain_matching ... ok
+test data_flow::tests::unlimited_allows_all ... ok
+test data_flow::tests::denies_when_total_exceeded ... ok
+test embedding_anomaly::tests::ambiguous_respects_policy ... ok
+test embedding_anomaly::tests::cosine_basics ... ok
+test embedding_anomaly::tests::extract_embedding_from_args ... ok
+test embedding_anomaly::tests::extract_embedding_averages_list ... ok
+test embedding_anomaly::tests::extract_embedding_none_when_absent ... ok
+test embedding_anomaly::tests::guard_allows_orthogonal_vector ... ok
+test embedding_anomaly::tests::guard_denies_identical_vector ... ok
+test embedding_anomaly::tests::guard_dim_mismatch_denies ... ok
+test embedding_anomaly::tests::guard_nan_score_denies ... ok
+test embedding_anomaly::tests::pattern_db_rejects_dim_mismatch ... ok
+test embedding_anomaly::tests::pattern_db_rejects_empty ... ok
+test embedding_anomaly::tests::reject_bad_config ... ok
+test external::cache::tests::lru_eviction_when_capacity_exceeded ... ok
+test external::cache::tests::overwrite_updates_value_and_ttl ... ok
+test external::cache::tests::expired_entry_returns_none ... ok
+test external::cache::tests::insert_and_get_returns_value ... ok
+test external::cache::tests::prune_removes_only_expired ... ok
+test external::circuit_breaker::tests::half_open_closes_after_success_threshold ... ok
+test external::circuit_breaker::tests::half_open_failure_reopens ... ok
+test external::circuit_breaker::tests::opens_after_threshold_failures ... ok
+test external::circuit_breaker::tests::stale_failures_are_forgotten ... ok
+test external::circuit_breaker::tests::starts_closed ... ok
+test external::clock_tests::clock_failure_and_regression_cannot_release_cache_or_breaker_calls ... ok
+test external::circuit_breaker::tests::transitions_to_half_open_after_reset_timeout ... ok
+test external::retry::tests::compute_delay_caps_at_max_delay ... ok
+test external::retry::tests::returns_last_error_after_exhausting_retries ... ok
+test external::clock_tests::failed_initial_clock_does_not_mint_a_recovery_burst ... ok
+test code_execution::tests::module_regex_matches_import_forms ... ok
+test external::retry::tests::succeeds_after_retries ... ok
+test external::retry::tests::succeeds_on_first_attempt ... ok
+test external::retry::tests::zero_max_retries_runs_once ... ok
+test external::token_bucket::tests::refills_at_configured_rate ... ok
+test code_execution::tests::network_module_regex_detects_requests ... ok
+test external::token_bucket::tests::starts_full_with_burst_capacity ... ok
+test external::token_bucket::tests::zero_rate_only_uses_burst ... ok
+test finding_retraction::tests::lineage_finding_must_match_the_requested_memory_key ... ok
+test finding_retraction::tests::cross_feed_delivery_lineage_fails_before_status_lookup ... ok
+test finding_retraction::tests::pending_and_retracted_status_are_preserved_for_the_guard ... ok
+test forbidden_path::tests::blocks_env_files ... ok
+test finding_retraction::tests::stale_status_and_missing_provenance_fail_closed ... ok
+test finding_retraction::tests::verified_resolution_cross_binds_provenance_lineage_and_status ... ok
+test forbidden_path::tests::allows_normal_files ... ok
+test forbidden_path::tests::blocks_ssh_keys ... ok
+test forbidden_path::tests::default_patterns_all_compile ... ok
+test forbidden_path::tests::invalid_exception_fails_closed ... ok
+test forbidden_path::tests::invalid_pattern_fails_closed ... ok
+test forbidden_path::tests::windows_paths_normalized ... ok
+test input_injection::tests::detects_action_type_argument ... ok
+test input_injection::tests::detects_explicit_input_inject_tool ... ok
+test input_injection::tests::ignores_unrelated_tools ... ok
+test input_injection::tests::input_type_accepts_camel_case ... ok
+test input_injection::tests::postcondition_probe_detected_both_cases ... ok
+test input_injection::tests::postcondition_probe_empty_string_is_missing ... ok
+test forbidden_path::tests::blocks_aws_credentials ... ok
+test internal_network::tests::allows_normal_hostnames ... ok
+test internal_network::tests::allows_public_ips ... ok
+test forbidden_path::tests::blocks_etc_shadow ... ok
+test internal_network::tests::blocks_cloud_metadata ... ok
+test internal_network::tests::blocks_broadcast ... ok
+test internal_network::tests::blocks_hex_encoded_ip ... ok
+test internal_network::tests::blocks_dns_rebinding_patterns ... ok
+test internal_network::tests::blocks_ipv6_link_local ... ok
+test internal_network::tests::blocks_ipv4_mapped_ipv6 ... ok
+test internal_network::tests::blocks_ipv6_loopback ... ok
+test internal_network::tests::blocks_ipv6_unique_local ... ok
+test internal_network::tests::blocks_decimal_encoded_ip ... ok
+test internal_network::tests::blocks_kubernetes_metadata ... ok
+test internal_network::tests::blocks_loopback ... ok
+test internal_network::tests::blocks_zero_network ... ok
+test internal_network::tests::dns_rebinding_detection_can_be_disabled ... ok
+test internal_network::tests::guard_name ... ok
+test internal_network::tests::extra_blocked_hosts ... ok
+test internal_network::tests::blocks_link_local ... ok
+test internal_network::tests::blocks_rfc_1918 ... ok
+test forbidden_path::tests::exceptions_work ... ok
+test embedding_anomaly::reader_boundary_tests::pattern_extension_duplicates_and_byte_limit_reject_before_projection ... ok
+test forbidden_path::tests::dispatch_revalidation_repeats_pure_path_evaluation ... ok
+test jailbreak::tests::guard_name ... ok
+test internal_network::tests::non_network_actions_pass ... ok
+test jailbreak::tests::extract_texts_recurses_into_nested_json_values ... ok
+test jailbreak::tests::empty_input_allows ... ok
+test jailbreak::tests::with_config_overrides_layer_weights_on_detector ... ok
+test browser_automation::tests::builtin_detects_common_tokens ... ok
+test jailbreak_detector::tests::benign_input_scores_low ... ok
+test jailbreak::tests::scan_does_not_flag_benign_request ... ok
+test jailbreak_detector::tests::dan_framing_fires_roleplay_signal ... ok
+test jailbreak_detector::tests::developer_mode_fires ... ok
+test jailbreak_detector::tests::final_score_is_bounded ... ok
+test jailbreak::tests::threshold_above_one_allows_everything ... ok
+test jailbreak::tests::scan_flags_system_prompt_extraction ... ok
+test content_review::tests::pii_patterns_detect_email ... ok
+test jailbreak_detector::tests::statistical_zero_width_counts_original_input ... ok
+test jailbreak_detector::tests::ignore_policy_fires_authority_confusion ... ok
+test jailbreak::tests::repeat_attack_short_circuits_via_dedup ... ok
+test jailbreak_detector::tests::ml_layer_bounded_in_unit_interval ... ok
+test mcp_tool::tests::block_takes_precedence_over_allow ... ok
+test mcp_tool::tests::default_action_block ... ok
+test mcp_tool::tests::default_allows_normal_tools ... ok
+test mcp_tool::tests::allowlist_mode ... ok
+test mcp_tool::tests::args_size_limit ... ok
+test memory_governance::tests::extract_retention_ttl_reads_common_keys ... ok
+test jailbreak_detector::tests::system_prompt_extraction_fires ... ok
+test memory_governance::tests::content_size_falls_back_to_text_length ... ok
+test mcp_tool::tests::evaluate_blocks_tool_via_guard_trait ... ok
+test mcp_tool::tests::default_blocked_tools ... ok
+test memory_governance::tests::store_matches_wildcards ... ok
+test memory_governance::tests::saturated_quarantine_never_reopens_on_a_live_resolution ... ok
+test mcp_tool::tests::disabled_guard_allows_everything ... ok
+test patch_integrity::tests::disabled_guard_allows_everything ... ok
+test patch_integrity::tests::eval_blocks_patch_with_eval ... ok
+test patch_integrity::tests::with_config_rejects_invalid_forbidden_regex ... ok
+test path_allowlist::tests::allows_paths_inside_scope ... ok
+test path_allowlist::tests::denies_paths_outside_scope ... ok
+test patch_integrity::tests::evaluate_allows_safe_patch ... ok
+test path_allowlist::tests::disabled_guard_allows_everything ... ok
+test patch_integrity::tests::safe_patch_is_allowed ... ok
+test patch_integrity::tests::evaluate_blocks_unsafe_patch ... ok
+test path_allowlist::tests::disabled_guard_with_session_roots_denies_malformed_filesystem_actions ... ok
+test patch_integrity::tests::forbidden_pattern_blocks ... ok
+test path_allowlist::tests::disabled_guard_without_session_roots_allows_malformed_filesystem_actions ... ok
+test path_allowlist::tests::evaluate_denies_acp_write_text_file_outside_allowlist ... ok
+test patch_integrity::tests::max_deletions_exceeded ... ok
+test path_allowlist::tests::session_roots_fail_closed_when_root_set_is_empty ... ok
+test path_allowlist::tests::evaluate_denies_write_outside_allowlist ... ok
+test path_allowlist::tests::explicit_patch_allow_does_not_fall_back ... ok
+test patch_integrity::tests::imbalance_check ... ok
+test path_allowlist::tests::patch_allow_falls_back_to_file_write_allow ... ok
+test path_allowlist::tests::session_roots_allow_in_root_access_when_other_checks_pass ... ok
+test path_normalization::tests::lexical_absolute_normalization_uses_cwd_for_relative_paths ... ok
+test path_normalization::tests::normalizes_separators_and_dots ... ok
+test path_normalization::tests::resolves_parent_segments_lexically ... ok
+test path_normalization::tests::root_containment_examples_follow_normalized_boundaries ... ok
+test path_allowlist::tests::symlink_escape_outside_allowlist_is_denied ... ok
+test pipeline::tests::all_allow_means_pipeline_allows ... ok
+test pipeline::tests::empty_pipeline_allows ... ok
+test path_allowlist::tests::session_roots_deny_out_of_root_access_even_when_allowlist_matches ... ok
+test post_invocation::tests::all_allow_passes ... ok
+test post_invocation::tests::block_stops_pipeline ... ok
+test pipeline::tests::error_treated_as_deny ... ok
+test pipeline::tests::mixed_pipeline_revalidation_preserves_legacy_child_compatibility ... ok
+test pipeline::tests::one_deny_means_pipeline_denies ... ok
+test pipeline::tests::pipeline_forwards_exact_output_validation_to_children ... ok
+test post_invocation::tests::block_after_escalation_returns_block_with_escalations ... ok
+test post_invocation::tests::empty_pipeline_allows ... ok
+test post_invocation::tests::len_and_is_empty ... ok
+test post_invocation::tests::escalations_collected ... ok
+test patch_integrity::tests::max_additions_exceeded ... ok
+test post_invocation::tests::redact_modifies_response ... ok
+test prompt_injection::tests::extract_texts_recurses_into_nested_json_values ... ok
+test prompt_injection::tests::guard_name ... ok
+test prompt_injection::tests::dedup_short_circuits_prior_deny ... ok
+test prompt_injection::tests::canonicalization_sees_zero_width_and_homoglyph_and_case ... ok
+test prompt_injection::tests::empty_input_allows ... ok
+test prompt_injection::tests::signal_exfiltration_framing ... ok
+test prompt_injection::tests::signal_delimiter_injection ... ok
+test remote_desktop::tests::is_side_channel_classifies_correctly ... ok
+test remote_desktop::tests::read_transfer_size_variants ... ok
+test post_invocation::tests::sanitizer_tokenization_has_no_durable_identity ... ok
+test response_sanitization::tests::custom_pattern ... ok
+test prompt_injection::tests::signal_output_hijack ... ok
+test prompt_injection::tests::threshold_below_allows ... ok
+test prompt_injection::tests::signal_role_injection ... ok
+test prompt_injection::tests::signal_instruction_override ... ok
+test response_sanitization::tests::default_patterns_compile_to_full_set ... ok
+test prompt_injection::tests::signal_tool_chain_hijack ... ok
+test response_sanitization::tests::luhn_rejects_random_16_digit_number ... ok
+test response_sanitization::tests::detects_mrn ... ok
+test response_sanitization::tests::detects_email ... ok
+test response_sanitization::tests::guard_evaluate_allows_clean_args ... ok
+test response_sanitization::tests::guard_evaluate_denies_args_with_pii ... ok
+test agent_velocity::tests::from_memory_budget_bounds_combined_bucket_table ... ok
+test response_sanitization::tests::detects_ssn ... ok
+test response_sanitization::tests::guard_name ... ok
+test response_sanitization::tests::no_findings_on_clean_text ... ok
+test response_sanitization::tests::shannon_entropy_basic ... ok
+test response_sanitization::tests::ssn_fragments_validator_rejects_invalid_areas ... ok
+test response_sanitization::tests::redacts_ssn ... ok
+test post_invocation::tests::sanitizer_hook_allows_clean_response ... ok
+test response_sanitization::tests::scan_response_clean ... ok
+test post_invocation::tests::sanitizer_hook_redacts_and_emits_evidence ... ok
+test response_sanitization::tests::scan_response_redacted ... ok
+test response_sanitization::tests::redacts_email ... ok
+test secret_leak::tests::detects_gitlab_pat ... ok
+test secret_leak::tests::detects_aws_access_key ... ok
+test secret_leak::tests::detects_gcp_service_account ... ok
+test secret_leak::tests::detects_github_token ... ok
+test secret_leak::tests::detects_anthropic_api03_key ... ok
+test secret_leak::tests::detects_private_key ... ok
+test secret_leak::tests::redaction ... ok
+test secret_leak::tests::skip_paths ... ok
+test secret_leak::tests::evaluate_allows_write_to_test_path ... ok
+test secret_leak::tests::detects_openai_project_key ... ok
+test secret_leak::tests::detects_stripe_secret_key ... ok
+test secret_leak::tests::no_false_positive_on_normal_code ... ok
+test response_sanitization::tests::output_sanitizer_clone_preserves_token_vault ... ok
+test response_sanitization::tests::respects_minimum_sensitivity ... ok
+test secret_leak::tests::evaluate_blocks_file_write_with_secret ... ok
+test shell_command::tests::blocks_curl_pipe_bash ... ok
+test shell_command::tests::allows_quoted_separator_literals_as_shell_data ... ok
+test shell_command::tests::allows_non_executing_wrapper_modes_before_rm_text ... ok
+test response_sanitization::tests::scan_response_blocked ... ok
+test shell_command::tests::allows_benign_commands ... ok
+test secret_leak::tests::with_config_rejects_invalid_custom_regex ... ok
+test shell_command::tests::allows_escaped_separator_literals_as_shell_data ... ok
+test shell_command::tests::blocks_quote_obfuscated_rm_rf_root ... ok
+test shell_command::tests::allows_rm_text_as_shell_data ... ok
+test shell_command::tests::blocks_quote_obfuscated_rm_rf_root_inside_shell_command_string ... ok
+test shell_command::tests::blocks_forbidden_paths_inside_shell_command_strings ... ok
+test shell_command::tests::blocks_forbidden_paths_after_shell_separators ... ok
+test shell_command::tests::invalid_operator_regex_fails_closed ... ok
+test text_utils::tests::canonicalize_collapses_separators ... ok
+test text_utils::tests::canonicalize_folds_homoglyphs ... ok
+test text_utils::tests::canonicalize_lowercases_ascii ... ok
+test text_utils::tests::canonicalize_strips_zero_width ... ok
+test text_utils::tests::long_run_of_symbols_detects_runs ... ok
+test text_utils::tests::punctuation_ratio_basic ... ok
+test text_utils::tests::shannon_entropy_ascii_nonws_bounds ... ok
+test text_utils::tests::shingle_uniqueness_detects_repetition ... ok
+test text_utils::tests::truncate_respects_utf8_boundary ... ok
+test text_utils::tests::truncate_short_input_unchanged ... ok
+test text_utils::tests::zero_width_count_matches_inserts ... ok
+test velocity::tests::allows_requests_up_to_limit ... ok
+test shell_command::tests::blocks_prefixed_quote_obfuscated_rm_rf_root ... ok
+test shell_command::tests::blocks_quoted_pipe_bash ... ok
+test shell_command::tests::blocks_forbidden_paths_via_shell ... ok
+test velocity::tests::denies_request_exceeding_limit ... ok
+test shell_command::tests::blocks_redirection_to_forbidden_path ... ok
+test velocity::tests::dispatch_revalidation_does_not_consume_another_invocation_token ... ok
+test shell_command::tests::blocks_reverse_shell ... ok
+test shell_command::tests::blocks_windows_forbidden_paths_via_shell ... ok
+test velocity::tests::guard_name_is_velocity ... ok
+test velocity::tests::full_table_of_active_buckets_denies_new_key_without_eviction ... ok
+test shell_command::tests::redirection_path_target_is_not_reprocessed ... ok
+test velocity::tests::impossible_spend_denies_without_creating_a_bucket ... ok
+test shell_command::tests::blocks_rm_root_after_real_separator ... ok
+test velocity::tests::invocation_velocity_requires_matched_grant_index ... ok
+test velocity::tests::returns_verdict_deny_not_err_when_rate_limited ... ok
+test velocity::tests::separate_buckets_for_different_grant_indices ... ok
+test velocity::tests::separate_buckets_for_different_capability_ids ... ok
+test shell_command::tests::blocks_rm_rf_root ... ok
+test velocity::tests::spend_velocity_allows_up_to_limit ... ok
+test velocity::tests::spend_denial_does_not_wedge_or_deplete_invocation_bucket ... ok
+test velocity::tests::spend_velocity_consumes_planned_cost_units ... ok
+test velocity::tests::spend_velocity_requires_cost_metadata_on_matched_grant ... ok
+test velocity::tests::unlimited_config_always_allows ... ok
+test velocity::tests::velocity_config_defaults_unlimited ... ok
+test velocity::tests::updating_existing_bucket_at_cap_is_not_evicted ... ok
+test velocity::tests::impossible_spend_flood_does_not_populate_the_bounded_table ... ok
+test velocity::tests::from_memory_budget_honors_lowered_velocity_bucket_cap ... ok
+test velocity::tests::idle_buckets_are_swept_and_key_count_is_capped ... ok
+test velocity::tests::combined_cap_holds_under_concurrent_distinct_capability_flood ... ok
+test velocity::tests::both_bucket_maps_together_stay_within_total_cap ... ok
+test agent_velocity::tests::burst_drained_agent_bucket_is_not_reset_after_one_idle_window ... ok
+test agent_velocity::tests::tokens_refill_over_time ... ok
+test velocity::tests::burst_drained_bucket_is_not_reaped_after_one_idle_window ... ok
+test velocity::tests::tokens_refill_after_window ... ok
+test velocity::tests::fully_refilled_bucket_is_pruned_to_admit_new_key ... ok
+
+test result: ok. 381 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.55s
+
+     Running tests/behavioral_profile.rs (/home/connor/chio-security-target-6d-final/debug/deps/behavioral_profile-c8e631a2460b0721)
+
+running 4 tests
+test fifty_x_spike_triggers_advisory_signal ... ok
+test ema_baseline_stabilizes_under_steady_calls ... ok
+test in_memory_receipt_feed_persists_and_filters_by_agent_and_window ... ok
+test guard_reads_from_sqlite_receipt_store ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.17s
+
+     Running tests/browser_automation.rs (/home/connor/chio-security-target-6d-final/debug/deps/browser_automation-4a18de69b38e4de8)
+
+running 7 tests
+test disabled_guard_allows_all ... ok
+test non_browser_actions_pass_through ... ok
+test credential_detection_disabled_allows_secrets ... ok
+test blocked_domain_takes_precedence ... ok
+test navigation_outside_allowlist_denied ... ok
+test read_only_session_denies_type_and_click ... ok
+test type_with_credential_shaped_value_denied ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/code_execution.rs (/home/connor/chio-security-target-6d-final/debug/deps/code_execution-c8f8210c752dd36b)
+
+running 11 tests
+test network_access_false_denies_network_request_flag ... ok
+test execution_time_bound_allows_exact_limit ... ok
+test python_language_allowed_when_allowlist_is_python ... ok
+test execution_time_bound_denies_over_limit ... ok
+test network_access_false_denies_network_module_import ... ok
+test non_code_execution_actions_pass_through ... ok
+test disabled_guard_allows_everything ... ok
+test payload_exceeding_max_scan_bytes_is_denied_failclosed ... ok
+test import_subprocess_denied_by_dangerous_module_detection ... ok
+test payload_at_max_scan_bytes_is_allowed ... ok
+test bash_language_denied_when_allowlist_is_python ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/content_review.rs (/home/connor/chio-security-target-6d-final/debug/deps/content_review-0950df98fa3a75da)
+
+running 12 tests
+test extra_pattern_complexity_limit_fails_initialization ... ok
+test extra_pattern_length_limit_fails_initialization ... ok
+test extra_pattern_count_limit_fails_initialization ... ok
+test invalid_regex_pattern_fails_initialization ... ok
+test non_external_api_actions_pass_through ... ok
+test stripe_charge_above_threshold_triggers_pending_approval ... ok
+test stripe_charge_via_governed_intent_also_triggers_pending_approval ... ok
+test stripe_charge_below_threshold_allowed ... ok
+test benign_slack_message_allowed ... ok
+test slack_blocks_api_pii_detected_in_nested_text ... ok
+test profanity_banned_word_denies ... ok
+test slack_message_with_pii_denied ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/cua_guards.rs (/home/connor/chio-security-target-6d-final/debug/deps/cua_guards-5e7e038529588de4)
+
+running 28 tests
+test computer_use_failclosed_denies_unlisted_action_type ... ok
+test computer_use_guardrail_allows_warning_only ... ok
+test embedding_anomaly_malformed_pattern_db_fails_closed_at_init ... ok
+test embedding_anomaly_bundled_pattern_db_loads ... ok
+test embedding_anomaly_benign_embedding_allows ... ok
+test computer_use_observe_mode_allows_unknown_actions ... ok
+test embedding_anomaly_known_bad_embedding_denies ... ok
+test embedding_anomaly_dimension_mismatch_denies ... ok
+test embedding_anomaly_no_embedding_is_allow ... ok
+test computer_use_screenshot_rate_limit_enforced ... ok
+test computer_use_denies_navigation_to_blocked_domain ... ok
+test input_injection_allows_keyboard ... ok
+test input_injection_denies_non_allowlisted_input_type ... ok
+test input_injection_passes_through_unrelated_actions ... ok
+test input_injection_strict_mode_denies_missing_input_type ... ok
+test remote_desktop_allows_clipboard_when_enabled ... ok
+test remote_desktop_allows_file_transfer_within_size_limit ... ok
+test remote_desktop_denies_file_transfer_exceeding_size_limit ... ok
+test remote_desktop_denies_file_transfer_missing_size_when_limit_set ... ok
+test embedding_anomaly_threshold_configurable ... ok
+test input_injection_detects_injection_via_action_type_arg ... ok
+test embedding_anomaly_malformed_explicit_embedding_denies ... ok
+test input_injection_requires_postcondition_probe_when_configured ... ok
+test remote_desktop_denies_invalid_transfer_size_type ... ok
+test remote_desktop_denies_unknown_channel_fail_closed ... ok
+test remote_desktop_denies_when_clipboard_disabled ... ok
+test remote_desktop_ignores_non_remote_actions ... ok
+test remote_desktop_ignores_session_lifecycle ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/external_guard_adapter.rs (/home/connor/chio-security-target-6d-final/debug/deps/external_guard_adapter-c1c47b25616ba12e)
+
+running 10 tests
+test happy_path_allows_and_calls_once ... ok
+test retry_succeeds_after_n_attempts ... ok
+test cache_hit_bypasses_rate_limit ... ok
+test permanent_failure_stops_retry_loop ... ok
+test cache_miss_on_distinct_keys ... ok
+test circuit_open_allow_returns_allow ... ok
+test rate_limit_allow_honors_fail_open_verdict ... ok
+test circuit_opens_after_n_failures_and_skips_external_call ... ok
+test cache_hit_skips_external_call ... ok
+test rate_limit_rejects_fail_closed_by_default ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/integration.rs (/home/connor/chio-security-target-6d-final/debug/deps/integration-7c65667d4574d9a6)
+
+running 20 tests
+test acp_fs_read_text_file_blocks_etc_shadow ... ok
+test forbidden_path_blocks_etc_shadow ... ok
+test egress_allowlist_denies_malformed_primary_url_alias ... ok
+test filesystem_tool_allows_normal_path ... ok
+test filesystem_tool_session_roots_allow_in_root_path ... ok
+test egress_allowlist_blocks_evil_com ... ok
+test filesystem_tool_blocks_etc_shadow ... ok
+test filesystem_tool_session_roots_deny_out_of_root_path ... ok
+test egress_allowlist_allows_github_api ... ok
+test filesystem_tool_with_action_read_blocks_forbidden ... ok
+test filesystem_tool_session_roots_fail_closed_when_missing ... ok
+test forbidden_path_allows_normal_file ... ok
+test forbidden_path_denies_malformed_primary_path_alias ... ok
+test internal_network_denies_invalid_explicit_port ... ok
+test shell_command_blocks_rm_rf ... ok
+test pipeline_all_allow_means_overall_allow ... ok
+test pipeline_one_deny_means_overall_deny ... ok
+test guard_names_are_stable_for_kernel_evidence ... ok
+test shell_command_allows_git_status ... ok
+test shell_command_denies_malformed_primary_command_alias ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/jailbreak.rs (/home/connor/chio-security-target-6d-final/debug/deps/jailbreak-88ab03cfb9164cbb)
+
+running 12 tests
+test low_threshold_denies_marginal_input ... ok
+test allows_benign_question ... ok
+test homoglyph_attack_detected_after_canonicalization ... ok
+test non_text_action_passes_through ... ok
+test scan_exposes_signal_ids_without_raw_input ... ok
+test high_threshold_allows_moderate_attack ... ok
+test denies_dan_prompt ... ok
+test denies_evil_confidant_prompt ... ok
+test layer_weights_zeroed_suppress_detection ... ok
+test allows_benign_code_execution ... ok
+test denies_ignore_previous_instructions_reveal_system_prompt ... ok
+test fingerprint_dedup_suppresses_repeats ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/memory_governance.rs (/home/connor/chio-security-target-6d-final/debug/deps/memory_governance-442275c244d772b5)
+
+running 15 tests
+test finding_quarantine_denies_unavailable_state_and_resolver_substitution ... ok
+test finding_quarantine_binds_the_released_value_to_latest_write_provenance ... ok
+test finding_quarantine_rejects_unbounded_marker_keys ... ok
+test non_memory_actions_pass_through ... ok
+test finding_quarantine_allows_only_fresh_live_exact_key_reads ... ok
+test finding_quarantine_denies_writes_without_delivery_lineage ... ok
+test finding_quarantine_rechecks_status_immediately_before_dispatch ... ok
+test max_retention_ttl_honored ... ok
+test config_store_allowlist_composes_with_grant_allowlist ... ok
+test read_outside_memory_store_allowlist_denied ... ok
+test max_content_size_denies_unknown_or_oversized_content ... ok
+test write_outside_memory_store_allowlist_denied ... ok
+test writes_exceeding_max_memory_entries_denied ... ok
+test invalid_regex_fails_initialization ... ok
+test deny_patterns_block_matching_content ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/mutation_gap_closure.rs (/home/connor/chio-security-target-6d-final/debug/deps/mutation_gap_closure-d87b197815a80c99)
+
+running 5 tests
+test forbidden_path_exceptions_do_not_widen_neighboring_secret_paths ... ok
+test egress_blocklist_takes_precedence_over_allowlist_case_insensitively ... ok
+test path_allowlist_patch_falls_back_to_write_allowlist_and_denies_siblings ... ok
+test invalid_custom_secret_pattern_is_rejected_at_load_time ... ok
+test secret_leak_custom_patterns_scan_and_skip_paths_are_bounded ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/output_sanitization.rs (/home/connor/chio-security-target-6d-final/debug/deps/output_sanitization-35a383e3b98f5700)
+
+running 45 tests
+test allowlist_pattern_suppresses_redaction ... ok
+test detects_aws_secret_access_key ... ok
+test denylist_pattern_cannot_be_downgraded_by_secret_keep_default ... ok
+test denylist_exact_forces_redaction ... ok
+test denylist_pattern_forces_redaction ... ok
+test compact_ssn_preserves_digest_identities ... ok
+test allowlist_exact_suppresses_redaction ... ok
+test detects_aws_access_key ... ok
+test denylist_exact_cannot_be_downgraded_by_secret_keep_default ... ok
+test detects_credit_card_with_luhn ... ok
+test compact_ssn_redacts_adjacent_numeric_tokens_without_consuming_separator ... ok
+test detects_email ... ok
+test detects_high_entropy_token ... ok
+test acceptance_post_invocation_guard_redacts_everything ... ok
+test detects_gcp_service_account_object_through_pipeline ... ok
+test detects_internal_private_ip ... ok
+test detects_dashed_ssn ... ok
+test low_entropy_token_not_flagged ... ok
+test detects_password_assignment ... ok
+test detects_gcp_service_account_json ... ok
+test detects_slack_bot_token ... ok
+test detects_slack_webhook ... ok
+test overlap_only_one_redaction_per_region ... ok
+test detects_github_token ... ok
+test detects_jwt ... ok
+test rejects_invalid_ssn_area ... ok
+test sanitizer_hook_clean_response_no_evidence ... ok
+test detects_oauth_bearer_header ... ok
+test rejects_random_16_digit_number ... ok
+test rejects_repeated_digit_16 ... ok
+test sanitize_json_helper_aggregates_findings ... ok
+test sanitize_value_preserves_json_structure ... ok
+test sanitizer_hook_dirty_response_emits_evidence ... ok
+test detects_pem_private_key ... ok
+test strategy_drop_empties_string ... ok
+test strategy_tokenize_records_mapping ... ok
+test overlap_prefers_stronger_strategy ... ok
+test entropy_threshold_configurable ... ok
+test strategy_type_label_uses_data_type ... ok
+test strategy_fingerprint_replaces_with_hash ... ok
+test strategy_drop_collapses_field_to_null_in_json ... ok
+test strategy_mask_replaces_with_stars ... ok
+test strategy_partial_keeps_prefix_suffix ... ok
+test invalid_denylist_regex_is_rejected ... ok
+test sanitize_json_helper_omits_object_findings_when_configured ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/prompt_injection.rs (/home/connor/chio-security-target-6d-final/debug/deps/prompt_injection-c07474b25d3644ee)
+
+running 6 tests
+test scan_reports_signals_and_fingerprint_shape ... ok
+test allows_non_text_action ... ok
+test high_threshold_still_allows_single_signal ... ok
+test denies_ignore_previous_instructions_in_code ... ok
+test denies_combined_attack_via_string_argument ... ok
+test allows_benign_code_execution ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+   Doc-tests chio_guards
+
+running 2 tests
+test crates/guards/chio-guards/src/external/mod.rs - external (line 24) ... ignored
+test crates/guards/chio-guards/src/lib.rs - (line 33) ... ignored
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
