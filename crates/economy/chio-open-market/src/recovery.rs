@@ -44,6 +44,8 @@ pub enum RecoveryVerificationError {
     CarrierInput(#[source] chio_finding::FindingError),
     #[error("recovery carrier is not valid base64 canonical JSON")]
     Carrier,
+    #[error("recovery carrier encoding is invalid")]
+    CarrierEncoding(#[source] base64::DecodeError),
     #[error("recovery carrier member {0} failed strict parsing")]
     Member(&'static str),
     #[error("original capability signature is invalid")]
@@ -53,7 +55,7 @@ pub enum RecoveryVerificationError {
     #[error("original capability does not carry the exact purchase delivery profile")]
     CapabilityProfile,
     #[error("original purchase context was rejected")]
-    PurchaseContext,
+    PurchaseContext(#[source] Box<crate::purchase_verification::PurchaseVerificationError>),
     #[error("settled purchase record signature or body is invalid")]
     PurchaseRecord,
     #[error("settled purchase record does not bind the verified purchase")]
@@ -206,7 +208,7 @@ pub fn verify_finding_recovery_context(
     }
     let raw = base64::engine::general_purpose::STANDARD
         .decode(inputs.context_b64.as_bytes())
-        .map_err(|_| RecoveryVerificationError::Carrier)?;
+        .map_err(RecoveryVerificationError::CarrierEncoding)?;
     let context =
         parse_finding_recovery_context(&raw).map_err(RecoveryVerificationError::CarrierInput)?;
     let original_capability: CapabilityToken = strict_member(
@@ -256,7 +258,7 @@ pub fn verify_finding_recovery_context(
         },
         &authorities.purchase,
     )
-    .map_err(|_| RecoveryVerificationError::PurchaseContext)?;
+    .map_err(|error| RecoveryVerificationError::PurchaseContext(Box::new(error)))?;
 
     let purchase_record: SignedFindingPurchaseRecord = strict_member(
         &context.purchase_record_envelope_json,

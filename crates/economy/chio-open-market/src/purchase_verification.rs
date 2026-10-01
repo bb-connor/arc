@@ -62,7 +62,7 @@ pub enum PurchaseVerificationError {
     #[error("purchase context member {0} failed strict parsing")]
     Member(&'static str),
     #[error("signed finding rejected: {0}")]
-    Finding(chio_finding::FindingError),
+    Finding(#[source] chio_finding::FindingError),
     #[error("purchase context does not bind the marked finding sale")]
     MarkerMismatch,
     #[error("finding payload commitment does not equal the grant digest")]
@@ -72,11 +72,11 @@ pub enum PurchaseVerificationError {
     #[error("{0} envelope signature is not verifiable")]
     EnvelopeSignature(&'static str),
     #[error("venue admission rejected: {0}")]
-    Admission(chio_finding::FindingError),
+    Admission(#[source] chio_finding::FindingError),
     #[error("admission does not bind the carried {0} envelope")]
     AdmissionBindingMismatch(&'static str),
     #[error("seller authorization rejected: {0}")]
-    SellerAuthorization(chio_finding::FindingError),
+    SellerAuthorization(#[source] chio_finding::FindingError),
     #[error("seller authorization does not cover this sale")]
     SellerAuthorizationScope,
     #[error("token issuer is neither the finding issuer nor an authorized seller")]

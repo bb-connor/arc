@@ -27,7 +27,9 @@ unrepresentable-defects mechanisms A/B/C.
 3. **Markets, predicates and witnesses (8 pinned readers).** Purchase member
    digest construction cannot erase duplicate original keys. Recovery keeps its
    stricter external canonical contract and authenticated receipt/purchase
-   bindings. Parametric imports retain native canonical bytes and authority
+   bindings. Kernel-facing purchase/recovery denials retain native causes through
+   prefixing and cloning while exposing fixed public text and stable denial codes.
+   Parametric imports retain native canonical bytes and authority
    checks. Predicate parsing is bounded and exposes a local native cause while
    preserving the closed wire verdict and deterministic evaluation identity.
    Rekor bounds HTTP retention and nested base64/JSON, requires a single entry,
