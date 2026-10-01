@@ -1,0 +1,53 @@
+{
+  "runs": {
+    "post-consumer-packages": {
+      "passed": 950,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0,
+      "test_and_doc_targets": 49
+    },
+    "market-test-module": {
+      "passed": 79,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0,
+      "test_and_doc_targets": 4
+    },
+    "settlement-fixture": {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 254,
+      "test_and_doc_targets": 1
+    },
+    "consumer-cause-final": {
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 1186,
+      "test_and_doc_targets": 1
+    },
+    "kernel-denial": {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 1487,
+      "test_and_doc_targets": 1
+    },
+    "rekor-conformance": {
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0,
+      "test_and_doc_targets": 1
+    }
+  },
+  "interpretation": "Each entry is a separate terminal command. The complete eight-owner campaign has 950 passes. The market rerun repeats tests after an unchanged test-module relocation; do not sum these as unique tests. Kernel, adapter and Rekor conformance are separate focused commands."
+}

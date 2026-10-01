@@ -217,7 +217,7 @@ impl std::error::Error for FindingDenial {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.source
             .as_deref()
-            .map(|source| source as &(dyn std::error::Error + 'static))
+            .map(|source| -> &(dyn std::error::Error + 'static) { source })
     }
 }
 

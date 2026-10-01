@@ -93,6 +93,7 @@
     "crates/kernel/chio-kernel/src/caller_delivery/retained.rs",
     "crates/kernel/chio-kernel/src/capability_lineage.rs",
     "crates/kernel/chio-kernel/src/dpop/replay_source/snapshot.rs",
+    "crates/kernel/chio-kernel/src/finding_denial.rs",
     "crates/kernel/chio-kernel/src/kernel/active_response_committed_recovery.rs",
     "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc",
     "crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs",
@@ -184,6 +185,8 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs",
+    "crates/platform/chio-control-plane/src/trust_control/finding_purchase_verifier.rs",
+    "crates/platform/chio-control-plane/src/trust_control/finding_recovery_verifier.rs",
     "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs",
     "crates/platform/chio-control-plane/src/trust_control/frost.rs",
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs",
@@ -11159,6 +11162,10 @@
       "kind": "parser-internal-or-typed",
       "contract": "Wasm module files are capped at the existing 10 MiB module limit before retention. Structured guest denial JSON validates original bounded native bytes before typed projection and no longer reinterprets malformed JSON as plaintext. Existing Wasmtime fuel/memory/import/result constraints remain; a denial cannot become Allow."
     },
+    "crates/kernel/chio-kernel/src/finding_denial.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Closed kernel denial family and public text stay separate from optional native diagnostic custody. Error sources survive prefixing and cloning, and do not participate in public formatting or deterministic equality."
+    },
     "crates/platform/chio-agent-web-interop/src/artifacts.rs": {
       "contract": "External subject bytes are bounded and original-token checked before value projection; exact subject digest, signature/HMAC, manifest scope and receipt authority checks remain.",
       "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
@@ -11214,6 +11221,14 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_profile/custody.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Private profile Deserialize implementations own seed/token strings in wiping guards even before all fields have parsed. Successful conversion transfers allocations into wiping owner types; serde errors retain no surviving partial secret fields."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/finding_purchase_verifier.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Market purchase parsing and verification causes survive the kernel-facing denial adapter. Closed CarrierInvalid/AuthorityInvalid/BindingMismatch families remain and public detail is fixed."
+    },
+    "crates/platform/chio-control-plane/src/trust_control/finding_recovery_verifier.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Recovery parsing, encoding and nested purchase causes survive the kernel-facing denial adapter with fixed public text and unchanged closed family mapping."
     },
     "crates/platform/chio-enterprise-export/src/artifacts.rs": {
       "contract": "Receipts and signed risk documents use bounded original native input. Fallible auxiliary risk, graph-reference and receipt lookups preserve native parsing causes; absent or unauthenticated references remain fail closed. Schema, digest and signer/claim verification remain mandatory.",

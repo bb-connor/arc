@@ -3,6 +3,7 @@ use std::{error::Error, fmt, sync::Arc};
 
 #[derive(Clone)]
 pub struct OracleRequestError(Arc<dyn Error + Send + Sync>);
+#[cfg(feature = "web3")]
 impl OracleRequestError {
     pub(crate) fn new(error: impl Error + Send + Sync + 'static) -> Self {
         Self(Arc::new(error))

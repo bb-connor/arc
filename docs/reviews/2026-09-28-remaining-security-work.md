@@ -167,14 +167,10 @@ contracts remain distinct; auxiliary reader errors retain their causes. Shared
 fenced clocks govern HTTP authority, hosted route time and worker completion.
 The execution record identifies the terminal local qualification and its limits.
 
-Next execute all 22 economy readers pinned in that batch's `next-readers.json`:
-credit credentials/obligations/factors, fiscal readiness/continuity, settlement
-configuration/replay/enforcement, market purchases/recovery/predicates and
-anchor/Chainlink evidence. There are 67 baseline files across the workspace,
-with zero guard, security, trust, protocol or CLI baseline files. The other
-45 readers remain queued after this economy batch. These lexical counts describe
-semantic review debt, not known vulnerabilities. Broader clock/deadline/accounting
-and negative-control work remains owner-specific.
+The platform handoff pinned 22 economy readers from the then-remaining 67
+baseline files. Their completed batch follows below. These lexical counts
+describe semantic review debt, not known vulnerabilities. Broader
+clock/deadline/accounting and negative-control work remains owner-specific.
 
 Broader semantic error taxonomy, other product/protocol readers, and the
 remaining structural/declaration/assurance queues below remain open.
@@ -186,7 +182,9 @@ input and alternate transport output, retains native causes, removes legacy
 dead-letter decoding, and binds Rekor receipt time under a shared fallible clock.
 Its terminal qualification and review records govern completion claims. The next
 batch is the 23 core, kernel and SDK paths pinned in that execution record;
-45 baseline reader files remain overall.
+45 baseline reader files remain overall. Production Rekor egress still needs
+HttpEgressContract threading under the separate egress owner; this batch does
+not establish live endpoint authorization or stronger public-log inclusion.
 
 ### 3. Compiler enforcement and secret ownership (implemented)
 

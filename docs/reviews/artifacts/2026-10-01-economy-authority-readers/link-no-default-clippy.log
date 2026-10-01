@@ -1,0 +1,96 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on build directory
+    Checking typenum v1.20.0
+    Checking tinystr v0.8.2
+    Checking subtle v2.6.1
+    Checking zerotrie v0.2.3
+    Checking icu_collections v2.1.1
+    Checking icu_locale_core v2.1.1
+    Checking memchr v2.8.0
+    Checking signature v2.2.0
+    Checking ed25519 v2.2.3
+    Checking generic-array v0.14.7
+    Checking serde_json v1.0.149
+    Checking bytes v1.11.1
+    Checking icu_provider v2.1.1
+    Checking icu_properties v2.1.2
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking icu_normalizer v2.1.1
+    Checking digest v0.10.7
+    Checking thiserror v2.0.18
+    Checking sha2 v0.10.9
+    Checking curve25519-dalek v4.1.3
+    Checking cobs v0.3.0
+    Checking chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling aws-lc-rs v1.18.1 (/tmp/arc-security-launch/third_party/aws-lc-rs-chio)
+    Checking either v1.15.0
+    Checking itertools v0.14.0
+    Checking ed25519-dalek v2.2.0
+    Checking idna_adapter v1.2.1
+    Checking idna v1.1.0
+    Checking postcard v1.1.3
+    Checking url v2.5.8
+    Checking rs_merkle v1.5.0
+    Checking tokio v1.50.0
+    Checking http v1.4.0
+    Checking frost-core v3.0.0
+    Checking http-body v1.0.1
+    Checking frost-rerandomized v3.0.0
+   Compiling rustls v0.23.45
+    Checking slab v0.4.12
+    Checking futures-task v0.3.32
+    Checking futures-util v0.3.32
+    Checking rustls-webpki v0.103.15
+    Checking frost-ed25519 v3.0.0
+    Checking tracing-core v0.1.36
+    Checking futures-channel v0.3.32
+    Checking ruint v1.20.0
+    Checking hyper v1.8.1
+    Checking sha3 v0.10.8
+    Checking tracing v0.1.44
+    Checking const-hex v1.18.1
+    Checking tower v0.5.3
+    Checking alloy-primitives v1.5.7
+    Checking hyper-util v0.1.20
+    Checking tokio-rustls v0.26.4
+    Checking bitflags v2.11.0
+    Checking log v0.4.29
+    Checking tower-http v0.6.8
+    Checking rustls-platform-verifier v0.6.2
+    Checking http-body-util v0.1.3
+    Checking hyper-rustls v0.27.7
+    Checking reqwest v0.13.2
+    Checking chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+    Checking chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+    Checking chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+    Checking chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+    Checking chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+    Checking chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+    Checking chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+    Checking chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+    Checking chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+    Checking chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+    Checking chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+    Checking chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+    Checking chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+    Checking chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+    Checking chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+    Checking chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+    Checking chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+    Checking chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+    Finished `dev` profile [unoptimized] target(s) in 2m 15s

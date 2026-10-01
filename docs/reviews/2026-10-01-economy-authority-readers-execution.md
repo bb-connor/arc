@@ -34,14 +34,16 @@ unrepresentable-defects mechanisms A/B/C.
    preserving the closed wire verdict and deterministic evaluation identity.
    Rekor bounds HTTP retention and nested base64/JSON, requires a single entry,
    validates SHA-256 hash shape, and binds receipt time to the signed entry.
-   Pinned SET signatures and optional Merkle proofs remain required. Publication
+   Pinned SET signatures remain required; supplied Merkle proofs remain checked. Publication
    and verification use a shared fallible clock with clone-shared regression
    fences. Chainlink validates original JSON before Alloy's raw-value projection,
    preserving unsigned document numbers and retaining safe native RPC causes.
 4. **Review, accounting and publication.** The inventory now records all 22
    dispositions and 45 remaining baseline reader files. Rekor joins the clock
-   gate without an ambient-clock exception. Independent review, qualification
-   and publication results are recorded in the linked evidence as they finish.
+   gate without an ambient-clock exception. One independent read-only review
+   found no material findings. Terminal qualification, source hashes, subsequent
+   qualification cleanups and the authorized publication boundary are recorded
+   in the linked evidence.
 
 The [plan](../superpowers/plans/2026-10-01-economy-authority-readers.md),
 [reader contracts](artifacts/2026-10-01-economy-authority-readers/reviewed-readers.json),
@@ -67,10 +69,24 @@ separate implementation from qualification.
 
 ## Qualification boundary
 
+The complete eight-owner campaign passes **950 tests** with zero failures or
+ignored tests. All **19 direct consumers** compile with all targets; all-target
+Clippy passes for the eight owners plus kernel and control plane. Both default
+and no-default-feature oracle Clippy checks pass. Five kernel denial tests, two
+actual adapter cause tests and seven Rekor conformance cases also pass. A full
+79-test market rerun and the settlement identity fixture qualify the test-only
+cleanups after review; they repeat coverage in the owner campaign.
+
+The [qualification record](artifacts/2026-10-01-economy-authority-readers/README.md)
+identifies accepted runs and exact source hashes. The only production changes
+after independent review are an equivalent trait-object coercion for the
+existing kernel lint and a private oracle constructor feature gate. The final
+checks qualify those changes; no second independent review is claimed.
+
 Terminal failed attempts are retained, including test-fixture compile errors,
 expected regression failures and old error-variant assertions. The qualification
-record will identify accepted runs and source hashes; a failed attempt is not
-counted as passing. The dependency change adds only the existing workspace
+record keeps those separate from accepted runs; a failed attempt is not counted
+as passing. The dependency change adds only the existing workspace
 `chio-security-types` edge to `chio-anchor`; package versions are unchanged.
 
 This batch does not establish full-workspace, native Firecracker, live-provider,

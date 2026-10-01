@@ -63,7 +63,7 @@ response decoding; fixed wire outcome/error classification with local causes.
   bound config reads and alternate transport output before projection.
 - [x] Remove legacy dead-letter decoding and require a nonzero attempt count.
   Classify the CCIP embedded fixture separately from production ingress.
-- [ ] Finish source-preserving consumer compilation; settlement package tests passed.
+- [x] Finish source-preserving consumer compilation; settlement package tests passed.
 
 ### Task 3: Markets, predicates and external witnesses (8 readers)
 
@@ -80,15 +80,16 @@ Merkle authentication, bounded transport/nested input and a fenced clock.
   bounded Rekor response/proof retention and shared fallible authority time.
 - [x] Verify exact publish/receipt identity and request binding; fail closed on
   future/regressing witness time without manufacturing an epoch timestamp.
-- [ ] Finish direct consumer compilation; all affected owning packages passed.
+- [x] Finish direct consumer compilation; all affected owning packages passed.
 
 ### Task 4: Review, accounting, qualification and publication
 
-- [ ] Obtain one fresh independent review; fix material findings and qualify them.
-- [ ] Record every pinned reader and supporting owner, preserve terminal failed
+- [x] Obtain one fresh independent review; fix material findings and qualify them.
+  The read-only review found no material findings; scope rulings are recorded.
+- [x] Record every pinned reader and supporting owner, preserve terminal failed
   attempts, refresh the inventory and pin the next substantial batch.
-- [ ] Run scoped all-target Clippy, format, trust/clock/negative/hygiene/wire gates.
-- [ ] Commit and non-force push the complete source/evidence; verify remote SHA.
+- [x] Run scoped all-target Clippy, format, trust/clock/negative/hygiene/wire gates.
+- [x] Commit and non-force push the complete source/evidence; verify remote SHA.
 
 ## Execution record
 

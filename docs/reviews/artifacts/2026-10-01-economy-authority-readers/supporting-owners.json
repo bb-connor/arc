@@ -1,4 +1,7 @@
 {
+  "crates/kernel/chio-kernel/src/finding_denial.rs": "Closed kernel denial family and public text stay separate from optional native diagnostic custody. Error sources survive prefixing and cloning, and do not participate in public formatting or deterministic equality.",
+  "crates/platform/chio-control-plane/src/trust_control/finding_purchase_verifier.rs": "Market purchase parsing and verification causes survive the kernel-facing denial adapter. Closed CarrierInvalid/AuthorityInvalid/BindingMismatch families remain and public detail is fixed.",
+  "crates/platform/chio-control-plane/src/trust_control/finding_recovery_verifier.rs": "Recovery parsing, encoding and nested purchase causes survive the kernel-facing denial adapter with fixed public text and unchanged closed family mapping.",
   "crates/economy/chio-anchor/src/witness/rekor/input.rs": "Bounded actual HTTP retention and nested base64 custody precede duplicate-aware original native JSON projection. Response cardinality is exact; HTTP bodies are excluded from public failures.",
   "crates/economy/chio-anchor/src/witness/rekor/clock.rs": "Clock sampling and high-water observation share a mutex across client clones. Native failure, wall regression and monotonic regression deny before effects.",
   "crates/economy/chio-credit/src/input.rs": "Shared bounded native typed canonical original-byte reader; source error is retained through the existing shared redacted owner.",

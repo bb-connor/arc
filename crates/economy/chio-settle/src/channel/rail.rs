@@ -737,31 +737,30 @@ mod identity_fixture_tests {
         let fixtures: Vec<serde_json::Value> = serde_json::from_str(include_str!(
             "../../../../../spec/fixtures/shared-security-identifiers.json"
         ))?;
-        for identity in [SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN] {
-            let text = std::str::from_utf8(identity)?;
-            let fixture = fixtures
-                .iter()
-                .find(|row| row["identity"].as_str() == Some(text))
-                .ok_or("missing independent identity fixture")?;
-            let payload: serde_json::Value = serde_json::from_str(
-                fixture["canonical_payload"]
-                    .as_str()
-                    .ok_or("fixture payload")?,
-            )?;
-            let canonical = chio_core::canonical_json_bytes(&payload)?;
-            assert_eq!(
-                std::str::from_utf8(&canonical)?,
-                fixture["canonical_payload"]
-                    .as_str()
-                    .ok_or("fixture canonical bytes")?
-            );
-            let mut preimage = identity.to_vec();
-            preimage.extend_from_slice(&canonical);
-            assert_eq!(
-                chio_core::sha256_hex(&preimage),
-                fixture["sha256"].as_str().ok_or("fixture digest")?
-            );
-        }
+        let identity = SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN;
+        let text = std::str::from_utf8(identity)?;
+        let fixture = fixtures
+            .iter()
+            .find(|row| row["identity"].as_str() == Some(text))
+            .ok_or("missing independent identity fixture")?;
+        let payload: serde_json::Value = serde_json::from_str(
+            fixture["canonical_payload"]
+                .as_str()
+                .ok_or("fixture payload")?,
+        )?;
+        let canonical = chio_core::canonical_json_bytes(&payload)?;
+        assert_eq!(
+            std::str::from_utf8(&canonical)?,
+            fixture["canonical_payload"]
+                .as_str()
+                .ok_or("fixture canonical bytes")?
+        );
+        let mut preimage = identity.to_vec();
+        preimage.extend_from_slice(&canonical);
+        assert_eq!(
+            chio_core::sha256_hex(&preimage),
+            fixture["sha256"].as_str().ok_or("fixture digest")?
+        );
         Ok(())
     }
 }
