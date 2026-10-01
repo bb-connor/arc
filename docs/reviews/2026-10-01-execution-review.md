@@ -209,3 +209,10 @@ In order:
 Each plan named above now ends with an "Execution review (October 1, 2026)" section that links the
 slice review covering it, states its conformance verdict, and lists the open findings against it.
 The working queue carries the ordered list above.
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. It is a separate review of product claims rather than of this range's execution, and it attaches to the same plans.
+
+None of its findings duplicates a pass 9 finding; related IDs are cross-referenced inline (SR1, SR3,
+SR6, SF4, PB6, PB9, PR5, AC6, CA2, CA9, GT1, GT10). Its High findings are AP1, KG1 and RL1.

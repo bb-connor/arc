@@ -516,3 +516,13 @@ Open findings against this plan:
 - **RP6, Low.** No escape-hatch gate exists; escape hatches went from seven to eight.
 
 **Next:** Split the decode contracts into distinct types (SF8), carry `DispatchRejection` through the kernel seam (RP2), and build the escape-hatch gate before adding more sealed types.
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Two findings fit this design's aim of making defects unrepresentable:
+
+- **KG4, Medium.** Capability constraints that nothing enforces are accepted at issuance:
+  `TableAllowlist` is read by no guard, `OperationClass` only by the vector guard, and
+  `ensure_capability_issuance_supported` is a no-op. A constraint should be unrepresentable unless an
+  installed enforcer claims it.
+- **KG5, Medium.** A HushSpec policy without tool rules compiles to a `*/*` grant.

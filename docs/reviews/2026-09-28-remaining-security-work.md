@@ -331,3 +331,22 @@ Before another batch, in order:
 
 Item 2 of this queue changes scope: finish the 13 baseline files inside TCB libraries, reclassify
 the 22 tooling and observability files, and stop the census for the remainder (CA4).
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. It adds 69 findings (3 High, 43 Medium, 21 Low, 2 Note), none previously on this queue. After the pass 9 list above, in order:
+
+1. The High findings: AP1 (caller-supplied subject keys), KG1 (signed authority replication, no
+   plaintext peer links), RL1 (claim the signer name; one pinned identity; executable verification docs).
+2. RL5 (upgrade or gate out wasmtime) so the required `cargo deny` step can pass; repair the dead
+   scheduled lanes (RL6); enforce reviews and tag rules (RL7).
+3. Evidence integrity: EV6, EV7, EV13, AP9, AP10, EV12.
+4. Authority: KG2, KG3, KG4, KG5, KG6, KG7, KG8, AP2, AP3, AP4, AP5, AP6, AP7, AP8.
+5. Data handling, before any pilot with personal data or PHI: EV1, EV2, KG11, KG12, EV5 (with SR1 and SR6).
+6. Evidence completeness: EV3, EV4, EV14, EV8, EV17, EV9, EV15, EV16, EV11.
+7. Truth: KG9, KG10, KG13, EV10, RL17, RL10, and the merge of the compliance guidance (RL11).
+8. Release: RL2, RL3, RL4, then RL8, RL9 and RL12 to RL20.
+
+Maintainer decisions are listed in the review: registering `backbay-industries`, the fate of the
+hand-published v0.1.0 artifacts and the PyPI name, the stray public tags, and the MCP registry and
+Bedrock claims.

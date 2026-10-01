@@ -115,3 +115,17 @@ tests rather than selecting an implicit skip.
 
 These are local router, network and store-boundary regressions, not native
 confinement, cross-tenant authorization, throughput, or hosted qualification.
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings against this authority boundary:
+
+- **AP1, High.** `derive_sidecar_subject_key` (`crates/products/chio-api-protect/src/proxy/sidecar.rs:1206-1216`)
+  seeds the subject keypair from SHA-256(subject, 0, job_uid); with the SDK's subject contract the
+  private key is computable from public values, contradicting this boundary's rule that the sidecar
+  must not hold or derive the subject key. The subject must be a caller-supplied public key.
+- **AP4, Medium.** Unmatched routes and `x-chio-side-effects: false` operations are session-allowed
+  without a capability, and the spec deciding this is discovered from the protected upstream.
+- **AP7, Medium.** The "Migration and limits" deferral of TLS leaves every listener plain HTTP; the
+  review asks for a refusal to bind off loopback without TLS.
+- **KG5, Medium.** The mediation route's `policy_hash` is a constant label, not the policy in force.

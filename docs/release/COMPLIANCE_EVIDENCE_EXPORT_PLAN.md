@@ -209,3 +209,13 @@ The verifier enforces that:
 - an admin-all manifest MUST NOT carry a tenant-scoped disclosure notice
 - the notice content MUST match the canonical disclosure boundary for the
   current protocol version (tampering or selective omission is rejected)
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings against the export contract:
+
+- **EV6, Medium.** Packages are unsigned and verify against the keys they embed; archived receipts are
+  not exported.
+- **EV7, Medium.** The trust-anchor state is taken from the package itself.
+- **EV13, Low.** Receipt `kernel_key` is not bound to the checkpoint signer during verification.
+- **EV18, Note.** Import accepts a federation policy self-signed by its embedded key.

@@ -95,3 +95,10 @@ remains open for independent per-statement and broader principal coverage.
 PostgreSQL surfaces and hosted deployment acceptance remain outside this SQLite
 matrix. See the [batch execution record](../reviews/2026-09-28-kernel-admission-reader-execution.md)
 and the [preceding execution record](../reviews/2026-09-28-signed-reader-tenant-execution.md).
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. One open finding:
+
+- **AP12, Low.** `--tenant-read-token` has no environment or file source, so tenant tokens appear in
+  the process list.

@@ -69,3 +69,17 @@ Local quote-verifier fixtures, in-memory durable-operation fixtures and signing
 queue tests do not establish physical process-crash recovery, real TEE evidence,
 native cage enforcement, hosted exact-head qualification or operational-pilot
 completion. These boundaries remain explicit launch gates.
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings against key custody and issuer trust:
+
+- **KG1, High.** Cluster followers apply unsigned authority snapshots from peers authenticated by the
+  shared service token over plain HTTP, adding any listed issuer.
+- **KG2, Medium.** SQLite rotation never retires a key and writes no signed record; the witnessed
+  keyring writes no Retire, Revoke or Recover and ignores `verify_until`; the kernel's receipt key is
+  always a trusted capability issuer and approval signer and cannot be rotated.
+- **KG3, Medium.** The authority database stores `seed_hex` in clear and is created with default
+  permissions.
+- **KG14, Low.** Remote signing reaches only the finding-market hosted profile.
+- **AP9, Medium.** API protect signs with a fresh `Keypair::generate()` on every start without a seed.

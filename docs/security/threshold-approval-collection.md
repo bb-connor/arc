@@ -303,3 +303,15 @@ Regression coverage lives in the kernel and SQLite
 are not proof of whole-database rollback resistance, hosted exact-head
 qualification, native confinement or observed pilot behavior. The remaining
 launch requirements are tracked in [the launch ledger](launch-plan.md).
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings against approval semantics:
+
+- **AP2, Medium.** Only `serve-http` builds `BoundToolInvocation` intents; unbound intents are still
+  accepted with an approval, API protect signs a caller-supplied `parameter_hash`, and no evaluation
+  path reads the API-protect approval store, so those approvals gate nothing.
+- **AP3, Medium.** Operator-respond signs with the sidecar key and records no approver; any CA,
+  authority or kernel key may sign an approval; `approve_above_currency`, `timeout_seconds`,
+  `on_timeout` and `approve_when` are parsed but not enforced while the canonical example presents them.
+- **KG4, Medium.** `RequireDualApproval` never matches, so grants carrying it always deny.

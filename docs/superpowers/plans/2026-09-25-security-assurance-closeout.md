@@ -156,3 +156,17 @@ and FROST transport sealing remain separate acceptance work.
 - Share security decisions across live, recovery and simulation paths. Avoid duplicate policy implementations, permissive trait defaults, boolean mode flags and generic frameworks without a concrete caller.
 - A regression fails for the defect it names. Integration tests observe durable state or actual effects. Fuzzing reaches valid deep states. Formal claims include assumptions and implementation linkage. Test counts and line coverage do not establish threat closure.
 - Run focused checks while implementing, then the complete required qualification at the stable candidate. Reuse existing harnesses; create additional tooling only when an uncovered boundary requires it.
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Packets 5 and 6 own the release and supply-chain findings:
+
+- **Packet 5.** RL2 (nothing released through the signed pipeline; hand-published npm, PyPI and
+  crates.io versions without provenance), RL3 (published v0.1.0 binary: 27 advisories, not auditable),
+  RL5 (RUSTSEC-2026-0316 unrecorded; required `cargo deny` and cve-monitor red), RL8 (unreasoned and
+  dead advisory ignores; self-approved cargo-vet exemptions), RL12 (provenance not checkable with stock
+  slsa-verifier).
+- **Packet 6.** RL1 (High: verification docs pin the unclaimed GitHub name `backbay-industries`), RL4
+  (installer serves v0.1.0 with a same-origin checksum), RL6 (nightly, fuzz, cve-monitor and
+  tuf-rebake silently red; the embedded Sigstore root expired 2026-06-22), RL7 (CODEOWNERS invalid in
+  both repositories; no review or tag rules), RL9, RL13 to RL20.

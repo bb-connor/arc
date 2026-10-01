@@ -647,3 +647,35 @@ Do not restart open-ended repository cleanup, add new frameworks, or add another
 round of capture metadata fault variants without a demonstrated missing invariant.
 At every milestone boundary, reassess this order against the actual remaining
 launch blockers and report any proposed scope change before taking it.
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. None was on a plan. Open findings by milestone:
+
+- **M4.** AP1 (High: sidecar subject keys derivable from public values, so DPoP binds nothing),
+  AP2 (API-protect approvals gate nothing; unbound intents accepted), AP3 (approver identity not
+  recorded; any trusted key approves), AP4 (API protect allows unmatched routes and side-effect-free
+  methods by default), AP5 (capabilities are bearer tokens; `jkt` binding fails open), AP6
+  (certificate binding satisfied by caller-set headers), AP10 (submitted records verify as decisions),
+  KG4 (capability constraints silently unenforced), KG5 and KG6 (wildcard default grant; policy
+  hashes that do not identify policy), KG12 (two kernel paths with no guards or sanitizer).
+- **M6.** KG1 (High: unsigned cluster authority replication over plain HTTP), KG2 (rotation never
+  retires keys; kernel key is an unrotatable issuer), KG3 (authority database with the plaintext seed
+  created world-readable), KG7 and KG8 (attestation never verified), KG14 (no KMS or HSM signer),
+  AP7 (no TLS on any listener), AP8 (session revocation reports success on failure), AP12.
+- **M7.** EV1 (raw tool arguments in receipts, SIEM events and pages; prerequisite for any personal
+  data or PHI pilot), KG10 (library-only guards documented as running), KG11 (indirect injection and
+  PHI in tool output unchecked), EV11 (no operator-reachable emergency stop).
+- **M8.** EV2 (admission blobs keep credentials and raw output forever), EV5 (retention runs in no
+  binary), AP9 (mutable API-protect receipts outside the evidence chain), AP11 (unbounded in-memory
+  receipts).
+- **M9.** AP7 (TLS listeners), EV9 (`chio-wall` and the SIEM exporters are not shipped; OCSF class
+  mislabeled), EV15 and EV16 (unverified deny pages; a CEF exporter that sends nothing).
+- **M10.** RL1 (High: verification docs pin an unclaimed GitHub name), RL2 to RL20 (nothing released
+  through the signed pipeline; v0.1.0 carries 27 advisories and is what the installer serves; dead
+  scheduled lanes; unenforced CODEOWNERS; RUSTSEC-2026-0316), KG9 (FIPS 140-3 claim), KG13, KG15,
+  EV3, EV4, EV6, EV7, EV8 (evidence and certificate verification), EV10 (operator runbook steps
+  that cannot be performed), KG16 and KG17 (guard documentation and threat-model gaps; KG19 notes
+  that TR2 is latent for shipped binaries), RL11 (merge of the compliance guidance branch).
+
+The review's "Before the next batch" list orders these after the pass 9 items.

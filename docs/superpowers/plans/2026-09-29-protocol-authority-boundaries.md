@@ -47,3 +47,16 @@ Open findings against this plan:
 - **PB12, Low.** Six test names use `review_regression_*`, and a module is named `oauth_cache_review`.
 
 **Next:** Decide the numeric contract by producer (PB2) and make clock faults degrade rather than terminate sessions (PB3).
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings at the protocol edges:
+
+- **EV3, Medium.** `mcp serve` and `serve-http` reject uncovered calls, including constraint and
+  model-metadata mismatches, before the kernel with no receipt; the `tool_denied` notification goes
+  only to the client, which can suppress it; this plan's own batch added more receiptless rejections
+  (`3d3e4b4d9d`, `348b7ae4c2`).
+- **EV4, Medium.** Session-credential `serve-http` answers out-of-allowlist tools with a bare 403.
+- **AP5, Medium.** A `cnf` carrying only RFC 9449 `jkt` is accepted as a plain bearer.
+- **AP6, Medium.** Certificate and attestation sender binding is satisfied by caller-set headers.
+- **AP8, Medium.** `POST /admin/sessions/{id}/trust` reports `revoked: true` when revocation fails.

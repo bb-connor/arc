@@ -1176,3 +1176,10 @@ documentation of the current security posture. Everything else builds on it.
    Global is simpler but means a tenant's checkpoint proof includes sibling
    hashes from other tenants (privacy concern for the tree structure, though
    not the receipt content).
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. One finding against section 5:
+
+- **EV11, Medium.** The emergency stop is an in-memory flag with no signed record, and its HTTP
+  routes are mounted by no binary, although section 5 says it is exposed over the kernel's HTTP API.

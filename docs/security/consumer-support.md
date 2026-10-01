@@ -399,3 +399,13 @@ removed uncaged child no longer has a production supervision exception. The
 launch gate checks top-level migration rejection, process release, evidence
 validation, receipt persistence and transport construction in order; its
 mutation calibration removes, weakens and reorders those phases.
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings for `chio mcp wrap` consumers:
+
+- **EV3, Medium.** `mcp wrap` persists no per-call decision receipts.
+- **EV14, Low.** It stamps `_meta.chio_verified` without a durable receipt and silently ignores the
+  global `--receipt-db`.
+- **KG18, Low.** Strict mode builds its server from the child's own `tools/list` and ignores the
+  verified manifest registry it already loaded.

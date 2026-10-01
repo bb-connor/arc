@@ -52,3 +52,15 @@ Open findings against this plan:
 - **PR7, Low.** Manifest v1 was removed, but `spec/PROTOCOL.md` and the crate README still name v1 as the only schema.
 
 **Next:** Decode operator-written files with duplicate-key rejection and ordinary numbers (PR2), and page certificate collection (PR5).
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings in the CLI proof readers:
+
+- **EV6, Medium.** `chio evidence verify` takes no trusted key, so a fabricated package signed by a
+  fresh key verifies; the manifest is unsigned; exports skip archived receipts.
+- **EV7, Medium.** `trust_anchored` is reported from an unsigned binding inside the package.
+- **EV8, Medium.** `chio cert generate` reads a `chio_receipts` table no Chio store has, its scope and
+  guard checks are vacuous, verdicts and delegation are not checked, and full-bundle verification
+  passes on an empty bundle.
+- **EV17, Low.** Certificate chain continuity uses global row ids.

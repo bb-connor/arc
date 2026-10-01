@@ -78,3 +78,13 @@ The Cargo feature named `fips` selects the ECDSA backend in this crate. Enabling
 it alone is not evidence of a validated FIPS module or a qualified deployment.
 See the [launch ledger](launch-plan.md) for executed feature profiles and the
 remaining full-runtime qualification gates.
+
+## Compliance and product-truth review (October 1, 2026)
+
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings against cryptographic claims and verification:
+
+- **KG9, Medium.** `crates/core/chio-core-types/src/crypto.rs:1029,1095` and its README still call
+  the `fips` feature "FIPS 140-3 validated"; it builds `aws-lc-sys`, and no Chio build uses a module
+  validated under FIPS 140-3.
+- **KG15, Low.** The `aws-lc-rs` fork changes no compiled code but is the only cause of the red cargo-vet.
+- **EV12, Low.** Receipt and checkpoint signatures use non-strict Ed25519 verification.
