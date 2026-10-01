@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path};
 
 use chio_core_types::{
-    canonical::{canonical_json_bytes, canonical_json_bytes_from_str},
+    canonical::canonical_json_bytes,
     crypto::{Keypair, Signature},
     hashing::Hash,
     merkle::{leaf_hash, MerkleProof},
@@ -203,6 +203,7 @@ pub fn verify_transaction_passport_signature_with_evidence_graph(
     scoped_evidence_graph_bytes: &[u8],
     trusted_root_signer_keys: &[PublicKey],
 ) -> Result<(), TransactionPassportError> {
+    crate::validate_evidence_budget([signed_evidence_graph_bytes, scoped_evidence_graph_bytes])?;
     let mut signed_passport = passport.clone();
     signed_passport.evidence_graph_sha256 = super::sha256_hex(signed_evidence_graph_bytes);
     verify_transaction_passport_signature(&signed_passport, trusted_root_signer_keys)?;
@@ -219,14 +220,8 @@ fn validate_scoped_evidence_graph_subset(
     signed_evidence_graph_bytes: &[u8],
     scoped_evidence_graph_bytes: &[u8],
 ) -> Result<(), TransactionPassportError> {
-    let signed_graph: Value =
-        serde_json::from_slice(signed_evidence_graph_bytes).map_err(|error| {
-            TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-        })?;
-    let scoped_graph: Value =
-        serde_json::from_slice(scoped_evidence_graph_bytes).map_err(|error| {
-            TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-        })?;
+    let signed_graph: Value = crate::decode_evidence_json(signed_evidence_graph_bytes)?;
+    let scoped_graph: Value = crate::decode_evidence_json(scoped_evidence_graph_bytes)?;
     ensure_scoped_entries_are_subset(&signed_graph, &scoped_graph, "nodes")?;
     ensure_scoped_entries_are_subset(&signed_graph, &scoped_graph, "edges")
 }
@@ -332,6 +327,11 @@ pub(crate) fn verify_minimal_passport_artifacts_with_anchor_inputs(
     artifacts: &BTreeMap<String, Vec<u8>>,
     trusted_checkpoint_signer_keys: &[PublicKey],
 ) -> Result<TransactionVerifierReport, TransactionPassportError> {
+    crate::validate_evidence_budget(
+        [evidence_graph_bytes, verifier_policy_bytes]
+            .into_iter()
+            .chain(artifacts.values().map(Vec::as_slice)),
+    )?;
     verify_minimal_passport_schema(passport)?;
 
     let evidence_graph_sha256 = super::sha256_hex(evidence_graph_bytes);
@@ -350,14 +350,9 @@ pub(crate) fn verify_minimal_passport_artifacts_with_anchor_inputs(
         });
     }
 
-    let evidence_graph: TransactionEvidenceGraph = serde_json::from_slice(evidence_graph_bytes)
-        .map_err(|error| {
-            TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-        })?;
-    let evidence_graph_value: Value =
-        serde_json::from_slice(evidence_graph_bytes).map_err(|error| {
-            TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-        })?;
+    let evidence_graph: TransactionEvidenceGraph =
+        crate::decode_evidence_json(evidence_graph_bytes)?;
+    let evidence_graph_value: Value = crate::decode_evidence_json(evidence_graph_bytes)?;
     validate_evidence_graph(&evidence_graph)?;
     validate_claim_set_node_binding(
         &evidence_graph,
@@ -365,10 +360,8 @@ pub(crate) fn verify_minimal_passport_artifacts_with_anchor_inputs(
         &passport.claim_set_sha256,
     )?;
 
-    let verifier_policy: TransactionVerifierPolicy = serde_json::from_slice(verifier_policy_bytes)
-        .map_err(|error| {
-            TransactionPassportError::InvalidVerifierPolicyArtifact(error.to_string())
-        })?;
+    let verifier_policy: TransactionVerifierPolicy =
+        crate::decode_evidence_json(verifier_policy_bytes)?;
     validate_verifier_policy(&verifier_policy)?;
     validate_passport_omission_policy(passport, &verifier_policy)?;
     enforce_verifier_policy_gates(
@@ -522,6 +515,11 @@ fn verify_passport_root_and_claim_set_artifacts_bound(
     trusted_checkpoint_signer_keys: &[PublicKey],
     externally_verified_claims: &[String],
 ) -> Result<TransactionVerifierReport, TransactionPassportError> {
+    crate::validate_evidence_budget(
+        [evidence_graph_bytes, verifier_policy_bytes]
+            .into_iter()
+            .chain(artifacts.values().map(Vec::as_slice)),
+    )?;
     let claim_results = verify_signed_root_graph_binding(
         passport,
         evidence_graph_bytes,
@@ -530,9 +528,7 @@ fn verify_passport_root_and_claim_set_artifacts_bound(
         trusted_checkpoint_signer_keys,
         externally_verified_claims,
     )?;
-    let evidence_graph: Value = serde_json::from_slice(evidence_graph_bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let evidence_graph: Value = crate::decode_evidence_json(evidence_graph_bytes)?;
     let transparency_state = evidence_graph_transparency_state(
         evidence_graph_nodes(&evidence_graph)?,
         artifacts,
@@ -551,9 +547,8 @@ fn verify_passport_root_and_claim_set_artifacts_bound(
 pub fn transaction_evidence_graph_transparency_state(
     evidence_graph_bytes: &[u8],
 ) -> Result<String, TransactionPassportError> {
-    let evidence_graph: Value = serde_json::from_slice(evidence_graph_bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let evidence_graph: Value = crate::decode_evidence_json(evidence_graph_bytes)?;
+    validate_root_graph_schema(&evidence_graph)?;
     Ok(evidence_graph_transparency_state(
         evidence_graph_nodes(&evidence_graph)?,
         &BTreeMap::new(),
@@ -575,10 +570,12 @@ pub fn transaction_evidence_graph_transparency_state_with_anchors(
     artifacts: &BTreeMap<String, Vec<u8>>,
     trust_anchors: TransactionTrustAnchors<'_>,
 ) -> Result<String, TransactionPassportError> {
+    crate::validate_evidence_budget(
+        std::iter::once(evidence_graph_bytes).chain(artifacts.values().map(Vec::as_slice)),
+    )?;
     trust_anchors.validate()?;
-    let evidence_graph: Value = serde_json::from_slice(evidence_graph_bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let evidence_graph: Value = crate::decode_evidence_json(evidence_graph_bytes)?;
+    validate_root_graph_schema(&evidence_graph)?;
     Ok(evidence_graph_transparency_state(
         evidence_graph_nodes(&evidence_graph)?,
         artifacts,
@@ -611,15 +608,11 @@ fn verify_signed_root_graph_binding(
         });
     }
 
-    let verifier_policy: TransactionVerifierPolicy = serde_json::from_slice(verifier_policy_bytes)
-        .map_err(|error| {
-            TransactionPassportError::InvalidVerifierPolicyArtifact(error.to_string())
-        })?;
+    let verifier_policy: TransactionVerifierPolicy =
+        crate::decode_evidence_json(verifier_policy_bytes)?;
     validate_verifier_policy(&verifier_policy)?;
     validate_passport_omission_policy(passport, &verifier_policy)?;
-    let evidence_graph: Value = serde_json::from_slice(evidence_graph_bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let evidence_graph: Value = crate::decode_evidence_json(evidence_graph_bytes)?;
     validate_root_graph_schema(&evidence_graph)?;
     enforce_verifier_policy_gates(
         passport,
@@ -665,6 +658,16 @@ fn validate_root_graph_schema(evidence_graph: &Value) -> Result<(), TransactionP
             schema.to_string(),
         ));
     }
+    let nodes = evidence_graph_nodes(evidence_graph)?;
+    let edges = evidence_graph
+        .get("edges")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            TransactionPassportError::InvalidEvidenceGraphArtifact(
+                "evidence graph missing edges".into(),
+            )
+        })?;
+    crate::validate_evidence_graph_size(nodes.len(), edges.len())?;
     Ok(())
 }
 
@@ -936,6 +939,7 @@ enum TransparencyAnchor {
     NotEvaluable,
     /// The anchor was checkable and did not hold.
     Invalid(String),
+    InvalidInput(TransactionPassportError),
 }
 
 /// Transparency state of an evidence graph, promoted to `trust_anchored` only
@@ -975,6 +979,7 @@ fn evidence_graph_transparency_state(
             {
                 TransparencyAnchor::Verified => has_verified_anchor = true,
                 TransparencyAnchor::NotEvaluable => has_transparency_preview = true,
+                TransparencyAnchor::InvalidInput(error) => return Err(error),
                 TransparencyAnchor::Invalid(reason) => {
                     return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
                         format!("transparency inclusion proof is invalid: {reason}"),
@@ -1020,19 +1025,16 @@ fn transparency_anchor_state(
     if super::sha256_hex(bytes) != node_sha256 {
         return TransparencyAnchor::Invalid(format!("{path} does not match its declared digest"));
     }
-    let Ok(raw_json) = std::str::from_utf8(bytes) else {
-        return TransparencyAnchor::Invalid(format!("{path} is not a readable inclusion proof"));
-    };
-    let canonical_artifact_bytes = match canonical_json_bytes_from_str(raw_json) {
-        Ok(bytes) => bytes,
+    let raw_artifact: Value = match chio_core_types::canonical::UntrustedJsonText::from_wire(
+        bytes,
+        crate::MAX_EVIDENCE_DOCUMENT_BYTES,
+    )
+    .and_then(|input| input.decode_external())
+    {
+        Ok(value) => value,
         Err(error) => {
-            return TransparencyAnchor::Invalid(format!(
-                "{path} is not a strict inclusion proof: {error}"
-            ))
+            return TransparencyAnchor::InvalidInput(TransactionPassportError::Input(error.into()))
         }
-    };
-    let Ok(raw_artifact) = serde_json::from_slice::<Value>(&canonical_artifact_bytes) else {
-        return TransparencyAnchor::Invalid(format!("{path} is not a readable inclusion proof"));
     };
     let Some(schema) = raw_artifact.get("schema").and_then(Value::as_str) else {
         return TransparencyAnchor::Invalid(format!("{path} has no inclusion proof schema"));
@@ -1058,13 +1060,9 @@ fn transparency_anchor_state(
     if schema != TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V2_ID {
         return TransparencyAnchor::Invalid(format!("unsupported inclusion proof schema {schema}"));
     }
-    let artifact: TransparencyInclusionProofArtifact = match serde_json::from_value(raw_artifact) {
+    let artifact: TransparencyInclusionProofArtifact = match crate::input::project(raw_artifact) {
         Ok(artifact) => artifact,
-        Err(error) => {
-            return TransparencyAnchor::Invalid(format!(
-                "v2 inclusion proof envelope is invalid: {error}"
-            ))
-        }
+        Err(error) => return TransparencyAnchor::InvalidInput(error),
     };
     if artifact.schema != TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V2_ID {
         return TransparencyAnchor::Invalid(format!(
@@ -1143,13 +1141,9 @@ fn transparency_anchor_state(
             artifact.log_id
         ));
     }
-    let checkpoint_body: CheckpointStatementBody = match serde_json::from_value(statement.body) {
+    let checkpoint_body: CheckpointStatementBody = match crate::input::project(statement.body) {
         Ok(checkpoint_body) => checkpoint_body,
-        Err(error) => {
-            return TransparencyAnchor::Invalid(format!(
-                "checkpoint statement body is invalid: {error}"
-            ))
-        }
+        Err(error) => return TransparencyAnchor::InvalidInput(error),
     };
     let Ok(typed_body_bytes) = canonical_json_bytes(&checkpoint_body) else {
         return invalid("parsed checkpoint statement body is not canonicalizable");
@@ -1290,11 +1284,7 @@ fn validate_claim_set_bytes(
             },
         );
     }
-    let claim_set: RootClaimSet = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(format!(
-            "invalid claim set: {error}"
-        ))
-    })?;
+    let claim_set: RootClaimSet = crate::decode_evidence_json(bytes)?;
     if claim_set.schema != super::ids::TRANSACTION_CLAIM_SET_SCHEMA_ID {
         return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
             "unsupported claim set schema".to_string(),
@@ -1605,16 +1595,12 @@ fn verify_standalone_minimal_passport_artifacts_bound(
         artifacts,
         trusted_checkpoint_signer_keys,
     )?;
-    let verifier_policy: TransactionVerifierPolicy = serde_json::from_slice(verifier_policy_bytes)
-        .map_err(|error| {
-            TransactionPassportError::InvalidVerifierPolicyArtifact(error.to_string())
-        })?;
+    let verifier_policy: TransactionVerifierPolicy =
+        crate::decode_evidence_json(verifier_policy_bytes)?;
     validate_standalone_transaction_claims(&verifier_policy)?;
     let effective_required_claims = verifier_policy.effective_required_claims();
-    let evidence_graph: TransactionEvidenceGraph = serde_json::from_slice(evidence_graph_bytes)
-        .map_err(|error| {
-            TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-        })?;
+    let evidence_graph: TransactionEvidenceGraph =
+        crate::decode_evidence_json(evidence_graph_bytes)?;
     validate_minimal_governed_action_evidence(&evidence_graph)?;
     validate_claim_set_node_binding(
         &evidence_graph,

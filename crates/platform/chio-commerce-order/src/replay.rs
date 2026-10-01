@@ -283,13 +283,7 @@ fn authority_receipts_by_ref(
 fn parse_authority_receipt(
     artifact: &CommerceEventAuthorityReceiptArtifact,
 ) -> Result<ChioReceipt, CommerceOrderError> {
-    let value: serde_json::Value =
-        serde_json::from_slice(&artifact.receipt_bytes).map_err(|error| {
-            CommerceOrderError::ReplayFailed(format!(
-                "authority receipt artifact JSON invalid: {}: {error}",
-                artifact.receipt_ref
-            ))
-        })?;
+    let value: serde_json::Value = crate::input::decode(&artifact.receipt_bytes)?;
     let schema = value
         .get("schema")
         .and_then(serde_json::Value::as_str)
@@ -305,12 +299,7 @@ fn parse_authority_receipt(
             schema: schema.to_string(),
         });
     }
-    serde_json::from_value(value).map_err(|error| {
-        CommerceOrderError::ReplayFailed(format!(
-            "authority receipt artifact invalid: {}: {error}",
-            artifact.receipt_ref
-        ))
-    })
+    crate::input::project(value)
 }
 
 fn validate_event_authority_receipt(

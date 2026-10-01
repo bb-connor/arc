@@ -1,0 +1,42 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+warning: unused variable: `label`
+   --> crates/platform/chio-transaction-passport/src/evidence_graph.rs:917:5
+    |
+917 |     label: &'static str,
+    |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_label`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `project` is never used
+  --> crates/platform/chio-transaction-passport/src/input.rs:42:15
+   |
+42 | pub(crate) fn project<T: DeserializeOwned>(
+   |               ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-transaction-passport` (lib) generated 2 warnings (run `cargo fix --lib -p chio-transaction-passport` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 1m 37s
+     Running tests/original_input.rs (/home/connor/chio-security-target-6d-final/debug/deps/original_input-d11c76279f26e0a8)
+
+running 3 tests
+test original_graph_duplicates_cannot_disappear_before_validation ... ok
+test original_graph_keeps_native_integers_but_rejects_lossy_tokens ... ok
+test policy_size_is_bounded_before_typed_projection ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

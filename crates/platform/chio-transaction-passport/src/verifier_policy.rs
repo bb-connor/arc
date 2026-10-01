@@ -134,10 +134,8 @@ pub(super) fn validate_verifier_policy(
 pub fn validate_verifier_policy_artifact(
     verifier_policy_bytes: &[u8],
 ) -> Result<(), TransactionPassportError> {
-    let verifier_policy: TransactionVerifierPolicy = serde_json::from_slice(verifier_policy_bytes)
-        .map_err(|error| {
-            TransactionPassportError::InvalidVerifierPolicyArtifact(error.to_string())
-        })?;
+    let verifier_policy: TransactionVerifierPolicy =
+        crate::decode_evidence_json(verifier_policy_bytes)?;
     validate_verifier_policy(&verifier_policy)
 }
 

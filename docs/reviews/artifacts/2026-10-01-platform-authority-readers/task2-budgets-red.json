@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--no-fail-fast",
+    "-p",
+    "chio-enterprise-export",
+    "-p",
+    "chio-trust-market-context",
+    "original_"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 15.17,
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/connor/chio-security-target-6d-final",
+    "CARGO_INCREMENTAL": "0",
+    "CHIO_CHECKOUT_ROOT": "/tmp/arc-security-launch",
+    "CARGO_BUILD_JOBS": "4"
+  }
+}

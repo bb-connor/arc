@@ -5,6 +5,8 @@ use std::fmt;
 /// Error type for Chio tower middleware operations.
 #[derive(Debug)]
 pub enum ChioTowerError {
+    /// The authority clock could not provide a valid monotonic observation.
+    Clock(chio_security_types::clock::ClockError),
     /// Failed to evaluate the request.
     Evaluation(String),
     /// Failed to sign a receipt.
@@ -23,6 +25,7 @@ pub enum ChioTowerError {
 impl fmt::Display for ChioTowerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Clock(err) => write!(f, "Chio authority clock error: {err}"),
             Self::Evaluation(msg) => write!(f, "Chio evaluation error: {msg}"),
             Self::ReceiptSign(msg) => write!(f, "Chio receipt signing error: {msg}"),
             Self::ReceiptPersist(msg) => write!(f, "Chio receipt persistence error: {msg}"),
@@ -35,6 +38,7 @@ impl fmt::Display for ChioTowerError {
 impl std::error::Error for ChioTowerError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Clock(err) => Some(err),
             Self::Inner(err) => Some(err.as_ref()),
             _ => None,
         }

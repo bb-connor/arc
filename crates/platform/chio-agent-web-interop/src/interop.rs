@@ -710,6 +710,11 @@ fn verify_agent_web_interop_with_trust_mode(
     consume_replays: bool,
     expected_read_only_report: Option<&AgentWebInteropReport>,
 ) -> Result<AgentWebInteropReport, TransactionPassportError> {
+    chio_transaction_passport::validate_evidence_budget(
+        [bundle.evidence_graph_bytes.as_slice(), bundle.verifier_policy_bytes.as_slice()]
+            .into_iter().chain(bundle.root_evidence_graph_bytes.as_deref())
+            .chain(bundle.artifacts.values().map(Vec::as_slice)),
+    )?;
     trust.validate_signer_role_separation()?;
     let signed_evidence_graph_bytes = bundle
         .root_evidence_graph_bytes
@@ -988,8 +993,7 @@ fn validate_agent_web_receipt(
     envelope: &AgentWebProofEnvelope,
     trust: &AgentWebVerifierTrust,
 ) -> Result<(), TransactionPassportError> {
-    let receipt: ChioReceipt = serde_json::from_slice(receipt_bytes)
-        .map_err(|_| claim_failed("Agent Web receipt signature invalid"))?;
+    let receipt: ChioReceipt = chio_transaction_passport::decode_evidence_json(receipt_bytes)?;
     let signature_valid = receipt
         .verify_signature()
         .map_err(|_| claim_failed("Agent Web receipt signature invalid"))?;
@@ -1150,12 +1154,7 @@ fn validate_order_context_binding(
     payment_bytes: &[u8],
     source_protocol: &str,
 ) -> Result<(), TransactionPassportError> {
-    let payment: serde_json::Value = serde_json::from_slice(payment_bytes).map_err(|error| {
-        TransactionPassportError::InvalidAgentWebArtifact {
-            path: payment_node.path.clone(),
-            message: error.to_string(),
-        }
-    })?;
+    let payment: serde_json::Value = chio_transaction_passport::decode_evidence_json(payment_bytes)?;
     let payment_order_id = payment
         .get("order_id")
         .and_then(serde_json::Value::as_str)
@@ -1175,12 +1174,7 @@ fn validate_order_context_binding(
         }
         let order_bytes = raw_artifact_bytes(bundle, order_node)?;
         let order_context: CommerceOrderContext =
-            serde_json::from_slice(order_bytes).map_err(|error| {
-                TransactionPassportError::InvalidAgentWebArtifact {
-                    path: order_node.path.clone(),
-                    message: error.to_string(),
-                }
-            })?;
+            chio_transaction_passport::decode_evidence_json(order_bytes)?;
         order_context.validate_shape().map_err(|error| {
             TransactionPassportError::InvalidAgentWebArtifact {
                 path: order_node.path.clone(),

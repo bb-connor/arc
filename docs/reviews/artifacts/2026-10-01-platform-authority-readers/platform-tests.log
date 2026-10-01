@@ -1,0 +1,90 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling reqwest v0.13.2
+   Compiling rsa v0.9.10
+   Compiling x509-cert v0.2.5
+   Compiling openidconnect v4.0.1
+   Compiling oci-client v0.17.0
+   Compiling sigstore v0.14.0
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+   Compiling chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+   Compiling chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+   Compiling chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+   Compiling chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+   Compiling chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+   Compiling chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+   Compiling chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+   Compiling chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+   Compiling chio-swarm-authority v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-swarm-authority)
+   Compiling chio-disclosure-lineage v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-disclosure-lineage)
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+   Compiling chio-finding-market-port v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-port)
+   Compiling chio-finding-market-store-postgres v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-store-postgres)
+   Compiling chio-finding-worker v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-worker)
+   Compiling chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+   Compiling chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+   Compiling chio-workflow v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-workflow)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-selective-disclosure v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-cross-protocol)
+   Compiling chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+   Compiling chio-http-core v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-http-core)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+   Compiling chio-trust-market-context v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-trust-market-context)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+   Compiling chio-enterprise-export v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-enterprise-export)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-store-sqlite)
+error[E0432]: unresolved imports `chio_core_types::CapabilityToken`, `chio_core_types::ChioScope`
+ --> crates/platform/chio-http-core/tests/authority_input.rs:8:45
+  |
+8 |     capability::token::CapabilityTokenBody, CapabilityToken, ChioScope, Keypair,
+  |                                             ^^^^^^^^^^^^^^^  ^^^^^^^^^ no `ChioScope` in the root
+  |                                             |
+  |                                             no `CapabilityToken` in the root
+  |                                             help: a similar name exists in the module: `CapabilityId`
+  |
+  = help: consider importing one of these structs instead:
+          chio_core::capability::token::CapabilityToken
+          chio_core_types::capability::token::CapabilityToken
+  = help: consider importing one of these structs instead:
+          chio_core::capability::scope::ChioScope
+          chio_core_types::capability::scope::ChioScope
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `chio-http-core` (test "authority_input") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

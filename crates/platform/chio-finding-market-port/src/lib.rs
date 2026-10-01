@@ -27,8 +27,12 @@ pub const HOSTED_API_KEY_REVOKED_EVENT_KIND: &str = "hosted.api_key.revoked";
 
 const MAX_TENANT_ID_BYTES: usize = 128;
 
-#[derive(Clone, Copy, Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub enum HostedMarketPortError {
+    #[error("hosted market input JSON is invalid")]
+    InvalidInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("hosted market durable JSON is invalid")]
+    CorruptInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("hosted market port input is invalid")]
     Invalid,
     #[error("hosted market tenant identity is invalid")]

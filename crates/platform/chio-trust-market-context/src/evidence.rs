@@ -66,9 +66,8 @@ struct TrustMarketEvidenceEdge {
 pub(super) fn parse_graph(
     bytes: &[u8],
 ) -> Result<TrustMarketEvidenceGraph, TransactionPassportError> {
-    let graph: TrustMarketEvidenceGraph = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidEvidenceGraphArtifact(error.to_string())
-    })?;
+    let graph: TrustMarketEvidenceGraph = chio_transaction_passport::decode_evidence_json(bytes)?;
+    chio_transaction_passport::validate_evidence_graph_size(graph.nodes.len(), graph.edges.len())?;
     if graph.schema != TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID {
         return Err(TransactionPassportError::UnsupportedEvidenceGraphSchema(
             graph.schema,
@@ -111,25 +110,23 @@ pub(super) fn bundle_contains_verified_receipt_node_id(
     graph: &TrustMarketEvidenceGraph,
     receipt_ref: &str,
     trusted_authority_keys: &[PublicKey],
-) -> bool {
+) -> Result<bool, TransactionPassportError> {
     let Some(node) = graph.nodes.iter().find(|node| {
         risk_evidence_ref_matches_node(node, receipt_ref)
             && node.role == TrustMarketEvidenceRole::Receipt
             && node.schema == CHIO_RECEIPT_SCHEMA
     }) else {
-        return false;
+        return Ok(false);
     };
     let Some(bytes) = bundle.artifacts.get(&node.path) else {
-        return false;
+        return Ok(false);
     };
     if chio_core_types::sha256_hex(bytes) != node.sha256 {
-        return false;
+        return Ok(false);
     }
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else {
-        return false;
-    };
+    let value = chio_transaction_passport::decode_evidence_json::<serde_json::Value>(bytes)?;
     if value.get("schema").and_then(serde_json::Value::as_str) != Some(CHIO_RECEIPT_SCHEMA) {
-        return false;
+        return Ok(false);
     }
     let receipt_id = value
         .get("receipt_id")
@@ -142,16 +139,16 @@ pub(super) fn bundle_contains_verified_receipt_node_id(
         && receipt_id != Some(node.id.as_str())
         && receipt_id != node_file_stem
     {
-        return false;
+        return Ok(false);
     }
     if value
         .get("terminal_status")
         .and_then(serde_json::Value::as_str)
         != Some("allowed_executed")
     {
-        return false;
+        return Ok(false);
     }
-    validate_artifact_signature(node, &value, trusted_authority_keys).is_ok()
+    Ok(validate_artifact_signature(node, &value, trusted_authority_keys).is_ok())
 }
 
 pub(super) fn bundle_contains_risk_evidence_kind(
@@ -160,26 +157,24 @@ pub(super) fn bundle_contains_risk_evidence_kind(
     evidence_ref: &str,
     kind: RiskEvidenceRefKind,
     trusted_authority_keys: &[PublicKey],
-) -> bool {
+) -> Result<bool, TransactionPassportError> {
     let Some(node) = graph.nodes.iter().find(|node| {
         risk_evidence_ref_matches_node(node, evidence_ref)
             && risk_evidence_schema_matches_kind(&node.schema, kind)
     }) else {
-        return false;
+        return Ok(false);
     };
     let Some(bytes) = bundle.artifacts.get(&node.path) else {
-        return false;
+        return Ok(false);
     };
     if chio_core_types::sha256_hex(bytes) != node.sha256 {
-        return false;
+        return Ok(false);
     }
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else {
-        return false;
-    };
+    let value = chio_transaction_passport::decode_evidence_json::<serde_json::Value>(bytes)?;
     if value.get("schema").and_then(serde_json::Value::as_str) != Some(node.schema.as_str()) {
-        return false;
+        return Ok(false);
     }
-    validate_artifact_signature(node, &value, trusted_authority_keys).is_ok()
+    Ok(validate_artifact_signature(node, &value, trusted_authority_keys).is_ok())
 }
 
 fn risk_evidence_ref_matches_node(node: &TrustMarketEvidenceNode, evidence_ref: &str) -> bool {
@@ -248,12 +243,7 @@ fn parse_artifact_value(
             ),
         });
     }
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidTrustMarketArtifact {
-            path: node.path.clone(),
-            message: error.to_string(),
-        }
-    })?;
+    let value: serde_json::Value = chio_transaction_passport::decode_evidence_json(bytes)?;
     let schema = value
         .get("schema")
         .and_then(serde_json::Value::as_str)
@@ -271,14 +261,13 @@ fn parse_artifact_value(
 }
 
 fn parse_artifact_from_value<T: for<'de> Deserialize<'de>>(
-    node: &TrustMarketEvidenceNode,
+    _node: &TrustMarketEvidenceNode,
     value: serde_json::Value,
 ) -> Result<T, TransactionPassportError> {
     serde_json::from_value(value).map_err(|error| {
-        TransactionPassportError::InvalidTrustMarketArtifact {
-            path: node.path.clone(),
-            message: error.to_string(),
-        }
+        TransactionPassportError::Input(
+            chio_core_types::canonical::UntrustedJsonError::Decode(error).into(),
+        )
     })
 }
 

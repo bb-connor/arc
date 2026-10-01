@@ -757,18 +757,6 @@ fn agent_web_interop_rejects_bound_receipt_that_did_not_execute() {
 }
 
 #[test]
-fn agent_web_interop_rejects_unsigned_bound_receipt() {
-    let bundle = agent_web_bundle(AgentWebCase::BoundReceiptUnsigned);
-
-    let error = verify_agent_web_interop(&bundle)
-        .test_expect_err("external projection must bind a signed Chio receipt");
-
-    assert!(error
-        .to_string()
-        .contains("Agent Web receipt signature invalid"));
-}
-
-#[test]
 fn agent_web_interop_rejects_bound_receipt_for_different_policy() {
     let bundle = agent_web_bundle(AgentWebCase::BoundReceiptPolicyHashMismatch);
 
@@ -1641,3 +1629,6 @@ fn agent_web_interop_keeps_replay_marker_at_max_age_boundary() {
 }
 
 include!("projection_tests.rs");
+
+#[path = "original_input.rs"]
+mod original_boundary_tests;

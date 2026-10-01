@@ -1,0 +1,342 @@
+[
+  {
+    "branch": "fix/security-adversarial-cases-20260922",
+    "local_head": "21b32859b972623b82bb04d3f13b7ffc8512742e",
+    "remote_containment": [
+      "origin/fix/security-adversarial-cases-20260922"
+    ]
+  },
+  {
+    "branch": "fix/security-atomic-receipt-migration-20260924",
+    "local_head": "54609bb56a517a5e369c6dae58cb2cd44a2319d1",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/0-gates",
+      "origin/packet/1-dry-run",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/9-measurement",
+      "origin/packet/ci-regressions",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "fix/security-checkpoint-snapshot-20260922",
+    "local_head": "534e8040c392f1280a2bb1975b27d06cefc76f93",
+    "remote_containment": [
+      "origin/fix/security-checkpoint-snapshot-20260922"
+    ]
+  },
+  {
+    "branch": "fix/security-definition-inputs-20260922",
+    "local_head": "66f9cea4bdd5881c8d25b2c6d4d796bc7adf9e02",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/fix/security-adversarial-cases-20260922",
+      "origin/fix/security-checkpoint-snapshot-20260922",
+      "origin/fix/security-definition-inputs-20260922",
+      "origin/integration/process-security-m4",
+      "origin/packet/0-gates",
+      "origin/packet/1-dry-run",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/9-measurement",
+      "origin/packet/ci-regressions",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "fix/security-definition-transition-20260922",
+    "local_head": "e752eb30b63d678f9b543bcb17121828431d6318",
+    "remote_containment": [
+      "origin/fix/security-definition-transition-20260922"
+    ]
+  },
+  {
+    "branch": "fix/security-image-source-layer-20260924",
+    "local_head": "b7cb138785590417c92ef4c220b9c371eb85b795",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/0-gates",
+      "origin/packet/1-dry-run",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/9-measurement",
+      "origin/packet/ci-regressions",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "fix/security-main-dependencies-20260922",
+    "local_head": "b0dfffb35e5e889d158767e31bfe0d2da1832413",
+    "remote_containment": [
+      "origin/fix/security-main-dependencies-20260922"
+    ]
+  },
+  {
+    "branch": "fix/security-mutation-controls-20260923",
+    "local_head": "ab660210451d6fbfdc18a49297f6c16ae4314771",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/0-gates",
+      "origin/packet/1-dry-run",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/9-measurement",
+      "origin/packet/ci-regressions",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "fix/security-source-audit-gate-20260925",
+    "local_head": "ec6f17185cdb06e2b620604ef2038df2dc0f51c9",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/0-gates",
+      "origin/packet/1-dry-run",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/9-measurement",
+      "origin/packet/ci-regressions",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "integration/process-security-m4",
+    "local_head": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/integration/process-security-m4",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting"
+    ]
+  },
+  {
+    "branch": "integration/process-security-recovery",
+    "local_head": "75d664822abf5f6e8da6e6f858cab5a6d81dc3bd",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/backup/repository-execution-before-parent-fix-20260907",
+      "origin/ci/optimized-mini-swe-comparison",
+      "origin/codex/process-preview-entrypoint-20260908",
+      "origin/codex/process-response-binding-20260908",
+      "origin/codex/shared-resource-execution-contract-20260908",
+      "origin/codex/shared-resource-release-e470d05f3",
+      "origin/docs/native-application-adoption",
+      "origin/feat/coding-task-session",
+      "origin/feat/container-watchdog",
+      "origin/feat/independent-worker-failures",
+      "origin/feat/mini-swe-process",
+      "origin/feat/mini-swe-worker-boundary",
+      "origin/feat/native-coding-operator",
+      "origin/feat/native-container-workers",
+      "origin/feat/native-mini-swe-process",
+      "origin/feat/renewable-mailbox-leases",
+      "origin/feat/repository-execution-service",
+      "origin/feat/repository-export-verification",
+      "origin/feat/repository-snapshot-store",
+      "origin/feat/scoped-repository-workspace",
+      "origin/feat/structured-checkpoints",
+      "origin/feat/supervised-child-outcomes",
+      "origin/fix/adaptive-timeout-roundtrip",
+      "origin/fix/process-socket-path",
+      "origin/fix/security-adversarial-cases-20260922",
+      "origin/fix/security-checkpoint-snapshot-20260922",
+      "origin/fix/security-definition-inputs-20260922",
+      "origin/fix/session-fuzz-mapping",
+      "origin/fix/xtask-runtime-workspace",
+      "origin/integration/process-security-m4",
+      "origin/integration/process-security-recovery",
+      "origin/packet/0-gates",
+      "origin/packet/1-dry-run",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/9-measurement",
+      "origin/packet/ci-regressions",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers",
+      "origin/perf/kernel-custody-dependencies",
+      "origin/test/mini-swe-upstream-comparison",
+      "origin/test/session-store-identities"
+    ]
+  },
+  {
+    "branch": "packet/0-gates",
+    "local_head": "f75b4069d67b2c667fc6d28a8d30255667bd09e1",
+    "remote_containment": [
+      "origin/packet/0-gates"
+    ]
+  },
+  {
+    "branch": "packet/1-dry-run",
+    "local_head": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/integration/process-security-m4",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting"
+    ]
+  },
+  {
+    "branch": "packet/10-poison-policy",
+    "local_head": "3b596d22bbc436679abda019ff8f1d751bed0910",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/j-receipt-boundaries"
+    ]
+  },
+  {
+    "branch": "packet/2-runtime-boundaries",
+    "local_head": "4c35ce78671998b6ade1ff9cf6d47b0dde7790d3",
+    "remote_containment": [
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting"
+    ]
+  },
+  {
+    "branch": "packet/3-retention-accounting",
+    "local_head": "377ee5b773eff424d12182682b411867b4d643be",
+    "remote_containment": [
+      "origin/packet/3-retention-accounting"
+    ]
+  },
+  {
+    "branch": "packet/9-measurement",
+    "local_head": "79a70abbc3d1cafe3060946b5b39f10522dc373a",
+    "remote_containment": [
+      "origin/archive/20261001/packet-9-measurement"
+    ]
+  },
+  {
+    "branch": "packet/ci-regressions",
+    "local_head": "24779051963cfc1db03da8a4fbde74e6b2d2f057",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/1-dry-run",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/9-measurement",
+      "origin/packet/ci-regressions",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "packet/f-canonical-boundaries",
+    "local_head": "07e963e8f542c9777a7cc02cb0ae421c489847ae",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "packet/h-frost-round2-split",
+    "local_head": "07e963e8f542c9777a7cc02cb0ae421c489847ae",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/m-fuzz-model",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "packet/j-receipt-boundaries",
+    "local_head": "1346b5b78be16f67d208bd1261a1eed7731b41b7",
+    "remote_containment": [
+      "origin/packet/j-receipt-boundaries"
+    ]
+  },
+  {
+    "branch": "packet/k-gates",
+    "local_head": "d0469ce384970e5474084cb881c09c340c1413d3",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/k-gates",
+      "origin/packet/x-ffi-buffers"
+    ]
+  },
+  {
+    "branch": "packet/m-fuzz-model",
+    "local_head": "806b42c12ca8d9adc6875eab6cc39d18c959f92a",
+    "remote_containment": [
+      "origin/packet/m-fuzz-model"
+    ]
+  },
+  {
+    "branch": "packet/x-ffi-buffers",
+    "local_head": "4c5d43dfe543f5632a485164ca481c248af4f687",
+    "remote_containment": [
+      "origin/archive/20261001/packet-1-dry-run",
+      "origin/archive/20261001/packet-9-measurement",
+      "origin/integration/process-security-m4",
+      "origin/packet/10-poison-policy",
+      "origin/packet/2-runtime-boundaries",
+      "origin/packet/3-retention-accounting",
+      "origin/packet/j-receipt-boundaries",
+      "origin/packet/x-ffi-buffers"
+    ]
+  }
+]

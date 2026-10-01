@@ -2,6 +2,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum TransactionPassportError {
+    #[error("transaction evidence input rejected: {0}")]
+    Input(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("transaction evidence exceeds the verification budget")]
+    EvidenceLimit,
     #[error("unsupported transaction passport schema: {0}")]
     UnsupportedSchema(String),
     #[error("invalid transaction passport field {field}: {message}")]

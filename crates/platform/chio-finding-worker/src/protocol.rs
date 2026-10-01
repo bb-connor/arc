@@ -16,6 +16,49 @@ pub const FINDING_WORKER_GUEST_ENFORCEMENT_SCHEMA: &str =
 pub const FINDING_WORKER_INPUT_SCHEMA: &str = "chio.finding.worker-input.v1";
 pub const FINDING_WORKER_INPUT_END_SCHEMA: &str = "chio.finding.worker-input-end.v1";
 
+/// Local protocol cause. Public worker diagnostics project only a registered code.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum WorkerProtocolError {
+    #[error("worker JSON input rejected")]
+    Input(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("worker protocol rejected: {0}")]
+    Rejected(&'static str),
+}
+
+impl From<&'static str> for WorkerProtocolError {
+    fn from(code: &'static str) -> Self {
+        Self::Rejected(code)
+    }
+}
+
+const MAX_JOB_BYTES: usize = 4 * 1024 * 1024;
+
+fn decode_original<T: serde::de::DeserializeOwned + Serialize>(
+    bytes: &[u8],
+    bound: usize,
+) -> Result<T, WorkerProtocolError> {
+    use chio_core_types::canonical::{UntrustedJsonError, UntrustedJsonText};
+    let parse = || {
+        let input = UntrustedJsonText::from_wire(bytes, bound)?;
+        if input.canonicalize()? != bytes {
+            return Err(UntrustedJsonError::NonCanonical);
+        }
+        input.decode_canonical()
+    };
+    parse().map_err(|error| WorkerProtocolError::Input(error.into()))
+}
+
+/// Validate result identity before the executor receives or commits any output.
+pub(crate) fn decode_worker_result(
+    bytes: &[u8],
+    request: &FindingWorkerRequest,
+    bound: usize,
+) -> Result<FindingWorkerResult, WorkerProtocolError> {
+    let result: FindingWorkerResult = decode_original(bytes, bound)?;
+    result.validate_for(request)?;
+    Ok(result)
+}
+
 const MAX_COMMAND_ARGUMENTS: usize = 64;
 const MAX_COMMAND_ARGUMENT_BYTES: usize = 4_096;
 const MAX_INPUT_ARTIFACTS: usize = 256;
@@ -302,7 +345,7 @@ impl FindingWorkerRequest {
         execution_timeout_secs: u64,
         capability_authority: &PublicKey,
         now: u64,
-    ) -> Result<Self, &'static str> {
+    ) -> Result<Self, WorkerProtocolError> {
         let payload = authorized_job_payload(job, capability_authority, now)?;
         let deadline = bounded_execution_deadline(
             now,
@@ -376,7 +419,7 @@ pub(crate) fn authorized_attempt_limit(
     job: &HostedMarketJob,
     capability_authority: &PublicKey,
     now: u64,
-) -> Result<u64, &'static str> {
+) -> Result<u64, WorkerProtocolError> {
     authorized_job_payload(job, capability_authority, now)
         .map(|payload| u64::from(payload.capability.body.max_attempts))
 }
@@ -385,14 +428,13 @@ fn authorized_job_payload(
     job: &HostedMarketJob,
     capability_authority: &PublicKey,
     now: u64,
-) -> Result<FindingWorkerJobPayload, &'static str> {
-    let payload: FindingWorkerJobPayload =
-        serde_json::from_slice(&job.payload_json).map_err(|_| "payload_invalid")?;
+) -> Result<FindingWorkerJobPayload, WorkerProtocolError> {
+    let payload: FindingWorkerJobPayload = decode_original(&job.payload_json, MAX_JOB_BYTES)?;
     payload.job.validate()?;
     verify_job_capability(&payload.capability, capability_authority, now)?;
     let payload_bytes = canonical_json_bytes(&payload).map_err(|_| "payload_invalid")?;
     if sha256_hex(&payload_bytes) != job.payload_sha256 {
-        return Err("payload_digest_mismatch");
+        return Err("payload_digest_mismatch".into());
     }
     let capability = &payload.capability.body;
     if capability.tenant_id != job.tenant_id.as_str()
@@ -401,7 +443,7 @@ fn authorized_job_payload(
         || capability.request_sha256 != job.request_sha256
         || capability.job_spec_sha256 != payload.job.sha256()?
     {
-        return Err("worker_capability_binding_invalid");
+        return Err("worker_capability_binding_invalid".into());
     }
     Ok(payload)
 }
@@ -968,6 +1010,49 @@ mod tests {
         );
         assert!(bounded_execution_deadline(100, 0, 1_000, 400).is_err());
         assert!(bounded_execution_deadline(100, 1, 1_000, 99).is_err());
+    }
+
+    #[test]
+    fn original_job_bytes_cannot_be_normalized_before_digest_binding() {
+        let (request, authority) = request().unwrap_or_else(|| panic!("valid request fixture"));
+        let mut job = hosted_job(&request).unwrap_or_else(|| panic!("valid hosted job fixture"));
+        assert_eq!(
+            authorized_attempt_limit(&job, &authority.public_key(), 10),
+            Ok(3)
+        );
+        job.payload_json.insert(0, b' ');
+        let error = authorized_attempt_limit(&job, &authority.public_key(), 10)
+            .err()
+            .unwrap_or_else(|| panic!("noncanonical original must reject"));
+        assert!(matches!(error, WorkerProtocolError::Input(_)));
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    fn original_worker_result_is_bound_before_output_delivery() {
+        let (request, _) = request().unwrap_or_else(|| panic!("valid request fixture"));
+        let result = successful_result(&request);
+        let bytes = canonical_json_bytes(&result)
+            .unwrap_or_else(|error| panic!("result encoding: {error}"));
+        assert_eq!(
+            decode_worker_result(&bytes, &request, MAX_JOB_BYTES),
+            Ok(result.clone())
+        );
+        let mut substituted = result;
+        substituted.request_sha256 = "f".repeat(64);
+        let bytes = canonical_json_bytes(&substituted)
+            .unwrap_or_else(|error| panic!("result encoding: {error}"));
+        assert!(matches!(
+            decode_worker_result(&bytes, &request, MAX_JOB_BYTES),
+            Err(WorkerProtocolError::Rejected("result_binding_invalid"))
+        ));
+        let bytes = br#"{"private-marker":1,"private-marker":2}"#;
+        let error = decode_worker_result(bytes, &request, MAX_JOB_BYTES)
+            .err()
+            .unwrap_or_else(|| panic!("duplicate original must reject"));
+        assert!(matches!(&error, WorkerProtocolError::Input(_)));
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains("private-marker"));
     }
 
     #[test]

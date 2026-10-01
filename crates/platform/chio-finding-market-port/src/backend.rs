@@ -82,8 +82,12 @@ pub struct HostedHttpPage {
 
 /// Bounded backend failure vocabulary. Adapters map their own errors into
 /// these variants and must fail closed on anything they cannot classify.
-#[derive(Clone, Copy, Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub enum HostedMarketBackendError {
+    #[error("hosted backend input JSON is invalid")]
+    InvalidInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("hosted backend durable JSON is invalid")]
+    CorruptInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("hosted backend input is invalid")]
     Invalid,
     #[error("hosted backend resource was not found")]

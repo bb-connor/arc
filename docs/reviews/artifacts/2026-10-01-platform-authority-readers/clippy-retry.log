@@ -1,0 +1,42 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Checking chio-control-plane v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-control-plane)
+    Checking chio-api-protect v0.1.0 (/tmp/arc-security-launch/crates/products/chio-api-protect)
+error: items after a test module
+   --> crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs:39:1
+    |
+ 39 |   mod input_tests {
+    |   ^^^^^^^^^^^^^^^
+...
+ 52 |   fn rejected() -> Response {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 63 | / pub(crate) async fn start(
+ 64 | |     State(state): State<Arc<ProxyState>>,
+ 65 | |     request: Request<Body>,
+ 66 | | ) -> Response {
+    | |_____________^
+...
+106 | / pub(crate) async fn report(
+107 | |     State(state): State<Arc<ProxyState>>,
+108 | |     request: Request<Body>,
+109 | | ) -> Response {
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#items_after_test_module
+    = note: `-D clippy::items-after-test-module` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`
+    = help: move the items to before the test module was defined
+
+error: could not compile `chio-api-protect` (lib test) due to 1 previous error

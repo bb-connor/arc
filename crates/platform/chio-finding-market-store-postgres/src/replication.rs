@@ -874,8 +874,7 @@ fn principal_rollback_record(
         validate_digest(previous, "principal outbox predecessor")?;
     }
     let envelope: SignedHostedPrincipalLifecycleEvent =
-        serde_json::from_slice(&event_envelope_json)
-            .map_err(|_| HostedMarketStoreError::DigestMismatch)?;
+        crate::validation::decode_native_durable(&event_envelope_json)?;
     let canonical =
         canonical_json_bytes(&envelope).map_err(|_| HostedMarketStoreError::DigestMismatch)?;
     if canonical != event_envelope_json

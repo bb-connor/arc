@@ -26,7 +26,7 @@ pub use protocol::{
     FindingWorkerJobPayload, FindingWorkerJobSpec, FindingWorkerRepository,
     FindingWorkerRepositoryKind, FindingWorkerRequest, FindingWorkerResourceLimits,
     FindingWorkerResourceUsage, FindingWorkerResult, SignedFindingWorkerCapability,
-    SignedFindingWorkerResult, FINDING_WORKER_ATTESTED_RESULT_SCHEMA,
+    SignedFindingWorkerResult, WorkerProtocolError, FINDING_WORKER_ATTESTED_RESULT_SCHEMA,
     FINDING_WORKER_CAPABILITY_SCHEMA, FINDING_WORKER_GUEST_ENFORCEMENT_SCHEMA,
     FINDING_WORKER_INPUT_END_SCHEMA, FINDING_WORKER_INPUT_SCHEMA, FINDING_WORKER_JOB_SCHEMA,
     FINDING_WORKER_REQUEST_SCHEMA, FINDING_WORKER_RESULT_SCHEMA,

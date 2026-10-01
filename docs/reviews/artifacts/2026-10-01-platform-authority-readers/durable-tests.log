@@ -1,0 +1,255 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling sha2 v0.10.9
+   Compiling aes v0.8.4
+   Compiling signature v2.2.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling rustls-webpki v0.103.15
+   Compiling scrypt v0.11.0
+   Compiling pkcs5 v0.7.1
+   Compiling pkcs8 v0.10.2
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling rustls v0.23.45
+   Compiling rs_merkle v1.5.0
+   Compiling ed25519 v2.2.3
+   Compiling ed25519-dalek v2.2.0
+   Compiling sha3 v0.10.8
+   Compiling frost-core v3.0.0
+   Compiling alloy-primitives v1.5.7
+   Compiling frost-rerandomized v3.0.0
+   Compiling frost-ed25519 v3.0.0
+   Compiling getrandom v0.3.4
+   Compiling ff v0.13.1
+   Compiling group v0.13.0
+   Compiling ahash v0.8.12
+   Compiling sec1 v0.7.3
+   Compiling crypto-bigint v0.5.5
+   Compiling tower-http v0.6.8
+   Compiling referencing v0.46.0
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.7
+   Compiling elliptic-curve v0.13.8
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling jsonschema v0.46.0
+   Compiling sqlx-core v0.8.6
+   Compiling reqwest v0.13.2
+   Compiling md-5 v0.10.6
+   Compiling sqlx-postgres v0.8.6
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling alloy-json-abi v1.5.7
+   Compiling num-bigint-dig v0.8.6
+   Compiling pkcs1 v0.7.5
+   Compiling sqlx v0.8.6
+   Compiling chio-finding-market-migrations v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-migrations)
+   Compiling alloy-sol-types v1.5.7
+   Compiling rsa v0.9.10
+   Compiling p256 v0.13.2
+   Compiling p384 v0.13.1
+   Compiling oauth2 v5.0.0
+   Compiling jsonwebtoken v10.4.0
+   Compiling sha1 v0.10.6
+   Compiling tough v0.22.0
+   Compiling oci-client v0.17.0
+   Compiling openidconnect v4.0.1
+   Compiling x509-cert v0.2.5
+   Compiling alloy-core v1.5.7
+   Compiling uuid v1.22.0
+   Compiling alloy v1.8.3
+   Compiling sigstore v0.14.0
+   Compiling ciborium v0.2.2
+   Compiling chio-spec-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-spec-validate)
+   Compiling coset v0.4.2
+   Compiling chio-web3-bindings v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3-bindings)
+   Compiling secrecy v0.10.3
+   Compiling rusqlite v0.39.0
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+   Compiling chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+   Compiling chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+   Compiling chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+   Compiling chio-finding-market-port v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-port)
+   Compiling chio-finding-market-store-postgres v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-store-postgres)
+   Compiling chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+   Compiling chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+   Compiling chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+   Compiling chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+   Compiling chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+   Compiling chio-credit v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-credit)
+   Compiling chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+   Compiling chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+   Compiling chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+   Compiling ureq v2.12.1
+   Compiling rcgen v0.13.2
+   Compiling chio-finding-worker v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-worker)
+   Compiling chio-web3 v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-link)
+   Compiling chio-tool-call-fabric v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-kernel v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel)
+   Compiling chio-finding-hosted-edge v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-hosted-edge)
+    Finished `test` profile [unoptimized] target(s) in 1m 57s
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_hosted_edge-12fc4d769600fc3c)
+
+running 41 tests
+test error::tests::public_errors_are_stable_and_non_reflective ... ok
+test operations::tests::breaker_allows_one_half_open_trial_and_fail_closes ... ok
+test operations::tests::rate_limit_is_bounded_and_resets_only_at_window_boundary ... ok
+test auth::tests::endpoint_validation_rejects_origin_and_path_confusion ... ok
+test operations::tests::readiness_and_metrics_have_only_closed_labels ... ok
+test proxy::tests::proxy_token_is_safe_for_deployment_configuration ... ok
+test proxy::tests::malformed_quoted_forwarded_values_fail_closed ... ok
+test auth::tests::api_key_secret_is_hmac_verified_without_fallback ... ok
+test proxy::tests::proxy_spoofing_and_ambiguous_headers_fail_closed ... ok
+test proxy::tests::trusted_proxy_accepts_one_exact_forwarded_context ... ok
+test proxy::tests::trusted_proxy_accepts_quoted_ipv6_and_nondefault_port ... ok
+test server::tests::catalog_status_results_must_be_a_subset_of_the_request ... ok
+test server::tests::artifact_signer_is_pinned_to_the_authenticated_principal ... ok
+test server::tests::finding_query_is_closed_bounded_and_unambiguous ... ok
+test server::tests::credential_modes_are_exactly_one_complete_pair ... ok
+test server::tests::a_shed_request_carries_the_hosted_error_envelope ... ok
+test server::tests::guarded_traffic_is_counted_as_admitted_or_refused ... ok
+test auth::tests::capability_is_audience_action_body_role_and_replay_bound ... ok
+test server::tests::operations_are_closed_and_role_bound ... ok
+test server::tests::penalty_authority_binds_principal_and_both_body_identities ... ok
+test server::tests::health_probes_answer_outside_the_guarded_surface ... ok
+test server::tests::listener_refuses_non_loopback_binding ... ok
+test lifecycle::tests::issue_and_revocation_emit_verified_secret_free_receipts ... ok
+test server::tests::public_challenge_route_rejects_venue_audit_authorization ... ok
+test server::tests::a_readiness_flood_costs_one_backend_round_trip ... ok
+test server::tests::public_endpoint_is_an_origin_and_release_identity_is_exact ... ok
+test lifecycle::tests::caller_held_secret_makes_response_loss_retry_exact ... ok
+test server::tests::catalog_projection_expires_and_corruption_fails_closed ... ok
+test server::tests::trusted_proxy_is_authenticated_and_forwarding_is_closed ... ok
+test server::tests::router_returns_stable_fail_closed_errors ... ok
+test tls::tests::group_readable_private_key_is_rejected ... ok
+test tls::tests::certificate_must_cover_public_endpoint ... ok
+test tls::tests::expired_presented_intermediate_is_rejected ... ok
+test tls::tests::missing_presented_intermediate_is_rejected ... ok
+test tls::tests::complete_presented_certificate_chain_is_validated ... ok
+test tls::tests::public_ipv6_endpoint_uses_an_ip_server_name ... ok
+test tls::tests::invalid_reload_retains_last_known_good_configuration ... ok
+test contracts::tests::tenant_header_is_mandatory_and_bound_to_the_principal ... ok
+test contracts::tests::mutating_request_requires_idempotency_and_serializes_to_contract ... ok
+test contracts::tests::hosted_error_contract_is_schema_valid_and_non_reflective ... ok
+test contracts::tests::response_and_domain_event_match_their_closed_schemas ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_market_port-5767f5015b24b20f)
+
+running 4 tests
+test grammar::tests::aggregate_labels_round_trip ... ok
+test grammar::tests::event_kinds_round_trip_and_bind_unique_wire_names ... ok
+test tests::role_storage_values_are_closed ... ok
+test tests::tenant_identity_is_canonical_and_bounded ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_market_store_postgres-e2038add4edbbd58)
+
+running 16 tests
+test http::tests::store_errors_never_leak_database_details ... ok
+test aggregates::tests::aggregate_kinds_have_a_closed_round_trip ... ok
+test ports::tests::database_specific_failures_are_not_exposed_through_ports ... ok
+test catalog::tests::write_expectation_requires_a_coherent_head ... ok
+test aggregates::tests::aggregate_history_rejects_a_gap_or_broken_link ... ok
+test domain::tests::domain_event_validation_cannot_be_bypassed_at_append_input ... ok
+test tests::tenant_ids_are_closed_and_bounded ... ok
+test aggregates::tests::aggregate_event_digest_binds_tenant_revision_and_predecessor ... ok
+test import::tests::import_batch_requires_a_contiguous_closed_sequence ... ok
+test tests::postgres_pool_bounds_reject_operational_extremes ... ok
+test tests::canonical_payload_validation_fails_closed ... ok
+test tests::postgres_dsn_is_redacted_and_tls_is_forced ... ok
+test tests::tenant_limits_are_closed_and_bounded ... ok
+test spend::tests::billing_periods_are_closed ... ok
+test domain::tests::delivery_requires_a_pinned_valid_receipt_and_exact_tenant ... ok
+test domain::tests::every_declared_domain_family_has_a_typed_validated_artifact ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/worker_lease_api.rs (/home/connor/chio-security-target-6d-final/debug/deps/worker_lease_api-be61f566bc21de11)
+
+running 1 test
+test public_worker_lease_methods_preserve_role_and_fence_boundaries ... ignored, requires dedicated TLS PostgreSQL runtime and worker credentials
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_worker-c1b3732265ff7d6c)
+
+running 25 tests
+test executor::tests::non_aligned_guest_memory_stays_below_signed_limit_with_vmm_headroom ... ok
+test executor::tests::config_requires_distinct_nonroot_identities ... ok
+test executor::tests::machine_config_has_no_network_and_keeps_default_seccomp ... ok
+test executor::tests::cancelled_staging_stops_before_touching_the_jail ... ok
+test executor::tests::every_worker_input_obeys_the_host_file_ceiling ... ok
+test executor::tests::jailer_plan_enforces_namespaces_cgroups_and_default_seccomp ... ok
+test executor::tests::low_duty_cycle_cpu_budget_uses_the_kernel_minimum_quota ... ok
+test executor::tests::request_frame_is_rejected_before_execution_when_it_exceeds_the_protocol_limit ... ok
+test executor::tests::cleanup_path_guard_binds_generated_names_to_exact_parent ... ok
+test executor::tests::tenant_cas_namespaces_are_opaque_and_distinct ... ok
+test protocol::tests::execution_deadline_obeys_every_signed_and_local_window ... ok
+test protocol::tests::input_transfer_headers_are_closed ... ok
+test executor::tests::signed_usage_cannot_underreport_host_counters ... ok
+test service::tests::signed_attempt_budget_caps_the_worker_profile ... ok
+test executor::tests::jailer_plan_does_not_inherit_worker_credentials ... ok
+test service::tests::cancellation_waits_for_execution_cleanup ... ok
+test protocol::tests::artifact_paths_are_relative_and_normalized ... ok
+test protocol::tests::failed_result_cannot_smuggle_output_artifacts ... ok
+test protocol::tests::attested_result_binds_guest_digest_images_and_signer ... ok
+test protocol::tests::capability_binds_exact_job_and_deadline ... ok
+test service::tests::batch_error_cancels_and_drains_every_execution ... ok
+test service::tests::tenant_lifecycle_errors_remain_tenant_scoped ... ok
+test protocol::tests::result_requires_exact_in_guest_kernel_limits ... ok
+test protocol::tests::original_job_bytes_cannot_be_normalized_before_digest_binding ... ok
+test protocol::tests::retained_signed_attempt_limit_is_available_after_budget_exhaustion ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests chio_finding_hosted_edge
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_finding_market_port
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_finding_market_store_postgres
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_finding_worker
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

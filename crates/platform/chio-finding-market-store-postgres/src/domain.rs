@@ -519,8 +519,7 @@ async fn validate_retraction_finding_binding(
         &finding_id,
         &row,
     )?;
-    let finding: Finding = serde_json::from_slice(&projection.payload_json)
-        .map_err(|_| HostedMarketStoreError::DigestMismatch)?;
+    let finding: Finding = crate::validation::decode_durable(&projection.payload_json)?;
     if finding.issuer != seller || finding.status_feed_ref != status_feed_ref {
         return Err(HostedMarketStoreError::Invalid("subject finding binding"));
     }
@@ -935,8 +934,11 @@ fn parse_authenticated_delivery(
         .and_then(|metadata| metadata.get(FINDING_DELIVERY_METADATA_KEY))
         .cloned()
         .ok_or(HostedMarketStoreError::Invalid("delivery receipt"))?;
-    let delivery: FindingDelivery = serde_json::from_value(delivery)
-        .map_err(|_| HostedMarketStoreError::Invalid("delivery receipt"))?;
+    let delivery: FindingDelivery = serde_json::from_value(delivery).map_err(|error| {
+        HostedMarketStoreError::InvalidInput(
+            chio_core_types::canonical::UntrustedJsonError::Decode(error).into(),
+        )
+    })?;
     delivery
         .validate()
         .map_err(|_| HostedMarketStoreError::Invalid("delivery receipt"))?;
@@ -960,16 +962,9 @@ fn validate_domain_tenant_binding(
 
 fn parse_canonical<T: DeserializeOwned + Serialize>(
     payload_json: &[u8],
-    label: &'static str,
+    _label: &'static str,
 ) -> Result<T, HostedMarketStoreError> {
-    let artifact: T =
-        serde_json::from_slice(payload_json).map_err(|_| HostedMarketStoreError::Invalid(label))?;
-    let canonical =
-        canonical_json_bytes(&artifact).map_err(|_| HostedMarketStoreError::Invalid(label))?;
-    if canonical != payload_json {
-        return Err(HostedMarketStoreError::Invalid(label));
-    }
-    Ok(artifact)
+    crate::validation::decode_artifact(payload_json)
 }
 
 fn parse_signed<T: DeserializeOwned + Serialize>(

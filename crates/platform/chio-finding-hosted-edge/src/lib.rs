@@ -16,6 +16,7 @@ pub use chio_finding_market_port::{
 mod auth;
 mod contracts;
 mod error;
+mod input;
 mod lifecycle;
 mod operations;
 mod proxy;

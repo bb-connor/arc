@@ -794,7 +794,11 @@ fn commerce_order_replay_rejects_event_without_actor() {
     let error = chio_commerce_order::verify_commerce_order(&bundle)
         .test_expect_err("commerce event actor must be present");
 
-    assert!(error.to_string().contains("actor"));
+    assert!(matches!(
+        &error,
+        chio_commerce_order::CommerceOrderError::Input(_)
+    ));
+    assert!(std::error::Error::source(&error).is_some());
 }
 
 #[test]
@@ -817,7 +821,11 @@ fn commerce_order_replay_rejects_event_without_digest() {
     let error = chio_commerce_order::verify_commerce_order(&bundle)
         .test_expect_err("commerce event digest must be present");
 
-    assert!(error.to_string().contains("event_sha256"));
+    assert!(matches!(
+        &error,
+        chio_commerce_order::CommerceOrderError::Input(_)
+    ));
+    assert!(std::error::Error::source(&error).is_some());
 }
 
 #[test]
@@ -1686,4 +1694,20 @@ fn commerce_order_replay_rejects_refund_before_completion() {
     assert!(error
         .to_string()
         .contains("unresolved payment recovery state"));
+}
+
+#[test]
+fn original_authority_receipt_duplicate_schema_is_rejected() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    chio_commerce_order::verify_commerce_order(&bundle).test_expect("positive control verifies");
+    let receipt = &mut bundle.event_authority_receipts[0].receipt_bytes;
+    let value: serde_json::Value = serde_json::from_slice(receipt).test_expect("fixture parses");
+    let schema = serde_json::to_string(&value["schema"]).test_expect("schema serializes");
+    let mut original = String::from_utf8(receipt.clone()).test_expect("JSON is UTF-8");
+    let end = original.rfind('}').test_expect("object has closing brace");
+    original.insert_str(end, &format!(",\"schema\":{schema}"));
+    *receipt = original.into_bytes();
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("duplicate receipt fields must reject before signature projection");
+    assert!(std::error::Error::source(&error).is_some());
 }

@@ -3,6 +3,7 @@ mod cognition_market;
 mod error;
 mod evidence_graph;
 mod ids;
+mod input;
 mod minimal;
 mod runtime_security;
 mod types;
@@ -23,6 +24,10 @@ pub use ids::{
     TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID, TRANSACTION_PASSPORT_SCHEMA_ID,
     TRANSACTION_RUNTIME_SECURITY_REPORT_SCHEMA_ID, TRANSACTION_VERIFIER_POLICY_SCHEMA_ID,
     TRANSACTION_VERIFIER_REPORT_SCHEMA_ID,
+};
+pub use input::{
+    decode_evidence_json, validate_evidence_budget, validate_evidence_graph_size,
+    MAX_EVIDENCE_ARTIFACTS, MAX_EVIDENCE_BUNDLE_BYTES, MAX_EVIDENCE_DOCUMENT_BYTES,
 };
 pub use minimal::{
     sign_transaction_passport, transaction_evidence_graph_transparency_state,

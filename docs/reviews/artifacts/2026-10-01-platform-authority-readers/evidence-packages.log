@@ -1,0 +1,719 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-transaction-passport v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-transaction-passport)
+   Compiling chio-commerce-order v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-agent-web-interop)
+warning: unused variable: `node`
+   --> crates/platform/chio-enterprise-export/src/evidence.rs:160:5
+    |
+160 |     node: &EnterpriseEvidenceNode,
+    |     ^^^^ help: if this is intentional, prefix it with an underscore: `_node`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-enterprise-export` (lib) generated 1 warning (run `cargo fix --lib -p chio-enterprise-export` to apply 1 suggestion)
+warning: unused variable: `node`
+   --> crates/platform/chio-trust-market-context/src/evidence.rs:267:5
+    |
+267 |     node: &TrustMarketEvidenceNode,
+    |     ^^^^ help: if this is intentional, prefix it with an underscore: `_node`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-trust-market-context` (lib) generated 1 warning (run `cargo fix --lib -p chio-trust-market-context` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 19.10s
+     Running tests/agent_web_interop.rs (/home/connor/chio-security-target-6d-final/debug/deps/agent_web_interop-2fa7bdfa2ccff4aa)
+
+running 161 tests
+test core_tests::agent_web_interop_accepts_acp_commerce_projection ... ok
+test core_tests::agent_web_interop_accepts_rpa_projection ... ok
+test core_tests::agent_web_interop_accepts_openapi_30_projection ... ok
+test core_tests::agent_web_interop_accepts_browser_automation_projection ... ok
+test core_tests::agent_web_interop_accepts_webhook_and_cloudevents_fixture ... ok
+test core_tests::agent_web_interop_accepts_ag_ui_projection ... ok
+test core_tests::agent_web_interop_does_not_consume_replay_id_before_whole_bundle_succeeds ... ok
+test core_tests::agent_web_interop_accepts_acp_client_projection ... ok
+test core_tests::agent_web_interop_keeps_replay_marker_at_max_age_boundary ... ok
+test core_tests::agent_web_interop_accepts_calendar_projection ... ok
+test core_tests::agent_web_interop_accepts_openapi_projection ... ok
+test core_tests::agent_web_interop_accepts_email_projection ... ok
+test core_tests::agent_web_interop_rejects_a2a_authority_claim_without_limitation ... ok
+test core_tests::agent_web_interop_rejects_action_content_digest_mismatch ... ok
+test core_tests::agent_web_interop_rejects_action_for_different_envelope ... ok
+test core_tests::agent_web_interop_rejects_action_for_different_passport ... ok
+test core_tests::agent_web_interop_persists_webhook_replay_after_successful_verification ... ok
+test core_tests::agent_web_interop_rejects_action_for_different_projection_manifest ... ok
+test core_tests::agent_web_interop_rejects_acp_commerce_order_context_digest_mismatch ... ok
+test core_tests::agent_web_interop_rejects_acp_commerce_unbound_checkout_receipt ... ok
+test core_tests::agent_web_interop_read_only_verification_is_idempotent_without_replay_store ... ok
+test core_tests::agent_web_interop_rejects_action_for_different_passport_issuer ... ok
+test core_tests::agent_web_interop_rejects_action_for_different_source_protocol ... ok
+test core_tests::agent_web_interop_rejects_a2a_failed_task_state ... ok
+test core_tests::agent_web_interop_rejects_action_receipt_ref_mismatch ... ok
+test core_tests::agent_web_interop_rejects_action_for_different_source_protocol_version ... ok
+test core_tests::agent_web_interop_rejects_bound_receipt_that_did_not_execute ... ok
+test core_tests::agent_web_interop_rejects_cloudevents_specversion_mismatch ... ok
+test core_tests::agent_web_interop_rejects_bound_receipt_from_different_tool ... ok
+test core_tests::agent_web_interop_rejects_cloudevents_authority_claim_without_limitation ... ok
+test core_tests::agent_web_interop_rejects_bound_receipt_for_different_policy ... ok
+test core_tests::agent_web_interop_rejects_ambiguous_same_role_receipt_alias ... ok
+test core_tests::agent_web_interop_rejects_claim_set_transplant ... ok
+test core_tests::agent_web_interop_rejects_denied_acp_client_permission ... ok
+test core_tests::agent_web_interop_rejects_browser_automation_unbound_command_receipt ... ok
+test core_tests::agent_web_interop_rejects_bound_receipt_from_different_tool_server ... ok
+test core_tests::agent_web_interop_rejects_denied_ag_ui_event ... ok
+test core_tests::agent_web_interop_rejects_external_digest_mismatch ... ok
+test core_tests::agent_web_interop_rejects_kernel_and_sidecar_role_overlap ... ok
+test core_tests::agent_web_interop_rejects_forged_webhook_signature ... ok
+test core_tests::agent_web_interop_rejects_graphql_http_failed_status ... ok
+test core_tests::agent_web_interop_rejects_graphql_errors_projected_as_success ... ok
+test core_tests::agent_web_interop_rejects_duplicate_envelope_id ... ok
+test core_tests::agent_web_interop_rejects_malformed_webhook_signature ... ok
+test core_tests::agent_web_interop_rejects_envelope_missing_required_sidecar_claim ... ok
+test core_tests::agent_web_interop_rejects_graphql_http_draft_version_missing ... ok
+test core_tests::agent_web_interop_rejects_external_subject_schema_mismatch ... ok
+test core_tests::agent_web_interop_rejects_duplicate_projection_id ... ok
+test core_tests::agent_web_interop_rejects_email_send_without_message_digest ... ok
+test core_tests::agent_web_interop_rejects_missing_receipt_binding_edge ... ok
+test core_tests::agent_web_interop_rejects_mcp_authority_claim_without_limitation ... ok
+test core_tests::agent_web_interop_rejects_missing_required_signature ... ok
+test core_tests::agent_web_interop_rejects_missing_external_subject_binding_edge ... ok
+test core_tests::agent_web_interop_rejects_openapi_failed_status ... ok
+test core_tests::agent_web_interop_rejects_non_content_addressed_envelope_id ... ok
+test core_tests::agent_web_interop_rejects_openapi_profile_from_another_envelope_version ... ok
+test core_tests::agent_web_interop_rejects_missing_manifest_binding_edge ... ok
+test core_tests::agent_web_interop_rejects_missing_webhook_timestamp ... ok
+test core_tests::agent_web_interop_rejects_passport_and_kernel_role_overlap ... ok
+test core_tests::agent_web_interop_rejects_passport_and_sidecar_role_overlap ... ok
+test core_tests::agent_web_interop_rejects_openapi_unbound_operation_receipt ... ok
+test core_tests::agent_web_interop_rejects_passport_issuance_transplant ... ok
+test core_tests::agent_web_interop_rejects_openapi_redirect_followed ... ok
+test core_tests::agent_web_interop_rejects_projection_manifest_changed_after_sidecar_signature ... ok
+test core_tests::agent_web_interop_rejects_openapi_response_size_exceeded ... ok
+test core_tests::agent_web_interop_rejects_required_signature_with_none_algorithm ... ok
+test core_tests::agent_web_interop_rejects_receipt_from_previous_passport_scope ... ok
+test core_tests::agent_web_interop_rejects_openapi_without_proof_envelope_profile ... ok
+test core_tests::agent_web_interop_rejects_replayed_webhook_id ... ok
+test core_tests::agent_web_interop_rejects_refunded_acp_commerce_payment ... ok
+test core_tests::agent_web_interop_rejects_policy_required_external_authority_claim ... ok
+test core_tests::agent_web_interop_rejects_receipts_without_trusted_kernel_key ... ok
+test core_tests::agent_web_interop_rejects_sidecar_claim_marked_native ... ok
+test core_tests::agent_web_interop_rejects_standard_webhooks_without_configured_secret ... ok
+test core_tests::agent_web_interop_rejects_stale_webhook_timestamp ... ok
+test core_tests::agent_web_interop_rejects_unbound_risk_refs ... ok
+test core_tests::agent_web_interop_rejects_tampered_transaction_passport_signature ... ok
+test core_tests::agent_web_interop_rejects_valid_envelope_signature_from_untrusted_sidecar ... ok
+test core_tests::agent_web_interop_rejects_tampered_sidecar_envelope_signature ... ok
+test core_tests::in_memory_replay_capacity_is_atomic_and_never_evicts_live_markers ... ok
+test core_tests::in_memory_replay_capacity_rejects_zero_or_inverted_limits ... ok
+test core_tests::in_memory_replay_store_advances_clock_on_replay_and_preserves_batch_atomicity ... ok
+test core_tests::in_memory_replay_store_closes_forward_prune_clock_rollback_window ... ok
+test core_tests::in_memory_replay_store_rejects_expired_input_and_preserves_exact_boundary ... ok
+test core_tests::in_memory_replay_store_scopes_ids_to_authenticated_sender_and_endpoint ... ok
+test core_tests::agent_web_interop_rejects_valid_passport_signature_from_untrusted_signer ... ok
+test core_tests::agent_web_interop_rejects_unsupported_openapi_version ... ok
+test core_tests::agent_web_interop_rejects_unsigned_bound_receipt ... FAILED
+test core_tests::agent_web_interop_rejects_unresolved_receipt_ref ... ok
+test core_tests::replay_scope_and_webhook_id_inputs_are_strictly_validated ... ok
+test core_tests::agent_web_interop_rejects_unsupported_claim_without_limitation ... ok
+test core_tests::agent_web_interop_rejects_unused_signature_algorithm ... ok
+test core_tests::agent_web_interop_rejects_webhook_when_durable_replay_store_is_missing ... ok
+test core_tests::consuming_verifier_deduplicates_one_webhook_subject_across_envelopes ... ok
+test core_tests::agent_web_interop_report_mismatch_does_not_consume_replay_id ... ok
+test core_tests::consuming_verifier_derives_opaque_scope_only_for_authenticated_delivery ... ok
+test core_tests::verifier_accepts_signed_legacy_v1_envelope ... ok
+test protocol_tests::agent_web_interop_accepts_bbs_projection ... ok
+test protocol_tests::agent_web_interop_accepts_ap2_projection ... ok
+test core_tests::published_v1_proof_envelope_schema_accepts_legacy_shape ... ok
+test protocol_tests::agent_web_interop_accepts_asyncapi_projection ... ok
+test protocol_tests::agent_web_interop_accepts_dsse_projection ... ok
+test protocol_tests::agent_web_interop_accepts_oci_ref_projection ... ok
+test protocol_tests::agent_web_interop_accepts_in_toto_dsse_projection ... ok
+test protocol_tests::agent_web_interop_accepts_openid_connect_projection ... ok
+test protocol_tests::agent_web_interop_accepts_kubernetes_admission_projection ... ok
+test protocol_tests::agent_web_interop_accepts_scim_projection ... ok
+test core_tests::verifier_accepts_legacy_v1_receipt_node_aliases ... ok
+test core_tests::published_agent_web_report_schema_accepts_verifier_output ... ok
+test core_tests::published_v2_proof_envelope_schema_requires_scope_and_unique_receipts ... ok
+test protocol_tests::agent_web_interop_accepts_oauth2_projection ... ok
+test protocol_tests::agent_web_interop_accepts_sigstore_projection ... ok
+test protocol_tests::agent_web_interop_accepts_slack_projection ... ok
+test protocol_tests::agent_web_interop_accepts_vc_projection ... ok
+test protocol_tests::agent_web_interop_accepts_slsa_projection ... ok
+test protocol_tests::agent_web_interop_accepts_sd_jwt_vc_projection ... ok
+test protocol_tests::agent_web_interop_rejects_ag_ui_without_start_content_end_sequence ... ok
+test protocol_tests::agent_web_interop_rejects_a2a_without_message_send_binding ... ok
+test protocol_tests::agent_web_interop_accepts_spiffe_projection ... ok
+test protocol_tests::agent_web_interop_accepts_x402_projection ... ok
+test protocol_tests::agent_web_interop_rejects_asyncapi_unbound_message_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_ap2_mandate_detached_from_order ... ok
+test protocol_tests::agent_web_interop_rejects_acp_client_unsigned_audit_path_as_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_acp_client_without_path_scope ... ok
+test protocol_tests::agent_web_interop_rejects_calendar_create_time_range_mismatch ... ok
+test protocol_tests::agent_web_interop_rejects_ap2_transaction_context_digest_mismatch ... ok
+test protocol_tests::agent_web_interop_rejects_ap2_unbound_mandate_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_in_toto_missing_capability_lease ... ok
+test protocol_tests::agent_web_interop_rejects_in_toto_missing_peer_pin ... ok
+test protocol_tests::agent_web_interop_rejects_in_toto_non_bilateral_predicate ... ok
+test protocol_tests::agent_web_interop_rejects_in_toto_single_signature_count ... ok
+test protocol_tests::agent_web_interop_rejects_mcp_without_dpop_binding ... ok
+test protocol_tests::agent_web_interop_rejects_kubernetes_admission_uid_mismatch ... ok
+test protocol_tests::agent_web_interop_rejects_in_toto_statement_without_bound_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_bbs_receipt_disclosure_without_bound_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_calendar_time_range_mismatch ... ok
+test protocol_tests::agent_web_interop_rejects_dsse_single_signature_count ... ok
+test protocol_tests::agent_web_interop_rejects_oauth2_unbound_authorization_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_oauth2_wrong_object_kind ... ok
+test protocol_tests::agent_web_interop_rejects_oci_tag_only_ref ... ok
+test protocol_tests::agent_web_interop_rejects_in_toto_missing_policy_summary ... ok
+test protocol_tests::agent_web_interop_rejects_openid_connect_unbound_identity_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_refunded_x402_payment ... ok
+test protocol_tests::agent_web_interop_rejects_self_asserted_oci_rekor_verified ... ok
+test protocol_tests::agent_web_interop_rejects_slack_failed_provider_response ... ok
+test protocol_tests::agent_web_interop_rejects_self_asserted_bbs_verified_status ... ok
+test protocol_tests::agent_web_interop_rejects_openid_connect_wrong_object_kind ... ok
+test protocol_tests::agent_web_interop_rejects_sd_jwt_vc_without_bound_receipt ... ok
+test core_tests::published_agent_web_schemas_accept_supported_projection_fixtures ... ok
+test protocol_tests::agent_web_interop_rejects_scim_active_lifecycle_without_bound_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_spiffe_trust_domain_with_path ... ok
+test protocol_tests::agent_web_interop_rejects_self_asserted_sigstore_verified_status ... ok
+test protocol_tests::agent_web_interop_rejects_sigstore_bundle_without_bound_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_unverified_slsa_provenance ... ok
+test protocol_tests::agent_web_interop_rejects_unsupported_asyncapi_version ... ok
+test protocol_tests::agent_web_interop_rejects_spiffe_workload_without_bound_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_x402_payment_amount_mismatch ... ok
+test protocol_tests::agent_web_interop_rejects_vc_without_bound_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_x402_unbound_payment_receipt ... ok
+test protocol_tests::agent_web_interop_rejects_x402_payment_detached_from_order ... ok
+test protocol_tests::agent_web_interop_rejects_x402_payment_asset_mismatch ... ok
+
+failures:
+
+---- core_tests::agent_web_interop_rejects_unsigned_bound_receipt stdout ----
+
+thread 'core_tests::agent_web_interop_rejects_unsigned_bound_receipt' (3852522) panicked at crates/platform/chio-agent-web-interop/tests/agent_web_interop/core_tests.rs:766:5:
+assertion failed: error.to_string().contains("Agent Web receipt signature invalid")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    core_tests::agent_web_interop_rejects_unsigned_bound_receipt
+
+test result: FAILED. 160 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+error: test failed, to rerun pass `-p chio-agent-web-interop --test agent_web_interop`
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_commerce_order-a94e934cd0045cd8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/commerce_order.rs (/home/connor/chio-security-target-6d-final/debug/deps/commerce_order-44a5b4f6dc71253a)
+
+running 54 tests
+test commerce_order_replay_rejects_event_authority_receipt_without_signed_artifact ... ok
+test commerce_order_replay_rejects_event_without_actor ... FAILED
+test commerce_order_replay_rejects_coverage_required_without_risk_report ... ok
+test commerce_order_passport_binds_verified_digests_and_redaction_policy ... ok
+test commerce_order_replay_rejects_completed_order_with_open_dispute ... ok
+test commerce_order_replay_rejects_event_without_digest ... FAILED
+test commerce_order_replay_rejects_forged_risk_comptroller_signature ... ok
+test commerce_order_replay_accepts_offline_psp_fixture ... ok
+test commerce_order_replay_accepts_marketplace_refs_with_verified_trust_market_context ... ok
+test commerce_order_replay_rejects_duplicate_idempotency_key ... ok
+test commerce_order_replay_accepts_coverage_required_with_bound_risk_report ... ok
+test commerce_order_replay_accepts_full_normative_success_path ... ok
+test commerce_order_replay_rejects_double_budget_reservation ... ok
+test commerce_order_replay_rejects_mandate_missing_chio_projection ... ok
+test commerce_order_replay_rejects_mandate_missing_x402_projection ... ok
+test commerce_order_replay_accepts_disputed_refunded_recovery_path ... ok
+test commerce_order_replay_rejects_expired_mandate ... ok
+test commerce_order_replay_rejects_forged_payment_lifecycle_signature ... ok
+test commerce_order_replay_rejects_forged_provider_passport_signature ... ok
+test commerce_order_replay_rejects_mandate_protocol_digest_mismatch ... ok
+test commerce_order_replay_rejects_mandate_protocol_payload_digest_mismatch ... ok
+test commerce_order_replay_rejects_payment_before_budget_reservation ... ok
+test commerce_order_replay_rejects_marketplace_refs_without_verified_trust_market_context ... ok
+test commerce_order_replay_rejects_marketplace_provider_admission_without_trust_market_refs ... ok
+test commerce_order_replay_rejects_mandate_protocol_payload_semantic_mismatch ... ok
+test commerce_order_replay_rejects_marketplace_risk_ref_mismatch ... ok
+test commerce_order_replay_rejects_mandate_unsupported_protocol_name ... ok
+test commerce_order_replay_rejects_payment_lifecycle_bad_psp_object_ref ... ok
+test commerce_order_replay_rejects_payment_capture_after_replay_event ... ok
+test commerce_order_replay_rejects_payment_wrong_merchant ... ok
+test commerce_order_replay_rejects_payment_capture_before_authorization_events ... ok
+test commerce_order_replay_rejects_marketplace_selected_provider_subject_mismatch ... ok
+test commerce_order_replay_rejects_payment_quote_digest_mismatch ... ok
+test commerce_order_replay_rejects_marketplace_settlement_without_trust_market_refs ... ok
+test commerce_order_replay_rejects_quote_evidence_mismatch ... ok
+test commerce_order_replay_rejects_provider_passport_subject_mismatch ... ok
+test commerce_order_replay_rejects_payment_wrong_transfer_group ... ok
+test commerce_order_replay_rejects_settlement_packet_digest_mismatch ... ok
+test commerce_order_replay_rejects_trust_market_refs_with_required_false ... ok
+test commerce_order_replay_rejects_stale_reputation_snapshot ... ok
+test commerce_order_replay_rejects_settlement_packet_psp_mismatch ... ok
+test commerce_order_replay_rejects_refund_before_completion ... ok
+test commerce_order_replay_rejects_settlement_packet_order_mismatch ... ok
+test commerce_order_replay_rejects_wrong_provider_admission_ref ... ok
+test commerce_order_replay_rejects_refund_without_dispute_transition ... ok
+test commerce_order_replay_rejects_zero_reputation_score ... ok
+test commerce_order_replay_rejects_unsigned_payment_lifecycle ... ok
+test commerce_order_replay_rejects_unused_settlement_dispatch_receipt_ref ... ok
+test original_authority_receipt_duplicate_schema_is_rejected ... ok
+test commerce_order_replay_rejects_unknown_recovery_status_before_completion ... ok
+test commerce_order_replay_rejects_unverified_settlement_dispatch_receipt_ref ... ok
+test commerce_order_replay_rejects_wrong_intent_evidence_ref ... ok
+test commerce_order_replay_rejects_wrong_reconciliation_ref ... ok
+test commerce_order_replay_rejects_wrong_settlement_packet_ref ... ok
+
+failures:
+
+---- commerce_order_replay_rejects_event_without_actor stdout ----
+
+thread 'commerce_order_replay_rejects_event_without_actor' (3852618) panicked at crates/platform/chio-commerce-order/tests/commerce_order.rs:797:5:
+assertion failed: error.to_string().contains("actor")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- commerce_order_replay_rejects_event_without_digest stdout ----
+
+thread 'commerce_order_replay_rejects_event_without_digest' (3852619) panicked at crates/platform/chio-commerce-order/tests/commerce_order.rs:820:5:
+assertion failed: error.to_string().contains("event_sha256")
+
+
+failures:
+    commerce_order_replay_rejects_event_without_actor
+    commerce_order_replay_rejects_event_without_digest
+
+test result: FAILED. 52 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+error: test failed, to rerun pass `-p chio-commerce-order --test commerce_order`
+     Running tests/enterprise_export.rs (/home/connor/chio-security-target-6d-final/debug/deps/enterprise_export-d3508ec5b90a8d46)
+
+running 62 tests
+test enterprise_export_rejects_closed_risk_facility_with_unreconciled_reserve ... ok
+test enterprise_export_rejects_approval_expired_before_export_issued ... ok
+test enterprise_export_accepts_reverse_slash_net_reconciliation ... ok
+test enterprise_export_ignores_non_enterprise_required_claims ... ok
+test enterprise_export_rejects_approval_replay_over_recomputed_export_bundle ... ok
+test enterprise_export_accepts_risk_payout_matched_lifecycle ... ok
+test enterprise_export_accepts_market_slash_with_sanction_bridge ... ok
+test enterprise_export_accepts_valid_autonomous_commerce_fixture ... ok
+test enterprise_export_accepts_risk_settlement_counterparty_bound_claim_payout ... ok
+test enterprise_export_rejects_control_map_missing_gate ... ok
+test enterprise_export_rejects_control_map_gate_for_wrong_claim ... ok
+test enterprise_export_rejects_control_map_gate_without_artifact ... ok
+test enterprise_export_rejects_data_governance_region_not_allowed ... ok
+test enterprise_export_rejects_data_governance_retention_shorter_than_policy ... ok
+test enterprise_export_rejects_blank_approvers ... ok
+test enterprise_export_rejects_duplicate_risk_coverage_claim_id ... ok
+test enterprise_export_rejects_export_bundle_digest_mismatch ... ok
+test enterprise_export_rejects_duplicate_risk_reserve_receipt_id ... ok
+test enterprise_export_rejects_data_governance_legal_hold ... ok
+test enterprise_export_rejects_duplicate_approvers_for_quorum ... ok
+test enterprise_export_rejects_market_slash_consuming_facility_reserve ... ok
+test enterprise_export_rejects_missing_approval_case ... ok
+test enterprise_export_rejects_export_issued_before_approval ... ok
+test enterprise_export_rejects_disclosure_capsule_export_bound_to_other_ref ... ok
+test enterprise_export_rejects_leakage_ledger_export_bound_to_other_ref ... ok
+test enterprise_export_rejects_forged_approval_signature ... ok
+test enterprise_export_rejects_open_appeal_reserve_release ... ok
+test enterprise_export_rejects_open_appeal_claim_payout ... ok
+test enterprise_export_rejects_market_slash_missing_jurisdiction_ref ... ok
+test enterprise_export_rejects_missing_risk_reserve_state ... ok
+test enterprise_export_rejects_reverse_slash_exceeding_prior_penalty ... ok
+test enterprise_export_rejects_reverse_slash_without_prior_penalty ... ok
+test enterprise_export_rejects_risk_actuarial_backtest_breach ... ok
+test enterprise_export_rejects_open_appeal_write_off ... ok
+test enterprise_export_rejects_risk_capital_adequacy_breach ... ok
+test enterprise_export_rejects_risk_capital_allocatable_without_lifecycle_replay ... ok
+test enterprise_export_rejects_pii_overdisclosure ... ok
+test enterprise_export_rejects_passport_export_bound_to_other_passport ... ok
+test enterprise_export_rejects_risk_claim_outside_coverage ... ok
+test enterprise_export_rejects_missing_risk_ref_artifact ... ok
+test enterprise_export_rejects_padded_duplicate_approvers_for_quorum ... ok
+test enterprise_export_rejects_risk_coverage_subject_mismatch ... ok
+test enterprise_export_rejects_risk_exposure_exceeding_capital ... ok
+test enterprise_export_rejects_risk_double_consumed_reserve ... ok
+test enterprise_export_rejects_risk_settlement_counterparty_unbound_payee ... ok
+test enterprise_export_rejects_risk_claim_payout_without_counterparties ... ok
+test enterprise_export_rejects_risk_facility_lifecycle_missing_evidence ... ok
+test enterprise_export_rejects_tampered_transaction_passport_signature ... ok
+test enterprise_export_rejects_risk_settlement_counterparty_mismatch ... ok
+test enterprise_export_rejects_telemetry_digest_mismatch ... ok
+test enterprise_export_rejects_risk_insurance_copy_exceeding_actuarial_support ... ok
+test enterprise_export_rejects_risk_facility_lifecycle_missing_authority ... ok
+test enterprise_export_rejects_telemetry_passport_mismatch ... ok
+test enterprise_export_rejects_unsigned_risk_comptroller_report ... ok
+test enterprise_export_rejects_telemetry_schema_only_receipt_ref ... FAILED
+test enterprise_export_rejects_telemetry_siem_without_receipt ... ok
+test enterprise_export_rejects_telemetry_receipt_content_hash_mismatch ... ok
+test enterprise_export_rejects_risk_portfolio_capital_overallocation ... ok
+test original_bundle_artifact_count_is_bounded_before_verification ... ok
+test enterprise_export_rejects_telemetry_signed_untrusted_receipt_ref ... ok
+test enterprise_export_rejects_untrusted_approval_signer ... ok
+test enterprise_export_selects_referenced_risk_report_when_unrelated_report_precedes_it ... ok
+
+failures:
+
+---- enterprise_export_rejects_telemetry_schema_only_receipt_ref stdout ----
+
+thread 'enterprise_export_rejects_telemetry_schema_only_receipt_ref' (3852717) panicked at crates/platform/chio-enterprise-export/tests/enterprise_export.rs:2267:5:
+assertion failed: error.to_string().contains("telemetry receipt invalid")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    enterprise_export_rejects_telemetry_schema_only_receipt_ref
+
+test result: FAILED. 61 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `-p chio-enterprise-export --test enterprise_export`
+     Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_transaction_passport-07b858e58f9912b3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/claim_set_digest.rs (/home/connor/chio-security-target-6d-final/debug/deps/claim_set_digest-6af81bc33ea4dcfb)
+
+running 1 test
+test root_claim_set_rejects_tampered_claim_set_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cognition_market.rs (/home/connor/chio-security-target-6d-final/debug/deps/cognition_market-7d9fbb5987331fc0)
+
+running 69 tests
+test claim_set_schema_requires_a_subject_for_finding_claims ... ok
+test cognition_market_delivery_claim_rejects_a_pre_sale_report ... ok
+test cognition_market_delivery_claim_requires_purchase_authority_standing ... ok
+test cognition_market_purchase_record_must_fall_within_the_pinned_authority_lifecycle ... ok
+test cognition_market_profile_recipe_floor_loads_the_recipe_for_a_bond_claim ... ok
+test cognition_market_deterministic_delivery_claim_loads_recipe_without_status ... ok
+test cognition_market_qualified_profile ... ok
+test cognition_market_claim_set_subject_must_match_the_signed_report ... ok
+test cognition_market_qualified_profile_binds_status_authorization_envelope_digest ... ok
+test cognition_market_persists_authenticated_inclusion_before_denying ... ok
+test cognition_market_profile_status_floor_reaches_durable_store_for_delivery_claim ... ok
+test cognition_market_qualified_profile_rejects_a_stale_status_clock ... ok
+test cognition_market_qualified_profile_rejects_an_independent_facet_projection ... ok
+test cognition_market_qualified_profile_enforces_verifier_signer_lifecycle ... ok
+test cognition_market_qualified_profile_accepts_anchored_only_policy ... ok
+test cognition_market_qualified_profile_preserves_verified_transaction_claims ... ok
+test cognition_market_qualified_profile_drops_unknown_transaction_claims ... ok
+test cognition_market_qualified_profile_rejects_an_unsupported_predicate_engine ... ok
+test cognition_market_qualified_profile_rejects_an_expired_status_authority ... ok
+test cognition_market_qualified_profile_enforces_required_facet_floor ... ok
+test cognition_market_qualified_profile_rejects_backdated_report_after_revocation ... ok
+test cognition_market_qualified_profile_rejects_an_unselected_failed_facet ... ok
+test cognition_market_qualified_profile_rejects_extra_finding_claim ... ok
+test cognition_market_qualified_profile_rejects_backdated_report_after_key_expiry ... ok
+test cognition_market_qualified_profile_rejects_non_typed_report_encoding ... ok
+test cognition_market_qualified_profile_rejects_purchase_authority_outside_profile ... ok
+test cognition_market_qualified_profile_rejects_mismatched_profile_id ... ok
+test cognition_market_qualified_profile_rejects_purchase_authority_as_passport_signer ... ok
+test cognition_market_qualified_profile_rejects_revoked_status_operator_standing ... ok
+test cognition_market_qualified_profile_rejects_durable_status_rollback ... ok
+test cognition_market_qualified_profile_rejects_substituted_attachment ... ok
+test cognition_market_qualified_profile_rejects_recipe_for_another_profile ... ok
+test cognition_market_qualified_profile_rejects_revoked_verifier_signer ... ok
+test cognition_market_qualified_profile_rejects_sticky_retraction ... ok
+test cognition_market_qualified_profile_rejects_self_signed_verifier_status ... ok
+test cognition_market_delivery_claim_rejects_cross_purchase_report_identity ... ok
+test cognition_market_qualified_profile_rejects_unsupported_receipt_semantics ... ok
+test cognition_market_every_claim_requires_artifact_integrity ... ok
+test cognition_market_qualified_profile_rejects_verifier_as_operator_status_authority ... ok
+test cognition_market_qualified_profile_rejects_unpinned_profile ... ok
+test cognition_market_qualified_profile_rejects_unpinned_trust_root_snapshot ... ok
+test cognition_market_qualified_profile_rejects_verifier_as_status_operator ... ok
+test cognition_market_qualified_profile_rejects_verifier_as_passport_signer ... ok
+test cognition_market_qualified_profile_rejects_wrong_digest ... ok
+test cognition_market_rejects_verifier_as_purchase_standing_authority ... ok
+test cognition_market_qualified_profile_rejects_unsupported_required_facets ... ok
+test cognition_market_qualified_profile_rejects_unpinned_resolution_inputs ... ok
+test cognition_market_rejects_unanchored_purchase_after_authority_expiry ... ok
+test cognition_market_rejects_unanchored_purchase_after_authority_revocation ... ok
+test expiry_regressions::cognition_market_qualified_profile_rejects_backdated_report_after_finding_expiry ... ok
+test expiry_regressions::cognition_market_qualified_profile_rejects_backdated_report_after_profile_expiry ... ok
+test cognition_market_root_accepts_an_independently_verified_risk_claim ... ok
+test expiry_regressions::cognition_market_recipe_bytes_must_fit_the_committed_recipe_bound ... ok
+test cognition_market_qualified_profile_rejects_wrong_role_and_schema ... ok
+test expiry_regressions::cognition_market_recipe_must_use_a_profile_allowed_runner ... ok
+test expiry_regressions::cognition_market_enforces_facets_derived_from_the_signed_finding ... ok
+test profile_governance_regressions::cognition_market_qualified_profile_rejects_aliased_authorities ... ok
+test regenerate_cognition_market_golden ... ignored, writes the checked-in cognition-market proof-room golden
+test expiry_regressions::cognition_market_status_proof_must_bind_the_finding_feed ... ok
+test expiry_regressions::deterministic_delivery_claim_rechecks_the_recipe_attachment ... ok
+test golden::persisted_cognition_market_golden_verifies ... ok
+test expiry_regressions::cognition_market_recipe_must_bind_the_signed_finding_payload ... ok
+test profile_governance_regressions::cognition_market_qualified_profile_rejects_verifier_as_governance_status_authority ... ok
+test profile_governance_regressions::cognition_market_rejects_governance_as_operator_standing_authority ... ok
+test profile_governance_regressions::cognition_market_qualified_profile_rejects_backdated_profile_after_governance_revocation ... ok
+test profile_governance_regressions::cognition_market_qualified_profile_rejects_self_pinned_governance ... ok
+test expiry_regressions::cognition_market_status_proof_must_not_predate_the_finding ... ok
+test expiry_regressions::delivery_claim_requires_authenticated_receipt_facets_for_asserted_findings ... ok
+test expiry_regressions::cognition_market_enforces_observed_and_metered_finding_facet_floors ... ok
+
+test result: ok. 68 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+     Running tests/original_input.rs (/home/connor/chio-security-target-6d-final/debug/deps/original_input-d11c76279f26e0a8)
+
+running 4 tests
+test original_graph_keeps_native_integers_but_rejects_lossy_tokens ... ok
+test original_graph_duplicates_cannot_disappear_before_validation ... ok
+test policy_size_is_bounded_before_typed_projection ... ok
+test original_deep_graph_is_validated_without_recursive_stack_growth ... FAILED
+
+failures:
+
+---- original_deep_graph_is_validated_without_recursive_stack_growth stdout ----
+
+thread 'original_deep_graph_is_validated_without_recursive_stack_growth' (3852799) panicked at crates/platform/chio-transaction-passport/tests/original_input.rs:59:5:
+assertion `left == right` failed
+  left: Err(InvalidEvidenceGraphArtifact("evidence graph node id digest mismatch: expected aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, got node-0"))
+ right: Ok(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    original_deep_graph_is_validated_without_recursive_stack_growth
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `-p chio-transaction-passport --test original_input`
+     Running tests/transaction_passport.rs (/home/connor/chio-security-target-6d-final/debug/deps/transaction_passport-6aaa00062d15419a)
+
+running 96 tests
+test evidence_graph_schema_allows_public_settlement_proof_bundle_role ... ok
+test evidence_graph_schema_allows_swarm_authority_roles ... ok
+test root_claim_set_rejects_policy_required_commerce_state_without_claim ... ok
+test root_claim_set_accepts_required_risk_claim_after_external_verifier ... ok
+test root_claim_set_rejects_required_risk_claim_without_external_verifier ... ok
+test runtime_receipt_totality_rejects_graph_receipt_without_artifact ... ok
+test runtime_security_rejects_missing_claim_set_artifact ... ok
+test runtime_security_rejects_evidence_node_id_digest_mismatch ... ok
+test runtime_security_rejects_advisory_authorization_by_node_role ... ok
+test runtime_receipt_totality_rejects_unsigned_terminal_receipt ... FAILED
+test runtime_security_rejects_tampered_transaction_passport_signature ... ok
+test runtime_security_rejects_execution_lease_without_route_plan_receipt ... ok
+test runtime_security_rejects_execution_lease_without_budget_pool_binding ... ok
+test runtime_security_rejects_self_supplied_runtime_trust_root ... ok
+test runtime_security_rejects_advisory_runtime_authority_edge_predicates ... ok
+test runtime_security_rejects_tampered_join_receipt_signature ... ok
+test runtime_security_rejects_execution_lease_without_join_receipt_binding ... ok
+test standalone_minimal_passport_accepts_packaged_verifier_policy_node_path ... ok
+test standalone_minimal_passport_accepts_governed_action_evidence ... ok
+test runtime_security_rejects_execution_lease_without_task_graph_binding ... ok
+test standalone_minimal_passport_accepts_verifier_policy_as_policy_digest_anchor ... ok
+test standalone_minimal_passport_accepts_signed_omission_policy ... ok
+test runtime_security_rejects_revocation_freshness_ancestor_mismatch ... ok
+test standalone_minimal_passport_keeps_registered_v1_proofs_at_preview ... ok
+test standalone_minimal_passport_rejects_advisory_authority_edge ... ok
+test standalone_minimal_passport_preserves_nonbinary_claim_result_statuses ... ok
+test runtime_online_checks_run_for_tool_ack_requirement ... ok
+test standalone_minimal_passport_rejects_detached_verifier_policy_node ... ok
+test standalone_minimal_passport_rejects_evidence_node_id_digest_mismatch ... ok
+test runtime_security_rejects_revocation_freshness_subject_mismatch ... ok
+test standalone_minimal_passport_promotes_verified_transparency_anchor ... ok
+test runtime_security_rejects_tool_ack_without_trusted_time_proof ... ok
+test standalone_minimal_passport_rejects_missing_governed_action_evidence ... ok
+test standalone_minimal_passport_rejects_future_capability_not_before ... ok
+test runtime_security_rejects_overflowing_budget_allocation_total ... ok
+test standalone_minimal_passport_emits_all_registered_transaction_claims ... ok
+test standalone_minimal_passport_rejects_checkpoint_keys_shared_with_passport_roots ... ok
+test standalone_minimal_passport_rejects_missing_governed_action_artifacts ... ok
+test runtime_security_rejects_untrusted_join_receipt_issuer ... ok
+test standalone_minimal_passport_rejects_governed_action_mismatch ... ok
+test standalone_minimal_passport_rejects_request_response_wrapper_digest_binding ... ok
+test standalone_minimal_passport_rejects_policy_disallowed_issuer ... ok
+test standalone_minimal_passport_rejects_tampered_signed_omission_policy ... ok
+test standalone_minimal_passport_rejects_policy_transparency_state_mismatch ... ok
+test standalone_minimal_passport_rejects_missing_policy_required_role ... ok
+test standalone_minimal_passport_rejects_tampered_passport_signature ... ok
+test standalone_minimal_passport_rejects_transparency_anchor_with_tampered_root ... ok
+test standalone_minimal_passport_rejects_stale_capability_proof ... ok
+test runtime_security_rejects_trusted_time_after_lease_expiry ... ok
+test transaction_evidence_graph_rejects_advisory_authority_endpoint ... ok
+test transaction_evidence_graph_rejects_advisory_authority_predicates ... ok
+test standalone_minimal_passport_rejects_unpinned_trust_root_signer ... ok
+test standalone_minimal_passport_rejects_unregistered_transaction_claim ... ok
+test transaction_passport_accepts_signed_root ... ok
+test standalone_minimal_passport_rejects_transparency_anchor_from_untrusted_signer ... ok
+test standalone_minimal_passport_rejects_forged_governed_action_signatures ... ok
+test transaction_passport_rejects_bad_digest_shape ... ok
+test transaction_passport_rejects_cyclic_evidence_graph ... ok
+test transaction_passport_rejects_duplicate_evidence_graph_node_ids ... ok
+test transaction_passport_rejects_empty_identity_fields ... ok
+test transaction_passport_rejects_expired_validity_window ... ok
+test transaction_passport_rejects_root_without_claim_set_binding ... ok
+test transaction_passport_rejects_invalid_evidence_graph_artifact ... FAILED
+test transaction_passport_rejects_unknown_schema_id ... ok
+test standalone_minimal_passport_rejects_self_declared_guard_and_kernel_keys ... ok
+test standalone_minimal_passport_rejects_unsigned_omission_policy ... ok
+test transaction_passport_rejects_tampered_signed_root ... ok
+test transaction_passport_rejects_unresolved_evidence_graph_edge_refs ... ok
+test transaction_passport_rejects_wrong_verifier_policy_schema ... ok
+test standalone_minimal_passport_rejects_unknown_v2_inclusion_envelope_fields ... FAILED
+test standalone_minimal_passport_rejects_v2_anchor_without_checkpoint_statement ... ok
+test standalone_minimal_passport_report_surfaces_transparency_state ... ok
+test transaction_passport_rejects_unsafe_artifact_paths ... ok
+test standalone_minimal_passport_rejects_transparency_anchor_with_unbound_subject ... ok
+test transaction_passport_rejects_untrusted_signed_root ... ok
+test transaction_passport_rejects_unsigned_root_json ... ok
+test transaction_passport_accepts_minimal_schema_shape ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_keeps_preview_when_the_anchor_is_not_evaluable ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_accepts_unique_key_proof_with_noncanonical_whitespace ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_denies_a_checkable_but_invalid_transparency_anchor ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_accepts_canonical_inclusion_proof_hash_encodings ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_an_anchor_claiming_another_log ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_anchor_over_a_non_receipt_artifact ... ok
+test standalone_minimal_passport_requires_the_complete_v2_inclusion_envelope ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_signed_checkpoint_missing_required_body_fields ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_noncanonical_checkpoint_signature_encoding ... ok
+test transparency_anchor_edge_tests::transparency_state_api_requires_disjoint_signer_roles ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_signed_checkpoint_unknown_body_fields ... FAILED
+test transparency_anchor_edge_tests::standalone_minimal_passport_requires_node_and_artifact_schema_parity ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_duplicate_v2_proof_keys ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_validates_every_transparency_candidate ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_signed_checkpoint_explicit_null_options ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_zero_checkpoint_issuance_time ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_noncanonical_inclusion_proof_hash_encodings ... ok
+test transaction_verifier_report_schema_requires_machine_result_fields ... ok
+test transparency_anchor_edge_tests::standalone_minimal_passport_rejects_noncanonical_checkpoint_body_encodings ... ok
+
+failures:
+
+---- runtime_receipt_totality_rejects_unsigned_terminal_receipt stdout ----
+
+thread 'runtime_receipt_totality_rejects_unsigned_terminal_receipt' (3852812) panicked at crates/platform/chio-transaction-passport/tests/transaction_passport.rs:1980:5:
+transaction evidence input rejected: urn:chio:error:attest:signed-json-invalid-shape
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- transaction_passport_rejects_invalid_evidence_graph_artifact stdout ----
+
+thread 'transaction_passport_rejects_invalid_evidence_graph_artifact' (3852874) panicked at crates/platform/chio-transaction-passport/tests/transaction_passport.rs:817:5:
+assertion failed: error.to_string().contains("invalid evidence graph artifact")
+
+---- standalone_minimal_passport_rejects_unknown_v2_inclusion_envelope_fields stdout ----
+
+thread 'standalone_minimal_passport_rejects_unknown_v2_inclusion_envelope_fields' (3852858) panicked at crates/platform/chio-transaction-passport/tests/transaction_passport.rs:2673:5:
+invalid evidence graph artifact: transparency inclusion proof is invalid: v2 inclusion proof envelope is invalid: transaction evidence input rejected: urn:chio:error:attest:signed-json-invalid-shape
+
+---- transparency_anchor_edge_tests::standalone_minimal_passport_rejects_signed_checkpoint_unknown_body_fields stdout ----
+
+thread 'transparency_anchor_edge_tests::standalone_minimal_passport_rejects_signed_checkpoint_unknown_body_fields' (3852896) panicked at crates/platform/chio-transaction-passport/tests/transaction_passport/transparency_anchor_edge_tests.rs:247:5:
+invalid evidence graph artifact: transparency inclusion proof is invalid: checkpoint statement body is invalid: transaction evidence input rejected: urn:chio:error:attest:signed-json-invalid-shape
+
+
+failures:
+    runtime_receipt_totality_rejects_unsigned_terminal_receipt
+    standalone_minimal_passport_rejects_unknown_v2_inclusion_envelope_fields
+    transaction_passport_rejects_invalid_evidence_graph_artifact
+    transparency_anchor_edge_tests::standalone_minimal_passport_rejects_signed_checkpoint_unknown_body_fields
+
+test result: FAILED. 92 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+error: test failed, to rerun pass `-p chio-transaction-passport --test transaction_passport`
+     Running tests/trust_market_context.rs (/home/connor/chio-security-target-6d-final/debug/deps/trust_market_context-040e0845a1abf702)
+
+running 50 tests
+test trust_market_context_rejects_tampered_transaction_passport_signature ... ok
+test trust_market_rejects_guarantee_without_backing ... ok
+test original_bundle_artifact_count_is_bounded_before_verification ... ok
+test trust_market_context_ignores_non_trust_market_required_claims ... ok
+test trust_market_rejects_ambiguous_top_rank_without_override ... ok
+test trust_market_rejects_facility_lifecycle_replay_gap ... ok
+test trust_market_context_accepts_marketplace_fixture ... ok
+test trust_market_accepts_facility_lifecycle_replay ... ok
+test trust_market_rejects_global_scorecard_scope ... ok
+test trust_market_rejects_guarantee_claim_window_after_sla ... ok
+test trust_market_rejects_collateral_lock_start_after_guarantee_start ... ok
+test trust_market_rejects_facility_lifecycle_missing_evidence ... ok
+test trust_market_rejects_guarantee_wrong_beneficiary ... ok
+test trust_market_rejects_inverted_guarantee_claim_window ... ok
+test trust_market_rejects_required_unsupported_market_claim ... ok
+test trust_market_rejects_open_appeal_reserve_release ... ok
+test trust_market_rejects_policy_authority_not_pinned_by_verifier ... ok
+test trust_market_rejects_missing_committed_sla_metric ... ok
+test trust_market_rejects_ranking_missing_available_candidate ... ok
+test trust_market_rejects_ranking_order_mismatch ... ok
+test trust_market_rejects_reputation_import_overweight ... ok
+test trust_market_rejects_lower_rank_selection_with_unavailable_override_receipt ... ok
+test trust_market_rejects_policy_authority_without_external_root ... ok
+test trust_market_rejects_lower_rank_selection_with_unbound_override_receipt ... ok
+test trust_market_rejects_lower_rank_selection_with_untrusted_override_receipt ... ok
+test trust_market_rejects_risk_double_consumed_reserve ... ok
+test trust_market_rejects_scorecard_portable_reputation_overweight ... ok
+test trust_market_rejects_ranking_duplicate_provider ... ok
+test trust_market_rejects_selected_provider_absent_from_discovery ... ok
+test trust_market_rejects_scorecard_stale_at_selection_time ... ok
+test trust_market_rejects_score_recompute_mismatch ... ok
+test trust_market_rejects_risk_evidence_ref_without_artifact ... ok
+test trust_market_rejects_sla_performance_target_exceeded_even_if_report_passed ... ok
+test trust_market_rejects_sla_performance_metric_mismatch ... ok
+test trust_market_rejects_slash_authority_outside_jurisdiction ... ok
+test trust_market_rejects_selection_before_discovery_snapshot ... ok
+test trust_market_rejects_tampered_provider_selection_signature ... ok
+test trust_market_rejects_selection_scorecard_score_mismatch ... ok
+test trust_market_rejects_stale_discovery_snapshot ... ok
+test trust_market_rejects_unsigned_risk_comptroller_report ... ok
+test trust_market_rejects_sla_wrong_order ... ok
+test trust_market_rejects_unbound_risk_report_ref ... ok
+test trust_market_rejects_unsigned_risk_lifecycle_authority_evidence ... ok
+test trust_market_rejects_unsupported_collateral_source_type ... ok
+test trust_market_rejects_untrusted_risk_sanction_receipt ... ok
+test trust_market_rejects_untrusted_risk_reserve_ledger_receipt ... ok
+test trust_market_rejects_unsupported_guarantee_type ... ok
+test trust_market_rejects_untrusted_risk_settlement_receipt ... ok
+test trust_market_rejects_untrusted_risk_sanction_authority_receipt ... ok
+test trust_market_rejects_untrusted_risk_sanction_jurisdiction_receipt ... ok
+
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+   Doc-tests chio_agent_web_interop
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_commerce_order
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_enterprise_export
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_transaction_passport
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests chio_trust_market_context
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 5 targets failed:
+    `-p chio-agent-web-interop --test agent_web_interop`
+    `-p chio-commerce-order --test commerce_order`
+    `-p chio-enterprise-export --test enterprise_export`
+    `-p chio-transaction-passport --test original_input`
+    `-p chio-transaction-passport --test transaction_passport`

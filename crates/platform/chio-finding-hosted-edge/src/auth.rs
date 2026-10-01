@@ -624,6 +624,8 @@ fn principal_signer_key(principal: &HostedPrincipal) -> Result<Option<PublicKey>
 
 fn map_store(error: HostedMarketPortError) -> HostedEdgeError {
     match error {
+        HostedMarketPortError::InvalidInput(source)
+        | HostedMarketPortError::CorruptInput(source) => HostedEdgeError::InvalidCredential(source),
         HostedMarketPortError::Capacity => HostedEdgeError::CapacityUnavailable,
         HostedMarketPortError::Unavailable => HostedEdgeError::DependencyUnavailable,
         _ => HostedEdgeError::AuthenticationFailed,

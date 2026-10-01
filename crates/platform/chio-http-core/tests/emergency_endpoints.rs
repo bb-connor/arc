@@ -31,6 +31,28 @@ use chio_kernel::{
 
 const ADMIN_TOKEN: &str = "unit-test-admin-token";
 
+#[test]
+fn original_ambiguous_stop_body_does_not_change_kernel_state() {
+    let admin = admin(build_kernel());
+    let body = br#"{"reason":"incident","ignored":{"private-marker":1,"private-marker":2}}"#;
+    let result = handle_emergency_stop(&admin, Some(ADMIN_TOKEN), body);
+    let error = result.expect_err("duplicate original fields must reject");
+    assert_eq!(error.status(), 400);
+    assert!(!admin.kernel().is_emergency_stopped());
+    assert!(!error.body().to_string().contains("private-marker"));
+}
+
+#[test]
+fn original_oversized_stop_body_does_not_change_kernel_state() {
+    let admin = admin(build_kernel());
+    let body = serde_json::to_vec(&serde_json::json!({"reason": "x".repeat(1024 * 1024)}))
+        .expect("stop body serializes");
+    let error = handle_emergency_stop(&admin, Some(ADMIN_TOKEN), &body)
+        .expect_err("oversized original body must reject");
+    assert_eq!(error.status(), 400);
+    assert!(!admin.kernel().is_emergency_stopped());
+}
+
 struct EchoServer {
     id: ServerId,
     tool: String,

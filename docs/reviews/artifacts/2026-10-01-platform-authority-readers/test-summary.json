@@ -1,0 +1,486 @@
+{
+  "source_base": "377ee5b773eff424d12182682b411867b4d643be",
+  "qualification": "Composite local results: the 13-package campaign failed one new enterprise fixture; all enterprise results are replaced by its complete passing package rerun. Add the separate PostgreSQL integration campaign. This is not a single green combined command. Three focused control-plane custody tests qualify the checked-slice lint fix; 1183 unrelated control-plane unit tests are filtered.",
+  "original_campaign_exit_code": 101,
+  "totals": {
+    "passed": 1070,
+    "failed": 0,
+    "ignored": 2,
+    "measured": 0,
+    "filtered": 1183
+  },
+  "harness_groups": 34,
+  "doctest_groups": 13,
+  "accepted_results": [
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/agent_web_interop.rs (/home/connor/chio-security-target-6d-final/debug/deps/agent_web_interop-b35d511e5363fc87)",
+      "status": "ok",
+      "passed": 162,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_api_protect-5bb07e6f6426a648)",
+      "status": "ok",
+      "passed": 217,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_commerce_order-f948f23cc6ac33af)",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/commerce_order.rs (/home/connor/chio-security-target-6d-final/debug/deps/commerce_order-93b6a3e9e7561a29)",
+      "status": "ok",
+      "passed": 54,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_hosted_edge-6d45982d59adda8c)",
+      "status": "ok",
+      "passed": 43,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_market_port-64093e9748cf50d5)",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_market_store_postgres-dbbb8627e2f20de4)",
+      "status": "ok",
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/worker_lease_api.rs (/home/connor/chio-security-target-6d-final/debug/deps/worker_lease_api-3cc5da995e72a6a1)",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_finding_worker-4785fc31c99034e9)",
+      "status": "ok",
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_http_core-dcb2808ed752906c)",
+      "status": "ok",
+      "passed": 102,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/approvals_endpoints.rs (/home/connor/chio-security-target-6d-final/debug/deps/approvals_endpoints-4be3bdd95f653882)",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/authority_input.rs (/home/connor/chio-security-target-6d-final/debug/deps/authority_input-c5f33bd3ba4e566d)",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/compliance_score_endpoint.rs (/home/connor/chio-security-target-6d-final/debug/deps/compliance_score_endpoint-0089ee1476b3a4b6)",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/emergency_endpoints.rs (/home/connor/chio-security-target-6d-final/debug/deps/emergency_endpoints-9a2e262f9466e173)",
+      "status": "ok",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/evaluate_plan_endpoint.rs (/home/connor/chio-security-target-6d-final/debug/deps/evaluate_plan_endpoint-0a5090093168fd33)",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/execution_nonce.rs (/home/connor/chio-security-target-6d-final/debug/deps/execution_nonce-182d63456284fe73)",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/http_egress_contract.rs (/home/connor/chio-security-target-6d-final/debug/deps/http_egress_contract-cb62bc289279c7fd)",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/regulatory_api.rs (/home/connor/chio-security-target-6d-final/debug/deps/regulatory_api-69f398f2db58afb4)",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/verdict_deny_enrichment.rs (/home/connor/chio-security-target-6d-final/debug/deps/verdict_deny_enrichment-380b2a3e4f03eb91)",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/risk_comptroller.rs (/home/connor/chio-security-target-6d-final/debug/deps/risk_comptroller-e9828b48ade68033)",
+      "status": "ok",
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_tower-1627f2e40f7e9440)",
+      "status": "ok",
+      "passed": 56,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/axum_integration.rs (/home/connor/chio-security-target-6d-final/debug/deps/axum_integration-f4f93e224c3a79ee)",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/load_shed_overloaded.rs (/home/connor/chio-security-target-6d-final/debug/deps/load_shed_overloaded-99a8757ac5a29763)",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/per_tenant_concurrency_limit.rs (/home/connor/chio-security-target-6d-final/debug/deps/per_tenant_concurrency_limit-a910d4884f70cda8)",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/tonic_integration.rs (/home/connor/chio-security-target-6d-final/debug/deps/tonic_integration-bed070f2dd01923a)",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_transaction_passport-da504272dbac9397)",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/claim_set_digest.rs (/home/connor/chio-security-target-6d-final/debug/deps/claim_set_digest-e54d449cbb816b9f)",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/cognition_market.rs (/home/connor/chio-security-target-6d-final/debug/deps/cognition_market-d33fd6e92c0ce3d7)",
+      "status": "ok",
+      "passed": 68,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/original_input.rs (/home/connor/chio-security-target-6d-final/debug/deps/original_input-4b54b0691707b7ae)",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/transaction_passport.rs (/home/connor/chio-security-target-6d-final/debug/deps/transaction_passport-73b40ef379526fb5)",
+      "status": "ok",
+      "passed": 96,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Running tests/trust_market_context.rs (/home/connor/chio-security-target-6d-final/debug/deps/trust_market_context-791e3fbce5c3fd9b)",
+      "status": "ok",
+      "passed": 51,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_agent_web_interop",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_api_protect",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_commerce_order",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_finding_hosted_edge",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_finding_market_port",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_finding_market_store_postgres",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_finding_worker",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_http_core",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_risk_comptroller",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_tower",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_transaction_passport",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "platform-tests-final.log",
+      "target": "Doc-tests chio_trust_market_context",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "enterprise-final.log",
+      "target": "Running tests/enterprise_export.rs (/home/connor/chio-security-target-6d-final/debug/deps/enterprise_export-d3508ec5b90a8d46)",
+      "status": "ok",
+      "passed": 63,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "enterprise-final.log",
+      "target": "Doc-tests chio_enterprise_export",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "postgres-final.log",
+      "target": "Running tests/postgres_store.rs (/home/connor/chio-security-target-6d-final/debug/deps/postgres_store-510e627a23e49a20)",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "log": "custody-final.log",
+      "target": "Running unittests src/lib.rs (/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-795fed837997b456)",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 1183
+    }
+  ]
+}

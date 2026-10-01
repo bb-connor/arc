@@ -70,6 +70,15 @@ pub struct EnterpriseVerifierSections {
 pub fn verify_enterprise_export(
     bundle: &EnterpriseExportBundle,
 ) -> Result<EnterpriseVerifierReport, TransactionPassportError> {
+    chio_transaction_passport::validate_evidence_budget(
+        [
+            bundle.evidence_graph_bytes.as_slice(),
+            bundle.verifier_policy_bytes.as_slice(),
+        ]
+        .into_iter()
+        .chain(bundle.root_evidence_graph_bytes.as_deref())
+        .chain(bundle.artifacts.values().map(Vec::as_slice)),
+    )?;
     let signed_evidence_graph_bytes = bundle
         .root_evidence_graph_bytes
         .as_deref()

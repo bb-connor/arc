@@ -15,7 +15,7 @@ name = "chio_http_core"
 chio-security-types = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 chrono = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }

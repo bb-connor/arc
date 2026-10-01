@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 mod error;
 mod ids;
+mod input;
 mod mandate;
 mod payment;
 mod provider;
@@ -50,6 +51,7 @@ const RISK_COMPTROLLER_REPORT_SCHEMA_ID: &str = "chio.risk.comptroller-report.v1
 pub fn verify_commerce_order(
     bundle: &CommerceOrderVerificationBundle,
 ) -> Result<CommerceOrderPassportReport, CommerceOrderError> {
+    input::validate_budget(bundle)?;
     bundle.order_context.validate_shape()?;
     verify_quote_digest(&bundle.order_context)?;
     verify_digest(
@@ -350,13 +352,7 @@ fn verify_coverage_requirement(
         trusted_risk_comptroller_signer_keys,
     )
     .map_err(|error| CommerceOrderError::CoverageFailed(error.to_string()))?;
-    let report: CommerceCoverageDecisionReport =
-        serde_json::from_value(report_value).map_err(|error| {
-            CommerceOrderError::InvalidArtifact {
-                field: "risk comptroller report",
-                message: error.to_string(),
-            }
-        })?;
+    let report: CommerceCoverageDecisionReport = crate::input::project(report_value)?;
     validate_coverage_decision_report(context, requirement, &report)?;
     Ok(true)
 }
@@ -471,13 +467,10 @@ fn canonical_order_context_sha256(
 }
 
 fn parse_json<T: for<'de> serde::Deserialize<'de>>(
-    field: &'static str,
+    _field: &'static str,
     bytes: &[u8],
 ) -> Result<T, CommerceOrderError> {
-    serde_json::from_slice(bytes).map_err(|error| CommerceOrderError::InvalidArtifact {
-        field,
-        message: error.to_string(),
-    })
+    crate::input::decode(bytes)
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

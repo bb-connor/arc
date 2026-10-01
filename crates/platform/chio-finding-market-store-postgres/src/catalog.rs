@@ -260,14 +260,12 @@ impl PostgresFindingMarketStore {
             let finding_id = match event_kind {
                 HostedMarketDomainEventKind::RetractionVoluntary => {
                     let artifact: SignedFindingVoluntaryRetraction =
-                        serde_json::from_slice(&projection.payload_json)
-                            .map_err(|_| HostedMarketStoreError::DigestMismatch)?;
+                        crate::validation::decode_durable(&projection.payload_json)?;
                     artifact.body.finding_id
                 }
                 HostedMarketDomainEventKind::EnforcementFinalized => {
                     let artifact: SignedFindingChallengeEnforcement =
-                        serde_json::from_slice(&projection.payload_json)
-                            .map_err(|_| HostedMarketStoreError::DigestMismatch)?;
+                        crate::validation::decode_durable(&projection.payload_json)?;
                     if !artifact
                         .body
                         .effect_intents

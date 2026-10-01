@@ -117,8 +117,8 @@ fn map_outcome(outcome: HostedJobWriteOutcome) -> HostedMarketBackendOutcome {
 fn http_projection(
     projection: HostedMarketDomainProjection,
 ) -> Result<HostedHttpProjection, HostedMarketBackendError> {
-    let payload = serde_json::from_slice(&projection.payload_json)
-        .map_err(|_| HostedMarketBackendError::Integrity)?;
+    let payload =
+        crate::validation::decode_durable(&projection.payload_json).map_err(map_store_error)?;
     Ok(HostedHttpProjection {
         event_kind: projection.event_kind.event_kind().to_owned(),
         aggregate_kind: projection.event_kind.aggregate_kind().label().to_owned(),
@@ -136,6 +136,12 @@ fn http_projection(
 
 fn map_store_error(error: HostedMarketStoreError) -> HostedMarketBackendError {
     match error {
+        HostedMarketStoreError::InvalidInput(source) => {
+            HostedMarketBackendError::InvalidInput(source)
+        }
+        HostedMarketStoreError::CorruptInput(source) => {
+            HostedMarketBackendError::CorruptInput(source)
+        }
         HostedMarketStoreError::Invalid(_)
         | HostedMarketStoreError::Tenant
         | HostedMarketStoreError::TenantNotFound

@@ -1,0 +1,66 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on artifact directory
+   Compiling sha2 v0.10.9
+   Compiling idna v1.1.0
+   Compiling parking_lot_core v0.9.12
+   Compiling ring v0.17.14
+   Compiling parking_lot v0.12.5
+   Compiling url v2.5.8
+   Compiling chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+   Compiling ed25519-dalek v2.2.0
+   Compiling tokio v1.50.0
+   Compiling rustls-webpki v0.103.15
+   Compiling rand_chacha v0.3.1
+   Compiling rustls v0.23.45
+   Compiling futures-intrusive v0.5.0
+   Compiling futures-util v0.3.32
+   Compiling aho-corasick v1.1.4
+   Compiling tokio-stream v0.1.18
+   Compiling regex-automata v0.4.14
+   Compiling sqlx-core v0.8.6
+   Compiling rand v0.8.6
+   Compiling rs_merkle v1.5.0
+   Compiling futures-channel v0.3.32
+   Compiling atoi v2.0.0
+   Compiling bitflags v2.11.0
+   Compiling fluent-uri v0.4.1
+   Compiling chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+   Compiling sqlx-postgres v0.8.6
+   Compiling ahash v0.8.12
+   Compiling referencing v0.46.0
+   Compiling regex v1.12.3
+   Compiling fancy-regex v0.17.0
+   Compiling email_address v0.2.9
+   Compiling jsonschema v0.46.0
+   Compiling sqlx v0.8.6
+   Compiling chio-finding-market-migrations v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-migrations)
+   Compiling chio-spec-validate v0.1.0 (/tmp/arc-security-launch/crates/tooling/chio-spec-validate)
+   Compiling chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+   Compiling chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+   Compiling chio-finding-market-port v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-port)
+   Compiling chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+   Compiling chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+   Compiling chio-finding-market-store-postgres v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-store-postgres)
+    Finished `test` profile [unoptimized] target(s) in 3m 27s
+     Running tests/postgres_store.rs (/home/connor/chio-security-target-6d-final/debug/deps/postgres_store-510e627a23e49a20)
+
+running 1 test
+test tenant_isolation_exact_replay_and_lease_recovery ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.72s
+

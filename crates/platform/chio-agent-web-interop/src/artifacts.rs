@@ -470,12 +470,7 @@ pub(super) fn validate_external_subject(
     if actual_digest != envelope.external_subject_digest {
         return Err(claim_failed("external subject digest mismatch"));
     }
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidAgentWebArtifact {
-            path: envelope.external_subject_path.clone(),
-            message: error.to_string(),
-        }
-    })?;
+    let value: serde_json::Value = chio_transaction_passport::decode_evidence_json(bytes)?;
     let subject_id = value
         .get("id")
         .and_then(serde_json::Value::as_str)

@@ -389,6 +389,8 @@ fn valid_bounded_identifier(value: &str, maximum: usize) -> bool {
 
 fn map_store(error: HostedMarketPortError) -> HostedEdgeError {
     match error {
+        HostedMarketPortError::InvalidInput(source)
+        | HostedMarketPortError::CorruptInput(source) => HostedEdgeError::InvalidInput(source),
         HostedMarketPortError::Capacity => HostedEdgeError::CapacityUnavailable,
         HostedMarketPortError::Unavailable => HostedEdgeError::DependencyUnavailable,
         _ => HostedEdgeError::InvalidRequest,

@@ -15,9 +15,7 @@ pub(super) struct EnterpriseVerifierPolicy {
 pub(super) fn parse_policy(
     bytes: &[u8],
 ) -> Result<EnterpriseVerifierPolicy, TransactionPassportError> {
-    let policy: EnterpriseVerifierPolicy = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidVerifierPolicyArtifact(error.to_string())
-    })?;
+    let policy: EnterpriseVerifierPolicy = chio_transaction_passport::decode_evidence_json(bytes)?;
     if policy.schema != TRANSACTION_VERIFIER_POLICY_SCHEMA_ID {
         return Err(TransactionPassportError::UnsupportedVerifierPolicySchema(
             policy.schema,

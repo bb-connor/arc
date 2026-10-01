@@ -1,0 +1,17 @@
+{
+  "command": [
+    "rustfmt",
+    "--edition",
+    "2021",
+    "--check",
+    "crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.05,
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/connor/chio-security-target-6d-final",
+    "CARGO_INCREMENTAL": "0",
+    "CHIO_CHECKOUT_ROOT": "/tmp/arc-security-launch",
+    "CARGO_BUILD_JOBS": "4"
+  }
+}

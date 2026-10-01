@@ -3801,6 +3801,7 @@ dependencies = [
  "chio-finding-market-port",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-security-types",
  "chio-spec-validate",
  "chio-test-support",
  "hex",
@@ -3933,6 +3934,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-finding-market-store-postgres",
+ "chio-security-types",
  "futures-util",
  "libc",
  "nix",
@@ -5360,6 +5362,7 @@ dependencies = [
  "chio-http-core",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-security-types",
  "chio-store-sqlite",
  "chrono",
  "hex",

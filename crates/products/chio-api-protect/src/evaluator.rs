@@ -507,6 +507,7 @@ impl From<HttpAuthorityEvaluation> for EvaluationResult {
 impl From<HttpAuthorityError> for crate::error::ProtectError {
     fn from(value: HttpAuthorityError) -> Self {
         match value {
+            HttpAuthorityError::Clock(source) => Self::Clock(source),
             HttpAuthorityError::CallerIdentity(message)
             | HttpAuthorityError::ContentHash(message)
             | HttpAuthorityError::Kernel(message) => Self::Evaluation(message),

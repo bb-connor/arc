@@ -810,16 +810,6 @@ fn transaction_passport_rejects_unsafe_artifact_paths() {
 }
 
 #[test]
-fn transaction_passport_rejects_invalid_evidence_graph_artifact() {
-    let evidence_graph_bytes = b"not-json";
-    let error = passport_error_for_evidence_graph(evidence_graph_bytes);
-
-    assert!(error
-        .to_string()
-        .contains("invalid evidence graph artifact"));
-}
-
-#[test]
 fn transaction_passport_rejects_duplicate_evidence_graph_node_ids() {
     let evidence_graph_bytes = br#"{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-duplicate-node","issued_at":"2026-06-10T00:00:00Z","nodes":[{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.transaction.verifier-policy.v1","path":"verifier-policy.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"verifier-policy"},{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.receipt.v1","path":"receipt.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"receipt"}],"edges":[]}"#;
 
@@ -1949,42 +1939,6 @@ fn runtime_receipt_totality_rejects_graph_receipt_without_artifact() {
 }
 
 #[test]
-fn runtime_receipt_totality_rejects_unsigned_terminal_receipt() {
-    let mut bundle = load_runtime_security_fixture("valid-side-effecting-call");
-    update_runtime_policy_required_claims(
-        &mut bundle,
-        vec!["claim.runtime.receipt_totality_complete"],
-    );
-    let policy_digest = bundle.passport.verifier_policy_sha256.clone();
-    update_runtime_artifact(&mut bundle, "allow-receipt.json", |receipt| {
-        receipt["policy_digest"] = Value::String(policy_digest);
-        receipt["terminal_status"] = Value::String("denied_guard_request".to_string());
-        receipt
-            .as_object_mut()
-            .test_expect("terminal receipt is object")
-            .remove("execution_lease_ref");
-        receipt
-            .as_object_mut()
-            .test_expect("terminal receipt is object")
-            .remove("kernel_key");
-        receipt
-            .as_object_mut()
-            .test_expect("terminal receipt is object")
-            .remove("signature");
-    });
-
-    let error = verify_runtime_security_fixture(&bundle)
-        .test_expect_err("unsigned terminal receipt must fail closed");
-    let error = error.to_string();
-
-    assert!(
-        error.contains("terminal receipt kernel_key must not be empty")
-            || error.contains("missing field `kernel_key`"),
-        "{error}"
-    );
-}
-
-#[test]
 fn runtime_security_rejects_advisory_authorization_by_node_role() {
     let mut bundle = load_runtime_security_fixture("advisory-used-as-authorization");
     let advisory_bytes = serde_json::to_vec(&json!({
@@ -2630,11 +2584,9 @@ fn standalone_minimal_passport_rejects_v2_anchor_without_checkpoint_statement() 
             .test_expect_err("a v2 inclusion proof without its signed anchor must deny");
 
     assert!(
-        error
-            .to_string()
-            .contains("v2 inclusion proof envelope is invalid"),
-        "{error}"
+        matches!(&error, chio_transaction_passport::TransactionPassportError::Input(source) if source.code() == "urn:chio:error:attest:signed-json-invalid-shape")
     );
+    assert!(std::error::Error::source(&error).is_some());
 }
 
 #[test]
@@ -2652,11 +2604,9 @@ fn standalone_minimal_passport_requires_the_complete_v2_inclusion_envelope() {
             verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
                 .test_expect_err("an incomplete v2 envelope must deny");
         assert!(
-            error
-                .to_string()
-                .contains("v2 inclusion proof envelope is invalid"),
-            "missing {field}: {error}"
+            matches!(&error, chio_transaction_passport::TransactionPassportError::Input(source) if source.code() == "urn:chio:error:attest:signed-json-invalid-shape")
         );
+        assert!(std::error::Error::source(&error).is_some());
     }
 }
 
@@ -2670,10 +2620,12 @@ fn standalone_minimal_passport_rejects_unknown_v2_inclusion_envelope_fields() {
     let error =
         verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
             .test_expect_err("a field-smuggled v2 envelope must deny");
-    assert!(
-        error.to_string().contains("unknown field `smuggled`"),
-        "{error}"
-    );
+    assert!(matches!(
+        &error,
+        chio_transaction_passport::TransactionPassportError::Input(_)
+    ));
+    assert!(std::error::Error::source(&error).is_some());
+    assert!(!error.to_string().contains("smuggled"));
 }
 
 #[test]
@@ -2787,3 +2739,6 @@ fn standalone_minimal_passport_rejects_checkpoint_keys_shared_with_passport_root
 
 #[path = "transaction_passport/transparency_anchor_edge_tests.rs"]
 mod transparency_anchor_edge_tests;
+
+#[path = "transaction_passport/original_boundary_tests.rs"]
+mod original_boundary_tests;

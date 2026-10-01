@@ -1,10 +1,11 @@
+use chio_security_types::clock::{Clock, ClockError, ClockFence, SystemClock};
 use std::collections::BTreeSet;
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 #[cfg(test)]
 use axum::body::to_bytes;
@@ -18,7 +19,7 @@ use axum::{Json, Router};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use chio_core_types::crypto::PublicKey;
-use chio_core_types::{canonical_json_bytes, canonical_json_bytes_from_str, sha256_hex};
+use chio_core_types::{canonical_json_bytes, sha256_hex};
 use chio_finding_market_port::{
     HostedDomainMutation, HostedHttpProjection, HostedMarketBackend, HostedMarketBackendError,
     HostedMarketBackendOutcome, HOSTED_AUTHENTICATED_DELIVERY_SCHEMA,
@@ -131,6 +132,8 @@ impl HostedHttpServerConfig {
 /// backend, and the trusted proxy.
 #[derive(Clone)]
 pub struct HostedHttpServerState {
+    clock: Arc<dyn Clock>,
+    clock_fence: Arc<std::sync::Mutex<ClockFence>>,
     config: HostedHttpServerConfig,
     authenticator: Arc<HostedAuthenticator>,
     backend: Arc<dyn HostedMarketBackend>,
@@ -150,12 +153,30 @@ impl HostedHttpServerState {
     ) -> Result<Self, HostedEdgeError> {
         config.validate()?;
         Ok(Self {
+            clock: Arc::new(SystemClock),
+            clock_fence: Arc::new(std::sync::Mutex::new(ClockFence::default())),
             config,
             authenticator,
             backend,
             trusted_proxy,
             metrics,
         })
+    }
+
+    /// Install the authority clock before serving requests. Clones share its fence.
+    #[must_use]
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self.clock_fence = Arc::new(std::sync::Mutex::new(ClockFence::default()));
+        self
+    }
+
+    fn unix_now(&self) -> Result<u64, HostedEdgeError> {
+        let mut fence = self
+            .clock_fence
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        Ok(fence.observe(self.clock.read()?)?.unix_millis().as_secs())
     }
 }
 
@@ -615,7 +636,7 @@ async fn release_identity(
 ) -> Response {
     let request_id = single_header(&headers, REQUEST_ID_HEADER).unwrap_or("invalid-request-id");
     let result = async {
-        let now = unix_now()?;
+        let now = state.unix_now()?;
         authenticate(
             &state,
             &headers,
@@ -655,10 +676,10 @@ async fn publish_inner(
     let request_id = single_header(&headers, REQUEST_ID_HEADER).unwrap_or("invalid-request-id");
     let result = async {
         let canonical_body = strict_canonical_body(&body)?;
-        let finding: chio_finding::Finding =
-            serde_json::from_slice(&canonical_body).map_err(|_| HostedEdgeError::InvalidRequest)?;
+        let finding: chio_finding::Finding = crate::input::decode(&canonical_body, MAX_BODY_BYTES)
+            .map_err(HostedEdgeError::InvalidInput)?;
         chio_finding::verify_finding(&finding).map_err(|_| HostedEdgeError::InvalidRequest)?;
-        let received_at = unix_now()?;
+        let received_at = state.unix_now()?;
         let operation = PUBLISH_OPERATION;
         let event_id = required_header(&headers, IDEMPOTENCY_KEY_HEADER)?.to_owned();
         let principal = authenticate(
@@ -688,8 +709,8 @@ async fn publish_inner(
             Some(event_id.clone()),
             received_at,
         )?;
-        let payload =
-            serde_json::from_slice(&canonical_body).map_err(|_| HostedEdgeError::InvalidRequest)?;
+        let payload = crate::input::decode(&canonical_body, MAX_BODY_BYTES)
+            .map_err(HostedEdgeError::InvalidInput)?;
         let mutation = HostedDomainMutation {
             aggregate_id: finding.finding_id.clone(),
             event_id,
@@ -747,8 +768,8 @@ async fn mutate_inner(
     let result = async {
         let operation = operation.ok_or(HostedEdgeError::InvalidRequest)?;
         let canonical_body = strict_canonical_body(&body)?;
-        let mutation: HostedDomainMutation =
-            serde_json::from_slice(&canonical_body).map_err(|_| HostedEdgeError::InvalidRequest)?;
+        let mutation: HostedDomainMutation = crate::input::decode(&canonical_body, MAX_BODY_BYTES)
+            .map_err(HostedEdgeError::InvalidInput)?;
         if mutation
             .payload
             .get("schema")
@@ -757,7 +778,7 @@ async fn mutate_inner(
         {
             return Err(HostedEdgeError::InvalidRequest);
         }
-        let received_at = unix_now()?;
+        let received_at = state.unix_now()?;
         let idempotency_key = required_header(&headers, IDEMPOTENCY_KEY_HEADER)?.to_owned();
         let principal = authenticate(
             &state,
@@ -833,7 +854,7 @@ async fn get_finding(
     let request_id = single_header(&headers, REQUEST_ID_HEADER).unwrap_or("invalid-request-id");
     let result = async {
         let binding = tenant_binding(&headers)?;
-        let requested_at = unix_now()?;
+        let requested_at = state.unix_now()?;
         authenticate(
             &state,
             &headers,
@@ -881,7 +902,7 @@ async fn list_findings(
     let result = async {
         let binding = tenant_binding(&headers)?;
         let query = parse_finding_query(uri.query())?;
-        let requested_at = unix_now()?;
+        let requested_at = state.unix_now()?;
         authenticate(
             &state,
             &headers,
@@ -1044,7 +1065,7 @@ fn live_finding_payload(
         return Err(HostedEdgeError::IntegrityFailure);
     }
     let finding: chio_finding::Finding =
-        serde_json::from_slice(&canonical).map_err(|_| HostedEdgeError::IntegrityFailure)?;
+        crate::input::decode(&canonical, MAX_BODY_BYTES).map_err(HostedEdgeError::CorruptInput)?;
     chio_finding::verify_finding(&finding).map_err(|_| HostedEdgeError::IntegrityFailure)?;
     if finding.finding_id != projection.aggregate_id || finding.issued_at > now_unix_secs {
         return Err(HostedEdgeError::IntegrityFailure);
@@ -1082,16 +1103,7 @@ fn decode_canonical_credential<T: serde::de::DeserializeOwned + Serialize>(
     let bytes = URL_SAFE_NO_PAD
         .decode(encoded)
         .map_err(|_| HostedEdgeError::AuthenticationFailed)?;
-    if bytes.is_empty() || bytes.len() > MAX_CREDENTIAL_BYTES {
-        return Err(HostedEdgeError::AuthenticationFailed);
-    }
-    let text = std::str::from_utf8(&bytes).map_err(|_| HostedEdgeError::AuthenticationFailed)?;
-    let canonical =
-        canonical_json_bytes_from_str(text).map_err(|_| HostedEdgeError::AuthenticationFailed)?;
-    if canonical != bytes {
-        return Err(HostedEdgeError::AuthenticationFailed);
-    }
-    serde_json::from_slice(&canonical).map_err(|_| HostedEdgeError::AuthenticationFailed)
+    crate::input::decode(&bytes, MAX_CREDENTIAL_BYTES).map_err(HostedEdgeError::InvalidCredential)
 }
 
 fn tenant_binding(headers: &HeaderMap) -> Result<HostedTenantBinding, HostedEdgeError> {
@@ -1099,16 +1111,7 @@ fn tenant_binding(headers: &HeaderMap) -> Result<HostedTenantBinding, HostedEdge
 }
 
 fn strict_canonical_body(body: &[u8]) -> Result<Vec<u8>, HostedEdgeError> {
-    if body.is_empty() || body.len() > MAX_BODY_BYTES {
-        return Err(HostedEdgeError::InvalidRequest);
-    }
-    let text = std::str::from_utf8(body).map_err(|_| HostedEdgeError::InvalidRequest)?;
-    let canonical =
-        canonical_json_bytes_from_str(text).map_err(|_| HostedEdgeError::InvalidRequest)?;
-    if canonical != body {
-        return Err(HostedEdgeError::InvalidRequest);
-    }
-    Ok(canonical)
+    crate::input::canonical(body, MAX_BODY_BYTES).map_err(HostedEdgeError::InvalidInput)
 }
 
 fn canonical_target(base: &str, uri: &axum::http::Uri) -> Result<String, HostedEdgeError> {
@@ -1132,15 +1135,10 @@ fn single_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     Some(value)
 }
 
-fn unix_now() -> Result<u64, HostedEdgeError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .map_err(|_| HostedEdgeError::DependencyUnavailable)
-}
-
 fn map_backend(error: HostedMarketBackendError) -> HostedEdgeError {
     match error {
+        HostedMarketBackendError::InvalidInput(source) => HostedEdgeError::InvalidInput(source),
+        HostedMarketBackendError::CorruptInput(source) => HostedEdgeError::CorruptInput(source),
         HostedMarketBackendError::Invalid => HostedEdgeError::InvalidRequest,
         HostedMarketBackendError::NotFound => HostedEdgeError::NotFound,
         HostedMarketBackendError::Conflict => HostedEdgeError::Conflict,
@@ -1165,6 +1163,7 @@ mod tests {
         HostedCapabilityAdmissionOutcome, HostedHttpPage, HostedMarketPortError, HostedPrincipal,
         HostedTenantId,
     };
+    use chio_test_support::prelude::*;
     use tower::ServiceExt as _;
 
     use super::*;
@@ -1260,6 +1259,52 @@ mod tests {
         ) -> Result<BTreeSet<String>, HostedMarketBackendError> {
             Err(HostedMarketBackendError::Unavailable)
         }
+    }
+
+    #[test]
+    fn original_hosted_input_preserves_safe_classification_and_native_cause() {
+        let error = strict_canonical_body(br#"{"private-marker":1,"private-marker":2}"#)
+            .test_expect_err("duplicate original must reject");
+        assert!(matches!(&error, HostedEdgeError::InvalidInput(_)));
+        assert!(std::error::Error::source(&error).is_some());
+        assert_eq!(error.body("request").code, "invalid_request");
+        assert!(!format!("{error:?} {error}").contains("private-marker"));
+        let encoded = URL_SAFE_NO_PAD.encode(br#"{"private-marker":1,"private-marker":2}"#);
+        let error = decode_canonical_credential::<serde_json::Value>(&encoded)
+            .test_expect_err("ambiguous credential must reject");
+        assert!(matches!(&error, HostedEdgeError::InvalidCredential(_)));
+        assert_eq!(error.http_status(), 401);
+        assert!(std::error::Error::source(&error).is_some());
+        assert_eq!(
+            strict_canonical_body(b"{}").test_expect("canonical control"),
+            b"{}"
+        );
+    }
+
+    #[test]
+    fn hosted_authority_clock_rejects_regression_across_clones() {
+        struct TestClock(std::sync::atomic::AtomicU64);
+        impl Clock for TestClock {
+            fn read(&self) -> Result<chio_security_types::clock::ClockReading, ClockError> {
+                Ok(chio_security_types::clock::ClockReading::new(
+                    chio_security_types::clock::UnixMillis::new(
+                        self.0.load(std::sync::atomic::Ordering::SeqCst),
+                    ),
+                    chio_security_types::clock::MonotonicInstant::from_nanos(1),
+                ))
+            }
+        }
+        let clock = Arc::new(TestClock(std::sync::atomic::AtomicU64::new(100_000)));
+        let state = server_state()
+            .test_expect("server state builds")
+            .with_clock(clock.clone());
+        assert_eq!(state.unix_now(), Ok(100));
+        let cloned = state.clone();
+        clock.0.store(99_000, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(
+            cloned.unix_now(),
+            Err(HostedEdgeError::Clock(ClockError::WallClockRegression))
+        );
     }
 
     fn server_state() -> Result<HostedHttpServerState, HostedEdgeError> {

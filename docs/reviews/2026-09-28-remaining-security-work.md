@@ -3,7 +3,7 @@
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
-Updated through the September 30 guard and security reader batch. Each batch has its own
+Updated through the October 1 platform authority reader batch. Each batch has its own
 implementation and verification record below; this queue does not establish
 hosted or release qualification.
 
@@ -11,7 +11,7 @@ hosted or release qualification.
 
 | Work | Current recorded scope | Interpretation |
 | --- | --- | --- |
-| Decoder classification | 98 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers, the remaining 29 CLI readers, all 28 remaining protocol readers, all 35 pinned trust readers, all 33 guard/security readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
+| Decoder classification | 67 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers, the remaining 29 CLI readers, all 28 remaining protocol readers, all 35 pinned trust readers, all 33 guard/security readers, all 31 pinned platform readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
 | Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
 | Negative assertions | Baseline contains 1,257 assertions at 1,175 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
@@ -157,13 +157,24 @@ and bounded-vector/path allocation. Existing canonical and authenticated readers
 remain explicit retained contracts. Unsigned embedding documents accept ordinary
 float spellings without weakening signed JSON numeric rules.
 
-Next execute the 31 platform readers pinned in that batch's `next-readers.json`:
-HTTP authority and transaction passports; hosted finding workers/ingress and
-PostgreSQL catalog/checkpoint/replication; commerce orders, enterprise exports,
-web interoperability and trust-market context. There are 98 baseline files across
-the workspace, with zero guard, security, trust, protocol or CLI baseline files.
-These lexical counts describe semantic review debt, not known vulnerabilities.
-Broader clock/deadline/accounting and negative-control work remains owner-specific.
+The [platform authority reader batch](2026-10-01-platform-authority-readers-execution.md)
+disposes all 31 pinned readers: HTTP authority and transaction passports; hosted
+finding ingress, workers and PostgreSQL durable state; commerce, enterprise
+exports, web interoperability and trust-market context. Original documents are
+bounded before projection, evidence collections before hashing/traversal, and
+worker results before output delivery. Native integer and unsigned argument
+contracts remain distinct; auxiliary reader errors retain their causes. Shared
+fenced clocks govern HTTP authority, hosted route time and worker completion.
+The execution record identifies the terminal local qualification and its limits.
+
+Next execute all 22 economy readers pinned in that batch's `next-readers.json`:
+credit credentials/obligations/factors, fiscal readiness/continuity, settlement
+configuration/replay/enforcement, market purchases/recovery/predicates and
+anchor/Chainlink evidence. There are 67 baseline files across the workspace,
+with zero guard, security, trust, protocol or CLI baseline files. The other
+45 readers remain queued after this economy batch. These lexical counts describe
+semantic review debt, not known vulnerabilities. Broader clock/deadline/accounting
+and negative-control work remains owner-specific.
 
 Broader semantic error taxonomy, other product/protocol readers, and the
 remaining structural/declaration/assurance queues below remain open.

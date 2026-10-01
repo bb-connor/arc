@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "chio-transaction-passport",
+    "--test",
+    "original_input"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 125.46,
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/connor/chio-security-target-6d-final",
+    "CARGO_INCREMENTAL": "0",
+    "CHIO_CHECKOUT_ROOT": "/tmp/arc-security-launch",
+    "CARGO_BUILD_JOBS": "2"
+  }
+}

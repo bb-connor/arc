@@ -179,12 +179,11 @@ impl PostgresFindingMarketStore {
             let envelope_json: Vec<u8> = row.try_get(1).map_err(unavailable)?;
             validate_digest(&checkpoint_sha256, "durable aggregate checkpoint")
                 .map_err(|_| HostedMarketStoreError::DigestMismatch)?;
+            let checkpoint: SignedHostedAggregateCheckpoint =
+                crate::validation::decode_native_durable(&envelope_json)?;
             if sha256_hex(&envelope_json) != checkpoint_sha256 {
                 return Err(HostedMarketStoreError::DigestMismatch);
             }
-            let checkpoint: SignedHostedAggregateCheckpoint =
-                serde_json::from_slice(&envelope_json)
-                    .map_err(|_| HostedMarketStoreError::DigestMismatch)?;
             if canonical_json_bytes(&checkpoint).ok().as_deref() != Some(envelope_json.as_slice())
                 || checkpoint.body.aggregate_kind != aggregate_kind
                 || checkpoint.body.aggregate_id != aggregate_id

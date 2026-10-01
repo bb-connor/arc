@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use chio_risk_comptroller::{
-    validate_risk_evidence_refs,
+    try_validate_risk_evidence_refs,
     validate_risk_portfolio_reports as validate_comptroller_portfolio_reports,
     validate_risk_report as validate_comptroller_report, RiskEvidenceRefKind,
 };
@@ -146,7 +146,7 @@ pub(super) fn validate_risk_report(
     graph: &EnterpriseEvidenceGraph,
 ) -> Result<(), TransactionPassportError> {
     validate_comptroller_report(passport, report)?;
-    validate_risk_evidence_refs(report, |evidence_ref, kind| {
+    try_validate_risk_evidence_refs(report, |evidence_ref, kind| {
         graph_contains_risk_evidence_kind(bundle, graph, evidence_ref, kind)
     })
 }
@@ -422,8 +422,8 @@ pub(super) fn validate_telemetry_projection(
             let receipt_bytes = bundle.artifacts.get(receipt_ref).ok_or_else(|| {
                 TransactionPassportError::MissingEnterpriseArtifact(receipt_ref.to_string())
             })?;
-            let receipt: ChioReceipt = serde_json::from_slice(receipt_bytes)
-                .map_err(|_| claim_failed("telemetry receipt invalid"))?;
+            let receipt: ChioReceipt =
+                chio_transaction_passport::decode_evidence_json(receipt_bytes)?;
             let signature_valid = receipt
                 .verify_signature()
                 .map_err(|_| claim_failed("telemetry receipt signature invalid"))?;
@@ -648,14 +648,15 @@ pub(super) fn validate_control_map(
                 control.claim_ref
             )));
         }
-        let Some(gate_node) = graph
-            .nodes
-            .iter()
-            .find(|node| graph_node_ref_matches(bundle, node, &control.gate_ref))
-        else {
-            return Err(claim_failed("control gate did not run"));
-        };
-        if !graph_node_artifact_matches(bundle, gate_node) {
+        let mut gate_node = None;
+        for node in &graph.nodes {
+            if graph_node_ref_matches(bundle, node, &control.gate_ref)? {
+                gate_node = Some(node);
+                break;
+            }
+        }
+        let gate_node = gate_node.ok_or_else(|| claim_failed("control gate did not run"))?;
+        if !graph_node_artifact_matches(bundle, gate_node)? {
             return Err(claim_failed("control gate did not run"));
         }
         if !node_schema_proves_claim(&gate_node.schema, &control.claim_ref) {
@@ -757,12 +758,7 @@ fn ensure_export_role_field_points_to(
     let bytes = bundle.artifacts.get(&artifact.path).ok_or_else(|| {
         TransactionPassportError::MissingEnterpriseArtifact(artifact.path.clone())
     })?;
-    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
-        TransactionPassportError::InvalidEnterpriseArtifact {
-            path: artifact.path.clone(),
-            message: error.to_string(),
-        }
-    })?;
+    let value: serde_json::Value = chio_transaction_passport::decode_evidence_json(bytes)?;
     let actual_value = value
         .get(field)
         .and_then(serde_json::Value::as_str)
@@ -816,60 +812,52 @@ fn graph_contains_risk_evidence_kind(
     graph: &EnterpriseEvidenceGraph,
     evidence_ref: &str,
     kind: RiskEvidenceRefKind,
-) -> bool {
-    graph.nodes.iter().any(|node| {
-        graph_node_ref_matches(bundle, node, evidence_ref)
-            && risk_evidence_schema_matches_kind(&node.schema, kind)
-            && graph_node_artifact_matches(bundle, node)
-    })
+) -> Result<bool, TransactionPassportError> {
+    for node in &graph.nodes {
+        if risk_evidence_schema_matches_kind(&node.schema, kind)
+            && graph_node_ref_matches(bundle, node, evidence_ref)?
+            && graph_node_artifact_matches(bundle, node)?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn graph_node_ref_matches(
     bundle: &EnterpriseExportBundle,
     node: &super::evidence::EnterpriseEvidenceNode,
     evidence_ref: &str,
-) -> bool {
-    node.id == evidence_ref
+) -> Result<bool, TransactionPassportError> {
+    if node.id == evidence_ref
         || node.sha256 == evidence_ref
         || node.path == evidence_ref
         || Path::new(&node.path)
             .file_stem()
             .and_then(|stem| stem.to_str())
             == Some(evidence_ref)
-        || graph_node_artifact_id_matches(bundle, node, evidence_ref)
-}
-
-fn graph_node_artifact_id_matches(
-    bundle: &EnterpriseExportBundle,
-    node: &super::evidence::EnterpriseEvidenceNode,
-    evidence_ref: &str,
-) -> bool {
+    {
+        return Ok(true);
+    }
     let Some(bytes) = bundle.artifacts.get(&node.path) else {
-        return false;
+        return Ok(false);
     };
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else {
-        return false;
-    };
-    value
-        .get("id")
-        .and_then(serde_json::Value::as_str)
-        .is_some_and(|id| id == evidence_ref)
+    let value = chio_transaction_passport::decode_evidence_json::<serde_json::Value>(bytes)?;
+    Ok(value.get("id").and_then(serde_json::Value::as_str) == Some(evidence_ref))
 }
 
 fn graph_node_artifact_matches(
     bundle: &EnterpriseExportBundle,
     node: &super::evidence::EnterpriseEvidenceNode,
-) -> bool {
+) -> Result<bool, TransactionPassportError> {
     let Some(bytes) = bundle.artifacts.get(&node.path) else {
-        return false;
+        return Ok(false);
     };
     if chio_core_types::sha256_hex(bytes) != node.sha256 {
-        return false;
+        return Ok(false);
     }
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else {
-        return false;
-    };
-    value.get("schema").and_then(serde_json::Value::as_str) == Some(node.schema.as_str())
+    let value = chio_transaction_passport::decode_evidence_json::<serde_json::Value>(bytes)?;
+    Ok(value.get("schema").and_then(serde_json::Value::as_str) == Some(node.schema.as_str()))
 }
 
 fn risk_evidence_schema_matches_kind(schema: &str, kind: RiskEvidenceRefKind) -> bool {

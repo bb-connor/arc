@@ -64,7 +64,10 @@ pub fn read_private_signing_custody(
     let mut bytes = zeroize::Zeroizing::new(vec![0; capacity]);
     let mut filled = 0;
     while filled < bytes.len() {
-        match file.read(&mut bytes[filled..]) {
+        let remaining = bytes
+            .get_mut(filled..)
+            .ok_or_else(|| CliError::cli_io_error("signing custody read exceeds its byte limit"))?;
+        match file.read(remaining) {
             Ok(0) => break,
             Ok(count) => filled += count,
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,

@@ -1,0 +1,148 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/arc-security-launch/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/arc-security-launch/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/arc-security-launch/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/arc-security-launch/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/arc-security-launch/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/arc-security-launch/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/arc-security-launch/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Checking smallvec v1.15.1
+    Checking sha2 v0.10.9
+    Checking aes v0.8.4
+    Checking signature v2.2.0
+    Checking curve25519-dalek v4.1.3
+    Checking icu_normalizer v2.1.1
+    Checking scrypt v0.11.0
+    Checking chio-security-types v0.1.0 (/tmp/arc-security-launch/crates/security/chio-security-types)
+    Checking pkcs5 v0.7.1
+    Checking idna_adapter v1.2.1
+    Checking pkcs8 v0.10.2
+    Checking idna v1.1.0
+    Checking parking_lot_core v0.9.12
+    Checking ed25519 v2.2.3
+    Checking url v2.5.8
+    Checking parking_lot v0.12.5
+    Checking ed25519-dalek v2.2.0
+    Checking tokio v1.50.0
+    Checking rustls-webpki v0.103.15
+    Checking rs_merkle v1.5.0
+    Checking sha3 v0.10.8
+    Checking rustls v0.23.45
+    Checking frost-core v3.0.0
+    Checking alloy-primitives v1.5.7
+    Checking frost-rerandomized v3.0.0
+    Checking frost-ed25519 v3.0.0
+    Checking ff v0.13.1
+    Checking group v0.13.0
+    Checking sec1 v0.7.3
+    Checking crypto-bigint v0.5.5
+    Checking rustls-platform-verifier v0.6.2
+    Checking getrandom v0.4.2
+    Checking alloy-json-abi v1.5.7
+    Checking tokio-util v0.7.18
+    Checking hyper v1.8.1
+    Checking tower v0.5.3
+    Checking tokio-rustls v0.26.4
+    Checking elliptic-curve v0.13.8
+    Checking primeorder v0.13.6
+    Checking tower-http v0.6.8
+    Checking hyper-util v0.1.20
+    Checking ecdsa v0.16.9
+    Checking getrandom v0.3.4
+    Checking num-bigint-dig v0.8.6
+    Checking pkcs1 v0.7.5
+    Checking tempfile v3.27.0
+    Checking p384 v0.13.1
+    Checking rsa v0.9.10
+    Checking hyper-rustls v0.27.7
+    Checking p256 v0.13.2
+    Checking reqwest v0.13.2
+    Checking ahash v0.8.12
+    Checking alloy-sol-types v1.5.7
+    Checking tokio-stream v0.1.18
+    Checking chio-core-types v0.1.0 (/tmp/arc-security-launch/crates/core/chio-core-types)
+    Checking oauth2 v5.0.0
+    Checking jsonwebtoken v10.4.0
+    Checking futures-intrusive v0.5.0
+    Checking sha1 v0.10.6
+    Checking openidconnect v4.0.1
+    Checking alloy-core v1.5.7
+    Checking sqlx-core v0.8.6
+    Checking referencing v0.46.0
+    Checking tough v0.22.0
+    Checking oci-client v0.17.0
+    Checking x509-cert v0.2.5
+    Checking webbrowser v1.2.2
+    Checking md-5 v0.10.6
+    Checking jsonschema v0.46.0
+    Checking sqlx-postgres v0.8.6
+    Checking sigstore v0.14.0
+    Checking ciborium v0.2.2
+    Checking alloy v1.8.3
+    Checking tracing-subscriber v0.3.23
+    Checking chio-web3-bindings v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-web3-bindings)
+    Checking coset v0.4.2
+    Checking uuid v1.22.0
+    Checking secrecy v0.10.3
+    Checking dashmap v6.1.0
+    Checking rusqlite v0.39.0
+    Checking chio-log-redact v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-log-redact)
+    Checking chio-finding-market-migrations v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-migrations)
+    Checking ureq v2.12.1
+    Checking sqlx v0.8.6
+    Checking axum v0.8.8
+    Checking nix v0.31.2
+    Checking chio-listing v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-listing)
+    Checking chio-revocation-oracle v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-revocation-oracle)
+    Checking chio-pheromone v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-pheromone)
+    Checking chio-finding v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-finding)
+    Checking chio-did v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-did)
+    Checking chio-fincred v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fincred)
+    Checking chio-egress-contract v0.1.0 (/tmp/arc-security-launch/crates/protocol/chio-egress-contract)
+    Checking chio-cage-plan v0.1.0 (/tmp/arc-security-launch/crates/security/chio-cage-plan)
+    Checking chio-finding-market-port v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-port)
+    Checking chio-fiscal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-fiscal)
+    Checking chio-governance v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-governance)
+    Checking chio-lineage v0.1.0 (/tmp/arc-security-launch/crates/observability/chio-lineage)
+    Checking chio-attest-verify v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-attest-verify)
+    Checking chio-custody-hw v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-custody-hw)
+    Checking chio-kernel-core v0.1.0 (/tmp/arc-security-launch/crates/kernel/chio-kernel-core)
+    Checking chio-open-market v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-open-market)
+    Checking chio-appraisal v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-appraisal)
+    Checking chio-weights v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-weights)
+    Checking chio-quarantine v0.1.0 (/tmp/arc-security-launch/crates/security/chio-quarantine)
+    Checking chio-underwriting v0.1.0 (/tmp/arc-security-launch/crates/economy/chio-underwriting)
+    Checking chio-federation v0.1.0 (/tmp/arc-security-launch/crates/trust/chio-federation)
+    Checking chio-finding-market-store-postgres v0.1.0 (/tmp/arc-security-launch/crates/platform/chio-finding-market-store-postgres)
+error[E0004]: non-exhaustive patterns: `HostedMarketStoreError::InvalidInput(_)` and `HostedMarketStoreError::CorruptInput(_)` not covered
+   --> crates/platform/chio-finding-market-store-postgres/src/ports.rs:132:11
+    |
+132 |     match error {
+    |           ^^^^^ patterns `HostedMarketStoreError::InvalidInput(_)` and `HostedMarketStoreError::CorruptInput(_)` not covered
+    |
+note: `HostedMarketStoreError` defined here
+   --> crates/platform/chio-finding-market-store-postgres/src/lib.rs:149:10
+    |
+149 | pub enum HostedMarketStoreError {
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+150 |     #[error("hosted market input JSON is invalid")]
+151 |     InvalidInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    |     ------------ not covered
+152 |     #[error("hosted market durable JSON is invalid")]
+153 |     CorruptInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    |     ------------ not covered
+    = note: the matched value is of type `HostedMarketStoreError`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern, a match arm with multiple or-patterns as shown, or multiple match arms
+    |
+147 ~         HostedMarketStoreError::RetentionHeld => HostedMarketPortError::RetentionHeld,
+148 ~         HostedMarketStoreError::InvalidInput(_) | HostedMarketStoreError::CorruptInput(_) => todo!(),
+    |
+
+For more information about this error, try `rustc --explain E0004`.
+error: could not compile `chio-finding-market-store-postgres` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

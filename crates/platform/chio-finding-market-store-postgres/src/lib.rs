@@ -147,6 +147,10 @@ const MAX_I_JSON_INTEGER: u64 = (1_u64 << 53) - 1;
 
 #[derive(Debug, thiserror::Error)]
 pub enum HostedMarketStoreError {
+    #[error("hosted market input JSON is invalid")]
+    InvalidInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("hosted market durable JSON is invalid")]
+    CorruptInput(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
     #[error("hosted market PostgreSQL configuration is invalid")]
     Configuration,
     #[error("hosted market tenant identity is invalid")]

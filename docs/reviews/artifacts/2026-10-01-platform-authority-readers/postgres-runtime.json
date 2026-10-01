@@ -1,0 +1,21 @@
+{
+  "container": "chio-platform-readers-20261001",
+  "image_requested": "postgres:16.6-alpine",
+  "image_id": "sha256:1d04b9ba1d4996401f2552b51beda8187f175c0645c091e4781134fc9c9a3eef",
+  "repo_digests": [
+    "postgres@sha256:1d04b9ba1d4996401f2552b51beda8187f175c0645c091e4781134fc9c9a3eef"
+  ],
+  "platform": "arm64",
+  "endpoint": "127.0.0.1:55441",
+  "database": "chio_platform_readers",
+  "roles": [
+    "migrator",
+    "runtime",
+    "retention",
+    "worker",
+    "replicator"
+  ],
+  "transport": "Local isolated Docker PostgreSQL; sslmode=disable. Does not qualify dedicated TLS worker-lease API.",
+  "scope": "Container created exclusively for this batch; integration test resets only its public schema. Existing developer databases were untouched.",
+  "cleanup": "Stopped and removed only this task-owned container after the terminal passing integration campaign."
+}

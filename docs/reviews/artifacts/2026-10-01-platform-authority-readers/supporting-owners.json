@@ -1,0 +1,16 @@
+{
+  "crates/platform/chio-transaction-passport/src/input.rs": "Shared original native decoder (16 MiB/document), 64 MiB total and 4096-document preflight; typed projection only follows original validation. No parser result claims authentication.",
+  "crates/platform/chio-transaction-passport/src/runtime_security.rs": "Bundle bytes/count preflight runs before runtime graph/artifact cloning and verification.",
+  "crates/platform/chio-commerce-order/src/input.rs": "Commerce-owned original native decoder, native typed projection causes and complete pre-hash document/count/byte budget.",
+  "crates/platform/chio-http-core/src/input.rs": "Shared original native HTTP decoder; callers choose explicit request or capability bound before any effect.",
+  "crates/platform/chio-finding-hosted-edge/src/input.rs": "Strict original external canonical byte equality and bounded projection; returns SharedUntrustedJsonError with safe display and native source.",
+  "crates/platform/chio-finding-market-store-postgres/src/validation.rs": "Strict bounded original external canonical ingress and native canonical checkpoint/principal readback keep separate numeric contracts. Submitted input and durable corruption retain distinct error classifications with native local causes.",
+  "crates/platform/chio-finding-market-port/src/backend.rs": "Backend input and integrity failures preserve native JSON causes for the explicit edge wire projection.",
+  "crates/platform/chio-finding-market-port/src/lib.rs": "Auth/job/lifecycle port errors preserve invalid-input and durable-input native causes through store adapters.",
+  "crates/platform/chio-finding-market-store-postgres/src/ports.rs": "Store port adapters forward shared native input causes while retaining existing error classification vocabulary.",
+  "crates/platform/chio-finding-hosted-edge/src/error.rs": "Source-bearing local errors project fixed existing HTTP code/status/message classifications; borrowed projection methods avoid consuming retained native causes.",
+  "crates/platform/chio-risk-comptroller/src/evidence_refs.rs": "Shared risk-reference traversal accepts fallible lookups so auxiliary reader causes reach callers. The existing infallible typed lookup API delegates to the same validation algorithm.",
+  "crates/protocol/chio-tower/src/error.rs": "HTTP authority clock rejection preserves the native ClockError source in the middleware error.",
+  "crates/products/chio-api-protect/src/error.rs": "HTTP authority clock rejection preserves the native ClockError source and the existing evaluation failure HTTP class.",
+  "crates/platform/chio-control-plane/src/signing_custody.rs": "The qualification Clippy gate exposed a pre-existing direct slice in the zeroizing fixed-capacity custody reader. Fallible slicing now retains fail-closed bounds without a lint exception; existing identity, mode, symlink and zeroizing ownership stay intact."
+}

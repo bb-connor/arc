@@ -457,6 +457,7 @@ impl ChioEvaluatorBuilder {
 impl From<HttpAuthorityError> for ChioTowerError {
     fn from(value: HttpAuthorityError) -> Self {
         match value {
+            HttpAuthorityError::Clock(source) => Self::Clock(source),
             HttpAuthorityError::CallerIdentity(message) => {
                 Self::IdentityExtraction(format!("hash failed: {message}"))
             }

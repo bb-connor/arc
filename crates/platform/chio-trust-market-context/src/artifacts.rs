@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use chio_risk_comptroller::{
-    validate_risk_evidence_refs, validate_risk_report as validate_comptroller_report,
+    try_validate_risk_evidence_refs, validate_risk_report as validate_comptroller_report,
     RiskEvidenceRefKind,
 };
 use chio_transaction_passport::{TransactionPassport, TransactionPassportError};
@@ -444,7 +444,7 @@ pub(super) fn validate_selection(
     selection: &ProviderSelectionReport,
     scorecard: &TrustScorecardSnapshot,
     sla: &SlaCommitment,
-    mut contains_override_receipt_ref: impl FnMut(&str) -> bool,
+    mut contains_override_receipt_ref: impl FnMut(&str) -> Result<bool, TransactionPassportError>,
 ) -> Result<(), TransactionPassportError> {
     for (field, value) in [
         ("schema", &selection.schema),
@@ -528,10 +528,10 @@ pub(super) fn validate_risk_report(
     passport: &TransactionPassport,
     selection: &ProviderSelectionReport,
     report: &RiskComptrollerReport,
-    contains_ref: impl FnMut(&str, RiskEvidenceRefKind) -> bool,
+    contains_ref: impl FnMut(&str, RiskEvidenceRefKind) -> Result<bool, TransactionPassportError>,
 ) -> Result<(), TransactionPassportError> {
     validate_comptroller_report(passport, report)?;
-    validate_risk_evidence_refs(report, contains_ref)?;
+    try_validate_risk_evidence_refs(report, contains_ref)?;
     if report.id != selection.risk_report_ref {
         return Err(claim_failed("selection risk report ref mismatch"));
     }
@@ -914,7 +914,7 @@ fn validate_provider_candidate(
 fn validate_ranking(
     selection: &ProviderSelectionReport,
     discovery: &ProviderDiscoverySnapshot,
-    contains_override_receipt_ref: &mut impl FnMut(&str) -> bool,
+    contains_override_receipt_ref: &mut impl FnMut(&str) -> Result<bool, TransactionPassportError>,
 ) -> Result<(), TransactionPassportError> {
     let selected = selection
         .ranking_results
@@ -935,7 +935,7 @@ fn validate_ranking(
         return Err(claim_failed("ranking result rank is ambiguous"));
     }
     if (selected.rank != 1 || top_rank_count != 1)
-        && !contains_override_receipt_ref(&selection.override_receipt_ref)
+        && !contains_override_receipt_ref(&selection.override_receipt_ref)?
     {
         return Err(claim_failed("selection override receipt missing"));
     }

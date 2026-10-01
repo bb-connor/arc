@@ -129,6 +129,8 @@ pub struct TransportDenyInput<'a> {
 
 #[derive(Debug, Clone)]
 pub struct PreparedHttpEvaluation {
+    /// Native input cause for a signed capability denial. Never serialized.
+    pub capability_input_error: Option<chio_core_types::canonical::SharedUntrustedJsonError>,
     pub verdict: Verdict,
     pub evidence: Vec<GuardEvidence>,
     pub request_id: String,
@@ -145,6 +147,8 @@ pub struct PreparedHttpEvaluation {
 
 #[derive(Debug, Clone)]
 pub struct HttpAuthorityEvaluation {
+    /// Native input cause for a signed capability denial. Never serialized.
+    pub capability_input_error: Option<chio_core_types::canonical::SharedUntrustedJsonError>,
     pub verdict: Verdict,
     pub receipt: HttpReceipt,
     pub evidence: Vec<GuardEvidence>,
@@ -153,6 +157,8 @@ pub struct HttpAuthorityEvaluation {
 
 #[derive(Debug, Error)]
 pub enum HttpAuthorityError {
+    #[error("HTTP authority clock rejected the operation: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("failed to hash caller identity: {0}")]
     CallerIdentity(String),
 
@@ -184,6 +190,7 @@ fn is_dispatch_failure(error: &HttpAuthorityError) -> bool {
 
 #[derive(Debug, Clone)]
 struct PresentedCapabilityState {
+    input_error: Option<chio_core_types::canonical::SharedUntrustedJsonError>,
     capability_id: Option<String>,
     invalid_reason: Option<String>,
 }
@@ -631,6 +638,7 @@ impl HttpAuthority {
                 crate::metrics::observe_decision_latency_nanos_for_outcome(outcome, elapsed_nanos);
                 crate::metrics::record_guard_evaluation(outcome);
                 Ok(HttpAuthorityEvaluation {
+                    capability_input_error: prepared.capability_input_error.clone(),
                     verdict: prepared.verdict.clone(),
                     receipt,
                     evidence: prepared.evidence.clone(),
@@ -666,6 +674,11 @@ impl HttpAuthority {
         &self,
         input: HttpAuthorityInput<'_>,
     ) -> Result<PreparedHttpEvaluation, HttpAuthorityError> {
+        let now = self
+            .kernel
+            .authority_clock_reading()?
+            .unix_millis()
+            .as_secs();
         let caller_identity_hash = input
             .caller
             .identity_hash()
@@ -677,6 +690,7 @@ impl HttpAuthority {
         let presented_capability =
             if let Some(reason) = unsupported_reason.or_else(|| binding.invalid_reason.clone()) {
                 PresentedCapabilityState {
+                    input_error: None,
                     capability_id: None,
                     invalid_reason: Some(reason),
                 }
@@ -689,6 +703,7 @@ impl HttpAuthority {
                     binding.requested_tool_name.as_deref(),
                     binding.requested_arguments.as_ref(),
                     input.model_metadata,
+                    now,
                     &|capability_id| {
                         self.kernel
                             .is_capability_revoked(capability_id)
@@ -719,7 +734,7 @@ impl HttpAuthority {
             threshold_approval_proposal: None,
             supplemental_authorization: None,
             execution_nonce: input.execution_nonce.cloned(),
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: now,
         };
 
         let content_hash = chio_request
@@ -782,6 +797,7 @@ impl HttpAuthority {
         if is_execution_nonce_preflight(&kernel_response) {
             let evidence = projected_evidence(binding.policy, &presented_capability);
             return Ok(PreparedHttpEvaluation {
+                capability_input_error: presented_capability.input_error.clone(),
                 verdict: Verdict::Incomplete {
                     reason: "execution nonce preflight requires retry with presented nonce"
                         .to_string(),
@@ -807,6 +823,7 @@ impl HttpAuthority {
         let evidence = projected_evidence(binding.policy, &presented_capability);
 
         Ok(PreparedHttpEvaluation {
+            capability_input_error: presented_capability.input_error.clone(),
             verdict,
             evidence,
             request_id: input.request_id,
@@ -890,7 +907,11 @@ impl HttpAuthority {
             actor_chain: Vec::new(),
             evidence: Vec::new(),
             response_status,
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: self
+                .kernel
+                .authority_clock_reading()?
+                .unix_millis()
+                .as_secs(),
             content_hash: input.content_hash.unwrap_or_default().to_string(),
             policy_hash: self.policy_hash.clone(),
             trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
@@ -914,7 +935,11 @@ impl HttpAuthority {
         let route_selection = metadata_value(body.metadata.as_ref(), "route_selection").cloned();
         body.id = uuid::Uuid::now_v7().to_string();
         body.response_status = response_status;
-        body.timestamp = chrono::Utc::now().timestamp() as u64;
+        body.timestamp = self
+            .kernel
+            .authority_clock_reading()?
+            .unix_millis()
+            .as_secs();
         body.metadata = final_metadata(
             Some(&decision_receipt_id),
             kernel_receipt_id.as_deref(),
@@ -1004,16 +1029,20 @@ impl HttpAuthority {
         &self,
         nonce: &SignedExecutionNonce,
     ) -> Result<CapabilityToken, HttpAuthorityError> {
-        let now = chrono::Utc::now().timestamp();
-        let issued_at = u64::try_from(now.max(0))
-            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
+        let issued_at = self
+            .kernel
+            .authority_clock_reading()?
+            .unix_millis()
+            .as_secs();
         let body = CapabilityTokenBody {
             id: nonce.nonce.bound_to.capability_id.clone(),
             issuer: self.keypair.public_key(),
             subject: self.kernel_subject.clone(),
             scope: kernel_scope(),
             issued_at,
-            expires_at: issued_at.saturating_add(HTTP_AUTHORITY_TTL_SECS),
+            expires_at: issued_at
+                .checked_add(HTTP_AUTHORITY_TTL_SECS)
+                .ok_or(chio_security_types::clock::ClockError::Overflow)?,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
         };
@@ -1043,7 +1072,11 @@ impl HttpAuthority {
             actor_chain: Vec::new(),
             evidence: prepared.evidence.clone(),
             response_status,
-            timestamp: chrono::Utc::now().timestamp() as u64,
+            timestamp: self
+                .kernel
+                .authority_clock_reading()?
+                .unix_millis()
+                .as_secs(),
             content_hash: prepared.content_hash.clone(),
             policy_hash: self.policy_hash.clone(),
             trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
@@ -1091,6 +1124,7 @@ fn validate_presented_capability(
     requested_tool_name: Option<&str>,
     requested_arguments: Option<&Value>,
     model_metadata: Option<&ModelMetadata>,
+    now: u64,
     is_revoked: &dyn Fn(&str) -> Result<bool, HttpAuthorityError>,
 ) -> PresentedCapabilityState {
     let requested_tool = match (requested_tool_server, requested_tool_name) {
@@ -1102,6 +1136,7 @@ fn validate_presented_capability(
         (None, None) => None,
         _ => {
             return PresentedCapabilityState {
+                input_error: None,
                 capability_id: None,
                 invalid_reason: Some(
                     "tool-call evaluation requires both tool_server and tool_name".to_string(),
@@ -1111,6 +1146,7 @@ fn validate_presented_capability(
     };
     let Some(raw_capability) = presented_capability else {
         return PresentedCapabilityState {
+            input_error: None,
             capability_id: None,
             invalid_reason: None,
         };
@@ -1121,11 +1157,13 @@ fn validate_presented_capability(
         trusted_issuers,
         requested_tool,
         model_metadata,
+        now,
     ) {
         Ok(token) => {
             if let Some(hint) = capability_id_hint {
                 if hint != token.id {
                     return PresentedCapabilityState {
+                        input_error: None,
                         capability_id: None,
                         invalid_reason: Some(
                             "capability_id does not match the presented capability token"
@@ -1141,18 +1179,24 @@ fn validate_presented_capability(
             // projected as authorized.
             match presented_capability_revocation(&token, is_revoked) {
                 Ok(None) => PresentedCapabilityState {
+                    input_error: None,
                     capability_id: Some(token.id),
                     invalid_reason: None,
                 },
                 Ok(Some(reason)) | Err(reason) => PresentedCapabilityState {
+                    input_error: None,
                     capability_id: None,
                     invalid_reason: Some(reason),
                 },
             }
         }
         Err(reason) => PresentedCapabilityState {
+            input_error: match &reason {
+                CapabilityRejection::Input(source) => Some(source.clone()),
+                CapabilityRejection::Invalid(_) => None,
+            },
             capability_id: None,
-            invalid_reason: Some(reason),
+            invalid_reason: Some(reason.to_string()),
         },
     }
 }
@@ -1243,30 +1287,50 @@ fn projected_evidence(
     }
 }
 
+#[derive(Debug, Error)]
+enum CapabilityRejection {
+    #[error("invalid capability token: {0}")]
+    Input(#[source] chio_core_types::canonical::SharedUntrustedJsonError),
+    #[error("{0}")]
+    Invalid(String),
+}
+
+impl From<String> for CapabilityRejection {
+    fn from(reason: String) -> Self {
+        Self::Invalid(reason)
+    }
+}
+
 fn validate_capability_token(
     raw: &str,
     trusted_issuers: &[PublicKey],
     requested_tool: Option<RequestedToolInvocation<'_>>,
     model_metadata: Option<&ModelMetadata>,
-) -> Result<CapabilityToken, String> {
+    now: u64,
+) -> Result<CapabilityToken, CapabilityRejection> {
     let token: CapabilityToken =
-        serde_json::from_str(raw).map_err(|e| format!("invalid capability token: {e}"))?;
+        crate::input::decode(raw.as_bytes(), crate::input::MAX_CAPABILITY_BYTES)
+            .map_err(CapabilityRejection::Input)?;
     if !trusted_issuers.contains(&token.issuer) {
-        return Err("capability issuer is not trusted".to_string());
+        return Err("capability issuer is not trusted".to_string().into());
     }
     let signature_valid = token
         .verify_signature()
         .map_err(|e| format!("capability signature verification failed: {e}"))?;
     if !signature_valid {
-        return Err("capability signature verification failed".to_string());
+        return Err("capability signature verification failed"
+            .to_string()
+            .into());
     }
     if token.attenuation_proof.is_some() {
         return Err(
-            "chain-binding requires a trust-root resolver on the HTTP authority path".to_string(),
+            "chain-binding requires a trust-root resolver on the HTTP authority path"
+                .to_string()
+                .into(),
         );
     }
     token
-        .validate_time(chrono::Utc::now().timestamp() as u64)
+        .validate_time(now)
         .map_err(|e| format!("invalid capability token: {e}"))?;
 
     if let Some(requested_tool) = requested_tool {
@@ -1282,7 +1346,8 @@ fn validate_capability_token(
             return Err(format!(
                 "capability does not authorize tool {} on server {}",
                 requested_tool.tool_name, requested_tool.server_id
-            ));
+            )
+            .into());
         }
     }
     Ok(token)

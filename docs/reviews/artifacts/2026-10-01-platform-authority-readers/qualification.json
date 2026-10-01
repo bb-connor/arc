@@ -1,0 +1,19 @@
+{
+  "source_base": "377ee5b773eff424d12182682b411867b4d643be",
+  "branch": "packet/3-retention-accounting",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8",
+  "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+  "scope": "13 package tests and all-target Clippy; 13 direct consumer compile; isolated local PostgreSQL integration; scoped source gates. Composite terminal evidence, not workspace or hosted qualification.",
+  "source_sha256_manifest": "source-hashes.json",
+  "binary_sha256_manifest": "binary-hashes.json",
+  "test_result_manifest": "test-summary.json",
+  "production_edits_after_combined_package_campaign": [
+    "Control-plane signing custody replaces direct mutable slicing with checked get_mut to satisfy its existing panic-prevention lint; qualified by focused existing custody tests and the repeated Clippy campaign."
+  ],
+  "test_edits_after_combined_package_campaign": [
+    "Enterprise original auxiliary receipt regression selects the existing valid RiskSettlementCounterpartyBound fixture; full enterprise package rerun passes.",
+    "API-protect authenticated input_tests moved intact to the end of its module to satisfy items_after_test_module; its body passed in the combined campaign and is compiled again by final all-target Clippy."
+  ],
+  "publication": "Commit and non-force push explicitly authorized by the user. The owning commit is the candidate identity; source hashes avoid self-referential commit metadata.",
+  "consumer_compile_boundary": "The 13-consumer campaign precedes the private custody checked-slice lint fix and unchanged API-protect test-module relocation; the final Clippy campaign compiles those final owners, and focused custody execution validates the changed read."
+}
