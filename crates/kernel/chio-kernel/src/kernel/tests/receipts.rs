@@ -590,6 +590,7 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -700,6 +701,7 @@ fn nested_admission_denied_while_rss_shedding() {
         .set_session_peer_capabilities(
             &session_id,
             PeerCapabilities {
+                authorization: None,
                 supports_progress: false,
                 supports_cancellation: false,
                 supports_subscriptions: false,
@@ -1105,6 +1107,7 @@ fn redaction_reapplies_stream_chunk_cap() {
             0,
             None,
             None,
+            None,
         )
         .unwrap();
 
@@ -1243,6 +1246,7 @@ fn checkpoint_triggers_at_100_receipts() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             })
             .unwrap();
     }
@@ -1311,6 +1315,7 @@ fn concurrent_receipt_checkpointing_keeps_contiguous_batches() {
                         supplemental_authorization: None,
                         model_metadata: None,
                         federated_origin_kernel_id: None,
+        declassification_grant: None,
                     })
                     .unwrap();
             })
@@ -1384,6 +1389,7 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             })
             .unwrap();
     }
@@ -1428,6 +1434,7 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             })
             .unwrap();
     }
@@ -1499,6 +1506,7 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     first_kernel
@@ -1521,6 +1529,7 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     second_kernel
@@ -1602,6 +1611,7 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             })
             .unwrap();
     }
@@ -1668,6 +1678,7 @@ fn background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             })
             .unwrap();
     }

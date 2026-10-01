@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::scope::MonetaryAmount;
@@ -29,9 +30,16 @@ use chio_kernel::tool_outcome::{MonetaryReleaseEvidenceKindV1, MonetaryReleaseEv
 use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord, CanonicalRevocationSet};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
+use crate::store_connection::StoreConnection;
+
 mod authorization;
 mod composite;
-pub(crate) use composite::{AdmissionAuthorizationBinding, AdmissionCaptureBinding};
+pub(crate) use composite::{
+    preflight_authorization_commit_index, verify_compensated_budget_hold_tx,
+    verify_nonce_budget_phase_tx, verify_preflight_hold, AdmissionAuthorizationBinding,
+    AdmissionCaptureBinding, NonceBudgetPhase, NoncePreflightAuthorizationBinding,
+    NoncePreflightHoldState,
+};
 pub(crate) mod composite_schema;
 mod import_hold_state;
 mod import_validation;
@@ -58,6 +66,10 @@ pub use snapshot::{
 pub(crate) use store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;
+
+#[cfg(test)]
 #[path = "budget_store/tests.rs"]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests;
@@ -70,6 +82,6 @@ use schema::*;
 
 #[derive(Clone)]
 pub struct SqliteBudgetStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Option<Arc<crate::serving_owner::SqliteServingOwner>>,
 }

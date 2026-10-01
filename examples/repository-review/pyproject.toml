@@ -1,0 +1,24 @@
+[project]
+name = "chio-repository-review-application"
+version = "0.1.0"
+description = "Runtime dependencies for the Chio repository review application"
+requires-python = ">=3.11"
+dependencies = [
+    "chio-langgraph[process]==0.1.1",
+    "langgraph-checkpoint-sqlite>=3,<4",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9", "ruff>=0.5"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+chio-langgraph = { path = "../../sdks/python/chio-langgraph" }
+chio-process = { path = "../../sdks/python/chio-process" }
+chio-adapter-base = { path = "../../sdks/python/chio-adapter-base" }
+chio-sdk-python = { path = "../../sdks/python/chio-sdk-python" }
+
+[tool.ruff]
+target-version = "py311"

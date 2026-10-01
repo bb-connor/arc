@@ -34,8 +34,8 @@ struct HttpRequest {
   std::string body;
   std::chrono::milliseconds timeout{30000};
   int attempt = 1;
-  std::shared_ptr<CancellationToken> cancellation;
-  std::function<Result<void>(const std::string&)> stream_message;
+  std::shared_ptr<CancellationToken> cancellation{};
+  std::function<Result<void>(const std::string&)> stream_message{};
 };
 
 struct HttpResponse {

@@ -70,6 +70,12 @@ Binaries (`src/bin/`):
 
 ## Usage
 
+When using an out-of-tree `CARGO_TARGET_DIR`, set `CHIO_CHECKOUT_ROOT` at
+runtime to the absolute checkout directory. Discovery validates the workspace
+member, package identity and conformance fixture layout; relative or invalid
+anchors are rejected. No checkout path is embedded in workspace-built binaries.
+Explicit fixture options and `CHIO_PEERS_LOCK` continue to override defaults.
+
 ```rust
 use chio_conformance::{default_run_options, run_conformance_harness, PeerTarget};
 

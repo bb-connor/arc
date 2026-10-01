@@ -28,8 +28,10 @@ impl SqliteBudgetStore {
 
         let mut connection = Connection::open(path)?;
         Self::initialize_connection(&mut connection, false)?;
+        // Opened by path there is no serving owner and no anchor: each write is
+        // one RAII transaction and nothing outside the database records it.
         Ok(Self {
-            connection: Arc::new(Mutex::new(connection)),
+            connection: Arc::new(StoreConnection::transaction_only("budget", connection)),
             serving_owner: None,
         })
     }
@@ -236,7 +238,7 @@ impl SqliteBudgetStore {
     }
 
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<crate::serving_owner::SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -246,9 +248,9 @@ impl SqliteBudgetStore {
     }
 
     pub(super) fn connection(&self) -> Result<MutexGuard<'_, Connection>, BudgetStoreError> {
-        self.connection.lock().map_err(|_| {
-            BudgetStoreError::Invariant("sqlite budget store lock poisoned".to_string())
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| BudgetStoreError::Invariant(fenced.to_string()))
     }
 
     pub(super) fn begin_write<'a>(

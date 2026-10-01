@@ -336,6 +336,7 @@ function hasRequiredReceiptSemantics(receipt: HttpReceipt): boolean {
       "caller_executed",
       "host_executed_provider_reported",
       "host_executed_unmediated",
+      "chio_internal",
     ])
     && isOneOf(record["redaction_mode"], ["none", "summary", "redacted"])
     && isOptionalOneOf(record["observation_outcome"], ["observed", "evaluated", "dropped"])

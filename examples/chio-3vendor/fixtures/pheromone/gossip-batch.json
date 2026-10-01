@@ -36,8 +36,8 @@
             "verifierKeyId": "cost-root-key-1",
             "runtimePolicySha256": "b0cfe65c6f966a7e7b3abbc3490bcc9a2c2546e46df757aa15ab6473096f6955",
             "scarcityPolicySha256": "69073f134018c3cc27f53726aa2a98a63bdfedf6bd68bfde7bb2b3777f3050d4",
-            "depositBodySha256": "acd0286d4d079536cd32c91c0b48f214195ae0cb1e8e6ff62662ddc95e81ce9f",
-            "depositSignatureSha256": "a69c9d048e8bd66cf6bdccbb3ad0f0e086d29597cfe4ead175881831c3ac4f1c",
+            "depositBodySha256": "9e646600849b574a294f4b871da265a69120fe69017001bfc7af13bce5bae54f",
+            "depositSignatureSha256": "9a4f0eeae63ae299a17b0269a612f5c3c9f98e379d0013f88c9c6bfd03a788fc",
             "kernelId": "did:chio:llamaworks",
             "agentPassportKeyHash": "1f5fe64ec2f8c901be3aad94a41d70c12d2f3a8f43755f902e665c96f41c87e3",
             "treatyId": "treaty:buyer-dataco:support-ops",
@@ -54,7 +54,7 @@
             "telemetry": {
               "schema": "chio.pheromone-observation-cost-telemetry-root.v1",
               "algorithm": "rfc6962-sha256-v1",
-              "rootHash": "0x03d57ee94d7c00e7980572b34426973abe83bd7e7c38a3c230f187b3d4cad693",
+              "rootHash": "0xe78cc8ba52b2e353b1ebcce964eabd353777e7954b5bea9d5ba1dc714200dc54",
               "treeSize": 1,
               "verifierId": "did:chio:dataco-cost-verifier",
               "verifierKeyId": "cost-root-key-1",
@@ -65,23 +65,23 @@
               "leaf_index": 0,
               "audit_path": []
             },
-            "leafPreimageSha256": "87e975957c8a68e5ef9fad681bfd5b9635eec4f3c261186808a9b1ece26d9576"
+            "leafPreimageSha256": "7beef1af11e6b951fa7682343d3547018a49391650c8556793e647df63bd83d9"
           },
-          "signature": "a18ba6cbaeb3689c098f980bcbc7fdf215777155644ec4b79b679ead7f221a674255b49e07a15e0244d54fe82a593963066be36d676757cb331d35c0e3e9090e"
+          "signature": "2fb429e0c4fb47f9b8dc666ae2fc2b8c3be609e209836695ca4cfef701bd4c941eb5221e918e2d2da43fa09bffeb268cff57692e5a1e1a92e3026d933314cb01"
         },
         "workflow_context": {
           "schema": "chio.pheromone-workflow-context.v1",
           "workflow_id": "wf-chio-refund-001",
           "workflow_receipt_id": "wf-chio-refund-001",
-          "workflow_receipt_sha256": "7fffe9c72b7113a65d0abadf73f98099e92e31ee5a5595a304199608a2ae0a10",
+          "workflow_receipt_sha256": "08739631eb2f4140f129484c999918f7d564da4aa82d95ad0f623275a727a743",
           "workflow_intersection_id": "workflow-intersection:buyer-refund:001",
-          "workflow_intersection_sha256": "c852513d4ebcee42d0d5d020eb9bf3be40b85c7dec78e4c2578898ecd89892dd",
+          "workflow_intersection_sha256": "742176d093e51e9dfc0b874a725a3ce43a1e55087f8dbbc26c9f455b49e17a87",
           "step_index": 0,
-          "tool_receipt_id": "ea1f74990eaef54beaac9d7af04893a2320390b773b556fbd310fa9246ed3b3d",
-          "bilateral_dsse_sha256": "3e7ac510ae43d4668966534d81c7592d2c7bb62d10e7938e1bb7c9e477c49077",
+          "tool_receipt_id": "db51b18ace666c67be85086dd7ea84375281415680c50a0da465b8674051f524",
+          "bilateral_dsse_sha256": "f2d9f0da99ea4b57fb5d78213cd7738abd58ad02774406577b6ae17d07d1c7f8",
           "consistency_anchor": "chio:consistency:wf-chio-refund-001:0"
         },
-        "signature": "5a6f94c43773d1f97174d5aa65a32ac9fe16e9900593617a30ecfb33197db54d6a1eed72ec8fcf142ce404c48e8c173eb9f7590b622c0b916fd6ff20b5a60d0d"
+        "signature": "d072cfc7c30facb34ef3ebaff6f54d6f16159a29957f9cb77a70fd67a0cbf7c48b64d62480657cee41ec7e78f9284a3cdbfda323df8cbef7a857bb733fa0180b"
       },
       "origin_kernel_id": "did:chio:llamaworks",
       "gossiping_peer_kernel_id": "did:chio:buyer-kernel",

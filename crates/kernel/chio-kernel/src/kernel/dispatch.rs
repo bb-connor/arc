@@ -8,6 +8,22 @@ use crate::budget_store::BudgetReverseHoldDecision;
 use chio_log_redact::redacted;
 
 use super::*;
+use crate::admission_operation::AdmissionOperationV1;
+
+#[path = "dispatch/dpop_verification.rs"]
+mod dpop_verification;
+
+#[path = "dispatch/runtime_admission.rs"]
+mod runtime_admission;
+
+#[path = "dispatch/invocation.rs"]
+mod invocation;
+#[path = "dispatch/security_pre_dispatch.rs"]
+mod security_pre_dispatch;
+pub(crate) use security_pre_dispatch::derive_security_dispatch_commitment_id;
+#[cfg(test)]
+#[path = "dispatch/timer_probe_tests.rs"]
+mod timer_probe_tests;
 
 const READINESS_DEADLINE_PENDING: u8 = 0;
 const READINESS_DEADLINE_ELAPSED: u8 = 1;
@@ -379,6 +395,7 @@ struct OwnedGuardInvocation {
     scope: ChioScope,
     session_filesystem_roots: Option<Vec<String>>,
     matched_grant_index: Option<usize>,
+    security_context: Option<SecurityInvocationContext>,
 }
 
 /// Synchronous fail-closed guard loop. Shared by the inline path and the
@@ -448,6 +465,7 @@ fn run_guards_owned(
         server_id: &owned.request.server_id,
         session_filesystem_roots: owned.session_filesystem_roots.as_deref(),
         matched_grant_index: owned.matched_grant_index,
+        security_context: owned.security_context.as_ref(),
     };
     evaluate_guards_sequential(guards, &ctx)
 }
@@ -671,19 +689,23 @@ impl ChioKernel {
     pub(crate) fn revalidate_immediately_before_dispatch(
         &self,
         request: &ToolCallRequest,
+        durable_admission: Option<&DurableToolAdmission>,
         dpop_required: bool,
         matched_grant: &ToolGrant,
         matched_grant_index: usize,
         parent_context: Option<&OperationContext>,
         session_id: Option<&SessionId>,
         session_filesystem_roots: Option<&[String]>,
+        security_context: Option<&SecurityInvocationContext>,
         receipt_admission: &ReceiptFederationAdmission,
         runtime_admission_metadata: Option<&serde_json::Value>,
         reserve_for_caller_preflight: bool,
+        durable_execution_nonce: bool,
         revalidate_all: bool,
         now_unix_secs: u64,
         now_unix_ms: u64,
     ) -> Result<VerifiedFindingDispatchAdmission, KernelError> {
+        self.validate_live_admission_authority_profile(durable_admission)?;
         if self.is_emergency_stopped() {
             return Err(KernelError::GuardDenied(
                 EMERGENCY_STOP_DENY_REASON.to_string(),
@@ -714,7 +736,11 @@ impl ChioKernel {
                 &request.arguments,
             )?;
         }
-        if !reserve_for_caller_preflight {
+        // A durable nonce operation verified its presented nonce against the
+        // retained issuance before any mutation, and the store rechecks it when
+        // reserving and capturing. The legacy validator does not know that
+        // profile and must not judge it here.
+        if !reserve_for_caller_preflight && !durable_execution_nonce {
             let _ = self.validate_execution_nonce_non_consuming(
                 request,
                 &request.capability,
@@ -748,6 +774,10 @@ impl ChioKernel {
             },
         )?;
 
+        if request.approval_token.is_some() && self.governed_approval_authority.is_some() {
+            self.verify_configured_governed_approval_source()?;
+        }
+
         let current_session_roots = session_id
             .map(|id| self.session_enforceable_filesystem_root_paths_owned(id))
             .transpose()?;
@@ -767,6 +797,7 @@ impl ChioKernel {
                 .as_deref()
                 .or(session_filesystem_roots),
             matched_grant_index: Some(matched_grant_index),
+            security_context,
         };
         for guard in self.guards.iter() {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -801,7 +832,15 @@ impl ChioKernel {
                     local_kernel_id: self.federation_local_kernel_id(),
                 };
                 match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    hook.revalidate_before_dispatch(&context)
+                    if let Some(binding) = self.configured_runtime_participant_binding()? {
+                        self.revalidate_operation_owned_runtime_hook(
+                            hook.as_ref(),
+                            &context,
+                            binding,
+                        )
+                    } else {
+                        hook.revalidate_before_dispatch(&context)
+                    }
                 })) {
                     Ok(result) => result?,
                     Err(_) => {
@@ -1021,18 +1060,32 @@ impl ChioKernel {
             .any(|candidate| candidate == *signer)
     }
 
+    /// Preserve the adapter operation namespace in initial calls and signed evidence.
+    pub(crate) fn payment_operation_reference<'a>(
+        request: &'a ToolCallRequest,
+        durable_operation: Option<&'a AdmissionOperationV1>,
+    ) -> &'a str {
+        durable_operation
+            .filter(|operation| operation.binding().participant_requirements().payment)
+            .map_or(request.request_id.as_str(), |operation| {
+                operation.binding().operation_id().as_str()
+            })
+    }
+
     pub(crate) fn unwind_pre_dispatch_monetary_invocation(
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
+        durable_operation: Option<&AdmissionOperationV1>,
     ) -> Result<Option<BudgetReverseHoldDecision>, KernelError> {
         self.unwind_pre_dispatch_monetary_invocation_with_evidence(
             request,
             cap,
             charge_result,
             payment_authorization,
+            durable_operation,
             PaymentCredentialDisposition::NonePresent,
         )
         .map(|(reverse, _)| reverse)
@@ -1045,6 +1098,7 @@ impl ChioKernel {
         cap: &CapabilityToken,
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
+        durable_operation: Option<&AdmissionOperationV1>,
         credential_disposition: PaymentCredentialDisposition,
     ) -> Result<
         (
@@ -1055,6 +1109,11 @@ impl ChioKernel {
     > {
         let mut unwind_evidence = None;
         if let Some(authorization) = payment_authorization {
+            // Authorization and crash recovery use the immutable operation ID.
+            // Reusing only the caller request ID here can address a different
+            // adapter operation or collide with another request namespace.
+            let payment_operation_id =
+                Self::payment_operation_reference(request, durable_operation);
             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                 KernelError::Internal(
                     "payment authorization present without configured adapter".to_string(),
@@ -1075,7 +1134,7 @@ impl ChioKernel {
                             &authorization.authorization_id,
                             amount_units,
                             &currency,
-                            &request.request_id,
+                            payment_operation_id,
                         )
                     }),
                     RailSettlementStatus::Refunded,
@@ -1083,7 +1142,7 @@ impl ChioKernel {
             } else {
                 (
                     run_payment_adapter_operation("release", || {
-                        adapter.release(&authorization.authorization_id, &request.request_id)
+                        adapter.release(&authorization.authorization_id, payment_operation_id)
                     }),
                     RailSettlementStatus::Released,
                 )
@@ -1172,90 +1231,6 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Verify a DPoP proof carried on the request against the capability.
-    ///
-    /// Fails closed: if no proof is present, or if the nonce store / config is
-    /// absent (misconfigured kernel), or if verification fails, the call is denied.
-    #[cfg(test)]
-    pub(crate) fn verify_dpop_for_request(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-    ) -> Result<(), KernelError> {
-        let proof = request.dpop_proof.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed(
-                "grant requires DPoP proof but none was provided".to_string(),
-            )
-        })?;
-
-        let nonce_store = self.dpop_nonce_store.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed(
-                "kernel DPoP nonce store not configured".to_string(),
-            )
-        })?;
-
-        let config = self.dpop_config.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed("kernel DPoP config not configured".to_string())
-        })?;
-
-        let args_bytes = canonical_json_bytes(&request.arguments).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!(
-                "failed to serialize arguments for action hash: {e}"
-            ))
-        })?;
-        let action_hash = sha256_hex(&args_bytes);
-
-        dpop::verify_dpop_proof(
-            proof,
-            cap,
-            &request.server_id,
-            &request.tool_name,
-            &action_hash,
-            nonce_store,
-            config,
-        )
-    }
-
-    /// Verify a DPoP proof for non-mutating permission preview.
-    ///
-    /// This mirrors invocation DPoP policy and checks that the nonce store and
-    /// config are installed, but deliberately avoids inserting the nonce so a
-    /// later authoritative invocation can still spend it.
-    pub fn verify_dpop_for_permission_preview(
-        &self,
-        proof: &dpop::DpopProof,
-        cap: &CapabilityToken,
-        expected_tool_server: &str,
-        expected_tool_name: &str,
-        arguments: &serde_json::Value,
-    ) -> Result<(), KernelError> {
-        if self.dpop_nonce_store.is_none() {
-            return Err(KernelError::DpopVerificationFailed(
-                "kernel DPoP nonce store not configured".to_string(),
-            ));
-        }
-
-        let config = self.dpop_config.as_ref().ok_or_else(|| {
-            KernelError::DpopVerificationFailed("kernel DPoP config not configured".to_string())
-        })?;
-
-        let args_bytes = canonical_json_bytes(arguments).map_err(|e| {
-            KernelError::DpopVerificationFailed(format!(
-                "failed to serialize arguments for action hash: {e}"
-            ))
-        })?;
-        let action_hash = sha256_hex(&args_bytes);
-
-        dpop::verify_dpop_proof_stateless(
-            proof,
-            cap,
-            expected_tool_server,
-            expected_tool_name,
-            &action_hash,
-            config,
-        )
-    }
-
     /// Run all registered guards. Fail-closed: any error from a guard is
     /// treated as a deny.
     pub(crate) fn run_guards(
@@ -1264,6 +1239,7 @@ impl ChioKernel {
         scope: &ChioScope,
         session_filesystem_roots: Option<&[String]>,
         matched_grant_index: Option<usize>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let ctx = GuardContext {
             request,
@@ -1272,6 +1248,7 @@ impl ChioKernel {
             server_id: &request.server_id,
             session_filesystem_roots,
             matched_grant_index,
+            security_context,
         };
         evaluate_guards_sequential(self.guards.as_slice(), &ctx)
     }
@@ -1298,6 +1275,7 @@ impl ChioKernel {
         scope: &ChioScope,
         session_filesystem_roots: Option<&[String]>,
         matched_grant_index: Option<usize>,
+        security_context: Option<&SecurityInvocationContext>,
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let has_per_guard = !self.config.deadlines.per_guard_budget_ms.is_empty();
         let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
@@ -1315,6 +1293,7 @@ impl ChioKernel {
                 scope,
                 session_filesystem_roots,
                 matched_grant_index,
+                security_context,
             );
         }
 
@@ -1331,6 +1310,7 @@ impl ChioKernel {
                 scope,
                 session_filesystem_roots,
                 matched_grant_index,
+                security_context,
             );
         }
 
@@ -1339,6 +1319,7 @@ impl ChioKernel {
             scope: scope.clone(),
             session_filesystem_roots: session_filesystem_roots.map(<[String]>::to_vec),
             matched_grant_index,
+            security_context: security_context.cloned(),
         });
 
         // Per-guard budgets require a per-guard timeout, so this path only runs
@@ -1455,124 +1436,39 @@ impl ChioKernel {
         Ok(evidence)
     }
 
-    pub(crate) fn run_runtime_admission_hook(
-        &self,
-        request: &ToolCallRequest,
-        extra_metadata: Option<&serde_json::Value>,
-        now: u64,
-        now_unix_ms: u64,
-        matched_grant_index: Option<usize>,
-    ) -> RuntimeAdmissionDecision {
-        let Some(hook) = self.runtime_admission_hook.as_ref() else {
-            let has_runtime_context = request
-                .governed_intent
-                .as_ref()
-                .and_then(|intent| intent.context.as_ref())
-                .is_some_and(|context| {
-                    context.get("chioAdmission").is_some()
-                        || context.get("chioTreaty").is_some()
-                        || context.get("chioSwarm").is_some()
-                });
-            if has_runtime_context {
-                return RuntimeAdmissionDecision::deny(
-                    "chio runtime admission hook is required for governed runtime requests",
-                    Some(serde_json::json!({
-                        "chio_runtime": {
-                            "accepted": false,
-                            "failure_code": "runtime_admission_hook_missing"
-                        }
-                    })),
-                );
-            }
-            if request.federated_origin_kernel_id.is_some() {
-                return RuntimeAdmissionDecision::deny(
-                    "chio treaty-bound runtime admission context missing",
-                    Some(serde_json::json!({
-                        "chio_runtime": {
-                            "accepted": false,
-                            "failure_code": "missing_chio_treaty_context"
-                        }
-                    })),
-                );
-            }
-            return RuntimeAdmissionDecision::allow(None);
-        };
-        let context = RuntimeAdmissionContext {
-            request,
-            extra_metadata,
-            now_unix_secs: now,
-            now_unix_ms,
-            matched_grant_index,
-            local_kernel_id: self.federation_local_kernel_id(),
-        };
-        match hook.evaluate(&context) {
-            Ok(mut decision) => {
-                if decision.allowed {
-                    match decision.verified_treaty_material.take() {
-                        Some(material) => {
-                            decision.metadata = merge_metadata_objects(
-                                decision.metadata,
-                                Some(material.receipt_metadata()),
-                            );
-                            if let Err(error) = self.install_verified_treaty_material_for_request(
-                                &request.request_id,
-                                material,
-                            ) {
-                                return RuntimeAdmissionDecision::deny(
-                                    format!(
-                                        "verified federation treaty material could not be retained (fail-closed): {error}"
-                                    ),
-                                    decision.metadata,
-                                );
-                            }
-                        }
-                        None if request.federated_origin_kernel_id.is_some() => {
-                            let mut metadata = decision.metadata;
-                            if let Some(runtime) = metadata
-                                .as_mut()
-                                .and_then(serde_json::Value::as_object_mut)
-                                .and_then(|metadata| metadata.get_mut("chio_runtime"))
-                                .and_then(serde_json::Value::as_object_mut)
-                            {
-                                runtime.remove("federation_treaty_dsse");
-                            }
-                            return RuntimeAdmissionDecision::deny(
-                                "verified federation treaty material missing from allowed runtime admission",
-                                metadata,
-                            );
-                        }
-                        None => {}
-                    }
-                }
-                decision
-            }
-            Err(error) => RuntimeAdmissionDecision::deny(
-                format!(
-                    "runtime admission hook \"{}\" error (fail-closed): {error}",
-                    hook.name()
-                ),
-                Some(serde_json::json!({
-                    "runtime_admission": {
-                        "hook": hook.name(),
-                        "accepted": false,
-                        "failure_code": "runtime_admission_hook_error"
-                    }
-                })),
-            ),
-        }
-    }
-
     pub(crate) fn release_runtime_admission_reservations(
         &self,
+        operation: Option<&crate::admission_operation::AdmissionOperationV1>,
         metadata: Option<&serde_json::Value>,
     ) -> Result<(), KernelError> {
+        // DPoP, approval and runtime custody share the selected-grant episode. All
+        // must be released before a denied candidate can yield to a sibling.
+        self.release_operation_owned_approval_before_dispatch(operation)?;
+        self.release_operation_owned_dpop_before_dispatch(operation)?;
+        // Original ledger custody survives hook removal, replacement or faults.
+        // Current configuration cannot hide this owner or choose legacy cleanup.
+        if operation
+            .is_some_and(|operation| operation.runtime_participant_ledger_digest().is_some())
+        {
+            return self.release_operation_owned_runtime_before_dispatch(operation);
+        }
+        let Some(hook) = self.runtime_admission_hook.as_ref() else {
+            return Ok(());
+        };
+        if self.configured_runtime_participant_binding()?.is_some() {
+            return self.release_operation_owned_runtime_before_dispatch(operation);
+        }
         let Some(metadata) = metadata else {
             return Ok(());
         };
-        let Some(hook) = self.runtime_admission_hook.as_ref() else {
-            return Ok(());
-        };
-        hook.release_reserved(metadata)
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            hook.release_reserved(metadata)
+        }))
+        .unwrap_or_else(|_| {
+            Err(KernelError::Internal(
+                "runtime reservation release panicked (fail-closed)".into(),
+            ))
+        })
     }
 
     /// Record, in receipt metadata, that runtime-admission reservations
@@ -1643,26 +1539,19 @@ impl ChioKernel {
 
     pub(crate) fn release_runtime_admission_reservations_for_pre_dispatch_denial(
         &self,
+        operation: Option<&crate::admission_operation::AdmissionOperationV1>,
         metadata: Option<serde_json::Value>,
     ) -> (Option<serde_json::Value>, bool) {
-        let Some(metadata_value) = metadata else {
-            return (None, true);
-        };
-        let Some(hook) = self.runtime_admission_hook.as_ref() else {
-            return (Some(metadata_value), true);
-        };
-
-        match hook.release_reserved(&metadata_value) {
-            Ok(()) => (Some(metadata_value), true),
+        match self.release_runtime_admission_reservations(operation, metadata.as_ref()) {
+            Ok(()) => (metadata, true),
             Err(error) => {
                 warn!(
-                    hook = hook.name(),
                     reason = %redacted!(&error),
                     "runtime admission reservation release failed on pre-dispatch denial"
                 );
                 (
                     merge_metadata_objects(
-                        Some(metadata_value),
+                        metadata,
                         Some(serde_json::json!({
                             "chio_runtime": {
                                 "reservation_release_failed": true,
@@ -1734,7 +1623,7 @@ impl ChioKernel {
         if has_monetary_grant || request_has_monetary_grant {
             return Err(KernelError::DirectDispatchUnavailable);
         }
-        self.reserve_presented_execution_nonce(request)?;
+        self.reserve_presented_execution_nonce(request, &request.capability)?;
         self.dispatch_within_budget(request, has_monetary_grant)
             .await
     }
@@ -1773,8 +1662,20 @@ impl ChioKernel {
                     request.server_id, request.tool_name
                 ))
             })?;
-        self.dispatch_resolved_server_within_budget(server, request, has_monetary_grant)
+        self.dispatch_resolved_server_within_budget(server, request, has_monetary_grant, None)
             .await
+    }
+
+    /// Build the identity a durable dispatch carries to its tool server. The
+    /// provider attempt is registered before any dispatch commits, so a durable
+    /// admission without one is not dispatched with an identity at all.
+    pub(crate) fn tool_dispatch_context(
+        request: &ToolCallRequest,
+        admission: Option<&DurableToolAdmission>,
+    ) -> Option<ToolDispatchContext> {
+        admission
+            .and_then(|admission| admission.operation().provider_attempt().cloned())
+            .map(|attempt| ToolDispatchContext::new(request.request_id.clone(), attempt))
     }
 
     pub(crate) async fn dispatch_resolved_server_within_budget(
@@ -1782,7 +1683,9 @@ impl ChioKernel {
         server: Arc<dyn ToolServerConnection>,
         request: &ToolCallRequest,
         has_monetary_grant: bool,
+        context: Option<ToolDispatchContext>,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
+        let context = crate::ToolInvocationContext::from_request(request)?.with_dispatch(context);
         let Some(budget) = self
             .config
             .deadlines
@@ -1790,7 +1693,7 @@ impl ChioKernel {
         else {
             return Self::invoke_resolved_server(
                 server,
-                request.tool_name.clone(),
+                context,
                 request.arguments.clone(),
                 has_monetary_grant,
             )
@@ -1805,7 +1708,7 @@ impl ChioKernel {
         if !multi_thread {
             let call = Self::invoke_resolved_server(
                 server,
-                request.tool_name.clone(),
+                context,
                 request.arguments.clone(),
                 has_monetary_grant,
             );
@@ -1818,7 +1721,6 @@ impl ChioKernel {
             return call.await;
         }
 
-        let tool_name = request.tool_name.clone();
         let arguments = request.arguments.clone();
         let handle = tokio::runtime::Handle::current();
         // Drive the connection call to completion on the blocking pool via
@@ -1838,8 +1740,7 @@ impl ChioKernel {
         // without limit. Either way the outer timeout frees the async worker at
         // the budget, so the per-eval wall clock holds.
         let join = tokio::task::spawn_blocking(move || {
-            let call =
-                Self::invoke_resolved_server(server, tool_name, arguments, has_monetary_grant);
+            let call = Self::invoke_resolved_server(server, context, arguments, has_monetary_grant);
             if timer_available {
                 handle.block_on(async move {
                     match tokio::time::timeout(budget, call).await {
@@ -1873,71 +1774,6 @@ impl ChioKernel {
                     "dispatch task join failed: {join_error}"
                 ))),
             }
-        }
-    }
-
-    /// Drive one already-resolved tool-server invocation to completion. Taken
-    /// over owned inputs and free of any `&self` borrow so the dispatch deadline
-    /// path can move it onto a `spawn_blocking` thread (`'static`), isolating a
-    /// connection that blocks synchronously before its first `.await` from the
-    /// async worker.
-    async fn invoke_resolved_server(
-        server: Arc<dyn ToolServerConnection>,
-        tool_name: String,
-        arguments: serde_json::Value,
-        has_monetary_grant: bool,
-    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
-        // Try streaming first regardless of monetary mode.
-        //
-        // Why the kernel cannot bound stream memory "as chunks arrive" at THIS
-        // seam, and where the actual bounds live.
-        //
-        // `ToolServerConnection::invoke_stream` returns a FULLY MATERIALIZED
-        // `ToolServerStreamResult` (which owns a `ToolCallStream { chunks: Vec<..>
-        // }`). The connector is in-process trusted code that drains its transport
-        // and builds the entire Vec BEFORE returning; the kernel receives control
-        // only after materialization. There is no incremental per-chunk arrival at
-        // this seam, so `push_chunk_bounded` cannot be driven here to bound the
-        // stream as it accumulates. True accumulation-time bounding would require
-        // changing the trait contract to a kernel-driven pull model (invoke_stream
-        // yielding a chunk source the kernel pulls), a public runtime-API change
-        // affecting every implementor; and even then a malicious in-process
-        // connector could allocate before yielding. So the transient peak
-        // allocation of a non-cooperating out-of-tree connector is a genuine
-        // connector-trust-boundary limit, bounded only by the process RSS ceiling
-        // (cgroup/ulimit).
-        //
-        // Layered bounds that DO apply:
-        //   - Accumulation is bounded by the ACCUMULATOR. In-tree connectors cap
-        //     it (A2A: `parse_sse_stream_with_limit`, MAX_SSE_TOTAL_BYTES = 1 MiB).
-        //     `enforce_stream_byte_limit` / `push_chunk_bounded` (crate::runtime)
-        //     are pub fail-closed Overloaded { StreamBytes / StreamChunks }
-        //     primitives (bounding total bytes AND retained chunk count) so
-        //     out-of-tree connector authors can bound their own invoke_stream.
-        //   - Retained memory is bounded at finalize by `apply_stream_limits` /
-        //     `truncate_stream_to_limits`: the stream is truncated to
-        //     `max_stream_total_bytes` / `max_stream_chunks` and the receipt is
-        //     marked incomplete,
-        //     PRESERVING the charge-for-work-done and financial metadata on
-        //     governed monetary streams (pinned by
-        //     `governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata`
-        //     and `streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete`).
-        //     A hard-deny (Err) here was deliberately reverted because it unwinds
-        //     the monetary charge for an already-executed stream, so this seam
-        //     does not hard-deny.
-        if let Some(stream) = server
-            .invoke_stream(&tool_name, arguments.clone(), None)
-            .await?
-        {
-            return Ok((ToolServerOutput::Stream(stream), None));
-        }
-
-        if has_monetary_grant {
-            let (value, cost) = server.invoke_with_cost(&tool_name, arguments, None).await?;
-            Ok((ToolServerOutput::Value(value), cost))
-        } else {
-            let value = server.invoke(&tool_name, arguments, None).await?;
-            Ok((ToolServerOutput::Value(value), None))
         }
     }
 
@@ -1979,80 +1815,5 @@ impl ChioKernel {
             Ok(mut log) => log.append(receipt),
             Err(poisoned) => poisoned.into_inner().append(receipt),
         }
-    }
-}
-
-#[cfg(test)]
-mod timer_probe_tests {
-    use super::dispatch_timer_available;
-
-    // The probe verdict is keyed by runtime id, so each runtime is probed under
-    // its own key. `re_probes_when_the_entered_runtime_changes_on_one_thread`
-    // exercises two runtimes on one thread directly; the two single-runtime tests
-    // below pin the per-runtime verdicts in isolation.
-
-    #[test]
-    fn re_probes_when_the_entered_runtime_changes_on_one_thread(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        // A timerless runtime, then a timer-enabled one, both entered from this
-        // same OS thread. A per-thread-only cache would reuse the timerless
-        // verdict and wrongly report no timer in the second runtime; keying on the
-        // runtime id re-probes when the entered runtime changes.
-        let timerless = tokio::runtime::Builder::new_current_thread().build()?;
-        timerless.block_on(async {
-            assert!(!dispatch_timer_available());
-        });
-        let timed = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()?;
-        timed.block_on(async {
-            assert!(dispatch_timer_available());
-            let elapsed = tokio::time::timeout(
-                std::time::Duration::from_millis(1),
-                std::future::pending::<()>(),
-            )
-            .await;
-            assert!(elapsed.is_err(), "the timer must actually fire here");
-        });
-        Ok(())
-    }
-
-    #[test]
-    fn reports_false_in_a_runtime_without_a_time_driver() -> Result<(), Box<dyn std::error::Error>>
-    {
-        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
-        runtime.block_on(async {
-            assert!(!dispatch_timer_available());
-            // Mirror the hot-path guard: only wrap work in a timer when the probe
-            // allows it, so a timerless runtime degrades to inline instead of
-            // panicking on timer construction.
-            let ran_inline = if dispatch_timer_available() {
-                tokio::time::timeout(std::time::Duration::from_millis(1), std::future::ready(()))
-                    .await
-                    .is_ok()
-            } else {
-                std::future::ready(()).await;
-                true
-            };
-            assert!(ran_inline);
-        });
-        Ok(())
-    }
-
-    #[test]
-    fn reports_true_in_a_runtime_with_a_time_driver() -> Result<(), Box<dyn std::error::Error>> {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()?;
-        runtime.block_on(async {
-            assert!(dispatch_timer_available());
-            let elapsed = tokio::time::timeout(
-                std::time::Duration::from_millis(1),
-                std::future::pending::<()>(),
-            )
-            .await;
-            assert!(elapsed.is_err(), "the timer must actually fire here");
-        });
-        Ok(())
     }
 }

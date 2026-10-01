@@ -250,10 +250,30 @@ fn threshold_fixture() -> TestResult<ThresholdFixture> {
         100,
     )
     .map_err(std::io::Error::other)?;
+    let context = chio_kernel::approval::ThresholdApprovalProposalCreationContext::new(
+        chio_kernel::approval::ThresholdApprovalProposalCreationParameters {
+            matched_request:
+                chio_core::capability::threshold_approval::ThresholdApprovalRequest::new(
+                    "request-1",
+                    "server",
+                    "tool",
+                )
+                .map_err(std::io::Error::other)?,
+            requirement: requirement.clone(),
+            subject: subject.public_key(),
+            governed_intent_hash: sha256_hex(b"intent"),
+            authorization_capability_hash: sha256_hex(b"capability"),
+            authorizing_capability_expires_at: 200,
+            governed_operation_expires_at: 200,
+            submitter: None,
+            separation_of_duties: false,
+        },
+    )?;
     let collector = ThresholdApprovalCollector::new(
         Arc::new(InMemoryThresholdApprovalCollectorStore::new()),
         policy_hash,
         vec![authority.public_key()],
+        Arc::new(move |_: &str, _: u64| Ok(context.clone())),
     );
     Ok(ThresholdFixture {
         collector,
@@ -339,13 +359,7 @@ fn threshold_proposal_mutations_and_exact_quorum_fail_closed() -> TestResult {
         }
     }
 
-    fixture.collector.create_proposal(
-        proposal.clone(),
-        fixture.requirement.clone(),
-        None,
-        false,
-        100,
-    )?;
+    fixture.collector.create_proposal(proposal.clone(), 100)?;
     let one = fixture.collector.submit_token(
         "proposal-1",
         approval_token(&proposal, &fixture.alice, "token-alice")?,

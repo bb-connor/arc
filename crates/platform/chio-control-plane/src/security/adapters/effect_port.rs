@@ -1,0 +1,16 @@
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/security/adapters/effect_port_parts/part_01.inc"
+));
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/security/adapters/effect_port_parts/part_02.inc"
+));
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/security/adapters/effect_port_parts/part_03.inc"
+));
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/security/adapters/effect_port_parts/part_04.inc"
+));

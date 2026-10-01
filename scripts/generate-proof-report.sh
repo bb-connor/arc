@@ -217,6 +217,8 @@ def discover_adapter_gate_sources(repo: Path) -> list[str]:
         "crate_name_markers",
         "explicit_roots",
         "contract_sources",
+        "constructor_sites",
+        "dispatch_sites",
     }
     if set(inventory) != expected_keys:
         fail(
@@ -251,6 +253,54 @@ def discover_adapter_gate_sources(repo: Path) -> list[str]:
     markers = checked_strings("crate_name_markers", paths=False)
     explicit_roots = checked_strings("explicit_roots", paths=True)
     contract_sources = checked_strings("contract_sources", paths=True)
+    site_sources: set[str] = set()
+    identities: set[str] = set()
+    coordinates: set[tuple[str, str, str]] = set()
+    source_directories = {"crates", "examples", "integrations", "bench", "sdks"}
+    for label in ("constructor_sites", "dispatch_sites"):
+        entries = inventory[label]
+        if not isinstance(entries, list) or not entries:
+            fail(f"adapter source inventory {label} must be a nonempty table list")
+        for site in entries:
+            if not isinstance(site, dict) or set(site) != {
+                "id", "path", "symbol", "target", "references"
+            }:
+                fail(f"adapter source inventory {label} has invalid site keys")
+            if any(
+                not isinstance(site[key], str)
+                or not site[key]
+                or site[key].strip() != site[key]
+                for key in ("id", "path", "symbol", "target")
+            ):
+                fail(f"adapter source inventory {label} has invalid site strings")
+            references = site["references"]
+            # TOML integer values must fit its signed 64-bit domain.
+            if type(references) is not int or not 0 < references < 2**63:
+                fail(f"adapter source inventory {label} has invalid reference count")
+            coordinate = (site["path"], site["symbol"], site["target"])
+            if site["id"] in identities or coordinate in coordinates:
+                fail(f"adapter source inventory {label} has duplicate site identity")
+            identities.add(site["id"])
+            coordinates.add(coordinate)
+            relative = Path(site["path"])
+            if (
+                relative.is_absolute()
+                or not relative.parts
+                or relative.parts[0] not in source_directories
+                or relative.as_posix() != site["path"]
+                or "\\" in site["path"]
+                or any(part in {".", ".."} for part in relative.parts)
+                or relative.suffix not in {".rs", ".inc"}
+            ):
+                fail(f"adapter source inventory {label} has an unsafe source path")
+            absolute = repo
+            for part in relative.parts:
+                absolute = absolute / part
+                if absolute.is_symlink():
+                    fail(f"adapter source inventory {label} has a symlinked source")
+            if not absolute.is_file():
+                fail(f"adapter source inventory {label} source is not a regular file")
+            site_sources.add(relative.as_posix())
     roots: list[Path] = []
     crates_root = repo / "crates"
     try:
@@ -271,11 +321,16 @@ def discover_adapter_gate_sources(repo: Path) -> list[str]:
                 roots.append(candidate / "src")
     roots.extend(repo / relative for relative in explicit_roots)
 
-    sources: set[str] = set()
+    sources: set[str] = set(site_sources)
 
     def collect(path: Path) -> None:
         if path.is_symlink() or not path.is_dir():
             fail(f"adapter source root is not a regular directory: {path.relative_to(repo)}")
+        ancestor = repo
+        for part in path.relative_to(repo).parts:
+            ancestor = ancestor / part
+            if ancestor.is_symlink():
+                fail(f"adapter source root has a symlinked ancestor: {path.relative_to(repo)}")
         try:
             entries = sorted(path.iterdir())
         except OSError as exc:
@@ -286,11 +341,10 @@ def discover_adapter_gate_sources(repo: Path) -> list[str]:
                 fail(f"adapter source tree contains a symlink: {relative}")
             if entry.is_dir():
                 collect(entry)
-            elif entry.is_file() and entry.suffix == ".rs":
-                if "tests" in relative.parts or relative.name == "tests.rs" or relative.name.endswith(
-                    "_tests.rs"
-                ):
-                    continue
+            elif entry.is_file():
+                # Literal includes cannot traverse upward. Binding all files
+                # below each source root covers arbitrary fragment extensions
+                # and test-named includes without reimplementing Rust parsing.
                 sources.add(relative.as_posix())
 
     for root in roots:
@@ -300,6 +354,36 @@ def discover_adapter_gate_sources(repo: Path) -> list[str]:
         if path.is_symlink() or not path.is_file():
             fail(f"adapter contract source is missing or symlinked: {relative}")
         sources.add(relative)
+        collect(path.parent)
+
+    def collect_constructor_candidates(path: Path) -> None:
+        # Match constructors.rs's physical scan boundary. Even a file with no
+        # current call site can later introduce an unclassified reference.
+        name = path.name
+        if name in {
+            "tests", "tests.rs", "_generated", "target", "node_modules",
+            ".venv", ".git", "__pycache__",
+        } or name.endswith(("_tests.rs", "_tests")):
+            return
+        if path.is_symlink():
+            if path.suffix in {".rs", ".inc"} or path.is_dir():
+                fail(f"adapter source inventory has a symlinked candidate: {path.relative_to(repo)}")
+            return
+        if path.is_dir():
+            try:
+                entries = sorted(path.iterdir())
+            except OSError as exc:
+                fail(f"cannot read adapter source inventory candidates: {exc}")
+            for entry in entries:
+                collect_constructor_candidates(entry)
+        elif path.is_file() and path.suffix in {".rs", ".inc"}:
+            sources.add(path.relative_to(repo).as_posix())
+
+    for directory in sorted(source_directories):
+        root = repo / directory
+        if root.is_symlink() or not root.is_dir():
+            fail(f"adapter source inventory candidate root is not a regular directory: {directory}")
+        collect_constructor_candidates(root)
     if not sources:
         fail("adapter source discovery produced no Rust files")
     return sorted(sources)
@@ -643,6 +727,8 @@ tracked_paths = [
     repo / "scripts/check-adapter-no-bypass.sh",
     repo / ADAPTER_SOURCE_INVENTORY,
     repo / "xtask/src/adapter_no_bypass.rs",
+    repo / "xtask/src/adapter_no_bypass/constructors.rs",
+    repo / "xtask/src/adapter_no_bypass/source.rs",
     repo / "xtask/src/cli.rs",
     repo / "xtask/src/dispatch.rs",
     repo / "xtask/src/error.rs",

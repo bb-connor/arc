@@ -9,7 +9,27 @@ pub fn replay_openai_fixture(path: impl AsRef<Path>) -> Result<ReplayOutcome, Re
     fixture.ensure_openai()?;
     let captured = fixture.captured_verdicts()?;
     let org_id = fixture.openai_org_id()?;
-    let adapter = OpenAiAdapter::new(org_id);
+    let (_, registry) = conformance_registry(
+        &fixture.path,
+        "openai-1",
+        "OpenAI Responses",
+        "0.1.0",
+        41,
+        &captured,
+        &[
+            "approve_payout",
+            "create_calendar_event",
+            "create_support_ticket",
+            "customer_summary",
+            "fetch_account_balance",
+            "get_weather",
+            "list_recent_activity",
+            "lookup_customer",
+            "search_web",
+            "translate_text",
+        ],
+    )?;
+    let adapter = OpenAiAdapter::new_with_registry(org_id, "openai-1", &registry)?;
 
     let (mode, invocations, verdicts) = if fixture.has_stream_tool_events() {
         let (invocations, verdicts) = replay_openai_stream(&fixture, &adapter, &captured)?;

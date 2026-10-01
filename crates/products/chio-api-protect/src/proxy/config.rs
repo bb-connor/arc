@@ -25,7 +25,13 @@ pub struct ProtectConfig {
     /// proxy runs with in-memory receipts and revocations that are lost on every
     /// restart. Leave it `false` for durable-by-default embedding.
     pub allow_ephemeral_receipts: bool,
-    /// Optional bearer token that authorizes remote sidecar control requests.
+    /// Bearer token required for all sidecar control requests, including loopback.
+    /// Missing or blank configuration disables control routes without disabling
+    /// public liveness or the independently authorized proxy path. Keep this
+    /// operator/tool-server credential separate from agent credentials.
+    /// Nonempty values must use the RFC 6750 bearer-token alphabet and be at most
+    /// 512 bytes after trimming; invalid configuration rejects before startup I/O.
+    /// Proxy routes reject this token's bytes in any header value before egress.
     pub sidecar_control_token: Option<String>,
     /// Optional seed used to keep the sidecar signer stable across restarts.
     pub signer_seed_hex: Option<String>,

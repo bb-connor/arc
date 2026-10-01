@@ -5,8 +5,9 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
-    canonical_json_bytes, is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend,
-    Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, is_default_optional_algorithm, sha256_hex,
+    sign_canonical_with_backend_for_identity, Keypair, PublicKey, Signature, SigningAlgorithm,
+    SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::signer_binding::{
@@ -298,18 +299,30 @@ impl ChioReceipt {
 
     /// Sign a receipt body with an arbitrary [`SigningBackend`].
     ///
-    /// The `body.kernel_key` must equal `backend.public_key()`.
+    /// The `body.kernel_key` must equal the atomic signing identity. The
+    /// returned identity, algorithm and signature are independently checked.
     pub fn sign_with_backend(body: ChioReceiptBody, backend: &dyn SigningBackend) -> Result<Self> {
         validate_bbs_receipt_binding(&body, None)?;
         ensure_backend_matches_embedded_key(&body.kernel_key, backend, "receipt", "kernel_key")?;
         let body = prepare_receipt_body_for_signing(body)?;
         let signing_body = ChioReceiptSigningBody::from(&body);
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &signing_body)?;
+        let (outcome, bytes) =
+            sign_canonical_with_backend_for_identity(backend, &body.kernel_key, &signing_body)?;
+        let expected_algorithm = body.kernel_key.algorithm();
+        if outcome.public_key != body.kernel_key
+            || outcome.algorithm != expected_algorithm
+            || outcome.signature.algorithm() != expected_algorithm
+            || !body.kernel_key.verify(&bytes, &outcome.signature)
+        {
+            return Err(Error::InvalidSignature(
+                "receipt backend returned a mismatched signing identity".to_string(),
+            ));
+        }
         Ok(Self::from_signed_body(
             body,
             None,
-            Some(backend.algorithm()),
-            signature,
+            Some(expected_algorithm),
+            outcome.signature,
         ))
     }
 

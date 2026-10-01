@@ -5,7 +5,7 @@ pub(super) fn chio_swarm_runtime_request(
     bundle_hash: String,
     swarm_context: serde_json::Value,
 ) -> Result<ToolCallRequest, Box<dyn std::error::Error>> {
-    let cap = capability("cap-live-1")?;
+    let cap = swarm_fixtures::runtime_swarm_capability("task-child-a")?;
     Ok(ToolCallRequest {
         request_id: "req-live-destructive".to_string(),
         capability: cap.clone(),
@@ -41,13 +41,14 @@ pub(super) fn chio_swarm_runtime_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })
 }
 
 pub(super) fn swarm_runtime_context(
     bundle: &SwarmAuthorityBundle,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-    Ok(serde_json::json!({
+    let mut context = serde_json::json!({
         "taskGraph": {
             "id": &bundle.task_graph.graph_id,
             "sha256": canonical_test_hash(&bundle.task_graph)?
@@ -64,10 +65,6 @@ pub(super) fn swarm_runtime_context(
             "id": &bundle.witness_chains[0].chain_id,
             "sha256": canonical_test_hash(&bundle.witness_chains[0])?
         },
-        "joinReceipt": {
-            "id": &bundle.join_receipts[0].join_id,
-            "sha256": canonical_test_hash(&bundle.join_receipts[0])?
-        },
         "revocationEpoch": {
             "id": &bundle.revocation_epoch.epoch_id,
             "sha256": canonical_test_hash(&bundle.revocation_epoch)?
@@ -76,5 +73,11 @@ pub(super) fn swarm_runtime_context(
             "id": &bundle.budget_pool.pool_id,
             "sha256": canonical_test_hash(&bundle.budget_pool)?
         }
-    }))
+    });
+    if let Some(join) = bundle.join_receipts.first() {
+        context["joinReceipt"] = serde_json::json!({
+            "id": join.join_id, "sha256": canonical_test_hash(join)?
+        });
+    }
+    Ok(context)
 }

@@ -60,6 +60,14 @@ impl OllamaAdapter {
                 for entry in array {
                     let parsed: ToolCallPart = response::tool_call_part(entry)?;
                     let invocation = self.invocation_from_tool_call(tool_index, &parsed)?;
+                    if !invocation.bridge_security.as_ref().is_some_and(
+                        chio_manifest::BridgeSecurityMetadata::has_registry_coordinates,
+                    ) {
+                        return Err(ProviderError::Malformed(
+                            "Ollama stream evaluation requires a registry-admitted security sidecar"
+                                .to_string(),
+                        ));
+                    }
                     let verdict = evaluate(&invocation)?;
                     ensure_streaming_allow_no_redactions(
                         "Ollama",

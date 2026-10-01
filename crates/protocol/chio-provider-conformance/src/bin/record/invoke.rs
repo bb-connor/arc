@@ -209,6 +209,7 @@ fn tool_invocation(
             principal,
             received_at: SystemTime::now(),
         },
+        bridge_security: None,
     })
 }
 

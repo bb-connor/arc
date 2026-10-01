@@ -20,9 +20,10 @@ use chio_core_types::capability::threshold_approval::{
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_http_core::approvals::{
     handle_batch_respond, handle_create_threshold_proposal, handle_deliver_threshold_approval,
-    handle_get_approval, handle_list_pending, handle_respond, handle_submit_threshold_approval,
-    ApprovalAdmin, ApprovalHandlerError, BatchDecisionEntry, BatchRespondRequest,
-    CreateThresholdProposalRequest, PendingQuery, RespondRequest, SubmitThresholdApprovalRequest,
+    handle_get_approval, handle_get_threshold_proposal, handle_list_pending, handle_respond,
+    handle_submit_threshold_approval, ApprovalAdmin, ApprovalHandlerError, BatchDecisionEntry,
+    BatchRespondRequest, CreateThresholdProposalRequest, PendingQuery, RespondRequest,
+    SubmitThresholdApprovalRequest,
 };
 use chio_kernel::{
     ApprovalOutcome, ApprovalRequest, ApprovalStore, InMemoryApprovalStore,
@@ -386,23 +387,58 @@ fn threshold_handlers_collect_and_deliver_original_tokens() {
         &authority,
     )
     .unwrap();
+    let context = chio_kernel::approval::ThresholdApprovalProposalCreationContext::new(
+        chio_kernel::approval::ThresholdApprovalProposalCreationParameters {
+            matched_request:
+                chio_core_types::capability::threshold_approval::ThresholdApprovalRequest::new(
+                    "http-request",
+                    "server",
+                    "tool",
+                )
+                .unwrap(),
+            requirement,
+            subject: subject.public_key(),
+            governed_intent_hash: sha256_hex(b"http-intent"),
+            authorization_capability_hash: sha256_hex(b"http-capability"),
+            authorizing_capability_expires_at: 200,
+            governed_operation_expires_at: 200,
+            submitter: None,
+            separation_of_duties: false,
+        },
+    )
+    .unwrap();
+    let resolver_context = context.clone();
     let collector = ThresholdApprovalCollector::new(
         Arc::new(InMemoryThresholdApprovalCollectorStore::new()),
         policy_hash,
         vec![authority.public_key()],
+        Arc::new(move |_: &str, _: u64| Ok(resolver_context.clone())),
     );
     let admin = ApprovalAdmin::with_threshold_collector(legacy_store, collector);
-    handle_create_threshold_proposal(
-        &admin,
-        CreateThresholdProposalRequest {
-            proposal: proposal.clone(),
-            requirement,
-            submitter: None,
-            require_submitter_separation: false,
-        },
-        100,
-    )
-    .unwrap();
+    let creation = CreateThresholdProposalRequest {
+        proposal: proposal.clone(),
+    };
+    let base_payload = serde_json::to_value(&creation).unwrap();
+    assert!(serde_json::from_value::<CreateThresholdProposalRequest>(base_payload.clone()).is_ok());
+    for (field, value) in [
+        (
+            "requirement",
+            serde_json::to_value(context.requirement()).unwrap(),
+        ),
+        (
+            "submitter",
+            serde_json::to_value(subject.public_key()).unwrap(),
+        ),
+        ("require_submitter_separation", serde_json::json!(false)),
+    ] {
+        let mut payload = base_payload.clone();
+        payload.as_object_mut().unwrap().insert(field.into(), value);
+        assert!(
+            serde_json::from_value::<CreateThresholdProposalRequest>(payload).is_err(),
+            "{field}"
+        );
+    }
+    handle_create_threshold_proposal(&admin, creation, 100).unwrap();
 
     let make_token = |approver: &Keypair, id: &str| {
         GovernedApprovalToken::sign(
@@ -446,6 +482,11 @@ fn threshold_handlers_collect_and_deliver_original_tokens() {
     assert_eq!(ready.state, ThresholdApprovalCollectorState::Ready);
 
     let delivered = handle_deliver_threshold_approval(&admin, "http-proposal", 112).unwrap();
+    assert_eq!(
+        handle_deliver_threshold_approval(&admin, "http-proposal", 113).unwrap(),
+        delivered
+    );
+    assert!(handle_get_threshold_proposal(&admin, "http-proposal", 111).is_err());
     assert_eq!(delivered.proposal, proposal);
     assert_eq!(
         delivered
@@ -455,4 +496,17 @@ fn threshold_handlers_collect_and_deliver_original_tokens() {
             .collect::<Vec<_>>(),
         vec!["http-token-alice", "http-token-bob"]
     );
+}
+
+#[test]
+fn threshold_handlers_are_unavailable_without_a_trusted_collector() {
+    let (admin, _) = make_admin();
+    assert!(matches!(
+        handle_get_threshold_proposal(&admin, "proposal", 100),
+        Err(ApprovalHandlerError::Internal(_))
+    ));
+    assert!(matches!(
+        handle_deliver_threshold_approval(&admin, "proposal", 100),
+        Err(ApprovalHandlerError::Internal(_))
+    ));
 }

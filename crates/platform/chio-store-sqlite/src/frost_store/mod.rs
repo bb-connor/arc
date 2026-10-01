@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_core::StoreMutationFence;
 use chio_federation_authority::{FrostAuthenticatedDkgPackage, FrostCeremonySecret};
@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::admission_operation_store::verify_active_owner;
 use crate::encrypted_blob::TenantKey;
 use crate::serving_owner::SqliteServingOwner;
+use crate::store_connection::StoreConnection;
 
 mod ceremony;
 mod commit;
@@ -402,13 +403,13 @@ impl StagedFrostRotation {
 
 #[derive(Clone)]
 pub struct SqliteFrostStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Arc<SqliteServingOwner>,
 }
 
 impl SqliteFrostStore {
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -418,9 +419,9 @@ impl SqliteFrostStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, FrostStoreError> {
-        self.connection.lock().map_err(|_| {
-            FrostStoreError::Unavailable("sqlite FROST store lock is poisoned".to_string())
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| FrostStoreError::Unavailable(fenced.to_string()))
     }
 
     fn begin_read<'a>(
@@ -567,3 +568,7 @@ pub(super) fn secret_kind_name(secret: &FrostCeremonySecret) -> &'static str {
         chio_federation_authority::FrostCeremonySecretKind::KeyPackage => "key_package",
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;

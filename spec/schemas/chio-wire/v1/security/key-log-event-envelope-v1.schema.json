@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/key-log-event-envelope-v1.schema.json",
+  "title": "Chio signed key-log event envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["body", "authorizations"],
+  "properties": {
+    "body": { "$ref": "key-log-event-body-v1.schema.json" },
+    "authorizations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bootstrap": { "$ref": "#/$defs/keyAuthorization" },
+        "old_key": { "$ref": "#/$defs/keyAuthorization" },
+        "new_key": { "$ref": "#/$defs/keyAuthorization" },
+        "recovery": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/recoveryAuthorization" } }
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
+    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
+    "signature": { "type": "string", "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$" },
+    "keyLogIdentifier": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:/-]+$" },
+    "keyAuthorization": { "type": "object", "additionalProperties": false, "required": ["key_id", "algorithm", "signature"], "properties": { "key_id": { "$ref": "#/$defs/hash" }, "algorithm": { "$ref": "#/$defs/algorithm" }, "signature": { "$ref": "#/$defs/signature" } } },
+    "recoveryAuthorization": { "type": "object", "additionalProperties": false, "required": ["authorizer_id", "algorithm", "signature"], "properties": { "authorizer_id": { "$ref": "#/$defs/keyLogIdentifier" }, "algorithm": { "$ref": "#/$defs/algorithm" }, "signature": { "$ref": "#/$defs/signature" } } }
+  }
+}

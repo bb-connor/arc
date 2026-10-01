@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use chio_kernel::budget_store::{
     BudgetEventAuthority, BudgetGuaranteeLevel, RevocationCommitMetadata,
@@ -8,9 +8,11 @@ use chio_kernel::budget_store::{
 use chio_kernel::{RevocationObservation, RevocationRecord, RevocationStore, RevocationStoreError};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
+use crate::store_connection::StoreConnection;
+
 #[derive(Clone)]
 pub struct SqliteRevocationStore {
-    connection: Arc<Mutex<Connection>>,
+    connection: Arc<StoreConnection>,
     serving_owner: Option<Arc<crate::serving_owner::SqliteServingOwner>>,
     /// Whether the backing database lives only in process memory and so loses
     /// every revocation on restart. Computed from the open path, not assumed
@@ -120,15 +122,18 @@ impl SqliteRevocationStore {
             rotate_revocation_stream_identity(&mut connection)?;
         }
 
+        // Opened by path there is no serving owner and no anchor: a revocation
+        // and its delta-log entry land in one RAII transaction and nothing
+        // outside the database records them.
         Ok(Self {
-            connection: Arc::new(Mutex::new(connection)),
+            connection: Arc::new(StoreConnection::transaction_only("revocation", connection)),
             serving_owner: None,
             ephemeral,
         })
     }
 
     pub(crate) fn open_alongside(
-        connection: Arc<Mutex<Connection>>,
+        connection: Arc<StoreConnection>,
         serving_owner: Arc<crate::serving_owner::SqliteServingOwner>,
     ) -> Self {
         Self {
@@ -139,9 +144,9 @@ impl SqliteRevocationStore {
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, RevocationStoreError> {
-        self.connection.lock().map_err(|_| {
-            RevocationStoreError::Sync("sqlite revocation store lock poisoned".to_string())
-        })
+        self.connection
+            .lock()
+            .map_err(|fenced| RevocationStoreError::Sync(fenced.to_string()))
     }
 
     fn begin_write<'a>(
@@ -156,6 +161,75 @@ impl SqliteRevocationStore {
                 .map_err(map_serving_owner_error)?;
         }
         Ok(transaction)
+    }
+
+    /// Record `capability_id` as revoked inside `transaction`: the row, its
+    /// delta-log entry and, under a serving owner, the commit-chain entries the
+    /// rollback anchor tracks. Returns false when it was already revoked.
+    fn record_revocation(
+        &self,
+        transaction: &Transaction<'_>,
+        capability_id: &str,
+        revoked_at: i64,
+    ) -> Result<bool, RevocationStoreError> {
+        let exists = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if exists {
+            return Ok(false);
+        }
+        let joint = self.serving_owner.is_some();
+        let revocation_index = allocate_revocation_index(transaction, joint)?;
+        let index_column = if joint {
+            "admission_authority_commit_index"
+        } else {
+            "revocation_index"
+        };
+        let inserted = transaction
+            .query_row(
+                &format!(
+                    r#"
+            INSERT INTO revoked_capabilities (
+                capability_id, revoked_at, {index_column}
+            ) VALUES (?1, ?2, ?3)
+            ON CONFLICT(capability_id) DO NOTHING RETURNING 1
+            "#
+                ),
+                params![capability_id, revoked_at, revocation_index],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?;
+        if inserted.is_none() {
+            return Ok(false);
+        }
+        append_revocation_delta(
+            transaction,
+            &RevocationRecord {
+                capability_id: capability_id.to_string(),
+                revoked_at,
+            },
+        )?;
+        if joint {
+            append_admission_revocation_commit(transaction, revocation_index, capability_id)?;
+            self.serving_owner
+                .as_ref()
+                .ok_or_else(|| {
+                    RevocationStoreError::Sync(
+                        "joint revocation mutation lost its serving owner".to_string(),
+                    )
+                })?
+                .append_global_commit(
+                    transaction,
+                    "revocation_revoke",
+                    "revocation",
+                    capability_id,
+                    stored_index(revocation_index)?,
+                )
+                .map_err(map_serving_owner_error)?;
+        }
+        Ok(true)
     }
 
     fn read<T>(
@@ -541,72 +615,17 @@ impl RevocationStore for SqliteRevocationStore {
             .unwrap_or(0);
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
-        let exists = transaction.query_row(
-            "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
-            params![capability_id],
-            |row| row.get::<_, bool>(0),
-        )?;
-        if exists {
+        if !self.record_revocation(&transaction, capability_id, revoked_at)? {
             transaction.rollback()?;
             return Ok(false);
         }
-        let joint = self.serving_owner.is_some();
-        let revocation_index = allocate_revocation_index(&transaction, joint)?;
-        let index_column = if joint {
-            "admission_authority_commit_index"
-        } else {
-            "revocation_index"
-        };
-        let inserted = transaction
-            .query_row(
-                &format!(
-                    r#"
-            INSERT INTO revoked_capabilities (
-                capability_id, revoked_at, {index_column}
-            ) VALUES (?1, ?2, ?3)
-            ON CONFLICT(capability_id) DO NOTHING RETURNING 1
-            "#
-                ),
-                params![capability_id, revoked_at, revocation_index],
-                |row| row.get::<_, i64>(0),
-            )
-            .optional()?;
-        if inserted.is_some() {
-            append_revocation_delta(
-                &transaction,
-                &RevocationRecord {
-                    capability_id: capability_id.to_string(),
-                    revoked_at,
-                },
-            )?;
-            if joint {
-                append_admission_revocation_commit(&transaction, revocation_index, capability_id)?;
-                self.serving_owner
-                    .as_ref()
-                    .ok_or_else(|| {
-                        RevocationStoreError::Sync(
-                            "joint revocation mutation lost its serving owner".to_string(),
-                        )
-                    })?
-                    .append_global_commit(
-                        &transaction,
-                        "revocation_revoke",
-                        "revocation",
-                        capability_id,
-                        stored_index(revocation_index)?,
-                    )
-                    .map_err(map_serving_owner_error)?;
-            }
-            commit_mutation(self, transaction)?;
-            if let Some(owner) = self.serving_owner.as_ref() {
-                owner
-                    .sync_authority_anchor(&connection)
-                    .map_err(map_serving_owner_error)?;
-            }
-        } else {
-            transaction.rollback()?;
+        commit_mutation(self, transaction)?;
+        if let Some(owner) = self.serving_owner.as_ref() {
+            owner
+                .sync_authority_anchor(&connection)
+                .map_err(map_serving_owner_error)?;
         }
-        Ok(inserted.is_some())
+        Ok(true)
     }
 
     fn observe_revocation(
@@ -1272,6 +1291,12 @@ fn verify_revocation_foreign_keys(connection: &Connection) -> Result<(), Revocat
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod connection_recovery;
+#[cfg(test)]
+pub(crate) use connection_recovery::write_probe_revocation;
 
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]

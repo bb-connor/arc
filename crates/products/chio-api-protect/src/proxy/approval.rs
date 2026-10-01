@@ -1,5 +1,11 @@
 use super::*;
 
+fn approval_timestamp(seconds: i64) -> Result<u64, ApprovalHandlerError> {
+    u64::try_from(seconds).map_err(|_| {
+        ApprovalHandlerError::Internal("approval clock precedes the Unix epoch".to_string())
+    })
+}
+
 pub(crate) async fn list_pending_approvals_handler(
     State(state): State<Arc<ProxyState>>,
     Query(query): Query<PendingQuery>,
@@ -34,7 +40,10 @@ pub(crate) async fn respond_approval_handler(
         }
     };
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(error) => return approval_error_response(error),
+    };
     match handle_respond(&state.approval_admin, &approval_id, body, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
@@ -54,7 +63,10 @@ pub(crate) async fn batch_respond_approvals_handler(
         }
     };
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(error) => return approval_error_response(error),
+    };
     match handle_batch_respond(&state.approval_admin, body, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
@@ -73,7 +85,10 @@ pub(crate) async fn create_threshold_proposal_handler(
             )));
         }
     };
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(error) => return approval_error_response(error),
+    };
     match handle_create_threshold_proposal(&state.approval_admin, body, now) {
         Ok(response) => approval_json(StatusCode::CREATED, response),
         Err(error) => approval_error_response(error),
@@ -84,7 +99,11 @@ pub(crate) async fn get_threshold_proposal_handler(
     State(state): State<Arc<ProxyState>>,
     Path(proposal_id): Path<String>,
 ) -> Response {
-    match handle_get_threshold_proposal(&state.approval_admin, &proposal_id) {
+    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(error) => return approval_error_response(error),
+    };
+    match handle_get_threshold_proposal(&state.approval_admin, &proposal_id, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
@@ -103,7 +122,10 @@ pub(crate) async fn submit_threshold_approval_handler(
             )));
         }
     };
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(error) => return approval_error_response(error),
+    };
     match handle_submit_threshold_approval(&state.approval_admin, &proposal_id, body, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
@@ -114,7 +136,10 @@ pub(crate) async fn deliver_threshold_approval_handler(
     State(state): State<Arc<ProxyState>>,
     Path(proposal_id): Path<String>,
 ) -> Response {
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(error) => return approval_error_response(error),
+    };
     match handle_deliver_threshold_approval(&state.approval_admin, &proposal_id, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
@@ -173,7 +198,10 @@ pub(crate) async fn submit_approval_handler(
         }
     };
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(error) => return approval_error_response(error),
+    };
     let ttl = if body.ttl_seconds == 0 {
         3600
     } else {
@@ -288,7 +316,10 @@ pub(crate) async fn operator_respond_approval_handler(
         .or_else(|| PublicKey::from_hex(&pending.subject_id).ok())
         .unwrap_or_else(|| approver_pubkey.clone());
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+        Ok(now) => now,
+        Err(error) => return approval_error_response(error),
+    };
     let decision = match body.outcome {
         ApprovalOutcome::Approved => GovernedApprovalDecision::Approved,
         ApprovalOutcome::Denied => GovernedApprovalDecision::Denied,
@@ -324,5 +355,17 @@ pub(crate) async fn operator_respond_approval_handler(
     match handle_respond(&state.approval_admin, &approval_id, respond_body, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
+    }
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use super::approval_timestamp;
+
+    #[test]
+    fn approval_clock_rejects_pre_epoch_timestamps() {
+        assert!(approval_timestamp(-1).is_err());
+        assert!(matches!(approval_timestamp(0), Ok(0)));
+        assert!(matches!(approval_timestamp(123), Ok(123)));
     }
 }

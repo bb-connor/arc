@@ -4,7 +4,7 @@ use chio_core::{
     CompletionResult, PromptDefinition, PromptResult, ResourceContent, ResourceDefinition,
     ResourceTemplateDefinition, ServerId,
 };
-use chio_kernel::NestedFlowBridge;
+use chio_kernel::{NestedFlowBridge, ToolDispatchContext};
 use chio_manifest::ToolManifest;
 use tracing::warn;
 
@@ -12,6 +12,18 @@ use crate::edge::{AdapterError, McpServerCapabilities, McpToolInfo, McpToolResul
 use crate::manifest;
 use crate::result_mapping::mcp_tool_result_to_chio_value;
 use crate::transport::StdioMcpTransport;
+
+pub(crate) fn merge_shutdown_error(
+    primary: AdapterError,
+    shutdown: Result<(), AdapterError>,
+) -> AdapterError {
+    match shutdown {
+        Ok(()) => primary,
+        Err(shutdown_error) => AdapterError::ConnectionFailed(format!(
+            "{primary}; terminal receipt persistence also failed: {shutdown_error}"
+        )),
+    }
+}
 
 /// Configuration for the MCP adapter.
 #[derive(Clone)]
@@ -33,17 +45,12 @@ pub struct McpAdapterConfig {
 ///
 /// Usage:
 ///
-/// ```ignore
-/// let transport = StdioMcpTransport::spawn("npx", &["-y", "some-mcp-server"]);
-/// let config = McpAdapterConfig { /* ... */ };
-/// let adapter = McpAdapter::new(config, Box::new(transport));
-/// let manifest = adapter.generate_manifest()?;
-/// let result = adapter.invoke("read_file", json!({"path": "/tmp/test.txt"}))?;
-/// ```
 #[derive(Clone)]
 pub struct McpAdapter {
     pub(crate) config: McpAdapterConfig,
     pub(crate) transport: Arc<dyn McpTransport>,
+    native_enforcement_evidence: Option<chio_cage::FullyEnforcedEvidence>,
+    native_enforcement_receipt: Option<chio_core::receipt::body::ChioReceipt>,
 }
 
 /// Transport wrapper that serializes upstream MCP calls through one shared gate.
@@ -102,6 +109,22 @@ impl McpTransport for SerializedMcpTransport {
         })
     }
 
+    fn call_tool_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<McpToolResult, AdapterError> {
+        self.with_request_gate(|inner| {
+            inner.call_tool_in_context(context, tool_name, arguments, nested_flow_bridge)
+        })
+    }
+
+    fn prepare_delivery(&self) -> Result<(), AdapterError> {
+        self.with_request_gate(|inner| inner.prepare_delivery())
+    }
+
     fn list_resources(&self) -> Result<Vec<ResourceDefinition>, AdapterError> {
         self.with_request_gate(|inner| inner.list_resources())
     }
@@ -157,6 +180,13 @@ impl McpTransport for SerializedMcpTransport {
                 vec![]
             })
     }
+
+    fn shutdown(&self) -> Result<(), AdapterError> {
+        // Shutdown must be able to cancel the request currently holding the
+        // serialization gate. The underlying transport owns that cancellation
+        // and terminal-evidence synchronization.
+        self.inner.shutdown()
+    }
 }
 
 impl McpAdapter {
@@ -164,7 +194,14 @@ impl McpAdapter {
         Self {
             config,
             transport: Arc::from(transport),
+            native_enforcement_evidence: None,
+            native_enforcement_receipt: None,
         }
+    }
+
+    /// Shut down the upstream transport and persist terminal security evidence.
+    pub fn shutdown(&self) -> Result<(), AdapterError> {
+        self.transport.shutdown()
     }
 
     /// Create an adapter that spawns an MCP server as a subprocess.
@@ -176,9 +213,83 @@ impl McpAdapter {
         command: &str,
         args: &[&str],
         config: McpAdapterConfig,
+        launch: crate::transport::NativeMcpLaunch,
     ) -> Result<Self, AdapterError> {
-        let transport = StdioMcpTransport::spawn(command, args)?;
-        Ok(Self::new(config, Box::new(transport)))
+        Self::from_command_with_timeouts(
+            command,
+            args,
+            config,
+            launch,
+            crate::transport::StdioRequestTimeouts::default(),
+        )
+    }
+
+    /// Create an authorized subprocess adapter with operator-selected request deadlines.
+    pub fn from_command_with_timeouts(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        launch: crate::transport::NativeMcpLaunch,
+        request_timeouts: crate::transport::StdioRequestTimeouts,
+    ) -> Result<Self, AdapterError> {
+        if launch.server_id() != config.server_id {
+            return Err(AdapterError::ConnectionFailed(
+                "native MCP launch authorization belongs to a different server".to_string(),
+            ));
+        }
+        let cage_required = matches!(&launch, crate::transport::NativeMcpLaunch::CageRequired(_));
+        let transport =
+            StdioMcpTransport::spawn_with_timeouts(command, args, launch, request_timeouts)?;
+        let enforcement_evidence = if cage_required {
+            match transport.enforcement_evidence().cloned() {
+                Some(evidence) => Some(evidence),
+                None => {
+                    let error = AdapterError::ConnectionFailed(
+                        "cage-required transport returned no fully enforced evidence".into(),
+                    );
+                    return Err(merge_shutdown_error(error, transport.shutdown()));
+                }
+            }
+        } else {
+            None
+        };
+        let enforcement_receipt = transport.enforcement_receipt().cloned();
+        if cage_required && enforcement_receipt.is_none() {
+            let error = AdapterError::ConnectionFailed(
+                "cage-required transport returned no persisted enforcement receipt".into(),
+            );
+            return Err(merge_shutdown_error(error, transport.shutdown()));
+        }
+        let mut adapter = Self::new(config, Box::new(transport));
+        adapter.native_enforcement_evidence = enforcement_evidence;
+        adapter.native_enforcement_receipt = enforcement_receipt;
+        Ok(adapter)
+    }
+
+    /// Create an adapter whose subprocess is required to reach verified cage
+    /// enforcement. Cage admission or launch failure is terminal.
+    pub fn from_cage_required_command(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        launch: crate::transport::CageRequiredLaunch,
+    ) -> Result<Self, AdapterError> {
+        Self::from_command(
+            command,
+            args,
+            config,
+            crate::transport::NativeMcpLaunch::CageRequired(Box::new(launch)),
+        )
+    }
+
+    #[must_use]
+    pub fn native_enforcement_evidence(&self) -> Option<&chio_cage::FullyEnforcedEvidence> {
+        self.native_enforcement_evidence.as_ref()
+    }
+
+    #[must_use]
+    pub fn native_enforcement_receipt(&self) -> Option<&chio_core::receipt::body::ChioReceipt> {
+        self.native_enforcement_receipt.as_ref()
     }
 
     /// Query the MCP server for its tool list and generate a Chio manifest.
@@ -214,6 +325,28 @@ impl McpAdapter {
                 .call_tool_with_nested_flow(tool_name, arguments, nested_flow_bridge)?;
 
         Ok(mcp_tool_result_to_chio_value(result))
+    }
+
+    /// Invoke with the kernel's dispatch identity forwarded to the server.
+    pub fn invoke_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, AdapterError> {
+        let result = self.transport.call_tool_in_context(
+            context,
+            tool_name,
+            arguments,
+            nested_flow_bridge,
+        )?;
+        Ok(mcp_tool_result_to_chio_value(result))
+    }
+
+    /// Prove the upstream is reachable before a durable dispatch commits.
+    pub fn prepare_delivery(&self) -> Result<(), AdapterError> {
+        self.transport.prepare_delivery()
     }
 
     pub fn list_resources(&self) -> Result<Vec<ResourceDefinition>, AdapterError> {

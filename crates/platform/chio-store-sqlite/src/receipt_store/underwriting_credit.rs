@@ -302,7 +302,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let (raw_json, lifecycle_state_raw) = row?;
-            let decision: SignedUnderwritingDecision = serde_json::from_str(&raw_json)?;
+            let decision: SignedUnderwritingDecision = decode_verified_signed_export(&raw_json)?;
             let lifecycle_state =
                 parse_underwriting_lifecycle_state(&lifecycle_state_raw).map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
@@ -529,7 +529,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let (raw_json, lifecycle_state_raw, superseded_by_facility_id) = row?;
-            let facility: SignedCreditFacility = serde_json::from_str(&raw_json)?;
+            let facility: SignedCreditFacility = decode_verified_signed_export(&raw_json)?;
             let persisted_lifecycle = parse_credit_facility_lifecycle_state(&lifecycle_state_raw)
                 .map_err(|error| {
                 ReceiptStoreError::Conflict(format!(
@@ -716,7 +716,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let (raw_json, lifecycle_state_raw, superseded_by_bond_id) = row?;
-            let bond: SignedCreditBond = serde_json::from_str(&raw_json)?;
+            let bond: SignedCreditBond = decode_verified_signed_export(&raw_json)?;
             let persisted_lifecycle = parse_credit_bond_lifecycle_state(&lifecycle_state_raw)
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
@@ -878,7 +878,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let raw_json = row?;
-            let event: SignedCreditLossLifecycle = serde_json::from_str(&raw_json)?;
+            let event: SignedCreditLossLifecycle = decode_verified_signed_export(&raw_json)?;
             let body = &event.body;
             let summary = &body.report.summary;
             if normalized

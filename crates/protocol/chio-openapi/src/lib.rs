@@ -12,7 +12,7 @@ mod generator;
 mod parser;
 mod policy;
 
-pub use extensions::{ChioExtensions, Sensitivity};
+pub use extensions::{export_tool_flow_extension, ChioExtensions, Sensitivity};
 pub use generator::{GeneratorConfig, ManifestGenerator};
 pub use parser::{OpenApiSpec, Operation, Parameter, ParameterLocation, PathItem};
 pub use policy::{DefaultPolicy, PolicyDecision};
@@ -58,5 +58,5 @@ pub type Result<T> = std::result::Result<T, OpenApiError>;
 pub fn tools_from_spec(input: &str) -> Result<Vec<chio_core_types::ToolDefinition>> {
     let spec = OpenApiSpec::parse(input)?;
     let generator = ManifestGenerator::new(GeneratorConfig::default());
-    Ok(generator.generate_tools(&spec))
+    generator.generate_tools(&spec)
 }

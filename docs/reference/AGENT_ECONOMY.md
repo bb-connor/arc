@@ -585,6 +585,31 @@ Cost-range queries require an exact three-letter uppercase currency and execute
 their page and count in one reader transaction. Tenant-scoped queries use the
 tenant-leading index; admin-all queries use the global index.
 
+Receipt schema version 6 also stores `attempted_cost_be` as a nullable,
+CHECK-constrained eight-byte BLOB derived from signed `financial.attempted_cost`.
+Absence stays NULL; an explicit zero stays eight zero bytes. Writable open
+migrates older databases and archive rotation migrates older archives in one
+transaction. Read-only open refuses older schema versions until writable
+migration completes. Migration verifies each signed receipt and refuses any
+preexisting projection that disagrees with it. It never changes signed receipt
+bytes. Keep a database backup before upgrading; older binaries reject version 6.
+
+Analytics sums charged and attempted projections with exact unsigned arithmetic
+in one read snapshot. It first verifies each selected receipt's signature and
+compares both projections and currency with that signed receipt. A schema-valid
+projection alone cannot authorize a reported amount, including after an external
+database mutation or reopen. Every dimension returns the exact total or a named
+refusal when the total exceeds the report's `u64` range. No JSON-to-SQL integer
+cast is used for either total.
+
+A report refuses more than 250,000 matching receipts and also limits total SQL
+work to approximately 100 million VM instructions, checked every 1,000
+instructions. The latter also bounds sparse filters that examine many rows but
+match none. Exhaustion returns a read-boundary error and releases the read
+snapshot. Callers must narrow capability, tool, subject, or time filters for
+larger history. Signature verification adds CPU cost proportional to the selected
+receipts; the instruction limit is not a wall-clock latency guarantee.
+
 ### 3.6 Payment Rail Integration
 
 #### 3.6.1 PaymentAdapter Trait

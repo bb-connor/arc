@@ -68,6 +68,7 @@ fn make_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     (scope, agent_id, server_id, req)
@@ -97,6 +98,7 @@ fn evaluate_with_matched_grant(
         server_id: &server_id,
         session_filesystem_roots: None,
         matched_grant_index,
+        security_context: None,
     };
     guard
         .evaluate(&ctx)

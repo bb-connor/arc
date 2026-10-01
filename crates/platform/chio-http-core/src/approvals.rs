@@ -17,7 +17,6 @@
 use std::sync::Arc;
 
 use chio_core_types::capability::governance::{GovernedApprovalToken, ThresholdApprovalProposal};
-use chio_core_types::capability::threshold_approval::ThresholdApprovalRequirement;
 use chio_core_types::crypto::PublicKey;
 use chio_kernel::{
     resume_with_decision, ApprovalDecision, ApprovalFilter, ApprovalOutcome, ApprovalRequest,
@@ -103,10 +102,12 @@ impl std::error::Error for ApprovalHandlerError {}
 impl From<ApprovalStoreError> for ApprovalHandlerError {
     fn from(e: ApprovalStoreError) -> Self {
         match e {
+            ApprovalStoreError::Invalid(m) => Self::BadRequest(m),
             ApprovalStoreError::NotFound(m) => Self::NotFound(m),
             ApprovalStoreError::AlreadyResolved(m) => {
                 Self::Conflict(format!("already resolved: {m}"))
             }
+            ApprovalStoreError::Conflict(m) => Self::Conflict(m),
             ApprovalStoreError::Replay(m) => Self::ReplayDetected(m),
             ApprovalStoreError::Backend(m) => Self::Internal(m),
             ApprovalStoreError::Serialization(m) => Self::Internal(m),
@@ -242,13 +243,9 @@ pub struct RespondResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreateThresholdProposalRequest {
     pub proposal: ThresholdApprovalProposal,
-    pub requirement: ThresholdApprovalRequirement,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub submitter: Option<PublicKey>,
-    #[serde(default)]
-    pub require_submitter_separation: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -468,23 +465,18 @@ pub fn handle_create_threshold_proposal(
 ) -> Result<ThresholdApprovalCollectorProposal, ApprovalHandlerError> {
     admin
         .threshold_collector()?
-        .create_proposal(
-            body.proposal,
-            body.requirement,
-            body.submitter,
-            body.require_submitter_separation,
-            now,
-        )
+        .create_proposal(body.proposal, now)
         .map_err(Into::into)
 }
 
 pub fn handle_get_threshold_proposal(
     admin: &ApprovalAdmin,
     proposal_id: &str,
+    now: u64,
 ) -> Result<ThresholdApprovalCollectorProposal, ApprovalHandlerError> {
     admin
         .threshold_collector()?
-        .get_proposal(proposal_id)?
+        .get_proposal(proposal_id, now)?
         .ok_or_else(|| ApprovalHandlerError::NotFound(proposal_id.to_string()))
 }
 

@@ -169,6 +169,18 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// The caller durably terminalized the admission but still needs the
     /// armed post-dispatch path to record its signed ambiguity receipt and
     /// retain non-durable reservations.
+    /// Terminalize the durable operation as outcome unknown after a transport
+    /// failure that followed the dispatch commit, before the response that
+    /// reports the ambiguity is built. The caller disarms the guard afterwards.
+    pub(crate) fn terminalize_after_transport_failure(&mut self) -> Result<(), KernelError> {
+        if let Some(operation) = self.durable_operation {
+            self.kernel
+                .terminalize_dispatch_committed_admission(operation, current_unix_timestamp_ms())?;
+            self.mark_durable_operation_terminalized();
+        }
+        Ok(())
+    }
+
     pub(crate) fn mark_durable_operation_terminalized(&mut self) {
         self.durable_operation = None;
     }
@@ -224,6 +236,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 self.cap,
                 self.budget_mutation.charge_result(),
                 self.payment_authorization,
+                self.durable_operation,
             ) {
                 Ok(_) => {}
                 Err(error) => {
@@ -285,10 +298,10 @@ impl<'a> PostAdmissionDropGuard<'a> {
         }
 
         // 3. Runtime-admission reservation release.
-        if let Err(error) = self
-            .kernel
-            .release_runtime_admission_reservations(self.receipt_context.extra_metadata.as_ref())
-        {
+        if let Err(error) = self.kernel.release_runtime_admission_reservations(
+            self.durable_operation,
+            self.receipt_context.extra_metadata.as_ref(),
+        ) {
             let reason = redacted!(&error).to_string();
             warn!(
                 request_id = %self.request.request_id,

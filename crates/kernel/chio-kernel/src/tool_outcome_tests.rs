@@ -2,6 +2,8 @@ use super::*;
 
 use std::sync::Mutex;
 
+use chio_core::capability::scope::ChioScope;
+use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
     body::{ChioReceipt, ChioReceiptBody},
@@ -9,6 +11,8 @@ use chio_core::receipt::{
     metadata::GuardEvidence,
 };
 use chio_core_types::{provider_attempt::ProviderAttemptBindingV1, StoreMutationFence};
+use chio_security_types::ports::{IsolationEpochId, LineageId, SessionId, TenantId};
+use chio_security_types::PrincipalId;
 use serde_json::{json, Map};
 
 use crate::admission_operation::{
@@ -21,6 +25,7 @@ use crate::admission_operation::{
     AuthenticatedRequestNamespace, SideEffectClass, UntrustedAdmissionRecoveryClaim,
     VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
 };
+use crate::{SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest};
 
 fn sha(label: &str) -> String {
     sha256_hex(label.as_bytes())
@@ -401,6 +406,7 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
     reverse.insert("a".to_owned(), json!(1));
     let operation_id = AdmissionOperationId::from_persisted(sha("op")).unwrap();
     let raw = RawInvocationOutcomeV1 {
+        caller_delivery_evidence: None,
         schema: RAW_INVOCATION_OUTCOME_SCHEMA,
         operation_id: operation_id.clone(),
         request_id: id("req"),
@@ -429,6 +435,10 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         receipt_metadata_snapshot: None,
         pre_invocation_guard_evidence: Vec::new(),
         request_canonical_json: None,
+        security_invocation_context: None,
+        security_release_required: None,
+        federation_context_json: None,
+        receipt_signing_identity: None,
     };
     let blob = raw.canonical_blob().unwrap();
     let expected = format!(
@@ -469,6 +479,114 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         reason: " ambiguous ".to_owned(),
     };
     assert!(incomplete.canonical_blob().is_err());
+}
+
+#[test]
+fn raw_outcome_preserves_and_revalidates_authoritative_security_context() {
+    let operation = committed_operation("request-security-context");
+    let issuer = Keypair::generate();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "capability-1".to_string(),
+            issuer: issuer.public_key(),
+            subject: issuer.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 1,
+            expires_at: 2,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .unwrap();
+    let request = ToolCallRequest {
+        request_id: "request-security-context".to_string(),
+        agent_id: capability.subject.to_hex(),
+        capability,
+        tool_name: "tool-1".to_string(),
+        server_id: "server-1".to_string(),
+        arguments: json!({"value": "input"}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let security_context = SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
+        TenantId::new("tenant-1").unwrap(),
+        SessionId::new("session-1").unwrap(),
+        PrincipalId::new(request.agent_id.clone()).unwrap(),
+        IsolationEpochId::new("epoch-1").unwrap(),
+        LineageId::new(request.capability.id.clone()).unwrap(),
+        7,
+    ));
+    let raw = RawInvocationOutcomeV1::from_committed_dispatch_with_request(
+        &operation,
+        operation.dispatch_commit().unwrap(),
+        id("server-1"),
+        id("tool-1"),
+        provider_attempt(&operation, "attempt-1"),
+        admission_digest("transport-terminal"),
+        0,
+        7,
+        stream_limits(),
+        InvocationOutputV1::Value { value: json!(1) },
+        None,
+        None,
+        Vec::new(),
+        &request,
+        Some(security_context.clone()),
+    )
+    .unwrap();
+    let bytes = raw.canonical_blob().unwrap().bytes().to_vec();
+    let decoded = RawInvocationOutcomeV1::from_canonical_bytes(&bytes).unwrap();
+    assert_eq!(
+        decoded.security_invocation_context(),
+        Some(&security_context)
+    );
+    assert!(decoded.requires_security_release().is_err());
+    for required in [false, true] {
+        let frozen = raw
+            .clone()
+            .with_security_release_requirement(required)
+            .unwrap();
+        let blob = frozen.canonical_blob().unwrap();
+        let decoded = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes()).unwrap();
+        assert_eq!(decoded.requires_security_release().unwrap(), required);
+        assert_eq!(decoded.federation_context_json(), None);
+        assert_eq!(
+            decoded.to_persisted().schema,
+            RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA
+        );
+        let mut missing = frozen.to_persisted();
+        missing.security_release_required = None;
+        assert!(RawInvocationOutcomeV1::from_persisted(missing).is_err());
+        let mut downgraded = frozen.to_persisted();
+        downgraded.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA.to_owned();
+        assert!(RawInvocationOutcomeV1::from_persisted(downgraded).is_err());
+    }
+
+    let mut wrong_schema = raw.to_persisted();
+    wrong_schema.schema = RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA.to_string();
+    assert!(RawInvocationOutcomeV1::from_persisted(wrong_schema).is_err());
+
+    let mut wrong_principal = raw.to_persisted();
+    wrong_principal.security_invocation_context = Some(SecurityInvocationContext::v1(
+        SecurityInvocationContextV1::new(
+            TenantId::new("tenant-1").unwrap(),
+            SessionId::new("session-1").unwrap(),
+            PrincipalId::new("other-agent").unwrap(),
+            IsolationEpochId::new("epoch-1").unwrap(),
+            LineageId::new("capability-1").unwrap(),
+            7,
+        ),
+    ));
+    assert!(RawInvocationOutcomeV1::from_persisted(wrong_principal).is_err());
 }
 
 #[test]

@@ -1975,3 +1975,6 @@ fn corrupted_content_is_caught_on_the_serve_path_and_by_the_explicit_sweep() {
 
 #[path = "finding_market_store_companion_tests.rs"]
 mod companion;
+
+#[path = "finding_market_store_tests/connection_recovery.rs"]
+mod connection_recovery;

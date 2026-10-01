@@ -15,6 +15,7 @@ pub mod loaded_weights;
 pub mod native;
 pub mod transport;
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chio_attest_verify::{AttestVerifier, ExpectedIdentity};
@@ -123,11 +124,15 @@ pub struct BedrockAdapter {
     transport: Arc<dyn Transport>,
     principal_owner: Option<String>,
     matched_iam_principal_pattern: Option<String>,
+    admitted_security: Option<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>>,
 }
 
 impl BedrockAdapter {
-    /// Build a new adapter from config and transport, rejecting configs that
-    /// drift from the v1 `us-east-1` pin.
+    /// Build a raw provider projection from config and transport, rejecting
+    /// configs that drift from the v1 `us-east-1` pin.
+    ///
+    /// This constructor has no manifest authority. Use
+    /// [`Self::new_with_registry`] before lifted calls enter an evaluator.
     pub fn new(
         config: BedrockAdapterConfig,
         transport: Arc<dyn Transport>,
@@ -143,11 +148,28 @@ impl BedrockAdapter {
             transport,
             principal_owner: None,
             matched_iam_principal_pattern: None,
+            admitted_security: None,
         })
     }
 
-    /// Build a new adapter by loading a signed IAM principal map and
-    /// resolving the caller identity before any tool traffic can be lifted.
+    /// Build an adapter bound to one verified, policy-admitted Chio server.
+    pub fn new_with_registry(
+        config: BedrockAdapterConfig,
+        transport: Arc<dyn Transport>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, BedrockAdapterError> {
+        let admitted_security = admitted_security_snapshot(&config, registry)?;
+        let mut adapter = Self::new(config, transport)?;
+        adapter.admitted_security = Some(admitted_security);
+        Ok(adapter)
+    }
+
+    /// Build an identity-bound raw projection by loading a signed IAM
+    /// principal map and resolving the caller identity.
+    ///
+    /// This constructor has no manifest authority. Use
+    /// [`Self::new_with_signed_iam_principals_config_and_registry`] before
+    /// lifted calls enter an evaluator.
     pub fn new_with_signed_iam_principals_config(
         mut config: BedrockAdapterConfig,
         transport: Arc<dyn Transport>,
@@ -179,11 +201,35 @@ impl BedrockAdapter {
             transport,
             principal_owner: Some(resolved.owner),
             matched_iam_principal_pattern: Some(resolved.matched_pattern),
+            admitted_security: None,
         })
     }
 
-    /// Resolve STS identity once per process, then initialize from the
-    /// signed IAM principal config.
+    /// Build an execution-ready adapter with both signed IAM identity and
+    /// verified manifest security bound before any tool traffic is lifted.
+    pub fn new_with_signed_iam_principals_config_and_registry(
+        config: BedrockAdapterConfig,
+        transport: Arc<dyn Transport>,
+        caller_identity: BedrockCallerIdentity,
+        iam_principals_path: impl AsRef<std::path::Path>,
+        verifier: &dyn AttestVerifier,
+        expected_identity: &ExpectedIdentity,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, BedrockAdapterError> {
+        let mut adapter = Self::new_with_signed_iam_principals_config(
+            config,
+            transport,
+            caller_identity,
+            iam_principals_path,
+            verifier,
+            expected_identity,
+        )?;
+        adapter.admitted_security = Some(admitted_security_snapshot(&adapter.config, registry)?);
+        Ok(adapter)
+    }
+
+    /// Resolve STS identity once per process, then initialize an identity-bound
+    /// raw projection from the signed IAM principal config.
     pub async fn new_with_signed_iam_principals_config_from_sts(
         config: BedrockAdapterConfig,
         transport: Arc<dyn Transport>,
@@ -200,6 +246,29 @@ impl BedrockAdapter {
             iam_principals_path,
             verifier,
             expected_identity,
+        )
+    }
+
+    /// Resolve STS identity once per process, then bind both the signed IAM
+    /// identity and verified manifest security before tool evaluation.
+    pub async fn new_with_signed_iam_principals_config_from_sts_and_registry(
+        config: BedrockAdapterConfig,
+        transport: Arc<dyn Transport>,
+        sts_provider: &AwsStsCallerIdentityProvider,
+        iam_principals_path: impl AsRef<std::path::Path>,
+        verifier: &dyn AttestVerifier,
+        expected_identity: &ExpectedIdentity,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, BedrockAdapterError> {
+        let caller_identity = sts_provider.get_caller_identity_once().await?;
+        Self::new_with_signed_iam_principals_config_and_registry(
+            config,
+            transport,
+            caller_identity,
+            iam_principals_path,
+            verifier,
+            expected_identity,
+            registry,
         )
     }
 
@@ -226,6 +295,21 @@ impl BedrockAdapter {
     /// Borrow the transport handle.
     pub fn transport(&self) -> &Arc<dyn Transport> {
         &self.transport
+    }
+
+    pub(crate) fn bridge_security_for_tool(
+        &self,
+        tool_name: &str,
+    ) -> Result<Option<chio_manifest::BridgeSecurityMetadata>, chio_tool_call_fabric::ProviderError>
+    {
+        let Some(bindings) = &self.admitted_security else {
+            return Ok(None);
+        };
+        bindings.get(tool_name).cloned().map(Some).ok_or_else(|| {
+            chio_tool_call_fabric::ProviderError::Malformed(format!(
+                "registry-bound Bedrock lift has no admitted security sidecar for tool `{tool_name}`"
+            ))
+        })
     }
 
     /// Run one batch Bedrock Runtime Converse turn through the transport and
@@ -260,6 +344,39 @@ impl BedrockAdapter {
     }
 }
 
+fn admitted_security_snapshot(
+    config: &BedrockAdapterConfig,
+    registry: &chio_manifest::VerifiedManifestRegistry,
+) -> Result<BTreeMap<String, chio_manifest::BridgeSecurityMetadata>, BedrockAdapterError> {
+    let manifest = registry
+        .verified_manifest(&config.server_id)
+        .map(|signed| &signed.manifest)
+        .ok_or_else(|| BedrockAdapterError::RegistryManifestUnavailable {
+            server_id: config.server_id.clone(),
+        })?;
+    if manifest.name != config.server_name
+        || manifest.version != config.server_version
+        || manifest.public_key != config.public_key
+    {
+        return Err(BedrockAdapterError::ConfigManifestMismatch {
+            server_id: config.server_id.clone(),
+        });
+    }
+
+    let mut admitted_security = BTreeMap::new();
+    for tool in &manifest.tools {
+        let security = registry
+            .bridge_security(&config.server_id, &tool.name)
+            .filter(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+            .ok_or_else(|| BedrockAdapterError::RegistrySecurityUnavailable {
+                server_id: config.server_id.clone(),
+                tool_name: tool.name.clone(),
+            })?;
+        admitted_security.insert(tool.name.clone(), security);
+    }
+    Ok(admitted_security)
+}
+
 impl chio_provider_adapter_core::Provider for BedrockAdapter {
     fn provider_id(&self) -> ProviderId {
         self.provider()
@@ -283,6 +400,20 @@ pub enum BedrockAdapterError {
     Transport(#[from] transport::TransportError),
     #[error(transparent)]
     IamPrincipals(#[from] iam_principals::IamPrincipalConfigError),
+    /// The configured server has no admitted signed manifest.
+    #[error("verified manifest registry has no Bedrock server {server_id}")]
+    RegistryManifestUnavailable { server_id: String },
+    /// Runtime configuration must identify exactly the admitted publisher surface.
+    #[error("Bedrock adapter config does not match admitted manifest for {server_id}")]
+    ConfigManifestMismatch { server_id: String },
+    /// A verified tool did not retain registry-admitted bridge metadata.
+    #[error(
+        "verified manifest registry has no admitted security sidecar for Bedrock tool {server_id}/{tool_name}"
+    )]
+    RegistrySecurityUnavailable {
+        server_id: String,
+        tool_name: String,
+    },
 }
 
 /// Map a wire-level [`transport::TransportError`] into the adapter-visible
@@ -311,6 +442,12 @@ fn map_transport_error(error: transport::TransportError) -> chio_tool_call_fabri
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_core::Keypair;
+    use chio_manifest::{
+        RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
+        VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    };
+    use serde_json::json;
 
     fn config() -> BedrockAdapterConfig {
         BedrockAdapterConfig::new(
@@ -320,6 +457,69 @@ mod tests {
             "deadbeef",
             "arn:aws:iam::123456789012:role/ChioAgentRole",
             "123456789012",
+        )
+    }
+
+    fn admitted_registry(
+        tool_name: &str,
+    ) -> (
+        BedrockAdapterConfig,
+        VerifiedManifestRegistry,
+        ToolFlowDeclaration,
+    ) {
+        let signer = Keypair::from_seed(&[63; 32]);
+        let config = BedrockAdapterConfig::new(
+            "bedrock-1",
+            "Bedrock Converse",
+            "0.1.0",
+            signer.public_key().to_hex(),
+            "arn:aws:iam::123456789012:role/ChioAgentRole",
+            "123456789012",
+        );
+        let flow = ToolFlowDeclaration::public_egress();
+        let manifest = ToolManifest {
+            schema: TOOL_MANIFEST_SCHEMA.to_string(),
+            server_id: config.server_id.clone(),
+            name: config.server_name.clone(),
+            description: None,
+            version: config.server_version.clone(),
+            tools: vec![ToolDefinition {
+                name: tool_name.to_string(),
+                description: "Admitted Bedrock tool".to_string(),
+                input_schema: json!({"type": "object"}),
+                output_schema: None,
+                pricing: None,
+                annotations: ToolAnnotations {
+                    read_only: false,
+                    destructive: false,
+                    idempotent: false,
+                    requires_approval: false,
+                },
+                latency_hint: None,
+                flow: Some(flow.clone()),
+            }],
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: signer.public_key().to_hex(),
+        };
+        let signed = chio_manifest::sign_manifest(&manifest, &signer).unwrap();
+        let mut registry = VerifiedManifestRegistry::default();
+        registry
+            .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
+            .unwrap();
+        (config, registry, flow)
+    }
+
+    fn tool_use_payload(tool_name: &str) -> chio_tool_call_fabric::ProviderRequest {
+        chio_tool_call_fabric::ProviderRequest(
+            serde_json::to_vec(&json!({
+                "toolUse": {
+                    "toolUseId": "tooluse_registry_1",
+                    "name": tool_name,
+                    "input": {"city": "Paris"}
+                }
+            }))
+            .unwrap(),
         )
     }
 
@@ -339,6 +539,91 @@ mod tests {
         assert_eq!(adapter.provider(), ProviderId::Bedrock);
         assert_eq!(adapter.api_version(), "bedrock.converse.v1");
         assert_eq!(adapter.region(), "us-east-1");
+    }
+
+    #[test]
+    fn registry_bound_lift_preserves_exact_flow_sidecar() {
+        let (config, registry, expected_flow) = admitted_registry("get_weather");
+        let adapter = BedrockAdapter::new_with_registry(
+            config,
+            Arc::new(transport::MockTransport::new()),
+            &registry,
+        )
+        .unwrap();
+        let invocation = adapter
+            .lift_batch(tool_use_payload("get_weather"))
+            .unwrap()
+            .remove(0);
+
+        let security = invocation
+            .bridge_security
+            .as_ref()
+            .expect("registry-bound lift retains security");
+        assert!(security.has_registry_coordinates());
+        assert_eq!(
+            chio_core::canonical::canonical_json_bytes(security.flow().expect("flow sidecar"))
+                .unwrap(),
+            chio_core::canonical::canonical_json_bytes(&expected_flow).unwrap()
+        );
+    }
+
+    #[test]
+    fn registry_bound_constructor_rejects_missing_server() {
+        let (mut config, registry, _) = admitted_registry("get_weather");
+        config.server_id = "missing-bedrock".to_string();
+
+        let error = match BedrockAdapter::new_with_registry(
+            config,
+            Arc::new(transport::MockTransport::new()),
+            &registry,
+        ) {
+            Ok(_) => panic!("missing admitted server must fail closed"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            BedrockAdapterError::RegistryManifestUnavailable { .. }
+        ));
+    }
+
+    #[test]
+    fn registry_bound_constructor_rejects_config_mismatch() {
+        let (mut config, registry, _) = admitted_registry("get_weather");
+        config.public_key = "wrong-key".to_string();
+
+        let error = match BedrockAdapter::new_with_registry(
+            config,
+            Arc::new(transport::MockTransport::new()),
+            &registry,
+        ) {
+            Ok(_) => panic!("config identity mismatch must fail closed"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            BedrockAdapterError::ConfigManifestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn registry_bound_lift_rejects_unknown_tool_sidecar() {
+        let (config, registry, _) = admitted_registry("get_weather");
+        let adapter = BedrockAdapter::new_with_registry(
+            config,
+            Arc::new(transport::MockTransport::new()),
+            &registry,
+        )
+        .unwrap();
+
+        let error = adapter
+            .lift_batch(tool_use_payload("send_email"))
+            .expect_err("unknown tool must not inherit an admitted sidecar");
+
+        assert!(error.to_string().contains(
+            "registry-bound Bedrock lift has no admitted security sidecar for tool `send_email`"
+        ));
     }
 
     #[test]

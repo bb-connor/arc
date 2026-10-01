@@ -53,6 +53,14 @@ target; the portable-kernel contract is documented in
 `Verdict` (`Allow` / `Deny` / `PendingApproval`) lives at the crate root; the
 core itself only ever produces the first two.
 
+`verify_capability_full_with_evidence` accepts a `CapabilityEvidenceContext`
+containing original signed ancestors for narrowed recursive chains. It checks
+each ancestor and scope transition before admitting a budget. The matching
+`evaluate_with_full_floor_and_evidence` entry point also evaluates subject,
+scope and guards. Existing entry points continue to reject narrowed multi-hop
+chains without this evidence. See `tests/signed_lineage.rs`; these behavioral
+tests do not extend the bounded formal-proof claims to the new lineage code.
+
 ## Feature flags
 
 | Flag | Effect |

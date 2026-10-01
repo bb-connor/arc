@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "sandbox-unsigned-manifest-001",
+  "class": "sandbox_unsigned_manifest",
+  "expected_verdict": "DENY",
+  "expected_reason": "sandbox_unsigned_manifest_detected",
+  "threat_id": "tool_server_escape",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "manifest_signature_control",
+        "package": "chio-cage",
+        "test_source": "crates/security/chio-cage/src/lib_parts/part_02.rs",
+        "target_kind": "lib",
+        "test_name": "tests::signature_is_verified_before_permissions_are_read"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "sandbox_unsigned_manifest",
+        "control_id": "manifest_signature_control",
+        "package": "chio-manifest",
+        "source": "crates/platform/chio-manifest/src/lib.rs",
+        "function": "verify_manifest",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/sandbox_unsigned_manifest/mutants.out/outcomes.json",
+          "sha256": "c5c171c67a176cf7eed73b7f2239c5a72268227f8baca982957efcc043a31ff0",
+          "inputs_sha256": "4657f185a92e8f2d5862033213082441a6757ad9eb11f13e6dbefcdb5c539d26"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

@@ -43,7 +43,7 @@
         }
       ],
       "residualRisk": "Compatibility profiles still allow bearer-style capability use when sender constraint is not required, and replay protection weakens across restart or failover when nonce state is only process-local.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/capability_token_theft.rs",
         "crates/core/chio-adversarial-suite/cases/clock_rewound/clock-rewound-001.json",
@@ -54,7 +54,7 @@
         "crates/core/chio-adversarial-suite/cases/scope_superset/scope-superset-003.json",
         "crates/core/chio-adversarial-suite/cases/scope_superset/scope-superset-005.json"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (sender-constrained grants, durable replay state, and revocation propagation): real mutation evidence closes post-mint signed-scope expansion, while otherwise valid bearer-token replay, mandatory DPoP or mTLS continuity, restart and failover replay resistance, and end-to-end revocation remain deferred (see audits/evidence/threats/capability_token_theft.json::deferred_follow_up)"
     },
     {
       "id": "kernel_impersonation",
@@ -78,7 +78,7 @@
         }
       ],
       "residualRisk": "Plaintext local-development modes intentionally do not provide peer authenticity, and receipt trust still depends on deployment-specific trust-anchor distribution.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/kernel_impersonation.rs",
         "crates/core/chio-adversarial-suite/cases/anchor_grafted/anchor-grafted-002.json",
@@ -94,7 +94,7 @@
         "crates/core/chio-adversarial-suite/cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-003.json",
         "crates/core/chio-adversarial-suite/cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-005.json"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (authenticated service transport and trust-anchor operations): real mutation evidence closes receipt mint-side kernel-key binding, and the same conformance row rejects on-the-wire kernel_key tampering; authenticated cross-host transport, verifier-key or service-certificate pinning, and safe trust-anchor rotation remain deferred (see audits/evidence/threats/kernel_impersonation.json::deferred_follow_up)"
     },
     {
       "id": "tool_server_escape",
@@ -117,8 +117,8 @@
         }
       ],
       "residualRisk": "Chio mediation does not by itself sandbox arbitrary tool-server code; a compromised tool process can still abuse whatever host privileges the operator granted it.",
-      "coverage_state": "pending",
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed; previous deferred scope: future milestone (kernel-side tool-server dispatch sandbox-escape coverage; current tests close the wasm-guard host-import + fuel paths only, see audits/evidence/threats/tool_server_escape.json::deferred_follow_up)",
+      "coverage_state": "partial",
+      "deferred_to": "future milestone (WASM mutation evidence, authenticated process transport, and process isolation): real mutation evidence closes hosted-kernel and portable verified-core tool-name and server-ID mediation, while targeted WASM mutation evidence, authenticated process-boundary framing, and operator-enforced OS or container isolation remain deferred (see audits/evidence/threats/tool_server_escape.json::deferred_follow_up)",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/tool_server_escape.rs",
         "crates/core/chio-adversarial-suite/cases/sigstore_bundle_payload_mismatch/sigstore-bundle-payload-mismatch-004.json",
@@ -146,7 +146,7 @@
         }
       ],
       "residualRisk": "The native framed lane has no separate in-band anti-replay mechanism outside the sender-proof and capability systems, so non-DPoP grants remain replayable within their validity window if the transport is exposed.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/native_channel_replay.rs",
         "crates/core/chio-adversarial-suite/cases/anchor_grafted/anchor-grafted-001.json",
@@ -161,7 +161,7 @@
         "crates/core/chio-adversarial-suite/cases/replayed_nonce/replayed-nonce-003.json",
         "crates/core/chio-adversarial-suite/cases/revocation_rollback/revocation-rollback-003.json"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (durable replay state and sender-constrained native profiles): real mutation evidence closes signed execution-nonce consumption and same-process second-presentation rejection; restart and failover continuity, multi-process nonce coordination, and mandatory DPoP for replay-sensitive native traffic remain deferred (see audits/evidence/threats/native_channel_replay.json::deferred_follow_up)"
     },
     {
       "id": "resource_exhaustion_dos",
@@ -187,15 +187,11 @@
         }
       ],
       "residualRisk": "Size checks and lifecycle rules reduce but do not eliminate asymmetric workload attacks, and authenticated callers can still consume their own allowed quota share.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
-        "crates/tooling/chio-conformance/tests/threats/resource_exhaustion_dos.rs",
-        "crates/guards/chio-wasm-guards/tests/escape/fuel_exhaustion.rs",
-        "crates/guards/chio-wasm-guards/tests/escape/oversize_memory.rs",
-        "crates/guards/chio-wasm-guards/tests/escape/deep_recursion.rs",
-        "crates/guards/chio-wasm-guards/tests/escape/table_grow.rs"
+        "crates/tooling/chio-conformance/tests/threats/resource_exhaustion_dos.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (multi-edge resource governance): real mutation evidence closes pre-allocation rejection of oversized native-kernel frames; request-rate, concurrency, CPU-time, queue, replay-buffer, per-tenant state, and upstream load-shedding limits remain deferred (see audits/evidence/threats/resource_exhaustion_dos.json::deferred_follow_up)"
     },
     {
       "id": "delegation_chain_abuse",
@@ -220,7 +216,7 @@
         }
       ],
       "residualRisk": "The shipped runtime is stronger than unchecked delegation metadata, but it is not yet a universally recursive, fail-closed delegated-authority proof system at every entry point.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/delegation_chain_abuse.rs",
         "crates/core/chio-adversarial-suite/cases/future_dated/future-dated-004.json",
@@ -237,7 +233,7 @@
         "crates/core/chio-adversarial-suite/cases/scope_superset/scope-superset-002.json",
         "crates/core/chio-adversarial-suite/cases/scope_superset/scope-superset-004.json"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (authoritative recursive lineage and distributed delegation state): real mutation evidence closes verifier-owned parent presence and delegated budget admission; recursive ancestry resolution, cross-process sibling-budget coordination, revocation-aware lineage, and strongest-verifier coverage at every entry point remain deferred (see audits/evidence/threats/delegation_chain_abuse.json::deferred_follow_up)"
     },
     {
       "id": "ssrf_via_http_substrate",
@@ -261,12 +257,12 @@
         }
       ],
       "residualRisk": "DNS time-of-check/time-of-use gaps remain deployment-sensitive, but substrate callers now require explicit scheme and authority allowlists, address-class denials, redirect ceilings, and response-size ceilings before outbound HTTP is accepted.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/platform/chio-http-core/tests/http_egress_contract.rs",
         "crates/tooling/chio-conformance/tests/threats/ssrf_via_http_substrate.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (pinned DNS and universal egress-contract adoption): real mutation evidence closes typed address-class enforcement for literal internal targets; DNS rebinding resistance, outbound call-site inventory enforcement, deployment-specific hostname policy, and operator network restrictions remain deferred (see audits/evidence/threats/ssrf_via_http_substrate.json::deferred_follow_up)"
     },
     {
       "id": "pii_phi_exposure",
@@ -289,11 +285,11 @@
         }
       ],
       "residualRisk": "Regex-based pattern detection is incomplete, may false-positive in non-medical contexts, and does not scan image or binary response content.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/pii_phi_exposure.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (deployment-specific detectors and non-text inspection): real mutation evidence closes built-in structured-text SSN and MRN detection with block and redact outcomes; local identifier coverage, image and binary inspection, mandatory regulated-profile activation, and detector-quality qualification remain deferred (see audits/evidence/threats/pii_phi_exposure.json::deferred_follow_up)"
     },
     {
       "id": "agent_velocity_abuse",
@@ -319,11 +315,11 @@
         }
       ],
       "residualRisk": "Rate limits are process-local, and an attacker controlling multiple agent identities can multiply the effective allowed rate.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/agent_velocity_abuse.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (distributed velocity state and multi-identity controls): real mutation evidence closes single-process per-agent token-bucket exhaustion and identity isolation; per-session qualification, cross-process counters, Sybil resistance, and secure deployment configuration remain deferred (see audits/evidence/threats/agent_velocity_abuse.json::deferred_follow_up)"
     },
     {
       "id": "cumulative_data_exfiltration",
@@ -346,11 +342,11 @@
         }
       ],
       "residualRisk": "Per-session accounting can be bypassed through many short sessions, and byte counts do not measure semantic information density or compression.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/cumulative_data_exfiltration.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (principal-wide durable data budgets): real mutation evidence closes a single session's cumulative byte ceiling with below-limit and over-limit controls; cross-session and cross-process aggregation, session-churn resistance, semantic and compression-aware accounting, and deployment-specific limits remain deferred (see audits/evidence/threats/cumulative_data_exfiltration.json::deferred_follow_up)"
     },
     {
       "id": "behavioral_sequence_attack",
@@ -373,11 +369,11 @@
         }
       ],
       "residualRisk": "The guard cannot prevent cross-session dangerous sequences, non-adjacent forbidden transitions, or semantically dangerous invocations hidden behind benign tool names.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/behavioral_sequence_attack.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (principal-wide multi-step behavioral policies): real mutation evidence closes one explicit adjacent forbidden transition with a benign successor control; non-adjacent and cross-session chains, canonical action aliases, semantic-intent signals, and deployment-specific policy qualification remain deferred (see audits/evidence/threats/behavioral_sequence_attack.json::deferred_follow_up)"
     },
     {
       "id": "wasm_guard_resource_exhaustion",
@@ -400,11 +396,11 @@
         }
       ],
       "residualRisk": "Linear memory pressure within the runtime limit and compilation CPU for pathologically complex modules are not fully capped by Chio fuel metering.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/wasm_guard_resource_exhaustion.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (WASM execution and compilation resource qualification): real mutation evidence closes core-module byte-cap admission; fuel-enforcement mutation evidence, component-backend parity, linear-memory, stack, and table ceilings, compilation-complexity bounds, and deployment-specific fuel tuning remain deferred (see audits/evidence/threats/wasm_guard_resource_exhaustion.json::deferred_follow_up)"
     },
     {
       "id": "pq_signature_downgrade",
@@ -416,21 +412,21 @@
       ],
       "mitigations": [
         {
-          "status": "planned",
-          "control": "Signed artifacts that opt into the post-quantum profile will carry policy-visible algorithm metadata so verifiers can reject classical-only substitutions."
+          "status": "existing",
+          "control": "Capability, receipt, and compliance-certificate artifacts carry self-describing signature algorithms plus consistency-checked algorithm metadata."
         },
         {
-          "status": "planned",
-          "control": "Receipt, capability, and compliance-certificate verification will enforce the configured cryptographic floor before accepting an artifact."
+          "status": "existing",
+          "control": "Capability, receipt, and compliance-certificate verification enforce the configured cryptographic floor before accepting an artifact."
         },
         {
-          "status": "planned",
-          "control": "Migration tests will cover classical compatibility and post-quantum-required rejection of downgraded signatures."
+          "status": "existing",
+          "control": "Migration tests cover classical compatibility, hybrid ML-DSA-65 signing, and post-quantum-required rejection of classical artifacts."
         }
       ],
-      "residualRisk": "Until hybrid signature verification and cryptographic-floor enforcement ship, operators must treat post-quantum protection as planned rather than available.",
-      "coverage_state": "pending",
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed; previous deferred scope: future milestone (hybrid-PQ artifact downgrade vector; current test closes the classical-only verifier-side rejection path only, see audits/evidence/threats/pq_signature_downgrade.json::deferred_follow_up)",
+      "residualRisk": "The classical-substitution capability boundary is mutation-qualified, but stripped or corrupted post-quantum components and cross-artifact floor enforcement still require attributable mutation evidence and deployment key-rotation qualification.",
+      "coverage_state": "partial",
+      "deferred_to": "future milestone (cross-artifact hybrid downgrade and operations qualification): real mutation evidence closes rejection of classical capability tokens under a post-quantum-required floor; stripped or corrupted hybrid components across capabilities, receipts, and compliance certificates, policy-loader continuity, and deployment key rotation remain deferred (see audits/evidence/threats/pq_signature_downgrade.json::deferred_follow_up)",
       "covered_by_tests": [
         "crates/trust/chio-attest-verify/tests/migration.rs::end_to_end_migration_walks_three_stages",
         "crates/trust/chio-attest-verify/tests/migration.rs::stage3_pq_required_accepts_rolled_hybrid_and_rejects_v318_bundle",
@@ -448,21 +444,22 @@
       ],
       "mitigations": [
         {
-          "status": "planned",
-          "control": "Quote verifiers will validate platform evidence for Intel TDX, AMD SEV-SNP, and AWS Nitro before accepting a claimed confidential-runtime binding."
+          "status": "existing",
+          "control": "Quote verifiers validate platform evidence for Intel TDX, AMD SEV-SNP, and AWS Nitro before accepting a claimed confidential-runtime binding."
         },
         {
-          "status": "planned",
-          "control": "Accepted quotes will bind report data to the kernel signing key and receipt root so copied or stale quotes cannot authorize another runtime."
+          "status": "existing",
+          "control": "Accepted quotes bind report data to the kernel signing key and receipt root so copied or misbound quotes cannot authorize another runtime."
         },
         {
-          "status": "planned",
-          "control": "Pinned positive and negative quote fixtures will exercise malformed, stale, and mismatched quote paths."
+          "status": "existing",
+          "control": "Pinned positive and negative quote fixtures exercise malformed, stale, mismatched, backend-confused, and trust-root-rotation paths."
         }
       ],
-      "residualRisk": "Until platform quote verification lands, TEE deployment claims depend on external operator evidence and are not independently verified by Chio.",
-      "coverage_state": "pending",
+      "residualRisk": "TEE-frame tenant-signature binding is mutation-qualified, but each platform verifier still requires attributable bypass mutations and production collateral freshness, trust-root rotation, and revocation operations remain deployment-sensitive.",
+      "coverage_state": "partial",
       "covered_by_tests": [
+        "crates/tooling/chio-conformance/tests/threats/tee_quote_forgery.rs",
         "crates/trust/chio-attest-verify/tests/cross_backend_conformance.rs",
         "crates/trust/chio-attest-verify/tests/expect_report_data.rs",
         "crates/trust/chio-attest-verify/tests/tdx_integration.rs",
@@ -471,7 +468,7 @@
         "crates/trust/chio-attest-verify/tests/nitro_root_rotation.rs",
         "crates/kernel/chio-kernel/tests/pq_key_load_after_self_quote.rs::allow_hybrid_loads_pq_only_after_verified_self_quote"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (platform-verifier mutation and collateral operations): real mutation evidence closes canonical TEE-frame tenant-key, body, signature, and tee-ID binding; TDX, SEV-SNP, and Nitro verifier bypass mutations plus production collateral freshness, revocation, and trust-root rotation remain deferred (see audits/evidence/threats/tee_quote_forgery.json::deferred_follow_up)"
     },
     {
       "id": "passkey_credential_theft",
@@ -483,20 +480,20 @@
       ],
       "mitigations": [
         {
-          "status": "planned",
+          "status": "existing",
           "control": "Browser clients present WebAuthn assertions to a server-side issuer instead of holding root capability or signing material."
         },
         {
-          "status": "planned",
+          "status": "existing",
           "control": "Issued capabilities are short-lived, bound to the credential id, and revocable through the shared revocation surface."
         },
         {
-          "status": "planned",
+          "status": "existing",
           "control": "Issuer verification rejects failed WebAuthn assertions and treats authenticator, challenge, or origin ambiguity as fail-closed."
         }
       ],
       "residualRisk": "A compromised authenticator or issuer account can still request fresh capabilities until revocation propagates, and platform phishing resistance depends on correct relying-party and origin configuration.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/trust/chio-custody-hw/src/verifier.rs",
         "crates/trust/chio-custody-hw/src/nonce_store.rs",
@@ -506,7 +503,7 @@
         "crates/trust/chio-custody-hw/tests/end_to_end.rs",
         "crates/tooling/chio-conformance/tests/threats/passkey_credential_theft.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (credential-compromise recovery and deployment qualification): real mutation evidence closes retained credential and challenge replay classification shared by the in-memory and SQLite nonce stores; fresh assertions from a compromised authenticator, relying-party and origin configuration, durable-store adoption across clustered issuers, revocation propagation, and account recovery remain deferred (see audits/evidence/threats/passkey_credential_theft.json::deferred_follow_up)"
     },
     {
       "id": "audience_confusion",
@@ -518,26 +515,26 @@
       ],
       "mitigations": [
         {
-          "status": "planned",
-          "control": "Passkey-issued capabilities carry an explicit audience and scope set in the signed envelope."
+          "status": "existing",
+          "control": "Passkey-issued capabilities carry an explicit audience and scope set in the canonical signed envelope."
         },
         {
-          "status": "planned",
-          "control": "Kernel verification rejects capabilities whose audience does not match the target runtime or tool boundary."
+          "status": "existing",
+          "control": "Kernel passkey-capability verification invokes target-runtime audience matching as a mandatory admission gate."
         },
         {
-          "status": "planned",
-          "control": "Audience-confusion property tests exercise cross-audience presentation and envelope bit-flips."
+          "status": "existing",
+          "control": "Audience-confusion property tests exercise cross-audience presentation and signed-envelope bit flips."
         }
       ],
       "residualRisk": "Deployments that reuse broad audience names across environments can still create operational confusion even when cryptographic envelope checks are correct.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/trust/chio-custody-hw/src/capability.rs",
         "crates/trust/chio-custody-hw/tests/audience_confusion.rs",
         "crates/tooling/chio-conformance/tests/threats/audience_confusion.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (universal audience namespaces and entry-point qualification): real mutation evidence closes issuer-signed passkey capability audience mismatch rejection; cross-environment audience naming, non-passkey artifact parity, universal kernel and hosted-edge adoption, and deployment namespace qualification remain deferred (see audits/evidence/threats/audience_confusion.json::deferred_follow_up)"
     },
     {
       "id": "weights_hash_spoof",
@@ -565,14 +562,14 @@
         }
       ],
       "residualRisk": "Hosted providers that do not expose loaded model bytes cannot bind under this check; deployments must use local recomputation or a signed model-card bundle with a provider surface that can produce a recomputed loaded-weight digest.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/weights_hash_spoof.rs",
         "crates/kernel/chio-kernel/tests/weights_binding.rs",
         "crates/trust/chio-weights/tests/lineage_anchor.rs",
         "crates/trust/chio-weights/tests/equivalence.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (model supply-chain and activation qualification): real mutation evidence closes kernel comparison of a card-declared hash to a recomputed loaded-weight digest and fail-closed refusal when loaded bytes are unavailable; signed-bundle trust, artifact retrieval integrity, runtime activation linkage, provider parity, and deployment qualification remain deferred (see audits/evidence/threats/weights_hash_spoof.json::deferred_follow_up)"
     },
     {
       "id": "mobile_attestation_replay",
@@ -584,26 +581,30 @@
       ],
       "mitigations": [
         {
-          "status": "implemented",
-          "control": "App Attest assertions and Play Integrity tokens must bind to a fresh issuer challenge or nonce before a mobile capability is minted."
+          "status": "existing",
+          "control": "App Attest and Play Integrity verification bind platform evidence to the expected challenge or nonce supplied to the verifier."
         },
         {
-          "status": "implemented",
-          "control": "The mobile issuer must reject stale, reused, or audience-mismatched attestation evidence fail-closed."
+          "status": "existing",
+          "control": "The server-owned mobile challenge authority generates random application- and audience-bound challenges, then atomically consumes verified challenges with monotonic per-key App Attest counter compare-and-swap in bounded in-memory or durable SQLite stores."
         },
         {
-          "status": "implemented",
-          "control": "T0.C verifier fixtures exercise replayed App Attest assertions and Play Integrity tokens before coverage can flip to covered."
+          "status": "existing",
+          "control": "Verifier fixtures exercise App Attest counter rollback and Play Integrity nonce, expiry, and audience rejection."
         }
       ],
-      "residualRisk": "Platform attestation services do not protect flows that reuse server challenges or accept broad audiences; deployments must keep nonce state durable enough for their mobile issuance window.",
-      "coverage_state": "pending",
+      "residualRisk": "The challenge authority is not yet integrated into capability minting or qualified with real Apple and Google evidence. Production deployment remains blocked on real platform trust roots, startup wiring, clock policy, and physical-device qualification.",
+      "coverage_state": "partial",
       "coveredBy": [
+        "crates/trust/chio-custody-hw/src/attestation/app_attest.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge/tests.rs",
         "crates/tooling/chio-conformance/tests/threats/mobile_attestation_replay.rs",
         "crates/trust/chio-custody-hw/tests/attestation_app_attest.rs",
         "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (production mobile trust and capability integration): real mutation evidence closes monotonic App Attest counter replay refusal, and the server-owned authority now supplies one-time challenge state plus durable counter custody; real Apple certificate and nonce-extension evidence, production Google trust, capability-mint integration, clock-policy qualification, and physical-device qualification remain deferred (see audits/evidence/threats/mobile_attestation_replay.json::deferred_follow_up)"
     },
     {
       "id": "device_key_extraction",
@@ -615,26 +616,30 @@
       ],
       "mitigations": [
         {
-          "status": "implemented",
-          "control": "iOS signing keys must remain in Secure Enclave or App Attest managed storage and Android signing keys must prefer StrongBox with TEE fallback explicitly marked."
+          "status": "existing",
+          "control": "The mobile SDK creates iOS signing keys in Secure Enclave storage and Android signing keys in Android Keystore with StrongBox preference and an explicit degraded trust marker."
         },
         {
-          "status": "implemented",
-          "control": "Mobile receipts must use per-call signing assertions or hardware-bound key references rather than exportable long-lived signing seeds."
+          "status": "planned",
+          "control": "Mobile receipt signing must replace the raw Ed25519 seed FFI with per-call signing assertions or hardware-bound key references."
         },
         {
-          "status": "implemented",
-          "control": "The issued capability must carry a trust-level marker so downgraded Android API 26-27 devices cannot claim StrongBox-backed custody."
+          "status": "planned",
+          "control": "The issued mobile capability must carry the verified platform trust level so downgraded Android devices cannot claim StrongBox-backed custody."
         }
       ],
       "residualRisk": "A fully compromised mobile OS can still interfere with UI and request timing; this control only prevents export of the device-bound signing key from being treated as normal custody.",
-      "coverage_state": "pending",
+      "coverage_state": "partial",
       "coveredBy": [
+        "crates/trust/chio-custody-hw/src/attestation/app_attest.rs",
+        "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs",
         "crates/tooling/chio-conformance/tests/threats/device_key_extraction.rs",
         "crates/trust/chio-custody-hw/tests/attestation_app_attest.rs",
-        "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs"
+        "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs",
+        "sdks/swift/Sources/Chio/Keystore.swift",
+        "sdks/jvm/chio-kernel-mobile/src/main/kotlin/dev/chio/kernel/Keystore.kt"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (hardware-key receipt signing and trust projection): real mutation evidence closes App Attest credential-id binding in the production WebAuthn-shaped verifier; hardware non-exportability, attestation leaf-key qualification, hardware-reference receipt signing, Android trust-level propagation, and physical-device qualification remain deferred (see audits/evidence/threats/device_key_extraction.json::deferred_follow_up)"
     },
     {
       "id": "play_integrity_token_replay",
@@ -645,25 +650,30 @@
       ],
       "mitigations": [
         {
-          "status": "implemented",
-          "control": "The Play Integrity verifier must assert nonce equality against issuer-generated nonce state before minting any capability."
+          "status": "existing",
+          "control": "The Play Integrity verifier asserts signed-token nonce equality against the expected nonce supplied to verification."
         },
         {
-          "status": "implemented",
-          "control": "The issuer nonce store must consume accepted Play Integrity nonces once and reject duplicate presentations."
+          "status": "existing",
+          "control": "The server-owned challenge authority generates Play Integrity nonces, binds them to one package and audience, and atomically consumes accepted challenges once in bounded in-memory or durable SQLite state."
         },
         {
-          "status": "implemented",
-          "control": "T0.C verifier fixtures include stale JWS, wrong-nonce JWS, and wrong-audience JWS cases before coverage can flip to covered."
+          "status": "existing",
+          "control": "Verifier fixtures include a valid signed-token control plus expired, wrong-nonce, and wrong-audience JWS cases."
         }
       ],
-      "residualRisk": "Google-signed verdict freshness still depends on issuer nonce storage and clock policy; a weak deployment can make a valid token replayable by accepting stale nonce state.",
-      "coverage_state": "pending",
+      "residualRisk": "Production verification remains disabled while the synthetic Google root is pinned, and the authority is not yet integrated into capability minting or qualified against real Play Integrity responses and deployment clock policy.",
+      "coverage_state": "partial",
       "coveredBy": [
+        "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs",
+        "crates/trust/chio-custody-hw/src/attestation/google_root.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge/sqlite.rs",
+        "crates/trust/chio-custody-hw/src/mobile_challenge/tests.rs",
         "crates/tooling/chio-conformance/tests/threats/play_integrity_token_replay.rs",
         "crates/trust/chio-custody-hw/tests/attestation_play_integrity.rs"
       ],
-      "deferred_to": "backlog (strict threat-mutants evidence backfill): row has in-tree tests or corpus links, but current evidence is bootstrap/generated metadata and is not release-closed"
+      "deferred_to": "future milestone (production Play Integrity trust and capability integration): real mutation evidence closes signed-token nonce equality, and the server-owned authority now supplies atomic durable nonce issuance and consume; production Google trust-root provisioning, capability-mint integration, clock-policy qualification, and physical-device qualification remain deferred (see audits/evidence/threats/play_integrity_token_replay.json::deferred_follow_up)"
     }
   ],
   "transportRequirements": {

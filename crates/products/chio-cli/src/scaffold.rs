@@ -6,6 +6,7 @@ use crate::CliError;
 const CARGO_TEMPLATE: &str = include_str!("../templates/init/Cargo.toml.tmpl");
 const README_TEMPLATE: &str = include_str!("../templates/init/README.md.tmpl");
 const POLICY_TEMPLATE: &str = include_str!("../templates/init/policy.yaml.tmpl");
+const TOOLS_TEMPLATE: &str = include_str!("../templates/init/tools.json.tmpl");
 const GITIGNORE_TEMPLATE: &str = include_str!("../templates/init/gitignore.tmpl");
 const HELLO_SERVER_TEMPLATE: &str = include_str!("../templates/init/src/bin/hello_server.rs.tmpl");
 const DEMO_TEMPLATE: &str = include_str!("../templates/init/src/bin/demo.rs.tmpl");
@@ -33,6 +34,7 @@ pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {
     write_template(&directory, Path::new("Cargo.toml"), CARGO_TEMPLATE, &replacements)?;
     write_template(&directory, Path::new("README.md"), README_TEMPLATE, &replacements)?;
     write_template(&directory, Path::new("policy.yaml"), POLICY_TEMPLATE, &replacements)?;
+    write_template(&directory, Path::new("tools.json"), TOOLS_TEMPLATE, &replacements)?;
     write_template(&directory, Path::new(".gitignore"), GITIGNORE_TEMPLATE, &replacements)?;
     directory.create_dir_all(Path::new("src/bin"))?;
     write_template(

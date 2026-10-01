@@ -6,7 +6,7 @@
 //! path, preventing the synchronous `build_and_sign_receipt` step from pinning a
 //! worker thread per concurrent evaluate call.
 //!
-//! A single signing task owns a clone of the kernel signing keypair and
+//! A single signing task shares the kernel's selected signing backend and
 //! pulls signing requests from a bounded [`tokio::sync::mpsc`] channel.
 //! Producers `.await` on a oneshot reply channel rather than on a mutex.
 //! Admission is non-blocking: when the queue is full (by count or by the
@@ -16,12 +16,12 @@
 //! task is the off-critical-path optimisation; the inline
 //! fallback is the always-correct floor.
 //!
-//! The synchronous `build_and_sign_receipt` helper in `kernel/responses.rs`
-//! remains the inline path for internal call sites (deny-receipt builders,
-//! child-receipt builders, federation cosign hook). The mpsc path signs the
-//! same canonical receipt body bytes through the shared canonical-byte signing
-//! API, so receipt bytes are byte-identical across the two paths. Persistence
-//! stays inline; only the signature step crosses the channel.
+//! The synchronous `build_and_sign_receipt` helper in
+//! `kernel/responses/receipt_persistence.rs` remains the ordinary inline path.
+//! Both paths bind the same canonical receipt body. Classical deterministic
+//! signatures remain byte-identical; randomized signatures are independently
+//! valid over that same body. Persistence retains the original signed envelope;
+//! only the signature step crosses the channel.
 //!
 //! ## Crash recovery contract
 //!
@@ -210,7 +210,7 @@ pub(crate) struct SignRequest {
     /// The exact byte preimage `body.content_hash` was derived from. The task
     /// recomputes `sha256_hex(canonical_content)` at the signing boundary and
     /// refuses to sign on mismatch (WYSIWYS), so this async funnel is
-    /// byte-identical *and* equally fail-closed to the inline
+    /// canonical-body-identical and equally fail-closed to the inline
     /// `build_and_sign_receipt` path.
     pub(crate) canonical_content: Vec<u8>,
 
@@ -220,7 +220,7 @@ pub(crate) struct SignRequest {
 
     /// Aggregate byte-budget permit held for the lifetime of this queued
     /// request. Acquired (sized to the preimage) before the request is
-    /// enqueued and dropped by the signing task once `sign_one` returns, which
+    /// enqueued and dropped by the signing task once signing returns, which
     /// releases the permits back to the shared [`Semaphore`] so the *sum* of
     /// queued preimage bytes stays under the aggregate budget. `None` only on
     /// the `#[path]`-included test/crash binaries that
@@ -273,7 +273,7 @@ impl SigningTaskInner {
 /// Handle owned by [`crate::ChioKernel`] for routing signing requests
 /// through the dedicated signing task.
 ///
-/// The handle stores the signing keypair and the configured channel
+/// The handle stores the signing backend and the configured channel
 /// capacity. The task is spawned **lazily** on the first call to
 /// [`Self::sign`] so the kernel can be constructed outside a tokio
 /// runtime (the existing `ChioKernel::new` is sync and is invoked from
@@ -283,10 +283,8 @@ pub(crate) struct SigningTaskHandle {
     /// Lazy state: spawned on first `sign` call inside an async context.
     inner: OnceLock<SigningTaskInner>,
 
-    /// Cloned signing keypair. Held alongside the lazy `inner` so the
-    /// task can be spawned without re-deriving from `KernelConfig` at
-    /// the call site.
-    keypair: Keypair,
+    /// One authority shared by the worker and every inline fallback.
+    backend: Arc<dyn SigningBackend>,
 
     /// Configured channel capacity. Exposed for diagnostics and tests.
     capacity: usize,
@@ -407,12 +405,26 @@ impl SigningTaskHandle {
         max_content_bytes: usize,
         max_queued_bytes: usize,
     ) -> Self {
+        Self::with_backend_and_limits(
+            Arc::new(Ed25519Backend::new(keypair)),
+            capacity,
+            max_content_bytes,
+            max_queued_bytes,
+        )
+    }
+
+    pub(crate) fn with_backend_and_limits(
+        backend: Arc<dyn SigningBackend>,
+        capacity: usize,
+        max_content_bytes: usize,
+        max_queued_bytes: usize,
+    ) -> Self {
         let capacity = capacity.max(1);
         // Do NOT `max(1)`: 0 is the explicit "no per-request cap" sentinel.
         let aggregate_budget_permits = clamp_aggregate_permits(max_queued_bytes);
         Self {
             inner: OnceLock::new(),
-            keypair,
+            backend,
             capacity,
             max_content_bytes,
             aggregate_byte_budget: Arc::new(Semaphore::new(aggregate_budget_permits as usize)),
@@ -420,6 +432,20 @@ impl SigningTaskHandle {
             spawn_gate: Mutex::new(()),
             closed: AtomicBool::new(false),
         }
+    }
+
+    /// Reconfigure under exclusive kernel access, retaining limits and terminal
+    /// shutdown state. No queued request can borrow the kernel during this call.
+    pub(crate) fn reconfigured_with_backend(&self, backend: Arc<dyn SigningBackend>) -> Self {
+        let next = Self::with_backend_and_limits(
+            backend,
+            self.capacity,
+            self.max_content_bytes,
+            self.aggregate_budget_permits as usize,
+        );
+        next.closed
+            .store(self.closed.load(Ordering::Acquire), Ordering::Release);
+        next
     }
 
     fn lock_spawn_gate(&self) -> MutexGuard<'_, ()> {
@@ -498,7 +524,7 @@ impl SigningTaskHandle {
             )
         })?;
         let (sender, receiver) = mpsc::channel::<SignRequest>(self.capacity);
-        let join = handle.spawn(run_signing_task(self.keypair.clone(), receiver));
+        let join = handle.spawn(run_signing_task(Arc::clone(&self.backend), receiver));
         let candidate = SigningTaskInner {
             sender: Mutex::new(Some(sender)),
             join: Mutex::new(Some(join)),
@@ -553,7 +579,7 @@ impl SigningTaskHandle {
     /// falls back to INLINE signing rather than parking with the preimage held,
     /// so the bytes retained by would-be waiters cannot exceed the configured
     /// queue budget. The async signer is the documented off-critical-path
-    /// signer, and the inline primitive is byte-identical and equally
+    /// signer, and the inline primitive preserves canonical body bytes and is equally
     /// fail-closed (WYSIWYS), so the fallback is safe.
     fn try_enqueue_if_open(
         &self,
@@ -606,9 +632,9 @@ impl SigningTaskHandle {
     /// Inline (synchronous) fallback signer for requests that cannot be cleanly
     /// enqueued: a preimage too large for the aggregate budget (case 1) or a
     /// request that hit backpressure (case 2). Routes through the SAME
-    /// `sign_one` primitive the signing task uses, which recomputes
+    /// `sign_one_with_backend` primitive the signing task uses, which recomputes
     /// `sha256_hex(canonical_content)` inside the trust boundary and refuses on
-    /// mismatch, so the inline path is byte-identical AND equally fail-closed
+    /// mismatch, so the inline path preserves canonical body bytes and fails closed
     /// (WYSIWYS): a render-A/sign-B attempt is rejected here too. Memory stays
     /// bounded because the preimage is consumed immediately rather than retained
     /// in a queue.
@@ -617,7 +643,7 @@ impl SigningTaskHandle {
         body: ChioReceiptBody,
         canonical_content: Vec<u8>,
     ) -> Result<ChioReceipt, KernelError> {
-        sign_one(&self.keypair, body, canonical_content)
+        sign_one_with_backend(body, self.backend.as_ref(), canonical_content)
     }
 
     /// Submit a signing request and `.await` the signed receipt.
@@ -649,7 +675,7 @@ impl SigningTaskHandle {
     ///    configured queue budget.
     ///
     /// Every inline fallback routes through the same WYSIWYS primitive
-    /// ([`Self::sign_inline`] -> `sign_one`), so a render-A/sign-B attempt is
+    /// ([`Self::sign_inline`] -> `sign_one_with_backend`), so a render-A/sign-B attempt is
     /// rejected on the fallback path too.
     pub(crate) async fn sign(
         &self,
@@ -918,13 +944,16 @@ impl Drop for SigningTaskHandle {
 }
 
 /// Body of the signing task. Pulls requests from `receiver`, signs each
-/// one against `keypair`, and replies on the per-request oneshot.
+/// one against the selected backend, and replies on the per-request oneshot.
 ///
 /// Returns when `receiver` is closed (every `Sender` clone has been
 /// dropped). The task does not panic on signing errors; it surfaces them
 /// via the oneshot reply so producers can observe them as
 /// [`KernelError::ReceiptSigningFailed`].
-async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignRequest>) {
+async fn run_signing_task(
+    backend: Arc<dyn SigningBackend>,
+    mut receiver: mpsc::Receiver<SignRequest>,
+) {
     debug!("signing task started");
     while let Some(request) = receiver.recv().await {
         let SignRequest {
@@ -933,8 +962,8 @@ async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignReq
             reply,
             _aggregate_permit,
         } = request;
-        let result = sign_one(&keypair, body, canonical_content);
-        // Release the aggregate byte-budget permit only AFTER `sign_one` has
+        let result = sign_one_with_backend(body, backend.as_ref(), canonical_content);
+        // Release the aggregate byte-budget permit only AFTER signing has
         // consumed `canonical_content` (the preimage is no longer retained), so
         // the budget reflects bytes actually held in memory. Dropping the
         // permit returns its bytes to the shared
@@ -949,18 +978,8 @@ async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignReq
     debug!("signing task exited (channel closed)");
 }
 
-/// Pure signing step: matches the inline path in `responses.rs` so
-/// receipts produced via the channel are byte-identical to receipts
-/// produced via `build_and_sign_receipt`.
-fn sign_one(
-    keypair: &Keypair,
-    body: ChioReceiptBody,
-    canonical_content: Vec<u8>,
-) -> Result<ChioReceipt, KernelError> {
-    let backend = Ed25519Backend::new(keypair.clone());
-    sign_one_with_backend(body, &backend, canonical_content)
-}
-
+/// Pure signing step: the channel and inline path use the same canonical body
+/// and authority. Randomized signature bytes may differ on fresh signing.
 fn sign_one_with_backend(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
@@ -977,8 +996,8 @@ fn sign_one_with_backend(
     // compute the content-addressed id, build the `ChioReceiptSigningBody`
     // wrapper, and sign. Routing the mpsc task through the same primitive means
     // there is exactly one signing implementation, so the inline and async
-    // funnels are byte-identical *and* equally fail-closed by construction
-    // rather than by hand synchronization. The mpsc task still owns the keypair
+    // funnels preserve canonical body bytes and fail closed by construction
+    // rather than by hand synchronization. The mpsc task still owns the backend
     // and channel plumbing; only the pure crypto step is delegated. We call the
     // portable kernel-core function directly (rather than the
     // `crate::receipt_support` wrapper) because this module is also

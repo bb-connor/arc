@@ -32,6 +32,8 @@ use chio_kernel::admission_operation::{
 
 use super::*;
 
+mod decision_time;
+
 const FACTOR_AUTHORITY_CONFIG_DIGEST_DOMAIN: &[u8] =
     b"chio.factor.assignment-authority-config.digest.v1\0";
 const FACTOR_ACTIVE_AUTHORITY_SET_DIGEST_DOMAIN: &[u8] =
@@ -809,13 +811,7 @@ impl SqliteFactorAssignmentStore {
                 "factor assignment targets a different obligation atom",
             ));
         }
-        let reason = classify_not_applied(
-            &current,
-            &submission,
-            commit.request,
-            commit.offer,
-            commit.trusted_now_unix_ms,
-        )?;
+        let reason = decision_time::classify_live(&transaction, &current, &submission, &commit)?;
         let (result, successor) = match reason {
             Some(reason) => (
                 DurableFactorAssignmentResultV1::NotApplied(build_not_applied(
@@ -2008,37 +2004,6 @@ fn load_status_head(
         &head.1,
     )?
     .ok_or_else(|| invariant("factor assignment status head is not durable"))
-}
-
-fn classify_not_applied(
-    current: &DurableObligationV1,
-    submission: &VerifiedFactorAssignmentSubmission,
-    request: &NormalizedAssignmentRequestV1,
-    offer: &AssignmentOfferV1,
-    trusted_now_unix_ms: u64,
-) -> Result<Option<AssignmentNotAppliedReasonV1>, AdmissionOperationStoreError> {
-    if trusted_now_unix_ms < submission.status_proof.body().issued_at_unix_ms()
-        || trusted_now_unix_ms < submission.authorization.body().issued_at_unix_ms()
-        || trusted_now_unix_ms < offer.issued_at_unix_ms()
-        || trusted_now_unix_ms < request.effective_at_unix_ms()
-    {
-        return Err(invariant(
-            "factor assignment artifacts are not yet effective",
-        ));
-    }
-    classify_assignment_not_applied(&AssignmentNotAppliedClassificationV1 {
-        atom: current.atom(),
-        request,
-        offer,
-        authorization: &submission.authorization,
-        status_proof: &submission.status_proof,
-        observed_disposition: current.disposition(),
-        observed_settlement_lifecycle: current.settlement_lifecycle(),
-        observed_snapshot_version: current.snapshot_version(),
-        observed_resource_fence: current.resource_fence(),
-        decided_at_unix_ms: trusted_now_unix_ms,
-    })
-    .map_err(factor_error)
 }
 
 fn assignment_successor(

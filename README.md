@@ -40,9 +40,8 @@
 
 ---
 
-```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
-```
+[Build the CLI from source](docs/install/README.md), or try the
+[Linux process preview](docs/install/PROCESS_PREVIEW.md) with Python and Node workers.
 
 ## What is Chio
 
@@ -82,6 +81,16 @@ Agent swarms, security tooling, and cognition markets are built on those three t
 token, the kernel, and the receipt.
 
 ## See it run
+
+The [Python and Node process starter](examples/process-starter/README.md) runs
+two real workers under the native host, restarts an interrupted handoff and
+verifies the original signed receipts. Its packaged Linux development preview
+installs both SDKs offline and runs outside the Chio checkout.
+
+The [repository coding session](sdks/python/chio-mini-swe/SESSION.md) runs
+mini-SWE-agent against a selected Git commit, supports package-scoped tasks,
+and exports the resulting patch with verified receipts. This source-built
+Linux profile preserves the source checkout and recovers recorded work.
 
 An orchestrator fans out to a researcher and a writer. Each child gets a narrower scope, a
 route plan, a slice of the budget pool, and a continuation token bound to the signed task
@@ -248,10 +257,15 @@ Bond Claude Code to a policy in one line, then verify everything it did.
 ### 1. Install
 
 ```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
+git clone https://github.com/backbay-labs/chio.git
+cd chio
+cargo build --locked --release -p chio-cli --bin chio
+export PATH="$PWD/target/release:$PATH"
+chio --version
 ```
 
-<sub>Or from source: <code>git clone https://github.com/backbay-labs/chio.git && cd chio && cargo build --release -p chio-cli</code></sub>
+See the [install guide](docs/install/README.md) for prerequisites and the
+[process preview](docs/install/PROCESS_PREVIEW.md) for the newer worker stack.
 
 ### 2. Put Claude or Hermes under policy
 

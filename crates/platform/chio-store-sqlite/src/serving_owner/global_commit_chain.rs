@@ -15,8 +15,14 @@ use super::finding_market_snapshot_versions::{
 };
 use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 
+mod projection_reference;
+mod schema_migration;
+use projection_reference::projection_reference_digest;
+
 pub(crate) const GLOBAL_GENESIS_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
+#[cfg(test)]
+mod schema_tests;
 const GLOBAL_COMMIT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS authority_global_commit_meta (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -38,7 +44,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -221,46 +227,9 @@ pub(crate) fn initialize_global_commit_schema(
     if !table_exists {
         connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
     } else if verify_global_commit_schema(connection).is_err() {
-        migrate_previous_global_commit_schema(connection)?;
+        schema_migration::migrate_previous_global_commit_schema(connection)?;
     }
     verify_global_commit_schema(connection)
-}
-
-fn migrate_previous_global_commit_schema(
-    connection: &Connection,
-) -> Result<(), SqliteServingOwnerError> {
-    let previous_schema = GLOBAL_COMMIT_SCHEMA.replace(", 'finding_status'", "");
-    let legacy_schema = previous_schema.replace(", 'finding_challenge'", "");
-    let expected_previous = Connection::open_in_memory()?;
-    expected_previous.execute_batch(&previous_schema)?;
-    let expected_legacy = Connection::open_in_memory()?;
-    expected_legacy.execute_batch(&legacy_schema)?;
-    let actual = global_schema_catalog(connection)?;
-    if actual != global_schema_catalog(&expected_previous)?
-        && actual != global_schema_catalog(&expected_legacy)?
-    {
-        return Err(invalid("global authority commit schema is not canonical"));
-    }
-    let transaction = connection.unchecked_transaction()?;
-    transaction.execute_batch(
-        r#"
-        DROP TRIGGER authority_global_commits_immutable;
-        DROP TRIGGER authority_global_commits_no_delete;
-        DROP INDEX authority_global_commits_projection;
-        ALTER TABLE authority_global_commits
-            RENAME TO authority_global_commits_previous;
-        "#,
-    )?;
-    transaction.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
-    transaction.execute_batch(
-        r#"
-        INSERT INTO authority_global_commits
-        SELECT * FROM authority_global_commits_previous;
-        DROP TABLE authority_global_commits_previous;
-        "#,
-    )?;
-    transaction.commit()?;
-    Ok(())
 }
 
 pub(crate) fn verify_global_commit_schema(
@@ -907,105 +876,6 @@ fn verify_historical_lease(
     Ok(())
 }
 
-fn projection_reference_digest(
-    connection: &Connection,
-    kind: &str,
-    key: &str,
-    sequence: u64,
-) -> Result<String, SqliteServingOwnerError> {
-    match kind {
-        "admission" => connection
-            .query_row(
-                r#"
-                SELECT chain_digest FROM admission_operation_commits
-                WHERE commit_sequence = ?1 AND operation_id = ?2
-                "#,
-                params![sqlite_u64(sequence, "admission commit sequence")?, key],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?
-            .ok_or_else(|| invalid("admission projection reference is absent")),
-        "budget" => budget_event_reference_digest(connection, key, sequence),
-        "payment" => payment_journal_reference_digest(connection, key, sequence),
-        "revocation" => revocation_reference_digest(connection, key, sequence),
-        "frost" => connection
-            .query_row(
-                r#"
-                SELECT chain_digest FROM frost_projection_commits
-                WHERE projection_key = ?1 AND projection_sequence = ?2
-                "#,
-                params![key, sqlite_u64(sequence, "FROST projection sequence")?],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?
-            .ok_or_else(|| invalid("FROST projection reference is absent")),
-        "economic" => connection
-            .query_row(
-                r#"
-                SELECT commit_digest FROM economic_state_stage_commits
-                WHERE batch_id = ?1 AND stage_version = ?2
-                "#,
-                params![key, sqlite_u64(sequence, "economic stage version")?],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?
-            .ok_or_else(|| invalid("economic projection reference is absent")),
-        "channel_release_publication" => {
-            channel_release_projection_reference_digest(connection, key, sequence)
-        }
-        "factor_assignment_authority_set" => {
-            factor_assignment_authority_set_reference_digest(connection, key, sequence)
-        }
-        "fiscal" => connection
-            .query_row(
-                r#"
-                SELECT commit_digest FROM fiscal_projection_commits
-                WHERE projection_key = ?1 AND projection_sequence = ?2
-                "#,
-                params![key, sqlite_u64(sequence, "fiscal projection sequence")?],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?
-            .ok_or_else(|| invalid("fiscal projection reference is absent")),
-        "finding_challenge" => {
-            if key != "market" {
-                return Err(invalid("finding challenge projection key is invalid"));
-            }
-            connection
-                .query_row(
-                    r#"
-                    SELECT commit_digest FROM finding_challenge_projection_commits
-                    WHERE projection_sequence = ?1
-                    "#,
-                    [sqlite_u64(
-                        sequence,
-                        "finding challenge projection sequence",
-                    )?],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()?
-                .ok_or_else(|| invalid("finding challenge projection reference is absent"))
-        }
-        "finding_status" => {
-            if key != "status" {
-                return Err(invalid("finding status projection key is invalid"));
-            }
-            connection
-                .query_row(
-                    r#"
-                    SELECT commit_digest FROM finding_status_projection_commits
-                    WHERE projection_sequence = ?1
-                    "#,
-                    [sqlite_u64(sequence, "finding status projection sequence")?],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()?
-                .ok_or_else(|| invalid("finding status projection reference is absent"))
-        }
-        _ => Err(invalid("unknown global authority projection kind")),
-    }
-}
-
 fn factor_assignment_authority_set_reference_digest(
     connection: &Connection,
     key: &str,
@@ -1250,7 +1120,7 @@ fn revocation_reference_digest(
     })
 }
 
-fn budget_event_reference_digest(
+pub(crate) fn budget_event_reference_digest(
     connection: &Connection,
     event_id: &str,
     event_seq: u64,
@@ -1567,6 +1437,12 @@ pub(super) fn finding_market_snapshot_digest_version(
 pub(crate) fn verify_pristine_authority_tables(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
+    // Keep runtime migration outside the historical baseline snapshot shape.
+    // Its own projection covers every row once an active owner writes it.
+    crate::admission_operation_store::verify_runtime_replay_pristine(connection)?;
+    crate::admission_operation_store::verify_governed_approval_replay_pristine(connection)?;
+    crate::admission_operation_store::verify_dpop_replay_pristine(connection)?;
+    crate::admission_operation_store::verify_security_participant_migration_pristine(connection)?;
     for table in table_names(connection, false)? {
         if matches!(
             table.as_str(),
@@ -1833,6 +1709,12 @@ fn without_factor_assignment_tables(tables: Vec<String>) -> Vec<String> {
 fn verify_global_projection_coverage(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
+    crate::admission_operation_store::verify_runtime_replay_projection_coverage(connection)?;
+    crate::admission_operation_store::verify_governed_approval_replay_projection_coverage(
+        connection,
+    )?;
+    crate::admission_operation_store::verify_dpop_replay_projection_coverage(connection)?;
+    crate::admission_operation_store::verify_security_participant_migration_coverage(connection)?;
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;
@@ -2664,18 +2546,6 @@ fn invalid(detail: impl Into<String>) -> SqliteServingOwnerError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn immediately_previous_global_schema_migrates_to_finding_status_kind(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let connection = Connection::open_in_memory()?;
-        let previous_schema = GLOBAL_COMMIT_SCHEMA.replace(", 'finding_status'", "");
-        connection.execute_batch(&previous_schema)?;
-        assert!(verify_global_commit_schema(&connection).is_err());
-        initialize_global_commit_schema(&connection)?;
-        verify_global_commit_schema(&connection)?;
-        Ok(())
-    }
 
     fn projection_fixture() -> Result<Connection, rusqlite::Error> {
         let connection = Connection::open_in_memory()?;

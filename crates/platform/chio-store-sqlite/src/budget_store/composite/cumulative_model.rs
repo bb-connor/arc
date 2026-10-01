@@ -8,7 +8,7 @@ fn canonical_approval_digest(value: &str) -> bool {
 }
 
 fn validate_cumulative_approval_history(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     request: &BudgetCumulativeApprovalRequest,
     state: BudgetCumulativeApprovalState,
     approval_set_digest: Option<&str>,
@@ -151,7 +151,7 @@ fn validate_cumulative_approval_history(
 }
 
 pub(super) fn load_hold_cumulative(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     hold_id: &str,
 ) -> Result<
     Option<(

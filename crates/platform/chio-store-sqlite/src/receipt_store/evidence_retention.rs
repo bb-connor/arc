@@ -6,6 +6,9 @@ use super::support::{
 };
 use super::*;
 
+#[path = "evidence_retention/dispatch.rs"]
+mod dispatch;
+
 pub(crate) fn receipt_query_sql(
     query: &ReceiptQuery,
     tenant_fragment: &str,
@@ -221,57 +224,6 @@ impl SqliteReceiptStore {
     /// checkpointed batch has fully aged, i.e. a no-op rotation).
     pub fn rotate_if_needed(&self, config: &RetentionConfig) -> Result<u64, ReceiptStoreError> {
         self.dispatch_rotate(Box::new(config.clone()), None)
-    }
-
-    fn dispatch_rotate(
-        &self,
-        config: Box<RetentionConfig>,
-        explicit_cutoff: Option<u64>,
-    ) -> Result<u64, ReceiptStoreError> {
-        if config.tenant_id.is_some() {
-            // Tenant-scoped archival is not expressible as a prefix watermark,
-            // so reject here before any partial work runs.
-            return Err(ReceiptStoreError::RetentionTenantScopeUnsupported);
-        }
-        let config = match explicit_cutoff {
-            Some(cutoff) => {
-                let mut config = config;
-                config.retention_days = 0;
-                config.explicit_cutoff_unix_secs = Some(cutoff);
-                config
-            }
-            None => config,
-        };
-        let (response, result) = std::sync::mpsc::sync_channel(1);
-        // A rotation is an in-flight writer just like an append or a Write job:
-        // increment BEFORE handing the command to the actor so a concurrent
-        // `receipt_store_health` cannot observe a dequeued-but-uncounted
-        // rotation, mirroring `ReceiptCommitActor::append` and
-        // `WriterHandle::run_write_kind`. The Rotate actor arm decrements
-        // unconditionally on dequeue; any send or recv failure here undoes the
-        // speculative increment so a rejected rotation never leaks inflight.
-        let health = &self.receipt_commit_actor.health;
-        health
-            .inflight
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        if let Err(error) = self
-            .receipt_commit_actor
-            .sender
-            .try_send(ReceiptCommitCommand::Rotate { config, response })
-        {
-            atomic_saturating_sub(&health.inflight, 1);
-            return Err(match error {
-                std::sync::mpsc::TrySendError::Full(_) => receipt_actor_saturated_error(),
-                std::sync::mpsc::TrySendError::Disconnected(_) => receipt_actor_unavailable_error(),
-            });
-        }
-        match result.recv() {
-            Ok(outcome) => outcome,
-            Err(_) => {
-                atomic_saturating_sub(&health.inflight, 1);
-                Err(receipt_actor_unavailable_error())
-            }
-        }
     }
 
     /// Internal implementation for `query_receipts` (called from `receipt_query` module).
@@ -1051,6 +1003,11 @@ pub(super) fn create_archive_schema(
                     typeof(cost_charged_be) = 'blob' AND
                     length(cost_charged_be) = 8
                 )
+            ),
+            attempted_cost_be BLOB CHECK (
+                attempted_cost_be IS NULL OR (
+                    typeof(attempted_cost_be) = 'blob' AND length(attempted_cost_be) = 8
+                )
             )
         );
         CREATE TABLE IF NOT EXISTS archive.chio_child_receipts (
@@ -1096,6 +1053,9 @@ pub(super) fn create_archive_schema(
             billed_cost_units INTEGER NOT NULL, billed_cost_currency TEXT NOT NULL,
             evidence_sha256 TEXT, recorded_at INTEGER NOT NULL,
             reconciliation_state TEXT NOT NULL, note TEXT, updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS archive.chio_security_evidence_index (
+            evidence_id TEXT NOT NULL PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE
         );
         CREATE TABLE IF NOT EXISTS archive.chio_authorization_receipt_consumptions (
             authorization_receipt_id TEXT PRIMARY KEY, consumer_receipt_id TEXT NOT NULL,
@@ -1158,8 +1118,11 @@ pub(super) fn create_archive_schema(
             "retention archive sink identity is not canonical".to_owned(),
         ));
     }
-    if archive_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION {
-        migrate_archive_receipt_cost_projection(&transaction)?;
+    if archive_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
+        migrate_archive_receipt_cost_projection(
+            &transaction,
+            archive_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
+        )?;
     }
     verify_archive_receipt_cost_projection(&transaction)?;
     for (column, definition) in [
@@ -1254,10 +1217,10 @@ pub(super) fn copy_archived_prefix(
         INSERT OR IGNORE INTO archive.chio_tool_receipts
             (seq, receipt_id, timestamp, capability_id, subject_key, issuer_key,
              grant_index, tool_server, tool_name, decision_kind, policy_hash,
-             content_hash, raw_json, tenant_id, cost_currency, cost_charged_be)
+             content_hash, raw_json, tenant_id, cost_currency, cost_charged_be, attempted_cost_be)
             SELECT seq, receipt_id, timestamp, capability_id, subject_key, issuer_key,
                    grant_index, tool_server, tool_name, decision_kind, policy_hash,
-                   content_hash, raw_json, tenant_id, cost_currency, cost_charged_be
+                   content_hash, raw_json, tenant_id, cost_currency, cost_charged_be, attempted_cost_be
             FROM main.chio_tool_receipts WHERE seq IN (
                 SELECT source_seq FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
@@ -1299,6 +1262,10 @@ pub(super) fn copy_archived_prefix(
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
         INSERT OR IGNORE INTO archive.chio_authorization_receipt_consumptions
             SELECT * FROM main.chio_authorization_receipt_consumptions WHERE authorization_receipt_id IN (
+                SELECT receipt_id FROM main.claim_receipt_log_entries
+                WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
+        INSERT OR IGNORE INTO archive.chio_security_evidence_index
+            SELECT * FROM main.chio_security_evidence_index WHERE receipt_id IN (
                 SELECT receipt_id FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
         INSERT OR IGNORE INTO archive.receipt_lineage_statements
@@ -1354,7 +1321,16 @@ fn verify_co_archival_complete(
     connection: &rusqlite::Connection,
     w: i64,
 ) -> Result<(), ReceiptStoreError> {
-    let checks: [(&'static str, String, String); 9] = [
+    let checks: [(&'static str, String, String); 10] = [
+        (
+            "chio_security_evidence_index",
+            format!("SELECT COUNT(*) FROM main.chio_security_evidence_index WHERE receipt_id IN \
+                (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')"),
+            format!("SELECT COUNT(*) FROM main.chio_security_evidence_index m WHERE m.receipt_id IN \
+                (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt') \
+                AND EXISTS (SELECT 1 FROM archive.chio_security_evidence_index a \
+                WHERE a.evidence_id = m.evidence_id AND a.receipt_id = m.receipt_id)"),
+        ),
         (
             // Present AND every column identical: `archive_sql` counts only live
             // prefix rows whose archive row matches on the `seq` primary key and
@@ -1381,7 +1357,8 @@ fn verify_co_archival_complete(
                  AND a.content_hash IS m.content_hash AND a.raw_json IS m.raw_json \
                  AND a.tenant_id IS m.tenant_id \
                  AND a.cost_currency IS m.cost_currency \
-                 AND a.cost_charged_be IS m.cost_charged_be)"
+                 AND a.cost_charged_be IS m.cost_charged_be
+                 AND a.attempted_cost_be IS m.attempted_cost_be)"
             ),
         ),
         (

@@ -1037,3 +1037,6 @@ fn runtime_assurance_policy_rebinds_google_attestation_to_verified_tier() {
         "issued capability should bind the verified runtime assurance tier"
     );
 }
+
+#[path = "tests/aggregate.rs"]
+mod aggregate;

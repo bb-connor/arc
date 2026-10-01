@@ -1,4 +1,5 @@
 use serde::Serialize;
+mod replay_source;
 use std::{fmt, path::Path};
 
 use crate::{
@@ -10,6 +11,16 @@ use crate::{
 };
 
 pub trait ChioRuntimeAdmissionStore: Send + Sync {
+    fn verify_operation_owned_replay_source(
+        &self,
+        _expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+    ) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(Err(RuntimeCoreError::Rejected {
+            code: "operation_owned_runtime_source_unsupported",
+            detail: "runtime backend does not qualify sealed operation-owned replay".into(),
+        }))
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
@@ -586,6 +597,13 @@ impl SqliteRuntimeOrchestrationStore {
 macro_rules! impl_chio_runtime_admission_store_for_inner {
     ($type:ty) => {
         impl ChioRuntimeAdmissionStore for $type {
+            fn verify_operation_owned_replay_source(
+                &self,
+                expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+            ) -> Result<(), ChioRuntimeError> {
+                wrap_runtime(chio_runtime_core::RuntimeAdmissionStore::verify_operation_owned_replay_source(&self.inner, expected))
+            }
+
             fn bundle(
                 &self,
                 admission_id: &str,
@@ -903,6 +921,13 @@ pub(crate) struct RuntimeCoreAdmissionStoreAdapter<'a> {
 }
 
 impl chio_runtime_core::RuntimeAdmissionStore for RuntimeCoreAdmissionStoreAdapter<'_> {
+    fn verify_operation_owned_replay_source(
+        &self,
+        expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+    ) -> Result<(), RuntimeCoreError> {
+        unwrap_runtime(self.inner.verify_operation_owned_replay_source(expected))
+    }
+
     fn bundle(
         &self,
         admission_id: &str,

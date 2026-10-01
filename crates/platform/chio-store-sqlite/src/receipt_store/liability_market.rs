@@ -61,7 +61,7 @@ impl SqliteReceiptStore {
                         "superseded liability provider `{supersedes_provider_record_id}` not found"
                     ))
                     })?;
-                let persisted: SignedLiabilityProvider = serde_json::from_str(&state.0)?;
+                let persisted: SignedLiabilityProvider = decode_verified_signed_export(&state.0)?;
                 if persisted.body.report.provider_id != artifact.report.provider_id {
                     return Err(ReceiptStoreError::Conflict(format!(
                         "liability provider `{}` cannot supersede `{}` because provider_id differs",
@@ -148,7 +148,7 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let (raw_json, lifecycle_state_raw, superseded_by_provider_record_id) = row?;
-            let provider: SignedLiabilityProvider = serde_json::from_str(&raw_json)?;
+            let provider: SignedLiabilityProvider = decode_verified_signed_export(&raw_json)?;
             let lifecycle_state =
                 parse_liability_provider_lifecycle_state(&lifecycle_state_raw).map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
@@ -216,7 +216,7 @@ impl SqliteReceiptStore {
         for row in rows {
             let (raw_json, lifecycle_state_raw) = row?;
             saw_provider = true;
-            let provider: SignedLiabilityProvider = serde_json::from_str(&raw_json)?;
+            let provider: SignedLiabilityProvider = decode_verified_signed_export(&raw_json)?;
             let lifecycle_state =
                 parse_liability_provider_lifecycle_state(&lifecycle_state_raw).map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
@@ -322,7 +322,7 @@ impl SqliteReceiptStore {
                     artifact.provider_policy.provider_record_id
                 ))
             })?;
-        let provider: SignedLiabilityProvider = serde_json::from_str(&provider_raw_json)?;
+        let provider: SignedLiabilityProvider = decode_verified_signed_export(&provider_raw_json)?;
         let lifecycle_state = parse_liability_provider_lifecycle_state(&lifecycle_state_raw)?;
         if lifecycle_state != LiabilityProviderLifecycleState::Active {
             return Err(ReceiptStoreError::Conflict(format!(
@@ -430,7 +430,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_request: SignedLiabilityQuoteRequest =
-            serde_json::from_str(&stored_request_raw_json)?;
+            decode_verified_signed_export(&stored_request_raw_json)?;
         if stored_request.body != artifact.quote_request.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability quote response quote_request does not match the persisted request"
@@ -454,7 +454,7 @@ impl SqliteReceiptStore {
                         "superseded liability quote response `{supersedes_quote_response_id}` not found"
                     ))
                 })?;
-            let prior: SignedLiabilityQuoteResponse = serde_json::from_str(&state.0)?;
+            let prior: SignedLiabilityQuoteResponse = decode_verified_signed_export(&state.0)?;
             if prior.body.quote_request.body.quote_request_id
                 != artifact.quote_request.body.quote_request_id
             {
@@ -589,7 +589,7 @@ impl SqliteReceiptStore {
                     ))
                 })?;
             let stored_request: SignedLiabilityQuoteRequest =
-                serde_json::from_str(&stored_request_raw_json)?;
+                decode_verified_signed_export(&stored_request_raw_json)?;
             if stored_request.body != artifact.quote_response.body.quote_request.body {
                 return Err(ReceiptStoreError::Conflict(
                     "liability placement quote_request does not match the persisted request"
@@ -619,7 +619,7 @@ impl SqliteReceiptStore {
                 )));
             }
             let stored_response: SignedLiabilityQuoteResponse =
-                serde_json::from_str(&stored_response_raw_json)?;
+                decode_verified_signed_export(&stored_response_raw_json)?;
             if stored_response.body != artifact.quote_response.body {
                 return Err(ReceiptStoreError::Conflict(
                     "liability placement quote_response does not match the persisted response"
@@ -740,7 +740,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_request: SignedLiabilityQuoteRequest =
-            serde_json::from_str(&stored_request_raw_json)?;
+            decode_verified_signed_export(&stored_request_raw_json)?;
         if stored_request.body != artifact.quote_request.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability pricing authority quote_request does not match the persisted request"
@@ -840,7 +840,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_placement: SignedLiabilityPlacement =
-            serde_json::from_str(&stored_placement_raw_json)?;
+            decode_verified_signed_export(&stored_placement_raw_json)?;
         if stored_placement.body != artifact.placement.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability bound coverage placement does not match the persisted placement"
@@ -959,7 +959,7 @@ impl SqliteReceiptStore {
                 ))
             })?;
         let stored_authority: SignedLiabilityPricingAuthority =
-            serde_json::from_str(&stored_authority_raw_json)?;
+            decode_verified_signed_export(&stored_authority_raw_json)?;
         if stored_authority.body != artifact.authority.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability auto-bind authority does not match the persisted authority".to_string(),
@@ -988,7 +988,7 @@ impl SqliteReceiptStore {
             )));
         }
         let stored_response: SignedLiabilityQuoteResponse =
-            serde_json::from_str(&stored_response_raw_json)?;
+            decode_verified_signed_export(&stored_response_raw_json)?;
         if stored_response.body != artifact.quote_response.body {
             return Err(ReceiptStoreError::Conflict(
                 "liability auto-bind quote_response does not match the persisted response"
@@ -1212,7 +1212,8 @@ impl SqliteReceiptStore {
 
         for row in rows {
             let raw_json = row?;
-            let quote_request: SignedLiabilityQuoteRequest = serde_json::from_str(&raw_json)?;
+            let quote_request: SignedLiabilityQuoteRequest =
+                decode_verified_signed_export(&raw_json)?;
             if !liability_market_workflow_matches_query(&quote_request, &normalized) {
                 continue;
             }
@@ -1230,7 +1231,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| serde_json::from_str::<SignedLiabilityQuoteResponse>(&raw_json))
+                .map(
+                    |raw_json| -> Result<SignedLiabilityQuoteResponse, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if let Some(response) = latest_quote_response.as_ref() {
                 quote_responses += 1;
@@ -1252,7 +1257,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| serde_json::from_str::<SignedLiabilityPricingAuthority>(&raw_json))
+                .map(
+                    |raw_json| -> Result<SignedLiabilityPricingAuthority, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if pricing_authority.is_some() {
                 pricing_authorities += 1;
@@ -1270,7 +1279,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| serde_json::from_str::<SignedLiabilityAutoBindDecision>(&raw_json))
+                .map(
+                    |raw_json| -> Result<SignedLiabilityAutoBindDecision, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if let Some(decision) = latest_auto_bind_decision.as_ref() {
                 auto_bind_decisions += 1;
@@ -1293,7 +1306,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| serde_json::from_str::<SignedLiabilityPlacement>(&raw_json))
+                .map(
+                    |raw_json| -> Result<SignedLiabilityPlacement, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if placement.is_some() {
                 placements += 1;
@@ -1311,7 +1328,11 @@ impl SqliteReceiptStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?
-                .map(|raw_json| serde_json::from_str::<SignedLiabilityBoundCoverage>(&raw_json))
+                .map(
+                    |raw_json| -> Result<SignedLiabilityBoundCoverage, ReceiptStoreError> {
+                        decode_verified_signed_export(&raw_json)
+                    },
+                )
                 .transpose()?;
             if bound_coverage.is_some() {
                 bound_coverages += 1;

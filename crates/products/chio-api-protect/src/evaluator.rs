@@ -49,6 +49,9 @@ pub(crate) struct DurableAdmissionStores {
     pub(crate) store: Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
     pub(crate) outcome_store: Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,
     pub(crate) fence: chio_kernel::admission_operation::StoreMutationFence,
+    /// The authority's own budget store. Durable operations, their preflight
+    /// holds and their executable holds live in one authority.
+    pub(crate) budget_store: Arc<dyn chio_kernel::budget_store::BudgetStore>,
 }
 
 impl RequestEvaluator {
@@ -645,6 +648,7 @@ mod tests {
                 store: Arc::new(authority.admission_operation_store()),
                 outcome_store: Arc::new(authority.tool_outcome_store()),
                 fence: authority.mutation_fence(),
+                budget_store: Arc::new(authority.budget_store()),
             }),
             false,
         )?;

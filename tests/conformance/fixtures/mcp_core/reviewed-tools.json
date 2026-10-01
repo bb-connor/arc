@@ -1,0 +1,116 @@
+{
+  "tools": [
+    {
+      "name": "echo_text",
+      "title": "Echo Text",
+      "description": "Return a simple text response",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "slow_echo",
+      "title": "Slow Echo",
+      "description": "Sleep before returning a simple text response",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "emit_fixture_notifications",
+      "title": "Emit Fixture Notifications",
+      "description": "Emit resource and catalog change notifications before returning",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "sampled_echo",
+      "title": "Sampled Echo",
+      "description": "Use sampling/createMessage before returning",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "elicited_echo",
+      "title": "Elicited Echo",
+      "description": "Use form-mode elicitation/create before returning",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "url_elicited_echo",
+      "title": "URL Elicited Echo",
+      "description": "Use URL-mode elicitation/create and completion notification before returning",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "roots_echo",
+      "title": "Roots Echo",
+      "description": "Use roots/list before returning",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ]
+}

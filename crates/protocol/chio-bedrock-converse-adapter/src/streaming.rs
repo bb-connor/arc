@@ -186,6 +186,16 @@ impl<'a> StreamGate<'a> {
 
         let block = active.completed_tool_use()?;
         let invocation = self.adapter.invocation_from_tool_use(block.clone())?;
+        if !invocation
+            .bridge_security
+            .as_ref()
+            .is_some_and(chio_manifest::BridgeSecurityMetadata::has_registry_coordinates)
+        {
+            return Err(ProviderError::Malformed(
+                "Bedrock stream evaluation requires a registry-admitted security sidecar"
+                    .to_string(),
+            ));
+        }
         let verdict = evaluate(&invocation)?;
         ensure_streaming_allow(&block, &verdict)?;
         self.phase = transition(&self.phase, StreamEvent::FinishBlock)?;

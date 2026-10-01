@@ -264,6 +264,7 @@ fn kernel_hook_accepts_governed_context_reference_and_returns_receipt_metadata(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent {
         id: "intent-live-1".to_string(),
@@ -341,6 +342,7 @@ fn kernel_hook_immediate_dispatch_revalidation_rejects_advanced_trust_floor(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent {
         id: "intent-live-1".to_string(),
@@ -434,6 +436,7 @@ fn kernel_hook_revalidates_non_runtime_request_without_admission_metadata(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = ChioRuntimeAdmissionHook::new(profile(), store);
     let decision = hook.evaluate(&RuntimeAdmissionContext {
@@ -485,6 +488,7 @@ fn kernel_hook_preserves_millisecond_admission_time() -> Result<(), Box<dyn std:
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent {
         id: "intent-live-1".to_string(),
@@ -564,6 +568,7 @@ fn kernel_hook_bypasses_non_chio_request() -> Result<(), Box<dyn std::error::Err
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
     let hook = ChioRuntimeAdmissionHook::new(profile(), store);
 
@@ -602,6 +607,7 @@ fn kernel_hook_denies_federated_origin_without_any_runtime_context(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
 
     let hook = allowing_policy_hook(store)?;
@@ -653,6 +659,7 @@ fn kernel_hook_denies_federated_runtime_request_without_treaty_context(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent {
         id: "intent-live-1".to_string(),
@@ -725,6 +732,7 @@ fn kernel_hook_denies_cross_boundary_request_when_treaty_store_evidence_missing(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     };
     request.governed_intent = Some(GovernedTransactionIntent {
         id: "intent-live-1".to_string(),

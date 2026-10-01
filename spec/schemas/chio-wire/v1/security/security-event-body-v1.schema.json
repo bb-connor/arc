@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/security-event-body-v1.schema.json",
+  "title": "Chio security event body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_time_unix_ms",
+    "ingest_time_unix_ms",
+    "tenant_id",
+    "subject",
+    "source_receipt_id",
+    "event_kind",
+    "severity",
+    "evidence_references",
+    "producer_id",
+    "producer_key_id",
+    "trust_class",
+    "policy_version"
+  ],
+  "properties": {
+    "event_id": { "$ref": "#/$defs/identifier" },
+    "event_time_unix_ms": { "$ref": "#/$defs/time" },
+    "ingest_time_unix_ms": { "$ref": "#/$defs/time" },
+    "tenant_id": { "$ref": "#/$defs/identifier" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "source_receipt_id": { "$ref": "#/$defs/identifier" },
+    "event_kind": {
+      "enum": [
+        "canary_invocation",
+        "credential_access",
+        "declassification_attempt",
+        "detector_health",
+        "egress_attempt",
+        "flow_denial",
+        "tool_invocation",
+        "tripwire_observation",
+        "watermark_observation"
+      ]
+    },
+    "severity": { "enum": ["informational", "low", "medium", "high", "critical"] },
+    "evidence_references": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "producer_id": { "$ref": "#/$defs/identifier" },
+    "producer_key_id": { "$ref": "#/$defs/identifier" },
+    "trust_class": { "enum": ["internal_detector", "verified_receipt"] },
+    "policy_version": { "$ref": "#/$defs/identifier" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    },
+    "time": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_id", "agent_id", "session_id", "capability_id", "lineage_seed"],
+      "properties": {
+        "subject_id": { "$ref": "#/$defs/identifier" },
+        "agent_id": { "$ref": "#/$defs/identifier" },
+        "session_id": { "$ref": "#/$defs/identifier" },
+        "capability_id": { "$ref": "#/$defs/identifier" },
+        "lineage_seed": { "$ref": "#/$defs/identifier" }
+      }
+    }
+  }
+}

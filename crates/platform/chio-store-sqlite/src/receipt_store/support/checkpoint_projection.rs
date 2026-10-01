@@ -651,17 +651,18 @@ pub(crate) fn validate_adopted_claim_log_delta(
     Ok(())
 }
 
-fn canonical_bytes_from_claim_log_row(
+fn verified_bytes_and_signer_from_claim_log_row(
     receipt_kind: &str,
     raw_json: &str,
     entry_seq: u64,
-) -> Result<Vec<u8>, ReceiptStoreError> {
+) -> Result<(Vec<u8>, chio_core::crypto::PublicKey), ReceiptStoreError> {
     match receipt_kind {
         "tool_receipt" => {
             let receipt =
                 decode_verified_chio_receipt(raw_json, "claim-log tool receipt", Some(entry_seq))?;
-            chio_core::canonical::canonical_json_bytes(&receipt)
-                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))
+            let bytes = chio_core::canonical::canonical_json_bytes(&receipt)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+            Ok((bytes, receipt.kernel_key))
         }
         "child_receipt" => {
             let receipt = decode_verified_child_receipt(
@@ -669,8 +670,9 @@ fn canonical_bytes_from_claim_log_row(
                 "claim-log child receipt",
                 Some(entry_seq),
             )?;
-            chio_core::canonical::canonical_json_bytes(&receipt)
-                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))
+            let bytes = chio_core::canonical::canonical_json_bytes(&receipt)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+            Ok((bytes, receipt.kernel_key))
         }
         other => Err(ReceiptStoreError::Conflict(format!(
             "unsupported claim receipt kind `{other}` in claim tree"
@@ -683,7 +685,83 @@ pub(crate) fn load_claim_tree_canonical_bytes_range(
     start_entry_seq: u64,
     end_entry_seq: u64,
 ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
-    super::ensure_claim_log_range_contiguous(connection, start_entry_seq, end_entry_seq, "range")?;
+    load_verified_claim_tree_range(
+        connection,
+        start_entry_seq,
+        end_entry_seq,
+        "range",
+        |_, _, _| Ok(()),
+    )
+}
+
+/// Bind signer and Merkle bytes to the same verified row. A second SELECT
+/// could observe a replacement signed by another kernel after signer checks.
+pub(crate) fn load_checkpoint_claim_tree_canonical_bytes_range(
+    connection: &Connection,
+    checkpoint: &KernelCheckpoint,
+) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
+    let mut range_signer: Option<chio_core::crypto::PublicKey> = None;
+    let rows = load_verified_claim_tree_range(
+        connection,
+        checkpoint.body.batch_start_seq,
+        checkpoint.body.batch_end_seq,
+        "checkpoint signer binding",
+        |receipt_kind, entry_seq, key| {
+            if let Some(expected_key) = range_signer.as_ref() {
+                if expected_key != key {
+                    return Err(ReceiptStoreError::Conflict(format!(
+                        "checkpoint {} covers mixed receipt signer range: {receipt_kind} entry {entry_seq} uses kernel key {}, expected {}",
+                        checkpoint.body.checkpoint_seq,
+                        key.to_hex(),
+                        expected_key.to_hex(),
+                    )));
+                }
+            } else {
+                range_signer = Some(key.clone());
+            }
+            Ok(())
+        },
+    )?;
+    match range_signer {
+        Some(key) if key == checkpoint.body.kernel_key => Ok(rows),
+        Some(key) => Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} kernel key {} does not match receipt signer key {} for claim receipt log range {}..={}",
+            checkpoint.body.checkpoint_seq,
+            checkpoint.body.kernel_key.to_hex(),
+            key.to_hex(),
+            checkpoint.body.batch_start_seq,
+            checkpoint.body.batch_end_seq,
+        ))),
+        None => Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} covers no receipt signer keys in claim receipt log range {}..={}",
+            checkpoint.body.checkpoint_seq,
+            checkpoint.body.batch_start_seq,
+            checkpoint.body.batch_end_seq,
+        ))),
+    }
+}
+
+fn load_verified_claim_tree_range(
+    connection: &Connection,
+    start_entry_seq: u64,
+    end_entry_seq: u64,
+    context: &str,
+    mut verify_signer: impl FnMut(
+        &str,
+        u64,
+        &chio_core::crypto::PublicKey,
+    ) -> Result<(), ReceiptStoreError>,
+) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
+    if end_entry_seq < start_entry_seq {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "claim receipt log {context} end {end_entry_seq} is before start {start_entry_seq}"
+        )));
+    }
+    let gap = || {
+        ReceiptStoreError::Conflict(format!(
+            "claim receipt log has a gap in {context} {start_entry_seq}..={end_entry_seq}"
+        ))
+    };
     let mut statement = connection.prepare(
         r#"
         SELECT entry_seq, receipt_kind, raw_json
@@ -705,14 +783,25 @@ pub(crate) fn load_claim_tree_canonical_bytes_range(
             ))
         },
     )?;
+    // Count and continuity belong to this same SELECT as the verified bytes.
+    // A separate count query would leave another snapshot substitution window.
+    let mut expected_seq = start_entry_seq;
     let mut result = Vec::new();
     for row in rows {
         let (entry_seq, receipt_kind, raw_json) = row?;
         let entry_seq = sqlite_positive_u64(entry_seq, "claim tree entry_seq")?;
-        result.push((
-            entry_seq,
-            canonical_bytes_from_claim_log_row(&receipt_kind, &raw_json, entry_seq)?,
-        ));
+        if entry_seq != expected_seq {
+            return Err(gap());
+        }
+        let (bytes, signer) =
+            verified_bytes_and_signer_from_claim_log_row(&receipt_kind, &raw_json, entry_seq)?;
+        verify_signer(&receipt_kind, entry_seq, &signer)?;
+        result.push((entry_seq, bytes));
+        expected_seq += 1;
+    }
+    // Both bounds were checked against SQLite's signed range before the query.
+    if expected_seq != end_entry_seq + 1 {
+        return Err(gap());
     }
     Ok(result)
 }

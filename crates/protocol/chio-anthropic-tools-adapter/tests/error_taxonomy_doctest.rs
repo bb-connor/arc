@@ -1,8 +1,10 @@
+mod support;
+
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use chio_anthropic_tools_adapter::transport::MockTransport;
-use chio_anthropic_tools_adapter::{AnthropicAdapter, AnthropicAdapterConfig};
+use chio_anthropic_tools_adapter::AnthropicAdapter;
 use chio_tool_call_fabric::{ProviderError, ProviderRequest, ReceiptId, Redaction, VerdictResult};
 use serde_json::{json, Value};
 
@@ -15,14 +17,7 @@ struct TaxonomyRow {
 }
 
 fn adapter() -> AnthropicAdapter {
-    let config = AnthropicAdapterConfig::new(
-        "anthropic-1",
-        "Anthropic Messages",
-        "0.1.0",
-        "deadbeef",
-        "wks_chio_demo",
-    );
-    AnthropicAdapter::new(config, Arc::new(MockTransport::new()))
+    support::adapter(Arc::new(MockTransport::new()))
 }
 
 fn raw(value: Value) -> Result<ProviderRequest, String> {

@@ -105,7 +105,9 @@ pub(super) fn attachment_supported(
         AdmissionAttachment::BrokerAttempt(_) => requirements.broker_attempt,
         AdmissionAttachment::BudgetHoldId(_) => requirements.budget_capture,
         AdmissionAttachment::ApprovalSetHash(_) => requirements.approval,
-        AdmissionAttachment::ExecutionNonceId(_) => requirements.execution_nonce,
+        AdmissionAttachment::ExecutionNonceId(_)
+        | AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
+        | AdmissionAttachment::ExecutionNoncePreflightDigest(_) => requirements.execution_nonce,
         AdmissionAttachment::OutcomeEligibilityDigest(_) => requirements.outcome_eligibility,
         AdmissionAttachment::PaymentParticipantId(_) => requirements.payment,
         AdmissionAttachment::ToolOutcomeId(_) => kind == AdmissionOperationKind::ToolDispatch,
@@ -113,6 +115,22 @@ pub(super) fn attachment_supported(
         | AdmissionAttachment::ChannelReservationDigest(_) => requirements.channel,
         AdmissionAttachment::CreditExposureReservationDigest(_) => {
             kind == AdmissionOperationKind::ToolDispatch && requirements.credit_exposure
+        }
+        AdmissionAttachment::CallerDispatchContextDigest(_) => {
+            kind == AdmissionOperationKind::ToolDispatch
+                && requirements.execution_nonce
+                && requirements.budget_capture
+                && requirements.broker_attempt
+        }
+        AdmissionAttachment::NativeDispatchLedgerDigest(_) => {
+            kind == AdmissionOperationKind::ToolDispatch
+                && requirements.budget_capture
+                && requirements.broker_attempt
+        }
+        AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+        | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+        | AdmissionAttachment::DpopReplayLedgerDigest(_) => {
+            kind == AdmissionOperationKind::ToolDispatch
         }
     }
 }
@@ -127,6 +145,16 @@ pub(super) fn attachment_allowed(
         return false;
     }
     match attachment {
+        AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
+        | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
+        | AdmissionAttachment::DpopReplayLedgerDigest(_) => matches!(
+            state,
+            AdmissionOperationState::Prepared | AdmissionOperationState::BrokerAttemptRegistered
+        ),
+        AdmissionAttachment::ExecutionNonceIssuanceDigest(_)
+        | AdmissionAttachment::ExecutionNoncePreflightDigest(_) => {
+            state == AdmissionOperationState::Prepared
+        }
         AdmissionAttachment::SupplementalAuthorizationDigest(_)
             if kind == AdmissionOperationKind::GovernedEconomicMutation =>
         {
@@ -134,7 +162,9 @@ pub(super) fn attachment_allowed(
         }
         AdmissionAttachment::ToolOutcomeId(_) => matches!(
             state,
-            AdmissionOperationState::DispatchCommitted | AdmissionOperationState::Finalizing
+            AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::AwaitingCallerReport
+                | AdmissionOperationState::Finalizing
         ),
         AdmissionAttachment::ChannelReservationProposalDigest(_) => {
             state == AdmissionOperationState::Prepared
@@ -145,6 +175,12 @@ pub(super) fn attachment_allowed(
         ),
         AdmissionAttachment::CreditExposureReservationDigest(_) => {
             state == AdmissionOperationState::BrokerAttemptRegistered
+        }
+        AdmissionAttachment::CallerDispatchContextDigest(_) => {
+            state == AdmissionOperationState::CapturePending
+        }
+        AdmissionAttachment::NativeDispatchLedgerDigest(_) => {
+            state == AdmissionOperationState::CapturePending
         }
         _ => matches!(
             state,
@@ -174,6 +210,33 @@ pub(super) fn validate_state_attachments(
                         | AdmissionOperationState::OutcomeUnknownAfterDispatch
                         | AdmissionOperationState::DeniedAfterDelivery
                 ),
+                AdmissionAttachment::NativeDispatchLedgerDigest(_) => {
+                    let committed = matches!(
+                        state,
+                        AdmissionOperationState::DispatchCommitted
+                            | AdmissionOperationState::Finalizing
+                            | AdmissionOperationState::Completed
+                            | AdmissionOperationState::NotAcceptedAfterDispatchCommit
+                            | AdmissionOperationState::OutcomeUnknownAfterDispatch
+                            | AdmissionOperationState::DeniedAfterDelivery
+                    );
+                    let caller_wait = state == AdmissionOperationState::AwaitingCallerReport
+                        && attachments.0.iter().any(|attachment| matches!(attachment,
+                            AdmissionAttachment::BrokerAttempt(attempt) if attempt.is_native_caller_report()))
+                        && attachments.0.iter().any(|attachment| matches!(attachment,
+                            AdmissionAttachment::CallerDispatchContextDigest(_)));
+                    !(committed || caller_wait)
+                }
+                AdmissionAttachment::CallerDispatchContextDigest(_) => !matches!(
+                    state,
+                    AdmissionOperationState::DispatchCommitted
+                        | AdmissionOperationState::AwaitingCallerReport
+                        | AdmissionOperationState::Finalizing
+                        | AdmissionOperationState::Completed
+                        | AdmissionOperationState::NotAcceptedAfterDispatchCommit
+                        | AdmissionOperationState::OutcomeUnknownAfterDispatch
+                        | AdmissionOperationState::DeniedAfterDelivery
+                ),
                 AdmissionAttachment::ChannelReservationDigest(_) => !matches!(
                     state,
                     AdmissionOperationState::BudgetAuthorized
@@ -181,6 +244,7 @@ pub(super) fn validate_state_attachments(
                         | AdmissionOperationState::ReadyToDispatch
                         | AdmissionOperationState::CapturePending
                         | AdmissionOperationState::DispatchCommitted
+                        | AdmissionOperationState::AwaitingCallerReport
                         | AdmissionOperationState::Finalizing
                         | AdmissionOperationState::Completed
                         | AdmissionOperationState::CompensatedBeforeDispatch
@@ -194,6 +258,7 @@ pub(super) fn validate_state_attachments(
                         | AdmissionOperationState::ReadyToDispatch
                         | AdmissionOperationState::CapturePending
                         | AdmissionOperationState::DispatchCommitted
+                        | AdmissionOperationState::AwaitingCallerReport
                         | AdmissionOperationState::Finalizing
                         | AdmissionOperationState::Completed
                         | AdmissionOperationState::CompensatedBeforeDispatch
@@ -243,6 +308,7 @@ pub(super) fn validate_state_attachments(
                 | AdmissionOperationState::ReadyToDispatch
                 | AdmissionOperationState::CapturePending
                 | AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::AwaitingCallerReport
                 | AdmissionOperationState::Finalizing
                 | AdmissionOperationState::Completed
                 | AdmissionOperationState::NotAcceptedAfterDispatchCommit
@@ -255,6 +321,7 @@ pub(super) fn validate_state_attachments(
                 | AdmissionOperationState::ReadyToDispatch
                 | AdmissionOperationState::CapturePending
                 | AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::AwaitingCallerReport
                 | AdmissionOperationState::Finalizing
                 | AdmissionOperationState::Completed
                 | AdmissionOperationState::NotAcceptedAfterDispatchCommit
@@ -266,6 +333,7 @@ pub(super) fn validate_state_attachments(
                 | AdmissionOperationState::ReadyToDispatch
                 | AdmissionOperationState::CapturePending
                 | AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::AwaitingCallerReport
                 | AdmissionOperationState::Finalizing
                 | AdmissionOperationState::Completed
                 | AdmissionOperationState::NotAcceptedAfterDispatchCommit
@@ -276,6 +344,7 @@ pub(super) fn validate_state_attachments(
             AdmissionOperationState::ReadyToDispatch
                 | AdmissionOperationState::CapturePending
                 | AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::AwaitingCallerReport
                 | AdmissionOperationState::Finalizing
                 | AdmissionOperationState::Completed
                 | AdmissionOperationState::NotAcceptedAfterDispatchCommit
@@ -399,6 +468,11 @@ pub(super) fn validate_state_requirements(
                 requirements.budget_capture
             }
             AdmissionOperationState::ApprovalReserved => requirements.approval,
+            AdmissionOperationState::AwaitingCallerReport => {
+                kind == AdmissionOperationKind::ToolDispatch
+                    && requirements.execution_nonce
+                    && requirements.budget_capture
+            }
             AdmissionOperationState::MutationReady
             | AdmissionOperationState::MutationSubmitted
             | AdmissionOperationState::EconomicMutationApplied
@@ -468,7 +542,8 @@ pub(super) fn dispatch_state_for(
         | AdmissionOperationState::ApprovalReserved
         | AdmissionOperationState::ReadyToDispatch => Ok(AdmissionDispatchState::NotCommitted),
         AdmissionOperationState::CapturePending => Ok(AdmissionDispatchState::CapturePending),
-        AdmissionOperationState::DispatchCommitted => Ok(AdmissionDispatchState::Committed),
+        AdmissionOperationState::DispatchCommitted
+        | AdmissionOperationState::AwaitingCallerReport => Ok(AdmissionDispatchState::Committed),
         AdmissionOperationState::Finalizing => Ok(AdmissionDispatchState::Finalizing),
         AdmissionOperationState::Completed
         | AdmissionOperationState::CompensatedBeforeDispatch
@@ -486,6 +561,7 @@ pub(super) fn validate_dispatch_commit(
         && matches!(
             operation.state,
             AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::AwaitingCallerReport
                 | AdmissionOperationState::Finalizing
                 | AdmissionOperationState::Completed
                 | AdmissionOperationState::NotAcceptedAfterDispatchCommit
@@ -611,10 +687,21 @@ pub(super) fn is_legal_transition(
         | AdmissionOperationState::NotAcceptedAfterDispatchCommit
         | AdmissionOperationState::OutcomeUnknownAfterDispatch => {
             from == AdmissionOperationState::DispatchCommitted
+                || (to == AdmissionOperationState::Finalizing
+                    && from == AdmissionOperationState::AwaitingCallerReport
+                    && kind == AdmissionOperationKind::ToolDispatch
+                    && requirements.execution_nonce
+                    && requirements.budget_capture)
                 || (to == AdmissionOperationState::OutcomeUnknownAfterDispatch
                     && from == AdmissionOperationState::Finalizing)
         }
         AdmissionOperationState::Completed => from == AdmissionOperationState::Finalizing,
+        AdmissionOperationState::AwaitingCallerReport => {
+            kind == AdmissionOperationKind::ToolDispatch
+                && requirements.execution_nonce
+                && requirements.budget_capture
+                && from == AdmissionOperationState::DispatchCommitted
+        }
         // A delivery-digest mismatch is decided during finalization, so
         // the only legal predecessor is Finalizing.
         AdmissionOperationState::DeniedAfterDelivery => from == AdmissionOperationState::Finalizing,

@@ -5,6 +5,32 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::OpenApiError;
+use chio_core_types::manifest::{ToolDefinition, ToolFlowDeclaration};
+
+/// Export a normative tool flow declaration back to an OpenAPI operation.
+/// Existing `x-chio-flow` content is replaced by the signed tool declaration.
+pub fn export_tool_flow_extension(
+    tool: &ToolDefinition,
+    operation: &mut serde_json::Value,
+) -> Result<(), OpenApiError> {
+    let object = operation.as_object_mut().ok_or_else(|| {
+        OpenApiError::InvalidSpec("OpenAPI operation must be an object".to_string())
+    })?;
+    match tool.flow.as_ref() {
+        Some(flow) => {
+            let value = serde_json::to_value(flow).map_err(|error| {
+                OpenApiError::InvalidSpec(format!("cannot serialize x-chio-flow: {error}"))
+            })?;
+            object.insert("x-chio-flow".to_string(), value);
+        }
+        None => {
+            object.remove("x-chio-flow");
+        }
+    }
+    Ok(())
+}
+
 /// Sensitivity classification for a route. Used by the guard pipeline to
 /// decide logging level and approval requirements.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,18 +63,27 @@ pub struct ChioExtensions {
     /// `x-chio-publish` -- whether to include this operation in the generated
     /// manifest. Defaults to true if absent.
     pub publish: Option<bool>,
+    /// Strict information-flow declaration for the generated tool.
+    pub flow: Option<ToolFlowDeclaration>,
 }
 
 impl ChioExtensions {
     /// Extract Chio extension fields from a raw JSON object (the operation
     /// object as parsed from the OpenAPI spec).
-    pub fn from_operation(obj: &serde_json::Value) -> Self {
+    pub fn from_operation(obj: &serde_json::Value) -> Result<Self, OpenApiError> {
         let map = match obj.as_object() {
             Some(m) => m,
-            None => return Self::default(),
+            None => return Ok(Self::default()),
         };
 
-        Self {
+        let flow = map
+            .get("x-chio-flow")
+            .cloned()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error| OpenApiError::InvalidSpec(format!("invalid x-chio-flow: {error}")))?;
+
+        Ok(Self {
             sensitivity: map
                 .get("x-chio-sensitivity")
                 .and_then(|v| v.as_str())
@@ -65,7 +100,8 @@ impl ChioExtensions {
                 .and_then(|v| v.as_bool()),
             budget_limit: map.get("x-chio-budget-limit").and_then(|v| v.as_u64()),
             publish: map.get("x-chio-publish").and_then(|v| v.as_bool()),
-        }
+            flow,
+        })
     }
 
     /// Whether this operation should be included in the generated manifest.
@@ -83,12 +119,13 @@ mod tests {
     #[test]
     fn empty_object() {
         let val = serde_json::json!({});
-        let ext = ChioExtensions::from_operation(&val);
+        let ext = ChioExtensions::from_operation(&val).unwrap();
         assert!(ext.sensitivity.is_none());
         assert!(ext.side_effects.is_none());
         assert!(ext.approval_required.is_none());
         assert!(ext.budget_limit.is_none());
         assert!(ext.publish.is_none());
+        assert!(ext.flow.is_none());
         assert!(ext.should_publish());
     }
 
@@ -101,7 +138,7 @@ mod tests {
             "x-chio-budget-limit": 5000,
             "x-chio-publish": false
         });
-        let ext = ChioExtensions::from_operation(&val);
+        let ext = ChioExtensions::from_operation(&val).unwrap();
         assert_eq!(ext.sensitivity, Some(Sensitivity::Restricted));
         assert_eq!(ext.side_effects, Some(true));
         assert_eq!(ext.approval_required, Some(true));
@@ -113,14 +150,14 @@ mod tests {
     #[test]
     fn unknown_sensitivity_ignored() {
         let val = serde_json::json!({ "x-chio-sensitivity": "unknown" });
-        let ext = ChioExtensions::from_operation(&val);
+        let ext = ChioExtensions::from_operation(&val).unwrap();
         assert!(ext.sensitivity.is_none());
     }
 
     #[test]
     fn non_object_returns_default() {
         let val = serde_json::json!("not an object");
-        let ext = ChioExtensions::from_operation(&val);
+        let ext = ChioExtensions::from_operation(&val).unwrap();
         assert!(ext.sensitivity.is_none());
     }
 
@@ -131,5 +168,59 @@ mod tests {
         assert_eq!(json, "\"sensitive\"");
         let back: Sensitivity = serde_json::from_str(&json).unwrap();
         assert_eq!(back, s);
+    }
+
+    #[test]
+    fn x_chio_flow_parses_strict_declaration() {
+        let val = serde_json::json!({
+            "x-chio-flow": {
+                "output_label": {"kind": "known", "owners": {}, "compartments": ["pii"]},
+                "input_clearance": {"kind": "known", "owners": {}, "compartments": ["pii"]},
+                "egress": true,
+                "declassification_purposes": ["billing"]
+            }
+        });
+        let ext = ChioExtensions::from_operation(&val)
+            .unwrap_or_else(|error| panic!("valid flow extension: {error}"));
+        assert!(ext.flow.as_ref().is_some_and(|flow| flow.egress));
+
+        let invalid = serde_json::json!({
+            "x-chio-flow": {"egress": false, "declassification_purposes": [], "unknown": true}
+        });
+        assert!(ChioExtensions::from_operation(&invalid).is_err());
+    }
+
+    #[test]
+    fn normative_tool_flow_exports_back_to_identical_extension() {
+        let input = serde_json::json!({
+            "x-chio-flow": {
+                "output_label": {"kind": "known", "owners": {}, "compartments": ["pii"]},
+                "input_clearance": {"kind": "known", "owners": {}, "compartments": ["pii"]},
+                "egress": true,
+                "declassification_purposes": ["billing"]
+            }
+        });
+        let flow = ChioExtensions::from_operation(&input)
+            .unwrap_or_else(|error| panic!("parse extension: {error}"))
+            .flow;
+        let tool = ToolDefinition {
+            name: "store".to_string(),
+            description: "Store".to_string(),
+            input_schema: serde_json::json!({"type": "object"}),
+            output_schema: None,
+            pricing: None,
+            annotations: chio_core_types::manifest::ToolAnnotations {
+                read_only: false,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: None,
+            flow,
+        };
+        let mut output = serde_json::json!({});
+        export_tool_flow_extension(&tool, &mut output)
+            .unwrap_or_else(|error| panic!("export extension: {error}"));
+        assert_eq!(output["x-chio-flow"], input["x-chio-flow"]);
     }
 }

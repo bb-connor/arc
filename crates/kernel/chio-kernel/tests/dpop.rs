@@ -43,6 +43,7 @@ fn make_proof_body(capability: &CapabilityToken, agent_kp: &Keypair) -> DpopProo
         .unwrap()
         .as_secs();
     DpopProofBody {
+        replay_authority: None,
         schema: DPOP_SCHEMA.to_string(),
         capability_id: capability.id.clone(),
         tool_server: "srv-a".to_string(),
@@ -65,6 +66,68 @@ fn default_store(config: &DpopConfig) -> DpopNonceStore {
         config.nonce_store_capacity,
         Duration::from_secs(config.proof_ttl_secs),
     )
+}
+
+#[test]
+fn dpop_identity_byte_limit_is_shared_by_stateless_and_consuming_verification() {
+    use chio_kernel::dpop::{verify_dpop_proof_stateless, MAX_DPOP_REPLAY_IDENTITY_PART_BYTES};
+    let key = Keypair::generate();
+    let capability = make_capability(&key);
+    let config = default_config();
+    let store = default_store(&config);
+    for (nonce, admitted) in [
+        ("é".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES / 2), true),
+        (
+            "é".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES / 2) + "x",
+            false,
+        ),
+    ] {
+        let mut body = make_proof_body(&capability, &key);
+        body.nonce = nonce;
+        let proof = DpopProof::sign(body, &key).unwrap();
+        let preview = verify_dpop_proof_stateless(
+            &proof,
+            &capability,
+            "srv-a",
+            "read_file",
+            &proof.body.action_hash,
+            &config,
+        );
+        assert_eq!(preview.is_ok(), admitted);
+        let execution = verify_dpop_proof(
+            &proof,
+            &capability,
+            "srv-a",
+            "read_file",
+            &proof.body.action_hash,
+            &store,
+            &config,
+        );
+        assert_eq!(execution.is_ok(), admitted);
+    }
+    assert_eq!(store.utilization().unwrap().0, 1);
+}
+
+#[test]
+fn dpop_oversized_identity_is_refused_before_signature_canonicalization() {
+    use chio_kernel::dpop::{verify_dpop_proof_stateless, MAX_DPOP_REPLAY_IDENTITY_PART_BYTES};
+    let key = Keypair::generate();
+    let capability = make_capability(&key);
+    let config = default_config();
+    let mut proof = DpopProof::sign(make_proof_body(&capability, &key), &key).unwrap();
+    // Deliberately invalidate the signature as well. The bounded shape gate
+    // must be the first rejection, before canonicalizing attacker-sized text.
+    proof.body.nonce = "n".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES + 1);
+    let error = verify_dpop_proof_stateless(
+        &proof,
+        &capability,
+        "srv-a",
+        "read_file",
+        &proof.body.action_hash,
+        &config,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("4096-byte limit"));
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +264,7 @@ fn dpop_wrong_agent_key_rejected() {
         .unwrap()
         .as_secs();
     let body = DpopProofBody {
+        replay_authority: None,
         schema: DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: "srv-a".to_string(),
@@ -245,6 +309,7 @@ fn dpop_expired_proof_rejected() {
 
     // issued_at = 0 is far in the past and will fail the freshness check.
     let body = DpopProofBody {
+        replay_authority: None,
         schema: DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: "srv-a".to_string(),
@@ -298,6 +363,7 @@ fn dpop_nonce_replay_within_ttl_rejected() {
     let shared_nonce = "nonce-replay-test-shared";
 
     let body1 = DpopProofBody {
+        replay_authority: None,
         schema: DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: "srv-a".to_string(),
@@ -325,6 +391,7 @@ fn dpop_nonce_replay_within_ttl_rejected() {
 
     // Second invocation reusing the same nonce -- must be rejected.
     let body2 = DpopProofBody {
+        replay_authority: None,
         schema: DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: "srv-a".to_string(),
@@ -374,6 +441,7 @@ fn dpop_nonce_replay_after_local_ttl_is_rejected() {
 
     // First use.
     let body1 = DpopProofBody {
+        replay_authority: None,
         schema: DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: "srv-a".to_string(),
@@ -397,6 +465,7 @@ fn dpop_nonce_replay_after_local_ttl_is_rejected() {
 
     // The second use remains a replay while the signed proof is valid.
     let body2 = DpopProofBody {
+        replay_authority: None,
         schema: DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: "srv-a".to_string(),
@@ -482,6 +551,7 @@ fn dpop_issued_at_u64_max_rejected_as_future_dated() {
 
     // u64::MAX is astronomically far in the future -- must exceed the clock-skew window.
     let body = DpopProofBody {
+        replay_authority: None,
         schema: DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: "srv-a".to_string(),

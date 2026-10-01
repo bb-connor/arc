@@ -1,0 +1,76 @@
+# cargo-nextest configuration.
+#
+# nextest runs every test in its own process. A test that passes under
+# `cargo test` and fails here is a lead, not yet a finding: it may depend on
+# state a sibling left in the shared process, on environment or stdio the
+# harness inherited differently, or on the harness's own timing. Each case is
+# dispositioned individually before anything is called a defect.
+#
+# Timeouts are per test, not per binary. The default slow-timeout below is a
+# ceiling for tests that declare no deadline of their own; every test group
+# that does declare one (a bounded wait on a child process, an HTTP timeout, a
+# cluster convergence wait) is listed in an override with a ceiling above its
+# own deadline, so the runner can never fire before the test's own
+# `Duration::from_secs(N)` would have. The inventory of those deadlines is
+# what the overrides encode; adding a longer wait to a test means adding or
+# raising its override here, in the same change.
+#
+# Leak detection sees exactly one thing: a child process that is still alive
+# and still holds the test's inherited stdout or stderr after the test itself
+# has returned. It does not see leaked threads, and it does not see a child
+# whose streams were redirected to a file or to /dev/null, which the native
+# process harnesses do deliberately. Their child-lifecycle assertions remain
+# the mechanism for those. A leak fails the test rather than passing it,
+# which is not nextest's default.
+
+[profile.default]
+# 60 s marks a test slow; three periods (180 s) terminate it. Tests without a
+# declared deadline finish in seconds; anything at this ceiling is stuck.
+slow-timeout = { period = "60s", terminate-after = 3, grace-period = "10s" }
+# A child still holding inherited stdio one second after the test returned is
+# a leaked child.
+leak-timeout = { period = "1s", result = "fail" }
+retries = 0
+fail-fast = false
+
+[profile.ci]
+inherits = "default"
+# The existing CI test lanes run with RUST_TEST_THREADS=1, which serialises
+# every test within a binary while cargo runs the binaries one after another.
+# One test process at a time reproduces that contract exactly; this profile
+# exists to isolate tests, not to run them concurrently.
+test-threads = 1
+
+[profile.ci.junit]
+path = "junit.xml"
+
+# Serialising the SQLite store suites replaces the RUST_TEST_THREADS=1 that
+# the workspace lanes apply globally: the constraint is scoped to the binaries
+# that share on-disk fixtures instead of the whole run.
+[test-groups]
+store-serial = { max-threads = 1 }
+
+# The native caller harness in the control plane allows its child 300 s before
+# it verifies the restart (`native_flow_caller_process_tests.rs`); 480 s keeps
+# the runner behind that deadline with room for the verification.
+[[profile.default.overrides]]
+filter = "package(chio-control-plane) & kind(lib)"
+slow-timeout = { period = "120s", terminate-after = 4, grace-period = "10s" }
+
+# The proof-serving contract tests wait 180 s for the served process and time
+# individual requests at 90 s (`proof_cli_contract/support.rs`).
+[[profile.default.overrides]]
+filter = "package(chio-cli) & binary(proof_cli_contract)"
+slow-timeout = { period = "60s", terminate-after = 5, grace-period = "10s" }
+
+# Cluster convergence and revocation replication waits of 120 s and 90 s
+# (`trust_cluster.rs`, `trust_cluster/revocation_proof.rs`), and the receipt
+# query support module's 120 s wait shared by the `receipt_query*` and
+# `proof_verify` binaries (`tests/support/receipt_query.rs`).
+[[profile.default.overrides]]
+filter = "package(chio-cli) & (binary(trust_cluster) | binary(proof_verify) | binary(/^receipt_query/))"
+slow-timeout = { period = "60s", terminate-after = 4, grace-period = "10s" }
+
+[[profile.default.overrides]]
+filter = "package(chio-store-sqlite)"
+test-group = "store-serial"

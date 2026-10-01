@@ -20,6 +20,7 @@ on:
       - "rust-toolchain.toml"
       - "scripts/tests/check-sidecar-image-workflow.test.sh"
       - "spec/**"
+      - "third_party/aws-lc-rs-chio/**"
       - "wit/**"
   workflow_dispatch:
     inputs:

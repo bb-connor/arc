@@ -44,6 +44,7 @@ fn governed_monetary_denial_without_required_runtime_assurance_consumes_no_budge
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -113,6 +114,7 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -171,6 +173,7 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -259,6 +262,7 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -321,6 +325,7 @@ fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -391,6 +396,7 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -453,6 +459,7 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -519,6 +526,7 @@ fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -598,6 +606,7 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -665,6 +674,7 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -749,6 +759,7 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -833,6 +844,7 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -885,6 +897,7 @@ fn governed_monetary_denial_without_approval_consumes_no_budget_and_records_inte
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -969,6 +982,7 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1077,6 +1091,7 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1191,6 +1206,7 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1303,6 +1319,7 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1479,6 +1496,7 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1595,6 +1613,7 @@ fn governed_acp_value_requires_signed_destination_authority() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             })
             .unwrap();
 

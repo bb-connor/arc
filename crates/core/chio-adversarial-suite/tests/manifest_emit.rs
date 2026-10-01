@@ -11,16 +11,16 @@
 //!    fail the build with a clear hint.
 //! 3. Every manifest entry references a real bundled case and pins its
 //!    sha256 against the embedded contents.
-//! 4. Every attack class shows up at least once so a future case drop
-//!    cannot silently shrink cross-SDK coverage.
+//! 4. Every attack class with completed evidence is represented. Pending
+//!    cases remain bundled but cannot inflate cross-SDK coverage.
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
 use chio_adversarial_suite::{
-    bundled_cases, AttackClass, ExpectedVerdict, Manifest, ATTACK_CLASSES, BUNDLED_CASES,
-    MANIFEST_PRODUCER, MANIFEST_SCHEMA_VERSION,
+    bundled_cases, AttackClass, ExpectedVerdict, Manifest, BUNDLED_CASES, MANIFEST_PRODUCER,
+    MANIFEST_SCHEMA_VERSION,
 };
 
 fn manifest_path() -> PathBuf {
@@ -57,17 +57,25 @@ fn manifest_emits_against_bundled_cases() {
 }
 
 #[test]
-fn manifest_covers_every_attack_class() {
+fn manifest_covers_only_attack_classes_with_completed_evidence() {
     let manifest = match Manifest::from_bundled() {
         Ok(manifest) => manifest,
         Err(err) => panic!("Manifest::from_bundled failed: {err}"),
     };
 
     let observed: BTreeSet<AttackClass> = manifest.cases.iter().map(|c| c.class).collect();
-    let expected: BTreeSet<AttackClass> = ATTACK_CLASSES.iter().copied().collect();
+    let cases = match bundled_cases() {
+        Ok(cases) => cases,
+        Err(err) => panic!("bundled_cases failed: {err}"),
+    };
+    let expected: BTreeSet<AttackClass> = cases
+        .into_iter()
+        .filter(|case| !case.pending)
+        .map(|case| case.class)
+        .collect();
     assert_eq!(
         observed, expected,
-        "manifest must reference every attack class"
+        "manifest must reference exactly the classes with completed evidence"
     );
 }
 

@@ -518,6 +518,7 @@ fn commit_valid_per_call_projection(
 }
 
 fn shape_obligation_schema_as_v5(connection: &Connection) -> rusqlite::Result<()> {
+    super::runtime_replay::remove_empty_v19_runtime_tables(connection)?;
     connection.execute_batch(
         r#"
         DROP TABLE obligation_assignment_results;

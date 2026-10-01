@@ -1,0 +1,76 @@
+[package]
+name = "chio-secret-broker"
+description = "Broker-mediated credential use with durable authoritative execution coordination"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_secret_broker"
+
+[[bin]]
+name = "chio-secret-brokerd"
+path = "src/bin/chio-secret-brokerd.rs"
+
+[[bin]]
+name = "chio-broker-mcp"
+path = "src/bin/chio-broker-mcp.rs"
+
+[features]
+# Compatibility selection for the production durable authority exercised by
+# the broker boundary gate. Conformance does not expose a second coordinator.
+conformance = ["kernel-admission"]
+kernel-admission = ["dep:chio-kernel", "dep:async-trait", "dep:tokio"]
+native-mcp = ["kernel-admission", "dep:chio-mcp-adapter", "dep:chio-manifest", "dep:tracing"]
+real-linux-enforcement = ["native-mcp"]
+
+[dependencies]
+async-trait = { workspace = true, optional = true }
+chio-core-types = { workspace = true }
+chio-kernel = { workspace = true, optional = true }
+chio-manifest = { workspace = true, optional = true }
+chio-mcp-adapter = { workspace = true, optional = true }
+chio-security-types = { workspace = true }
+chio-secure-ipc = { workspace = true }
+chio-store-sqlite = { workspace = true }
+hex = { workspace = true }
+hmac = { workspace = true }
+rand_core = { workspace = true }
+rusqlite = { workspace = true }
+rustix = { workspace = true }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+subtle = "2.6"
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+url = { workspace = true }
+webpki-roots = "1"
+zeroize = { workspace = true }
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+chio-keyring = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+async-trait = { workspace = true }
+chio-cage = { workspace = true }
+chio-control-plane = { workspace = true }
+chio-flow = { workspace = true }
+chio-keyring = { workspace = true }
+chio-manifest = { workspace = true }
+chio-security-kernel = { workspace = true }
+chio-test-support = { workspace = true }
+rcgen = "0.13"
+tempfile = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true

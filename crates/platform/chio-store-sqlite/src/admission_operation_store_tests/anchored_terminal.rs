@@ -286,6 +286,45 @@ fn stage_anchor_advanced_projection(
 }
 
 #[test]
+fn reserved_terminal_stage_refuses_expired_active_claim_without_mutation() -> AnchoredTestResult {
+    let fixture = fixture();
+    let at = now_ms();
+    let operation =
+        finalizing_tool_operation(&fixture, "reserved-expiry", "reserved-expiry-cap", at);
+    let signer = Keypair::generate();
+    let (lease, envelope) = signed_unknown_projection(
+        &fixture,
+        &operation,
+        &signer,
+        "reserved-expiry-incident",
+        at + 20_000,
+    )?;
+    stage_anchor_advanced_projection(&fixture, &operation, &lease, &envelope, at + 20_002)?;
+    let connection = Connection::open(&fixture.database)?;
+    let before = crate::tests::authority_snapshot(&connection)?;
+    let anchor = fixture.authority.anchor_generation()?;
+    let original = lease.untrusted_claim();
+    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
+        lease.expires_at_unix_ms() / 1000 + 1,
+        [],
+    );
+    // The requested replacement window is still live. Only the retained claim
+    // protecting the reserved terminal stage has expired in authority time.
+    let result = fixture.store.claim_recovery(
+        operation.binding().operation_id(),
+        operation.version(),
+        original.claimant_id(),
+        at + 20_003,
+        at + 60_000,
+        &fixture.fence,
+    );
+    assert!(matches!(result, Err(AdmissionOperationStoreError::Fenced)));
+    assert_eq!(crate::tests::authority_snapshot(&connection)?, before);
+    assert_eq!(fixture.authority.anchor_generation()?, anchor);
+    Ok(())
+}
+
+#[test]
 fn anchored_terminal_projection_commits_both_local_projections_and_replays() -> AnchoredTestResult {
     let fixture = fixture();
     let begun_at = now_ms();
@@ -820,7 +859,12 @@ fn anchored_terminal_projection_survives_expiry_and_same_store_owner_takeover() 
         },
     )?;
     assert_eq!(updated_at, i64::try_from(expired_at + 5)?);
-    assert_eq!(high_water, i64::try_from(expired_at + 5)?);
+    let observed_at: i64 = connection.query_row(
+        "SELECT observed_at_unix_ms FROM admission_operation_commits ORDER BY commit_sequence DESC LIMIT 1",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(high_water, observed_at);
     assert_eq!(owner_epoch, i64::try_from(second_fence.owner_epoch)?);
     assert_eq!(recorded_at, updated_at);
     assert_eq!(projection_committed_at, updated_at);

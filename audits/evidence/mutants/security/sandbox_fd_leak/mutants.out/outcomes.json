@@ -1,0 +1,127 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 53.151007056,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--features=real-linux-enforcement",
+            "--locked",
+            "--test=linux_enforcement",
+            "--target=x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.703854127,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--features=real-linux-enforcement",
+            "--locked",
+            "--test=linux_enforcement",
+            "--target=x86_64-unknown-linux-musl",
+            "target_exec_has_no_leaked_control_or_resource_descriptors",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "chio-cage",
+          "file": "crates/security/chio-cage/src/launch/linux.rs",
+          "function": {
+            "function_name": "close_unnamed_descriptors",
+            "return_type": "-> Result<(), BootstrapFault>",
+            "span": {
+              "start": {
+                "line": 13,
+                "column": 1
+              },
+              "end": {
+                "line": 26,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 14,
+              "column": 5
+            },
+            "end": {
+              "line": 25,
+              "column": 33
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__security__chio-cage__src__launch__linux.rs_line_14_col_5.log",
+      "diff_path": "diff/crates__security__chio-cage__src__launch__linux.rs_line_14_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 5.812027999,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--features=real-linux-enforcement",
+            "--locked",
+            "--test=linux_enforcement",
+            "--target=x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 1.603714759,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "cargo",
+            "test",
+            "--verbose",
+            "--package=chio-cage@0.1.0",
+            "--features=real-linux-enforcement",
+            "--locked",
+            "--test=linux_enforcement",
+            "--target=x86_64-unknown-linux-musl",
+            "target_exec_has_no_leaked_control_or_resource_descriptors",
+            "--",
+            "--exact"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 1,
+  "missed": 0,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0
+}

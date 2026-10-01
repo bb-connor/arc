@@ -1,16 +1,18 @@
 use chio_core_types::PublicKey;
 use chio_swarm_authority::{
-    verify_swarm_authority_bundle, SwarmAuthorityBundle, SwarmContinuationMode,
+    verify_swarm_authority_for_admission, SwarmAuthorityBundle, SwarmContinuationMode,
     SwarmContinuationToken, SwarmDelegationWitnessChain, SwarmJoinReceipt, SwarmRoutePlanReceipt,
 };
 use serde::Serialize;
 
 use super::swarm_ref::{SwarmAuthorityReference, SwarmEvidenceReference};
+use super::swarm_request_binding::verify_swarm_request_binding;
 use crate::*;
 
 pub(super) fn verify_swarm_authority_reference_from_store<S>(
     store: &S,
     reference: &SwarmAuthorityReference,
+    request: &chio_kernel::ToolCallRequest,
     trusted_witness_keys: &[PublicKey],
     route_metadata: Option<&serde_json::Value>,
     now_unix_ms: u64,
@@ -28,7 +30,7 @@ where
     verify_swarm_reference_hashes(&bundle, reference)?;
     let route_plan = find_route_plan(&bundle, &reference.route_plan_receipt.evidence_id)?;
     let route_metadata = verify_route_metadata_matches(route_metadata, route_plan)?;
-    verify_swarm_authority_bundle(&bundle, trusted_witness_keys).map_err(|error| {
+    verify_swarm_authority_for_admission(&bundle, trusted_witness_keys).map_err(|error| {
         ChioRuntimeError::Rejected {
             code: "chio_swarm_authority_rejected",
             detail: error.runtime_detail(),
@@ -41,18 +43,64 @@ where
             "swarm continuation route plan does not match referenced route plan evidence",
         );
     }
+    let request_binding = verify_swarm_request_binding(&bundle, continuation, reference, request)?;
+    let continuation_artifact_digest = crate::hash::canonical_sha256(continuation)?;
+    // Evaluation time is verifier-local, not an artifact. Bind all stored
+    // evidence while allowing dispatch freshness to be checked at a later time.
+    let mut evidence =
+        serde_json::to_value(&bundle).map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    if let Some(object) = evidence.as_object_mut() {
+        object.remove("nowUnixMs");
+    }
+    let evidence_digest = crate::hash::canonical_sha256(&(
+        "chio.runtime-prepared-swarm.v1",
+        evidence,
+        trusted_witness_keys,
+    ))?;
     Ok(VerifiedSwarmAuthorityReference {
+        // The verifier validates the entire bundle, not just the selected
+        // continuation. Preserve every temporal prerequisite of that decision.
+        valid_until_unix_ms: bundle
+            .continuation_tokens
+            .iter()
+            .map(|token| token.expires_at_unix_ms)
+            .chain(
+                bundle
+                    .route_plan_receipts
+                    .iter()
+                    .map(|route| route.expires_at_unix_ms),
+            )
+            .chain(
+                bundle
+                    .witness_chains
+                    .iter()
+                    .flat_map(|chain| &chain.hops)
+                    .map(|hop| hop.expires_at_unix_ms),
+            )
+            .chain([
+                bundle.task_graph.expires_at_unix_ms,
+                bundle.revocation_epoch.valid_until_unix_ms,
+            ])
+            .min()
+            .ok_or_else(|| ChioRuntimeError::Json("missing swarm validity".into()))?,
+        continuation_artifact_digest,
+        evidence_digest,
         continuation_id_to_consume: match continuation.mode {
             SwarmContinuationMode::SingleUse => Some(continuation.token_id.clone()),
             SwarmContinuationMode::Resumable => None,
         },
         route_metadata,
+        request_binding,
     })
 }
 
 pub(super) struct VerifiedSwarmAuthorityReference {
+    pub(super) valid_until_unix_ms: u64,
+    pub(super) continuation_artifact_digest: String,
+    pub(super) evidence_digest: String,
     pub(super) continuation_id_to_consume: Option<String>,
     pub(super) route_metadata: serde_json::Value,
+    pub(super) request_binding: serde_json::Value,
 }
 
 fn verify_swarm_reference_hashes(
@@ -79,11 +127,10 @@ fn verify_swarm_reference_hashes(
         &find_witness_chain(bundle, &reference.delegation_witness.evidence_id)?.chain_id,
         find_witness_chain(bundle, &reference.delegation_witness.evidence_id)?,
     )?;
-    verify_ref_matches(
-        &reference.join_receipt,
-        &find_join_receipt(bundle, &reference.join_receipt.evidence_id)?.join_id,
-        find_join_receipt(bundle, &reference.join_receipt.evidence_id)?,
-    )?;
+    if let Some(reference) = &reference.join_receipt {
+        let join = find_join_receipt(bundle, &reference.evidence_id)?;
+        verify_ref_matches(reference, &join.join_id, join)?;
+    }
     verify_ref_matches(
         &reference.revocation_epoch,
         &bundle.revocation_epoch.epoch_id,

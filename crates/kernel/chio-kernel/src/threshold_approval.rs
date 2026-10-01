@@ -1,10 +1,61 @@
-use chio_core::capability::governance::{
-    GovernedApprovalDecision, GovernedApprovalToken, ThresholdApprovalProposal,
+use chio_core::capability::governance::{GovernedApprovalDecision, GovernedApprovalToken};
+pub use chio_core::capability::governance::{
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody,
 };
-use chio_core::capability::threshold_approval::ThresholdApprovalRequirement;
+pub use chio_core::capability::threshold_approval::{
+    ThresholdApprovalRequest, ThresholdApprovalRequirement,
+};
 use chio_core::crypto::PublicKey;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+
+use crate::approval::ApprovalStoreError;
+use crate::approval::{
+    ThresholdApprovalProposalCreationContext, ThresholdApprovalProposalRegistration,
+};
+
+mod collection_policy;
+mod collector_validation;
+mod verification;
+
+pub use collection_policy::ThresholdApprovalCollectionPolicy;
+
+pub use verification::{
+    authorization_capability_hash, verify_threshold_approval_set,
+    ThresholdApprovalVerificationError, ThresholdApprovalVerificationInput,
+    VerifiedThresholdApprovalSet,
+};
+pub(crate) use verification::{
+    verify_threshold_approval_proposal, verify_threshold_approval_set_with_requirement,
+    ThresholdApprovalProposalVerificationInput,
+};
+
+/// Resolve current authority from an authenticated request source, never from
+/// collector HTTP fields or a proposal body. Implementations must recheck policy,
+/// capability authority, route, intent and submitter for each call. Collection
+/// does not replace the kernel's independent execution-time admission checks.
+pub trait ThresholdApprovalContextResolver: Send + Sync {
+    fn resolve_context(
+        &self,
+        request_id: &str,
+        now: u64,
+    ) -> Result<ThresholdApprovalProposalCreationContext, ApprovalStoreError>;
+}
+
+impl<F> ThresholdApprovalContextResolver for F
+where
+    F: Fn(&str, u64) -> Result<ThresholdApprovalProposalCreationContext, ApprovalStoreError>
+        + Send
+        + Sync,
+{
+    fn resolve_context(
+        &self,
+        request_id: &str,
+        now: u64,
+    ) -> Result<ThresholdApprovalProposalCreationContext, ApprovalStoreError> {
+        self(request_id, now)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedApproverIdentity {
@@ -26,6 +77,20 @@ pub trait ThresholdApprovalRequirementResolver: Send + Sync {
     ) -> Result<Option<ThresholdApprovalRequirement>, String>;
 }
 
+impl<F> ThresholdApprovalRequirementResolver for F
+where
+    F: Fn(&str, &str, &str) -> Result<Option<ThresholdApprovalRequirement>, String> + Send + Sync,
+{
+    fn resolve_requirement(
+        &self,
+        policy_hash: &str,
+        server_id: &str,
+        tool_name: &str,
+    ) -> Result<Option<ThresholdApprovalRequirement>, String> {
+        self(policy_hash, server_id, tool_name)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ThresholdApprovalCollectorState {
@@ -42,9 +107,15 @@ impl ThresholdApprovalCollectorState {
     }
 }
 
+/// Serializable collector state. Deserialization does not authenticate this record;
+/// use [`ThresholdApprovalCollector`] to validate it against current authority.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ThresholdApprovalCollectorProposal {
     pub proposal: ThresholdApprovalProposal,
+    /// None identifies a pre-context-binding record, which cannot authorize new
+    /// collection or delivery until explicitly migrated using trusted context.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_route: Option<ThresholdApprovalRequest>,
     pub requirement: ThresholdApprovalRequirement,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub submitter: Option<PublicKey>,
@@ -74,11 +145,23 @@ pub enum ThresholdApprovalCollectorStoreError {
     Serialization(String),
 }
 
+/// Persistence and compare-and-swap port, not an authorization interface.
+/// Implementations must atomically compare versions and persist complete records.
+/// Signature, policy, and approver checks belong to [`ThresholdApprovalCollector`].
 pub trait ThresholdApprovalCollectorStore: Send + Sync {
     fn create(
         &self,
         proposal: &ThresholdApprovalCollectorProposal,
-    ) -> Result<(), ThresholdApprovalCollectorStoreError>;
+    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError>;
+
+    /// Bind a retained pre-context record once, preserving votes and the last
+    /// state-transition timestamp (which also fixes the delivered token set).
+    fn bind_request_route(
+        &self,
+        proposal_id: &str,
+        expected_version: u64,
+        route: &ThresholdApprovalRequest,
+    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError>;
 
     fn get(
         &self,
@@ -109,6 +192,7 @@ pub struct ThresholdApprovalCollector {
     store: Arc<dyn ThresholdApprovalCollectorStore>,
     active_policy_hash: String,
     trusted_policy_authorities: Vec<PublicKey>,
+    context_resolver: Arc<dyn ThresholdApprovalContextResolver>,
 }
 
 impl std::fmt::Debug for ThresholdApprovalCollector {
@@ -129,78 +213,144 @@ impl ThresholdApprovalCollector {
         store: Arc<dyn ThresholdApprovalCollectorStore>,
         active_policy_hash: String,
         trusted_policy_authorities: Vec<PublicKey>,
+        context_resolver: Arc<dyn ThresholdApprovalContextResolver>,
     ) -> Self {
         Self {
             store,
             active_policy_hash,
             trusted_policy_authorities,
+            context_resolver,
         }
     }
 
     pub fn create_proposal(
         &self,
         proposal: ThresholdApprovalProposal,
-        requirement: ThresholdApprovalRequirement,
-        submitter: Option<PublicKey>,
-        require_submitter_separation: bool,
         now: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
-        requirement
-            .validate()
-            .map_err(ThresholdApprovalCollectorStoreError::Conflict)?;
         proposal
             .validate_at(now)
             .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if proposal.body.policy_hash != self.active_policy_hash
-            || requirement.policy_hash != self.active_policy_hash
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal is stale for the active policy".to_string(),
-            ));
-        }
-        if proposal.body.threshold != requirement.threshold
-            || proposal.body.eligible_set_digest != requirement.eligible_set_digest
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal does not match its approver requirement".to_string(),
-            ));
-        }
-        if !self
-            .trusted_policy_authorities
-            .contains(&proposal.body.policy_authority)
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal signer is not trusted".to_string(),
-            ));
-        }
-        if !proposal
-            .verify_signature()
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal signature did not verify".to_string(),
-            ));
-        }
+        let context = self.resolve_context(&proposal.body.request_id, now)?;
+        ThresholdApprovalProposalRegistration::new(
+            proposal.clone(),
+            &context,
+            &self.trusted_policy_authorities,
+            now,
+        )
+        .map_err(collector_validation::context_error)?;
         let record = ThresholdApprovalCollectorProposal {
             proposal,
-            requirement,
-            submitter,
-            require_submitter_separation,
+            request_route: Some(context.matched_request().clone()),
+            requirement: context.requirement().clone(),
+            submitter: context.submitter().cloned(),
+            require_submitter_separation: context.separation_of_duties(),
             state: ThresholdApprovalCollectorState::Collecting,
             tokens: Vec::new(),
             version: 0,
             updated_at: now,
         };
-        self.store.create(&record)?;
-        Ok(record)
+        record.validate_restored(
+            &record.proposal.body.proposal_id,
+            &self.active_policy_hash,
+            &self.trusted_policy_authorities,
+        )?;
+        let persisted = self.store.create(&record)?;
+        if !persisted.registration_matches(&record)? {
+            return Err(ThresholdApprovalCollectorStoreError::Serialization(
+                "threshold proposal store returned different registration material".into(),
+            ));
+        }
+        persisted.validate_restored(
+            &record.proposal.body.proposal_id,
+            &self.active_policy_hash,
+            &self.trusted_policy_authorities,
+        )?;
+        persisted.validate_update_time(now)?;
+        persisted.validate_current_context(&context, &self.trusted_policy_authorities)?;
+        Ok(persisted)
     }
 
+    /// Authenticate a historical snapshot against the collector's current trust
+    /// configuration. Expiry is checked separately when submitting or delivering.
     pub fn get_proposal(
         &self,
         proposal_id: &str,
+        now: u64,
     ) -> Result<Option<ThresholdApprovalCollectorProposal>, ThresholdApprovalCollectorStoreError>
     {
-        self.store.get(proposal_id)
+        let record = self.store.get(proposal_id)?;
+        if let Some(record) = &record {
+            record.validate_restored(
+                proposal_id,
+                &self.active_policy_hash,
+                &self.trusted_policy_authorities,
+            )?;
+            record.validate_update_time(now)?;
+            let context = self.resolve_context(&record.proposal.body.request_id, now)?;
+            record.validate_current_context(&context, &self.trusted_policy_authorities)?;
+        }
+        Ok(record)
+    }
+
+    fn resolve_context(
+        &self,
+        request_id: &str,
+        now: u64,
+    ) -> Result<ThresholdApprovalProposalCreationContext, ThresholdApprovalCollectorStoreError>
+    {
+        let context = self
+            .context_resolver
+            .resolve_context(request_id, now)
+            .map_err(collector_validation::context_error)?;
+        if context.matched_request().request_id() != request_id {
+            return Err(ThresholdApprovalCollectorStoreError::Conflict(
+                "threshold approval context resolved a different request".to_string(),
+            ));
+        }
+        Ok(context)
+    }
+
+    /// Explicit operator migration for a retained unbound proposal. The trusted
+    /// resolver must recover the original authenticated request, not infer it from
+    /// these records. No policy, token, or delivery timestamp is rewritten.
+    pub fn bind_existing_proposal(
+        &self,
+        proposal_id: &str,
+        now: u64,
+    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
+        let mut record = self
+            .store
+            .get(proposal_id)?
+            .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
+        record.validate_restored(
+            proposal_id,
+            &self.active_policy_hash,
+            &self.trusted_policy_authorities,
+        )?;
+        record.validate_update_time(now)?;
+        let context = self.resolve_context(&record.proposal.body.request_id, now)?;
+        if record.request_route.is_some() {
+            record.validate_current_context(&context, &self.trusted_policy_authorities)?;
+            return Ok(record);
+        }
+        record.request_route = Some(context.matched_request().clone());
+        record.validate_current_context(&context, &self.trusted_policy_authorities)?;
+        let persisted = self.store.bind_request_route(
+            proposal_id,
+            record.version,
+            context.matched_request(),
+        )?;
+        if !persisted.registration_matches(&record)?
+            || persisted.updated_at != record.updated_at
+            || persisted.state != record.state
+            || persisted.tokens != record.tokens
+        {
+            return Err(ThresholdApprovalCollectorStoreError::Serialization(
+                "threshold proposal migration changed retained history".into(),
+            ));
+        }
+        Ok(persisted)
     }
 
     pub fn submit_token(
@@ -210,71 +360,32 @@ impl ThresholdApprovalCollector {
         now: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
         let record = self
-            .store
-            .get(proposal_id)?
+            .get_proposal(proposal_id, now)?
             .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
+        record.validate_update_time(now)?;
+        record
+            .proposal
+            .validate_at(now)
+            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
+        let digest = token
+            .artifact_digest()
+            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
+        for existing in &record.tokens {
+            let existing_digest = existing.artifact_digest().map_err(|error| {
+                ThresholdApprovalCollectorStoreError::Serialization(error.to_string())
+            })?;
+            if existing_digest == digest {
+                // An acknowledgement retry returns the original stored state
+                // without adding a vote or extending token validity.
+                return Ok(record);
+            }
+        }
         if record.state.is_terminal() {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval proposal no longer accepts updates".to_string(),
             ));
         }
-        let proposal = &record.proposal;
-        proposal
-            .validate_at(now)
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if proposal.body.policy_hash != self.active_policy_hash {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal is stale for the active policy".to_string(),
-            ));
-        }
-        let proposal_hash = proposal
-            .artifact_digest()
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if token.id.is_empty()
-            || token.id.trim() != token.id
-            || token.request_id != proposal.body.request_id
-            || token.governed_intent_hash != proposal.body.governed_intent_hash
-            || token.subject != proposal.body.subject
-            || token.threshold_proposal_hash.as_deref() != Some(proposal_hash.as_str())
-            || token.decision != GovernedApprovalDecision::Approved
-            || token.issued_at < proposal.body.proposal_created_at
-            || token.issued_at >= proposal.body.proposal_deadline
-            || token.expires_at > proposal.body.proposal_deadline
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval token does not match the signed proposal".to_string(),
-            ));
-        }
-        token
-            .validate_time(now)
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if !record
-            .requirement
-            .eligible_approvers
-            .iter()
-            .any(|eligible| eligible.public_key == token.approver)
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval token signer is not eligible".to_string(),
-            ));
-        }
-        if record.require_submitter_separation && record.submitter.as_ref() == Some(&token.approver)
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval submitter cannot approve their own proposal".to_string(),
-            ));
-        }
-        if !token
-            .verify_signature()
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?
-        {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval token signature did not verify".to_string(),
-            ));
-        }
-        let digest = token
-            .artifact_digest()
-            .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
+        record.validate_new_token(&token, now)?;
         let mut replaced_token_id = None;
         for existing in &record.tokens {
             let existing_digest = existing.artifact_digest().map_err(|error| {
@@ -335,10 +446,12 @@ impl ThresholdApprovalCollector {
         now: u64,
     ) -> Result<CollectedThresholdApprovalSet, ThresholdApprovalCollectorStoreError> {
         let record = self
-            .store
-            .get(proposal_id)?
+            .get_proposal(proposal_id, now)?
             .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
-        if record.state != ThresholdApprovalCollectorState::Ready {
+        if !matches!(
+            record.state,
+            ThresholdApprovalCollectorState::Ready | ThresholdApprovalCollectorState::Delivered
+        ) {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval proposal is not ready for delivery".to_string(),
             ));
@@ -347,17 +460,18 @@ impl ThresholdApprovalCollector {
             .proposal
             .validate_at(now)
             .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        if record.proposal.body.policy_hash != self.active_policy_hash {
-            return Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "threshold approval proposal is stale for the active policy".to_string(),
-            ));
-        }
-        // A token may expire well before the proposal deadline. Ignore superseded
-        // or expired history and deliver only the currently valid set.
+        record.validate_update_time(now)?;
+        // A delivered record is terminal. Its timestamp and retained tokens fix
+        // the original response set, including after an acknowledgement is lost.
+        let selected_at = if record.state == ThresholdApprovalCollectorState::Delivered {
+            record.updated_at
+        } else {
+            now
+        };
         let valid_tokens = record
             .tokens
             .iter()
-            .filter(|token| token.validate_time(now).is_ok())
+            .filter(|token| token.is_valid_at(selected_at))
             .cloned()
             .collect::<Vec<_>>();
         let threshold = usize::try_from(record.requirement.threshold).map_err(|_| {
@@ -365,10 +479,18 @@ impl ThresholdApprovalCollector {
                 "threshold approval quorum does not fit this platform".to_string(),
             )
         })?;
-        if valid_tokens.len() < threshold {
+        if valid_tokens.len() < threshold
+            || valid_tokens.iter().any(|token| !token.is_valid_at(now))
+        {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval quorum is no longer satisfied".to_string(),
             ));
+        }
+        if record.state == ThresholdApprovalCollectorState::Delivered {
+            return Ok(CollectedThresholdApprovalSet {
+                proposal: record.proposal,
+                tokens: valid_tokens,
+            });
         }
         let delivered = self.store.transition(
             proposal_id,
@@ -388,14 +510,14 @@ impl ThresholdApprovalCollector {
         now: u64,
     ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
         let record = self
-            .store
-            .get(proposal_id)?
+            .get_proposal(proposal_id, now)?
             .ok_or_else(|| ThresholdApprovalCollectorStoreError::NotFound(proposal_id.into()))?;
         if record.state.is_terminal() {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval proposal is already terminal".to_string(),
             ));
         }
+        record.validate_update_time(now)?;
         self.store.transition(
             proposal_id,
             record.version,
@@ -421,21 +543,51 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
     fn create(
         &self,
         proposal: &ThresholdApprovalCollectorProposal,
-    ) -> Result<(), ThresholdApprovalCollectorStoreError> {
+    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
         let mut proposals = self.proposals.write().map_err(|_| {
             ThresholdApprovalCollectorStoreError::Backend("proposal map poisoned".to_string())
         })?;
         let id = &proposal.proposal.body.proposal_id;
         match proposals.get(id) {
-            Some(existing) if existing == proposal => Ok(()),
-            Some(_) => Err(ThresholdApprovalCollectorStoreError::Conflict(
-                "proposal id already exists with different content".to_string(),
-            )),
+            Some(existing) => {
+                if existing.registration_matches(proposal)? {
+                    Ok(existing.clone())
+                } else {
+                    Err(ThresholdApprovalCollectorStoreError::Conflict(
+                        "proposal id already exists with different content".to_string(),
+                    ))
+                }
+            }
             None => {
                 proposals.insert(id.clone(), proposal.clone());
-                Ok(())
+                Ok(proposal.clone())
             }
         }
+    }
+
+    fn bind_request_route(
+        &self,
+        proposal_id: &str,
+        expected_version: u64,
+        route: &ThresholdApprovalRequest,
+    ) -> Result<ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorStoreError> {
+        let mut proposals = self.proposals.write().map_err(|_| {
+            ThresholdApprovalCollectorStoreError::Backend("proposal map poisoned".to_string())
+        })?;
+        let record = proposals.get_mut(proposal_id).ok_or_else(|| {
+            ThresholdApprovalCollectorStoreError::NotFound(proposal_id.to_string())
+        })?;
+        if record.version != expected_version || record.request_route.is_some() {
+            return Err(ThresholdApprovalCollectorStoreError::Conflict(
+                "threshold proposal changed or already has an authenticated route".to_string(),
+            ));
+        }
+        let next_version = record.version.checked_add(1).ok_or_else(|| {
+            ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
+        })?;
+        record.request_route = Some(route.clone());
+        record.version = next_version;
+        Ok(record.clone())
     }
 
     fn get(
@@ -471,6 +623,9 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
                 "threshold approval proposal changed concurrently".to_string(),
             ));
         }
+        let next_version = record.version.checked_add(1).ok_or_else(|| {
+            ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
+        })?;
         if let Some(replaced_token_id) = replaced_token_id {
             let existing = record
                 .tokens
@@ -486,9 +641,7 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
             record.tokens.push(token.clone());
         }
         record.state = next_state;
-        record.version = record.version.checked_add(1).ok_or_else(|| {
-            ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
-        })?;
+        record.version = next_version;
         record.updated_at = updated_at;
         Ok(record.clone())
     }
@@ -511,10 +664,11 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
                 "threshold approval proposal changed concurrently".to_string(),
             ));
         }
-        record.state = next_state;
-        record.version = record.version.checked_add(1).ok_or_else(|| {
+        let next_version = record.version.checked_add(1).ok_or_else(|| {
             ThresholdApprovalCollectorStoreError::Conflict("proposal version overflowed".into())
         })?;
+        record.state = next_state;
+        record.version = next_version;
         record.updated_at = updated_at;
         Ok(record.clone())
     }
@@ -524,6 +678,7 @@ impl ThresholdApprovalCollectorStore for InMemoryThresholdApprovalCollectorStore
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::approval::ThresholdApprovalProposalCreationParameters;
     use chio_core::capability::governance::{
         GovernedApprovalTokenBody, ThresholdApprovalProposalBody,
     };
@@ -568,10 +723,26 @@ mod tests {
             100,
         )
         .unwrap();
+        let context = ThresholdApprovalProposalCreationContext::new(
+            ThresholdApprovalProposalCreationParameters {
+                matched_request: ThresholdApprovalRequest::new("request-1", "server", "tool")
+                    .unwrap(),
+                requirement: requirement.clone(),
+                subject: subject.public_key(),
+                governed_intent_hash: sha256_hex(b"intent"),
+                authorization_capability_hash: sha256_hex(b"capability"),
+                authorizing_capability_expires_at: 200,
+                governed_operation_expires_at: 200,
+                submitter: Some(submitter.public_key()),
+                separation_of_duties: true,
+            },
+        )
+        .unwrap();
         let collector = ThresholdApprovalCollector::new(
             Arc::new(InMemoryThresholdApprovalCollectorStore::new()),
             policy_hash,
             vec![authority.public_key()],
+            Arc::new(move |_: &str, _: u64| Ok(context.clone())),
         );
         Fixture {
             collector,
@@ -643,13 +814,7 @@ mod tests {
         let proposal = proposal(&fixture, "proposal-1");
         fixture
             .collector
-            .create_proposal(
-                proposal.clone(),
-                fixture.requirement.clone(),
-                Some(fixture.submitter.public_key()),
-                true,
-                100,
-            )
+            .create_proposal(proposal.clone(), 100)
             .unwrap();
 
         let separated = fixture
@@ -707,39 +872,32 @@ mod tests {
         );
         let stored = fixture
             .collector
-            .get_proposal("proposal-1")
+            .get_proposal("proposal-1", 120)
             .unwrap()
             .unwrap();
         assert_eq!(stored.state, ThresholdApprovalCollectorState::Delivered);
-        assert!(fixture.collector.deliver("proposal-1", 114).is_err());
+        assert_eq!(
+            fixture.collector.deliver("proposal-1", 114).unwrap(),
+            delivered
+        );
     }
 
     #[test]
     fn collector_rejects_stale_policy_changed_intent_and_terminal_updates() {
         let fixture = fixture();
-        let mut stale_requirement = fixture.requirement.clone();
-        stale_requirement.policy_hash = sha256_hex(b"stale-policy");
+        let mut stale_body = proposal(&fixture, "stale").body;
+        stale_body.policy_hash = sha256_hex(b"stale-policy");
+        let stale_proposal =
+            ThresholdApprovalProposal::sign(stale_body, &fixture.authority).unwrap();
         assert!(fixture
             .collector
-            .create_proposal(
-                proposal(&fixture, "stale"),
-                stale_requirement,
-                None,
-                false,
-                100,
-            )
+            .create_proposal(stale_proposal, 100)
             .is_err());
 
         let proposal = proposal(&fixture, "changed-intent");
         fixture
             .collector
-            .create_proposal(
-                proposal.clone(),
-                fixture.requirement.clone(),
-                None,
-                false,
-                100,
-            )
+            .create_proposal(proposal.clone(), 100)
             .unwrap();
         let mut changed = token(&proposal, &fixture.alice, "changed-token");
         changed.governed_intent_hash = sha256_hex(b"different-intent");
@@ -767,13 +925,7 @@ mod tests {
         let proposal = proposal(&fixture, "expiring");
         fixture
             .collector
-            .create_proposal(
-                proposal.clone(),
-                fixture.requirement.clone(),
-                None,
-                false,
-                100,
-            )
+            .create_proposal(proposal.clone(), 100)
             .unwrap();
 
         fixture
@@ -802,7 +954,11 @@ mod tests {
                 .contains("quorum is no longer satisfied"),
             "delivery must reject lapsed tokens; got: {expired}"
         );
-        let stored = fixture.collector.get_proposal("expiring").unwrap().unwrap();
+        let stored = fixture
+            .collector
+            .get_proposal("expiring", 120)
+            .unwrap()
+            .unwrap();
         assert_eq!(stored.state, ThresholdApprovalCollectorState::Ready);
 
         let refreshed = fixture

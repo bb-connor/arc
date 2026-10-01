@@ -1,0 +1,90 @@
+name: sanitizers
+
+# Nightly AddressSanitizer and ThreadSanitizer over the unit tests of a
+# committed crate list. Advisory: it gates nothing until it has a history.
+#
+# The crate list is the set measured to build and pass under both sanitizers
+# (docs/security/toolchain/sanitizer-audit.md). A crate joins the list when
+# its measurement row is green and leaves it only with a recorded reason.
+#
+# ASan links against the prebuilt standard library. TSan changes the ABI, so
+# this nightly refuses to mix it with a prebuilt `core`; `-Zbuild-std`
+# rebuilds the standard library instrumented, which is why the TSan job pins
+# `rust-src` and costs more. C compiled by `cc` inside `-sys` crates (SQLite
+# in chio-keyring) is not instrumented by either sanitizer: races and memory
+# errors inside it are invisible, those on the Rust side of each call are not.
+#
+# The toolchain is pinned by date. Bumping it is a reviewed change: a newer
+# nightly can change what the sanitizers report without any change here.
+
+on:
+  schedule:
+    # 04:41 UTC, after the fuzz matrix and clear of the hour boundary.
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  CHIO_SANITIZER_NIGHTLY: nightly-2026-02-07
+  CHIO_SANITIZER_TARGET: x86_64-unknown-linux-gnu
+  # Every crate below passed under both sanitizers on 2026-09-26.
+  CHIO_SANITIZER_CRATES: "-p chio-security-types -p chio-bounded -p chio-supervisor -p chio-keyring"
+
+jobs:
+  address:
+    name: sanitizer address (unit tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install the pinned nightly
+        run: |
+          rustup toolchain install --profile minimal "${CHIO_SANITIZER_NIGHTLY}"
+          rustup run "${CHIO_SANITIZER_NIGHTLY}" rustc --version
+
+      - name: Install protobuf compiler
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+
+      - name: Unit tests under AddressSanitizer
+        env:
+          RUSTFLAGS: "-Zsanitizer=address"
+          RUST_TEST_THREADS: "1"
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          cargo "+${CHIO_SANITIZER_NIGHTLY}" test --locked ${CHIO_SANITIZER_CRATES} --lib \
+            --target "${CHIO_SANITIZER_TARGET}"
+
+  thread:
+    name: sanitizer thread (unit tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install the pinned nightly with rust-src
+        run: |
+          rustup toolchain install --profile minimal --component rust-src "${CHIO_SANITIZER_NIGHTLY}"
+          rustup run "${CHIO_SANITIZER_NIGHTLY}" rustc --version
+
+      - name: Install protobuf compiler
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+
+      - name: Unit tests under ThreadSanitizer
+        env:
+          RUSTFLAGS: "-Zsanitizer=thread"
+          RUST_TEST_THREADS: "1"
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          cargo "+${CHIO_SANITIZER_NIGHTLY}" test --locked -Zbuild-std ${CHIO_SANITIZER_CRATES} --lib \
+            --target "${CHIO_SANITIZER_TARGET}"

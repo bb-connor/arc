@@ -37,6 +37,18 @@ pub struct ToolCallOperation {
     pub extra_metadata: Option<serde_json::Value>,
 }
 
+impl ToolCallOperation {
+    /// Reject ambiguous approval shapes before any session continuation is claimed.
+    #[must_use]
+    pub fn authorization_conflict(&self) -> Option<&'static str> {
+        crate::message::authorization_conflict(
+            self.approval_token.as_ref(),
+            &self.approval_tokens,
+            self.threshold_approval_proposal.as_ref(),
+        )
+    }
+}
+
 /// Resource metadata exposed through the session layer.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

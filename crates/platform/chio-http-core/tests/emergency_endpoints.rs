@@ -129,6 +129,7 @@ fn make_request(id: &str, cap: &CapabilityToken) -> ToolCallRequest {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     }
 }
 

@@ -1,0 +1,273 @@
+#![cfg(unix)]
+
+use std::path::Path;
+use std::process::Command;
+
+use chio_core_types::receipt::body::ChioReceipt;
+
+#[test]
+#[cfg(target_os = "linux")]
+fn process_administration_preserves_files_and_releases_diagnostic_locks(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/administration.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn process_runner_preserves_completion_and_launch_error_identity(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/lifecycle.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+fn process_host_runs_existing_mcp_tools_and_recovers_after_host_death(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/recovery.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let receipt: ChioReceipt =
+        serde_json::from_str(evidence["receipt_json"].as_str().ok_or("missing receipt")?)?;
+    assert!(receipt.verify_signature()?);
+    assert_eq!(receipt.kernel_key.to_hex(), evidence["kernel_key"]);
+    assert_eq!(evidence["publications"], 1);
+    Ok(())
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn process_runner_recovers_workers_and_host_without_repeating_effects(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/runner.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+fn process_host_runs_native_mailboxes_without_mcp_servers() -> Result<(), Box<dyn std::error::Error>>
+{
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/mailboxes.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn independent_workers_finish_after_peer_failure_and_host_restart(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/failures.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+fn mailbox_workers_renew_claims_across_host_restart_and_release_after_death(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/mailbox_leases.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn supervisors_recover_from_child_failure_without_erasing_unhandled_failures(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/supervision.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(())
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn adaptive_processes_delegate_and_join_across_python_node_and_host_death(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/adaptive.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(evidence["adaptive_children"], 4);
+    assert_eq!(evidence["max_parallel"], 1);
+    Ok(())
+}
+
+#[test]
+fn process_swarm_binds_issued_workers_and_recovers_sealed_authority(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/swarm.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let bootstrap: ChioReceipt = serde_json::from_value(evidence["bootstrap"].clone())?;
+    assert!(bootstrap.verify_signature()?);
+    assert_eq!(bootstrap.kernel_key.to_hex(), evidence["kernel_key"]);
+    for raw in evidence["receipts"].as_array().ok_or("missing receipts")? {
+        let receipt: ChioReceipt = serde_json::from_str(raw.as_str().ok_or("invalid receipt")?)?;
+        assert!(receipt.verify_signature()?);
+        assert_eq!(receipt.kernel_key.to_hex(), evidence["kernel_key"]);
+    }
+    assert_eq!(evidence["effects"], 2);
+    Ok(())
+}
+
+#[test]
+fn independent_swarm_graphs_share_the_original_family_quota(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/swarm_shared_family.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let bootstrap: ChioReceipt = serde_json::from_value(evidence["bootstrap"].clone())?;
+    assert!(bootstrap.verify_signature()?);
+    assert_eq!(bootstrap.kernel_key.to_hex(), evidence["kernel_key"]);
+    for raw in evidence["receipts"].as_array().ok_or("missing receipts")? {
+        let receipt: ChioReceipt = serde_json::from_str(raw.as_str().ok_or("invalid receipt")?)?;
+        assert!(receipt.verify_signature()?);
+        assert_eq!(receipt.kernel_key.to_hex(), evidence["kernel_key"]);
+    }
+    assert_eq!(evidence["effects"], 2);
+    assert_eq!(evidence["graphs"], 2);
+    Ok(())
+}

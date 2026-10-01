@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
+use chio_kernel::{
+    KernelError, NestedFlowBridge, ToolDispatchContext, ToolInvocationCost, ToolServerConnection,
+};
 use chio_manifest::ToolManifest;
 
 use crate::adapter::{McpAdapter, McpAdapterConfig};
@@ -8,6 +10,21 @@ use crate::edge::{AdapterError, McpServerCapabilities, McpTransport};
 use crate::errors::map_tool_invocation_error;
 use crate::prompts::AdaptedMcpPromptProvider;
 use crate::resources::AdaptedMcpResourceProvider;
+
+/// MCP transports perform synchronous I/O. Hand the executor's other tasks to
+/// another worker while retaining this borrowed invocation on its current stack.
+/// No detached dispatch or second cancellation owner is created. Non-Tokio and
+/// current-thread callers retain their existing synchronous behavior.
+fn blocking_transport<T>(call: impl FnOnce() -> T) -> T {
+    if matches!(
+        tokio::runtime::Handle::try_current().map(|handle| handle.runtime_flavor()),
+        Ok(tokio::runtime::RuntimeFlavor::MultiThread)
+    ) {
+        tokio::task::block_in_place(call)
+    } else {
+        call()
+    }
+}
 
 /// A Chio tool-server connection backed by a wrapped MCP server.
 #[derive(Clone)]
@@ -17,17 +34,101 @@ pub struct AdaptedMcpServer {
 }
 
 impl AdaptedMcpServer {
+    /// Build a discovery-only adapter server.
+    ///
+    /// Production runtimes that use manifest security metadata must call
+    /// [`Self::new_with_manifest_registry`] so the retained manifest comes
+    /// from a verified publisher signature.
     pub fn new(adapter: McpAdapter) -> Result<Self, AdapterError> {
-        let manifest = adapter.generate_manifest()?;
+        let manifest = match adapter.generate_manifest() {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                return Err(crate::adapter::merge_shutdown_error(
+                    error,
+                    adapter.shutdown(),
+                ));
+            }
+        };
         Ok(Self { adapter, manifest })
+    }
+
+    /// Build an adapter server after matching fresh MCP discovery against the
+    /// exact publisher-signed manifest admitted by `registry`.
+    pub fn new_with_manifest_registry(
+        adapter: McpAdapter,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AdapterError> {
+        let discovered = match adapter.generate_manifest() {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                return Err(crate::adapter::merge_shutdown_error(
+                    error,
+                    adapter.shutdown(),
+                ));
+            }
+        };
+        let admitted = match registry.verified_manifest(&discovered.server_id) {
+            Some(manifest) => manifest,
+            None => {
+                let error = AdapterError::SecurityMetadataUnavailable {
+                    server_id: discovered.server_id.clone(),
+                    tool_name: "*".to_string(),
+                };
+                return Err(crate::adapter::merge_shutdown_error(
+                    error,
+                    adapter.shutdown(),
+                ));
+            }
+        };
+        if let Err(error) =
+            crate::verify_discovered_manifest_surface(&discovered, &admitted.manifest)
+        {
+            return Err(crate::adapter::merge_shutdown_error(
+                error,
+                adapter.shutdown(),
+            ));
+        }
+        Ok(Self {
+            adapter,
+            manifest: admitted.manifest.clone(),
+        })
     }
 
     pub fn from_command(
         command: &str,
         args: &[&str],
         config: McpAdapterConfig,
+        launch: crate::transport::NativeMcpLaunch,
     ) -> Result<Self, AdapterError> {
-        Self::new(McpAdapter::from_command(command, args, config)?)
+        Self::new(McpAdapter::from_command(command, args, config, launch)?)
+    }
+
+    /// Construct a server whose subprocess cannot fall back from required
+    /// cage enforcement to direct native launch.
+    pub fn from_cage_required_command(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        launch: crate::transport::CageRequiredLaunch,
+    ) -> Result<Self, AdapterError> {
+        Self::new(McpAdapter::from_cage_required_command(
+            command, args, config, launch,
+        )?)
+    }
+
+    /// Spawn an MCP server, discover its live surface, and retain only the
+    /// publisher-signed manifest admitted by `registry`.
+    pub fn from_command_with_manifest_registry(
+        command: &str,
+        args: &[&str],
+        config: McpAdapterConfig,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+        launch: crate::transport::NativeMcpLaunch,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_manifest_registry(
+            McpAdapter::from_command(command, args, config, launch)?,
+            registry,
+        )
     }
 
     pub fn manifest(&self) -> &ToolManifest {
@@ -40,6 +141,21 @@ impl AdaptedMcpServer {
 
     pub fn upstream_capabilities(&self) -> McpServerCapabilities {
         self.adapter.capabilities()
+    }
+
+    #[must_use]
+    pub fn native_enforcement_evidence(&self) -> Option<&chio_cage::FullyEnforcedEvidence> {
+        self.adapter.native_enforcement_evidence()
+    }
+
+    #[must_use]
+    pub fn native_enforcement_receipt(&self) -> Option<&chio_core::receipt::body::ChioReceipt> {
+        self.adapter.native_enforcement_receipt()
+    }
+
+    /// Shut down the upstream transport and persist terminal security evidence.
+    pub fn shutdown(&self) -> Result<(), AdapterError> {
+        self.adapter.shutdown()
     }
 
     pub fn notification_source(&self) -> Arc<dyn McpTransport> {
@@ -88,8 +204,55 @@ impl ToolServerConnection for AdaptedMcpServer {
             return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
         }
 
-        self.adapter
-            .invoke_with_nested_flow(tool_name, arguments, nested_flow_bridge)
-            .map_err(map_tool_invocation_error)
+        blocking_transport(|| {
+            self.adapter
+                .invoke_with_nested_flow(tool_name, arguments, nested_flow_bridge)
+                .map_err(map_tool_invocation_error)
+        })
+    }
+
+    async fn prepare_delivery(&self, _context: &ToolDispatchContext) -> Result<(), KernelError> {
+        blocking_transport(|| {
+            self.adapter
+                .prepare_delivery()
+                .map_err(map_tool_invocation_error)
+        })
+    }
+
+    async fn invoke_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        if !self
+            .manifest
+            .tools
+            .iter()
+            .any(|tool| tool.name == tool_name)
+        {
+            return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
+        }
+        blocking_transport(|| {
+            self.adapter
+                .invoke_in_context(context, tool_name, arguments, nested_flow_bridge)
+                .map_err(map_tool_invocation_error)
+        })
+    }
+
+    async fn invoke_with_cost_in_context(
+        &self,
+        context: &ToolDispatchContext,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+        // Preserve the same realized-cost behavior as the plain MCP adapter
+        // while retaining caller and operation binding on monetary dispatches.
+        let value = self
+            .invoke_in_context(context, tool_name, arguments, nested_flow_bridge)
+            .await?;
+        Ok((value, None))
     }
 }

@@ -42,6 +42,7 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -120,6 +121,7 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -198,6 +200,7 @@ fn governed_request_rejects_empty_metered_billing_provider() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -258,6 +261,7 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -342,6 +346,7 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -437,6 +442,7 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -539,6 +545,7 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -618,6 +625,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     let asserted_governed = asserted_response
@@ -684,6 +692,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     let observed_governed = observed_response
@@ -786,6 +795,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
     let verified_governed = verified_response
@@ -896,6 +906,7 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -985,6 +996,7 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1074,6 +1086,7 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             },
             &mut client,
             None,
@@ -1219,6 +1232,7 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1294,6 +1308,7 @@ fn governed_request_rejects_self_referential_call_chain_parent_request() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1350,6 +1365,7 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         .unwrap();
 
@@ -1416,6 +1432,7 @@ fn governed_call_chain_evidence_store_error_consumes_no_budget() {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+        declassification_grant: None,
         })
         // The evidence-lookup store error must fail closed as a clean deny here,
         // not propagate out of evaluate.
@@ -1511,6 +1528,7 @@ fn nested_governed_call_chain_evidence_store_error_consumes_no_budget() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             },
             &mut client,
             None,
@@ -1603,6 +1621,7 @@ fn nested_missing_session_roots_lookup_reverses_pre_execution_budget() {
                 supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
+        declassification_grant: None,
             },
             &mut client,
             None,
@@ -1684,6 +1703,7 @@ fn missing_approval_replay_store_denies_before_dispatch_and_reverses_monetary_ad
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     })?;
 
     assert_eq!(response.verdict, Verdict::Deny);

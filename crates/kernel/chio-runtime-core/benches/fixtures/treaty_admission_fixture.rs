@@ -630,5 +630,6 @@ fn treaty_request(
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+        declassification_grant: None,
     })
 }

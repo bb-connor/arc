@@ -13,6 +13,42 @@
 
 ## Public API
 
+### Live swarm authority
+
+The hook uses `verify_swarm_authority_for_admission`: fan-out does not require
+future join or terminal results. `chioSwarm.joinReceipt` may be absent for a
+direct continuation. A fan-in continuation still requires its exact signed
+join reference, and malformed supplied references reject. Existing complete
+references retain their canonical binding. No request can supply its own trust
+roots, capability identity or trusted route metadata.
+
+This verifies live authority, not completed execution. The complete-artifact
+verifier remains strict about every graph join and terminal evidence. M5 must
+join actual worker outcomes and durable accounting before claiming completion.
+
+### Operation-owned replay custody
+
+`ChioRuntimeAdmissionHook::with_operation_owned_runtime_replay` opts into the
+kernel's operation-scoped claim port. The binding is configuration data, not
+activation evidence. Every accepted request needs a complete prepared runtime
+plan and a qualified durable operation, including read-only tools. The kernel
+supplies the original request binding, selected grant, phase and episode ID;
+the verifier supplies the validated plan digest and complete resource set.
+
+The SQLite authority must first pin and import the exact runtime source, then
+record explicit activation (admission schema v21). Activation verifies the
+existing physical source seal without repairing it. Operators must quiesce
+previously admitted legacy invocations before activating. Setting the hook
+alone never activates a source. In-memory, JSON, layered and unrelated SQLite
+backends reject this profile; fixed runtime clock overrides also reject.
+
+The runtime still performs the real trust-floor compare-and-set. It never calls
+legacy replay consume/release methods on this path. Source and artifact checks
+run again before dispatch. Cleanup uses the operation lease and fenced physical
+history, not signed receipt metadata. Dispatch commitment retains replay custody
+even when the outcome is unknown. This opt-in integration is not launch
+qualification; see [the security launch plan](../../../docs/security/launch-plan.md).
+
 | Area | Key items |
 |------|-----------|
 | Admission | `evaluate_runtime_admission`, `RuntimeAdmissionInput`, `ChioRuntimeAdmissionHook` |

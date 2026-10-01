@@ -256,10 +256,44 @@ async fn build_send_message_request_propagates_interface_tenant() {
                 return_immediately: None,
                 stream: false,
             },
+        None,
         )
         .expect("build send message request");
 
     assert_eq!(request.tenant.as_deref(), Some("tenant-alpha"));
+
+    let context = ToolDispatchContext::new(
+        "request-9",
+        chio_core::provider_attempt::ProviderAttemptBindingV1 {
+            operation_id: "d".repeat(64),
+            attempt_id: format!("attempt:{}", "d".repeat(64)),
+            transport_id: "kernel-tool-server:a2a".into(),
+            transport_key_epoch: 1,
+        },
+    );
+    let durable = adapter
+        .build_send_message_request(
+            &agent_card.skills[0],
+            A2aSendToolInput {
+                message: Some("hello".to_string()),
+                data: None,
+                context_id: None,
+                task_id: None,
+                reference_task_ids: None,
+                metadata: None,
+                message_metadata: None,
+                history_length: None,
+                return_immediately: None,
+                stream: false,
+            },
+            Some(&context),
+        )
+        .unwrap_or_else(|error| panic!("durable request: {error}"));
+    assert_eq!(
+        durable.message.message_id,
+        format!("chio-a2a-{}", "d".repeat(64)),
+        "a durable dispatch presents its operation id as the message id"
+    );
 }
 
 #[tokio::test]
@@ -288,6 +322,7 @@ async fn build_send_message_request_rejects_history_length_without_capability() 
                 return_immediately: None,
                 stream: false,
             },
+        None,
         )
         .expect_err("history_length without capability should fail");
     assert!(error
@@ -319,6 +354,7 @@ async fn build_send_message_request_rejects_text_when_skill_declares_json_only_i
                 return_immediately: None,
                 stream: false,
             },
+        None,
         )
         .expect_err("JSON-only A2A skill must reject text parts");
     assert!(
@@ -351,6 +387,7 @@ async fn build_send_message_request_rejects_data_when_skill_declares_text_only_i
                 return_immediately: None,
                 stream: false,
             },
+        None,
         )
         .expect_err("text-only A2A skill must reject JSON data parts");
     assert!(
@@ -559,6 +596,7 @@ async fn build_send_message_request_accepts_parameterized_text_and_json_input_mo
                 return_immediately: None,
                 stream: false,
             },
+        None,
         )
         .expect("parameterized text and JSON modes should admit both part shapes");
 
@@ -614,6 +652,7 @@ async fn empty_default_input_modes_accept_text_and_json() {
                 return_immediately: None,
                 stream: false,
             },
+        None,
         )
         .expect("empty default input modes should admit text and JSON parts");
 

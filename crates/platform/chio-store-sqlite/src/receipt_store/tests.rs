@@ -1,7 +1,11 @@
+#[path = "tests/attempted_cost.rs"]
+mod attempted_cost;
 #[path = "tests/background_checkpoints.rs"]
 mod background_checkpoints;
 #[path = "tests/bootstrap.rs"]
 mod bootstrap;
+#[path = "tests/canonical_readback.rs"]
+mod canonical_readback;
 #[path = "tests/checkpoint.rs"]
 mod checkpoint;
 #[path = "tests/errors.rs"]
@@ -20,16 +24,24 @@ mod lineage;
 mod qualified_finding_pool;
 #[path = "tests/query.rs"]
 mod query;
+#[path = "tests/receipt_batch.rs"]
+mod receipt_batch;
 #[path = "tests/retained_commitments.rs"]
 mod retained_commitments;
 #[path = "tests/retention.rs"]
 mod retention;
+#[path = "tests/retention_liveness.rs"]
+mod retention_liveness;
 #[path = "tests/scale_proof.rs"]
 mod scale_proof;
+#[path = "tests/scale_recovery.rs"]
+mod scale_recovery;
 #[path = "tests/schema_archive.rs"]
 mod schema_archive;
 #[path = "tests/settlement.rs"]
 mod settlement;
+#[path = "tests/signed_readback.rs"]
+mod signed_readback;
 #[path = "tests/single_writer.rs"]
 mod single_writer;
 #[path = "tests/support.rs"]

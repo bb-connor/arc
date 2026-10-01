@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "rotation-partial-commit-001",
+  "class": "rotation_partial_commit",
+  "expected_verdict": "DENY",
+  "expected_reason": "rotation_partial_commit_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "atomic_rotation_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/sqlite.rs",
+        "target_kind": "test",
+        "target": "sqlite",
+        "test_name": "write_and_signing_failures_leave_no_partial_event_checkpoint_or_state"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "rotation_partial_commit",
+        "control_id": "atomic_rotation_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/sqlite.rs",
+        "function": "persist_state",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "FnValue",
+          "replacement": "Ok(())"
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/rotation_partial_commit/mutants.out/outcomes.json",
+          "sha256": "1dbafb65c48dde9250c08ee2e57a80c4a8cf3df8c98447a543e92e2d64f8e61e",
+          "inputs_sha256": "3128286e01efe21fe3ef82ed13e30070ca44cafc47f5544867e09d5ef6f60fbc"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

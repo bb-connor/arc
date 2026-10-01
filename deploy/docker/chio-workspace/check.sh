@@ -17,6 +17,7 @@ cp "${script_dir}/Cargo.lock" "${tmp_dir}/Cargo.lock"
 
 copy_path ".cargo"
 copy_path "crates"
+copy_path "third_party"
 copy_path "examples/chio-3vendor/fixtures/runtime-spine/scenario.json"
 copy_path "fixtures/proof-room"
 copy_path "spec"

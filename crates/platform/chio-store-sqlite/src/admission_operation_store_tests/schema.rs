@@ -1,5 +1,9 @@
 use super::*;
 
+#[path = "schema/caller_wait.rs"]
+mod caller_wait;
+pub(super) use caller_wait::remove_caller_wait_state;
+
 struct SqlObligationHead {
     obligation_id: String,
     atom_digest: String,
@@ -597,6 +601,7 @@ fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTest
     drop(authority);
 
     let connection = Connection::open(&database)?;
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
     connection.execute_batch(
         r#"
         DROP TRIGGER threshold_approval_tokens_immutable;
@@ -653,6 +658,7 @@ fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTest
 
 #[test]
 fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
+    let _legacy = legacy_clock::LegacyClock::enter();
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -677,6 +683,8 @@ fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
     drop(authority);
 
     let connection = Connection::open(&database).expect("open offline database");
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)
+        .expect("remove empty post-v1 runtime migration schema");
     connection
         .execute_batch(
             r#"
@@ -719,6 +727,7 @@ fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
 
 #[test]
 fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
+    let _legacy = legacy_clock::LegacyClock::enter();
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -761,6 +770,8 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
         )
         .expect("closed commit epochs");
     assert!(closed_epochs > 0);
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)
+        .expect("remove empty post-v2 runtime migration schema");
     connection
         .execute_batch(
             r#"
@@ -891,6 +902,9 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
 
 #[test]
 fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> AnchoredTestResult {
+    let _legacy = legacy_clock::LegacyClock::enter();
+    let _clock =
+        chio_kernel::scope_fixed_runtime_for_current_thread(now_ms() / 1_000, std::iter::empty());
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -900,7 +914,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
     );
     let begun_at = now_ms();
     fixture.store.begin(&operation, &fixture.fence, begun_at)?;
-    let recovery = claim(&fixture, &operation, "v4-channel-migration", begun_at + 1);
+    let recovery = claim(&fixture, &operation, "v4-channel-migration", begun_at);
     let participant_digest = economic_digest("v4-channel-participant");
     {
         let mut connection = fixture.store.connection()?;
@@ -913,7 +927,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
             &operation,
             &recovery,
             &participant_digest,
-            begun_at + 2,
+            begun_at,
         )?;
         fixture.store.commit_write(transaction)?;
         fixture.store.sync_after_write(&connection)?;
@@ -935,6 +949,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
     drop(authority);
 
     let connection = Connection::open(&database)?;
+    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
     connection.execute_batch(
         r#"
         DROP TABLE obligation_assignment_results;

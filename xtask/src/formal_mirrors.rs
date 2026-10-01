@@ -16,6 +16,8 @@ use crate::{workspace_root, XtaskError};
 const MANIFEST_PATH: &str = "formal/proof-manifest.toml";
 const MANIFEST_SCHEMA: &str = "chio.proof-manifest.v1";
 
+mod dispatch_anchors;
+
 #[derive(Debug, Deserialize)]
 struct ProofManifest {
     schema: String,
@@ -73,6 +75,7 @@ pub(crate) fn run(bless: bool) -> Result<(), XtaskError> {
         .map_err(|error| XtaskError::Io(MANIFEST_PATH.to_string(), error))?;
     let entries = parse_manifest(&raw).map_err(XtaskError::FormalMirrors)?;
     validate_entries(&entries, &root).map_err(XtaskError::FormalMirrors)?;
+    dispatch_anchors::validate(&entries).map_err(XtaskError::FormalMirrors)?;
 
     let mut computed = Vec::with_capacity(entries.len());
     for entry in &entries {

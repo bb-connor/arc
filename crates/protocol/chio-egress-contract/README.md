@@ -55,6 +55,24 @@ Behind `reqwest-egress` (re-exported at the crate root from `reqwest_helper`):
 - `ContractResponse` - status/url/headers/body accessors plus async `text()`
   and `json()`.
 
+### Operator readiness, not tenant tool egress
+
+`OperatorReadinessProbe::prepare(url, bearer)` binds an operator-selected GET
+target before a supervised service starts. This separate host-management API
+permits local and private service addresses. It must not be used to authorize
+agent-selected destinations or replace `HttpEgressContract` in tool adapters.
+
+The handle retains its client and request privately, accepts no per-probe target,
+method, body or client override, and returns only a readiness boolean. URLs must
+use HTTP(S) with a host and nonzero port, without userinfo or fragments. Invalid
+URLs and bearer headers fail preparation. Proxies and redirects are disabled;
+the asynchronous request, including DNS and streamed body reads, has a
+two-second timeout. Only complete success responses of at most 64 KiB qualify.
+Transport, redirect, timeout and body-limit failures all deny readiness.
+
+This helper is available only with `reqwest-egress`. It adds no serialized
+policy option and does not change tenant address-class restrictions.
+
 ## Feature flags
 
 | Flag | Effect |

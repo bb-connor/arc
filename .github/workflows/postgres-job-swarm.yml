@@ -1,0 +1,106 @@
+name: PostgreSQL job process contract
+
+on:
+  pull_request:
+    paths:
+      - "crates/platform/chio-finding-market-store-postgres/**"
+      - "crates/platform/chio-finding-market-migrations/**"
+      - "examples/postgres-job-swarm/**"
+      - "sdks/python/chio-process/**"
+      - "crates/kernel/chio-process/**"
+      - "crates/protocol/chio-mcp-adapter/**"
+      - "crates/products/chio-cli/**"
+      - "Cargo.lock"
+      - ".github/workflows/postgres-job-swarm.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/platform/chio-finding-market-store-postgres/**"
+      - "crates/platform/chio-finding-market-migrations/**"
+      - "examples/postgres-job-swarm/**"
+      - "sdks/python/chio-process/**"
+      - "crates/kernel/chio-process/**"
+      - "crates/protocol/chio-mcp-adapter/**"
+      - "crates/products/chio-cli/**"
+      - "Cargo.lock"
+      - ".github/workflows/postgres-job-swarm.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postgres-job-swarm-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  native:
+    name: Native PostgreSQL worker API and process ownership
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install Rust toolchain
+        run: rustup toolchain install --profile minimal --component clippy --component rustfmt
+      - uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
+      - name: Build the real gateway and kernel
+        run: |
+          cargo fmt -p chio-finding-market-store-postgres -- --check
+          cargo test --locked -p chio-finding-market-store-postgres --lib
+          cargo clippy --locked -p chio-finding-market-store-postgres --example agent_jobs --test worker_lease_api -- -D warnings
+          cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
+          cargo build --locked -p chio-cli --bin chio
+      - name: Install the process package and create a dedicated TLS fixture
+        run: |
+          umask 077
+          job_root=$(mktemp -d /tmp/chio-pg-jobs-XXXXXX)
+          echo "CHIO_JOB_FIXTURE_ROOT=$job_root" >> "$GITHUB_ENV"
+          cp target/debug/chio "$job_root/chio"
+          cp target/debug/examples/agent_jobs "$job_root/agent-jobs"
+          chmod 700 "$job_root/chio" "$job_root/agent-jobs"
+          uv build sdks/python/chio-process --wheel --out-dir "$job_root/wheels"
+          uv venv --python /usr/bin/python3 "$job_root/venv"
+          uv pip install --python "$job_root/venv/bin/python" --no-deps "$job_root/wheels/chio_process-0.1.0-py3-none-any.whl"
+          docker pull postgres:17.11
+          python3 examples/postgres-job-swarm/postgres.py start --binary "$job_root/agent-jobs" --output "$job_root/database"
+      - name: Exercise the public worker role and actual native process host
+        run: |
+          python3 examples/postgres-job-swarm/check_api.py --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"
+          "$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/qualification"
+      - name: Lose a committed claim response and recover without redispatch
+        run: |
+          "$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/claim-loss"
+      - name: Preserve only nonsecret qualification evidence
+        if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postgres-job-process-qualification
+          path: |
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/qualification.json
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/receipts.ndjson
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/kernel.pub
+          if-no-files-found: warn
+      - name: Preserve only nonsecret claim response loss evidence
+        if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postgres-job-claim-loss-qualification
+          path: |
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/qualification.json
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/receipts.ndjson
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/kernel.pub
+          if-no-files-found: warn
+      - name: Stop only this job's database container
+        if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
+        run: |
+          if test -f "$CHIO_JOB_FIXTURE_ROOT/database/state.json"; then
+            python3 examples/postgres-job-swarm/postgres.py stop --state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"
+          fi

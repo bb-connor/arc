@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${CHIO_ENTERPRISE_SECURITY_RUNNER:-0}" == "1" ]]; then
+  workspace="${CHIO_SECURITY_WORKSPACE:-}"
+  inventory_checker="${CHIO_SECURITY_EXACT_INVENTORY_CHECKER:-}"
+  if [[ "$workspace" != "/private/candidate" ]] ||
+    [[ "$inventory_checker" != "/opt/chio-security/gates/check-exact-cargo-test-inventory.py" ]]; then
+    echo "designated broker gate paths do not match the trusted contract" >&2
+    exit 1
+  fi
+  if [[ ! -f "$inventory_checker" ]] || [[ -L "$inventory_checker" ]]; then
+    echo "designated broker inventory checker is missing or symbolic" >&2
+    exit 1
+  fi
+else
+  if [[ -n "${CHIO_SECURITY_WORKSPACE:-}" ]] ||
+    [[ -n "${CHIO_SECURITY_EXACT_INVENTORY_CHECKER:-}" ]]; then
+    echo "trusted broker gate paths leaked into a portable invocation" >&2
+    exit 1
+  fi
+  workspace="$(cd "$(dirname "$0")/.." && pwd)"
+  inventory_checker="$workspace/scripts/check-exact-cargo-test-inventory.py"
+fi
+cd "$workspace"
+
+mode="${1:---release}"
+if [[ "$#" -gt 1 ]] || [[ "${mode}" != "--release" && "${mode}" != "--portable" ]]; then
+  echo "usage: $0 [--release|--portable]" >&2
+  exit 64
+fi
+
+export CARGO_INCREMENTAL=0
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
+
+if [[ "${mode}" == "--release" ]]; then
+  if [[ "${CHIO_ENTERPRISE_SECURITY_RUNNER:-0}" != "1" ]] ||
+    [[ "$(uname -s):$(uname -m)" != "Linux:x86_64" ]]; then
+    echo "confined broker release evidence requires the designated Linux x86_64 runner" >&2
+    exit 1
+  fi
+fi
+
+run_tests() {
+  local label="$1"
+  local allow_filtered="$2"
+  local inventory="$3"
+  shift 3
+  local list_output run_output list_status run_status
+  local -a expected
+  expected=()
+  while IFS= read -r test_name; do
+    if [[ -n "${test_name}" ]]; then
+      expected+=("${test_name}")
+    fi
+  done <<< "${inventory}"
+  if [[ "${#expected[@]}" -eq 0 ]]; then
+    echo "${label} has an empty mandated inventory" >&2
+    return 1
+  fi
+  list_output="$(mktemp "${TMPDIR:-/tmp}/chio-broker-list.XXXXXX")"
+  run_output="$(mktemp "${TMPDIR:-/tmp}/chio-broker-run.XXXXXX")"
+  set +e
+  "$@" -- --list 2>&1 | tee "${list_output}"
+  list_status=${PIPESTATUS[0]}
+  set -e
+  if [[ "${list_status}" -ne 0 ]]; then
+    rm -f "${list_output}" "${run_output}"
+    return "${list_status}"
+  fi
+  set +e
+  "$@" 2>&1 | tee "${run_output}"
+  run_status=${PIPESTATUS[0]}
+  set -e
+  if [[ "${run_status}" -ne 0 ]]; then
+    rm -f "${list_output}" "${run_output}"
+    return "${run_status}"
+  fi
+  if [[ "${allow_filtered}" == "yes" ]]; then
+    python3 -I "$inventory_checker" \
+      --label "${label}" \
+      --list-output "${list_output}" \
+      --run-output "${run_output}" \
+      --allow-filtered \
+      "${expected[@]}"
+  else
+    python3 -I "$inventory_checker" \
+      --label "${label}" \
+      --list-output "${list_output}" \
+      --run-output "${run_output}" \
+      "${expected[@]}"
+  fi
+  rm -f "${list_output}" "${run_output}"
+}
+
+run_doctest() {
+  local output status
+  output="$(mktemp "${TMPDIR:-/tmp}/chio-broker-doc.XXXXXX")"
+  set +e
+  cargo test -p chio-secret-broker --doc 2>&1 | tee "${output}"
+  status=${PIPESTATUS[0]}
+  set -e
+  if [[ "${status}" -ne 0 ]]; then
+    rm -f "${output}"
+    return "${status}"
+  fi
+  if ! grep -Eq \
+    '^test result: ok\. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in [0-9]+(\.[0-9]+)?s$' \
+    "${output}"; then
+    echo "production transport API doctest inventory is not exactly one passing test" >&2
+    rm -f "${output}"
+    return 1
+  fi
+  rm -f "${output}"
+}
+
+run_tests "broker capability and proof binding" no "$(cat <<'EOF'
+canonical_wire_round_trip_and_unknown_field_rejection
+capability_and_proof_reject_single_field_tampering
+capability_signature_rejects_each_bound_field_tamper
+destination_rejects_userinfo_before_valid_normalization
+duplicate_reordered_and_unknown_option_inputs_fail_closed
+proof_rejects_body_path_header_option_key_stale_and_future_changes
+EOF
+)" cargo test -p chio-secret-broker --test execution
+
+run_doctest
+
+run_tests "broker execution concurrency and recovery" no \
+  "deterministic_attempt_conflict_precedes_exact_retry_and_concurrent_replay" \
+  cargo test -p chio-secret-broker --test concurrency
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  run_tests "single-use prepared broker MCP protocol" yes "$(cat <<'EOF'
+prepared_mcp::tests::malformed_or_oversized_stdio_never_reaches_the_broker
+prepared_mcp::tests::missing_handshake_or_wrong_tool_closes_without_any_broker_request
+prepared_mcp::tests::original_prepared_stream_executes_once_and_returns_only_signed_structured_content
+EOF
+)" cargo test --locked -p chio-secret-broker --lib prepared_mcp::tests::
+
+  run_tests "prepared broker MCP executable custody" no "$(cat <<'EOF'
+executable_preserves_one_broker_dispatch_and_rejects_a_tampered_completion
+executable_refuses_an_inherited_regular_file_without_mcp_output
+EOF
+)" cargo test --locked -p chio-secret-broker --test prepared_mcp_stdio
+
+  run_tests "prepared broker cage descriptor identity" yes \
+    "transport::stdio::cage_launch_tests::prepared_broker_descriptor_rejects_another_socket_with_the_same_peer" \
+    cargo test --locked -p chio-mcp-adapter --lib prepared_broker_descriptor_
+
+  run_tests "broker isolation secret boundary" no "$(cat <<'EOF'
+linux_process::brokerd_process_governed_provisioning_keeps_seeded_secret_inside_broker
+public_response_and_daemon_diagnostics_do_not_contain_seeded_credential
+EOF
+)" cargo test -p chio-secret-broker --test no_secret_crossing
+else
+  run_tests "portable broker isolation secret boundary" no \
+    "public_response_and_daemon_diagnostics_do_not_contain_seeded_credential" \
+    cargo test -p chio-secret-broker --test no_secret_crossing
+fi
+
+run_tests "broker network adversarial cases" no "$(cat <<'EOF'
+globally_routable_fixture_is_not_classified_as_restricted
+restricted_ipv4_ipv6_decimal_equivalents_and_mapped_forms_are_denied
+EOF
+)" cargo test -p chio-secret-broker --test network_adversarial
+
+run_tests "governed provisioning and durable receipts" no "$(cat <<'EOF'
+durable_completed_response_replays_exact_bytes_after_restart
+durable_failure_receipt_binds_truthful_dispatch_state_and_survives_restart
+durable_receipt_sink_is_append_only_idempotent_and_restart_safe
+enterprise_receipt_binds_every_execution_field_and_excludes_seeded_secret
+governed_admin_authorization_is_threshold_bound_and_durably_single_use
+governed_admin_control_replays_the_exact_signed_response_after_restart
+governed_admin_journal_rejects_self_signed_completion_substitution
+governed_admin_operation_recovers_after_expiry_and_persists_signed_completion
+governed_admin_replay_detects_hardlinks_and_path_rebinding
+governed_admin_replay_rejects_volatile_and_relative_database_names
+receipt_store_rejects_success_failure_terminal_conflicts_in_both_orders
+EOF
+)" cargo test -p chio-secret-broker --test production_surfaces
+
+daemon_runtime_inventory="$(cat <<'EOF'
+daemon_config_file_owner_is_bound_to_the_effective_service_uid
+daemon_governed_intent_changes_with_operation_tenant_and_payload
+daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage
+daemon_runtime_config_rejects_a_self_declared_service_uid
+EOF
+)"
+if [[ "$(uname -s)" == "Linux" ]]; then
+  daemon_runtime_inventory="${daemon_runtime_inventory}
+startup::broker_first_startup_stays_unpublished_until_authority_is_ready_then_retries
+startup::broker_startup_rejects_missing_or_wrong_migration_head_before_socket_publication
+"
+fi
+run_tests "broker daemon authority and fake upstream" no \
+  "${daemon_runtime_inventory}" \
+  cargo test -p chio-secret-broker --test daemon_runtime
+
+run_tests "daemon payload and sink governance" yes \
+  "daemon::tests::daemon_governance_binds_payload_and_fake_upstream_is_the_only_secret_sink" \
+  cargo test -p chio-secret-broker --lib \
+  daemon::tests::daemon_governance_binds_payload_and_fake_upstream_is_the_only_secret_sink
+
+run_tests "authority IPC signed response binding" yes \
+  "authority_ipc::tests::authority_rpc_requires_signed_exact_responses_and_full_capabilities" \
+  cargo test -p chio-secret-broker --lib \
+  authority_ipc::tests::authority_rpc_requires_signed_exact_responses_and_full_capabilities
+
+run_tests "authority RPC completion time and audit binding" yes "$(cat <<'EOF'
+service::tests::authority_rpc_completion_rejects_future_expired_and_unavailable_time
+service::tests::authority_rpc_completion_time_is_bound_into_independently_verified_audit
+service::tests::authority_rpc_completion_uses_current_trusted_time
+EOF
+)" cargo test --locked -p chio-secret-broker --lib authority_rpc_completion_
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  run_tests "prepared broker descriptor binding and deadlines" yes "$(cat <<'EOF'
+service::tests::prepared_connection_tests::prepared_connection_expiry_eof_and_trickle_release_capacity
+service::tests::prepared_connection_tests::prepared_connection_lifetime_respects_capability_and_nonce_expiry
+service::tests::prepared_connection_tests::prepared_connection_rejects_unauthorized_capacity_and_substituted_frames
+service::tests::prepared_connection_tests::prepared_connection_waits_without_blocking_control_and_executes_once
+EOF
+)" cargo test --locked -p chio-secret-broker --lib prepared_connection_tests::
+
+  run_tests "native kernel broker daemon, MCP and TLS provider" yes "$(cat <<'EOF'
+process_boundary_tests::native::cutpoints::native_broker_death_after_capture_retains_all_quotas_without_effect
+process_boundary_tests::native::cutpoints::native_broker_death_after_provider_effect_retains_capture_and_refuses_replay
+process_boundary_tests::native::cutpoints::native_broker_death_after_registration_has_no_effect_or_capture
+process_boundary_tests::native::native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_crossing
+process_boundary_tests::native::native_kernel_broker_mcp_tool_keeps_capture_on_lost_or_invalid_completion
+process_boundary_tests::native::native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion
+EOF
+)" \
+    cargo test --locked -p chio-secret-broker --features native-mcp --lib \
+    process_boundary_tests::native::
+fi
+
+run_tests "kernel broker capability and composite quota admission" yes "$(cat <<'EOF'
+kernel_admission::registration::tests::registered_generation_cannot_sign_with_a_rotated_authority_key
+kernel_admission::tests::broker_admission_rejects_substitution_even_when_kernel_hash_is_updated
+kernel_admission::tests::broker_admission_requires_bounded_exact_typed_canonical_json
+kernel_admission::tests::broker_admission_uses_installed_trust_and_live_clock
+kernel_admission::tests::broker_quota_identity_stays_constant_across_separate_invocations
+kernel_admission::tests::kernel::issued_nonce_cannot_adopt_a_changed_or_removed_broker_participant
+kernel_admission::tests::kernel::kernel_captures_parent_family_and_broker_once_and_denies_exhaustion
+kernel_admission::tests::kernel::strict_nonce_registers_original_broker_attempt_before_both_holds
+kernel_admission::tests::registration::registration_generation_binds_transport_tenant_signers_domain_and_verifier
+kernel_admission::tests::registration::registration_quota_aliases_preserve_all_owners_and_reject_collisions
+kernel_admission::tests::signed_broker_request_cannot_move_between_kernel_requests
+kernel_admission::tests::signed_broker_request_produces_original_operation_bound_quota
+EOF
+)" cargo test --locked -p chio-secret-broker --features native-mcp --lib kernel_admission::
+
+run_tests "native kernel broker custody and preparation" yes "$(cat <<'EOF'
+security::adapters::tests::native_flow::support::capture::broker::native_broker_capture_reads_only_original_operation_and_never_recharges
+security::adapters::tests::native_flow::support::capture::broker::connection::native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement
+security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody
+security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rechecks_original_parent_and_signs_actual_revocation_cut
+security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rejects_a_kernel_from_another_authority
+EOF
+)" \
+  cargo test --locked -p chio-control-plane --lib \
+  native_broker_
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  run_tests "sealed inherited FD master-key custody" no \
+    "secure_inherited_key_file_owns_the_original_descriptor_and_closes_it_on_drop" \
+    cargo test -p chio-secret-broker --test inherited_fd_custody
+elif [[ "${mode}" == "--release" ]]; then
+  echo "release broker evidence requires the Linux inherited-FD custody test" >&2
+  exit 1
+else
+  echo "Broker portable gate passed; no Linux inherited-FD custody evidence was produced"
+  exit 0
+fi
+
+if [[ "${mode}" == "--release" ]]; then
+  # Rebuild both executables from this candidate. The standard musl target
+  # supplies static binaries without broadening the tool's filesystem grants.
+  export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$workspace/target}"
+  if [[ "$CARGO_TARGET_DIR" != /* ]]; then
+    export CARGO_TARGET_DIR="$workspace/$CARGO_TARGET_DIR"
+  fi
+  cargo build --locked --target x86_64-unknown-linux-musl \
+    -p chio-cage --bin chio-cage-init
+  cargo build --locked --target x86_64-unknown-linux-musl \
+    -p chio-secret-broker --bin chio-broker-mcp
+  cargo build --locked -p chio-keyring --bins
+  cargo build --locked -p chio-cli --bin chio
+  export CHIO_CAGE_TEST_HELPER="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-cage-init"
+  export CHIO_BROKER_MCP_TOOL="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-broker-mcp"
+  export CHIO_KEYLOG_WITNESS="$CARGO_TARGET_DIR/debug/chio-keylog-witness"
+  export CHIO_KEYLOG_AUDIT="$CARGO_TARGET_DIR/debug/chio-keylog-audit"
+  run_tests "confined native broker MCP, process death and terminal cage receipts" yes "$(cat <<'EOF'
+process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
+process_boundary_tests::native::cutpoints::confined_broker_process_cutpoints_preserve_provider_and_quota_observations
+process_boundary_tests::native::process_host::confined_broker_process_host_exports_original_call_and_replays_after_restart
+process_boundary_tests::native::process_host::governed_broker_process_host_verifies_original_keyring_authority
+EOF
+)" \
+    cargo test --locked -p chio-secret-broker --features real-linux-enforcement --lib \
+    confined_broker_
+fi
+
+echo "Secret broker boundary gate passed"

@@ -1,8 +1,8 @@
 use super::*;
 
 pub(crate) const RECEIPT_COST_PROJECTION_SCHEMA_VERSION: i32 = 3;
-pub(crate) const RECEIPT_SINK_IDENTITY_SCHEMA_VERSION: i32 = 4;
-pub(crate) const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = RECEIPT_SINK_IDENTITY_SCHEMA_VERSION;
+pub(crate) const RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION: i32 = 6;
+pub(crate) const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 6;
 pub(crate) const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
 
 #[path = "support/checkpoint_projection.rs"]
@@ -17,6 +17,10 @@ mod lineage;
 mod receipt_verify;
 #[path = "support/retention_watermark.rs"]
 mod retention_watermark;
+#[path = "support/security_evidence.rs"]
+mod security_evidence;
+#[path = "support/signed_readback.rs"]
+mod signed_readback;
 #[path = "support/store_impl.rs"]
 mod store_impl;
 
@@ -26,4 +30,6 @@ pub(crate) use self::claim_log::*;
 pub(crate) use self::lineage::*;
 pub(crate) use self::receipt_verify::*;
 pub(crate) use self::retention_watermark::*;
+pub(crate) use self::security_evidence::*;
+pub(crate) use self::signed_readback::*;
 pub(crate) use self::store_impl::*;

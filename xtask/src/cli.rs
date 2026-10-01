@@ -272,7 +272,18 @@ pub struct LaunchAcceptanceArgs {
 
 pending_group!(FuzzCommand);
 pending_group!(MutantsCommand);
-pending_group!(ReleaseCommand);
+#[derive(Subcommand, Debug)]
+pub enum ReleaseCommand {
+    /// Assemble an offline Rust registry and external runtime consumer.
+    RustPreview {
+        /// New directory outside the source checkout.
+        #[arg(long)]
+        out: PathBuf,
+        /// Permit a development artifact whose source is explicitly marked dirty.
+        #[arg(long)]
+        allow_dirty: bool,
+    },
+}
 pending_group!(SupplyChainCommand);
 pending_group!(ToolsCommand);
 

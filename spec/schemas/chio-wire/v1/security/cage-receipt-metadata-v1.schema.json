@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-receipt-metadata-v1.schema.json",
+  "title": "Chio cage receipt metadata v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "cage_receipt"],
+  "properties": {
+    "schema": { "const": "chio.cage.receipt-metadata.v1" },
+    "cage_receipt": { "$ref": "cage-receipt-body-v1.schema.json" }
+  }
+}

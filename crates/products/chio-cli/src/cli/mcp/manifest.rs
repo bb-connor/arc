@@ -6,8 +6,9 @@
 
 use super::*;
 
+use super::cage_policy::load_native_mcp_launch;
 use super::scope::{infer_scopes, InferredCapability, InferredScope};
-use super::wrap::{split_wrapped_command, McpWrapArgs};
+use super::wrap::{require_unprotected_wrap_compatible, split_wrapped_command, McpWrapArgs};
 
 /// Render the inferred capability scaffold to a TOML string. The output
 /// is deterministic: tools are sorted alphabetically, scopes are emitted
@@ -54,37 +55,64 @@ fn escape_toml(value: &str) -> String {
         .replace('\n', "\\n")
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManifestScaffold {
+    #[serde(default)]
+    server_id: Option<String>,
+    #[serde(default)]
+    capability: Vec<ManifestScaffoldCapability>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ManifestScaffoldCapability {
+    #[serde(default)]
+    tool: Option<String>,
+    #[serde(default)]
+    scope: Option<String>,
+    #[serde(default)]
+    urn: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    allow: Option<bool>,
+}
+
 /// Read a promoted manifest scaffold and return the set of tool names
 /// flagged `allow = true`. The wrap loop's default verdict gate consults
 /// this set; tools that are absent or set to `allow = false` deny.
 pub(crate) fn load_manifest_allowlist(
     path: &std::path::Path,
+    expected_server_id: &str,
 ) -> Result<std::collections::BTreeSet<String>, CliError> {
     let raw = std::fs::read_to_string(path)
         .map_err(|e| CliError::cli_io_error(format!("failed to read manifest {path:?}: {e}")))?;
 
-    let value: toml::Value = toml::from_str(&raw).map_err(|e| {
+    let scaffold: ManifestScaffold = toml::from_str(&raw).map_err(|e| {
         CliError::cli_other_error(format!("failed to parse manifest TOML at {path:?}: {e}"))
     })?;
 
+    let ManifestScaffold {
+        server_id,
+        capability: capabilities,
+    } = scaffold;
+    if server_id.as_deref() != Some(expected_server_id) {
+        return Err(CliError::cli_other_error(format!(
+            "manifest server_id must exactly match {expected_server_id:?}"
+        )));
+    }
     let mut out = std::collections::BTreeSet::new();
-    let Some(capabilities) = value.get("capability").and_then(|c| c.as_array()) else {
-        return Ok(out);
-    };
     for capability in capabilities {
-        let Some(table) = capability.as_table() else {
-            continue;
-        };
-        let tool = table
-            .get("tool")
-            .and_then(toml::Value::as_str)
-            .unwrap_or("")
-            .to_string();
-        let allow = table
-            .get("allow")
-            .and_then(toml::Value::as_bool)
-            .unwrap_or(false);
-        if !tool.is_empty() && allow {
+        let ManifestScaffoldCapability {
+            tool,
+            scope: _scope,
+            urn: _urn,
+            description: _description,
+            allow,
+        } = capability;
+        let tool = tool.unwrap_or_default();
+        if !tool.is_empty() && allow.unwrap_or(false) {
             out.insert(tool);
         }
     }
@@ -99,18 +127,66 @@ pub(crate) fn cmd_mcp_print_scopes(args: &McpWrapArgs) -> Result<(), CliError> {
     } else {
         let (program, child_args) = split_wrapped_command(&args.command)?;
         let child_args_refs: Vec<&str> = child_args.iter().map(String::as_str).collect();
-        let transport =
-            chio_mcp_adapter::transport::StdioMcpTransport::spawn(&program, &child_args_refs)
-                .map_err(|e| {
-                    CliError::cli_other_error(format!(
-                        "failed to spawn wrapped MCP server '{program}': {e}"
-                    ))
-                })?;
-        let tools = transport
-            .list_tools()
-            .map_err(|e| CliError::cli_other_error(format!("failed to list tools: {e}")))?;
-        let _ = transport.shutdown();
-        tools
+        let policy_path = args.cage_policy.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "native MCP launch requires a signed, migration-bound cage policy".to_string(),
+            )
+        })?;
+        let trusted_policy_signer = args.cage_policy_signer.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "native MCP launch has no configured policy trust root".to_string(),
+            )
+        })?;
+        let launch = load_native_mcp_launch(
+            policy_path,
+            trusted_policy_signer,
+            &program,
+            &child_args_refs,
+            None,
+        )?;
+        if launch.server_id() != args.server_id {
+            return Err(CliError::cli_other_error(
+                "native MCP launch policy belongs to a different server".to_string(),
+            ));
+        }
+        require_unprotected_wrap_compatible(&launch)?;
+        let cage_required = matches!(
+            &launch,
+            chio_mcp_adapter::transport::NativeMcpLaunch::CageRequired(_)
+        );
+        let transport = chio_mcp_adapter::transport::StdioMcpTransport::spawn(
+            &program,
+            &child_args_refs,
+            launch,
+        )
+        .map_err(|e| {
+            CliError::cli_other_error(format!(
+                "failed to spawn wrapped MCP server '{program}': {e}"
+            ))
+        })?;
+        let operation = if cage_required && transport.enforcement_evidence().is_none() {
+            Err(CliError::cli_other_error(
+                "cage-required MCP launch returned no fully enforced evidence".to_string(),
+            ))
+        } else {
+            transport
+                .list_tools()
+                .map_err(|e| CliError::cli_other_error(format!("failed to list tools: {e}")))
+        };
+        let shutdown = transport.shutdown().map_err(|e| {
+            CliError::cli_other_error(format!(
+                "MCP scope inference terminal receipt persistence failed: {e}"
+            ))
+        });
+        match (operation, shutdown) {
+            (Ok(tools), Ok(())) => tools,
+            (Err(error), Ok(())) | (Ok(_), Err(error)) => return Err(error),
+            (Err(operation_error), Err(shutdown_error)) => {
+                return Err(CliError::cli_other_error(format!(
+                    "{operation_error}; shutdown also failed: {shutdown_error}"
+                )))
+            }
+        }
     };
 
     let inferred = infer_scopes(&tools);

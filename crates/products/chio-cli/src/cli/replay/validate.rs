@@ -350,6 +350,7 @@ mod replay_validate_tests {
                 },
                 received_at: SystemTime::UNIX_EPOCH,
             },
+            bridge_security: None,
         };
         // Round-trip through canonical JSON so the embedded value is
         // byte-for-byte canonical.
@@ -491,6 +492,7 @@ mod replay_validate_tests {
                 },
                 received_at: SystemTime::UNIX_EPOCH,
             },
+            bridge_security: None,
         };
         let bytes = chio_core::canonical::canonical_json_bytes(&invocation).unwrap();
         let frame = good_frame_with_invocation(serde_json::from_slice(&bytes).unwrap());

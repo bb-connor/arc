@@ -25,6 +25,14 @@ mod upstream_failures;
 #[path = "tests/health.rs"]
 mod health;
 
+#[path = "tests/control_auth.rs"]
+mod control_auth;
+
+#[path = "tests/control_containment.rs"]
+mod control_containment;
+
+use control_auth::{with_authenticated_control_peer, with_peer_addr, TEST_CONTROL_TOKEN};
+
 const PETSTORE_YAML: &str = r#"
 openapi: "3.0.0"
 info:
@@ -230,7 +238,7 @@ fn test_state_with_receipt_db(
         revoked_capability_ids: Mutex::new(revoked_capability_ids),
         trusted_capability_issuers,
         trusted_receipt_signers,
-        sidecar_control_token: None,
+        sidecar_control_token: Some(TEST_CONTROL_TOKEN.to_owned()),
         budget_store: None,
         mediation_hold_capable: false,
         mediation_kernel: None,
@@ -296,16 +304,6 @@ fn temp_receipt_db_path() -> String {
     let mut path = std::env::temp_dir();
     path.push(format!("chio-api-protect-test-{}.db", uuid::Uuid::now_v7()));
     path.to_string_lossy().to_string()
-}
-
-fn with_peer_addr(mut request: Request<Body>, peer: SocketAddr) -> Request<Body> {
-    // The capped serve listener exposes the peer address as `CappedPeerAddr`, so
-    // the sidecar-control checks read `ConnectInfo<CappedPeerAddr>`; mirror that
-    // extension type here rather than the bare `SocketAddr`.
-    request
-        .extensions_mut()
-        .insert(ConnectInfo(CappedPeerAddr(peer)));
-    request
 }
 
 fn with_loopback_peer(request: Request<Body>) -> Request<Body> {
@@ -600,7 +598,7 @@ async fn approval_routes_are_handled_before_proxy_catch_all() {
         &approver,
         GovernedApprovalDecision::Approved,
     );
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri(format!("/approvals/{}/respond", approval.approval_id))
@@ -644,7 +642,7 @@ async fn metrics_route_serves_rule_pack_families_when_authorized() {
     chio_metrics_spec::runtime::preregister_known_label_sets();
 
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("GET")
             .uri("/metrics")
@@ -677,7 +675,7 @@ async fn metrics_route_serves_rule_pack_families_when_authorized() {
 #[tokio::test]
 async fn metrics_route_is_gated() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    // No loopback peer and no bearer token: the sidecar-control gate must refuse.
+    // No bearer token: the sidecar-control gate must refuse.
     let request = Request::builder()
         .method("GET")
         .uri("/metrics")
@@ -708,7 +706,7 @@ async fn submit_approval_creates_pending_record_signed_by_sidecar() {
         "ttl_seconds": 300,
         "triggered_by": ["shell.requires_approval"],
     });
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/approvals/submit")
@@ -762,7 +760,7 @@ async fn operator_respond_resolves_pending_via_sidecar_signature() {
         "requested_by": subject.public_key().to_hex(),
         "ttl_seconds": 300,
     });
-    let submit_request = with_loopback_peer(
+    let submit_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/approvals/submit")
@@ -791,7 +789,7 @@ async fn operator_respond_resolves_pending_via_sidecar_signature() {
         "outcome": "approved",
         "reason": "ok via slash command",
     });
-    let respond_request = with_loopback_peer(
+    let respond_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri(format!("/approvals/{approval_id}/operator-respond"))
@@ -838,7 +836,7 @@ async fn submit_then_operator_respond_works_without_subject_pubkey() {
         "requested_by": "",
         "ttl_seconds": 300,
     });
-    let submit_request = with_loopback_peer(
+    let submit_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/approvals/submit")
@@ -874,7 +872,7 @@ async fn submit_then_operator_respond_works_without_subject_pubkey() {
     );
 
     let respond_payload = serde_json::json!({"outcome": "approved"});
-    let respond_request = with_loopback_peer(
+    let respond_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri(format!("/approvals/{approval_id}/operator-respond"))
@@ -895,7 +893,7 @@ async fn submit_then_operator_respond_works_without_subject_pubkey() {
 async fn operator_respond_rejects_unknown_approval() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
     let payload = serde_json::json!({"outcome": "approved"});
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/approvals/ap-missing/operator-respond")
@@ -1405,7 +1403,7 @@ async fn sidecar_verify_does_not_authorize_self_signed_receipts() {
 #[tokio::test]
 async fn sidecar_mint_returns_canonical_capability_tokens() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
@@ -1447,7 +1445,7 @@ async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
     }))
     .test_unwrap();
 
-    let first_request = with_loopback_peer(
+    let first_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
@@ -1455,7 +1453,7 @@ async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
             .body(Body::from(request_body.clone()))
             .test_unwrap(),
     );
-    let second_request = with_loopback_peer(
+    let second_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
@@ -1488,7 +1486,7 @@ async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
 async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
 
-    let search_request = with_loopback_peer(
+    let search_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
@@ -1503,7 +1501,7 @@ async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
             ))
             .test_unwrap(),
     );
-    let fetch_request = with_loopback_peer(
+    let fetch_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/mint")
@@ -1542,7 +1540,7 @@ async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
 #[tokio::test]
 async fn sidecar_submit_receipt_accepts_controller_job_receipts() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/receipts")
@@ -1608,7 +1606,7 @@ async fn sidecar_release_persists_revocation_and_blocks_reuse() {
         Some(&receipt_db),
     );
 
-    let release_request = with_loopback_peer(
+    let release_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/release")
@@ -1687,7 +1685,7 @@ async fn sidecar_release_reaches_a_replica_booted_before_the_revocation() {
         "http://127.0.0.1:1".to_string(),
         Some(&receipt_db),
     );
-    let release_request = with_loopback_peer(
+    let release_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/release")
@@ -1934,7 +1932,7 @@ async fn sidecar_release_revokes_in_process_without_a_receipt_store() {
         "ephemeral serving mode has no durable receipt store"
     );
 
-    let release_request = with_loopback_peer(
+    let release_request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/capabilities/release")
@@ -1981,7 +1979,7 @@ async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
         "http://127.0.0.1:1".to_string(),
         Some(&receipt_db),
     );
-    let request = with_loopback_peer(
+    let request = with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri("/v1/receipts")
@@ -2123,7 +2121,7 @@ async fn sidecar_control_endpoints_reject_non_loopback_callers() {
     assert_eq!(json["error"], "chio_control_forbidden");
     assert_eq!(
         json["message"],
-        "sidecar control endpoints require a loopback caller"
+        "sidecar control endpoints require a configured control token and valid bearer credentials"
     );
 }
 
@@ -2264,7 +2262,7 @@ async fn sidecar_control_endpoints_require_bearer_auth_for_loopback_when_configu
     assert_eq!(json["error"], "chio_control_forbidden");
     assert_eq!(
         json["message"],
-        "sidecar control endpoints require a loopback caller or valid bearer token"
+        "sidecar control endpoints require a configured control token and valid bearer credentials"
     );
 }
 
@@ -2449,7 +2447,7 @@ async fn persisted_receipts_are_visible_across_proxy_and_sidecar_flows() {
 // -------------------------------------------------------------
 
 fn loopback_post(uri: &str, body: serde_json::Value) -> Request<Body> {
-    with_loopback_peer(
+    with_authenticated_control_peer(
         Request::builder()
             .method("POST")
             .uri(uri)

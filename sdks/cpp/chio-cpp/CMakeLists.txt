@@ -23,17 +23,34 @@ if(NOT EXISTS "${CHIO_CPP_REPO_ROOT}/Cargo.toml")
 endif()
 set(CHIO_CPP_FFI_INCLUDE_DIR "${CHIO_CPP_REPO_ROOT}/crates/sdk/chio-bindings-ffi/include")
 
+set(CHIO_CPP_DEFAULT_CARGO_TARGET_DIR "${CHIO_CPP_REPO_ROOT}/target")
+if(DEFINED ENV{CARGO_TARGET_DIR} AND NOT "$ENV{CARGO_TARGET_DIR}" STREQUAL "")
+  get_filename_component(CHIO_CPP_DEFAULT_CARGO_TARGET_DIR "$ENV{CARGO_TARGET_DIR}"
+    ABSOLUTE BASE_DIR "${CHIO_CPP_REPO_ROOT}")
+endif()
+if(NOT DEFINED CHIO_CPP_CARGO_TARGET_DIR)
+  set(CHIO_CPP_CARGO_TARGET_DIR "${CHIO_CPP_DEFAULT_CARGO_TARGET_DIR}")
+endif()
+# Resolve before assigning PATH type: CMake otherwise makes an untyped -D
+# relative value absolute against the caller's working directory.
+get_filename_component(CHIO_CPP_RESOLVED_CARGO_TARGET_DIR "${CHIO_CPP_CARGO_TARGET_DIR}"
+  ABSOLUTE BASE_DIR "${CHIO_CPP_REPO_ROOT}")
+set(CHIO_CPP_CARGO_TARGET_DIR "${CHIO_CPP_RESOLVED_CARGO_TARGET_DIR}" CACHE PATH
+  "Cargo target directory used by both the Rust build and imported FFI library"
+  FORCE
+)
+
 set(CHIO_CPP_RUST_DEBUG_LIB
-  "${CHIO_CPP_REPO_ROOT}/target/debug/${CMAKE_STATIC_LIBRARY_PREFIX}chio_bindings_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
+  "${CHIO_CPP_CARGO_TARGET_DIR}/debug/${CMAKE_STATIC_LIBRARY_PREFIX}chio_bindings_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
 )
 set(CHIO_CPP_RUST_RELEASE_LIB
-  "${CHIO_CPP_REPO_ROOT}/target/release/${CMAKE_STATIC_LIBRARY_PREFIX}chio_bindings_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
+  "${CHIO_CPP_CARGO_TARGET_DIR}/release/${CMAKE_STATIC_LIBRARY_PREFIX}chio_bindings_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
 )
 
 if(CMAKE_CONFIGURATION_TYPES)
   set(CHIO_CPP_RUST_BUILD_COMMAND
-    COMMAND cargo build -p chio-bindings-ffi
-    COMMAND cargo build -p chio-bindings-ffi --release
+    COMMAND ${CMAKE_COMMAND} -E env "CARGO_TARGET_DIR=${CHIO_CPP_CARGO_TARGET_DIR}" cargo build -p chio-bindings-ffi
+    COMMAND ${CMAKE_COMMAND} -E env "CARGO_TARGET_DIR=${CHIO_CPP_CARGO_TARGET_DIR}" cargo build -p chio-bindings-ffi --release
   )
   set(CHIO_CPP_RUST_LIB
     "$<$<CONFIG:Debug>:${CHIO_CPP_RUST_DEBUG_LIB}>$<$<NOT:$<CONFIG:Debug>>:${CHIO_CPP_RUST_RELEASE_LIB}>"
@@ -53,11 +70,11 @@ else()
   set(CHIO_CPP_RUST_BYPRODUCTS "${CHIO_CPP_RUST_LIB}")
   if(CHIO_CPP_RUST_PROFILE_ARG)
     set(CHIO_CPP_RUST_BUILD_COMMAND
-      COMMAND cargo build -p chio-bindings-ffi ${CHIO_CPP_RUST_PROFILE_ARG}
+      COMMAND ${CMAKE_COMMAND} -E env "CARGO_TARGET_DIR=${CHIO_CPP_CARGO_TARGET_DIR}" cargo build -p chio-bindings-ffi ${CHIO_CPP_RUST_PROFILE_ARG}
     )
   else()
     set(CHIO_CPP_RUST_BUILD_COMMAND
-      COMMAND cargo build -p chio-bindings-ffi
+      COMMAND ${CMAKE_COMMAND} -E env "CARGO_TARGET_DIR=${CHIO_CPP_CARGO_TARGET_DIR}" cargo build -p chio-bindings-ffi
     )
   endif()
 endif()
@@ -133,6 +150,13 @@ if(CHIO_CPP_BUILD_TESTS)
   target_link_libraries(chio_cpp_tests PRIVATE chio_cpp)
   target_compile_definitions(chio_cpp_tests PRIVATE CHIO_CPP_REPO_ROOT="${CHIO_CPP_REPO_ROOT}")
   add_test(NAME chio_cpp_tests COMMAND chio_cpp_tests)
+  add_test(NAME chio_cpp_cmake_target_dir
+    COMMAND ${CMAKE_COMMAND}
+      "-DCHIO_CPP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+      "-DCHIO_CPP_REPO_ROOT=${CHIO_CPP_REPO_ROOT}"
+      "-DCHIO_CPP_TEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/target-dir-tests"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake_target_dir.cmake"
+  )
 endif()
 
 if(CHIO_CPP_BUILD_EXAMPLES)

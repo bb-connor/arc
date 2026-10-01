@@ -96,7 +96,6 @@ pub enum RunnerError {
 /// Not `Clone`: it holds the tenant at-rest [`TenantKey`], which is
 /// zeroize-on-drop and deliberately non-cloneable to keep key custody to a
 /// single owner.
-#[derive(Debug)]
 pub struct RunnerConfig {
     /// Stable per-deployment tee identifier (frame `tee_id`).
     pub tee_id: String,
@@ -108,6 +107,19 @@ pub struct RunnerConfig {
     pub redact_classes: RedactClass,
     /// Whether the `--paranoid` zero-match heuristic is armed.
     pub paranoid: bool,
+}
+
+impl std::fmt::Debug for RunnerConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RunnerConfig")
+            .field("tee_id", &self.tee_id)
+            .field("tenant_id", &self.tenant_id)
+            .field("tenant_key", &"[REDACTED]")
+            .field("redact_classes", &self.redact_classes)
+            .field("paranoid", &self.paranoid)
+            .finish()
+    }
 }
 
 impl RunnerConfig {

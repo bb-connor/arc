@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/tripwire-observation-receipt-body-v1.schema.json",
+  "title": "Chio tripwire observation receipt body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "header",
+    "policy",
+    "request_id",
+    "request_hash",
+    "event_id",
+    "tripwire_kind",
+    "artifact_id_hash",
+    "artifact_version_hash",
+    "observation_hash",
+    "severity"
+  ],
+  "properties": {
+    "header": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/header" },
+    "policy": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/policy" },
+    "request_id": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/identifier" },
+    "request_hash": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/digest" },
+    "event_id": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/identifier" },
+    "tripwire_kind": {
+      "enum": [
+        "canary_capability",
+        "honey_tool",
+        "credential_artifact",
+        "file_marker",
+        "browser_cookie",
+        "internal_hostname",
+        "signed_watermark"
+      ]
+    },
+    "artifact_id_hash": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/digest" },
+    "artifact_version_hash": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/digest" },
+    "observation_hash": { "$ref": "flow-denial-receipt-body-v1.schema.json#/$defs/digest" },
+    "severity": { "enum": ["informational", "low", "medium", "high", "critical"] }
+  }
+}

@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json",
+  "title": "Chio signed MCP cage launch policy v2",
+  "description": "Canonical signed operator policy for a migration-enforced MCP stdio cage launch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["body", "signer_public_key", "signature"],
+  "properties": {
+    "body": { "$ref": "#/$defs/policyBody" },
+    "signer_public_key": { "$ref": "#/$defs/publicKey" },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "policyBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "signed_manifest",
+        "registered_public_key",
+        "operator_ceilings",
+        "runtime",
+        "limits",
+        "receipt",
+        "enterprise_migration"
+      ],
+      "properties": {
+        "schema": { "const": "chio.mcp.cage-launch-policy.v2" },
+        "signed_manifest": { "$ref": "signed-tool-manifest-v2.schema.json" },
+        "registered_public_key": { "$ref": "#/$defs/publicKey" },
+        "operator_ceilings": { "$ref": "#/$defs/operatorCeilings" },
+        "runtime": { "$ref": "#/$defs/runtime" },
+        "limits": { "$ref": "#/$defs/limits" },
+        "receipt": { "$ref": "#/$defs/receiptRuntime" },
+        "enterprise_migration": { "$ref": "#/$defs/enterpriseMigration" },
+        "broker": { "$ref": "#/$defs/brokerBinding" }
+      }
+    },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicKey": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    },
+    "absoluteCanonicalPath": {
+      "type": "string",
+      "minLength": 2,
+      "pattern": "^/(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\/$)[^\\u0000-\\u001F\\u007F-\\u009F]+$"
+    },
+    "environmentVariable": {
+      "type": "string",
+      "pattern": "^(?!(?:[lL][dD]_|[dD][yY][lL][dD]_|[bB][aA][sS][hH]_[fF][uU][nN][cC]_|[mM][aA][lL][lL][oO][cC]_))(?!(?:[bB][aA][sS][hH]_[eE][nN][vV]|[dD][oO][cC][kK][eE][rR]_[cC][oO][nN][fF][iI][gG]|[eE][nN][vV]|[gG][cC][oO][nN][vV]_[pP][aA][tT][hH]|[gG][eE][mM]_[hH][oO][mM][eE]|[gG][eE][mM]_[pP][aA][tT][hH]|[gG][iI][tT]_[aA][sS][kK][pP][aA][sS][sS]|[gG][lL][iI][bB][cC]_[tT][uU][nN][aA][bB][lL][eE][sS]|[gG][pP][gG]_[aA][gG][eE][nN][tT]_[iI][nN][fF][oO]|[iI][fF][sS]|[jJ][aA][vV][aA]_[tT][oO][oO][lL]_[oO][pP][tT][iI][oO][nN][sS]|[jJ][dD][kK]_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS]|[kK][rR][bB]5[cC][cC][nN][aA][mM][eE]|[lL][oO][cC][pP][aA][tT][hH]|[nN][eE][tT][rR][cC]|[nN][lL][sS][pP][aA][tT][hH]|[nN][oO][dD][eE]_[oO][pP][tT][iI][oO][nN][sS]|[nN][oO][dD][eE]_[pP][aA][tT][hH]|[nN][pP][mM]_[cC][oO][nN][fF][iI][gG]_[uU][sS][eE][rR][cC][oO][nN][fF][iI][gG]|[pP][eE][rR][lL]5[oO][pP][tT]|[pP][eE][rR][lL]5[lL][iI][bB]|[pP][yY][tT][hH][oO][nN][hH][oO][mM][eE]|[pP][yY][tT][hH][oO][nN][iI][nN][sS][pP][eE][cC][tT]|[pP][yY][tT][hH][oO][nN][pP][aA][tT][hH]|[pP][yY][tT][hH][oO][nN][sS][tT][aA][rR][tT][uU][pP]|[rR][uU][bB][yY][lL][iI][bB]|[rR][uU][bB][yY][oO][pP][tT]|[rR][uU][sS][tT][cC]_[wW][rR][aA][pP][pP][eE][rR]|[sS][sS][lL][kK][eE][yY][lL][oO][gG][fF][iI][lL][eE]|[sS][sS][lL]_[cC][eE][rR][tT]_[dD][iI][rR]|[sS][sS][lL]_[cC][eE][rR][tT]_[fF][iI][lL][eE]|[sS][sS][hH]_[aA][uU][tT][hH]_[sS][oO][cC][kK]|[sS][uU][dD][oO]_[aA][sS][kK][pP][aA][sS][sS]|[zZ][dD][oO][tT][dD][iI][rR]|_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS])$)(?!.*(?:[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[aA][pP][iI]_[kK][eE][yY]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY]|[aA][cC][cC][eE][sS][sS]_[kK][eE][yY]|[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]))[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "operatorCeilings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "read_paths",
+        "write_paths",
+        "network_destinations",
+        "environment_variables",
+        "native_syscall_profiles",
+        "forbidden_paths"
+      ],
+      "properties": {
+        "read_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/absoluteCanonicalPath" }
+        },
+        "write_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/absoluteCanonicalPath" }
+        },
+        "network_destinations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "tool-manifest-v2.schema.json#/$defs/networkDestination" }
+        },
+        "environment_variables": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/environmentVariable" }
+        },
+        "native_syscall_profiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["native_minimal_v1", "native_standard_v1", "brokered_native_v1"]
+          }
+        },
+        "forbidden_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/absoluteCanonicalPath" }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cage_init_path",
+        "cage_init_binding_digest",
+        "target_path",
+        "target_binding_digest",
+        "working_directory",
+        "runtime_files",
+        "target_argv",
+        "execution_identity"
+      ],
+      "properties": {
+        "cage_init_path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+        "cage_init_binding_digest": { "$ref": "#/$defs/digest" },
+        "target_path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+        "target_binding_digest": { "$ref": "#/$defs/digest" },
+        "working_directory": { "$ref": "#/$defs/absoluteCanonicalPath" },
+        "runtime_files": {
+          "type": "array",
+          "maxItems": 48,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/absoluteCanonicalPath" }
+        },
+        "target_argv": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "prefixItems": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384,
+              "pattern": "^[^\\u0000]*$"
+            }
+          ],
+          "items": {
+            "type": "string",
+            "maxLength": 16384,
+            "pattern": "^[^\\u0000]*$"
+          }
+        },
+        "execution_identity": {
+          "$ref": "cage-init-plan-v2.schema.json#/$defs/executionIdentity"
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_artifact_bytes", "launch_timeout_ms", "nofile_soft", "nofile_hard"],
+      "properties": {
+        "max_artifact_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        },
+        "launch_timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        },
+        "nofile_soft": { "const": 192 },
+        "nofile_hard": { "const": 192 }
+      }
+    },
+    "receiptRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "database_path",
+        "signer_seed_path",
+        "trusted_signer_public_key",
+        "capability_id"
+      ],
+      "properties": {
+        "database_path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+        "signer_seed_path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+        "trusted_signer_public_key": { "$ref": "#/$defs/publicKey" },
+        "capability_id": { "$ref": "#/$defs/identifier" },
+        "tenant_id": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "migrationKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deployment_id", "scope_kind", "scope_id", "control"],
+      "properties": {
+        "deployment_id": { "$ref": "#/$defs/identifier" },
+        "scope_kind": { "const": "tool_server" },
+        "scope_id": { "$ref": "#/$defs/identifier" },
+        "control": { "const": "cage_enforcement" }
+      }
+    },
+    "nonzeroDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "not": {
+        "const": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      }
+    },
+    "minimumHead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "minimum_generation", "transition_digest"],
+      "properties": {
+        "key": { "$ref": "#/$defs/migrationKey" },
+        "minimum_generation": { "enum": [0, 1, 2, 3] },
+        "transition_digest": { "$ref": "#/$defs/nonzeroDigest32" }
+      }
+    },
+    "enterpriseMigration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_database_path",
+        "deployment_id",
+        "stage",
+        "trusted_transition_signers",
+        "minimum_head"
+      ],
+      "properties": {
+        "state_database_path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+        "deployment_id": { "$ref": "#/$defs/identifier" },
+        "stage": { "enum": ["disabled", "shadow", "enforced", "legacy_removed"] },
+        "trusted_transition_signers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/publicKey" }
+        },
+        "minimum_head": { "$ref": "#/$defs/minimumHead" }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "stage": { "const": "disabled" } } },
+          "then": {
+            "type": "object",
+            "properties": {
+              "minimum_head": {
+                "type": "object",
+                "properties": { "minimum_generation": { "const": 0 } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "type": "object", "properties": { "stage": { "const": "shadow" } } },
+          "then": {
+            "type": "object",
+            "properties": {
+              "minimum_head": {
+                "type": "object",
+                "properties": { "minimum_generation": { "const": 1 } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "type": "object", "properties": { "stage": { "const": "enforced" } } },
+          "then": {
+            "type": "object",
+            "properties": {
+              "minimum_head": {
+                "type": "object",
+                "properties": { "minimum_generation": { "const": 2 } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "type": "object", "properties": { "stage": { "const": "legacy_removed" } } },
+          "then": {
+            "type": "object",
+            "properties": {
+              "minimum_head": {
+                "type": "object",
+                "properties": { "minimum_generation": { "const": 3 } }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "brokerPeerIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "uid", "gid"],
+      "properties": {
+        "pid": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "uid": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "gid": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    },
+    "brokerBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authentication_digest", "expected_peer_identity"],
+      "oneOf": [
+        { "type": "object", "required": ["inherited_fd"], "not": { "type": "object", "required": ["socket_path"] } },
+        { "type": "object", "required": ["socket_path"], "not": { "type": "object", "required": ["inherited_fd"] } }
+      ],
+      "properties": {
+        "inherited_fd": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 2147483647
+        },
+        "socket_path": { "$ref": "#/$defs/absoluteCanonicalPath" },
+        "authentication_digest": { "$ref": "#/$defs/digest" },
+        "expected_peer_identity": { "$ref": "#/$defs/brokerPeerIdentity" }
+      }
+    }
+  }
+}

@@ -48,6 +48,9 @@ WORKDIR /workspace
 # separate top-level `COPY proto` needed.
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+# Vendored workspace members such as the sigstore verifier live outside
+# `crates/`; the locked build resolves their path dependencies from here.
+COPY third_party ./third_party
 COPY contracts ./contracts
 COPY spec ./spec
 COPY fixtures ./fixtures

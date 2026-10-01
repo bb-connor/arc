@@ -12,6 +12,7 @@ use crate::crypto::{
 use crate::error::{Error, Result};
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
+    sign_bytes_for_embedded_key,
 };
 
 use super::attenuation::{
@@ -135,10 +136,15 @@ impl AggregateBudgetRootBinding {
             "aggregate budget root binding",
             "root_issuer",
         )?;
-        let signature = backend.sign_bytes(&domain_message(ROOT_SIGNATURE_DOMAIN, &body)?)?;
+        let signature = sign_bytes_for_embedded_key(
+            &body.root_issuer,
+            backend,
+            &domain_message(ROOT_SIGNATURE_DOMAIN, &body)?,
+        )?;
+        let algorithm = body.root_issuer.algorithm();
         Ok(Self {
             body,
-            algorithm: Some(backend.algorithm()),
+            algorithm: Some(algorithm),
             signature,
         })
     }

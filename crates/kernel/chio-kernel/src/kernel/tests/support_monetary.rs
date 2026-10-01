@@ -1289,6 +1289,7 @@ fn make_dpop_proof(
         .expect("time error")
         .as_secs();
     let body = dpop::DpopProofBody {
+        replay_authority: None,
         schema: dpop::DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: server.to_string(),

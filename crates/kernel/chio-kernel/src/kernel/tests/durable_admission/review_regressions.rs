@@ -25,9 +25,7 @@ impl Guard for ToggleExactOutputGuard {
                 "durable output is no longer live".to_owned(),
             ));
         }
-        if output
-            != &ToolServerOutput::Value(serde_json::json!({"replacement": "filtered"}))
-        {
+        if output != &ToolServerOutput::Value(serde_json::json!({"replacement": "filtered"})) {
             return Err(KernelError::GuardDenied(
                 "durable output validation ran before the frozen transform".to_owned(),
             ));
@@ -92,6 +90,171 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
         AdmissionOperationState::OutcomeUnknownAfterDispatch
     );
     assert!(!kernel.receipt_log().receipts().is_empty());
+    let retained = store.operation();
+    for time in [0, (1_u64 << 53)] {
+        assert!(
+            crate::admission_operation::AdmissionReceiptMetadataV1::retained_unknown_dispatch(
+                &retained, time
+            )
+            .is_err(),
+            "unsafe observation time accepted: {time}"
+        );
+    }
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("signed replay refusal");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.receipt.verify_signature().expect("signature"));
+    let metadata = &response.receipt.metadata.as_ref().expect("metadata")["admission_operation"];
+    let schema: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../spec/schemas/chio-wire/v1/receipt/admission-metadata.schema.json"
+    )))
+    .expect("registered schema");
+    jsonschema::validator_for(&schema)
+        .expect("schema compiles")
+        .validate(metadata)
+        .expect("signed projection validates against registered schema");
+    assert_eq!(
+        metadata["projected_state"],
+        "outcome_unknown_after_dispatch"
+    );
+    assert_eq!(metadata["projected_operation_version"], retained.version());
+    assert_eq!(
+        metadata["operation_id"],
+        retained.binding().operation_id().as_str()
+    );
+    assert_eq!(
+        store.operation(),
+        retained,
+        "a replay refusal must retain uncertainty unchanged"
+    );
+}
+
+#[test]
+fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
+    use crate::admission_operation::{AdmissionDigest, DurableAdmissionMode};
+    struct UnknownRead {
+        inner: DurableUrlElicitationServer,
+        calls: std::sync::Arc<AtomicU64>,
+    }
+    #[async_trait::async_trait]
+    impl ToolServerConnection for UnknownRead {
+        fn server_id(&self) -> &str {
+            "durable-server"
+        }
+        fn tool_names(&self) -> Vec<String> {
+            vec!["mutate".into()]
+        }
+        fn tool_is_read_only(&self, _: &str) -> bool {
+            true
+        }
+        async fn invoke(
+            &self,
+            tool: &str,
+            arguments: serde_json::Value,
+            bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<serde_json::Value, KernelError> {
+            self.inner.invoke(tool, arguments, bridge).await
+        }
+        async fn invoke_stream(
+            &self,
+            tool: &str,
+            arguments: serde_json::Value,
+            bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.inner.invoke_stream(tool, arguments, bridge).await
+        }
+    }
+    for selected in [false, true] {
+        let (mut kernel, mut request, store, calls) = if selected {
+            super::dpop_acquisition::selected_profile_fixture()
+        } else {
+            durable_admission_fixture("unknown-configured-unselected-dpop")
+        };
+        kernel
+            .configure_durable_admission(DurableAdmissionMode::All, false)
+            .expect("all operations");
+        request.capability.scope.grants[0].max_invocations = None;
+        request.capability.signature = kernel
+            .config
+            .keypair
+            .sign_canonical(&request.capability.signing_body())
+            .expect("sign request")
+            .0;
+        kernel.register_tool_server(Box::new(UnknownRead {
+            inner: DurableUrlElicitationServer {
+                store: store.clone(),
+            },
+            calls: calls.clone(),
+        }));
+        if !selected {
+            kernel.dpop_authority = Some(
+                crate::dpop::authority::DpopReplayAuthorityV1::new(
+                    crate::dpop::authority::DpopReplayAuthorityInputV1 {
+                        destination_store_uuid: AdmissionIdentifier::try_new(
+                            "store",
+                            "11111111-1111-4111-8111-111111111111",
+                        )
+                        .expect("store"),
+                        dpop_authority_id: AdmissionIdentifier::try_new(
+                            "authority",
+                            "dpop-original",
+                        )
+                        .expect("authority"),
+                        expectation_id: AdmissionDigest::try_new("generation", "a".repeat(64))
+                            .expect("generation"),
+                        proof_ttl_secs: 60,
+                        max_clock_skew_secs: 5,
+                    },
+                )
+                .expect("profile"),
+            );
+        }
+        assert!(!kernel.can_redispatch_unknown_read(&request));
+        assert!(matches!(
+            kernel.evaluate_tool_call_blocking(&request),
+            Err(KernelError::UrlElicitationsRequired { .. })
+        ));
+        let retained = store.operation();
+        assert_eq!(
+            retained.state(),
+            AdmissionOperationState::OutcomeUnknownAfterDispatch
+        );
+        let claim = store.state.lock().expect("state").claim.clone();
+        assert_eq!(retained.dpop_replay_ledger_digest().is_some(), selected);
+        assert_eq!(
+            store
+                .state
+                .lock()
+                .expect("state")
+                .retained_request
+                .is_some(),
+            selected
+        );
+        kernel.dpop_authority = None;
+        assert_eq!(kernel.can_redispatch_unknown_read(&request), !selected);
+        let refusal = kernel
+            .evaluate_tool_call_blocking(&request)
+            .expect("signed refusal");
+        assert_eq!(refusal.verdict, Verdict::Deny);
+        assert!(refusal.receipt.verify_signature().expect("signature"));
+        assert_eq!(
+            refusal
+                .receipt
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.get("admission_operation"))
+                .is_none(),
+            selected,
+            "{:?}",
+            refusal.reason
+        );
+        assert_eq!(store.operation(), retained);
+        assert_eq!(store.state.lock().expect("state").claim, claim);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
 }
 
 #[test]
@@ -116,10 +279,10 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         .expect("qualified finding pool ledger");
 
     let error = kernel.evaluate_tool_call_blocking(&request);
-    assert!(matches!(
-        error,
-        Err(KernelError::UrlElicitationsRequired { .. })
-    ), "unexpected durable URL elicitation result: {error:?}");
+    assert!(
+        matches!(error, Err(KernelError::UrlElicitationsRequired { .. })),
+        "unexpected durable URL elicitation result: {error:?}"
+    );
     let terminal = store.operation();
     assert_eq!(
         terminal.state(),
@@ -226,11 +389,7 @@ fn configured_pool_ledger_freezes_the_durable_admission_runtime() {
         .expect("qualified finding pool ledger");
 
     assert_eq!(
-        kernel.set_durable_admission_store(
-            store.clone(),
-            store,
-            admission_test_fence(),
-        ),
+        kernel.set_durable_admission_store(store.clone(), store, admission_test_fence(),),
         Err(AdmissionOperationError::FindingPoolLedgerAlreadyConfigured)
     );
 }
@@ -258,11 +417,7 @@ fn pool_ledger_allows_the_initial_durable_admission_runtime() {
         .set_durable_admission_store(store.clone(), store.clone(), fence)
         .expect("initial durable runtime after the pool ledger");
     assert_eq!(
-        kernel.set_durable_admission_store(
-            store.clone(),
-            store,
-            admission_test_fence(),
-        ),
+        kernel.set_durable_admission_store(store.clone(), store, admission_test_fence(),),
         Err(AdmissionOperationError::FindingPoolLedgerAlreadyConfigured)
     );
 }
@@ -513,8 +668,8 @@ fn an_unrelated_cumulative_grant_does_not_withdraw_an_exempt_admission() {
 
     // The tools whose own matching grant carries the constraint still demand the
     // durable path, on both the coverage and the store gate.
-    let uncovered = admission_is_exempt("audit")
-        .expect_err("cumulative read-only tool must not stay exempt");
+    let uncovered =
+        admission_is_exempt("audit").expect_err("cumulative read-only tool must not stay exempt");
     assert!(
         uncovered
             .to_string()

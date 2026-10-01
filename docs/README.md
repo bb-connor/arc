@@ -7,7 +7,7 @@ everything in this tree is supporting material organized by audience.
 ## Start here
 
 - [Progressive Tutorial](start-here/PROGRESSIVE_TUTORIAL.md) - walk through Chio from scratch
-- [Native Adoption Guide](start-here/NATIVE_ADOPTION_GUIDE.md) - how to adopt Chio in a production service
+- [Native Adoption Guide](start-here/NATIVE_ADOPTION_GUIDE.md) - choose a native integration; process starters and coding sessions are experimental source-built Linux development profiles
 - [Vision](start-here/VISION.md) - what Chio is for and why
 - [Proof Room Quickstart](start-here/PROOF_ROOM_QUICKSTART.md) - run the checked-in Proof Room fixture bundle locally or via Docker
 - [Historical v2 Migration Draft](start-here/MIGRATION_GUIDE_V2.md) - archived internal draft notes, not current protocol guidance
@@ -102,6 +102,11 @@ The primary live release documents. Auditors and operators start here.
 
 - Canonical spec: [spec/PROTOCOL.md](../spec/PROTOCOL.md)
 - [Architecture notes](architecture/) - [Final Architecture](architecture/CHIO_FINAL_ARCHITECTURE.md), [Runtime Boundaries](architecture/CHIO_RUNTIME_BOUNDARIES.md), [Workspace Structure](architecture/WORKSPACE_STRUCTURE.md)
+- [Agent process direction](architecture/AGENT_PROCESS_DIRECTION.md) - experimental durable process runtime, executable recovery evidence, and the remaining worker, SDK and adoption work
+- [Python and Node process starter](../examples/process-starter/README.md) - build an offline native application kit and qualify installed SDKs outside the checkout
+- [Repository coding session](../sdks/python/chio-mini-swe/SESSION.md) - run mini-SWE-agent against selected committed paths, recover recorded work and export a patch with verified receipts
+- [AI SDK process tools](../sdks/typescript/packages/ai-sdk-process/README.md) - run AI SDK 6 and 7 tools through the native kernel with saved operation identities and recovery evidence
+- [Research swarm benchmark](../sdks/typescript/packages/ai-sdk-process/BENCHMARK.md) - the same AI SDK swarm under induced failures with native processes and with local callbacks, with duplicate effects, attempts, wall time and per-call kernel cost
 - [Architecture Decision Records](adr/README.md) - numbered ADRs (ADR-0001 through ADR-0020)
 - [Reliability program](architecture/reliability/README.md) - RFC and PLAN series for the fail-closed reliability, durability, and control-plane replication-soundness work (hot-path deadlines, post-admission unwind, dispatch-intent journal, storage hot path, observability wiring, and replication quorum)
 - [Transparency program](architecture/transparency/README.md) - the ordered plan for closing the `spec/PROTOCOL.md` section 6.5 append-only gate (real Merkle consistency proofs, claim and child-receipt completeness, declared verifier policy, witness cosigning)
@@ -114,7 +119,13 @@ The primary live release documents. Auditors and operators start here.
 
 ## Security
 
+- [Security launch ledger](security/launch-plan.md) - integrated roadmap, qualification results, remaining implementation and pilot gates
+- [Threshold approval collection](security/threshold-approval-collection.md) - trusted request context, retained-record migration and delivery retry contract
+- [Session report receipts](security/session-report-receipts.md) - kernel-owned failure observations, persisted conflict denials and execution-authority separation
+- [Cryptographic wire decoding](security/crypto-wire-decoding.md) - finite hybrid grammar, decode allocation bounds and verification boundaries
 - [Threat coverage](security/threat-coverage.md) - mapped threats and mitigations
+- [Active defense rollout](security/active-defense-rollout.md) - shadow evidence, staged promotion, and fail-closed rollback contract
+- [Committed Linux evidence](security/committed-linux-evidence.md) - trusted capture, publication, revocation, and merge-authority contract
 - [Expected identity migration](security/expected-identity-migration.md) - migrating expected-identity assertions
 - [Public witness semantics](security/public-witness-semantics.md)
 - [Corpus minimization](security/corpus-minimization.md)

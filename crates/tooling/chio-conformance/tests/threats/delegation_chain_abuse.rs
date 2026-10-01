@@ -12,23 +12,28 @@
 // the chained issuer-trust, signature, and time-window checks.
 //
 // Production call sites:
-//   `crates/chio-kernel-core/src/capability_verify.rs:148`
+//   `crates/kernel/chio-kernel-core/src/capability_verify.rs`
 //     (`verify_capability_with_floor`).
-//   `crates/chio-kernel-core/src/capability_verify.rs:275`
+//   `crates/kernel/chio-kernel-core/src/capability_verify.rs`
 //     (`verify_capability_with_trusted_and_floor`).
-//   `crates/chio-kernel-core/src/budget_split.rs:225`
-//     (`InMemoryBudgetRegistry::try_admit_child`).
+//   `crates/kernel/chio-kernel-core/src/budget_split.rs`
+//     (`InMemoryBudgetRegistry::verify_child_admission`).
 //
 // Revert-to-prove-it-fails recipes:
-//   (a) swallow the `?` on `try_admit_child` inside
-//       `verify_capability_with_floor` in
-//       `crates/chio-kernel-core/src/capability_verify.rs` (so the
+//   (a) swallow the `?` on `verify_child_admission` inside
+//       `admit_delegated_budget` in
+//       `crates/kernel/chio-kernel-core/src/capability_verify.rs` (so the
 //       sibling-sum / unknown-parent deny branches no longer
 //       propagate). The sibling-budget / unknown-parent deny-arm
 //       assertions below fail.
 //   (b) delete the trusted-issuer guard inside
 //       `verify_capability_with_trusted_and_floor`. The
 //       untrusted-issuer deny-arm assertion below fails.
+//
+// Targeted mutation recipe: replace `admit_delegated_budget` with `Ok(())`.
+// The unknown-parent token then bypasses the verifier-owned registry, and its
+// deny-arm assertion MUST fail. The registered-parent positive control MUST
+// continue to pass and commit the child share.
 
 use chio_core::capability::{
     attenuation::{DelegationLink, DelegationLinkBody},
@@ -41,7 +46,9 @@ use chio_kernel_core::capability_verify::{
     verify_capability_with_floor, verify_capability_with_trusted_and_floor, CapabilityError,
 };
 use chio_kernel_core::clock::FixedClock;
-use chio_kernel_core::{BudgetSplitError, InMemoryBudgetRegistry};
+use chio_kernel_core::{
+    BudgetRegistry, BudgetSplitError, InMemoryBudgetRegistry, MAX_BUDGET_SHARE_BPS,
+};
 
 fn signed_root_cap(
     issuer: &Keypair,
@@ -153,6 +160,41 @@ fn threat_delegation_chain_abuse_unknown_parent_in_registry_rejected() {
         ),
         "expected BudgetSplitRejected::UnknownParent on missing parent, got {err:?}"
     );
+}
+
+#[test]
+fn threat_delegation_chain_abuse_registered_parent_round_trips() {
+    // covers: delegation_chain_abuse
+    //
+    // Positive control: the same delegated-token shape MUST verify when its
+    // parent exists with enough headroom. Verification commits the child share
+    // in VerifyOnly mode, proving the registry path is live rather than merely
+    // returning a preconfigured verdict.
+    let authority = Keypair::generate();
+    let subject = Keypair::generate();
+    let parent_id = "registered-parent";
+    let child_id = "registered-child";
+    let token = signed_delegated_cap(&authority, &subject, child_id, parent_id, 100, 200);
+    let clock = FixedClock::new(150);
+    let mut budgets = InMemoryBudgetRegistry::new();
+    if let Err(err) = budgets.register_parent(parent_id.to_string(), MAX_BUDGET_SHARE_BPS) {
+        panic!("registered-parent fixture must register: {err:?}");
+    }
+
+    if let Err(err) = verify_capability_with_floor(
+        &token,
+        &[authority.public_key()],
+        &clock,
+        CapabilityCryptoFloor::AllowClassical,
+        &mut budgets,
+    ) {
+        panic!("delegated token with a registered parent must verify: {err:?}");
+    }
+
+    let committed_share = budgets
+        .split(parent_id)
+        .and_then(|split| split.child_share_bps(child_id));
+    assert_eq!(committed_share, Some(MAX_BUDGET_SHARE_BPS));
 }
 
 #[test]

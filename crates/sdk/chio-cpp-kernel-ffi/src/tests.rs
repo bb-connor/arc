@@ -194,6 +194,34 @@ fn evaluate_rejects_unsupported_authorization_extensions() {
 }
 
 #[test]
+fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
+    let envelope: serde_json::Value = serde_json::from_str(&evaluate_envelope("echo")).unwrap();
+    let positive: serde_json::Value =
+        serde_json::from_str(&evaluate_json_str(&envelope.to_string()).unwrap()).unwrap();
+    assert_eq!(positive["verdict"], "allow");
+    for field in [
+        "approval_tokens",
+        "threshold_approval_proposal",
+        "governed_intent",
+        "approval_token",
+        "supplemental_authorization",
+    ] {
+        let mut changed = envelope.clone();
+        changed["request"][field] = if field == "approval_tokens" {
+            json!([{"artifact":"one"}, {"artifact":"two"}])
+        } else {
+            json!({"artifact":field})
+        };
+        let error = evaluate_json_str(&changed.to_string()).unwrap_err();
+        assert!(
+            matches!(error, KernelFfiError::InvalidCapability(message)
+            if message.contains("cannot authenticate governed approvals")),
+            "{field}"
+        );
+    }
+}
+
+#[test]
 fn evaluate_allows_delegated_token_with_parent_budget_snapshot() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -464,6 +492,20 @@ fn take_result_string(result: &ChioKernelFfiResult) -> String {
     // over UTF-8 bytes with exactly this pointer and length.
     let bytes = unsafe { std::slice::from_raw_parts(result.data.ptr, result.data.len) };
     String::from_utf8(bytes.to_vec()).unwrap()
+}
+
+#[test]
+fn returned_buffer_can_be_read_modified_and_freed() {
+    let mut value = String::with_capacity(64);
+    value.push_str("data");
+    let buffer = ChioKernelFfiBuffer::from_string(value);
+    assert_eq!(buffer.len, 4);
+    // SAFETY: this buffer owns four initialized bytes and has not been freed.
+    let bytes = unsafe { std::slice::from_raw_parts_mut(buffer.ptr, buffer.len) };
+    assert_eq!(bytes, b"data");
+    bytes[0] = b'D';
+    assert_eq!(bytes, b"Data");
+    chio_kernel_buffer_free(buffer);
 }
 
 #[test]

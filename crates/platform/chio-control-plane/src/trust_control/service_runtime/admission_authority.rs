@@ -1,3 +1,4 @@
+use axum::extract::{FromRequest, Request};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chio_kernel::admission_operation::{
     AdmissionBeginResult, AdmissionCommandResult, AdmissionOperationCommand,
@@ -25,12 +26,17 @@ use super::super::*;
 
 pub(crate) async fn handle_admission_authority(
     State(state): State<TrustServiceState>,
-    headers: HeaderMap,
-    Json(request): Json<AdmissionAuthorityRequest>,
+    request: Request,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    // Authenticate before buffering a potentially large admission snapshot.
+    if let Err(response) = validate_service_auth(request.headers(), &state.config.service_token) {
         return response;
     }
+    let Json(request) = match Json::<AdmissionAuthorityRequest>::from_request(request, &state).await
+    {
+        Ok(request) => request,
+        Err(rejection) => return rejection.into_response(),
+    };
     let response = handle_request(&state, request);
     Json(response).into_response()
 }
@@ -103,6 +109,22 @@ fn handle_action(
         AdmissionAuthorityAction::Status => encode(&AdmissionAuthorityStatusWire {
             fence: fence.clone(),
         }),
+        AdmissionAuthorityAction::LoadBudgetHold => {
+            let request: RetainedBudgetHoldRequest = decode(payload)?;
+            chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "hold_id",
+                request.hold_id.clone(),
+            )
+            .map_err(invalid_operation)?;
+            let hold = chio_kernel::BudgetStore::get_budget_hold(budget, &request.hold_id)
+                .map_err(|error| {
+                    wire_error(AdmissionAuthorityErrorCode::Unavailable, error.to_string())
+                })?
+                .map(RetainedBudgetHoldWire::from_core)
+                .transpose()
+                .map_err(invalid_request)?;
+            encode(&hold)
+        }
         AdmissionAuthorityAction::Begin => {
             let request: AdmissionBeginWire = decode(payload)?;
             let operation = AdmissionOperationV1::from_persisted(request.operation)

@@ -1,0 +1,9 @@
+schema = "chio.conformance.peers/v2"
+
+[[peer]]
+language = "fortran"
+url = "http://example.invalid/insecure.tar.gz"
+sha256 = "NOT-A-DIGEST"
+target = ""
+binary = "../escape"
+published = false

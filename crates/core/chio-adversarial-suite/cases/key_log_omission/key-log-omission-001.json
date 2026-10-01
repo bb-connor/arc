@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "key-log-omission-001",
+  "class": "key_log_omission",
+  "expected_verdict": "DENY",
+  "expected_reason": "key_log_omission_detected",
+  "threat_id": "kernel_impersonation",
+  "pending": false,
+  "artifact": {
+    "schema": "chio.adversarial-mutation-evidence.v1",
+    "controls": [
+      {
+        "id": "history_control",
+        "package": "chio-keyring",
+        "test_source": "crates/security/chio-keyring/tests/history.rs",
+        "target_kind": "test",
+        "target": "history",
+        "test_name": "history_rejects_omission_fork_chain_break_and_insufficient_witnesses"
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "key_log_omission",
+        "control_id": "history_control",
+        "package": "chio-keyring",
+        "source": "crates/security/chio-keyring/src/state.rs",
+        "function": "WitnessedActivationSet::verify_complete",
+        "minimum_caught": 1,
+        "mutant": {
+          "genre": "BinaryOperator",
+          "original": "!=",
+          "replacement": "==",
+          "occurrence": 1
+        },
+        "outcomes": {
+          "path": "audits/evidence/mutants/security/key_log_omission/mutants.out/outcomes.json",
+          "sha256": "7ff51f69ecfe9011e3cfa913ab901b06fb43514ba625ec8acebc81729b2a3b0e",
+          "inputs_sha256": "3f081dd5c94fe9ed7a5c9bf80490b3991af4e8fca2de85d02975d1d572eb3bd9"
+        }
+      }
+    ]
+  },
+  "notes": [
+    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+  ]
+}

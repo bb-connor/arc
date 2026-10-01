@@ -6,10 +6,11 @@ join-receipt, route-plan, budget, and revocation artifacts authorizes a
 specific child task before that task runs, and returns a report the caller can
 act on.
 
-`chio-runtime-core` calls it from the runtime admission path and
-`chio-proof-room` calls it from the public proof-verification path; both call
-the same function, so a request is authorized under one shared definition or
-rejected.
+`chio-runtime-core` uses live admission verification; `chio-proof-room` uses
+complete-artifact verification. Both entry points share the authority checks.
+Live fan-out does not need future join or terminal results. Fan-in still needs
+its actual signed join, and every supplied result is validated. Only the
+complete-artifact entry point requires all graph joins and a terminal receipt.
 
 ## Responsibilities
 
@@ -43,7 +44,11 @@ rejected.
 
 - `verify_swarm_authority_bundle(bundle: &SwarmAuthorityBundle,
   trusted_witness_issuer_keys: &[PublicKey]) -> Result<SwarmAuthorityVerifierReport,
-  SwarmAuthorityError>` - the single entry point.
+  SwarmAuthorityError>` - complete-artifact verification, including every graph
+  join and terminal evidence.
+- `verify_swarm_authority_for_admission` - the same signature, for live task
+  admission. The report includes join/terminal claims only when those artifacts
+  are present and valid. An admission report is not evidence of a completed run.
 - Bundle types: `SwarmAuthorityBundle`, `SwarmTaskGraph`, `SwarmGraphNode`,
   `SwarmGraphEdge`, `SwarmGraphJoin`, `SwarmContinuationToken`,
   `SwarmDelegationWitnessChain`, `SwarmDelegationWitnessHop`,
@@ -66,10 +71,10 @@ rejected.
 
 ```rust
 use chio_core_types::crypto::PublicKey;
-use chio_swarm_authority::{verify_swarm_authority_bundle, SwarmAuthorityBundle};
+use chio_swarm_authority::{verify_swarm_authority_for_admission, SwarmAuthorityBundle};
 
 fn admit(bundle: &SwarmAuthorityBundle, trusted_witness_issuer_keys: &[PublicKey]) -> bool {
-    verify_swarm_authority_bundle(bundle, trusted_witness_issuer_keys).is_ok()
+    verify_swarm_authority_for_admission(bundle, trusted_witness_issuer_keys).is_ok()
 }
 ```
 
@@ -86,7 +91,7 @@ to populate the slice.
 
 - `chio-core-types` - canonical JSON, Ed25519 signing/verification, and the
   attenuation-proof primitives witness hops are checked against.
-- `chio-runtime-core` - calls `verify_swarm_authority_bundle` from its
+- `chio-runtime-core` - calls `verify_swarm_authority_for_admission` from its
   admission hook before dispatching swarm child tasks.
 - `chio-proof-room` - calls `verify_swarm_authority_bundle` on the public
   proof-verification path.

@@ -34,8 +34,19 @@ for slug in "" -monotone -attenuation -freshness; do
 done
 managed_paths=(
   formal/proof-manifest.toml
+  formal/adapter-source-inventory.toml
   crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs
   crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs
+  crates/protocol/chio-mcp-edge/src/lib.rs
+  crates/protocol/chio-mcp-edge/src/proof_report_fixture/entry.rs
+  crates/protocol/chio-mcp-edge/src/proof_report_fixture/second.fragment
+  crates/protocol/chio-mcp-edge/src/proof_report_fixture/tests.rs
+  crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc
+  crates/core/chio-arena/src/proof_report_candidate.rs
+  examples/proof_report_candidate_added.rs
+  examples/hello-a2a/src/lib.rs
+  xtask/src/adapter_no_bypass/constructors.rs
+  xtask/src/adapter_no_bypass/source.rs
   docs/reference/CLAIM_REGISTRY.md
   docs/formal/COVERAGE.md
   target/formal/coverage.json
@@ -247,6 +258,45 @@ grep -Fq 'refusing symlinked report file' "${tmp_dir}/leaf-link.out"
 test "$(sha256sum formal/proof-manifest.toml | awk '{print $1}')" = "${source_hash}"
 
 report="target/formal/test-proof-report.json"
+python3 - <<'PY'
+import ast
+from pathlib import Path
+
+# The standalone generator and checker must recognize the same source closure.
+readers = []
+for name in ("generate-proof-report.sh", "check-proof-report.sh"):
+    text = (Path("scripts") / name).read_text(encoding="utf-8")
+    body = text.split("<<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
+    matches = [
+        node for node in ast.parse(body).body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "discover_adapter_gate_sources"
+    ]
+    if len(matches) != 1:
+        raise SystemExit(f"{name}: expected one adapter source reader")
+    readers.append(ast.dump(matches[0], include_attributes=False))
+if readers[0] != readers[1]:
+    raise SystemExit("proof-report adapter source readers diverged")
+
+entry = Path("crates/protocol/chio-mcp-edge/src/lib.rs")
+entry.write_text(
+    entry.read_text(encoding="utf-8")
+    + '\ninclude!("proof_report_fixture/entry.rs");\n',
+    encoding="utf-8",
+)
+fixtures = {
+    "crates/protocol/chio-mcp-edge/src/proof_report_fixture/entry.rs": 'include!("second.fragment");\n',
+    "crates/protocol/chio-mcp-edge/src/proof_report_fixture/second.fragment": 'include!("tests.rs");\n',
+    "crates/protocol/chio-mcp-edge/src/proof_report_fixture/tests.rs": "fn proof_report_fixture() {}\n",
+    "crates/core/chio-arena/src/proof_report_candidate.rs": "fn unrelated_candidate() {}\n",
+}
+for relative, body in fixtures.items():
+    path = Path(relative)
+    if path.exists() or path.is_symlink():
+        raise SystemExit(f"proof-report source fixture already exists: {relative}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+PY
 CHIO_RUST_VERIFICATION_METADATA_ONLY=1 \
 CHIO_PROOF_REPORT_PATH="${report}" \
   bash scripts/generate-proof-report.sh
@@ -265,6 +315,182 @@ grep -Fq "tracked hashes hash does not match disk: ${adapter_source}" \
   "${tmp_dir}/adapter-source-mutation.out"
 cp -a "${tmp_dir}/backup/${adapter_source}" "${adapter_source}"
 
+for physical_source in \
+  examples/hello-a2a/src/lib.rs \
+  crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc \
+  xtask/src/adapter_no_bypass/constructors.rs \
+  xtask/src/adapter_no_bypass/source.rs; do
+  printf '\n// proof-report physical inventory mutation fixture\n' >>"${physical_source}"
+  if CHIO_PROOF_REPORT_PATH="${report}" bash scripts/check-proof-report.sh \
+    >"${tmp_dir}/physical-source-mutation.out" 2>&1; then
+    echo "proof-report checker accepted a changed inventory source: ${physical_source}" >&2
+    exit 1
+  fi
+  grep -Fq "tracked hashes hash does not match disk: ${physical_source}" \
+    "${tmp_dir}/physical-source-mutation.out"
+  cp -a "${tmp_dir}/backup/${physical_source}" "${physical_source}"
+done
+
+new_candidate=examples/proof_report_candidate_added.rs
+if [[ -e "${new_candidate}" || -L "${new_candidate}" ]]; then
+  echo "proof-report candidate fixture already exists" >&2
+  exit 1
+fi
+printf '%s\n' 'fn later_constructor_candidate() {}' >"${new_candidate}"
+if CHIO_PROOF_REPORT_PATH="${report}" bash scripts/check-proof-report.sh \
+  >"${tmp_dir}/new-constructor-source.out" 2>&1; then
+  echo "proof-report checker accepted an unbound constructor scan candidate" >&2
+  exit 1
+fi
+grep -Fq 'tracked hashes path set mismatch' "${tmp_dir}/new-constructor-source.out"
+rm -f "${new_candidate}"
+
+python3 - "${report}" <<'PY'
+import json
+import os
+import re
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+path = Path("formal/adapter-source-inventory.toml")
+original = path.read_text(encoding="utf-8")
+inventory = tomllib.loads(original)
+environment = {**os.environ, "CHIO_PROOF_REPORT_PATH": sys.argv[1]}
+
+def replace_site(section, replacements):
+    prefix, separator, tail = original.partition(f"[[{section}]]\n")
+    row, next_separator, rest = tail.partition("\n[[")
+    if not separator:
+        raise AssertionError(f"missing fixture section: {section}")
+    site = inventory[section][0]
+    for key, value in replacements.items():
+        old = f"{key} = {json.dumps(site[key])}\n"
+        if old not in row:
+            raise AssertionError(f"missing fixture property: {section}.{key}")
+        row = row.replace(old, "" if value is None else f"{key} = {value}\n", 1)
+    return prefix + separator + row + next_separator + rest
+
+mutations = [(
+    "unknown root property", "unexpected = true\n" + original,
+    "adapter source inventory keys do not match the closed schema",
+)]
+for section in ("constructor_sites", "dispatch_sites"):
+    without = re.sub(
+        rf"(?ms)^\[\[{section}\]\]\n.*?(?=^\[\[|\Z)", "", original
+    )
+    mutations.extend([
+        (f"missing {section}", without, "adapter source inventory keys do not match the closed schema"),
+        (f"empty {section}", f"{section} = []\n" + without, f"adapter source inventory {section} must be a nonempty table list"),
+        (f"scalar {section}", f"{section} = 1\n" + without, f"adapter source inventory {section} must be a nonempty table list"),
+        (f"non-table {section}", f'{section} = ["invalid"]\n' + without, f"adapter source inventory {section} has invalid site keys"),
+    ])
+    for key in ("id", "path", "symbol", "target", "references"):
+        mutations.append((
+            f"missing {section}.{key}", replace_site(section, {key: None}),
+            f"adapter source inventory {section} has invalid site keys",
+        ))
+    for value in ('"1"', "true", "0", "-1", "1.5", str(2**63)):
+        mutations.append((
+            f"invalid {section} count {value}", replace_site(section, {"references": value}),
+            f"adapter source inventory {section} has invalid reference count",
+        ))
+    for key in ("id", "path", "symbol", "target"):
+        for value in ('""', '" padded "', "false"):
+            mutations.append((
+                f"invalid {section}.{key} {value}", replace_site(section, {key: value}),
+                f"adapter source inventory {section} has invalid site strings",
+            ))
+    mutations.append((
+        f"unknown {section} property",
+        replace_site(section, {"references": "1\nunexpected = true"}),
+        f"adapter source inventory {section} has invalid site keys",
+    ))
+    mutations.append((
+        f"duplicate {section} identity",
+        replace_site(section, {"id": json.dumps(inventory[section][1]["id"])}),
+        f"adapter source inventory {section} has duplicate site identity",
+    ))
+    mutations.append((
+        f"duplicate {section} source tuple",
+        replace_site(section, {
+            key: json.dumps(inventory[section][1][key])
+            for key in ("path", "symbol", "target")
+        }),
+        f"adapter source inventory {section} has duplicate site identity",
+    ))
+    for value in (
+        "/outside.rs", "../outside.rs", "examples/../outside.rs",
+        "examples//hello-a2a/src/lib.rs", "examples/./hello-a2a/src/lib.rs",
+        "target/source.rs", "examples/missing.rs", "examples/hello-a2a/Cargo.toml",
+    ):
+        reason = "source is not a regular file" if value == "examples/missing.rs" else "has an unsafe source path"
+        mutations.append((
+            f"unsafe {section} source {value}", replace_site(section, {"path": json.dumps(value)}),
+            f"adapter source inventory {section} {reason}",
+        ))
+mutations.append((
+    "cross-section duplicate identity",
+    replace_site("dispatch_sites", {"id": json.dumps(inventory["constructor_sites"][0]["id"])}),
+    "adapter source inventory dispatch_sites has duplicate site identity",
+))
+mutations.append((
+    "cross-section duplicate source tuple",
+    replace_site("dispatch_sites", {
+        key: json.dumps(inventory["constructor_sites"][0][key])
+        for key in ("path", "symbol", "target")
+    }),
+    "adapter source inventory dispatch_sites has duplicate site identity",
+))
+
+def assert_rejected(label, mutated, diagnostic):
+    path.write_text(mutated, encoding="utf-8")
+    for command in (
+        ["bash", "scripts/generate-proof-report.sh", "--no-run-gates"],
+        ["bash", "scripts/check-proof-report.sh"],
+    ):
+        result = subprocess.run(command, env=environment, text=True, capture_output=True, check=False)
+        if result.returncode == 0 or diagnostic not in result.stderr:
+            raise AssertionError(f"{command[1]} did not reject {label} with {diagnostic!r}: {result.stderr}")
+
+symlink_mutations = 0
+try:
+    for label, mutated, diagnostic in mutations:
+        if mutated == original:
+            raise AssertionError(f"ineffective inventory mutation: {label}")
+        assert_rejected(label, mutated, diagnostic)
+    # Each link exists only during its own cases. Unrelated candidate scan
+    # failures must never mask a missing inventory validation check.
+    for name, target, candidate in (
+        ("proof-report-source-link.rs", "hello-a2a/src/lib.rs", "proof-report-source-link.rs"),
+        ("proof-report-directory-link", "hello-a2a/src", "proof-report-directory-link/lib.rs"),
+    ):
+        link = Path("examples") / name
+        if link.exists() or link.is_symlink():
+            raise AssertionError(f"fixture link already exists: {link}")
+        link.symlink_to(target)
+        try:
+            for section in ("constructor_sites", "dispatch_sites"):
+                assert_rejected(
+                    f"symlinked {section} source {candidate}",
+                    replace_site(section, {"path": json.dumps(f"examples/{candidate}")}),
+                    f"adapter source inventory {section} has a symlinked source",
+                )
+                symlink_mutations += 1
+            assert_rejected(
+                f"symlinked unlisted candidate {candidate}", original,
+                "adapter source inventory has a symlinked candidate",
+            )
+            symlink_mutations += 1
+        finally:
+            link.unlink()
+finally:
+    path.write_text(original, encoding="utf-8")
+print(f"Proof-report readers rejected {len(mutations) + symlink_mutations} inventory mutations each")
+PY
+CHIO_PROOF_REPORT_PATH="${report}" bash scripts/check-proof-report.sh
+
 kani_source="crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs"
 printf '\n// proof-report Kani source mutation fixture\n' >>"${kani_source}"
 if CHIO_PROOF_REPORT_PATH="${report}" bash scripts/check-proof-report.sh \
@@ -280,6 +506,7 @@ python3 - "${report}" <<'PY'
 import hashlib
 import json
 import sys
+import tomllib
 from pathlib import Path
 
 report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
@@ -323,6 +550,8 @@ for required in (
     "scripts/lean-assumption-audit.lean",
     "scripts/tests/lean-assumption-audit.test.sh",
     "xtask/src/adapter_no_bypass.rs",
+    "xtask/src/adapter_no_bypass/constructors.rs",
+    "xtask/src/adapter_no_bypass/source.rs",
     "xtask/src/cli.rs",
     "xtask/src/dispatch.rs",
     "xtask/src/error.rs",
@@ -333,9 +562,20 @@ for required in (
     "crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs",
     "crates/trust/chio-attest-verify/build.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+    "crates/protocol/chio-mcp-edge/src/proof_report_fixture/entry.rs",
+    "crates/protocol/chio-mcp-edge/src/proof_report_fixture/second.fragment",
+    "crates/protocol/chio-mcp-edge/src/proof_report_fixture/tests.rs",
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/lifecycle_and_tests.inc",
+    "crates/core/chio-arena/src/proof_report_candidate.rs",
 ):
     if tracked.get(required) != hashlib.sha256(Path(required).read_bytes()).hexdigest():
         raise SystemExit(f"proof report lacks the current hash for {required}")
+inventory = tomllib.loads(Path("formal/adapter-source-inventory.toml").read_text())
+for section in ("constructor_sites", "dispatch_sites"):
+    for site in inventory[section]:
+        source = Path(site["path"])
+        if tracked.get(site["path"]) != hashlib.sha256(source.read_bytes()).hexdigest():
+            raise SystemExit(f"proof report omits inventoried source: {site['id']}")
 coverage = report.get("proofCoverage", {})
 if coverage.get("path") != "target/formal/coverage.json" or not coverage.get("sha256"):
     raise SystemExit("proof report lacks the generated coverage hash")

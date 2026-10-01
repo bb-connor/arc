@@ -19,7 +19,7 @@
     "rollback_binding"
   ],
   "properties": {
-    "plan_schema": { "const": "chio.governed-response-plan.v1" },
+    "plan_schema": { "const": "chio.response-plan.v1" },
     "plan_id": { "type": "string", "minLength": 1 },
     "operator_capability_id": { "type": "string", "minLength": 1 },
     "operator_capability_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },

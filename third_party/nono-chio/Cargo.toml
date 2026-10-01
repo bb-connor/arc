@@ -1,0 +1,13 @@
+[package]
+name = "nono-chio"
+version = "0.53.0-chio.2"
+edition = "2021"
+rust-version = "1.85"
+license = "Apache-2.0"
+publish = false
+description = "Chio fail-closed caller-FD Landlock adapter for pinned nono"
+
+[dependencies]
+landlock = "=0.4.4"
+nono = { version = "=0.53.0", default-features = false }
+thiserror = "1"

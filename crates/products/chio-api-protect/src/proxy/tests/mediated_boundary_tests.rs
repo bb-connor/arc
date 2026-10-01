@@ -109,5 +109,5 @@ async fn mediated_presented_execution_nonce_is_rejected() {
     let (status, json) = post_evaluate(Arc::clone(&state), &settle_body).await;
 
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_ne!(json["status"], "authorized");
+    assert_ne!(json["status"], "reserved");
 }

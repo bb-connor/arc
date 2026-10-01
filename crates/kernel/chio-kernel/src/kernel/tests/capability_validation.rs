@@ -281,7 +281,10 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let valid_response = valid_kernel.evaluate_tool_call_blocking(&valid_request)?;
     assert_eq!(valid_response.verdict, Verdict::Deny);
     let valid_reason = valid_response.reason.as_deref().unwrap_or_default();
-    assert!(valid_reason.contains("qualified admission"), "{valid_reason}");
+    assert!(
+        valid_reason.contains("qualified admission"),
+        "{valid_reason}"
+    );
 
     let missing_path = unique_receipt_db_path("chio-hosted-cumulative-missing-root");
     let mut missing_kernel = make_hosted_kernel();
@@ -592,6 +595,110 @@ fn kernel_rejects_historical_issuance_key() {
         kernel.issue_capability(&Keypair::generate().public_key(), ChioScope::default(), 60);
 
     assert!(matches!(result, Err(KernelError::UntrustedIssuer)));
+}
+
+struct FixedCapabilityIssuanceAdmission {
+    deny: bool,
+}
+
+impl CapabilityIssuanceAdmissionAuthority for FixedCapabilityIssuanceAdmission {
+    fn ensure_ready(&self) -> chio_security_types::ports::PortResult<()> {
+        Ok(())
+    }
+
+    fn authorize(
+        &self,
+        _: &chio_security_types::ports::IssuanceFreezeAdmissionQuery,
+    ) -> chio_security_types::ports::PortResult<()> {
+        if self.deny {
+            Err(chio_security_types::ports::PortError::conflict())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+fn issuance_security_context(subject: &PublicKey) -> SecurityInvocationContext {
+    SecurityInvocationContext::V1(SecurityInvocationContextV1::new(
+        chio_security_types::ports::TenantId::new("tenant-issuance")
+            .unwrap_or_else(|error| panic!("tenant: {error}")),
+        chio_security_types::ports::SessionId::new("session-issuance")
+            .unwrap_or_else(|error| panic!("session: {error}")),
+        chio_security_types::PrincipalId::new(subject.to_hex())
+            .unwrap_or_else(|error| panic!("principal: {error}")),
+        chio_security_types::ports::IsolationEpochId::new("epoch-issuance")
+            .unwrap_or_else(|error| panic!("epoch: {error}")),
+        chio_security_types::ports::LineageId::new("lineage-issuance")
+            .unwrap_or_else(|error| panic!("lineage: {error}")),
+        1,
+    ))
+}
+
+#[test]
+fn installed_issuance_admission_requires_context_and_allows_exact_subject() {
+    let mut kernel = make_kernel(make_config());
+    kernel
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: false,
+        }))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    let subject = Keypair::generate().public_key();
+
+    assert!(matches!(
+        kernel.issue_capability(&subject, ChioScope::default(), 60),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+    assert!(matches!(
+        kernel.issue_aggregate_family_root(&subject, ChioScope::default(), 60, 2),
+        Err(KernelError::CapabilityIssuanceDenied(reason))
+            if reason.contains("tenant and lineage context")
+    ));
+    let capability = kernel
+        .issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&subject),
+        )
+        .unwrap_or_else(|error| panic!("security-bound issuance: {error}"));
+    assert_eq!(capability.subject, subject);
+}
+
+#[test]
+fn installed_issuance_admission_rejects_freeze_and_principal_substitution() {
+    let subject = Keypair::generate().public_key();
+    let mut frozen_kernel = make_kernel(make_config());
+    frozen_kernel
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: true,
+        }))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    assert!(matches!(
+        frozen_kernel.issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&subject),
+        ),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+
+    let mut open_kernel = make_kernel(make_config());
+    open_kernel
+        .set_capability_issuance_admission_authority(Arc::new(FixedCapabilityIssuanceAdmission {
+            deny: false,
+        }))
+        .unwrap_or_else(|error| panic!("install issuance admission: {error}"));
+    let substituted = Keypair::generate().public_key();
+    assert!(matches!(
+        open_kernel.issue_capability_with_security_context(
+            &subject,
+            ChioScope::default(),
+            60,
+            &issuance_security_context(&substituted),
+        ),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
 }
 
 #[test]
@@ -916,6 +1023,7 @@ fn untrusted_issuer_denied() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -958,6 +1066,7 @@ fn supplemental_authorization_is_rejected_before_dispatch_when_unconfigured() {
         ),
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel
@@ -965,10 +1074,9 @@ fn supplemental_authorization_is_rejected_before_dispatch_when_unconfigured() {
         .expect("unsupported extension must produce a signed denial");
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("supplemental authorization requires an installed verifier")));
+    assert!(response.reason.as_deref().is_some_and(
+        |reason| reason.contains("supplemental authorization requires an installed verifier")
+    ));
 }
 
 #[test]
@@ -1528,7 +1636,10 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
-    assert!(reason.contains("root evidence is not a direct token"), "{reason}");
+    assert!(
+        reason.contains("root evidence is not a direct token"),
+        "{reason}"
+    );
 
     let _ = std::fs::remove_file(path);
 }
@@ -1587,6 +1698,7 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1621,6 +1733,7 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1670,6 +1783,7 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
+        declassification_grant: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();

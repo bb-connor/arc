@@ -655,6 +655,7 @@ jobs:
           ).splitlines()[0]
           boundary = json.loads(boundary_line)
           expected_trusted_files = {
+              "cargo-mutants",
               "check-cage-all-target-inventory.py",
               "check-cage-enforcement.sh",
               "check-cage-linux-enforcement.sh",
@@ -2440,6 +2441,25 @@ jobs:
           test "$(jq -r '.owner.login' <<< "${app}")" = "${GITHUB_REPOSITORY_OWNER}"
           test "$(jq -cS '.permissions' <<< "${app}")" = '{"checks":"write","metadata":"read","statuses":"write"}'
 
+          installation="$({
+            curl \
+              --proto '=https' \
+              --tlsv1.2 \
+              --fail \
+              --silent \
+              --show-error \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${jwt}" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "https://api.github.com/app/installations/${SECURITY_APP_INSTALLATION_ID}"
+          })"
+          test "$(jq -r '.id' <<< "${installation}")" = "${SECURITY_APP_INSTALLATION_ID}"
+          test "$(jq -r '.app_id' <<< "${installation}")" = "${SECURITY_APP_ID}"
+          test "$(jq -r '.app_slug' <<< "${installation}")" = "chio-security-authority"
+          test "$(jq -r '.account.login' <<< "${installation}")" = "${GITHUB_REPOSITORY_OWNER}"
+          test "$(jq -r '.repository_selection' <<< "${installation}")" = "selected"
+          test "$(jq -cS '.permissions' <<< "${installation}")" = '{"checks":"write","metadata":"read","statuses":"write"}'
+
           token_request='{"permissions":{"checks":"write"}}'
           token_response="$({
             curl \
@@ -2464,29 +2484,12 @@ jobs:
             *) echo "unexpected installation token permissions" >&2; exit 1 ;;
           esac
           token_expires_epoch="$(date --date="$(jq -r '.expires_at' <<< "${token_response}")" +%s)"
-          test "${now_epoch}" -lt "${token_expires_epoch}"
-          test "$((token_expires_epoch - now_epoch))" -le 3600
+          token_now_epoch="$(date +%s)"
+          test "${token_now_epoch}" -lt "${token_expires_epoch}"
+          test "$((token_expires_epoch - token_now_epoch))" -le 3600
           unset token_response jwt jwt_header jwt_claims jwt_unsigned jwt_signature
           rm -f -- "${private_key}"
 
-          installation="$({
-            curl \
-              --proto '=https' \
-              --tlsv1.2 \
-              --fail \
-              --silent \
-              --show-error \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${installation_token}" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              https://api.github.com/installation
-          })"
-          test "$(jq -r '.id' <<< "${installation}")" = "${SECURITY_APP_INSTALLATION_ID}"
-          test "$(jq -r '.app_id' <<< "${installation}")" = "${SECURITY_APP_ID}"
-          test "$(jq -r '.app_slug' <<< "${installation}")" = "chio-security-authority"
-          test "$(jq -r '.account.login' <<< "${installation}")" = "${GITHUB_REPOSITORY_OWNER}"
-          test "$(jq -r '.repository_selection' <<< "${installation}")" = "selected"
-          test "$(jq -cS '.permissions' <<< "${installation}")" = '{"checks":"write","metadata":"read","statuses":"write"}'
           repositories="$({
             curl \
               --proto '=https' \

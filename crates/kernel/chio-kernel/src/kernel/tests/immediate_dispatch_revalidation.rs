@@ -300,6 +300,7 @@ fn guard_dispatch_revalidation_is_opt_in_and_opted_in_errors_fail_closed() {
         server_id: &request.server_id,
         session_filesystem_roots: None,
         matched_grant_index: Some(0),
+        security_context: None,
     };
 
     let legacy = LegacyDefaultGuard;

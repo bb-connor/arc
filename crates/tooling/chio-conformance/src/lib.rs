@@ -5,6 +5,8 @@
 //! Markdown compatibility reports.
 
 pub mod econsim;
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
 mod load;
 mod model;
 mod native_suite;

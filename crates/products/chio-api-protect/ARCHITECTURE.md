@@ -127,14 +127,21 @@ flowchart TD
   (`should_forward_request_header`).
 - `/v1/capabilities/attenuate` always returns `403`: the sidecar never holds
   the parent subject's signing key, so it cannot mint an attenuated child.
-- `/v1/evaluate` is retired (`410`); `/v1/evaluate/advisory` performs local
-  revocation and parameter-hash checks only and is explicitly not
-  kernel-mediated authorization. Kernel-driven tool-call evaluation is not
-  wired through the sidecar.
+- `/v1/evaluate` is a kernel-mediated pre-execution reservation gate. It
+  requires a local hold-capable budget store and a configured control token
+  for downstream reconciliation. It mints execution nonces, never dispatches
+  or settles a tool. `/v1/evaluate/advisory` performs local revocation and
+  parameter-hash checks only and is explicitly not kernel authorization.
 - Sidecar control routes (approvals, mint, release, validate, receipts,
-  `/metrics`) require a loopback caller or a bearer token compared in
-  constant time (`subtle::ConstantTimeEq`); a configured-but-blank token
-  rejects every remote caller.
+  reconciliation, `/metrics`) require a configured token and one matching
+  bearer header, compared in constant time (`subtle::ConstantTimeEq`).
+  Missing or blank configuration disables control access, including loopback.
+  Duplicate headers deny. The shared gate lives in `proxy/control.rs`.
+- Nonempty control tokens are validated before startup I/O against Bearer-token
+  syntax and a 512-byte bound. Before body reads or kernel admission, the proxy
+  rejects their raw bytes in any request header value. A 64 KiB name/value budget
+  bounds the scan, including duplicates. Ordinary upstream credentials stay
+  byte-preserved; this is not body, URL or encoded-secret inspection.
 - The upstream egress contract denies redirect chains beyond 4 hops, caps
   response bodies at 64 MiB, and denies loopback/link-local/IPv6-ULA
   destinations unless the configured upstream host is itself loopback.

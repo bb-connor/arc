@@ -19,10 +19,13 @@ use chio_core::session::{
     ResourceTemplateDefinition,
 };
 use chio_core::{capability::token::CapabilityToken, AgentId};
+
+mod threshold_continuation;
 #[cfg(loom)]
 use loom::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 #[cfg(not(loom))]
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+pub use threshold_continuation::PendingThresholdApproval;
 
 #[cfg(not(loom))]
 use crate::{ToolCallResponse, ToolServerEvent};
@@ -104,6 +107,10 @@ impl SessionState {
 /// Feature flags negotiated with the peer at session establishment.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PeerCapabilities {
+    /// Persisted invocation feature intersection. Legacy sessions have no
+    /// extension profile and must not gain features merely by being restored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<chio_core::capability::features::CapabilityNegotiation>,
     pub supports_progress: bool,
     pub supports_cancellation: bool,
     pub supports_subscriptions: bool,
@@ -131,6 +138,8 @@ pub struct InflightRequest {
     pub cancellation_reason: Option<String>,
     pub cancellable: bool,
     pub pending_execution_nonce_id: Option<String>,
+    /// Session retry binding only, never approval or execution authority.
+    pub pending_threshold_approval: Option<PendingThresholdApproval>,
 }
 
 impl InflightRequest {
@@ -206,6 +215,7 @@ impl InflightRegistry {
                 cancellation_reason: None,
                 cancellable,
                 pending_execution_nonce_id: None,
+                pending_threshold_approval: None,
             },
         );
         self.active_count.fetch_add(1, Ordering::AcqRel);
@@ -239,6 +249,7 @@ impl InflightRegistry {
                 cancellation_reason: None,
                 cancellable,
                 pending_execution_nonce_id: None,
+                pending_threshold_approval: None,
             },
         );
         self.active_count.fetch_add(1, Ordering::AcqRel);
@@ -352,6 +363,7 @@ impl InflightRegistry {
             });
         }
         request.pending_execution_nonce_id = Some(nonce_id.to_string());
+        request.pending_threshold_approval = None;
         Ok(())
     }
 
@@ -588,6 +600,9 @@ pub enum SessionError {
         "execution nonce retry for request {request_id} does not match a pending session preflight"
     )]
     ExecutionNonceRetryMismatch { request_id: RequestId },
+
+    #[error("threshold retry for request {request_id} does not match its pending session request")]
+    ThresholdApprovalRetryMismatch { request_id: RequestId },
 
     #[error("request {request_id} is not cancellable")]
     RequestNotCancellable { request_id: RequestId },

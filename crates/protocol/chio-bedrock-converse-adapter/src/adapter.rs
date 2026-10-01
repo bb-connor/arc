@@ -146,6 +146,7 @@ impl BedrockAdapter {
         &self,
         tool_use: ToolUseBlock,
     ) -> Result<ToolInvocation, ProviderError> {
+        let bridge_security = self.bridge_security_for_tool(&tool_use.name)?;
         let arguments = canonical_json_bytes(&tool_use.input).map_err(|error| {
             ProviderError::BadToolArgs(format!(
                 "bedrock toolUse `{}` input failed canonical JSON encoding: {error}",
@@ -164,6 +165,7 @@ impl BedrockAdapter {
                 principal: self.config().principal(),
                 received_at: SystemTime::now(),
             },
+            bridge_security,
         })
     }
 }

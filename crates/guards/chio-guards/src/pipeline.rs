@@ -290,6 +290,7 @@ mod tests {
             supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
+            declassification_grant: None,
         };
 
         (request, scope, agent_id, server_id)
@@ -309,6 +310,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let result = pipeline.evaluate(&ctx);
@@ -333,6 +335,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let result = pipeline.evaluate(&ctx).expect("pipeline decision");
@@ -355,6 +358,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let result = pipeline.evaluate(&ctx).expect("pipeline decision");
@@ -377,6 +381,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         let result = pipeline.evaluate(&ctx);
@@ -403,6 +408,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: None,
+            security_context: None,
         };
 
         assert!(pipeline.requires_dispatch_revalidation());
@@ -433,6 +439,7 @@ mod tests {
             server_id: &server_id,
             session_filesystem_roots: None,
             matched_grant_index: Some(0),
+            security_context: None,
         };
         assert!(pipeline.requires_exact_released_output(&ctx));
         assert!(pipeline

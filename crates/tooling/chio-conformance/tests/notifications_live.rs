@@ -1,6 +1,5 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use chio_conformance::{default_run_options, run_conformance_harness, unique_run_dir};
@@ -39,28 +38,6 @@ fn python3_supports_chio_sdk() -> bool {
     (major, minor) >= (3, 11)
 }
 
-fn ensure_chio_binary(repo_root: &PathBuf) {
-    let chio_binary = repo_root.join("target/debug/chio");
-    if chio_binary.exists() {
-        return;
-    }
-
-    let chio_binary = repo_root.join("target/debug/chio");
-    if chio_binary.exists() {
-        return;
-    }
-
-    let status = Command::new("cargo")
-        .current_dir(repo_root)
-        .arg("build")
-        .arg("-q")
-        .arg("-p")
-        .arg("chio-cli")
-        .status()
-        .expect("build chio-cli");
-    assert!(status.success(), "cargo build -p chio-cli must succeed");
-}
-
 #[test]
 fn notifications_harness_runs_against_live_js_and_python_peers() {
     if !command_available("node") || !python3_supports_chio_sdk() {
@@ -68,7 +45,6 @@ fn notifications_harness_runs_against_live_js_and_python_peers() {
     }
 
     let mut options = default_run_options();
-    ensure_chio_binary(&options.repo_root);
     options.scenarios_dir = options
         .repo_root
         .join("tests/conformance/scenarios/notifications");

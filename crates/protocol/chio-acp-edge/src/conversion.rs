@@ -123,10 +123,10 @@ fn cancelled_stream_task_metadata(authority_path: &str) -> Value {
 fn acp_invocation_result_from_orchestrated(
     orchestrated: OrchestratedToolCall,
 ) -> AcpInvocationResult {
-    let data = orchestrated
-        .protocol_result
-        .clone()
-        .unwrap_or_else(|| kernel_output_to_value(orchestrated.response.output.as_ref()));
+    let data = chio_cross_protocol::execution::pending_approval_result(
+        orchestrated.response.verdict, orchestrated.response.output.as_ref(),
+    ).unwrap_or_else(|| orchestrated.protocol_result.clone()
+        .unwrap_or_else(|| kernel_output_to_value(orchestrated.response.output.as_ref())));
     let metadata = Some(orchestrated.metadata());
     let response = orchestrated.response;
     let success =

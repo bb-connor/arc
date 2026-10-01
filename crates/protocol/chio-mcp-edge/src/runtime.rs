@@ -23,8 +23,9 @@ use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_cross_protocol::discovery::DiscoveryProtocol;
 use chio_cross_protocol::error::BridgeError;
 use chio_cross_protocol::execution::{
-    kernel_tool_call_request, metadata_with_source_receipt_context, CrossProtocolTargetExecution,
-    CrossProtocolTargetRequest, TargetExecutionHop, TargetProtocolExecutor,
+    evaluate_bound_kernel_request, metadata_with_source_receipt_context,
+    CrossProtocolTargetExecution, CrossProtocolTargetRequest, TargetExecutionHop,
+    TargetProtocolExecutor,
 };
 use chio_cross_protocol::routing::route_selection_metadata;
 use chio_kernel::{
@@ -133,6 +134,7 @@ impl Default for McpEdgeConfig {
 pub struct ChioMcpEdge {
     config: McpEdgeConfig,
     kernel: ChioKernel,
+    manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
     agent_id: String,
     session_auth_context: SessionAuthContext,
     capabilities: Vec<CapabilityToken>,
@@ -160,11 +162,63 @@ impl ChioMcpEdge {
         capabilities: Vec<CapabilityToken>,
         manifests: Vec<ToolManifest>,
     ) -> Result<Self, AdapterError> {
-        let (tools, tool_index) = build_exposed_tool_bindings(manifests)?;
+        Self::new_internal(config, kernel, agent_id, capabilities, manifests, None)
+    }
+
+    /// Construct an edge exclusively from publisher-signed manifests admitted
+    /// by the verified registry.
+    pub fn new_with_manifest_registry(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: &chio_manifest::VerifiedManifestRegistry,
+    ) -> Result<Self, AdapterError> {
+        Self::new_with_manifest_registry_arc(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            Arc::new(registry.clone()),
+        )
+    }
+
+    /// Construct an edge while retaining the caller's live admitted registry.
+    pub fn new_with_manifest_registry_arc(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        registry: Arc<chio_manifest::VerifiedManifestRegistry>,
+    ) -> Result<Self, AdapterError> {
+        let manifests = registry
+            .verified_manifests()
+            .map(|signed| signed.manifest.clone())
+            .collect();
+        Self::new_internal(
+            config,
+            kernel,
+            agent_id,
+            capabilities,
+            manifests,
+            Some(registry),
+        )
+    }
+
+    fn new_internal(
+        config: McpEdgeConfig,
+        kernel: ChioKernel,
+        agent_id: String,
+        capabilities: Vec<CapabilityToken>,
+        manifests: Vec<ToolManifest>,
+        registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
+    ) -> Result<Self, AdapterError> {
+        let (tools, tool_index) = build_exposed_tool_bindings(manifests, registry.as_deref())?;
 
         Ok(Self {
             config,
             kernel,
+            manifest_registry: registry,
             agent_id,
             session_auth_context: SessionAuthContext::stdio_anonymous(),
             capabilities,
@@ -212,6 +266,18 @@ impl ChioMcpEdge {
             return Err(AdapterError::ParseError(
                 "restore_ready_session requires an uninitialized MCP edge".to_string(),
             ));
+        }
+
+        if let Some(profile) = peer_capabilities.authorization.as_ref() {
+            let supported = crate::authorization::authorization_capabilities()
+                .negotiated_with(profile)
+                .map_err(|error| AdapterError::ParseError(error.to_string()))?;
+            if &supported != profile {
+                return Err(AdapterError::ParseError(
+                    "restored MCP authorization profile exceeds this host's supported features"
+                        .to_string(),
+                ));
+            }
         }
 
         let restored_session_id = self

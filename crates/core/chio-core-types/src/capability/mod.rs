@@ -31,6 +31,9 @@ mod delegation_trust_root_tests;
 mod aggregate_invocation_tests;
 
 #[cfg(test)]
+mod backend_identity_tests;
+
+#[cfg(test)]
 mod cumulative_approval_tests;
 
 #[cfg(test)]
