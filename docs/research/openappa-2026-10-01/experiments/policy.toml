@@ -1,0 +1,47 @@
+# Authored research fixture, not a deployment policy.
+[policy]
+version = 2
+
+[[policy.tool]]
+name = "mcp/files/read(path:/hr/*)"
+delta = { audience = ["hr@company.test"] }
+
+[[policy.tool]]
+name = "mcp/files/read"
+delta = {}
+
+[[policy.tool]]
+name = "mcp/mail/send"
+parameters = { type = "object", properties = { to = { type = "string" } }, required = ["to"] }
+requires = { audience = { contains = ["$to"] } }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/ops/wipe"
+requires = { attention = ["signoff"] }
+delta = {}
+
+[[policy.authority]]
+name = "approver"
+[policy.authority.permits]
+attention = ["signoff"]
+
+[[policy.tool]]
+name = "mcp/ops/backup"
+effects = ["backup.completed"]
+delta = {}
+
+[[policy.tool]]
+name = "mcp/ops/deploy"
+requires = { effects = { contains = ["backup.completed"] } }
+delta = {}
+
+[[policy.tool]]
+name = "mcp/ops/migrate"
+effects = ["migration.applied"]
+requires = { effects = { excludes = ["migration.applied"] } }
+delta = {}
+
+[externals]
+timeout_ms = 2000
+max_body_bytes = 65536

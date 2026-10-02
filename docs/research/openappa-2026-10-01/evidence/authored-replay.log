@@ -1,0 +1,17 @@
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:2 mcp/mail/send allow
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:7 mcp/files/read allow (after accepting the narrowing)
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:12 mcp/mail/send deny
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:17 mcp/files/read allow
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:22 mcp/mail/send deny
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:27 mcp/ops/wipe authority approver (after approver approved)
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:30 mcp/ops/wipe authority approver (after approver approved)
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:33 mcp/mail/send deny
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa:38 mcp/mail/send allow
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/ordering.appa:3 mcp/ops/deploy deny
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/ordering.appa:6 mcp/ops/backup allow
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/ordering.appa:9 mcp/ops/deploy allow
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/ordering.appa:12 mcp/ops/migrate allow
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/ordering.appa:15 mcp/ops/migrate deny
+ok    /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/ordering.appa
+2 files: 2 ok, 0 failed, 0 could not run

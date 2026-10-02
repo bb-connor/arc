@@ -1,0 +1,32 @@
+Model: one effectful step, two continuations, two coordinators, at most two owner epochs per continuation.
+Assumptions: atomic authoritative transitions; authentic approvals/no-effect proofs; correct provider evidence; finite abstraction.
+Excluded: cryptography, actual storage, reservation bridge, artifact protocol, time, fairness and production implementation.
+BASELINE PASS: 325 reachable states, 774 transitions; exhaustive within the stated bounds.
+MUTATION REJECTED OverlappingSelection: more than one unresolved continuation owns the step
+  explored 7 states, 6 transitions before counterexample
+  1. select continuation 0
+  2. select continuation 1
+MUTATION REJECTED IgnoreOwnerEpoch: a stale coordinator epoch captured live ownership
+  explored 71 states, 114 transitions before counterexample
+  1. select continuation 0
+  2. retain exact verified approval for 0
+  3. coordinator 0 acquires epoch 1 for 0
+  4. coordinator 1 acquires epoch 2 for 0
+  5. coordinator 0 captures 0 at epoch 1
+MUTATION REJECTED ReplayUnknown: the one modeled effectful step executed more than once
+  explored 179 states, 356 transitions before counterexample
+  1. select continuation 0
+  2. retain exact verified approval for 0
+  3. coordinator 0 acquires epoch 1 for 0
+  4. coordinator 0 captures 0 at epoch 1
+  5. external effect 0, then lost response/process death
+  6. MUTATED fresh dispatch owner for unknown 0
+  7. external effect 0, then lost response/process death
+MUTATION REJECTED UnknownMeansNoEffect: an actual effect was classified as closed without effect
+  explored 121 states, 215 transitions before counterexample
+  1. select continuation 0
+  2. retain exact verified approval for 0
+  3. coordinator 0 acquires epoch 1 for 0
+  4. coordinator 0 captures 0 at epoch 1
+  5. external effect 0, then lost response/process death
+  6. close 0 using MUTATED unknown-as-no-effect inference

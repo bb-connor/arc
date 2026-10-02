@@ -1,0 +1,66 @@
+{
+  "schema": "chio.recovery-architecture-model-evidence.v1",
+  "scope": "Bounded abstract protocols only; no production qualification",
+  "compiler": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-apple-darwin\nrelease: 1.94.1\nLLVM version: 21.1.8\n",
+  "toolchain": "+1.94.1",
+  "edition": "2021",
+  "warnings_denied": true,
+  "formatting_checked": true,
+  "sources": [
+    {
+      "path": "recovery.rs",
+      "sha256": "d5e821972460f58d60e1b7e754f522857e09094633e1dd7de72ce0246bd5b4bc"
+    },
+    {
+      "path": "review.rs",
+      "sha256": "124e0818c0e5a9c569dc681de0974d15efe7eac3edcc09c9f5fc0579be24d6fd"
+    },
+    {
+      "path": "review_states.rs",
+      "sha256": "6648b0335b71819e10060dd1e8aad503fd842c9c9446a9a59bb41434bbe4d231"
+    },
+    {
+      "path": "state.rs",
+      "sha256": "deead8a7cd36d0beb20d54c7048b70a9184c6793ac378ccf2529d13d8f397100"
+    },
+    {
+      "path": "third.rs",
+      "sha256": "11cce2818c30d5577a08d91c331de7dc94d7d8631ccbf1fb419aa134533b3af7"
+    },
+    {
+      "path": "third_contracts.rs",
+      "sha256": "b1d9c65459ac960b34841663fde5baa8dcaadef0e11f9074b64e08d9c46e66cb"
+    },
+    {
+      "path": "third_nonce.rs",
+      "sha256": "8a6a2dfbc37701e26441df54f2111107646d962614f468503bff243146ffce6a"
+    },
+    {
+      "path": "run.py",
+      "sha256": "4aa8aa36dc25310ebfcca6e06df750326a854e07ad12912fba90a7319d6ad168"
+    }
+  ],
+  "runs": [
+    {
+      "name": "ownership",
+      "entry": "recovery.rs",
+      "output": "results.txt",
+      "output_sha256": "ca35843e47885c2d4a0bd6404e017ba730581e2787712dda36e8f15244790e50",
+      "exit_code": 0
+    },
+    {
+      "name": "review",
+      "entry": "review.rs",
+      "output": "review-results.txt",
+      "output_sha256": "06ce2675a45a122c0f705a000a3bd2614dab55c6478eac722fa676316fcc8e6c",
+      "exit_code": 0
+    },
+    {
+      "name": "third",
+      "entry": "third.rs",
+      "output": "third-results.txt",
+      "output_sha256": "206cb04cc43bcd9cb429657194615536fc72f59648c2798272b31123637d2d25",
+      "exit_code": 0
+    }
+  ]
+}

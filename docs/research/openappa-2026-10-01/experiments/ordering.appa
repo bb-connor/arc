@@ -1,0 +1,16 @@
+# Replay reports successful stub results; unresolved dispatches are covered by
+# upstream engine and crash-recovery tests, not this trace format.
+mcp/ops/deploy {}
+expect deny
+
+mcp/ops/backup {}
+expect allow
+
+mcp/ops/deploy {}
+expect allow
+
+mcp/ops/migrate {}
+expect allow
+
+mcp/ops/migrate {}
+expect deny

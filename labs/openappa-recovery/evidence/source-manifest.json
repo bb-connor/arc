@@ -1,0 +1,225 @@
+{
+  "research_date": "2026-10-01",
+  "scope": "Local development research; not public release or combined qualification",
+  "base": {
+    "branch": "origin/integration/process-security-m4",
+    "commit": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
+    "tree": "db5f3a50f7fc40f822a287fa29dad271242db782",
+    "commit_date": "2026-09-27T04:18:33-04:00",
+    "remote_main_comparison": "0\t717"
+  },
+  "research_branch": "research/openappa-recovery-20261001",
+  "checkout": "/Users/connor/Medica/backbay/standalone/arc/.worktrees/openappa-recovery-lab-20261001",
+  "openappa_commit": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+  "production_inputs_changed": false,
+  "root_manifest_or_lock_changed": false,
+  "implementation_files": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "ac74f90336f1f2f40021b78a86c4ed64cafb5127aaae247b9a31be653e017a40",
+      "bytes": 28021
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "d9bda38a6c395cd6419760c0edd4473654d011ff1b483d02f36a1667f95a57c8",
+      "bytes": 375947
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0",
+      "bytes": 86
+    },
+    {
+      "path": "crates/security/chio-flow/src/engine.rs",
+      "sha256": "dc9e7701adb2465b43e12b3ca183e7e4e2001d3ef02f091d6b3019300050ecb4",
+      "bytes": 57803
+    },
+    {
+      "path": "crates/security/chio-flow/src/declassification.rs",
+      "sha256": "0e121749b4bc7f6811cea537840bfdbe1cd7fac5183384cffa2ff3f89503b5bc",
+      "bytes": 32130
+    },
+    {
+      "path": "crates/security/chio-security-kernel/src/pre_invocation.rs",
+      "sha256": "77d7ae78883677842972b8cf3f4bb01342552139e7c32263eb6b5a6f3a037f1c",
+      "bytes": 3594
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
+      "sha256": "119a5be1a42d98ebd76e810c00035a0bbfa620693f5a8dea779703b12c3bcf68",
+      "bytes": 20453
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow/declassification.rs",
+      "sha256": "81f42b57b006b5a9e4f7e2d4b9013d6c2d43d6f89fa13d34c346a65007263ce3",
+      "bytes": 3987
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_declassification_tests.rs",
+      "sha256": "c25cfa358d773127571497a595a386cc004a8c46ab220def46776b2f13b2364d",
+      "bytes": 8563
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_declassification_matrix_tests.rs",
+      "sha256": "7d711b25895140432e2cd7fd16415539f51c216751b766c43052f20a7d61b9bc",
+      "bytes": 2287
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_declassification_rejection_tests.rs",
+      "sha256": "2bd1dda8cc06e2c3759d17a632174d2570dc012ba4bbd22e9af302eb5f0db5cd",
+      "bytes": 5131
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow_declassification_fault_tests.rs",
+      "sha256": "cf110897516b1ee0997e4a6226219b6bfb4c284ccfd62957b3a42960c0f26815",
+      "bytes": 5380
+    },
+    {
+      "path": "crates/kernel/chio-process/src/lib.rs",
+      "sha256": "ec6dc924f363b7bdc1ef381005951c0aaf1ba9a9bfedd7b896a5fdc712581624",
+      "bytes": 26431
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store.rs",
+      "sha256": "b1f08866f54ca067a6e873fb3ba2a28585a9a67c3f91ccabc760ed922d482933",
+      "bytes": 16099
+    },
+    {
+      "path": "crates/kernel/chio-process/src/security.rs",
+      "sha256": "5b53ad63e237da529ba7018e81fd1af380e5219c51c9c6bc8778810791c5f234",
+      "bytes": 1764
+    },
+    {
+      "path": "crates/kernel/chio-process/src/state_reader.rs",
+      "sha256": "8c81c9c465b10268f9c8cea8e71ad0a876eb461aa8153484f4d78d1c787c80b0",
+      "bytes": 4682
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/blobs.rs",
+      "sha256": "726a28d19bc6597172404527c4ed9c732fdbb66a919dc7f2642f4cdd2790eac4",
+      "bytes": 3999
+    },
+    {
+      "path": "crates/kernel/chio-process/src/types.rs",
+      "sha256": "26ba7f6468167f743f7ab33ed10217583da7ee9457e69cc67415a896d4d6f3fc",
+      "bytes": 4343
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/processes.rs",
+      "sha256": "1ef700baf20e68415f0a477f42753af034aeb3581e06185abeefcf89b6e81122",
+      "bytes": 25017
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/crash_recovery.rs",
+      "sha256": "30ff56633c931ca5b55094d6ad12af3f1e5e1a9350e10f9bb689c9414e511ad7",
+      "bytes": 23989
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/active_response_simulation.rs",
+      "sha256": "38b551da16a27547af2de95067e5daf9fb17ffcc261cb2181cca6cc191c2afac",
+      "bytes": 6879
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/response_simulation_report.rs",
+      "sha256": "1a0bb7fa505eded04197fe0f3cd7066200055cbec40ce28ed9506afeba936ec1",
+      "bytes": 7717
+    },
+    {
+      "path": "crates/platform/chio-control-plane/tests/response_dry_run.rs",
+      "sha256": "84d1a3e1b314c87c2653a600cb4129271342d1143d4716f35d5f3e71c28ebd35",
+      "bytes": 6656
+    },
+    {
+      "path": "docs/security/launch-status.md",
+      "sha256": "2ffe55a75d021f582b8951ba08c9d750eee2968477ee2451a78d94d734d49ef2",
+      "bytes": 85461
+    },
+    {
+      "path": "docs/security/process-security-qualification.md",
+      "sha256": "539585d3fdb6b0b3e73a4156c87cb20420ffb4b782476999e3d401bee4cf4ff5",
+      "bytes": 123465
+    },
+    {
+      "path": "docs/reviews/2026-09-27-production-response-simulation.md",
+      "sha256": "6d8fb4b3db3825fe5100e95d115737a3f87a2c59f44aeda1d1bd935d6301472f",
+      "bytes": 7204
+    }
+  ],
+  "prototype_files": [
+    {
+      "path": "labs/openappa-recovery/Cargo.lock",
+      "sha256": "73998971f3129a5080f45852ad3dc9687500eba6bb8bbf3c615bd0bd749fa167",
+      "bytes": 20642
+    },
+    {
+      "path": "labs/openappa-recovery/Cargo.toml",
+      "sha256": "0eba8c256d16617250e75935ffc0d8f176b6636870870cfc73dd8516b321d904",
+      "bytes": 691
+    },
+    {
+      "path": "labs/openappa-recovery/README.md",
+      "sha256": "848cc6bb60b97b6b42a6f16b95fba2ca40c1ca9df6c4039fd9d1849b8073bc74",
+      "bytes": 7662
+    },
+    {
+      "path": "labs/openappa-recovery/src/fixture.rs",
+      "sha256": "2076da9d36e746c4c574ac2d0058d3ce730391b52195a608d35729574d30accd",
+      "bytes": 5589
+    },
+    {
+      "path": "labs/openappa-recovery/src/lib.rs",
+      "sha256": "03d17b03fca728a91171b5c31a1ff7c5f6f28750f436f6e4a62574d44d483169",
+      "bytes": 376
+    },
+    {
+      "path": "labs/openappa-recovery/src/main.rs",
+      "sha256": "0265dbdc3c87d877e3f657dd6246479f1a410a9628e44cf0f60c16539f8e555a",
+      "bytes": 1376
+    },
+    {
+      "path": "labs/openappa-recovery/src/offer.rs",
+      "sha256": "97b5acedbe70bd9b208bba1c0e491f0a4de7b282195860791d6915e7250059bf",
+      "bytes": 5949
+    },
+    {
+      "path": "labs/openappa-recovery/src/request.rs",
+      "sha256": "ea3abf94c4ec323476f6b8a31a0bbafe42250a41473b2337e57ac0ca9dc16d48",
+      "bytes": 1662
+    },
+    {
+      "path": "labs/openappa-recovery/src/types.rs",
+      "sha256": "f2836c67c1101c11cbe476c6b3f124b4e83925c46a8c5727a3bb1c148a32303b",
+      "bytes": 3307
+    },
+    {
+      "path": "labs/openappa-recovery/tests/consumption.rs",
+      "sha256": "a86a901bad5cd6ed7bd2fc2167fd37a8b3d85e1d4a89b21c45338f69db3d3ede",
+      "bytes": 6315
+    },
+    {
+      "path": "labs/openappa-recovery/tests/recovery.rs",
+      "sha256": "36b001d104327a117fbc91683f7ca99e541b61359eee09816d1bdab8f976af63",
+      "bytes": 9728
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/recovery_offer_binding_lab.rs",
+      "sha256": "657947248e818944876c96bc2b11bf95d9e55b1528b28b027abbe33e68fe6d11",
+      "bytes": 5744
+    }
+  ],
+  "evidence_boundaries": {
+    "prototype_host_snapshot": "synthetic; not read from serving kernel",
+    "offer_authentication": "not implemented",
+    "production_offer_persistence": "not implemented",
+    "native_recovery_workflow_integration": "not implemented",
+    "paid_model_evaluation": false,
+    "external_provider_dispatch": false,
+    "hosted_qualification": false,
+    "public_availability_verified": false
+  },
+  "remote_rechecked_at_end": {
+    "branch": "integration/process-security-m4",
+    "matches_base": true,
+    "commit": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2"
+  }
+}
