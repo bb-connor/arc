@@ -1,0 +1,88 @@
+{
+  "sourceCommit": "5f63e6e4e5284c182e9c94e56208c9a829e31a7e",
+  "siteCommit": "72b58f02c105c647920795886510e428b8757272",
+  "document": {
+    "vectorTests": 79,
+    "buildTests": 8,
+    "wireAssertions": 51,
+    "idnits": {
+      "errors": 0,
+      "warnings": 0,
+      "comments": 0
+    },
+    "pdfPages": 129,
+    "outsidePageWords": 0,
+    "normativeBlocks": 227,
+    "bcp14Occurrences": 591
+  },
+  "site": {
+    "testsPassed": 3338,
+    "testsSkipped": 1,
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "datasetsChecked": 21,
+    "snippetsChecked": 543,
+    "historicalTranscripts": 431,
+    "browserChecks": 34,
+    "axeViolations": 0
+  },
+  "baselineAudits": {
+    "proseFindingsIdentical": true,
+    "pageFindingsIdentical": true,
+    "sourceFindingsIdentical": true,
+    "added": 0
+  },
+  "hostedCI": "GitHub jobs could not start because of account billing/spending restriction",
+  "preview": {
+    "id": "dpl_HCRmhrZYkq9hmm4SuvAYFUUKi4Aq",
+    "state": "READY",
+    "httpStatus": 200,
+    "exactSourceRevision": true
+  },
+  "datatracker": "No submission performed",
+  "merge": {
+    "sha": "55b3243e5213831a28e2d0531a761dc5f7005af2",
+    "pr": "https://github.com/backbay-labs/chio-world/pull/221",
+    "treeMatchesTestedHead": true
+  },
+  "sharedTrackedChangesPreserved": {
+    "site": 459,
+    "source": 5
+  },
+  "verifiedAt": "2026-10-02T14:01:49.935867+00:00",
+  "production": {
+    "id": "dpl_95YRf4EPm7LeuQmuZQnRaHQQToDC",
+    "state": "READY",
+    "target": "production",
+    "gitSha": "55b3243e5213831a28e2d0531a761dc5f7005af2",
+    "aliases": [
+      "www.chio.computer",
+      "chio.computer",
+      "www.chio.world",
+      "chio.world"
+    ],
+    "httpArtifactChecks": 16,
+    "browserChecks": 6,
+    "mobileAxeViolations": 0,
+    "errorLogEntriesInSampled10MinuteWindow": 0
+  },
+  "search": {
+    "revision": "7a4e35a0ec6cabb13c3ecdb5274695f0af283f6e17c6315e61ad4b550d2c2df6",
+    "totalChunks": 8112,
+    "embeddedChunks": 8112,
+    "draftChunks": 156,
+    "newDraftChunks": 13,
+    "changedDraftChunks": 72,
+    "embeddedThisRelease": 85,
+    "embeddingInputTokens": 35500,
+    "pendingDraftDifferences": 0,
+    "missingDraftEmbeddings": 0,
+    "liveQueries": 4,
+    "liveMode": "hybrid",
+    "allChangesScopedToDraft": true
+  },
+  "toolingWarnings": [
+    "The PostgreSQL client reports a future sslmode alias compatibility warning. This release did not change database TLS settings.",
+    "The installed Vercel CLI is 60.1.3; release inspection used 62.1.0 through a separate npx cache."
+  ]
+}

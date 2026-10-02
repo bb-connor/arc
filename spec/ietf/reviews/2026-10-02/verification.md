@@ -1,6 +1,6 @@
 # Verification of the release-target draft
 
-All results below are local document-review results from October 2, 2026.
+Document and publication verification completed on October 2, 2026. The first table records local document checks; production verification is recorded separately below.
 
 | Check | Result |
 |---|---|
@@ -49,3 +49,19 @@ The wire checks do not run the Rust kernel. They do not prove durable admission,
 ## Public package
 
 The reviewed prose and all five source/rendering inputs match the public source package at `5f63e6e4e5284c182e9c94e56208c9a829e31a7e`, branch `docs/ietf-production-profile-20261002` in the public Chio repository. Public review and submission summaries replace internal provenance links in that package. The internal review source was refreshed to `df9f1791b3` and all 51 independent assertions were repeated successfully.
+
+The second pass also inspected PDF pages 54, 77, 81, 93, and 100 at 1300-pixel height after regeneration. No clipping or overlapping content was observed.
+
+## Site publication
+
+[Site PR 221](https://github.com/backbay-labs/chio-world/pull/221) merged as `55b3243e5213831a28e2d0531a761dc5f7005af2`. Its tree exactly matches the tested branch at `72b58f02c105c647920795886510e428b8757272`. Vercel production deployment `dpl_95YRf4EPm7LeuQmuZQnRaHQQToDC` is READY at that merge commit, with both Chio domains and their `www` aliases attached. The public source package is published on its named branch and pinned immutably by the site; this record does not claim a merge into the public source repository's main branch.
+
+Local site verification passed 3,338 unit tests (one existing skip), TypeScript, the production build, 21 generated datasets, 543 snippets, CLI source comparison, and 431 historical transcript integrity checks. A reviewed compatibility certificate preserves the existing transcript capture; these transcripts were not recaptured. All 34 production-build browser checks passed, covering responsive layout, source and paragraph anchors, keyboard and touch behavior, citations, downloads, JavaScript-disabled reading, and zero desktop/mobile axe violations.
+
+After deployment, 16 HTTP checks verified the reader and byte-identical TXT/XML/PDF downloads across all four public hostnames. Six browser checks against production passed, including source anchors, mobile deep links, mobile accessibility, and all three download hashes. No error entries were returned in the sampled ten-minute production log window.
+
+The search publisher changed only this draft: 13 new and 72 changed chunks received embeddings. The resulting index revision is `7a4e35a0ec6cabb13c3ecdb5274695f0af283f6e17c6315e61ad4b550d2c2df6`, with 8,112 of 8,112 chunks embedded. A post-publication comparison found all 156 draft chunks unchanged and no missing embeddings. Four live queries across both public domains returned the revised lifecycle and signing-key sections using hybrid keyword/semantic retrieval.
+
+Repository-wide prose, page, and source-reference audits reproduced the base's existing findings, with none added. GitHub Actions jobs could not start because GitHub reported an account billing/spending restriction. Hosted CI is therefore not recorded as passing; the local checks and successful Vercel builds are separate evidence. The search client emitted an existing future PostgreSQL `sslmode` compatibility warning, without any TLS configuration change. Vercel inspection used CLI 62.1.0, while the global installation remains 60.1.3.
+
+The shared checkouts' snapshotted tracked changes were preserved (459 site files and five source files). No runtime implementation or Datatracker submission was performed. [Publication results](publication-verification.json), [live artifact checks](production-artifact-verification.json), and [live search checks](production-search-verification.json) retain the exact release evidence.

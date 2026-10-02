@@ -1,0 +1,65 @@
+{
+  "verifiedAt": "2026-10-02T14:00:20.903735+00:00",
+  "checks": [
+    {
+      "host": "www.chio.computer",
+      "query": "Durable Execution Lifecycle",
+      "status": 200,
+      "mode": "hybrid",
+      "availability": {
+        "keyword": "available",
+        "semantic": "available"
+      },
+      "indexVersion": "7a4e35a0ec6cabb13c3ecdb5274695f0af283f6e17c6315e61ad4b550d2c2df6",
+      "draftAnchors": [
+        "section-3.4"
+      ],
+      "tookMs": 237
+    },
+    {
+      "host": "www.chio.computer",
+      "query": "Signing Roles and Key Lifecycle",
+      "status": 200,
+      "mode": "hybrid",
+      "availability": {
+        "keyword": "available",
+        "semantic": "available"
+      },
+      "indexVersion": "7a4e35a0ec6cabb13c3ecdb5274695f0af283f6e17c6315e61ad4b550d2c2df6",
+      "draftAnchors": [
+        "section-15.4.1"
+      ],
+      "tookMs": 199
+    },
+    {
+      "host": "www.chio.world",
+      "query": "Durable Execution Lifecycle",
+      "status": 200,
+      "mode": "hybrid",
+      "availability": {
+        "keyword": "available",
+        "semantic": "available"
+      },
+      "indexVersion": "7a4e35a0ec6cabb13c3ecdb5274695f0af283f6e17c6315e61ad4b550d2c2df6",
+      "draftAnchors": [
+        "section-3.4"
+      ],
+      "tookMs": 216
+    },
+    {
+      "host": "www.chio.world",
+      "query": "Signing Roles and Key Lifecycle",
+      "status": 200,
+      "mode": "hybrid",
+      "availability": {
+        "keyword": "available",
+        "semantic": "available"
+      },
+      "indexVersion": "7a4e35a0ec6cabb13c3ecdb5274695f0af283f6e17c6315e61ad4b550d2c2df6",
+      "draftAnchors": [
+        "section-15.4.1"
+      ],
+      "tookMs": 227
+    }
+  ]
+}

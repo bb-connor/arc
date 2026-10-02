@@ -1,0 +1,111 @@
+{
+  "verifiedAt": "2026-10-02T13:53:34Z",
+  "checks": [
+    {
+      "url": "https://chio.computer/docs/reference/ietf-draft",
+      "finalURL": "https://www.chio.computer/docs/reference/ietf-draft",
+      "status": 200,
+      "source": "5f63e6e4e5284c182e9c94e56208c9a829e31a7e",
+      "bodyBytes": 4171191
+    },
+    {
+      "url": "https://chio.computer/ietf/draft-whelan-chio-protocol-00.txt",
+      "status": 200,
+      "bytes": 392812,
+      "sha256": "2e6fe24f48ec784d46b032b7f4f51bccb345d3972964598c1f9716bef78b543f"
+    },
+    {
+      "url": "https://chio.computer/ietf/draft-whelan-chio-protocol-00.xml",
+      "status": 200,
+      "bytes": 585617,
+      "sha256": "158b68fbfcfe517df4778bb978f0e51dd7d4c45fdf7e8d2a51a15f0f583175c1"
+    },
+    {
+      "url": "https://chio.computer/ietf/draft-whelan-chio-protocol-00.pdf",
+      "status": 200,
+      "bytes": 605098,
+      "sha256": "ff828a7546df555047a4e5cf122eba9dc31ddbbf5aff7d4e122ae012e9a24fbd"
+    },
+    {
+      "url": "https://www.chio.computer/docs/reference/ietf-draft",
+      "finalURL": "https://www.chio.computer/docs/reference/ietf-draft",
+      "status": 200,
+      "source": "5f63e6e4e5284c182e9c94e56208c9a829e31a7e",
+      "bodyBytes": 4172635
+    },
+    {
+      "url": "https://www.chio.computer/ietf/draft-whelan-chio-protocol-00.txt",
+      "status": 200,
+      "bytes": 392812,
+      "sha256": "2e6fe24f48ec784d46b032b7f4f51bccb345d3972964598c1f9716bef78b543f"
+    },
+    {
+      "url": "https://www.chio.computer/ietf/draft-whelan-chio-protocol-00.xml",
+      "status": 200,
+      "bytes": 585617,
+      "sha256": "158b68fbfcfe517df4778bb978f0e51dd7d4c45fdf7e8d2a51a15f0f583175c1"
+    },
+    {
+      "url": "https://www.chio.computer/ietf/draft-whelan-chio-protocol-00.pdf",
+      "status": 200,
+      "bytes": 605098,
+      "sha256": "ff828a7546df555047a4e5cf122eba9dc31ddbbf5aff7d4e122ae012e9a24fbd"
+    },
+    {
+      "url": "https://chio.world/docs/reference/ietf-draft",
+      "finalURL": "https://www.chio.world/docs/reference/ietf-draft",
+      "status": 200,
+      "bytes": 4172635,
+      "sha256": null
+    },
+    {
+      "url": "https://chio.world/ietf/draft-whelan-chio-protocol-00.txt",
+      "finalURL": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.txt",
+      "status": 200,
+      "bytes": 392812,
+      "sha256": "2e6fe24f48ec784d46b032b7f4f51bccb345d3972964598c1f9716bef78b543f"
+    },
+    {
+      "url": "https://chio.world/ietf/draft-whelan-chio-protocol-00.xml",
+      "finalURL": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.xml",
+      "status": 200,
+      "bytes": 585617,
+      "sha256": "158b68fbfcfe517df4778bb978f0e51dd7d4c45fdf7e8d2a51a15f0f583175c1"
+    },
+    {
+      "url": "https://chio.world/ietf/draft-whelan-chio-protocol-00.pdf",
+      "finalURL": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.pdf",
+      "status": 200,
+      "bytes": 605098,
+      "sha256": "ff828a7546df555047a4e5cf122eba9dc31ddbbf5aff7d4e122ae012e9a24fbd"
+    },
+    {
+      "url": "https://www.chio.world/docs/reference/ietf-draft",
+      "finalURL": "https://www.chio.world/docs/reference/ietf-draft",
+      "status": 200,
+      "bytes": 4172635,
+      "sha256": null
+    },
+    {
+      "url": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.txt",
+      "finalURL": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.txt",
+      "status": 200,
+      "bytes": 392812,
+      "sha256": "2e6fe24f48ec784d46b032b7f4f51bccb345d3972964598c1f9716bef78b543f"
+    },
+    {
+      "url": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.xml",
+      "finalURL": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.xml",
+      "status": 200,
+      "bytes": 585617,
+      "sha256": "158b68fbfcfe517df4778bb978f0e51dd7d4c45fdf7e8d2a51a15f0f583175c1"
+    },
+    {
+      "url": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.pdf",
+      "finalURL": "https://www.chio.world/ietf/draft-whelan-chio-protocol-00.pdf",
+      "status": 200,
+      "bytes": 605098,
+      "sha256": "ff828a7546df555047a4e5cf122eba9dc31ddbbf5aff7d4e122ae012e9a24fbd"
+    }
+  ]
+}
