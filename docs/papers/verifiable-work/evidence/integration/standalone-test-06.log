@@ -1,0 +1,148 @@
+   Compiling chio-store-sqlite v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-paper-security-integration/examples/federated-work)
+error[E0308]: mismatched types
+   --> src/funded_work/finding_context.rs:190:21
+    |
+190 |             log_id: finding_checkpoint_log_id(&checkpoint.key),
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `String`, found `Result<String, FindingError>`
+    |
+    = note: expected struct `std::string::String`
+                 found enum `std::result::Result<std::string::String, FindingError>`
+help: use the `?` operator to extract the `std::result::Result<std::string::String, FindingError>` value, propagating a `Result::Err` value to the caller
+    |
+190 |             log_id: finding_checkpoint_log_id(&checkpoint.key)?,
+    |                                                               +
+
+error[E0277]: `std::result::Result<std::string::String, FindingError>` doesn't implement `std::fmt::Display`
+   --> src/funded_work/finding_acceptance_tests.rs:366:9
+    |
+365 |         "{}#1",
+    |          -- required by this formatting parameter
+366 |         finding_checkpoint_log_id(&checkpoint_key.public_key())
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `std::result::Result<std::string::String, FindingError>` cannot be formatted with the default formatter
+    |
+    = help: the trait `std::fmt::Display` is not implemented for `std::result::Result<std::string::String, FindingError>`
+    = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+    = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the macro `format` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+    --> src/provider.rs:367:9
+     |
+ 366 |       kernel.set_dpop_store(
+     |              -------------- arguments to this method are incorrect
+ 367 | /         chio_kernel::dpop::DpopNonceStore::new(
+ 368 | |             dpop.nonce_store_capacity,
+ 369 | |             Duration::from_secs(dpop.proof_ttl_secs + dpop.max_clock_skew_secs),
+ 370 | |         ),
+     | |_________^ expected `DpopNonceStore`, found `Result<DpopNonceStore, DpopError>`
+     |
+     = note: expected struct `DpopNonceStore`
+                  found enum `std::result::Result<DpopNonceStore, DpopError>`
+note: method defined here
+    --> /tmp/chio-paper-security-integration/crates/kernel/chio-kernel/src/kernel/construction.rs:1794:12
+     |
+1794 |     pub fn set_dpop_store(
+     |            ^^^^^^^^^^^^^^
+help: use the `?` operator to extract the `std::result::Result<DpopNonceStore, DpopError>` value, propagating a `Result::Err` value to the caller
+     |
+ 370 |         )?,
+     |          +
+
+error[E0308]: mismatched types
+   --> src/provider.rs:558:50
+    |
+558 |         let Some(response) = edge.handle_jsonrpc(value, &kernel, &context).into_value() else {
+    |                                   -------------- ^^^^^ expected `&[u8]`, found `Value`
+    |                                   |
+    |                                   arguments to this method are incorrect
+    |
+note: method defined here
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/jsonrpc.rs:180:12
+    |
+180 |     pub fn handle_jsonrpc(
+    |            ^^^^^^^^^^^^^^
+
+error[E0599]: no method named `into_value` found for enum `std::result::Result<T, E>` in the current scope
+   --> src/provider.rs:558:76
+    |
+558 |         let Some(response) = edge.handle_jsonrpc(value, &kernel, &context).into_value() else {
+    |                                                                            ^^^^^^^^^^
+    |
+note: the method `into_value` exists on the type `A2aJsonRpcResponse`
+   --> /tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge/src/types.rs:181:5
+    |
+181 |     pub fn into_value(self) -> Option<Value> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: use the `?` operator to extract the `A2aJsonRpcResponse` value, propagating a `Result::Err` value to the caller
+    |
+558 |         let Some(response) = edge.handle_jsonrpc(value, &kernel, &context)?.into_value() else {
+    |                                                                           +
+help: there is a method `into_raw` with a similar name
+    |
+558 -         let Some(response) = edge.handle_jsonrpc(value, &kernel, &context).into_value() else {
+558 +         let Some(response) = edge.handle_jsonrpc(value, &kernel, &context).into_raw() else {
+    |
+
+error[E0308]: mismatched types
+   --> src/review.rs:576:40
+    |
+576 |         || finance.budget_remaining != 0
+    |            ------------------------    ^ expected `Option<u64>`, found integer
+    |            |
+    |            expected because this is `std::option::Option<u64>`
+    |
+    = note: expected enum `std::option::Option<u64>`
+               found type `{integer}`
+help: try wrapping the expression in `Some`
+    |
+576 |         || finance.budget_remaining != Some(0)
+    |                                        +++++ +
+
+error[E0308]: mismatched types
+   --> src/review.rs:577:36
+    |
+577 |         || finance.budget_total != 100
+    |            --------------------    ^^^ expected `Option<u64>`, found integer
+    |            |
+    |            expected because this is `std::option::Option<u64>`
+    |
+    = note: expected enum `std::option::Option<u64>`
+               found type `{integer}`
+help: try wrapping the expression in `Some`
+    |
+577 |         || finance.budget_total != Some(100)
+    |                                    +++++   +
+
+error[E0308]: mismatched types
+   --> src/review.rs:670:40
+    |
+670 |         || finance.budget_remaining != 100
+    |            ------------------------    ^^^ expected `Option<u64>`, found integer
+    |            |
+    |            expected because this is `std::option::Option<u64>`
+    |
+    = note: expected enum `std::option::Option<u64>`
+               found type `{integer}`
+help: try wrapping the expression in `Some`
+    |
+670 |         || finance.budget_remaining != Some(100)
+    |                                        +++++   +
+
+error[E0308]: mismatched types
+   --> src/review.rs:671:36
+    |
+671 |         || finance.budget_total != 100
+    |            --------------------    ^^^ expected `Option<u64>`, found integer
+    |            |
+    |            expected because this is `std::option::Option<u64>`
+    |
+    = note: expected enum `std::option::Option<u64>`
+               found type `{integer}`
+help: try wrapping the expression in `Some`
+    |
+671 |         || finance.budget_total != Some(100)
+    |                                    +++++   +
+
+Some errors have detailed explanations: E0277, E0308, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `chio-federated-work` (bin "chio-federated-work" test) due to 9 previous errors

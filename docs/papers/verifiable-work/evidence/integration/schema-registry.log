@@ -1,0 +1,2 @@
+MANIFEST.sha256 path set is not deterministic
+MANIFEST.sha256 bytes do not match deterministic regeneration

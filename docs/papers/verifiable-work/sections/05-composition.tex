@@ -1,0 +1,67 @@
+\section{What composes}
+The following argument abstracts cryptography, finality and transaction
+execution into the assumptions of Section 2. It concerns admitted obligations,
+not the correctness of the entire implementation.
+
+For each funding source $u$, let $D_u$ be its fixed deposited endowment,
+$A_u$ its unallocated balance, $L_u$ its locked allocations, $P_u$ its paid
+outflow and $R_u$ its refunded outflow. Returned cash remains recorded as an
+outflow in this accounting interval; a later deposit opens a new interval.
+The conservation invariant is
+\begin{equation}
+ D_u=A_u+L_u+P_u+R_u,\qquad A_u,L_u,P_u,R_u\geq0. \label{eq:conservation}
+\end{equation}
+
+\begin{proposition}[Bounded funded exposure]
+If reservation moves $q\leq A_u$ from available to locked funds, and payment
+or refund moves an allocation's locked amount once to its corresponding
+outflow, every reachable state satisfies (\ref{eq:conservation}). Total paid
+and refunded outflow is at most the original deposit.
+\end{proposition}
+\begin{proof}
+The initial state is $(D_u,0,0,0)$. Reservation subtracts and adds the same
+quantity within the sum. Payment and refund do the same across a different
+pair of accounts. Their guards preserve nonnegativity. Other transitions do
+not change money. Induction over the transition sequence proves the equality
+and bound. This argument requires the implementation to identify allocations
+uniquely and couple each state transition with its actual transfer.
+\end{proof}
+
+\begin{proposition}[Earned child independence]
+Suppose each work edge has a distinct allocation with its own immutable terms,
+an earned claim can only remain payable or become paid, and a transition on
+one edge cannot modify another's allocation. Then any sequence of parent
+failure, refund or completion transitions leaves an earned unpaid child
+collectible under its original terms.
+\end{proposition}
+\begin{proof}
+A transition concerning another edge leaves the child unchanged. A transition
+on the child preserves the set $\{\textsf{Payable},\textsf{Paid}\}$. Induction
+therefore excludes child refund after acceptance. Distinct funding prevents a
+parent transfer from consuming the child's reserve. Eventual collection further
+requires availability, an exercisable beneficiary key and transaction inclusion.
+\end{proof}
+
+A small Lean specification checks conservation over arbitrary finite account
+traces, the paid-plus-refunded bound, persistence of the earned states, and
+noninterference of distinct map entries. A finite Python explorer checks
+concrete timing and role guards; selected traces are replayed against Solidity.
+These are complementary checks. There is no machine-checked refinement from the
+Rust kernel or Solidity contract to the Lean specification, and the arithmetic
+proof does not authenticate a signer or prove that a token is honest.
+
+The capital cost follows directly. If $E_{\rm open}$ contains the distinct
+unsettled obligations, their reserve is $\sum_{e\in E_{\rm open}}q_e$. A chain of
+promised future receipts cannot reduce this amount under F1. The example locks
+160 units while the two obligations coexist, although the buyer's task costs
+100. Short milestones may reduce capital duration; they do not eliminate
+capital needs. Capital efficiency must be measured alongside success rate.
+
+A payer-only signature cannot supply the missing exclusivity. Consider two
+receivers that see individually valid promises against the same deposit and
+have no common state or other non-equivocation mechanism. Each receiver's view
+is indistinguishable from a run in which it is the only payee. If both accept
+on that evidence alone, the two promises can exceed the deposit. The argument
+identifies a missing shared fact; a conventional trusted ledger, a qualified
+rollback-resistant authority or a settlement chain can supply it. It is not an
+impossibility result about OAuth, A2A, capabilities or ordinary escrow.

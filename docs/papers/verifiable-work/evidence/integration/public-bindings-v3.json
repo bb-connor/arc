@@ -1,0 +1,73 @@
+{
+  "binary": {
+    "path": "/tmp/chio-paper-integration-evidence/bin/chio-federated-work-v3",
+    "sha256": "919d5f4bad46f318f4e505e0377ee94f751a35a218c4713c1af58b06a1cdcfdf"
+  },
+  "bindings": {
+    "peer-pay": {
+      "agreementSha256": "0e0c12de7cd0926728f659e3f2be1d83baf4ca03ee6aad6e5c83131c9e1cf04b",
+      "allocationId": "0xbd4b175beab9203c511e65c79a21d5362a5ec5d6a5cb9329051f225b0dae980a",
+      "authorityUuid": "01a0fd4a-62ab-73f3-9435-496479dad4de",
+      "authorizationId": "funded-bd4b175beab9203c511e65c79a21d5362a5ec5d6a5cb9329051f225b0dae980a",
+      "decisionSha256": "9e1f89e832e87948ef882433251863cd92bf8319914213b7bfd16c8b915a7c20",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 1,
+        "Refunded": 0,
+        "TimedOut": 0
+      },
+      "executions": 1,
+      "files": {
+        "": "d25898a2786b6a0f4016a105b076f59c103576791aedcb5176f10b7956234b68",
+        "-decision": "9e1f89e832e87948ef882433251863cd92bf8319914213b7bfd16c8b915a7c20",
+        "-verifier-enrollment": "ed2c11dc6bb89f859b8557d73f930176033f4b368009a9b83389399a38e3395f"
+      },
+      "holdId": "admission-budget:83ac180ed068afc79973de0abd422f5fa266af86fd36ef42f2b49fc588452bec:0",
+      "nativePaymentState": "Settled",
+      "nativeState": "Completed",
+      "operationId": "83ac180ed068afc79973de0abd422f5fa266af86fd36ef42f2b49fc588452bec",
+      "paid": "100",
+      "paymentState": "paid",
+      "refunded": "0",
+      "requestSha256": "8cb382d7c9558f3a6696af865eeba954a52dfc99780b082531a61c4e084f9694",
+      "settlementTransaction": "0xc427eeecd45c5419d378466a1d8b332d5e9bb46698c2c501701fe4404f2132af"
+    },
+    "peer-reject": {
+      "agreementSha256": "3afd350280b9d4708a4ade59664c2c4ab0f22047c994eae6754a51fc7068bdbf",
+      "allocationId": "0x798b664da8a0831807d908707f0e1af754ff01f47065e954591b949f1c073827",
+      "authorityUuid": "01a0fd4a-d773-71d3-9b0c-cf40118413d9",
+      "authorizationId": "funded-798b664da8a0831807d908707f0e1af754ff01f47065e954591b949f1c073827",
+      "decisionSha256": "64df814af73fddb2e5f2c43ee782907b5ef679b426d687a3893a59c307d5ffba",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 0,
+        "Refunded": 1,
+        "TimedOut": 0
+      },
+      "executions": 1,
+      "files": {
+        "": "977706858a53148d2041bc9ff25e52ca505c7b1d16a5d9f3e47c1331f5791e12",
+        "-decision": "64df814af73fddb2e5f2c43ee782907b5ef679b426d687a3893a59c307d5ffba",
+        "-verifier-enrollment": "8a65765cf335f03af871b102898dafb1f709a43d45db2759b152a8bdfa282add"
+      },
+      "holdId": "admission-budget:22c20940a5a6976f304f834c14db419f6bfa253603eff0a9bbf8023d3313e488:0",
+      "nativePaymentState": "Settling",
+      "nativeState": "Finalizing",
+      "operationId": "22c20940a5a6976f304f834c14db419f6bfa253603eff0a9bbf8023d3313e488",
+      "paid": "0",
+      "paymentState": "refunded",
+      "refunded": "100",
+      "requestSha256": "04feae536936f3ef0cba1b2dc2347629cec21103719c4fa7566c62af2f840a76",
+      "settlementTransaction": "0xe29d6353f819bb2565bd6c5b292cf62716bd4ff2c7eb4bedef211f47352a0973"
+    }
+  },
+  "scope": "Public test fixtures on an owned mock chain; no independent administration or public-chain finality.",
+  "sourceManifest": {
+    "file": "source-manifest-v3.json",
+    "sha256": "c69a4db94361b2e4719ecac0d43af1d8088357903895d73637951f9a905710b4"
+  }
+}

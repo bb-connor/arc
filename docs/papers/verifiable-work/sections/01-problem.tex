@@ -1,0 +1,40 @@
+\section{Work between organizations}
+A buyer commissions a software review for 100 units. Its provider buys a
+specialist's analysis for 60. The specialist delivers acceptable work, but the
+provider crashes before completing the review. Two facts should survive: the
+buyer has not received its result, and the specialist has earned payment.
+Returning the buyer's funds must not erase the specialist's claim. Keeping the
+specialist paid must not require access to the provider's private scheduler,
+database or signing keys.
+
+This example separates an agent workflow from a work economy. Within one
+application, a coordinator can schedule tasks, allocate a budget and interpret
+success. Between organizations, those decisions belong to different principals.
+A remote operator can fork its database, sign contradictory promises or stop
+responding. Its signature authenticates a statement; it cannot establish that
+all its promises are jointly funded. Likewise, a payment receipt proves a
+financial event, not that the agreed work was performed.
+
+The unit of cooperation we propose is a \emph{work contract}: immutable terms
+that identify a bounded task, its acceptance procedure and a funded obligation.
+The receiver admits the task under its own authority. Evidence of execution and
+acceptance can travel; the power to use the receiver's resources cannot be
+installed by the arriving evidence. Payment becomes collectible through the
+agreed settlement mechanism rather than a new discretionary promise from the
+buyer.
+
+This construction uses existing cryptography and settlement. It does not create
+scarcity from signatures or equate useful work with consensus proof of work.
+Bitcoin resolves competing spends through a shared history under explicit
+assumptions~\cite{bitcoin}. Here the settlement domain supplies that history;
+the harder application question is what evidence should make a particular work
+obligation payable, and how that event relates to local execution.
+
+Our result is a concrete composition with a narrow demonstration. We identify
+the commitments each boundary must preserve, state the safety argument, and
+make its failure cases executable. We also implement the obvious alternative:
+an ordinary database escrow with the same transition rules. Its matching result
+is part of the evaluation. The protocol's broader promise is that parties can
+implement one public contract and change partners without adopting a common
+application. That promise requires an independent interoperability and
+integration study; it does not follow from the safety argument.

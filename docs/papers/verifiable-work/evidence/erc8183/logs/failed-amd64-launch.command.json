@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "/tmp/chio-paper-erc8183-artifact/tools/forge-amd64",
+    "--version"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183",
+  "started_at": "2026-10-02T15:16:16.289194+00:00",
+  "elapsed_seconds": 0.000874844379723072,
+  "exit_status": 126,
+  "log": "logs/failed-amd64-launch.log"
+}

@@ -1,0 +1,81 @@
+\section{The work contract}
+For exposition, write an agreement as
+\[
+ A=(B,P,I,C,D,F,T,L),\qquad a=H(\operatorname{canon}(A)).
+\]
+$I$ commits the input, $C$ identifies the checker and acceptance policy, $D$
+defines permitted disclosure, $F$ identifies the funding domain and terms, $T$
+sets the deadlines, and $L$ names any parent agreement. Both parties sign the
+same canonical agreement. This tuple is a description of the common contract,
+not a replacement wire encoding. The artifact companion maps it to the
+versioned implementation objects.
+
+An agreement has three bindings. \emph{Authority binding} connects it to the
+receiver's own admitted operation and bounded local grant. \emph{Result binding}
+connects the exact input, output and acceptance procedure. \emph{Funding binding}
+connects the agreement and result commitment to one allocation, beneficiary,
+asset and amount in one settlement domain. These bindings prevent a valid
+statement about one relationship from being reused as a statement about another.
+They do not establish useful work independently of the acceptance procedure.
+
+\subsection{Funding is an allocation}
+The payer deposits $q>0$ units into an allocation $f$. The reference contract
+derives its allocation identifier from the chain, contract address and complete
+terms. The agreement digest, payer, beneficiary, verifier, asset, amount and
+four deadlines are immutable. A new payer agreement cannot be funded twice
+under the same payer and digest. The receiver checks the selected contract code
+and observation source before relying on an allocation.
+
+A provider does not start merely because a payer supplies a signed balance. It
+requires an acceptable observation of the actual reserved allocation and a
+local admission decision bound to it. The binding does not atomically fuse a
+remote blockchain with a local database. Fresh observation, the deadline
+margin, retained operation identity and conservative recovery are necessary.
+If the chain reorganizes after an observation, the profile's finality assumption
+has failed or the observation was premature. A local receipt cannot repair that.
+
+\subsection{Acceptance is an explicit decision}
+A submission commits the result and its evidence. A verifier checks the exact
+agreement, allocation, input, output, checker and custody record before issuing
+a decision. Missing evidence produces no decision. An available result that
+fails the predicate produces rejection. These outcomes must remain distinct:
+a verifier outage is not proof that the provider delivered bad work.
+
+Off-chain artifacts use canonical JSON and Ed25519 signatures~\cite{jcs}.
+The reference escrow accepts a separate EIP-712 decision~\cite{eip712}, binding
+the allocation, agreement, submission commitment, decision digest, acceptance
+bit, beneficiary, asset and amount. Its domain includes chain ID and contract
+address. The contract verifies the pinned signer's decision, not the
+application predicate. The publication artifact specifies which digests cover
+bodies and which cover complete signed envelopes; those encodings cannot be
+interchanged.
+
+\subsection{A child is a separate obligation}
+A parent link records provenance. It is not collateral and grants no authority.
+Before hiring a specialist, the intermediary must commit funds it already
+controls to a different allocation. In the opening example, the buyer deposits
+100 and the intermediary deposits 60. The buyer's reserved 100 is not available
+for the intermediary to pledge again. If the intermediary cannot finance the
+60, this profile cannot admit the subcontract. Credit or conditional netting
+would require a different contract and a different failure argument.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\small,box/.style={draw=ink,rounded corners=2pt,align=center,minimum width=2.8cm,minimum height=0.9cm},>=Latex]
+\node[box] (b) {Buyer $B$\\local authority};
+\node[box,right=2.5cm of b] (p) {Provider $P$\\local authority};
+\node[box,right=2.5cm of p] (s) {Specialist $S$\\local authority};
+\draw[->,thick] (b) -- node[above]{agreement} (p);
+\draw[->,thick] (p) -- node[above]{subcontract} (s);
+\node[box,below=1.1cm of b] (f1) {Allocation $f_1$\\100 from $B$};
+\node[box,below=1.1cm of s] (f2) {Allocation $f_2$\\60 from $P$};
+\draw[->] (b) -- (f1);
+\draw[->] (p.south) -- node[left]{deposit} (f2.north west);
+\draw[->,dashed] (f2) -- node[right]{earned claim} (s);
+\node[align=center,below=0.22cm of f1.south east,anchor=north west] {Parent refund leaves $f_2$ intact.\\Evidence crosses; each receiver admits locally.};
+\end{tikzpicture}
+\caption{Work dependencies and funding dependencies differ. Each obligation has
+its own backing; the figure depicts neither a shared application operator nor
+an absence of shared settlement and verification dependencies.}
+\label{fig:work}
+\end{figure}

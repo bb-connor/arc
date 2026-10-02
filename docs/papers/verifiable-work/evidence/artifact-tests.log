@@ -1,0 +1,12 @@
+test_parent_refund_cannot_erase_a_child_earned_right (test_comparison.ComparisonTests.test_parent_refund_cannot_erase_a_child_earned_right) ... ok
+test_replays_representative_traces_in_sql_transactions (test_comparison.ComparisonTests.test_replays_representative_traces_in_sql_transactions) ... ok
+test_unknown_execution_and_unavailable_verifier_do_not_become_rejection (test_comparison.ComparisonTests.test_unknown_execution_and_unavailable_verifier_do_not_become_rejection) ... ok
+test_changed_evidence_fails_closed (test_evidence.EvidenceTests.test_changed_evidence_fails_closed) ... ok
+test_inventory_cannot_read_outside_artifact_root (test_evidence.EvidenceTests.test_inventory_cannot_read_outside_artifact_root) ... ok
+test_publication_cannot_drop_required_gates (test_evidence.EvidenceTests.test_publication_cannot_drop_required_gates) ... ok
+test_publication_requires_results_and_explicit_readiness (test_evidence.EvidenceTests.test_publication_requires_results_and_explicit_readiness) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.064s
+
+OK

@@ -1,0 +1,52 @@
+[31mThe application panicked (crashed).[0m
+Message:  [36merror: the config-path must be a path to a foundry.toml file[0m
+Location: [35mcrates/cli/src/opts/build/core.rs[0m:[35m188[0m
+
+This is a bug. Consider reporting it at https://github.com/foundry-rs/foundry
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BACKTRACE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   1: [91m<color_eyre[2538dcda10c9682a]::config::PanicHook>::panic_report[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+   2: [91m<color_eyre[2538dcda10c9682a]::config::PanicHook>::into_panic_hook::{closure#0}[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+   3: [91mstd[ad1da5b0f5a79652]::panicking::panic_with_hook[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+   4: [91mstd[ad1da5b0f5a79652]::panicking::panic_handler::{closure#0}[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+   5: [91mstd[ad1da5b0f5a79652]::sys::backtrace::__rust_end_short_backtrace::<std[ad1da5b0f5a79652]::panicking::panic_handler::{closure#0}, !>[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+   6: [91m__rustc[9d087a5ab36ea756]::rust_begin_unwind[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+   7: [91mcore[f95829038d642618]::panicking::panic_fmt[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+   8: [91m<figment2[2acd6206de166e]::figment::Figment as core[f95829038d642618]::convert::From<&foundry_cli[b4930140374a714b]::opts::build::core::BuildOpts>>::from[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+   9: [91m<figment2[2acd6206de166e]::figment::Figment as core[f95829038d642618]::convert::From<&forge[9eb264b29f68f9]::cmd::test::TestArgs>>::from[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  10: [91m<forge[9eb264b29f68f9]::cmd::test::TestArgs>::compile_project::{closure#0}[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  11: [91m<forge[9eb264b29f68f9]::cmd::test::TestArgs>::compile_and_run::{closure#0}[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  12: [91m<forge[9eb264b29f68f9]::cmd::test::TestArgs>::run::{closure#0}[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  13: [91m<foundry_cli[b4930140374a714b]::opts::global::GlobalArgs>::block_on::<<forge[9eb264b29f68f9]::cmd::test::TestArgs>::run::{closure#0}>[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  14: [91mforge[9eb264b29f68f9]::args::run_command[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  15: [91mforge[9eb264b29f68f9]::args::run[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  16: [91mforge[1281ee3f8ebb1ca7]::main[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  17: [91mstd[ad1da5b0f5a79652]::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  18: [32mmain[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+  19: [91m__libc_start_call_main[0m[90m<unknown>[0m
+      at [35m./csu/../sysdeps/nptl/libc_start_call_main.h[0m:[35m58[0m
+  20: [32m__libc_start_main_impl[0m[90m<unknown>[0m
+      at [35m./csu/../csu/libc-start.c[0m:[35m360[0m
+  21: [32m_start[0m[90m<unknown>[0m
+      at [35m<unknown source file>[0m:[35m<unknown line>[0m
+
+Run with COLORBT_SHOW_HIDDEN=1 environment variable to disable frame filtering.
+Run with RUST_BACKTRACE=full to include source snippets.

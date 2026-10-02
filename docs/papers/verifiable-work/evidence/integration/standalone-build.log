@@ -1,0 +1,34 @@
+   Compiling chio-kernel v0.1.0 (/tmp/chio-paper-security-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/chio-paper-security-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-edge-metrics v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-a2a-adapter v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-a2a-adapter)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-mcp-edge v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/tmp/chio-paper-security-integration/crates/protocol/chio-a2a-edge)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/chio-paper-security-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-paper-security-integration/examples/federated-work)
+warning: unused `std::result::Result` that must be used
+   --> src/provider.rs:366:5
+    |
+366 | /     kernel.set_dpop_store(
+367 | |         chio_kernel::dpop::DpopNonceStore::new(
+368 | |             dpop.nonce_store_capacity,
+369 | |             Duration::from_secs(dpop.proof_ttl_secs + dpop.max_clock_skew_secs),
+370 | |         )?,
+371 | |         dpop,
+372 | |     );
+    | |_____^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+    = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+366 |     let _ = kernel.set_dpop_store(
+    |     +++++++
+
+warning: `chio-federated-work` (bin "chio-federated-work") generated 1 warning
+    Finished `dev` profile [unoptimized] target(s) in 52.45s

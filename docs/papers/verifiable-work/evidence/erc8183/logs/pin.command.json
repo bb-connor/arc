@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "git",
+    "checkout",
+    "--detach",
+    "142e669c1fd318486a4628395b629f033654dd06"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183",
+  "started_at": "2026-10-02T15:14:32.167075+00:00",
+  "elapsed_seconds": 0.24069946398958564,
+  "exit_status": 0,
+  "log": "logs/pin.log"
+}

@@ -1,0 +1,11 @@
+--- a/examples/federated-work/src/funded_work/peer_https.rs
++++ b/examples/federated-work/src/funded_work/peer_https.rs
+@@ -27,7 +27,7 @@
+         || request.headers().iter().any(|h| {
+             ["Transfer-Encoding", "Content-Encoding", "Expect"]
+                 .iter()
+-                .any(|n| h.field.equiv(*n))
++                .any(|n| h.field.equiv(n))
+         })
+     {
+         return Err("unsupported verifier HTTP request".into());

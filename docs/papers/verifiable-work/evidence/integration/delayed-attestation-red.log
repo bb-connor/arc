@@ -1,0 +1,8 @@
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-paper-security-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 15.68s
+     Running unittests src/main.rs (/tmp/chio-paper-target/debug/deps/chio_federated_work-a9b60095aabf77d4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.00s
+

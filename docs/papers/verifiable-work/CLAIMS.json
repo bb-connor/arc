@@ -1,0 +1,214 @@
+{
+  "schema": "chio.paper.claims.v1",
+  "claims": [
+    {
+      "id": "C01",
+      "claim": "Receivers authorize execution using locally selected authority; incoming evidence does not install an issuer.",
+      "status": "implemented-design",
+      "evidence": [
+        "examples/federated-work/src/funded_work/authority_enrollment.rs"
+      ],
+      "assumptions": [
+        "honest local enforcement"
+      ],
+      "limitation": "Does not prove a dishonest receiver executed honestly."
+    },
+    {
+      "id": "C02",
+      "claim": "The native funded agreement binds the original request, authority, Finding policy and funding domain.",
+      "status": "implemented-design",
+      "evidence": [
+        "examples/federated-work/src/funded_work/agreement.rs"
+      ],
+      "assumptions": [
+        "canonical signatures",
+        "local policy"
+      ],
+      "limitation": "Experimental W0 amount is fixed to 100; not a universal work wire format."
+    },
+    {
+      "id": "C03",
+      "claim": "Atomic reservations and terminal transfers conserve deposited funds in the abstract model.",
+      "status": "modeled",
+      "evidence": [
+        "docs/papers/verifiable-work/formal/WorkClaims.lean",
+        "docs/papers/verifiable-work/evidence/lean.log"
+      ],
+      "assumptions": [
+        "natural-number accounts",
+        "atomic transitions"
+      ],
+      "limitation": "No refinement proof to Solidity or Rust."
+    },
+    {
+      "id": "C04",
+      "claim": "Recorded earned claims cannot transition to refund in the specified state machine.",
+      "status": "modeled-and-locally-tested",
+      "evidence": [
+        "docs/papers/verifiable-work/evidence/claim-traces.json",
+        "docs/papers/verifiable-work/evidence/contracts.log"
+      ],
+      "assumptions": [
+        "settlement finality",
+        "honest token semantics"
+      ],
+      "limitation": "An off-chain signature alone is not a recorded earned claim."
+    },
+    {
+      "id": "C05",
+      "claim": "A separately funded earned child can collect after parent refund.",
+      "status": "locally-tested",
+      "evidence": [
+        "contracts/scripts/work-claim-escrow.test.mjs",
+        "docs/papers/verifiable-work/evidence/contracts.log"
+      ],
+      "assumptions": [
+        "distinct allocations",
+        "available settlement and beneficiary key"
+      ],
+      "limitation": "Neither novel escrow nor guaranteed progress under failed verifier."
+    },
+    {
+      "id": "C06",
+      "claim": "The finite explorer checks 5508 states and 132192 transitions.",
+      "status": "locally-tested",
+      "evidence": [
+        "docs/papers/verifiable-work/evidence/claim-traces.json"
+      ],
+      "assumptions": [
+        "two prefunded obligations",
+        "nine timestamps",
+        "fixed alphabet"
+      ],
+      "limitation": "Not exhaustive arbitrary work graphs or all code."
+    },
+    {
+      "id": "C07",
+      "claim": "118 selected model traces are replayed against actual escrow bytecode.",
+      "status": "locally-tested",
+      "evidence": [
+        "contracts/scripts/work-claim-model.test.mjs",
+        "docs/papers/verifiable-work/evidence/contracts.log"
+      ],
+      "assumptions": [
+        "Ganache development chain"
+      ],
+      "limitation": "Not all model transitions; no public finality."
+    },
+    {
+      "id": "C08",
+      "claim": "Ordinary SQL matches 312 steps along the same 118 monetary traces.",
+      "status": "locally-tested",
+      "evidence": [
+        "docs/papers/verifiable-work/evidence/comparison.json",
+        "docs/papers/verifiable-work/tools/compare.py"
+      ],
+      "assumptions": [
+        "trusted sequential SQL",
+        "symbolic authenticated roles"
+      ],
+      "limitation": "Not a full networked alternative or independent authorship."
+    },
+    {
+      "id": "C09",
+      "claim": "Negative model and bytecode mutations detect refund of an earned claim.",
+      "status": "locally-tested",
+      "evidence": [
+        "docs/papers/verifiable-work/evidence/expiry-counterexample.json",
+        "docs/papers/verifiable-work/evidence/contract-mutation.log"
+      ],
+      "assumptions": [
+        "specific expiry mutation"
+      ],
+      "limitation": "One negative control does not establish complete fault detection."
+    },
+    {
+      "id": "C10",
+      "claim": "Missing checker or custody evidence yields no decision rather than rejection.",
+      "status": "implemented-design",
+      "evidence": [
+        "examples/funded-work/verifier.py",
+        "examples/federated-work/src/funded_work/verification.rs"
+      ],
+      "assumptions": [
+        "trusted checker and observer"
+      ],
+      "limitation": "Verifier outage may still cause eventual timeout refund."
+    },
+    {
+      "id": "C11",
+      "claim": "Execution uncertainty is not erased by monetary resolution.",
+      "status": "modeled-and-historical",
+      "evidence": [
+        "examples/funded-work-model/claim_model.py",
+        "docs/market/open-agent-work/execution/21-native-resolution-earned-child.md"
+      ],
+      "assumptions": [
+        "retained native history"
+      ],
+      "limitation": "Historical process evidence is not current merged qualification."
+    },
+    {
+      "id": "C12",
+      "claim": "The selected verifier and settlement domain remain trusted.",
+      "status": "explicit-assumption",
+      "evidence": [
+        "contracts/src/experimental/ChioWorkClaimEscrow.sol"
+      ],
+      "assumptions": [
+        "F1 profile"
+      ],
+      "limitation": "Public rechecking does not force a dishonest verifier to sign correctly."
+    },
+    {
+      "id": "C13",
+      "claim": "Pinned upstream ERC-8183 reproduces the child-payment economic outcome under equal capital and evaluator assumptions.",
+      "status": "locally-tested",
+      "evidence": [
+        "docs/papers/verifiable-work/evidence/erc8183/REPORT.json",
+        "docs/papers/verifiable-work/evidence/erc8183/logs/verified-comparison-traces.log"
+      ],
+      "assumptions": [
+        "local Cancun EVM",
+        "honest mock token and evaluator",
+        "unmodified upstream commit 142e669c1f",
+        "same 100 plus 60 funding"
+      ],
+      "limitation": "Strong counterexample to an exclusive economic primitive; no independent operators or full admission-profile comparison."
+    },
+    {
+      "id": "H02",
+      "claim": "Useful outputs can be verified materially more cheaply than produced.",
+      "status": "not-established",
+      "evidence": [],
+      "assumptions": [],
+      "limitation": "The deterministic OpenAPI inventory is inexpensive for the buyer to recompute."
+    },
+    {
+      "id": "H03",
+      "claim": "One public contract substantially reduces repeated partner integration.",
+      "status": "not-established",
+      "evidence": [],
+      "assumptions": [],
+      "limitation": "Requires independently implemented provider and matched integration trial."
+    },
+    {
+      "id": "H04",
+      "claim": "Live agents form economically useful teams with bounded loss.",
+      "status": "not-established",
+      "evidence": [],
+      "assumptions": [],
+      "limitation": "No live-agent economics or held-out commercial work result."
+    },
+    {
+      "id": "H05",
+      "claim": "The composition is a foundational breakthrough beyond existing mechanisms.",
+      "status": "not-established",
+      "evidence": [
+        "docs/papers/verifiable-work/sources.json"
+      ],
+      "assumptions": [],
+      "limitation": "ERC-8183 and conventional escrow overlap substantially; no measured advantage yet."
+    }
+  ]
+}

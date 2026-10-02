@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/tmp/chio-paper-erc8183-artifact/tools/forge",
+    "test",
+    "--config-path",
+    "/tmp/chio-paper-erc8183-artifact/reproduced-foundry.toml",
+    "-vvvv"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183-artifact",
+  "started_at": "2026-10-02T15:26:25.435112+00:00",
+  "elapsed_seconds": 0.31122569320723414,
+  "exit_status": -6,
+  "log": "logs/final-comparison-traces.log"
+}

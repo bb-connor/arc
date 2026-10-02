@@ -1,0 +1,732 @@
+docs/market/open-agent-work/execution/integration-evidence/a2a-interop-v2.log:11: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/a2a-tests.log:254: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/admission-store.log:511: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/caller-custody-followup.patch:33: trailing whitespace.
++ 
+docs/market/open-agent-work/execution/integration-evidence/caller-custody-followup.patch:38: trailing whitespace.
++ 
+docs/market/open-agent-work/execution/integration-evidence/caller-custody-followup.patch:46: trailing whitespace.
++ 
+docs/market/open-agent-work/execution/integration-evidence/caller-custody-followup.patch:62: trailing whitespace.
++ 
+docs/market/open-agent-work/execution/integration-evidence/caller-custody-followup.patch:307: trailing whitespace.
++ 
+docs/market/open-agent-work/execution/integration-evidence/caller-custody-followup.patch:315: trailing whitespace.
++ 
+docs/market/open-agent-work/execution/integration-evidence/caller-custody-kernel.log:1459: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/composed-tests-v2.log:121: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/consumer-startup-umask022.log:6: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/federation-conformance.log:50: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/global-schema-red.log:18: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/iroh-tests.log:493: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/kernel-lib.log:1446: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/kernel-sqlite.log:26: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/outcome-tests-green.log:14: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/outcome-tests-v2.log:54: trailing whitespace.
++receiver check failed: 
+docs/market/open-agent-work/execution/integration-evidence/predicate-final.log:16: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/runtime-extra-tests-final.log:64: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/runtime-tests.log:37: trailing whitespace.
++test operation_owned::combined::crash::combined_owned_process_loss_after_effect_does_not_redispatch ... 
+docs/market/open-agent-work/execution/integration-evidence/runtime-tests.log:40: trailing whitespace.
++test operation_owned::combined::crash::combined_owned_process_loss_at_dispatch_retains_custody ... 
+docs/market/open-agent-work/execution/integration-evidence/runtime-tests.log:43: trailing whitespace.
++test operation_owned::combined::crash::combined_owned_process_loss_before_dispatch_releases_custody ... 
+docs/market/open-agent-work/execution/integration-evidence/schema-green.log:113: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/security-baseline.log:539: new blank line at EOF.
+docs/market/open-agent-work/execution/integration-evidence/standalone-tests.log:20: new blank line at EOF.
+docs/market/open-agent-work/execution/w0-evidence/child-identity-red.log:27: trailing whitespace.
++  
+docs/market/open-agent-work/execution/w0-evidence/child-identity-red.log:30: trailing whitespace.
++  
+docs/market/open-agent-work/execution/w0-evidence/protocol-red.log:5: trailing whitespace.
++test_wire_limits_duplicates_nonfinite_and_invalid_utf8 (test_protocol.ProtocolTests.test_wire_limits_duplicates_nonfinite_and_invalid_utf8) ... 
+docs/market/open-agent-work/execution/w0-evidence/rust-tests.log:19: new blank line at EOF.
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:1: trailing whitespace.
++fact,state,slot,attested_by,invention_step
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:2: trailing whitespace.
++treaty_scope_sha256,absent,a vendor-prefixed key in the tool call's metadata,caller,"a vendor-prefixed key in the tool call's metadata, or a key in the message's metadata map"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:3: trailing whitespace.
++treaty_scope_sha256,absent,a vendor-prefixed key in the tool call's metadata,caller,"a name agreed bilaterally, since the reserved prefixes belong to the protocol and the rest is vendor space"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:4: trailing whitespace.
++treaty_scope_sha256,absent,a vendor-prefixed key in the tool call's metadata,caller,a rule in the receiver that reads the key and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:5: trailing whitespace.
++treaty_scope_sha256,absent,a vendor-prefixed key in the tool call's metadata,caller,"acceptance that the value is attested by the caller, because no signature in the set covers the message body"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:6: trailing whitespace.
++ladder_intersection_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:7: trailing whitespace.
++ladder_intersection_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:8: trailing whitespace.
++ladder_intersection_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:9: trailing whitespace.
++ladder_intersection_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:10: trailing whitespace.
++admission_report_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:11: trailing whitespace.
++admission_report_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:12: trailing whitespace.
++admission_report_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:13: trailing whitespace.
++admission_report_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:14: trailing whitespace.
++consistency_model,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:15: trailing whitespace.
++consistency_model,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:16: trailing whitespace.
++consistency_model,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:17: trailing whitespace.
++consistency_model,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:18: trailing whitespace.
++request_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:19: trailing whitespace.
++request_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:20: trailing whitespace.
++request_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:21: trailing whitespace.
++request_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:22: trailing whitespace.
++outcome_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:23: trailing whitespace.
++outcome_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:24: trailing whitespace.
++outcome_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:25: trailing whitespace.
++outcome_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:26: trailing whitespace.
++local_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:27: trailing whitespace.
++local_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:28: trailing whitespace.
++local_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:29: trailing whitespace.
++local_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:30: trailing whitespace.
++remote_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:31: trailing whitespace.
++remote_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:32: trailing whitespace.
++remote_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:33: trailing whitespace.
++remote_receipt_sha256,absent,a private claim of the issued token,issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:34: trailing whitespace.
++continuation_sha256,without_receiver_reference,"a private claim of the issued token, over a value the receiver minted",issuing_authorization_server,"a call before the call, since no method in the set returns a value for a caller to carry into its exchange"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:35: trailing whitespace.
++continuation_sha256,without_receiver_reference,"a private claim of the issued token, over a value the receiver minted",issuing_authorization_server,"a way to consume the value exactly once, which no specification in the set provides for any identifier it defines"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:36: trailing whitespace.
++lineage_bundle_sha256,without_receiver_reference,"a private claim of the issued token, or the message's reference list",issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:37: trailing whitespace.
++lineage_bundle_sha256,without_receiver_reference,"a private claim of the issued token, or the message's reference list",issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:38: trailing whitespace.
++lineage_bundle_sha256,without_receiver_reference,"a private claim of the issued token, or the message's reference list",issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:39: trailing whitespace.
++lineage_bundle_sha256,without_receiver_reference,"a private claim of the issued token, or the message's reference list",issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:40: trailing whitespace.
++lease_refs,without_receiver_reference,"a private claim of the issued token, naming a lease the receiver registered",issuing_authorization_server,"a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:41: trailing whitespace.
++lease_refs,without_receiver_reference,"a private claim of the issued token, naming a lease the receiver registered",issuing_authorization_server,"a private claim in the issued token, which that server must be changed to mint"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:42: trailing whitespace.
++lease_refs,without_receiver_reference,"a private claim of the issued token, naming a lease the receiver registered",issuing_authorization_server,"a name for both, agreed bilaterally, since no registry defines one"
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:43: trailing whitespace.
++lease_refs,without_receiver_reference,"a private claim of the issued token, naming a lease the receiver registered",issuing_authorization_server,a rule in the receiver that reads the claim and compares it against its own record
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:44: trailing whitespace.
++invented-key-unread,witness,"the caller carries the version it decided under in a vendor-prefixed key of the tool call's metadata, against a receiver that never agreed to read that name",composed,dispatched
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:45: trailing whitespace.
++invented-key-unread,witness,"the caller carries the version it decided under in a vendor-prefixed key of the tool call's metadata, against a receiver that never agreed to read that name",hardened,dispatched
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:46: trailing whitespace.
++invented-key-read-honest-caller,witness,"the same key, now one the receiver has agreed to read and compare, with the caller reporting the version it actually decided under",hardened_private_profile,private.agreement_version_mismatch
+docs/papers/programmable-sovereignty/bench/results/baseline-carrier-ledger.csv:47: trailing whitespace.
++invented-key-value-chosen-by-caller,witness,"the same key and the same rule, with the caller asserting the version the receiver holds while sending the call it prepared under the previous one",hardened_private_profile,dispatched
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:1: trailing whitespace.
++threat_id,chio_case_id,chio_expected_code,baseline_case_id,analogue,composed_dispatched,composed_code,composed_step,hardened_dispatched,hardened_code,hardened_step
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:2: trailing whitespace.
++PS-TH-01,wrong-treaty,chio_treaty_scope_hash_mismatch,unknown-agreement,direct,False,agreement.unknown,20,False,agreement.unknown,20
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:3: trailing whitespace.
++PS-TH-01,wrong-treaty,chio_treaty_scope_hash_mismatch,wrong-live-agreement,direct,True,,,False,policy.approval_missing,30
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:4: trailing whitespace.
++PS-TH-02,stale-treaty,chio_treaty_stale,superseded-agreement,partial,True,,,False,agreement.superseded,23
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:5: trailing whitespace.
++PS-TH-02,stale-treaty,chio_treaty_stale,agreement-version-advanced-in-flight,direct,True,,,False,agreement.version_mismatch,24
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:6: trailing whitespace.
++PS-TH-02,stale-treaty,chio_treaty_stale,asserted-version-matches-receiver-record,direct,True,,,True,,
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:7: trailing whitespace.
++PS-TH-03,forged-intersection,chio_treaty_intersection_mismatch,no-jointly-computed-bound,none,,,,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:8: trailing whitespace.
++PS-TH-04,missing-lineage,chio_treaty_missing_required_evidence,unresolvable-task-reference,partial,True,,,False,lineage.task_unknown,26
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:9: trailing whitespace.
++PS-TH-05,receipt-mismatch,predicate.schema_invalid,call-unbound-to-its-resource,partial,True,,,True,,
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:10: trailing whitespace.
++PS-TH-06,request-hash-mismatch,predicate.schema_invalid,arguments-differ-from-authorized-call,direct,True,,,True,,
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:11: trailing whitespace.
++PS-TH-07,outcome-hash-mismatch,predicate.schema_invalid,no-outcome-object,none,,,,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:12: trailing whitespace.
++PS-TH-08,missing-signature,dsse.malformed,missing-channel-authentication,direct,False,peer.svid_proof_missing,2,False,peer.svid_proof_missing,2
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:13: trailing whitespace.
++PS-TH-09,duplicate-signature-keyid,dsse.malformed,no-signature-set,none,,,,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:14: trailing whitespace.
++PS-TH-10,repeated-signer-key,signer.independence_required,one-key-for-svid-and-issuer,direct,True,,,False,signer.not_distinct,13
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:15: trailing whitespace.
++PS-TH-11,wrong-predicate-type,predicate.type_unrecognised,token-type-confusion,direct,False,token.malformed,8,False,token.malformed,8
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:16: trailing whitespace.
++PS-TH-12,noncanonical-payload,statement.malformed,duplicate-claim-in-signed-token,direct,False,token.malformed,8,False,token.malformed,8
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:17: trailing whitespace.
++PS-TH-12,noncanonical-payload,statement.malformed,reordered-token-encoding,direct,True,,,False,token.noncanonical,12
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:18: trailing whitespace.
++PS-TH-13,stale-lease,capability.lease_expired_or_unknown,expired-token,partial,False,token.expired,14,False,token.expired,14
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:19: trailing whitespace.
++PS-TH-13,stale-lease,capability.lease_expired_or_unknown,issuer-minted-decade-window,direct,True,,,False,token.window_too_long,15
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:20: trailing whitespace.
++PS-TH-14,missing-governance-receipt,governance.receipt_required_missing,approval-reference-unresolvable,direct,False,policy.approval_missing,30,False,policy.approval_missing,30
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:21: trailing whitespace.
++PS-TH-15,replayed-continuation,chio_treaty_continuation_replay,message-id-replay,direct,False,replay.message_id_seen,6,False,replay.message_id_seen,6
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:22: trailing whitespace.
++PS-TH-15,replayed-continuation,chio_treaty_continuation_replay,token-replay-under-fresh-message-id,direct,True,,,False,replay.token_id_seen,11
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:23: trailing whitespace.
++PS-TH-15,replayed-continuation,chio_treaty_continuation_replay,task-handle-reused-across-calls,direct,True,,,True,,
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:24: trailing whitespace.
++PS-TH-16,request-smuggled-trust-root,request_smuggled_trust_root,request-supplied-assurance-attribute,direct,True,,,False,context.request_supplied_attribute,25
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:25: trailing whitespace.
++PS-TH-17,dynamic-trust-smuggling,request_smuggled_dynamic_trust,request-supplied-approval-object,direct,True,,,False,context.request_supplied_attribute,25
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:26: trailing whitespace.
++PS-TH-18,schema-mismatch,dsse.malformed,unrecognised-issued-token-type,direct,False,token.type_unrecognised,9,False,token.type_unrecognised,9
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:27: trailing whitespace.
++PS-TH-19,policy-disagreement,policy.verdict_disagreement,exchange-refused-call-sent-anyway,partial,False,token.absent,7,False,token.absent,7
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:28: trailing whitespace.
++PS-TH-20,signed-unanimous-deny,chio_treaty_policy_denied,no-signed-refusal,none,,,,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:29: trailing whitespace.
++PS-EXTRA-01,audience-binding,n/a,cross-receiver-presentation,direct,False,token.audience_mismatch,16,False,token.audience_mismatch,16
+docs/papers/programmable-sovereignty/bench/results/baseline-negative-matrix.csv:30: trailing whitespace.
++PS-EXTRA-02,null-case,n/a,unmodified-admissible-call,direct,True,,,True,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:1: trailing whitespace.
++chio_field,carrier_document,carrier_field,carrier_section,attested_by,basis,noticed_composed,noticed_hardened,substitution,composed_code,hardened_code
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:2: trailing whitespace.
++treaty_id,rfc8693,scope,"4.2, with the syntax of RFC 6749 section 3.3",issuing_authorization_server,resolution,False,True,an agreement the receiver never provisioned,agreement.unknown,agreement.unknown
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:3: trailing whitespace.
++treaty_id,rfc8693,scope,"4.2, with the syntax of RFC 6749 section 3.3",issuing_authorization_server,resolution,False,True,a different agreement the receiver does hold,,policy.approval_missing
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:4: trailing whitespace.
++treaty_scope_sha256,,,,,not_carried,False,False,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:5: trailing whitespace.
++ladder_intersection_sha256,,,,,not_carried,False,False,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:6: trailing whitespace.
++admission_report_sha256,,,,,not_carried,False,False,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:7: trailing whitespace.
++continuation_sha256,a2a,"Message.task_id, naming a Task.id generated by the server","Message, Task",caller,carried_without_receiver_reference,False,False,a different task the receiver also holds,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:8: trailing whitespace.
++lineage_bundle_sha256,a2a,Message.reference_task_ids,Message.reference_task_ids,caller,carried_without_receiver_reference,False,False,a reference moved to another task the receiver holds,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:9: trailing whitespace.
++lineage_bundle_sha256,a2a,Message.reference_task_ids,Message.reference_task_ids,caller,carried_without_receiver_reference,False,False,a reference to a task the receiver never issued,,lineage.task_unknown
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:10: trailing whitespace.
++action_class_id,mcp,"params.name, against the action value of scope","server/tools, Calling Tools",caller,internal_consistency,True,True,the action value of scope alone,scope.action_mismatch,scope.action_mismatch
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:11: trailing whitespace.
++action_class_id,mcp,"params.name, against the action value of scope","server/tools, Calling Tools",caller,internal_consistency,True,True,the action value and the tool name together,agreement.action_not_covered,agreement.action_not_covered
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:12: trailing whitespace.
++consistency_model,,,,,not_carried,False,False,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:13: trailing whitespace.
++request_sha256,,,,,not_carried,False,False,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:14: trailing whitespace.
++outcome_sha256,,,,,not_carried,False,False,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:15: trailing whitespace.
++local_receipt_sha256,,,,,not_carried,False,False,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:16: trailing whitespace.
++remote_receipt_sha256,,,,,not_carried,False,False,,,
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:17: trailing whitespace.
++lease_refs,rfc7519,"exp and nbf, with expires_in beside them","4.1.4, 4.1.5",issuing_authorization_server,carried_without_receiver_reference,False,True,the issuer extends the window to a decade,,token.window_too_long
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:18: trailing whitespace.
++governance_refs,mcp,"params.arguments, shaped by the tool's own inputSchema","server/tools, Tool.inputSchema",caller,resolution,True,True,an approval identifier the receiver does not hold,policy.approval_missing,policy.approval_missing
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:19: trailing whitespace.
++"signer_kernel_ids, as a set",rfc8693,"act.sub beside sub, over SPIFFE IDs","4.1, with SPIFFE-ID and JWT-SVID for the values",issuing_authorization_server,internal_consistency,False,True,the actor claim alone,,token.actor_mismatch
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:20: trailing whitespace.
++"signer_kernel_ids, as a set",rfc8693,"act.sub beside sub, over SPIFFE IDs","4.1, with SPIFFE-ID and JWT-SVID for the values",issuing_authorization_server,internal_consistency,False,True,the actor claim and the presenting SVID together,peer.svid_unpinned,peer.svid_unpinned
+docs/papers/programmable-sovereignty/bench/results/baseline-substitution-matrix.csv:21: trailing whitespace.
++"signer_kernel_ids, in order",rfc8693,the nesting of act,4.1,issuing_authorization_server,internal_consistency,True,True,the subject and the actor exchanged,agreement.party_mismatch,token.actor_mismatch
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:1: trailing whitespace.
++scenario,sequence,request_id,round_trip_ms,evaluate_ms,prepare_ms,verdict,failure_code,cosign_connections
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:2: trailing whitespace.
++allow,1,req-federated-pair-1,213.516931,211.479000,4.092000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:3: trailing whitespace.
++allow,2,req-federated-pair-2,219.533680,217.710000,3.170000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:4: trailing whitespace.
++allow,3,req-federated-pair-3,204.132605,199.320000,7.758000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:5: trailing whitespace.
++allow,4,req-federated-pair-4,201.660552,199.797000,3.443000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:6: trailing whitespace.
++allow,5,req-federated-pair-5,225.707351,223.698000,4.246000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:7: trailing whitespace.
++allow,6,req-federated-pair-6,225.521910,219.650000,3.342000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:8: trailing whitespace.
++allow,7,req-federated-pair-7,196.231806,194.152000,3.264000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:9: trailing whitespace.
++allow,8,req-federated-pair-8,199.224421,197.202000,3.124000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:10: trailing whitespace.
++allow,9,req-federated-pair-9,214.166054,212.282000,3.157000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:11: trailing whitespace.
++allow,10,req-federated-pair-10,199.230260,197.086000,8.673000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:12: trailing whitespace.
++allow,11,req-federated-pair-11,213.416730,211.280000,3.114000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:13: trailing whitespace.
++allow,12,req-federated-pair-12,200.341226,197.916000,4.182000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:14: trailing whitespace.
++allow,13,req-federated-pair-13,195.405922,193.228000,3.455000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:15: trailing whitespace.
++allow,14,req-federated-pair-14,221.095608,218.882000,3.263000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:16: trailing whitespace.
++allow,15,req-federated-pair-15,193.031830,190.499000,3.735000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:17: trailing whitespace.
++allow,16,req-federated-pair-16,189.705814,187.758000,3.238000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:18: trailing whitespace.
++allow,17,req-federated-pair-17,208.251745,203.644000,2.981000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:19: trailing whitespace.
++allow,18,req-federated-pair-18,202.671357,200.649000,3.529000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:20: trailing whitespace.
++allow,19,req-federated-pair-19,190.681698,188.764000,3.206000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:21: trailing whitespace.
++allow,20,req-federated-pair-20,216.038384,206.887000,6.627000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:22: trailing whitespace.
++allow,21,req-federated-pair-21,191.313342,187.111000,5.954000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:23: trailing whitespace.
++allow,22,req-federated-pair-22,204.823448,202.883000,3.156000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:24: trailing whitespace.
++allow,23,req-federated-pair-23,186.656959,184.771000,5.947000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:25: trailing whitespace.
++allow,24,req-federated-pair-24,206.020894,204.176000,3.229000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:26: trailing whitespace.
++allow,25,req-federated-pair-25,204.906288,202.997000,3.266000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:27: trailing whitespace.
++allow,26,req-federated-pair-26,214.284495,209.747000,3.407000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:28: trailing whitespace.
++allow,27,req-federated-pair-27,194.999280,192.875000,3.199000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:29: trailing whitespace.
++allow,28,req-federated-pair-28,195.039039,192.670000,3.609000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:30: trailing whitespace.
++allow,29,req-federated-pair-29,212.296125,210.379000,3.286000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:31: trailing whitespace.
++allow,30,req-federated-pair-30,238.328653,231.817000,3.030000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:32: trailing whitespace.
++allow,31,req-federated-pair-31,202.038515,197.828000,5.345000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:33: trailing whitespace.
++allow,32,req-federated-pair-32,213.611491,211.546000,3.096000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:34: trailing whitespace.
++allow,33,req-federated-pair-33,203.256760,197.043000,3.374000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:35: trailing whitespace.
++allow,34,req-federated-pair-34,203.561402,201.468000,3.097000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:36: trailing whitespace.
++allow,35,req-federated-pair-35,217.345030,215.490000,3.191000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:37: trailing whitespace.
++allow,36,req-federated-pair-36,206.634457,204.372000,3.272000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:38: trailing whitespace.
++allow,37,req-federated-pair-37,203.233040,201.394000,3.008000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:39: trailing whitespace.
++allow,38,req-federated-pair-38,226.840356,224.918000,5.426000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:40: trailing whitespace.
++allow,39,req-federated-pair-39,225.568791,223.256000,3.326000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:41: trailing whitespace.
++allow,40,req-federated-pair-40,201.743873,199.318000,5.814000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:42: trailing whitespace.
++allow,41,req-federated-pair-41,198.108455,196.134000,3.228000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:43: trailing whitespace.
++allow,42,req-federated-pair-42,224.006142,222.189000,3.184000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:44: trailing whitespace.
++allow,43,req-federated-pair-43,210.288635,208.426000,3.244000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:45: trailing whitespace.
++allow,44,req-federated-pair-44,196.713848,194.678000,3.380000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:46: trailing whitespace.
++allow,45,req-federated-pair-45,215.020538,211.103000,7.080000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:47: trailing whitespace.
++allow,46,req-federated-pair-46,208.357466,205.592000,6.392000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:48: trailing whitespace.
++allow,47,req-federated-pair-47,201.576192,198.664000,3.616000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:49: trailing whitespace.
++allow,48,req-federated-pair-48,197.139010,195.230000,3.090000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:50: trailing whitespace.
++allow,49,req-federated-pair-49,210.068194,206.845000,3.270000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:51: trailing whitespace.
++allow,50,req-federated-pair-50,228.597925,226.367000,8.285000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:52: trailing whitespace.
++allow,51,req-federated-pair-51,203.591122,201.624000,3.294000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:53: trailing whitespace.
++allow,52,req-federated-pair-52,204.010004,201.959000,3.877000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:54: trailing whitespace.
++allow,53,req-federated-pair-53,213.361690,211.388000,3.206000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:55: trailing whitespace.
++allow,54,req-federated-pair-54,212.654807,210.818000,3.011000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:56: trailing whitespace.
++allow,55,req-federated-pair-55,196.143245,194.235000,3.103000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:57: trailing whitespace.
++allow,56,req-federated-pair-56,208.207945,206.187000,4.346000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:58: trailing whitespace.
++allow,57,req-federated-pair-57,214.431895,211.824000,3.595000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:59: trailing whitespace.
++allow,58,req-federated-pair-58,234.481234,231.799000,7.603000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:60: trailing whitespace.
++allow,59,req-federated-pair-59,207.143819,203.349000,5.556000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:61: trailing whitespace.
++allow,60,req-federated-pair-60,202.611317,200.496000,4.509000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:62: trailing whitespace.
++allow,61,req-federated-pair-61,215.629981,213.556000,3.064000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:63: trailing whitespace.
++allow,62,req-federated-pair-62,212.717487,210.867000,2.947000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:64: trailing whitespace.
++allow,63,req-federated-pair-63,223.101018,218.413000,3.199000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:65: trailing whitespace.
++allow,64,req-federated-pair-64,198.635058,195.971000,4.099000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:66: trailing whitespace.
++allow,65,req-federated-pair-65,198.003335,196.120000,3.138000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:67: trailing whitespace.
++allow,66,req-federated-pair-66,222.743776,219.796000,3.273000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:68: trailing whitespace.
++allow,67,req-federated-pair-67,193.595833,191.580000,3.162000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:69: trailing whitespace.
++allow,68,req-federated-pair-68,205.841053,203.724000,3.228000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:70: trailing whitespace.
++allow,69,req-federated-pair-69,211.773762,209.847000,3.415000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:71: trailing whitespace.
++allow,70,req-federated-pair-70,213.744332,211.822000,3.281000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:72: trailing whitespace.
++allow,71,req-federated-pair-71,197.228811,194.339000,3.688000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:73: trailing whitespace.
++allow,72,req-federated-pair-72,206.100774,204.073000,3.300000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:74: trailing whitespace.
++allow,73,req-federated-pair-73,218.873597,216.927000,3.065000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:75: trailing whitespace.
++allow,74,req-federated-pair-74,207.161259,205.197000,3.487000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:76: trailing whitespace.
++allow,75,req-federated-pair-75,206.971618,204.994000,2.982000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:77: trailing whitespace.
++allow,76,req-federated-pair-76,216.796587,211.944000,4.409000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:78: trailing whitespace.
++allow,77,req-federated-pair-77,202.742118,200.898000,3.330000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:79: trailing whitespace.
++allow,78,req-federated-pair-78,215.147299,213.140000,3.311000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:80: trailing whitespace.
++allow,79,req-federated-pair-79,199.496622,197.530000,3.060000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:81: trailing whitespace.
++allow,80,req-federated-pair-80,193.378272,191.347000,3.105000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:82: trailing whitespace.
++allow,81,req-federated-pair-81,216.799107,214.070000,3.428000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:83: trailing whitespace.
++allow,82,req-federated-pair-82,205.482011,203.566000,3.354000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:84: trailing whitespace.
++allow,83,req-federated-pair-83,195.281641,189.211000,2.987000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:85: trailing whitespace.
++allow,84,req-federated-pair-84,204.115884,201.950000,4.306000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:86: trailing whitespace.
++allow,85,req-federated-pair-85,204.842368,202.510000,3.431000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:87: trailing whitespace.
++allow,86,req-federated-pair-86,225.457109,223.416000,3.101000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:88: trailing whitespace.
++allow,87,req-federated-pair-87,192.929310,191.114000,3.050000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:89: trailing whitespace.
++allow,88,req-federated-pair-88,207.191940,203.850000,3.221000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:90: trailing whitespace.
++allow,89,req-federated-pair-89,216.490985,211.622000,3.516000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:91: trailing whitespace.
++allow,90,req-federated-pair-90,223.794821,221.245000,3.090000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:92: trailing whitespace.
++allow,91,req-federated-pair-91,214.257775,211.818000,3.884000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:93: trailing whitespace.
++allow,92,req-federated-pair-92,202.964319,201.092000,3.016000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:94: trailing whitespace.
++allow,93,req-federated-pair-93,207.999703,201.573000,3.332000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:95: trailing whitespace.
++allow,94,req-federated-pair-94,208.627067,205.751000,3.829000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:96: trailing whitespace.
++allow,95,req-federated-pair-95,196.723248,189.330000,3.791000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:97: trailing whitespace.
++allow,96,req-federated-pair-96,212.082324,207.727000,5.392000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:98: trailing whitespace.
++allow,97,req-federated-pair-97,195.138160,190.645000,7.403000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:99: trailing whitespace.
++allow,98,req-federated-pair-98,214.949858,212.978000,3.272000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:100: trailing whitespace.
++allow,99,req-federated-pair-99,203.169880,201.377000,3.226000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-allow-samples.csv:101: trailing whitespace.
++allow,100,req-federated-pair-100,215.469300,213.474000,3.160000,allow,,3
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:1: trailing whitespace.
++scenario,sequence,request_id,round_trip_ms,evaluate_ms,prepare_ms,verdict,failure_code,cosign_connections
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:2: trailing whitespace.
++scope_hash_mismatch,101,req-federated-pair-101,133.256096,128.733000,3.424000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:3: trailing whitespace.
++scope_hash_mismatch,102,req-federated-pair-102,54.090266,51.753000,3.340000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:4: trailing whitespace.
++scope_hash_mismatch,104,req-federated-pair-104,59.463133,57.492000,3.115000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:5: trailing whitespace.
++scope_hash_mismatch,105,req-federated-pair-105,50.335247,48.157000,3.900000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:6: trailing whitespace.
++scope_hash_mismatch,106,req-federated-pair-106,56.176436,54.020000,3.223000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:7: trailing whitespace.
++scope_hash_mismatch,107,req-federated-pair-107,77.856464,75.747000,3.167000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:8: trailing whitespace.
++scope_hash_mismatch,108,req-federated-pair-108,52.379458,49.671000,8.223000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:9: trailing whitespace.
++scope_hash_mismatch,109,req-federated-pair-109,62.251746,60.286000,3.114000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:10: trailing whitespace.
++scope_hash_mismatch,110,req-federated-pair-110,50.421768,47.596000,3.950000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:11: trailing whitespace.
++scope_hash_mismatch,111,req-federated-pair-111,70.709428,67.013000,3.167000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:12: trailing whitespace.
++scope_hash_mismatch,112,req-federated-pair-112,56.107516,53.586000,6.060000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:13: trailing whitespace.
++scope_hash_mismatch,113,req-federated-pair-113,58.446408,56.013000,3.126000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:14: trailing whitespace.
++scope_hash_mismatch,114,req-federated-pair-114,59.999695,57.428000,7.471000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:15: trailing whitespace.
++scope_hash_mismatch,115,req-federated-pair-115,50.493408,48.570000,3.081000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:16: trailing whitespace.
++scope_hash_mismatch,116,req-federated-pair-116,78.298505,76.126000,3.079000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:17: trailing whitespace.
++scope_hash_mismatch,117,req-federated-pair-117,47.496954,45.548000,3.252000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:18: trailing whitespace.
++scope_hash_mismatch,118,req-federated-pair-118,74.135645,72.079000,3.094000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:19: trailing whitespace.
++scope_hash_mismatch,119,req-federated-pair-119,52.744260,50.611000,3.317000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:20: trailing whitespace.
++scope_hash_mismatch,120,req-federated-pair-120,60.472658,54.759000,3.132000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:21: trailing whitespace.
++scope_hash_mismatch,121,req-federated-pair-121,72.265196,69.647000,4.195000,deny,chio_treaty_scope_hash_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:22: trailing whitespace.
++missing_required_evidence,122,req-federated-pair-122,66.102246,63.675000,3.158000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:23: trailing whitespace.
++missing_required_evidence,123,req-federated-pair-123,54.297547,49.310000,4.018000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:24: trailing whitespace.
++missing_required_evidence,124,req-federated-pair-124,66.782569,64.020000,3.177000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:25: trailing whitespace.
++missing_required_evidence,125,req-federated-pair-125,61.633103,57.865000,4.210000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:26: trailing whitespace.
++missing_required_evidence,126,req-federated-pair-126,54.631309,52.535000,3.255000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:27: trailing whitespace.
++missing_required_evidence,127,req-federated-pair-127,65.963365,63.547000,4.173000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:28: trailing whitespace.
++missing_required_evidence,128,req-federated-pair-128,53.509504,51.507000,3.042000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:29: trailing whitespace.
++missing_required_evidence,129,req-federated-pair-129,60.158656,56.056000,7.696000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:30: trailing whitespace.
++missing_required_evidence,130,req-federated-pair-130,51.649614,49.652000,3.140000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:31: trailing whitespace.
++missing_required_evidence,131,req-federated-pair-131,67.705974,65.409000,7.720000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:32: trailing whitespace.
++missing_required_evidence,132,req-federated-pair-132,55.888195,53.769000,3.141000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:33: trailing whitespace.
++missing_required_evidence,133,req-federated-pair-133,52.023936,49.926000,3.260000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:34: trailing whitespace.
++missing_required_evidence,134,req-federated-pair-134,72.542517,70.159000,4.349000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:35: trailing whitespace.
++missing_required_evidence,135,req-federated-pair-135,49.700204,47.678000,3.138000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:36: trailing whitespace.
++missing_required_evidence,136,req-federated-pair-136,63.646554,60.448000,6.893000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:37: trailing whitespace.
++missing_required_evidence,137,req-federated-pair-137,60.282977,58.061000,3.149000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:38: trailing whitespace.
++missing_required_evidence,138,req-federated-pair-138,68.716338,66.622000,3.130000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:39: trailing whitespace.
++missing_required_evidence,139,req-federated-pair-139,57.877084,55.603000,3.201000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:40: trailing whitespace.
++missing_required_evidence,140,req-federated-pair-140,73.525962,71.439000,3.352000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:41: trailing whitespace.
++missing_required_evidence,141,req-federated-pair-141,58.242887,55.859000,4.142000,deny,chio_treaty_missing_required_evidence,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:42: trailing whitespace.
++smuggled_trust_root,142,req-federated-pair-142,67.217531,65.309000,3.162000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:43: trailing whitespace.
++smuggled_trust_root,143,req-federated-pair-143,53.413822,49.883000,3.168000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:44: trailing whitespace.
++smuggled_trust_root,144,req-federated-pair-144,61.050261,58.491000,8.466000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:45: trailing whitespace.
++smuggled_trust_root,145,req-federated-pair-145,58.564369,56.259000,3.781000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:46: trailing whitespace.
++smuggled_trust_root,146,req-federated-pair-146,52.487098,48.775000,3.179000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:47: trailing whitespace.
++smuggled_trust_root,147,req-federated-pair-147,63.300592,60.737000,6.870000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:48: trailing whitespace.
++smuggled_trust_root,148,req-federated-pair-148,66.109246,63.968000,3.070000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:49: trailing whitespace.
++smuggled_trust_root,149,req-federated-pair-149,61.077741,56.844000,5.643000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:50: trailing whitespace.
++smuggled_trust_root,150,req-federated-pair-150,54.911270,52.862000,3.258000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:51: trailing whitespace.
++smuggled_trust_root,151,req-federated-pair-151,63.611193,61.332000,3.121000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:52: trailing whitespace.
++smuggled_trust_root,152,req-federated-pair-152,58.883050,56.818000,3.038000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:53: trailing whitespace.
++smuggled_trust_root,153,req-federated-pair-153,65.409042,63.302000,3.138000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:54: trailing whitespace.
++smuggled_trust_root,154,req-federated-pair-154,47.363673,45.232000,3.306000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:55: trailing whitespace.
++smuggled_trust_root,155,req-federated-pair-155,55.160032,53.049000,3.371000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:56: trailing whitespace.
++smuggled_trust_root,156,req-federated-pair-156,74.176365,72.055000,3.388000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:57: trailing whitespace.
++smuggled_trust_root,157,req-federated-pair-157,57.309642,55.160000,3.014000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:58: trailing whitespace.
++smuggled_trust_root,158,req-federated-pair-158,72.182276,70.185000,3.276000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:59: trailing whitespace.
++smuggled_trust_root,159,req-federated-pair-159,49.516844,47.468000,3.278000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:60: trailing whitespace.
++smuggled_trust_root,160,req-federated-pair-160,69.044499,64.296000,4.450000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:61: trailing whitespace.
++smuggled_trust_root,161,req-federated-pair-161,53.893426,51.687000,3.759000,deny,request_smuggled_trust_root,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:62: trailing whitespace.
++smuggled_dynamic_trust,162,req-federated-pair-162,65.126400,62.917000,6.067000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:63: trailing whitespace.
++smuggled_dynamic_trust,163,req-federated-pair-163,56.530158,54.416000,3.080000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:64: trailing whitespace.
++smuggled_dynamic_trust,164,req-federated-pair-164,53.485943,51.253000,3.366000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:65: trailing whitespace.
++smuggled_dynamic_trust,165,req-federated-pair-165,58.191207,55.094000,5.903000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:66: trailing whitespace.
++smuggled_dynamic_trust,166,req-federated-pair-166,59.727494,56.087000,3.617000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:67: trailing whitespace.
++smuggled_dynamic_trust,167,req-federated-pair-167,57.878205,54.588000,3.846000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:68: trailing whitespace.
++smuggled_dynamic_trust,168,req-federated-pair-168,54.606389,52.570000,3.090000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:69: trailing whitespace.
++smuggled_dynamic_trust,169,req-federated-pair-169,55.196031,52.301000,3.380000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:70: trailing whitespace.
++smuggled_dynamic_trust,170,req-federated-pair-170,58.615249,53.374000,5.377000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:71: trailing whitespace.
++smuggled_dynamic_trust,171,req-federated-pair-171,58.758290,56.659000,3.182000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:72: trailing whitespace.
++smuggled_dynamic_trust,172,req-federated-pair-172,61.353782,58.320000,4.849000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:73: trailing whitespace.
++smuggled_dynamic_trust,173,req-federated-pair-173,57.664324,55.575000,2.995000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:74: trailing whitespace.
++smuggled_dynamic_trust,174,req-federated-pair-174,62.604788,60.418000,3.308000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:75: trailing whitespace.
++smuggled_dynamic_trust,175,req-federated-pair-175,60.856700,58.862000,3.445000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:76: trailing whitespace.
++smuggled_dynamic_trust,176,req-federated-pair-176,64.205676,61.822000,3.370000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:77: trailing whitespace.
++smuggled_dynamic_trust,177,req-federated-pair-177,51.066091,48.269000,4.722000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:78: trailing whitespace.
++smuggled_dynamic_trust,178,req-federated-pair-178,54.815909,52.013000,3.215000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:79: trailing whitespace.
++smuggled_dynamic_trust,179,req-federated-pair-179,67.834294,63.504000,3.967000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:80: trailing whitespace.
++smuggled_dynamic_trust,180,req-federated-pair-180,57.057121,55.124000,3.431000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:81: trailing whitespace.
++smuggled_dynamic_trust,181,req-federated-pair-181,61.367622,59.215000,3.062000,deny,request_smuggled_dynamic_trust,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:82: trailing whitespace.
++intersection_hash_mismatch,182,req-federated-pair-182,58.202206,54.944000,6.094000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:83: trailing whitespace.
++intersection_hash_mismatch,183,req-federated-pair-183,66.982930,63.867000,5.781000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:84: trailing whitespace.
++intersection_hash_mismatch,184,req-federated-pair-184,48.955241,47.085000,3.300000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:85: trailing whitespace.
++intersection_hash_mismatch,185,req-federated-pair-185,72.144475,69.988000,3.051000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:86: trailing whitespace.
++intersection_hash_mismatch,186,req-federated-pair-186,57.727084,52.439000,6.131000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:87: trailing whitespace.
++intersection_hash_mismatch,187,req-federated-pair-187,65.747123,63.696000,3.380000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:88: trailing whitespace.
++intersection_hash_mismatch,188,req-federated-pair-188,56.890680,54.270000,4.070000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:89: trailing whitespace.
++intersection_hash_mismatch,189,req-federated-pair-189,77.482662,75.364000,3.130000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:90: trailing whitespace.
++intersection_hash_mismatch,190,req-federated-pair-190,57.061281,52.544000,4.441000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:91: trailing whitespace.
++intersection_hash_mismatch,191,req-federated-pair-191,65.461482,63.273000,3.125000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:92: trailing whitespace.
++intersection_hash_mismatch,192,req-federated-pair-192,51.979056,49.411000,4.604000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:93: trailing whitespace.
++intersection_hash_mismatch,193,req-federated-pair-193,60.370417,58.074000,3.117000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:94: trailing whitespace.
++intersection_hash_mismatch,194,req-federated-pair-194,68.784339,66.273000,7.466000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:95: trailing whitespace.
++intersection_hash_mismatch,195,req-federated-pair-195,49.459484,47.393000,3.185000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:96: trailing whitespace.
++intersection_hash_mismatch,196,req-federated-pair-196,68.117695,65.174000,3.070000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:97: trailing whitespace.
++intersection_hash_mismatch,197,req-federated-pair-197,52.726979,48.442000,7.981000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:98: trailing whitespace.
++intersection_hash_mismatch,198,req-federated-pair-198,68.524737,63.205000,3.206000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:99: trailing whitespace.
++intersection_hash_mismatch,199,req-federated-pair-199,55.852795,53.710000,3.305000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:100: trailing whitespace.
++intersection_hash_mismatch,200,req-federated-pair-200,72.895999,70.456000,3.084000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:101: trailing whitespace.
++intersection_hash_mismatch,201,req-federated-pair-201,94.959907,93.012000,3.235000,deny,chio_treaty_intersection_mismatch,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:102: trailing whitespace.
++unknown_treaty_scope,202,req-federated-pair-202,65.884485,63.129000,5.333000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:103: trailing whitespace.
++unknown_treaty_scope,203,req-federated-pair-203,66.424527,64.476000,3.081000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:104: trailing whitespace.
++unknown_treaty_scope,204,req-federated-pair-204,65.323641,62.714000,3.111000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:105: trailing whitespace.
++unknown_treaty_scope,205,req-federated-pair-205,56.068476,54.025000,3.147000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:106: trailing whitespace.
++unknown_treaty_scope,207,req-federated-pair-207,73.191320,71.213000,3.183000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:107: trailing whitespace.
++unknown_treaty_scope,208,req-federated-pair-208,47.308993,45.393000,3.235000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:108: trailing whitespace.
++unknown_treaty_scope,209,req-federated-pair-209,57.490883,55.403000,3.275000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:109: trailing whitespace.
++unknown_treaty_scope,210,req-federated-pair-210,57.988045,55.944000,4.213000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:110: trailing whitespace.
++unknown_treaty_scope,211,req-federated-pair-211,58.181807,55.978000,3.011000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:111: trailing whitespace.
++unknown_treaty_scope,212,req-federated-pair-212,54.940630,52.202000,3.423000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:112: trailing whitespace.
++unknown_treaty_scope,213,req-federated-pair-213,54.332228,52.318000,3.248000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:113: trailing whitespace.
++unknown_treaty_scope,214,req-federated-pair-214,60.342057,58.416000,3.683000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:114: trailing whitespace.
++unknown_treaty_scope,215,req-federated-pair-215,61.856304,58.844000,6.546000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:115: trailing whitespace.
++unknown_treaty_scope,216,req-federated-pair-216,60.832740,58.346000,3.264000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:116: trailing whitespace.
++unknown_treaty_scope,217,req-federated-pair-217,55.281712,53.159000,5.126000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:117: trailing whitespace.
++unknown_treaty_scope,218,req-federated-pair-218,51.215453,48.954000,3.039000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:118: trailing whitespace.
++unknown_treaty_scope,219,req-federated-pair-219,71.023990,68.252000,4.212000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:119: trailing whitespace.
++unknown_treaty_scope,220,req-federated-pair-220,55.919315,53.236000,4.365000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:120: trailing whitespace.
++unknown_treaty_scope,221,req-federated-pair-221,65.473242,63.335000,3.367000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:121: trailing whitespace.
++unknown_treaty_scope,222,req-federated-pair-222,52.467379,50.202000,3.169000,deny,chio_treaty_missing_scope,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:122: trailing whitespace.
++unknown_ladder_intersection,223,req-federated-pair-223,63.564233,57.311000,3.341000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:123: trailing whitespace.
++unknown_ladder_intersection,224,req-federated-pair-224,58.052445,56.035000,3.013000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:124: trailing whitespace.
++unknown_ladder_intersection,225,req-federated-pair-225,69.704383,67.653000,3.058000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:125: trailing whitespace.
++unknown_ladder_intersection,226,req-federated-pair-226,54.330827,52.321000,3.057000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:126: trailing whitespace.
++unknown_ladder_intersection,227,req-federated-pair-227,59.610813,57.614000,3.246000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:127: trailing whitespace.
++unknown_ladder_intersection,228,req-federated-pair-228,53.924186,51.777000,3.894000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:128: trailing whitespace.
++unknown_ladder_intersection,229,req-federated-pair-229,52.683180,50.657000,3.225000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:129: trailing whitespace.
++unknown_ladder_intersection,230,req-federated-pair-230,65.678524,63.441000,4.447000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:130: trailing whitespace.
++unknown_ladder_intersection,231,req-federated-pair-231,66.612368,64.623000,3.180000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:131: trailing whitespace.
++unknown_ladder_intersection,232,req-federated-pair-232,66.242166,64.048000,3.302000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:132: trailing whitespace.
++unknown_ladder_intersection,233,req-federated-pair-233,54.346228,52.347000,3.178000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:133: trailing whitespace.
++unknown_ladder_intersection,234,req-federated-pair-234,63.025630,60.854000,3.219000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:134: trailing whitespace.
++unknown_ladder_intersection,235,req-federated-pair-235,49.193683,47.191000,3.221000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:135: trailing whitespace.
++unknown_ladder_intersection,236,req-federated-pair-236,63.840394,61.679000,3.132000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:136: trailing whitespace.
++unknown_ladder_intersection,238,req-federated-pair-238,55.437633,53.204000,3.488000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:137: trailing whitespace.
++unknown_ladder_intersection,239,req-federated-pair-239,55.487754,50.856000,3.080000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:138: trailing whitespace.
++unknown_ladder_intersection,240,req-federated-pair-240,68.318176,65.683000,5.518000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:139: trailing whitespace.
++unknown_ladder_intersection,241,req-federated-pair-241,52.685260,50.325000,3.221000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:140: trailing whitespace.
++unknown_ladder_intersection,242,req-federated-pair-242,64.707238,62.435000,3.316000,deny,chio_treaty_missing_intersection,1
+docs/papers/programmable-sovereignty/bench/results/federated-pair-deny-samples.csv:141: trailing whitespace.
++unknown_ladder_intersection,243,req-federated-pair-243,51.594374,49.626000,3.140000,deny,chio_treaty_missing_intersection,1
+docs/papers/review-2026-09/02-p1-claim-audit.md:491: new blank line at EOF.
+docs/papers/review-2026-09/04-formal-evidence-audit.md:551: new blank line at EOF.
+docs/papers/review-2026-09/05-cross-paper-consistency.md:313: new blank line at EOF.
+docs/papers/review-2026-09/06-foundational-paper-benchmark.md:378: new blank line at EOF.
+docs/papers/review-2026-09/07-simulated-pc-reviews.md:463: new blank line at EOF.
+docs/papers/review-2026-09/08-the-thesis.md:482: new blank line at EOF.
+docs/papers/review-2026-09/09-claim-surface-and-landscape.md:473: new blank line at EOF.
+docs/papers/review-2026-09/11-prose-and-structure-audit.md:419: new blank line at EOF.

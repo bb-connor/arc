@@ -1,0 +1,8 @@
+test_parent_refund_cannot_erase_a_child_earned_right (test_comparison.ComparisonTests.test_parent_refund_cannot_erase_a_child_earned_right) ... ok
+test_replays_representative_traces_in_sql_transactions (test_comparison.ComparisonTests.test_replays_representative_traces_in_sql_transactions) ... ok
+test_unknown_execution_and_unavailable_verifier_do_not_become_rejection (test_comparison.ComparisonTests.test_unknown_execution_and_unavailable_verifier_do_not_become_rejection) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.067s
+
+OK

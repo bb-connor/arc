@@ -1,0 +1,57 @@
+\documentclass[11pt]{article}
+\pdfinfoomitdate=1
+\pdftrailerid{}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern,microtype,amsmath,amssymb,amsthm,booktabs,tabularx,enumitem}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor,tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\definecolor{ink}{HTML}{172C42}
+\usepackage[colorlinks=true,linkcolor=ink,citecolor=ink,urlcolor=ink]{hyperref}
+\usepackage{url}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries\color{ink}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\setlist{nosep,leftmargin=*}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{2em}
+\newtheorem{proposition}{Proposition}
+\input{results.tex}
+\hypersetup{pdftitle={Chio: A Peer-to-Peer Economy of Verifiable Work},pdfauthor={The Chio Project}}
+\title{\vspace{-2em}\textbf{Chio: A Peer-to-Peer Economy\\of Verifiable Work}}
+\author{The Chio Project\\\small\url{https://github.com/bb-connor/arc}}
+\date{October 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+An agent buying work from another organization needs more than a message channel
+and permission to pay. The provider needs a funded obligation; the buyer needs
+an agreed way to check the result; each organization needs to retain authority
+over its own resources. We describe a work contract joining these three
+conditions without a shared application operator. Each receiver authorizes
+execution locally. Signed evidence binds the agreed input, acceptance procedure,
+execution record and funding allocation. A separately funded subcontract can
+become payable even when its parent fails. We give a conditional composition
+argument, a reference implementation and a reproducible finite-state and
+contract-bytecode evaluation. An ordinary transactional escrow matches the
+monetary behavior on the same trace corpus: the contribution is the explicit
+composition and its implementation, not a new escrow primitive. The implemented
+profile trusts a selected verifier and settlement domain. It establishes a
+bounded basis for exchanging checked work; independent operation, lower
+integration cost and useful autonomous trade remain empirical questions.
+\end{abstract}
+\input{sections/01-problem}
+\input{sections/02-model}
+\input{sections/03-contract}
+\input{sections/04-execution}
+\input{sections/05-composition}
+\input{sections/06-evaluation}
+\input{sections/07-related}
+\input{sections/08-limits}
+\input{sections/09-conclusion}
+\bibliographystyle{unsrtnat}
+\bibliography{bib}
+\end{document}

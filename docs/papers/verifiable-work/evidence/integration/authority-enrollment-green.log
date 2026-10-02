@@ -1,0 +1,16 @@
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-paper-security-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 16.12s
+     Running unittests src/main.rs (/tmp/chio-paper-target/debug/deps/chio_federated_work-a9b60095aabf77d4)
+
+running 8 tests
+test funded_work::tests::authority_enrollment::every_pair_of_authority_roles_must_be_distinct ... ok
+test funded_work::tests::authority_enrollment::substituted_public_roles_cannot_provision_native_authority ... ok
+test funded_work::tests::authority_enrollment::valid_foreign_governance_signature_cannot_replace_selected_public_authority ... ok
+test funded_work::tests::authority_enrollment::incomplete_enrollment_cannot_replace_original_native_store ... ok
+test funded_work::tests::authority_enrollment::governance_draft_can_be_attested_without_either_role_reading_peer_seed ... ok
+test funded_work::tests::authority_enrollment::enrollment_accepts_later_attestation_without_admitting_future_standing ... ok
+test funded_work::tests::authority_enrollment::enrolled_authority_cannot_recover_by_replacing_missing_state_or_keys ... ok
+test funded_work::tests::authority_enrollment::public_enrollment_provisions_only_original_provider_authority ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 8.09s
+

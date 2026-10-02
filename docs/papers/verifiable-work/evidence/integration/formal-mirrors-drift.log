@@ -1,0 +1,1 @@
+xtask: formal-mirrors: required dispatch abstraction anchor missing: formal/apalache/PostAdmissionDropGuard.tla -> crates/kernel/chio-kernel/src/kernel/credential_reservation/legacy_nonce.rs::LegacyExecutionNonce; forwarding wrappers alone do not cover the reviewed implementation

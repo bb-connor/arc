@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "git",
+    "submodule",
+    "status",
+    "--recursive"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183",
+  "started_at": "2026-10-02T15:14:47.825784+00:00",
+  "elapsed_seconds": 0.18814220605418086,
+  "exit_status": 0,
+  "log": "logs/dependency-pins.log"
+}

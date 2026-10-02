@@ -1,0 +1,17 @@
+[profile.default]
+src = "empty-src"
+test = "test"
+out = "out"
+cache_path = "cache"
+libs = ["/tmp/chio-paper-erc8183/lib"]
+allow_paths = ["/tmp/chio-paper-erc8183"]
+solc_version = "0.8.28"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+remappings = [
+  "upstream/=/tmp/chio-paper-erc8183/",
+  "@openzeppelin/contracts/=/tmp/chio-paper-erc8183/lib/openzeppelin-contracts/contracts/",
+  "@openzeppelin/contracts-upgradeable/=/tmp/chio-paper-erc8183/lib/openzeppelin-contracts-upgradeable/contracts/",
+  "forge-std/=/tmp/chio-paper-erc8183/lib/forge-std/src/",
+]

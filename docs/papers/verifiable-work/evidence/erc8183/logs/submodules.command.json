@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "git",
+    "submodule",
+    "update",
+    "--init",
+    "--recursive"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183",
+  "started_at": "2026-10-02T15:14:32.511501+00:00",
+  "elapsed_seconds": 0.08298944914713502,
+  "exit_status": 0,
+  "log": "logs/submodules.log"
+}

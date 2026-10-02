@@ -1,0 +1,119 @@
+\section{Evidence and comparison}
+We evaluate the funded checkpoint and this paper's artifact with a recorded
+source inventory. The companion distinguishes freshly executed checks from
+retained September process evidence and the October security integration.
+All reported executions use author-controlled infrastructure. Development-chain
+tokens have no economic value.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l r X@{}}
+\toprule
+Experiment & Result & Boundary\\
+\midrule
+Finite claim graph & \ModelStates\ states & Two prefunded edges, fixed symbolic actors and nine timestamps\\
+Transition checks & \ModelTransitions & Conservation, terminal consistency, denial stability and uncertainty\\
+Contract suite & \ContractTests\ passing & Compiled bytecode on a private development chain; includes \TraceCount\ representative traces\\
+Ordinary SQL comparator & \MatchedSteps\ matched steps & The same \TraceCount\ traces; sequential trusted database\\
+Upstream ERC-8183 & \UpstreamTests\ passing & Unmodified upstream suite at the pinned commit\\
+Paired escrow cases & \PairedTests\ passing & Same token, zero fees, capital and evaluator trust; local Cancun EVM\\
+Lean specification & \ProofCount\ named results & Abstract transitions; no implementation refinement\\
+\bottomrule
+\end{tabularx}
+\caption{Fresh local evidence. Counts describe this artifact, not a production
+reliability estimate. Results and source hashes are checked by the build.}
+\label{tab:evidence}
+\end{table}
+
+\subsection{Transitions and negative controls}
+The finite graph starts with a three-unit parent and a two-unit child. It
+explores alternative submissions, conflicting and unauthorized decisions,
+payment, refund, expiry and execution uncertainty over the selected timestamps.
+Every reachable transition is checked against the invariants. Exploration is
+exhaustive only within this bounded alphabet and starting configuration.
+Funding and failed-transfer boundaries have separate unit tests.
+
+The \TraceCount\ shortest representative financial traces cover selected
+state-transition classes. The Solidity runner compares contract states,
+commitments, decisions and actual token balances with the model after each
+step. It does not replay all \ModelTransitions\ graph transitions against
+bytecode. Additional contract tests exercise failed and asymmetric transfers,
+unauthorized calls, duplicate funding, replay, verifier changes and delayed
+withdrawal. No confidence interval for deployed failure rates can be derived
+from this deterministic regression suite.
+
+Two negative controls test whether the harness can detect the property it
+claims to enforce. A deliberately weakened model allows a payable job to
+expire; the explorer finds the sequence submission, acceptance, refund. A
+corresponding in-memory mutation of the compiled escrow is rejected by the
+earned-withdrawal regression. Neither negative control changes the source
+contract. Separately, the older escrow characterization exhibits a timely
+certificate losing payment eligibility at expiry. That historical contract has
+different semantics; the paper does not describe it as an attempted equivalent
+implementation of the new rule.
+
+\subsection{An ordinary transactional alternative}
+We implement the monetary state machine using ordinary SQL transactions and
+conditional updates, without Chio kernel code. It receives the same role
+identities, deadlines and predicate outcomes as the model. It checks every
+observable snapshot and source balance along the same representative traces.
+The result is \MatchedSteps\ matched steps and no mismatch. Additional tests
+preserve an uncollected child's payment after parent refund, deny reuse of its
+funds, and keep unknown execution distinct from verifier rejection.
+
+This is evidence that the tested monetary safety is available through standard
+mechanisms. The comparator trusts the database operator; replacing it with the
+same external escrow gives an ordinary application access to the same scarce
+backing. We have not benchmarked that application's full integration effort or
+implemented every native admission feature in it. Accordingly, the comparison
+supports neither a Chio speedup nor an impossibility claim against alternatives.
+Both implementations were written within this project, so it is also not an
+independently authored replication.
+
+\subsection{Comparison with upstream ERC-8183}
+We also test the existing agent-commerce implementation at upstream commit
+\texttt{142e669c1f}. Its \UpstreamTests\ unchanged tests pass. We add
+\PairedTests\ comparison tests, using the same mock token, zero fees, a
+100-unit buyer and a separately capitalized 60-unit intermediary. Each escrow
+uses its native authorization and deadline rules; distinct trusted evaluator
+addresses make decisions. The artifact retains compiled-bytecode traces,
+compiler and dependency pins, and reproduction after relocation.
+
+Both implementations pay the child after parent refund, reject funding two
+60-unit jobs from 100, and deny spending the unsettled parent reserve. The
+upstream implementation also supports a stronger milestone case: it pays an
+approved 60-unit claim from one 100-unit job, then refunds the remaining 40 when
+the job is rejected. Chio's fixed-price allocation has no partial-settlement
+entrypoint. These results reject an exclusive claim to either funded agent
+jobs or surviving child payments.
+
+The observed differences concern state-machine policy. Chio separates recorded
+acceptance from withdrawal, rejects new acceptance after its resolution cutoff,
+and preserves earned withdrawal through a funding pause or allowlist change.
+Upstream completion pays immediately; after its expiry grace period, completion
+can still win if refund has not executed. Upstream refunds are blocked while
+paused. These are properties of the pinned implementations, not expressiveness
+limits of ERC-8183, whose evaluators and hooks admit extensions. No gas,
+performance or security superiority follows from the comparison.
+
+\subsection{Execution, verification and security integration}
+The existing funded prototype binds actual Rust-produced output to a separately
+implemented Python check, signed custody, a claim and payment. Its workload
+inventories supported OpenAPI authentication declarations. It checks the listed
+properties, not the security of a running API. September evidence records
+payment, rejection, missing custody, an earned child after parent refund,
+transaction recovery and native execution witnesses. Its later process
+experiments isolate role keys and pass public evidence between separate roles.
+
+We reconciled funded source \texttt{7755d3762b} with security source
+\texttt{491f585e90} in integration commit \texttt{71e5cbc3bf}. Their changes
+overlap in durable admission, recovery and evidence handling; compatibility
+cannot be inferred from their independent tests. \IntegrationSummary
+The companion retains the exact integration record and each remaining gate.
+
+The deterministic workload deliberately makes acceptance easy to inspect. It
+does not demonstrate an asymmetry between expensive production and cheap
+verification: a buyer can often compute this inventory itself. There is no
+held-out repair corpus, economic-margin result, live-agent advantage or
+independently operated company trial in the reported evaluation. Those omissions
+bound the broader economy claim rather than the tested escrow behavior.

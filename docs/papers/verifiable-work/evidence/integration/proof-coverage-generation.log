@@ -1,0 +1,1 @@
+xtask: proof-coverage: Kani harness response_terminal_states_and_clean_rollback_are_closed primary_rust_symbol is absent from its MAPPING surfaces: chio_security_types::response_state::is_legal_response_transition

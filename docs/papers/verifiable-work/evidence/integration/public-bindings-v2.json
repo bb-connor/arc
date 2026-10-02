@@ -1,0 +1,249 @@
+{
+  "binary": {
+    "path": "/tmp/chio-paper-integration-evidence/bin/chio-federated-work-v2",
+    "sha256": "71d3d0c43134ceea39660c48ec1e8a6d90aa7b49e38ed3f11c3d96e69efde1d5"
+  },
+  "bindings": {
+    "earned-child-none": {
+      "balances": {
+        "buyer": "1000",
+        "child": "100",
+        "escrow": "0",
+        "intermediary": "900",
+        "supply": "2000"
+      },
+      "child": {
+        "allocationId": "0xf5210478fb9ab7cc2657bab460d11e2a64526e72de25e2ef9653db006cd1800f",
+        "authorityUuid": "01a0fd3f-be5f-7663-ac09-42cd34b4e772",
+        "authorizationId": "funded-f5210478fb9ab7cc2657bab460d11e2a64526e72de25e2ef9653db006cd1800f",
+        "holdId": "admission-budget:7eaa457a372ad10cce9374d9329f25770289439d88907747859aa14f92b328f5:0",
+        "operationId": "7eaa457a372ad10cce9374d9329f25770289439d88907747859aa14f92b328f5"
+      },
+      "childPaid": "100",
+      "childPayKilledSignal": null,
+      "parent": {
+        "allocationId": "0x708ed0376bd0945bbfaf9270913278a8e912d90f05339b4c7795531bca57577a",
+        "authorityUuid": "01a0fd3f-ad07-7963-bd53-e94cf10dc53a",
+        "authorizationId": "funded-708ed0376bd0945bbfaf9270913278a8e912d90f05339b4c7795531bca57577a",
+        "holdId": "admission-budget:e4fe3f18ed6e514900daf4c49f23a910d711608a12f1ff6fe82d7d6af28cf800:0",
+        "operationId": "e4fe3f18ed6e514900daf4c49f23a910d711608a12f1ff6fe82d7d6af28cf800"
+      },
+      "parentKilledSignal": 9,
+      "parentNativeState": "OutcomeUnknownAfterDispatch",
+      "parentRefunded": "100",
+      "reportSha256": "f62c26772bcd6989490a9b09e36b2866a58e9a02ba537aa5b98e6ac2ea18f74a"
+    },
+    "earned-child-pay-after-broadcast": {
+      "balances": {
+        "buyer": "1000",
+        "child": "100",
+        "escrow": "0",
+        "intermediary": "900",
+        "supply": "2000"
+      },
+      "child": {
+        "allocationId": "0x50bba5a7bf66fa2dd033005ead1ab6d93cbb074f525904da7ac408679e6eeb09",
+        "authorityUuid": "01a0fd40-f920-7290-95cb-1ce4df1a87fb",
+        "authorizationId": "funded-50bba5a7bf66fa2dd033005ead1ab6d93cbb074f525904da7ac408679e6eeb09",
+        "holdId": "admission-budget:046aa34094f82865d2b3f094abae98787fa78f68a149dd2fdd218c9af84779a0:0",
+        "operationId": "046aa34094f82865d2b3f094abae98787fa78f68a149dd2fdd218c9af84779a0"
+      },
+      "childPaid": "100",
+      "childPayKilledSignal": 9,
+      "parent": {
+        "allocationId": "0x1501eceeba32d86c8476f8cef2be66a5d7883f5e28196e5406eb08e6ee2d645d",
+        "authorityUuid": "01a0fd40-e2cd-7f30-a29b-519764002d78",
+        "authorizationId": "funded-1501eceeba32d86c8476f8cef2be66a5d7883f5e28196e5406eb08e6ee2d645d",
+        "holdId": "admission-budget:db13534cb2da6a0f38e68567f008096748553d819f99409bfa19c80a3fd4a928:0",
+        "operationId": "db13534cb2da6a0f38e68567f008096748553d819f99409bfa19c80a3fd4a928"
+      },
+      "parentKilledSignal": 9,
+      "parentNativeState": "OutcomeUnknownAfterDispatch",
+      "parentRefunded": "100",
+      "reportSha256": "840ea9f3a805c031c915be2a3d169dadffc268862828d13c1b2b9eebd8efb1e6"
+    },
+    "earned-child-pay-after-observation": {
+      "balances": {
+        "buyer": "1000",
+        "child": "100",
+        "escrow": "0",
+        "intermediary": "900",
+        "supply": "2000"
+      },
+      "child": {
+        "allocationId": "0x52298776eeb912e1442b03315acf74b1ed86912e38daea1ca2b98e6a6eb9681d",
+        "authorityUuid": "01a0fd41-96c8-7542-8ac9-7dfaa4db941a",
+        "authorizationId": "funded-52298776eeb912e1442b03315acf74b1ed86912e38daea1ca2b98e6a6eb9681d",
+        "holdId": "admission-budget:3c5e50e600874fc21188721db90aa08de77f7de1a973c98ae1b5ee66966b720b:0",
+        "operationId": "3c5e50e600874fc21188721db90aa08de77f7de1a973c98ae1b5ee66966b720b"
+      },
+      "childPaid": "100",
+      "childPayKilledSignal": 9,
+      "parent": {
+        "allocationId": "0xf369342f51667ddedf16bf2e9293c6de5da9473bf13294d868790f6e77100faa",
+        "authorityUuid": "01a0fd41-8255-7a91-838f-bf1d8def2d28",
+        "authorizationId": "funded-f369342f51667ddedf16bf2e9293c6de5da9473bf13294d868790f6e77100faa",
+        "holdId": "admission-budget:8db56a2abfd851989d9bf9b5f5dcc5419ecd64fcae290e63b8fe8262d3123efe:0",
+        "operationId": "8db56a2abfd851989d9bf9b5f5dcc5419ecd64fcae290e63b8fe8262d3123efe"
+      },
+      "parentKilledSignal": 9,
+      "parentNativeState": "OutcomeUnknownAfterDispatch",
+      "parentRefunded": "100",
+      "reportSha256": "112567104e2927729e74a836016bbf459703587d138e2897dd97f029a4e229fe"
+    },
+    "earned-child-pay-after-prepare": {
+      "balances": {
+        "buyer": "1000",
+        "child": "100",
+        "escrow": "0",
+        "intermediary": "900",
+        "supply": "2000"
+      },
+      "child": {
+        "allocationId": "0xd4d3723c99c62f26ae6f1632cd1122b8f6a13d27b41aa3795e06d2de20dd26df",
+        "authorityUuid": "01a0fd40-572b-7890-8833-41fdb95e5115",
+        "authorizationId": "funded-d4d3723c99c62f26ae6f1632cd1122b8f6a13d27b41aa3795e06d2de20dd26df",
+        "holdId": "admission-budget:8b108e2952d3a8a8eee658947673c3bd44313a5a573dcedcf9ae169e9c7f8ec2:0",
+        "operationId": "8b108e2952d3a8a8eee658947673c3bd44313a5a573dcedcf9ae169e9c7f8ec2"
+      },
+      "childPaid": "100",
+      "childPayKilledSignal": 9,
+      "parent": {
+        "allocationId": "0x29ffeda92fdee9a973c9abc67dbaf22344427d65d7bcfbaf58cd23a520fe5653",
+        "authorityUuid": "01a0fd40-3ebf-7870-bad7-91cd41d6c327",
+        "authorizationId": "funded-29ffeda92fdee9a973c9abc67dbaf22344427d65d7bcfbaf58cd23a520fe5653",
+        "holdId": "admission-budget:651a458bc2d5ceffbdab7c0e66d98f42a8a4094f4c901fbdcf4bf155a506f327:0",
+        "operationId": "651a458bc2d5ceffbdab7c0e66d98f42a8a4094f4c901fbdcf4bf155a506f327"
+      },
+      "parentKilledSignal": 9,
+      "parentNativeState": "OutcomeUnknownAfterDispatch",
+      "parentRefunded": "100",
+      "reportSha256": "dd0a6aaa1c712a530c8414546dabe0a619bfb545d53ba79299033de1c93f0c77"
+    },
+    "isolated-pay": {
+      "agreementSha256": "9d24b1167785edf8d9a0a38d65facda10185a2ebe06dbd8a4aa19c4e60dafc85",
+      "allocationId": "0x36a77cf9fa6d44ab44317d7eee03a325e814080b6ac4b1e18a69fb1b63f41b5f",
+      "authorityUuid": "01a0fd3e-d57c-7b42-9e1f-a06ddb680846",
+      "authorizationId": "funded-36a77cf9fa6d44ab44317d7eee03a325e814080b6ac4b1e18a69fb1b63f41b5f",
+      "decisionSha256": "08d7fd4c4ad18d355865a51d6bffc73f8f7cee86876c2794ef58a5039f96b47b",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 1,
+        "Refunded": 0,
+        "TimedOut": 0
+      },
+      "executions": 1,
+      "files": {
+        "": "59fc99f1058a8c34539e88d8952d4a7c07fa2e9ec5bf06149ee162a18c1d8c31",
+        "-decision": "08d7fd4c4ad18d355865a51d6bffc73f8f7cee86876c2794ef58a5039f96b47b",
+        "-verifier-enrollment": "92a2cb744a0fa0b9bfc58fef692c5b553d3990e440917acfd07ef9cf6ec68951"
+      },
+      "holdId": "admission-budget:b78e1eb4a5544de93287eed99a174755e8bde2f548ce93b03f64cc1e6408013d:0",
+      "nativePaymentState": "Settled",
+      "nativeState": "Completed",
+      "operationId": "b78e1eb4a5544de93287eed99a174755e8bde2f548ce93b03f64cc1e6408013d",
+      "paid": "100",
+      "paymentState": "paid",
+      "refunded": "0",
+      "requestSha256": "ae34e06703075b09d388126c365c1163b6bc106367cc665376dfd7ecdab927c9",
+      "settlementTransaction": "0x5e1612c58006a9fd06e604162aa070398e0cd21677294a503cefe64dcb14c526"
+    },
+    "isolated-reject": {
+      "agreementSha256": "79627fa9912f90130d5b45d766cb3deb826c535de678d4b20c1fd554feec76ff",
+      "allocationId": "0xb9017c9ade8090566f47c77fa7d6c6ebe986e532da97a0a1016c045e23dbb0cf",
+      "authorityUuid": "01a0fd3f-4c31-7353-93a4-88a97d62a0fa",
+      "authorizationId": "funded-b9017c9ade8090566f47c77fa7d6c6ebe986e532da97a0a1016c045e23dbb0cf",
+      "decisionSha256": "189c369fd2c366b003b26b54f19269911b20893051e32456572f78ae4bed674d",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 0,
+        "Refunded": 1,
+        "TimedOut": 0
+      },
+      "executions": 1,
+      "files": {
+        "": "340ad61a00407d72783fc619ae5087d1e0dc7f23e0c9db235c4ea71f002b5ce7",
+        "-decision": "189c369fd2c366b003b26b54f19269911b20893051e32456572f78ae4bed674d",
+        "-verifier-enrollment": "fca0048e174262078249496ab341379c45be2143789982355f081d9752286c25"
+      },
+      "holdId": "admission-budget:790ff342bba149915674e3ce11823153ca7b5b9a0974d17ea629df79aca95ef3:0",
+      "nativePaymentState": "Settling",
+      "nativeState": "Finalizing",
+      "operationId": "790ff342bba149915674e3ce11823153ca7b5b9a0974d17ea629df79aca95ef3",
+      "paid": "0",
+      "paymentState": "refunded",
+      "refunded": "100",
+      "requestSha256": "63cd89f946a0bbffafd25a0f88753f2c061a65231ff2f928e67c13f9330844f5",
+      "settlementTransaction": "0xe0692209c27ac4e35b26608513c363380b6e0faf9faaac17dcbb424cc197cc9c"
+    },
+    "peer-pay": {
+      "agreementSha256": "f6db49f0618d17e8cd158cd1f720518869e002104f30cf57b85e8d62a69398f9",
+      "allocationId": "0x8a97b1774c424e7de98bf3b5384dd88905bf8a5d04902c0b7296a75c2c060ae9",
+      "authorityUuid": "01a0fd3e-d3bb-7281-ac02-f8bc70223b82",
+      "authorizationId": "funded-8a97b1774c424e7de98bf3b5384dd88905bf8a5d04902c0b7296a75c2c060ae9",
+      "decisionSha256": "5ba9ee4b15a8f83dbd2d514360597eba8a253db60022ae8022d38db310686039",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 1,
+        "Refunded": 0,
+        "TimedOut": 0
+      },
+      "executions": 1,
+      "files": {
+        "": "750de277dce61fc62fe6368dec0a9e3b862af7d1e99db420731be9c0dacc8d30",
+        "-decision": "5ba9ee4b15a8f83dbd2d514360597eba8a253db60022ae8022d38db310686039",
+        "-verifier-enrollment": "b07b6e7696794886d6b1d036576846ff77125298757d5a2559f5141b31e5ea68"
+      },
+      "holdId": "admission-budget:b31a415f4488aeb3615f0d838aae59725588394f29dd5ad7f5ef1bab0fe4eb98:0",
+      "nativePaymentState": "Settled",
+      "nativeState": "Completed",
+      "operationId": "b31a415f4488aeb3615f0d838aae59725588394f29dd5ad7f5ef1bab0fe4eb98",
+      "paid": "100",
+      "paymentState": "paid",
+      "refunded": "0",
+      "requestSha256": "b04456777f26e953432bd3fa007824dd3b355a9753a5edd4ea48f5c123b13d4b",
+      "settlementTransaction": "0xe41ac335c5451bcb385e83b696d4a3b4c1f4835488c06819d4a989b31e5481fe"
+    },
+    "peer-reject": {
+      "agreementSha256": "f69a3110454a54266152dea2de0330314c7215ddbda04a0b0b285b94b7fad734",
+      "allocationId": "0xa6dbb99be7901eb5cbf97949bf6c8d242ece45451012d37599973730cee118cf",
+      "authorityUuid": "01a0fd3f-5129-7743-99fa-4771cb4d464b",
+      "authorizationId": "funded-a6dbb99be7901eb5cbf97949bf6c8d242ece45451012d37599973730cee118cf",
+      "decisionSha256": "3a6e52f709dbf7678cb41fb440e7c391eedf250919830660d6d3fc4ec624a1d4",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 0,
+        "Refunded": 1,
+        "TimedOut": 0
+      },
+      "executions": 1,
+      "files": {
+        "": "2ebaa5bddcc557bdf365edceb76dffd687ecad79ef409a444f0c032a28d29296",
+        "-decision": "3a6e52f709dbf7678cb41fb440e7c391eedf250919830660d6d3fc4ec624a1d4",
+        "-verifier-enrollment": "d99cd3d29a9f4b67ffd6030fadbd0d6dc3ad718b449008a72b9744d84bc44ef3"
+      },
+      "holdId": "admission-budget:ed11ed1c47c1fc60d76d0b589a74b1c7519c40eea729a40b9218c71303b06a15:0",
+      "nativePaymentState": "Settling",
+      "nativeState": "Finalizing",
+      "operationId": "ed11ed1c47c1fc60d76d0b589a74b1c7519c40eea729a40b9218c71303b06a15",
+      "paid": "0",
+      "paymentState": "refunded",
+      "refunded": "100",
+      "requestSha256": "e3704ba11bce1d720fc33802ccf5637c0a846716a8009673fa1095bbc5509923",
+      "settlementTransaction": "0x2bce033089b746939b15085558637da71ec16ee983d9cf6ad09f6739e427f499"
+    }
+  },
+  "scope": "Public test fixtures on an owned mock chain; no independent administration or public-chain finality.",
+  "sourceManifest": {
+    "file": "source-manifest-v2.json",
+    "sha256": "0c318a449ef0c5c67fadcb421af4a680716ee6ae30cf32905fa7651348c1ce53"
+  }
+}

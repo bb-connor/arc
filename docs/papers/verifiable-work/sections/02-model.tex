@@ -1,0 +1,47 @@
+\section{Parties, authority and assumptions}
+A work edge connects a payer $B$ and a provider $P$. A selected verifier $V$
+decides the agreed acceptance predicate, a custody service retains the relevant
+bytes, and a settlement domain $R$ allocates and transfers funds. One
+organization may supply several services, but each role and key is explicit.
+Distinct keys alone do not establish independent administration. A provider on
+one edge can be the payer on another.
+
+An agent chooses requests and may be malicious. The honest organization's
+kernel mediates its resource access using locally activated trust roots,
+bounded capabilities and current policy. The remote operator may control its
+agents, signing keys, storage, messages and task implementation. The network
+may delay, duplicate, reorder or lose messages. Processes may fail between
+any two durable steps. Cryptographic authenticity cannot make a dishonest
+operator's account of its own execution true.
+
+The initial profile, F1, makes five assumptions. First, the honest party's local
+enforcement and protected state work as specified. Second, signatures are
+unforgeable and the selected hashes resist collisions. Third, the settlement
+domain enforces exclusive allocations, atomic transitions and the chosen
+finality rule; its token transfers exactly the agreed units. Fourth, the pinned
+verifier applies the agreed predicate to the bound inputs and makes an
+eligible decision available within its window. Fifth, the parties can obtain
+the evidence and submit transactions needed to exercise a claim. Safety and
+liveness depend on different subsets of these assumptions.
+
+The verifier is a trusted decision authority, even when its checker is publicly
+reproducible. Other readers can detect a wrong decision by rerunning the check;
+F1 does not make the settlement contract execute that check. A compromised
+verifier can approve bad work or withhold a decision. A compromised settlement
+domain can violate backing. These are central trust dependencies, not details
+of transport security.
+
+Three ledgers describe different facts. The receiver's authorization ledger
+answers whether an operation was admitted. The evidence record answers what
+was observed and checked. The settlement ledger answers which funds are
+reserved, payable or transferred. No record substitutes for the other two.
+In particular, a tool whose effect is unknown after a crash remains unknown
+even if the parties later release a payment hold.
+
+We bound only the obligations admitted under the contract. The bound excludes
+unapproved off-protocol spending, opportunity cost, loss of disclosed data,
+verifier fees and transaction fees unless the terms explicitly reserve them.
+The reference experiment uses one fixed-price result and one subcontracting
+level. The composition argument applies to a finite set of distinct funded
+edges; it neither proves that a cyclic task graph finishes nor implements
+unrestricted recursive procurement.

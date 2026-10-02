@@ -1,0 +1,77 @@
+{
+  "schema": "chio.paper.integration.v1",
+  "commit": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3",
+  "scope": "Focused research integration, not complete security or release qualification.",
+  "v2_binary_sha256": "71d3d0c43134ceea39660c48ec1e8a6d90aa7b49e38ed3f11c3d96e69efde1d5",
+  "v3_binary_sha256": "919d5f4bad46f318f4e505e0377ee94f751a35a218c4713c1af58b06a1cdcfdf",
+  "source_manifest": "integration/source-manifest-v3.json.gz",
+  "source_manifest_uncompressed_sha256": "c69a4db94361b2e4719ecac0d43af1d8088357903895d73637951f9a905710b4",
+  "v2_source_manifest": "integration/source-manifest-v2.json.gz",
+  "v2_to_final_changes": "integration/v2-to-final-source-changes.json",
+  "checks": [
+    {
+      "id": "standalone-all-final",
+      "record": "integration/standalone-all-final.json",
+      "log": "integration/standalone-all-final.log",
+      "scope": "v2: 95 native tests including all six opted-in owned-chain tests"
+    },
+    {
+      "id": "peer-process-final",
+      "record": "integration/peer-process-final.json",
+      "log": "integration/peer-process-final.log",
+      "scope": "v2: authenticated payout and refund"
+    },
+    {
+      "id": "isolated-process-final",
+      "record": "integration/isolated-process-final.json",
+      "log": "integration/isolated-process-final.log",
+      "scope": "v2: isolated bilateral payout and refund"
+    },
+    {
+      "id": "earned-child-process-final",
+      "record": "integration/earned-child-process-final.json",
+      "log": "integration/earned-child-process-final.log",
+      "scope": "v2: four earned-child process scenarios"
+    },
+    {
+      "id": "refund-resolution-final",
+      "record": "integration/refund-resolution-final.json",
+      "log": "integration/refund-resolution-final.log",
+      "scope": "v2: seven refund-resolution scenarios"
+    },
+    {
+      "id": "execution-custody-final",
+      "record": "integration/execution-custody-final.json",
+      "log": "integration/execution-custody-final.log",
+      "scope": "v2: five custody process-kill scenarios"
+    },
+    {
+      "id": "standalone-clippy-retry",
+      "record": "integration/standalone-clippy-retry.json",
+      "log": "integration/standalone-clippy-retry.log",
+      "scope": "v3 source: strict standalone Clippy"
+    },
+    {
+      "id": "peer-unit-final",
+      "record": "integration/peer-unit-final.json",
+      "log": "integration/peer-unit-final.log",
+      "scope": "v3 source: four affected peer unit tests"
+    },
+    {
+      "id": "peer-process-v3",
+      "record": "integration/peer-process-v3.json",
+      "log": "integration/peer-process-v3.log",
+      "scope": "v3: authenticated peer payout and refund after final lint simplification"
+    }
+  ],
+  "residual_gates": [
+    "formal mirror anchor references deleted or moved symbols",
+    "proof coverage mapping is stale",
+    "Rust file-hygiene limits exceeded",
+    "full combined workspace/security inventory not qualified",
+    "no terminal exact-source hosted CI",
+    "off-host deployment and operator profile not qualified",
+    "independent operator and economic trial unperformed"
+  ],
+  "manuscript_summary": "The integrated evidence snapshot passes 95 native tests, including all six opt-in chain tests, and 20 selected process scenarios covering authenticated transport, bilateral isolation, earned-child recovery, refund resolution and custody. The final source differs only by removal of a redundant dereference, checked by strict Clippy, four affected unit tests and a fresh authenticated payout/refund run. All roles remain under author control. Broader formal-source mapping, file-hygiene, hosted and deployment qualification remain open."
+}

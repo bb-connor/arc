@@ -1,0 +1,26 @@
+F
+======================================================================
+FAIL: test_isolated_payout_and_refund (__main__.IsolatedConsent.test_isolated_payout_and_refund) (mode='reject')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-paper-security-integration/examples/federated-work/test_isolated_consent.py", line 17, in test_isolated_payout_and_refund
+    self.assertEqual(p.returncode,0,p.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+isolated role failed: Finding governance standing invalid: status operator status evidence is stale
+
+
+
+----------------------------------------------------------------------
+Ran 1 test in 42.384s
+
+FAILED (failures=1)

@@ -1,0 +1,89 @@
+{
+  "commands": [
+    {
+      "command": [
+        "rustc",
+        "-Vv"
+      ],
+      "exitCode": 0,
+      "stdout": "rustc 1.94.1 (e408947bf 2026-03-25)\nbinary: rustc\ncommit-hash: e408947bfd200af42db322daf0fadfe7e26d3bd1\ncommit-date: 2026-03-25\nhost: aarch64-unknown-linux-gnu\nrelease: 1.94.1\nLLVM version: 21.1.8\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "-Vv"
+      ],
+      "exitCode": 0,
+      "stdout": "cargo 1.94.1 (29ea6fb6a 2026-03-24)\nrelease: 1.94.1\ncommit-hash: 29ea6fb6a5db279426f4cc4e17aa385f05a0cfbc\ncommit-date: 2026-03-24\nhost: aarch64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.3 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 24.4.0 (noble) [64-bit]\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "v24.16.0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "Python 3.12.3\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-m",
+        "pip",
+        "freeze"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "/tmp/chio-python31-locked-venv/bin/python: No module named pip\n"
+    },
+    {
+      "command": [
+        "/usr/bin/bwrap",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "bubblewrap 0.9.0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "openssl",
+        "version"
+      ],
+      "exitCode": 0,
+      "stdout": "OpenSSL 3.0.13 30 Jan 2024 (Library: OpenSSL 3.0.13 30 Jan 2024)\n",
+      "stderr": ""
+    }
+  ],
+  "nodePackages": {
+    "ethers": {
+      "version": "6.16.0",
+      "packageJsonSha256": "86117317a7713eb371f63ff1fbf9366f22459e9a8621e83dc17c8c93e479185c"
+    },
+    "ganache": {
+      "version": "7.9.2",
+      "packageJsonSha256": "8b257b4387f16176518127b21943fb451c1aad4c8f586eb8d7a3caa00333fa29"
+    },
+    "solc": {
+      "version": "0.8.30",
+      "packageJsonSha256": "d3059631769ee89e919b784e84566f7853300d5353b624f348d567577cf5c384"
+    }
+  },
+  "bubblewrapSha256": "cd6b143283b464baf078ab09ca19dadc5bcc2423b833c4f9dd7e83f9ba1b640b",
+  "dependencyMount": {
+    "type": "temporary symlink removed after qualification",
+    "path": "contracts/node_modules",
+    "target": "/home/connor/backbay/arc-funded-integration/contracts/node_modules"
+  }
+}

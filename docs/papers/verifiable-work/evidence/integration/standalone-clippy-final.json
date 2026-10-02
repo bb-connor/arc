@@ -1,0 +1,27 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--manifest-path",
+    "examples/federated-work/Cargo.toml",
+    "--locked",
+    "--offline",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/tmp/chio-paper-security-integration",
+  "startedAt": "2026-10-02T15:37:52.471153+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_TARGET_DIR": "/tmp/chio-paper-target",
+    "CHIO_CHECKOUT_ROOT": "/tmp/chio-paper-security-integration",
+    "CHIO_FUNDED_BINARY": "/tmp/chio-paper-integration-evidence/bin/chio-federated-work-v2",
+    "CHIO_FUNDED_PYTHON": "/tmp/chio-python31-locked-venv/bin/python",
+    "CHIO_FUNDED_EVIDENCE_DIR": "/tmp/chio-paper-integration-evidence/public"
+  },
+  "exitCode": 101,
+  "elapsedSeconds": 140.575,
+  "finishedAt": "2026-10-02T15:40:13.045915+00:00"
+}

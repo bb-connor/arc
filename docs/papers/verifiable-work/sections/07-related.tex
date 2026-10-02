@@ -1,0 +1,58 @@
+\section{Relation to existing mechanisms}
+Contract Net already organizes distributed work through announcements, bids
+and awards~\cite{contractnet}. Agent Contracts unifies task specifications,
+resource constraints and success conditions, including delegated budget
+conservation~\cite{agentcontracts}. Chio does not introduce contracting or
+hierarchical budget discipline. Our focus is the boundary between a remote
+operator's local budget and an obligation backed by a settlement authority the
+operator cannot rewrite.
+
+AgentBound places deterministic governance before execution and binds decisions
+to verifiable receipts~\cite{agentbound}. That overlaps substantially with local
+authorization and audit. A receipt about permitted behavior does not by itself
+reserve funds at a separate authority or decide application-specific output
+acceptance. Chio's work contract explicitly joins those duties, while retaining
+their distinct assumptions.
+
+A2A supplies tasks, messages, artifacts and discovery~\cite{a2a}; AP2 specifies
+signed commercial and payment mandates and their verification~\cite{ap2}.
+AP2 v0.2 leaves shopping-agent mandate delegation outside its scope and permits
+extensible authorization models. That is a scope choice, not evidence that its
+carriers cannot express this work contract. Likewise, OAuth token exchange
+leaves significant trust and token semantics to deployment profiles~\cite{oauth}.
+A receiver-issued credential and ordinary signed application fields can enforce
+receiver-owned authorization. Interoperability requires a defined profile and
+conformance tests, not a claim that other formats lack expressive power.
+
+ERC-8183 is a particularly close construction: it specifies escrowed agent jobs,
+providers, evaluator-approved completion and expiry refunds~\cite{erc8183}.
+The economic pattern is already present. The pinned upstream implementation
+additionally supports partial claims and relayable EIP-712 authorization; the
+specification and implementation differ in details. Section 6 tests their
+overlap with Chio directly. No new economic primitive follows from separating
+acceptance and withdrawal or from independently funding child jobs.
+ERC-8004 provides discovery, reputation and validation interfaces while leaving
+payments to other protocols~\cite{erc8004}. A registry entry is evidence a
+receiver may consider, not a capability to use its resources. Both standards
+are drafts at the pinned snapshots.
+
+Sagas explain how sequences of transactions use application-defined
+compensation~\cite{sagas}. A refund is such a financial action; it need not erase
+an already delivered effect. Our explicit unknown state prevents recovery from
+inventing a successful execution or a no-effect history. Durable workflows and
+transactional outboxes remain appropriate competing implementation techniques.
+
+Contingent service payments and fair exchange have established constructions
+for linking payment to verification~\cite{zkcsp,fairswap}. F1 is weaker in an
+important respect: it relies on a selected verifier, rather than supplying a
+cryptographic proof of arbitrary useful work or complete fair exchange.
+Replacing that verifier with a proof system would require a restricted task
+language, cost measurements and a new analysis of availability and disclosure.
+The current implementation does not establish that extension.
+
+The relevant comparison is thus a composition of competent implementations of
+these mechanisms. A missing field in a base specification is not an obstacle
+to that composition. Chio offers a particular contract and enforcement path;
+whether that common contract materially lowers the cost of changing partners
+remains the experiment that would distinguish protocol value from a large
+bespoke integration.

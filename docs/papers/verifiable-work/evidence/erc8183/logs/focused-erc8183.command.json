@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "--cwd",
+    "/tmp/chio-paper-erc8183-artifact",
+    "--",
+    "/tmp/chio-paper-erc8183-artifact/tools/forge",
+    "test",
+    "--root",
+    "/tmp/chio-paper-erc8183-artifact",
+    "--match-contract",
+    "ERC8183PaperComparisonTest",
+    "-vvvv"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183",
+  "started_at": "2026-10-02T15:20:12.178806+00:00",
+  "elapsed_seconds": 0.00270357308909297,
+  "exit_status": 126,
+  "log": "logs/focused-erc8183.log"
+}

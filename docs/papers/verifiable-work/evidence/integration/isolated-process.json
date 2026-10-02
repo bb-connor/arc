@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "examples/federated-work/test_isolated_consent.py"
+  ],
+  "cwd": "/tmp/chio-paper-security-integration",
+  "startedAt": "2026-10-02T15:23:13.221169+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_TARGET_DIR": "/tmp/chio-paper-target",
+    "CHIO_CHECKOUT_ROOT": "/tmp/chio-paper-security-integration",
+    "CHIO_FUNDED_BINARY": "/tmp/chio-paper-target/debug/chio-federated-work",
+    "CHIO_FUNDED_PYTHON": "/tmp/chio-python31-locked-venv/bin/python",
+    "CHIO_FUNDED_EVIDENCE_DIR": "/tmp/chio-paper-integration-evidence/public"
+  },
+  "exitCode": 1,
+  "elapsedSeconds": 42.458,
+  "finishedAt": "2026-10-02T15:23:55.679599+00:00"
+}

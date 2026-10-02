@@ -1,0 +1,53 @@
+{
+  "schema": "chio.paper.publication-gates.v1",
+  "requested_bar": "Completed publication-ready whitepaper supporting an evidence-based breakthrough judgment",
+  "publish_ready": false,
+  "breakthrough_established": false,
+  "gates": [
+    {
+      "id": "manuscript",
+      "status": "in-progress",
+      "acceptance": "Complete argument, exact sources, no unresolved scientific-review blockers."
+    },
+    {
+      "id": "artifact",
+      "status": "in-progress",
+      "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree."
+    },
+    {
+      "id": "funded-security-integration",
+      "status": "passed",
+      "acceptance": "Semantic integration and fresh focused native evidence on pinned combined source.",
+      "evidence": "evidence/integration-summary.json",
+      "result": "Focused integrated research boundaries pass on declared v2/v3 sources. Broader security release gates remain open and are enumerated separately."
+    },
+    {
+      "id": "closest-prior-art",
+      "status": "passed",
+      "acceptance": "Pinned ERC-8183 behavior fairly compared, material overlap acknowledged.",
+      "evidence": "evidence/erc8183/REPORT.json",
+      "result": "76 upstream and 20 comparison tests passed; substantial overlap and stronger upstream partial settlement acknowledged."
+    },
+    {
+      "id": "independent-operation",
+      "status": "open",
+      "acceptance": "Separately operated participants and independently written provider complete the published contract.",
+      "result": "No partner available as of 2026-10-02; user requested the external trial package. No external trial executed."
+    },
+    {
+      "id": "useful-work-economics",
+      "status": "open",
+      "acceptance": "Held-out useful work and full cost/capital accounting meet preregistered criteria."
+    },
+    {
+      "id": "integration-advantage",
+      "status": "open",
+      "acceptance": "Competent matched baseline with same resources and measurable integration advantage."
+    },
+    {
+      "id": "foundational-claim",
+      "status": "open",
+      "acceptance": "Compact result survives independent expert critique and strong counterexamples."
+    }
+  ]
+}

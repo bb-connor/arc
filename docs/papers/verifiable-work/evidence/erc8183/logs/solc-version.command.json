@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "/home/connor/.local/share/svm/0.8.28/solc-0.8.28",
+    "--version"
+  ],
+  "cwd": "/tmp/chio-paper-erc8183",
+  "started_at": "2026-10-02T15:23:20.485010+00:00",
+  "elapsed_seconds": 0.009320326149463654,
+  "exit_status": 0,
+  "log": "logs/solc-version.log"
+}

@@ -1,0 +1,80 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "pdflatex",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "pdfTeX 3.141592653-2.6-1.40.25 (TeX Live 2023/Debian)\nkpathsea version 6.3.5\nCopyright 2023 Han The Thanh (pdfTeX) et al.\nThere is NO warranty.  Redistribution of this software is\ncovered by the terms of both the pdfTeX copyright and\nthe Lesser GNU General Public License.\nFor more information about these matters, see the file\nnamed COPYING and the pdfTeX source.\nPrimary author of pdfTeX: Han The Thanh (pdfTeX) et al.\nCompiled with libpng 1.6.43; using libpng 1.6.43\nCompiled with zlib 1.3; using zlib 1.3\nCompiled with xpdf version 4.04\n"
+    },
+    {
+      "argv": [
+        "bibtex",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "BibTeX 0.99d (TeX Live 2023/Debian)\nkpathsea version 6.3.5\nCopyright 2023 Oren Patashnik.\nThere is NO warranty.  Redistribution of this software is\ncovered by the terms of both the BibTeX copyright and\nthe Lesser GNU General Public License.\nFor more information about these matters, see the file\nnamed COPYING and the BibTeX source.\nPrimary author of BibTeX: Oren Patashnik.\n"
+    },
+    {
+      "argv": [
+        "pdftotext",
+        "-v"
+      ],
+      "exit_code": 0,
+      "output": "pdftotext version 24.02.0\nCopyright 2005-2024 The Poppler Developers - http://poppler.freedesktop.org\nCopyright 1996-2011, 2022 Glyph & Cog, LLC\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "Python 3.13.13\n"
+    },
+    {
+      "argv": [
+        "node",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "v24.16.0\n"
+    },
+    {
+      "argv": [
+        "lean",
+        "+leanprover/lean4:v4.28.0",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "Lean (version 4.28.0, aarch64-unknown-linux-gnu, commit 7e01a1bf5c70fc6167d49c345d3bf80596e9a79b, Release)\n"
+    }
+  ],
+  "tex_packages": {
+    "lmodern.sty": {
+      "path": "/usr/share/texmf/tex/latex/lm/lmodern.sty",
+      "sha256": "d2877369dcb4bfe7b1b6bba1a3d96c46e93366459c9b46576f1b221009bbe359"
+    },
+    "microtype.sty": {
+      "path": "/usr/share/texlive/texmf-dist/tex/latex/microtype/microtype.sty",
+      "sha256": "1a41c71483a682e5443508d023fc2d01a3b96e8bdf914f0331a39760ef281549"
+    },
+    "tikz.sty": {
+      "path": "/usr/share/texlive/texmf-dist/tex/latex/pgf/frontendlayer/tikz.sty",
+      "sha256": "6e39ff4fdf9f126aff28880a7dd59fccc0e6735409d92ca455cdd2a4f2b4db53"
+    },
+    "natbib.sty": {
+      "path": "/usr/share/texlive/texmf-dist/tex/latex/natbib/natbib.sty",
+      "sha256": "d2709be806dc7d5f54daa9a16022ba1451b1322954751b98e38cfad0cc107450"
+    },
+    "hyperref.sty": {
+      "path": "/usr/share/texlive/texmf-dist/tex/latex/hyperref/hyperref.sty",
+      "sha256": "3e2bd51be23486a776165ebda8bdef7d442c0b779db14652dcc1e40429b1c1ad"
+    },
+    "geometry.sty": {
+      "path": "/usr/share/texlive/texmf-dist/tex/latex/geometry/geometry.sty",
+      "sha256": "d5d36ad74051ad36288242b51438e2d9a5db2bd6c063b9b5704d0931fbc9f439"
+    }
+  },
+  "source_date_epoch": 1790899200
+}

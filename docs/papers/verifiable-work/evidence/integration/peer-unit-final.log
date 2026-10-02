@@ -1,0 +1,12 @@
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-paper-security-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 15.74s
+     Running unittests src/main.rs (/tmp/chio-paper-target/debug/deps/chio_federated_work-a9b60095aabf77d4)
+
+running 4 tests
+test funded_work::tests::peer_verifier::bounded_http_response_rejects_redirects_ambiguous_framing_and_truncation ... ok
+test funded_work::tests::peer_verifier::authenticated_call_binds_exact_origin_enrollment_and_complete_request ... ok
+test funded_work::tests::peer_verifier::service_enrollment_requires_existing_versioned_custody_without_seed ... ok
+test funded_work::tests::peer_verifier::authenticated_call_custody_preserves_destination_and_historical_retries ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 91 filtered out; finished in 6.00s
+

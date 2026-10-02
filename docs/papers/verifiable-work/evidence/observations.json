@@ -1,0 +1,167 @@
+{
+  "collected_at": "2026-10-02T15:17:28.701269+00:00",
+  "note": "Command exit codes observed by execution tools; collection time is not start time. Negative controls intentionally exit 1. Python first run lacks the native binary and is not passing.",
+  "source_commit": "7755d3762baa5e0fda0d171835a9000c26de9033",
+  "environment": {
+    "platform": "Linux workstation 6.17.0-1020-oracle #20-Ubuntu SMP Sat Jul 25 00:52:17 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux",
+    "python": "Python 3.13.13",
+    "node": "v24.16.0"
+  },
+  "checks": [
+    {
+      "id": "finite-model",
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/funded-work-model",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "model-tests.log",
+      "log_sha256": "0bce2dd1e25016da49ca9eade892dd9ceb5f80bf6bf23ab8c349449a1a4a2127"
+    },
+    {
+      "id": "model-exploration",
+      "argv": [
+        "python3",
+        "-B",
+        "examples/funded-work-model/claim_explorer.py",
+        "--output",
+        "docs/papers/verifiable-work/evidence/claim-traces.json"
+      ],
+      "exit_code": 0,
+      "log": "explorer.log",
+      "log_sha256": "46d86b398118e733f22ec4b0579e9f4ff24d44741b9759873d48e0f18a5b5494"
+    },
+    {
+      "id": "expiry-negative",
+      "argv": [
+        "python3",
+        "-B",
+        "examples/funded-work-model/claim_explorer.py",
+        "--broken-expiry",
+        "--output",
+        "docs/papers/verifiable-work/evidence/expiry-counterexample.json"
+      ],
+      "exit_code": 1,
+      "log": "expiry-counterexample.log",
+      "log_sha256": "1c790cbff0a3d80c170f48b936a8b78796b49601ba786753ed46428d9b3475ec"
+    },
+    {
+      "id": "bytecode",
+      "argv": [
+        "node",
+        "--test",
+        "contracts/scripts/work-claim-escrow.test.mjs",
+        "contracts/scripts/work-claim-model.test.mjs",
+        "contracts/scripts/funded-work-fit.test.mjs"
+      ],
+      "exit_code": 0,
+      "log": "contracts.log",
+      "log_sha256": "bfc10be04360477a4f002f49684c47bfb333a35667736ed8505b28dc125437a4"
+    },
+    {
+      "id": "bytecode-negative",
+      "argv": [
+        "env",
+        "CHIO_CLAIM_MUTATION=expire-payable",
+        "node",
+        "--test",
+        "--test-name-pattern=accepted claim survives",
+        "contracts/scripts/work-claim-escrow.test.mjs"
+      ],
+      "exit_code": 1,
+      "log": "contract-mutation.log",
+      "log_sha256": "5a3833cdd0b9e2de2056948985ecd2a3c075e104fa218a5aae07833775b40a8a"
+    },
+    {
+      "id": "lean",
+      "argv": [
+        "lean",
+        "+leanprover/lean4:v4.28.0",
+        "docs/papers/verifiable-work/formal/WorkClaims.lean"
+      ],
+      "exit_code": 0,
+      "log": "lean.log",
+      "log_sha256": "251114945d8dde7478b1d1ff6f18b1923e73a1f22493feedf5082e0a0be549a9"
+    },
+    {
+      "id": "artifact-tools",
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "docs/papers/verifiable-work/tools",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "artifact-tests.log",
+      "log_sha256": "cac5c0f7a0d5b33448b07db87331a31b1bb965e78552c81c81e3058ba88edc91",
+      "scope": "Seven artifact-tool tests after publication-gate regressions; supersedes the initial five-test tool run."
+    },
+    {
+      "id": "funded-python-first",
+      "argv": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/funded-work",
+        "-v"
+      ],
+      "exit_code": 1,
+      "log": "python-tests.log",
+      "log_sha256": "6d4f90bd965d109fa029a80e409e550945b91807d417565b58c57dc5e6424e69"
+    },
+    {
+      "id": "funded-python-qualified",
+      "argv": [
+        "env",
+        "CHIO_W0_BINARY=/tmp/chio-paper-target/debug/chio-federated-work",
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/funded-work",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "python-tests-qualified.log",
+      "log_sha256": "8058badcb1cde677fb611ad5e055160c9d11ed91d44447b01436e5488a6c61a4",
+      "binary_sha256": "58635df3aabb84a0a3a55fd6b0f84aff12df3fd5f0b3090a89b08d8ccb14e2aa",
+      "scope": "38 Python tests; native checker cases use separately integrated binary; no native lifecycle claim"
+    },
+    {
+      "id": "funded-python-integrated-v2",
+      "argv": [
+        "env",
+        "CHIO_W0_BINARY=/tmp/chio-paper-integration-evidence/bin/chio-federated-work-v2",
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "examples/funded-work",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "python-tests-integrated-v2.log",
+      "log_sha256": "9c8ecbac766170b37ef68a9419d3be80542d95fadb469f8ef5c18c30c6ec1eef",
+      "binary_sha256": "71d3d0c43134ceea39660c48ec1e8a6d90aa7b49e38ed3f11c3d96e69efde1d5",
+      "scope": "38 Python tests against final integrated binary; source manifest v2 is retained separately."
+    }
+  ],
+  "refreshed_at": "2026-10-02T15:39:16.423593+00:00"
+}

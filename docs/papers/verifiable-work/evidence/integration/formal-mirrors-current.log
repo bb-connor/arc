@@ -1,0 +1,1 @@
+xtask: formal-mirrors: symbol not found: append_chio_receipt_tx in crates/platform/chio-store-sqlite/src/receipt_store.rs
