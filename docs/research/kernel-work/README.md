@@ -6,10 +6,11 @@ ambition. Read this package before changing that manuscript or restarting the
 novelty argument. The intended result is a consequential advance in how untrusted
 agents perform work across independently owned systems.
 
-**Current judgment:** a breakthrough is not established. The strongest direction
-to investigate is a common execution model that preserves authority, knowledge,
-resource commitments and obligations through delegation and uncertain outcomes, while
-allowing useful work to continue. The cross-owner contribution remains a hypothesis.
+**Current judgment:** the [G0 counterdesign pass](G0-DECISION.md) retains one
+composition question. Strong conventional, capability-contract and OpenAPPA
+constructions have plausible paths to the target behavior. Chio must establish a
+nontrivial composition result or consequential systems advantage under matched
+assumptions. A breakthrough remains unestablished.
 
 Start with these documents in order:
 
@@ -21,6 +22,12 @@ Start with these documents in order:
 3. [Execution plan](../../superpowers/plans/2026-10-02-kernel-breakthrough-research.md):
    ordered research tasks, concrete artifacts, experiments, acceptance criteria,
    and conditions for stopping an unsupported direction.
+4. [G0 decision](G0-DECISION.md), [counterdesigns](counterdesigns.md),
+   [recovery crosswalk](recovery-crosswalk.md) and [claim register](claim-register.json):
+   the Task 1 result and the exact question for Tasks 2-3.
+5. [Task 1 source audit](task1-source-audit.md) and
+   [verification record](task1-validation.md): reading locations, source pins,
+   reproducible checks and review scope.
 
 ```mermaid
 flowchart LR
@@ -38,9 +45,10 @@ flowchart LR
 | Research and planning package | Written; source and documentation checks recorded in the plan |
 | Assumed shipped baseline | PR #1172 revision 3, all P0-P6 recovery semantics, by the user's explicit instruction |
 | Recommended investigation | R1 composition of the full kernel/recovery design across owners, using R2 cross-owner progress as the first difficult test |
-| First execution task | Task 1: construct the strongest conventional counterdesign and identify the exact remaining difference |
+| Task 1 | Counterdesigns, crosswalk, claim register and G0 decision written; acceptance review recorded in task1-validation.md |
+| Next execution task | Task 2: shared model and F01-F16; then Task 3: minimal witness and G1 decision |
 | New theorem or mechanism | Not established |
-| New prototype or production changes | None in this planning pass |
+| New prototype or production changes | None; Task 1 adds research artifacts and a provenance/structure verifier |
 | External operator | None available; existing trial package prepared, invitation unsent |
 | Flagship manuscript | Frozen at the checkpoint below |
 | Publication and breakthrough status | Existing false/open statuses remain in force |
