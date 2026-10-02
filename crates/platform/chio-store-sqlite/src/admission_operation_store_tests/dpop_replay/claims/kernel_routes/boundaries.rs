@@ -116,7 +116,7 @@ async fn dpop_expiring_after_readiness_is_denied_and_released_before_capture() -
         result = &mut evaluation => panic!("evaluation completed before readiness: {result:?}"),
         _ = tokio::time::sleep(Duration::from_secs(10)) => panic!("evaluation did not reach readiness"),
     }
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(expires);
     resume.notify_one();
     let response = evaluation.await?;
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);

@@ -25,8 +25,8 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
         "x86_64",
         "native discovery requires x86_64"
     );
-    // SAFETY: credential query has no arguments or side effects.
     assert_eq!(
+        // SAFETY: credential query has no arguments or side effects.
         unsafe { libc::geteuid() },
         0,
         "native discovery requires the privileged runner"

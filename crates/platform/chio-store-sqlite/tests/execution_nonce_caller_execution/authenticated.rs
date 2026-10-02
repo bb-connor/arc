@@ -73,7 +73,7 @@ fn authenticated_report_finalizes_after_expiry_and_restart_without_readmission()
             .ok_or("nonce")?
             .expires_at(),
     )?);
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires + 1, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
     let runtime = fixture.open()?;
     assert_state(&fixture, &request, "awaiting_caller_report")?;
     assert_eq!(grant_quota(&runtime, &request)?, (0, 1));

@@ -468,7 +468,7 @@ fn caller_context_does_not_bypass_live_nonce_validation() -> TestResult {
     let expired_at = u64::try_from(fixture.reservation.signed_nonce().expires_at())?
         .checked_mul(1_000)
         .ok_or("expiry overflow")?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expired_at / 1_000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(expired_at / 1_000);
     let result = fixture
         .fixture
         .store
@@ -550,7 +550,7 @@ fn assert_ambiguous_migration_refused(fixture: NonceFixture, unversioned: bool) 
     }
     drop(fixture.fixture.store);
     drop(fixture.fixture.authority);
-    let error = match SqliteAuthorityStore::open_serving(&database, &fixture.fixture.lock_root) {
+    let error = match crate::test_authority::open_serving(&database, &fixture.fixture.lock_root) {
         Ok(_) => return Err("ambiguous legacy caller was migrated without reconciliation".into()),
         Err(error) => error,
     };

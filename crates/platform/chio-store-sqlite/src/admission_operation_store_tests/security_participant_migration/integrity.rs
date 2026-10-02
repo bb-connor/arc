@@ -30,7 +30,7 @@ fn byte_corruption_and_missing_global_references_fail_without_external_write_det
         let Fixture { _temp, database, lock_root, authority, store, .. } = fixture;
         drop(store);
         drop(authority);
-        assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err(), "{mutation}");
+        assert!(SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()).is_err(), "{mutation}");
     }
     Ok(())
 }
@@ -144,6 +144,11 @@ fn restoring_destination_before_import_is_rejected_by_independent_anchor() -> An
     // Replace only this private test database; its separately committed anchor
     // remains at the acknowledged import, as after a stale database restore.
     fs::copy(&backup, &database)?;
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     Ok(())
 }

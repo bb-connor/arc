@@ -400,7 +400,11 @@ fn pending_pin_survives_owner_restart_after_real_source_seal_before_import() -> 
     drop(authority);
     drop(source);
 
-    let reopened_authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened_authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let reopened_fence = reopened_authority.mutation_fence();
     assert_eq!(reopened_fence.store_uuid, fence.store_uuid);
     assert!(reopened_fence.owner_epoch > fence.owner_epoch);

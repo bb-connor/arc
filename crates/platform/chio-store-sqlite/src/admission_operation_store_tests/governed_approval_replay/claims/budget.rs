@@ -73,8 +73,7 @@ fn real_budget_authorization_checks_new_authority_but_acknowledges_expired_histo
             None
         };
         let count = global_count(&fixture);
-        let _clock =
-            chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(expires);
         let result = fixture.store.authorize_budget_and_commit_admission(
             &operation,
             &lease,
@@ -158,8 +157,7 @@ fn real_capture_checks_new_authority_but_acknowledges_expired_dispatch_history(
             None
         };
         let count = global_count(&fixture);
-        let _clock =
-            chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(expires);
         let result = fixture.store.capture_invocation_and_commit_dispatch(
             &operation,
             &lease,

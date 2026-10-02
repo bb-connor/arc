@@ -52,6 +52,7 @@ COPY wit ./wit
 # The control plane's finding handlers embed the finding schemas from
 # `spec/` at compile time.
 COPY spec ./spec
+COPY docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json ./docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json
 COPY examples ./examples
 COPY formal ./formal
 COPY tests ./tests

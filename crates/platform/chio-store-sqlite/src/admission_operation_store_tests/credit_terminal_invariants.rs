@@ -93,7 +93,7 @@ fn startup_rejects_credit_account_without_reservation_history() -> CreditAuthori
     drop(store);
     drop(authority);
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(database, lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(database, lock_root, chio_test_support::clock::clock()),
         Err(SqliteServingOwnerError::Invalid(detail))
             if detail.contains("credit exposure account has no immutable reservation history")
     ));

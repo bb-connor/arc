@@ -43,9 +43,10 @@ impl RestartState {
         Ok(CombinedFixture {
             inner: Fixture {
                 _directory: FixtureDirectory::Existing(path.to_owned()),
-                authority: SqliteAuthorityStore::open_serving(
+                authority: SqliteAuthorityStore::open_serving_with_clock(
                     path.join("authority.sqlite3"),
                     path.join("locks"),
+                    chio_test_support::clock::clock(),
                 )?,
                 source: SqliteRuntimeOrchestrationStore::open(path.join("runtime.sqlite3"))?,
                 binding: RuntimeParticipantAuthorityBindingV1::new(

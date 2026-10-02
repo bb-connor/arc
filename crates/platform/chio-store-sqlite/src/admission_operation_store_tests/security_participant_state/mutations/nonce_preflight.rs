@@ -284,7 +284,7 @@ fn preflight_cutpoints_preserve_only_committed_monotone_history_on_reopen() -> T
         } = fixture;
         drop(store);
         drop(authority);
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let store = authority.admission_operation_store();
         let fence = authority.mutation_fence();
         let (_, history) = store

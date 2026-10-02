@@ -5009,11 +5009,41 @@ assert_rejected(
     "omits its negative mutation ratchet",
 )
 assert_rejected(
+    "Apalache lifecycle dependency removed",
+    "apalache-safety.yml",
+    replace_in_named_job("apalache_verdict", "      - response_lifecycle\n", ""),
+    "does not aggregate every required shard",
+)
+assert_rejected(
+    "Apalache lifecycle result ignored",
+    "apalache-safety.yml",
+    replace_in_named_step("Validate safety results", ' || "${LIFECYCLE_RESULT}" != "success"', ""),
+    "verdict omits lifecycle success",
+)
+assert_rejected(
+    "Apalache lifecycle evidence command bypassed",
+    "apalache-safety.yml",
+    replace_in_named_step("Generate durable lifecycle evidence", "cargo test --locked", "true # cargo test --locked"),
+    "lifecycle evidence contract changed",
+)
+assert_rejected(
+    "Apalache lifecycle failure softened",
+    "apalache-safety.yml",
+    replace_in_named_step("Validate safety results", "            exit 1\n", "            :\n"),
+    "aggregate verdict contract changed",
+)
+assert_rejected(
+    "Apalache lifecycle job soft failed",
+    "apalache-safety.yml",
+    replace_in_named_job("response_lifecycle", "    timeout-minutes: 45\n", "    timeout-minutes: 45\n    continue-on-error: true\n"),
+    "lifecycle evidence contract changed",
+)
+assert_rejected(
     "required CI temporal self-test removed",
     "ci.yml",
     replace_in_named_step(
         "Workspace structural gates",
-        "          /bin/bash -p ./scripts/tests/check-temporal-security.test.sh\n",
+        "          run_gate /bin/bash -p ./scripts/tests/check-temporal-security.test.sh\n",
         "",
     ),
     "omits the temporal gate self-test",
@@ -5094,7 +5124,7 @@ assert_rejected(
     replace_in_named_step(
         "Temporal security gate",
         "          printf '%s  %s\\n' "
-        "'58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "
+        "'f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a' "
         '"${temporal_runner}" | /usr/bin/sha256sum --check --strict\n'
         '          /bin/bash -p "${temporal_runner}"',
         '          /bin/bash -p "${temporal_runner}"',
@@ -5106,7 +5136,7 @@ assert_rejected(
     "ci.yml",
     replace_in_named_step(
         "Temporal security gate",
-        "58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554",
+        "f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a",
         "0" * 64,
     ),
     "required CI test and Loom evidence changes mandatory step body",
@@ -5116,7 +5146,7 @@ assert_rejected(
     "ci.yml",
     replace_in_named_step(
         "Temporal security gate",
-        "af05bebc5c940b0145a64ae499eaf41ad62d1ee10b0f271745211565f2bdae06",
+        "606697a21a5f9ed1ce3af96dc1734cb98c5e95ba441ea2e68441d8382bb29fe1",
         "1" * 64,
     ),
     "required CI test and Loom evidence changes mandatory step body",

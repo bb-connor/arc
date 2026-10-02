@@ -1,4 +1,4 @@
-# Native consumers, ACP clocks/errors and OpenAPI execution
+# Native consumers, ACP-Client clocks/errors and OpenAPI execution
 
 Source base: `cacaf69fc9d4b709ebe30fd9c549fc0eeffc12f9` on
 `packet/3-retention-accounting`, `/tmp/arc-security-launch`.
@@ -11,11 +11,11 @@ task. This record does not establish hosted, release or M5 acceptance.
 | Task | State | Delivered boundary |
 | --- | --- | --- |
 | 1. Native consumers and mini-SWE transport | Partial | Restored OCI x86_64 qualification, repaired actual native discovery and recovery failures, and added explicit broker provisioning inputs. Full mini-SWE Docker/model transport remains open. |
-| 2. ACP clocks | Complete | Shared fenced clock for audit logging, kernel receipt signing and compliance generation; checked timestamps and sequences; clock faults do not consume authorization custody. |
-| 3. ACP and remote MCP errors | Complete for these owners | Typed semantic failures, retained local native sources, registered redacted diagnostics, and deferred task/receipt completion propagation. |
+| 2. ACP-Client clocks | Complete | Shared fenced clock for audit logging, kernel receipt signing and compliance generation; checked timestamps and sequences; clock faults do not consume authorization custody. |
+| 3. ACP-Client and remote MCP errors | Complete for these owners | Typed semantic failures, retained local native sources, registered redacted diagnostics, and deferred task/receipt completion propagation. |
 | 4. OpenAPI ingress | Complete | Bounded original bytes, duplicate-aware JSON/YAML decoding, local decoder causes, bridge/fuzz migration and production conformance callers. |
 
-### ACP authority and errors
+### ACP-Client authority and errors
 
 `AcpClock` owns the configured clock and one shared observation fence. Clones
 serialize reads through that fence. Audit logging, receipt signing and compliance
@@ -25,7 +25,7 @@ authorization or storing a receipt. Restart coverage rejects future persisted
 audit evidence with a fresh owner; it does not claim a persisted global clock
 high-water mark.
 
-ACP edge request/transition errors and proxy receipt/authorization rejections
+ACP-Client edge request/transition errors and proxy receipt/authorization rejections
 have domain variants. Deferred failures retain their original error owner and
 do not redispatch. Required receipt-signing errors propagate; checkpoint health
 retains its local typed error even when a receipt was already committed.
@@ -102,7 +102,7 @@ worker identity, review disposition and earlier failures.
 
 | Check | Terminal evidence |
 | --- | --- |
-| ACP edge, ACP proxy, remote MCP, OpenAPI, OpenAPI bridge | 513 tests passed: 98 + 205 + 99 + 59 + 52. |
+| ACP-Client edge, ACP-Client proxy, remote MCP, OpenAPI, OpenAPI bridge | 513 tests passed: 98 + 205 + 99 + 59 + 52. |
 | Sender-constraint review repairs and verifier refactor | 7 focused tests passed, including two newly added source/redaction cases. |
 | Registered CLI source preservation | 1 focused test passed. |
 | Actual OpenAPI conformance callers | 4 tests passed across two targets. |
@@ -137,7 +137,7 @@ native source; OAuth key/header paths still flattened causes; and a deployment
 policy unnecessarily retained a staging-directory dependency. Focused regressions
 cover all three. The final seccomp review also caught old-shape positive vectors;
 the vectors and integrity manifest were migrated and rechecked. No source-size
-allowance was increased. ACP tests and the cage syscall builder became ordinary
+allowance was increased. ACP-Client tests and the cage syscall builder became ordinary
 Rust modules where necessary.
 
 Earlier Cargo migration, Clippy, hygiene and schema failures are retained as

@@ -1,10 +1,10 @@
-# Remote lifecycle, ACP boundaries and native CI implementation plan
+# Remote lifecycle, ACP-Client boundaries and native CI implementation plan
 
 > **For agentic workers:** Use superpowers:executing-plans inline in the existing isolated worktree. The user approved these four tasks. Use one final reviewer.
 
-**Goal:** Close remote MCP clock custody, ACP invocation and input boundaries, and enforced native consumer CI wiring.
+**Goal:** Close remote MCP clock custody, ACP-Client invocation and input boundaries, and enforced native consumer CI wiring.
 
-**Architecture:** Share a fenced fallible clock across remote runtime owners and kernel admission. Remove ACP direct invocation rather than preserve compatibility. Decode bounded original bytes before projection, preserve typed local causes, and make native qualification an explicit enforcing-host job.
+**Architecture:** Share a fenced fallible clock across remote runtime owners and kernel admission. Remove ACP-Client direct invocation rather than preserve compatibility. Decode bounded original bytes before projection, preserve typed local causes, and make native qualification an explicit enforcing-host job.
 
 **Tech Stack:** Rust, Tokio, Axum, shared security clock/input types, Python fixtures, GitHub Actions.
 
@@ -20,15 +20,15 @@ Fail closed; canonical signed JSON; no compatibility surface, cap increases or e
 
 - Faulting or regressing clocks must retain grants, sessions and replay custody (task 1).
 - Exact expiry and counter overflow must not mint authority or extend lifetimes (task 1).
-- ACP notifications and asynchronous tasks must traverse kernel admission (task 2).
+- ACP-Client notifications and asynchronous tasks must traverse kernel admission (task 2).
 - Duplicate JSON keys, oversized frames and malformed projections must preserve typed causes and never reinterpret a rejected frame tail (task 3).
 - Native recovery evidence must require a qualified host and independent anchor/read grants, while ordinary worker tests remain runnable (task 4).
 
 ## Tasks
 
 - [x] 1. Add a remote clock owner module and inject it through `RemoteServeHttpConfig`, factory, OAuth, stores, sessions and rate limiter. Replace five ambient production reads, use checked lifecycle/counter operations and preserve custody on failure. Add focused rollback, expiry, restart and concurrency regressions; run the remote owning suite and affected consumer checks.
-- [x] 2. Remove ACP edge `compatibility-surface`, wrapper and direct server invocation. Migrate behavioral scenarios to kernel execution or explicit mocks. Keep notification/task lifecycle coverage and update the no-bypass contracts.
-- [x] 3. Add bounded original-byte ingress and typed local error owners to ACP edge/proxy. Bound framed transport, kernel checker and capability projection before allocation/projection. Add malformed/duplicate/oversize caller tests; run owning suites and applicable source gates.
+- [x] 2. Remove ACP-Client edge `compatibility-surface`, wrapper and direct server invocation. Migrate behavioral scenarios to kernel execution or explicit mocks. Keep notification/task lifecycle coverage and update the no-bypass contracts.
+- [x] 3. Add bounded original-byte ingress and typed local error owners to ACP-Client edge/proxy. Bound framed transport, kernel checker and capability projection before allocation/projection. Add malformed/duplicate/oversize caller tests; run owning suites and applicable source gates.
 - [x] 4. Provision explicit enforced fixtures for native process-host, SDK/example and conformance jobs, including helper, independent anchor and read grants. Separate ordinary worker coverage; run fixture checks and available native qualification, recording unavailable host evidence honestly.
 
 ## Completion
@@ -49,12 +49,12 @@ broader filesystem or network authority.
 
 Reviewed at `a2630c20a1` in the [protocol boundaries review](../../reviews/2026-10-01-execution-review-protocol-boundaries.md), [native consumers review](../../reviews/2026-10-01-execution-review-native-consumers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
 
-**Verdict:** ACP direct-invocation removal and ACP original-byte ingress are done and clean. The shared fenced clock for remote owners is done but introduced a restart failure. The native CI wiring is present but cannot pass.
+**Verdict:** ACP-Client direct-invocation removal and ACP-Client original-byte ingress are done and clean. The shared fenced clock for remote owners is done but introduced a restart failure. The native CI wiring is present but cannot pass.
 
 Open findings against this plan:
 
 - **PB1, High.** A remote MCP host that crashed holding a Ready session cannot restart once that session's idle deadline passes, and the retained row makes every later restart fail; recovery needs manual SQLite surgery. Independently verified.
 - **NC1, Medium.** The enforced native fixture action cannot succeed and has never run.
-- **PB10, Low.** When the ACP capability check errors, the request's capability context is not cleared (Plausible).
+- **PB10, Low.** When the ACP-Client capability check errors, the request's capability context is not cleared (Plausible).
 
 **Next:** Expire or tombstone Ready rows whose idle deadline passed before restoring them, with a startup test that seeds one (PB1).

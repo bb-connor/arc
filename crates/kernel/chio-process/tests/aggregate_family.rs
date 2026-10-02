@@ -122,7 +122,7 @@ async fn authenticated_siblings_share_issued_budget_across_contention_and_restar
 
 #[test]
 fn aggregate_issuance_requires_the_existing_durable_authority() -> Result {
-    let kernel = ChioKernel::new(support::config());
+    let kernel = ChioKernel::new_with_clock(support::config(), chio_test_support::clock::clock());
     assert!(kernel
         .issue_aggregate_family_root(
             &support::parent_key().public_key(),

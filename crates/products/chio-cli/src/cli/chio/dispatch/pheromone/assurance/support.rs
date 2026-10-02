@@ -207,22 +207,6 @@ fn ensure_clean_output_dir(out_dir: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::ensure_clean_output_dir;
-
-    #[test]
-    fn output_directory_errors_use_chio_boundary_label() {
-        let tempdir = tempfile::tempdir().expect("tempdir");
-        std::fs::write(tempdir.path().join("existing.json"), "{}").expect("write fixture");
-
-        let error = ensure_clean_output_dir(tempdir.path())
-            .expect_err("non-empty output dir should fail")
-            .to_string();
-
-        assert!(error.contains("Chio output directory"));
-    }
-}
 
 fn bundle_directories(root: &Path, budget: &mut Budget) -> Result<Vec<PathBuf>, CliError> {
     if fs::symlink_metadata(root.join("manifest.json")).is_ok() {
@@ -260,5 +244,22 @@ fn candidate_from_result(
             error_code: Some("bundle_read_failed".to_string()),
             error_detail: Some(error.to_string()),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ensure_clean_output_dir;
+
+    #[test]
+    fn output_directory_errors_use_chio_boundary_label() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tempdir.path().join("existing.json"), "{}").expect("write fixture");
+
+        let error = ensure_clean_output_dir(tempdir.path())
+            .expect_err("non-empty output dir should fail")
+            .to_string();
+
+        assert!(error.contains("Chio output directory"));
     }
 }

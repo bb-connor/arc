@@ -43,7 +43,7 @@ fn v28_initialization_and_anchor_survive_v29_without_rewriting_history() -> Anch
     assert_eq!(native::verify_all(&connection)?, vec![initialized.clone()]);
     drop(statement);
     drop(connection);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     assert_eq!(
         authority
             .admission_operation_store()
@@ -124,7 +124,7 @@ fn v27_upgrade_adds_empty_native_tables_but_rejects_partial_future_and_aliases(
             result?;
             assert_eq!(version, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION);
             assert!(native::verify_all(&connection)?.is_empty());
-            SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+            crate::test_authority::open_serving(&database, &lock_root)?;
         }
     }
     Ok(())
@@ -146,7 +146,12 @@ fn missing_current_native_barrier_is_never_repaired() -> AnchoredTestResult {
     let connection = Connection::open(&database)?;
     connection.execute_batch("DROP TRIGGER security_participant_state_0_inactive_insert")?;
     assert!(SqliteAuthorityStore::provision(&database, &lock_root).is_err());
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     assert_eq!(connection.query_row("SELECT COUNT(*) FROM sqlite_schema WHERE name = 'security_participant_state_0_inactive_insert'", [], |row| row.get::<_, i64>(0))?, 0);
     Ok(())
 }
@@ -183,7 +188,7 @@ fn v27_import_history_and_global_digests_survive_empty_v28_upgrade() -> Anchored
     assert_eq!(history(&connection)?, before);
     assert!(native::verify_all(&connection)?.is_empty());
     drop(connection);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     let key = identifier("security_authority_id", "source");
     assert_eq!(

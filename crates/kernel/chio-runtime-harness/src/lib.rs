@@ -114,6 +114,13 @@ fn run_runtime_loopback_scenario_with_static_baseline(
     static_package: chio_attest_buyer_core::proof_package::ChioProofPackage,
     static_report: chio_attest_buyer_core::report::VerifierReport,
 ) -> Result<(), RuntimeLoopbackError> {
+    // Deterministic fixture runs share one artificial store and lease identity.
+    // Keep their process-local operation ownership disjoint even when callers
+    // request independent fixture directories concurrently.
+    static AUTHORITY_RUN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _authority_run = AUTHORITY_RUN.lock().map_err(|_| {
+        RuntimeLoopbackError::message("runtime loopback authority run lock poisoned")
+    })?;
     let scenario: RuntimeLoopbackScenario = serde_json::from_str(&read_utf8_json_file(
         scenario,
         "Chio runtime loopback scenario",
@@ -191,12 +198,16 @@ fn run_runtime_loopback_scenario_with_static_baseline(
                 "Chio runtime loopback authority provision: {error}"
             ))
         })?;
-        chio_store_sqlite::SqliteAuthorityStore::open_serving(&authority_path, &authority_lock_root)
-            .map_err(|error| {
-                RuntimeLoopbackError::message(format!(
-                    "Chio runtime loopback authority open: {error}"
-                ))
-            })?
+        chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
+            &authority_path,
+            &authority_lock_root,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::from_millis(
+                now_unix_ms,
+            )),
+        )
+        .map_err(|error| {
+            RuntimeLoopbackError::message(format!("Chio runtime loopback authority open: {error}"))
+        })?
     };
     let receipt_store = std::sync::Arc::new(
         chio_store_sqlite::SqliteReceiptStore::open(store_dir.join("kernel-receipts.sqlite3"))

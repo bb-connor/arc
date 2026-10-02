@@ -124,7 +124,7 @@ capabilities:
 
     def verify(call, response):
         folder = directory / call["process"]
-        folder.mkdir(exist_ok=True)
+        folder.mkdir(mode=0o700, exist_ok=True)
         request = {field: call[field] for field in [
             "operation_key", "server_id", "tool_name", "arguments",
         ]}

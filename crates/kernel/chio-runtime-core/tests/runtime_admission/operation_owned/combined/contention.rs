@@ -25,7 +25,7 @@ impl CombinedFixture {
 #[test]
 fn combined_owned_competitor_cannot_steal_a_parked_claim_and_release_allows_a_fresh_owner(
 ) -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = CombinedFixture::new()?;
     let competitor = fixture.competing_request("competing")?;
     let after_release = fixture.competing_request("after-release")?;

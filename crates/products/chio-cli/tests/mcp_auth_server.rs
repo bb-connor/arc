@@ -182,6 +182,7 @@ fn spawn_http_server_with_local_auth(
         "wrapped-http-mock",
         "Wrapped HTTP Mock",
         "0.1.0",
+        &[],
     );
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))

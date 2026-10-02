@@ -172,7 +172,7 @@ pub(crate) fn read_relay_alert_delivery_evidence(
         let json = std::str::from_utf8(&bytes).map_err(|source| {
             CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
         })?;
-        let value: serde_json::Value = crate::input::text(&json).map_err(|error| {
+        let value: serde_json::Value = crate::input::text(json).map_err(|error| {
             CliError::cli_other_error(format!(
                 "Chio relay alert delivery evidence {}: {error}",
                 path.display()
@@ -184,7 +184,7 @@ pub(crate) fn read_relay_alert_delivery_evidence(
             continue;
         }
         evidence.push(
-            chio_pheromone_relay::relay_alert_delivery_evidence_from_json(&json).map_err(
+            chio_pheromone_relay::relay_alert_delivery_evidence_from_json(json).map_err(
                 |error| {
                     CliError::cli_other_error(format!(
                         "Chio relay alert delivery evidence {}: {error}",

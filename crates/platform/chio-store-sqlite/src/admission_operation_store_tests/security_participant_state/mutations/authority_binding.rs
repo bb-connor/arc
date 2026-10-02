@@ -107,7 +107,7 @@ fn original_native_binding_remains_stable_across_serving_owner_rotation() -> Tes
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = crate::SqliteAuthorityStore::open_serving(database, lock_root)?;
+    let authority = crate::test_authority::open_serving(database, lock_root)?;
     let next_fence = authority.mutation_fence();
     assert!(next_fence.owner_epoch > fence.owner_epoch);
     let store = authority.admission_operation_store();

@@ -118,7 +118,11 @@ impl Fixture {
         let locks = directory.path().join("locks");
         std::fs::DirBuilder::new().mode(0o700).create(&locks)?;
         SqliteAuthorityStore::provision(&database, &locks)?;
-        let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &locks,
+            chio_test_support::clock::clock(),
+        )?;
         let source =
             SqliteRuntimeOrchestrationStore::open(directory.path().join("runtime.sqlite3"))?;
         let request = prepare(&source)?;
@@ -182,24 +186,27 @@ impl Fixture {
         read_only: bool,
         keypair: Keypair,
     ) -> TestResult<ChioKernel> {
-        let mut kernel = ChioKernel::new(KernelConfig {
-            keypair,
-            ca_public_keys: vec![self.request.capability.issuer.clone()],
-            max_delegation_depth: 5,
-            policy_hash: sha256_hex(b"live-runtime-custody-test"),
-            allow_sampling: false,
-            allow_sampling_tool_use: false,
-            allow_elicitation: false,
-            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-            require_web3_evidence: false,
-            allow_ephemeral_receipt_log: true,
-            allow_ephemeral_revocation_store: true,
-            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-            retention_config: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        });
+        let mut kernel = ChioKernel::new_with_clock(
+            KernelConfig {
+                keypair,
+                ca_public_keys: vec![self.request.capability.issuer.clone()],
+                max_delegation_depth: 5,
+                policy_hash: sha256_hex(b"live-runtime-custody-test"),
+                allow_sampling: false,
+                allow_sampling_tool_use: false,
+                allow_elicitation: false,
+                max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+                max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+                require_web3_evidence: false,
+                allow_ephemeral_receipt_log: true,
+                allow_ephemeral_revocation_store: true,
+                checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+                retention_config: None,
+                memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+                deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            },
+            chio_test_support::clock::clock(),
+        );
         if durable {
             kernel.set_durable_admission_store(
                 Arc::new(self.authority.admission_operation_store()),
@@ -220,7 +227,7 @@ impl Fixture {
 
 #[test]
 fn live_owned_runtime_dispatch_retains_claim_and_real_trust_floor() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
     let kernel = fixture.kernel(fixture.hook()?, true, false)?;
     let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
@@ -271,7 +278,7 @@ fn live_owned_runtime_dispatch_retains_claim_and_real_trust_floor() -> TestResul
 
 #[test]
 fn owned_runtime_denies_inactive_source_and_ephemeral_read_only_fallback() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for (activate, durable, read_only) in [(false, true, false), (true, false, true)] {
         let fixture = Fixture::new(activate)?;
         let kernel = fixture.kernel(fixture.hook()?, durable, read_only)?;
@@ -288,7 +295,7 @@ fn owned_runtime_denies_inactive_source_and_ephemeral_read_only_fallback() -> Te
 
 #[test]
 fn owned_runtime_denies_fixed_clock_override_and_wrong_physical_source() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for wrong_source in [false, true] {
         let fixture = Fixture::new(true)?;
         let hook = if wrong_source {

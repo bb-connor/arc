@@ -85,8 +85,7 @@ fn recovery_claims_are_bounded_fenced_and_time_monotonic() {
 
 #[test]
 fn recovery_claims_advance_a_full_batch_without_hiding_later_operations() {
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now_ms() / 1_000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let begun_at = now_ms();
     for index in 0..257 {
@@ -485,17 +484,14 @@ fn decision_time_can_arrive_out_of_order_across_operations() {
 
 #[test]
 fn scoped_runtime_clock_qualifies_deterministic_admission_time() {
+    let fixed_now_unix_ms = 1_700_000_001_000;
+    let _scope = chio_test_support::clock::scope_unix_secs(fixed_now_unix_ms / 1_000);
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
         "request-fixed-runtime-time",
         "capability-fixed-runtime-time",
-    );
-    let fixed_now_unix_ms = 1_700_000_001_000;
-    let _scope = chio_kernel::scope_fixed_runtime_for_current_thread(
-        fixed_now_unix_ms / 1_000,
-        std::iter::empty(),
     );
 
     fixture

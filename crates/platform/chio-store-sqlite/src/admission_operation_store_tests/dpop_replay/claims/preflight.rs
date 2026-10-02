@@ -54,8 +54,7 @@ fn real_nonce_preflight_requires_fresh_claim_but_recovers_and_cleans_expired_his
         }
         let lease = renew(&fixture, &operation, &lease, now_ms())?;
         let count = global_count(&fixture);
-        let _clock =
-            chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(expires);
         let result = fixture.store.authorize_execution_nonce_preflight(
             &operation,
             &lease,

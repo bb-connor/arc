@@ -907,7 +907,11 @@ fn deployment_publishing_terms_and_rounds(
     std::fs::create_dir(&lock_root)?;
     secure_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let market = authority.finding_market_store();
     let purchases = authority.finding_purchase_store();
     let challenges = authority.finding_challenge_store();
@@ -1109,7 +1113,11 @@ impl Deployment {
         drop(purchases);
         drop(market);
         drop(_authority);
-        let authority = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+        let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?);
         let market = authority.finding_market_store();
         let purchases = authority.finding_purchase_store();
         let challenges = authority.finding_challenge_store();
@@ -1165,71 +1173,6 @@ impl FindingChallengeSubmissionExecutor for RouteChallengeExecutor {
             .push(now);
         self.coordinator
             .submit(&request.challenge, raw_finding, NOW)
-    }
-}
-
-fn challenge_route_state(
-    deployment: &Deployment,
-    executor: Arc<dyn FindingChallengeSubmissionExecutor>,
-) -> TrustServiceState {
-    let config = TrustServiceConfig {
-        listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
-        service_token: "challenge-service-secret".to_string(),
-        tenant_read_tokens: BTreeMap::new(),
-        authority_workload_token: None,
-        receipt_db_path: None,
-        revocation_db_path: None,
-        authority_seed_path: None,
-        authority_db_path: None,
-        authority_keyring_config_path: None,
-        authority_keyring_receipt_anchor_root: None,
-        budget_db_path: None,
-        joint_authority_db_path: None,
-        fiscal_runtime: None,
-        enterprise_providers_file: None,
-        federation_policies_file: None,
-        scim_lifecycle_file: None,
-        verifier_policies_file: None,
-        verifier_challenge_db_path: None,
-        passport_statuses_file: None,
-        passport_issuance_offers_file: None,
-        certification_registry_file: None,
-        certification_discovery_file: None,
-        issuance_policy: None,
-        runtime_assurance_policy: None,
-        advertise_url: None,
-        allow_local_peer_urls: true,
-        certification_public_metadata_ttl_seconds: 300,
-        peer_urls: Vec::new(),
-        cluster_sync_interval: std::time::Duration::from_millis(25),
-        roster_policy: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        finding_market: Some(market_config()),
-    };
-    TrustServiceState {
-        config,
-        authority_keyring: None,
-        authority_keyring_seed_path: None,
-        joint_authority_store: Some(Arc::clone(&deployment._authority)),
-        fiscal_runtime: None,
-        budget_store: None,
-        revocation_store: None,
-        enterprise_provider_registry: None,
-        verifier_policy_registry: None,
-        federation_admission_rate_limiter: Arc::new(Mutex::new(
-            FederationAdmissionRateLimiter::default(),
-        )),
-        cluster: None,
-        cluster_progress: None,
-        finding_rail: Some(deployment.rail.clone()),
-        finding_purchase_executor: None,
-        finding_purchase_execution_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        finding_proof_egress_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        finding_seller_submission_executor: None,
-        finding_seller_submission_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        finding_challenge_submission_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        finding_authority_status_resolver: Some(Arc::new(TestAuthorityStatusResolver::live())),
-        finding_challenge_executor: Some(executor),
     }
 }
 
@@ -7195,3 +7138,10 @@ fn assert_denial_cannot_sanction(shape: &DenyShape, expected_reason: &str) -> Te
     );
     Ok(())
 }
+
+#[path = "finding_challenge_enforcement_e2e_tests/filing_clock.rs"]
+mod filing_clock;
+
+#[path = "finding_challenge_enforcement_e2e_tests/route_fixture.rs"]
+mod route_fixture;
+use route_fixture::challenge_route_state;

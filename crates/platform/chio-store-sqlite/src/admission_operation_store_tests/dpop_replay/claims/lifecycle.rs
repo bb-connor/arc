@@ -157,8 +157,7 @@ fn expiry_and_release_cannot_cross_dispatch_commit() -> AnchoredTestResult {
                 .store
                 .release_dpop_replay(&operation, &lease, &reference, now_ms())?;
         }
-        let _clock =
-            chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(expires);
         let now = expires * 1000;
         let lease = renew(&fixture, &operation, &lease, now)?;
         let count = global_count(&fixture);
@@ -240,8 +239,8 @@ fn committed_claim_survives_source_loss_expiry_and_restart_without_release() -> 
     } = fixture;
     drop(store);
     drop(owner);
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
-    let owner = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let _clock = chio_test_support::clock::scope_unix_secs(expires);
+    let owner = crate::test_authority::open_serving(&database, &lock_root)?;
     let fixture = Fixture {
         store: owner.admission_operation_store(),
         fence: owner.mutation_fence(),
@@ -309,7 +308,7 @@ fn expired_pre_dispatch_claim_can_be_released_from_recovered_exact_history() -> 
             .store
             .claim_dpop_replay(&operation, &lease, &intent, now_ms())?;
     drop(source);
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(expires);
     let now = expires * 1000;
     let lease = renew(&fixture, &operation, &lease, now)?;
     let count = global_count(&fixture);

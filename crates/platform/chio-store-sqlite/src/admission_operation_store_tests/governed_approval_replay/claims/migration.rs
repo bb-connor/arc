@@ -37,7 +37,7 @@ fn v23_upgrade_preserves_active_approval_authority_and_owned_claims() -> Anchore
     connection.execute_batch("UPDATE chio_store_schema_versions SET version = 23 WHERE store_key = 'admission_operation'")?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
     assert_eq!(

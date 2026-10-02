@@ -3,8 +3,7 @@ use super::*;
 #[test]
 fn decision_and_observation_clocks_keep_their_distinct_causal_order() -> TestResult {
     let observed = now_ms().div_ceil(1000) * 1000;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(observed / 1000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(observed / 1000);
     let fixture = fixture();
     let source = imported(&fixture, "source")?;
     let initialized = hydrate(&fixture, &source)?;
@@ -54,17 +53,13 @@ fn decision_and_observation_clocks_keep_their_distinct_causal_order() -> TestRes
 #[test]
 fn a_later_authority_observation_cannot_hide_a_regressed_operation_decision() -> TestResult {
     let decision = now_ms().div_ceil(1000) * 1000;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(decision / 1000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(decision / 1000);
     let fixture = fixture();
     let source = imported(&fixture, "source")?;
     let initialized = hydrate(&fixture, &source)?;
     let (context, request) = request("native-join")?;
     let (operation, lease, _) = setup_at(&fixture, "native-operation", &context, decision)?;
-    let _advanced = chio_kernel::scope_fixed_runtime_for_current_thread(
-        decision / 1000 + 1,
-        std::iter::empty(),
-    );
+    let _advanced = chio_test_support::clock::scope_unix_secs(decision / 1000 + 1);
     assert!(fixture
         .store
         .join_security_participant_flow(
@@ -96,10 +91,8 @@ fn a_caller_clock_ahead_of_authority_cannot_extend_the_mutation_lease() -> TestR
     let (context, request) = request("native-join")?;
     let (operation, lease) = setup(&fixture, "native-operation", &context)?;
     {
-        let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-            lease.expires_at_unix_ms() / 1000 - 1,
-            std::iter::empty(),
-        );
+        let _clock =
+            chio_test_support::clock::scope_unix_secs(lease.expires_at_unix_ms() / 1000 - 1);
         let result = fixture.store.join_security_participant_flow(
             &operation,
             &lease,
@@ -142,8 +135,7 @@ fn expired_join_readback_returns_history_without_fresh_authority_or_writes() -> 
     )?;
     let before = global_count(&*fixture.store.connection()?)?;
     let now = lease.expires_at_unix_ms().div_ceil(1000) * 1000;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now / 1000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now / 1000);
     let history = fixture
         .store
         .load_security_participant_flow_join(
@@ -191,11 +183,19 @@ fn stale_version_and_expired_leases_cannot_mutate_native_flow() -> TestResult {
             now_ms()
         )
         .is_err());
+    assert_eq!(count(&fixture)?, 0);
+    fixture.store.join_security_participant_flow(
+        &operation,
+        &lease,
+        &initialized,
+        &context,
+        &request,
+        now_ms(),
+    )?;
+    let before = global_count(&*fixture.store.connection()?)?;
     {
-        let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-            lease.expires_at_unix_ms().div_ceil(1000),
-            std::iter::empty(),
-        );
+        let _clock =
+            chio_test_support::clock::scope_unix_secs(lease.expires_at_unix_ms().div_ceil(1000));
         assert!(fixture
             .store
             .join_security_participant_flow(
@@ -208,15 +208,8 @@ fn stale_version_and_expired_leases_cannot_mutate_native_flow() -> TestResult {
             )
             .is_err());
     }
-    assert_eq!(count(&fixture)?, 0);
-    fixture.store.join_security_participant_flow(
-        &operation,
-        &lease,
-        &initialized,
-        &context,
-        &request,
-        now_ms(),
-    )?;
+    assert_eq!(count(&fixture)?, 1);
+    assert_eq!(global_count(&*fixture.store.connection()?)?, before);
     Ok(())
 }
 

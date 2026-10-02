@@ -124,7 +124,7 @@ fn process_loss_retains_capture_and_never_reexecutes_original_attempt() -> TestR
             expires + 1 < request.capability.expires_at,
             "quota denial must not be capability expiry"
         );
-        let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires + 1, []);
+        let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
         let runtime = fixture.open()?;
         assert_state(&fixture, &request, "awaiting_caller_report")?;
         assert_eq!(grant_quota(&runtime, &request)?, (0, 1));

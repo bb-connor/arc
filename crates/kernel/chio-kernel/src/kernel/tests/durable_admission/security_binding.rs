@@ -66,7 +66,7 @@ fn security_bound_raw_return_recovers_without_a_live_request_or_redispatch() -> 
         store.operation().state(),
         AdmissionOperationState::Finalizing
     );
-    let _clock = crate::scope_fixed_runtime_for_current_thread(current_unix_timestamp() + 61, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(current_unix_timestamp() + 61);
     assert_eq!(kernel.reconcile_recoverable_admissions()?, 1);
     assert_eq!(
         store.operation().state(),

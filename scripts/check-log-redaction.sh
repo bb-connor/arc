@@ -15,7 +15,9 @@ if rg -n --pcre2 '(msg|reason|error|body|body_text)[[:space:]]*=[[:space:]]*%(?!
   failed=1
 fi
 
-if rg -n '%(msg|reason|error|body|body_text)\b' "${scope[@]}"; then
+# The stable report code is public diagnostic vocabulary. Keep full reports,
+# messages, and further field/method projections subject to redaction.
+if rg -n --pcre2 '%(msg|reason|error|body|body_text)\b(?!\.report\(\)\.code[[:space:]]*[,\)])' "${scope[@]}"; then
   echo "raw tracing shorthand for sensitive log field found; use field = %redacted!(value)" >&2
   failed=1
 fi

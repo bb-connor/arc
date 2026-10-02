@@ -21,12 +21,13 @@ fn retained_state_is_read_without_launch_keys_credentials_or_migration() -> Resu
     fs::write(dir.path().join("host.json"), serde_json::to_vec(&record)?)?;
     let path = dir.path().join("process.db");
     let db = rusqlite::Connection::open(&path)?;
+    db.execute_batch(include_str!("../../../kernel/chio-process/src/store.sql"))?;
+    // Use the current journal schema while retaining deliberately unusable
+    // authority material. Administrative reads must not deserialize it.
     db.execute_batch(
-        "CREATE TABLE process_runtime(singleton INTEGER, version INTEGER);
-        INSERT INTO process_runtime VALUES (1,1);
-        CREATE TABLE processes(id TEXT, revision INTEGER, checkpoint TEXT);
-        INSERT INTO processes VALUES ('coder',9007199254740993,'{\"complete\":true}');
-        CREATE TABLE process_state_blobs(process_id TEXT, sha256 TEXT, data BLOB);",
+        "INSERT INTO process_runtime VALUES (1,2,'retained','unavailable','unavailable');
+        INSERT INTO processes(id,root_id,depth,capability,limits,revision,checkpoint)
+        VALUES ('coder','coder',0,'unavailable','unavailable',9007199254740993,'{\"complete\":true}');",
     )?;
     let bytes = b"retained result";
     let digest = sha256_hex(bytes);
@@ -68,6 +69,18 @@ fn retained_state_is_read_without_launch_keys_credentials_or_migration() -> Resu
     );
     assert_eq!(fs::read(&path)?, before);
     assert!(!dir.path().join("process.db-wal").exists());
+    let db = rusqlite::Connection::open(&path)?;
+    db.execute("UPDATE process_runtime SET version=1", [])?;
+    drop(db);
+    let legacy_journal = fs::read(&path)?;
+    let rejected = run(&[])?;
+    assert!(!rejected.status.success());
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("unsupported process journal version")
+    );
+    assert_eq!(fs::read(&path)?, legacy_journal);
+    assert!(!dir.path().join("process.db-wal").exists());
+    fs::write(&path, &before)?;
     let mut legacy = record.clone();
     legacy["abi"] = json!("chio.process.abi.v1");
     fs::write(dir.path().join("host.json"), serde_json::to_vec(&legacy)?)?;

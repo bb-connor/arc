@@ -3,13 +3,12 @@ use super::*;
 #[test]
 fn delayed_capture_cannot_revive_a_nonce_or_capture_budget_after_authority_expiry() -> TestResult {
     let now = now_ms() / 1_000 * 1_000;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
     let mut fixture = ready()?;
     prepare(&mut fixture)?;
     let command = command(&fixture)?;
     let expires = u64::try_from(fixture.reservation.signed_nonce().expires_at())?;
-    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let _expired = chio_test_support::clock::scope_unix_secs(expires);
     let error = fixture
         .fixture
         .store
@@ -56,7 +55,7 @@ pub(in crate::admission_operation_store::tests::execution_nonce) fn reopen(
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
     let operation = store
@@ -287,7 +286,7 @@ fn durable_nonce_lifecycle_history_rejects_missing_corrupt_and_oversized_phases(
         let NonceFixture { fixture: Fixture { _temp, database, lock_root, authority, store, .. }, .. } = fixture;
         drop(store);
         drop(authority);
-        let error = match SqliteAuthorityStore::open_serving(&database, &lock_root) {
+        let error = match SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()) {
             Ok(_) => return Err("corrupt nonce history reopened".into()), Err(error) => error,
         };
         assert!(error.to_string().contains("nonce"), "{error}");
@@ -337,7 +336,7 @@ fn durable_nonce_lifecycle_v12_migration_keeps_ready_history_without_inventing_c
         UPDATE chio_store_schema_versions SET version = 12 WHERE store_key = 'admission_operation';")?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     assert_eq!(
         store

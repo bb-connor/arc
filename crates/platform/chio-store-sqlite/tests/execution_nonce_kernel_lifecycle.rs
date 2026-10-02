@@ -215,13 +215,12 @@ fn expired_issuance_denies_execution_and_is_compensated_by_startup_recovery() ->
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
     let fixture = Fixture::with_nonce_ttl(1)?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "expired-request")?;
     let nonce = preflight(&runtime, &request)?;
-    let _expired =
-        chio_kernel::scope_fixed_runtime_for_current_thread(u64::try_from(nonce.expires_at())?, []);
+    let _expired = chio_test_support::clock::scope_unix_secs(u64::try_from(nonce.expires_at())?);
 
     let denied = execute(&runtime, &request, &nonce)?;
     assert_eq!(denied.verdict, Verdict::Deny);
@@ -260,8 +259,7 @@ fn live_issuance_survives_startup_recovery_until_it_expires() -> TestResult {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now, std::iter::empty::<String>());
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
     let fixture = Fixture::with_nonce_ttl(2)?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "live-recovery")?;
@@ -270,10 +268,7 @@ fn live_issuance_survives_startup_recovery_until_it_expires() -> TestResult {
 
     let runtime = fixture.open()?;
     assert_state(&fixture, &request, "prepared")?;
-    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
-        u64::try_from(nonce.expires_at())?,
-        std::iter::empty::<String>(),
-    );
+    let _expired = chio_test_support::clock::scope_unix_secs(u64::try_from(nonce.expires_at())?);
     assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 1);
     assert_state(&fixture, &request, "compensated_before_dispatch")?;
     let denied = execute(&runtime, &request, &nonce)?;

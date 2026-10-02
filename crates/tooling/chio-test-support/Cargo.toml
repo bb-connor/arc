@@ -12,6 +12,7 @@ publish = false
 name = "chio_test_support"
 
 [dependencies]
+chio-security-types = { workspace = true, features = ["std"] }
 
 [lints]
 workspace = true

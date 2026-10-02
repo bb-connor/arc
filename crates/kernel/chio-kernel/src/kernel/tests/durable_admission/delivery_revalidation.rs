@@ -314,6 +314,7 @@ enum SuspendedOutcome {
 }
 
 fn suspended_delivery(nested: bool, outcome: SuspendedOutcome) -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(current_unix_timestamp());
     let (mut kernel, request, store, invocations) = durable_admission_fixture("suspended-delivery");
     let preparations = Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(PreparingServer {
@@ -326,7 +327,6 @@ fn suspended_delivery(nested: bool, outcome: SuspendedOutcome) -> TestResult {
         preparations: preparations.clone(),
         invocations: invocations.clone(),
     }));
-    let _clock = crate::scope_fixed_runtime_for_current_thread(request.capability.issued_at, []);
     let session_id = kernel.open_session("delivery-parent".to_owned(), Vec::new())?;
     kernel.activate_session(&session_id)?;
     let parent = make_operation_context(&session_id, "delivery-parent-request", "delivery-parent");
@@ -343,10 +343,13 @@ fn suspended_delivery(nested: bool, outcome: SuspendedOutcome) -> TestResult {
         } else {
             Box::pin(kernel.evaluate_tool_call(&request))
         };
-    assert!(evaluation
+    let first_poll = evaluation
         .as_mut()
-        .poll(&mut Context::from_waker(Waker::noop()))
-        .is_pending());
+        .poll(&mut Context::from_waker(Waker::noop()));
+    assert!(
+        first_poll.is_pending(),
+        "delivery preparation: {first_poll:?}"
+    );
     assert_eq!(preparations.load(Ordering::SeqCst), 1);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert_eq!(
@@ -363,7 +366,7 @@ fn suspended_delivery(nested: bool, outcome: SuspendedOutcome) -> TestResult {
         return Ok(());
     }
     let _expired_clock = matches!(outcome, SuspendedOutcome::Expire)
-        .then(|| crate::scope_fixed_runtime_for_current_thread(request.capability.expires_at, []));
+        .then(|| chio_test_support::clock::scope_unix_secs(request.capability.expires_at));
     if matches!(outcome, SuspendedOutcome::Revoke) {
         kernel.revoke_capability(&request.capability.id)?;
     }

@@ -145,7 +145,7 @@ fn populated_v33_caller_wait_upgrade_preserves_original_rows_and_commit_chain() 
     )?;
     assert!(!bad_foreign_key);
     drop(connection);
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     assert_eq!(
         reopened
             .admission_operation_store()

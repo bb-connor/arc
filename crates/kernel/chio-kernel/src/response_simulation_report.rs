@@ -85,8 +85,10 @@ impl ResponseSimulationReport {
                 return Err(PortError::invalid_data());
             }
         }
-        if chio_quarantine::simulation::evaluate_response_simulation(&self.plan, &self.snapshot)?
-            != self.evaluation
+        if chio_response_model::simulation::evaluate_response_simulation(
+            &self.plan,
+            &self.snapshot,
+        )? != self.evaluation
         {
             return Err(PortError::integrity_failure());
         }

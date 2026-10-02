@@ -31,7 +31,7 @@ fn child_process_crash() -> AnchoredTestResult {
         return Ok(());
     };
     let directory = PathBuf::from(directory);
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = crate::test_authority::open_serving(
         directory.join("authority.db"),
         directory.join("locks"),
     )?;
@@ -74,7 +74,7 @@ fn independent_process_abort_and_owner_rotation_never_expose_partial_native_stat
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let store = authority.admission_operation_store();
         let key = identifier("security_authority_id", "source");
         assert!(store

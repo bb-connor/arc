@@ -356,7 +356,7 @@ fn input_join_cutpoints_recover_exactly_one_intent_without_downgrading_to_raw() 
         } = fixture;
         drop(store);
         drop(authority);
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {
             _temp,
             database,
@@ -470,7 +470,12 @@ fn input_intent_schema_and_resolution_tampering_fail_recovery_with_recomputed_lo
         assert!(native::verify_coverage(&connection).is_err(), "{damage}");
         drop(connection);
         assert!(
-            SqliteAuthorityStore::open_serving(&database, &lock_root).is_err(),
+            SqliteAuthorityStore::open_serving_with_clock(
+                &database,
+                &lock_root,
+                chio_test_support::clock::clock()
+            )
+            .is_err(),
             "{damage}"
         );
     }

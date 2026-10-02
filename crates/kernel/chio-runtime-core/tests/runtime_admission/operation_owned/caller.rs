@@ -24,7 +24,7 @@ fn nonce_config(kernel: &mut ChioKernel) {
 #[test]
 fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_restart(
 ) -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
     let signer = Keypair::generate();
     let mut kernel = fixture.kernel_with_key(fixture.hook()?, true, false, signer.clone())?;
@@ -137,9 +137,10 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
     } = fixture;
     drop(authority);
     drop(source);
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
         _directory.path().join("authority.sqlite3"),
         _directory.path().join("locks"),
+        chio_test_support::clock::clock(),
     )?;
     let source = SqliteRuntimeOrchestrationStore::open(_directory.path().join("runtime.sqlite3"))?;
     let fixture = Fixture {

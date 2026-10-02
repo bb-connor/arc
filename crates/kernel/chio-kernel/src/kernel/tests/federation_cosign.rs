@@ -6,7 +6,7 @@ use super::*;
 #[tokio::test(flavor = "current_thread")]
 async fn concurrent_duplicate_request_ids_keep_federation_scopes_isolated(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let kernel = ChioKernel::new(make_config());
+    let kernel = ChioKernel::new_with_clock(make_config(), chio_test_support::clock::clock());
     let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
 
     let first = RECEIPT_EVALUATION_SCOPE_KEY.scope("evaluation-a".to_string(), async {

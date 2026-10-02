@@ -58,7 +58,7 @@ impl NestedFlowClient for NoNestedRequests {
 
 #[test]
 fn ordinary_and_nested_fallback_retire_the_denied_grants_runtime_episode() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for nested in [false, true] {
         let mut fixture = Fixture::new(true)?;
         let mut body = fixture.request.capability.body();

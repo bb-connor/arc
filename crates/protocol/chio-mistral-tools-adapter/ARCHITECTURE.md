@@ -54,3 +54,7 @@ External: `async-trait` for the `Transport` trait; `serde`/`serde_json` for wire
 ## Extension points
 
 - `transport::Transport` - implement to point the adapter at a different HTTP client or test double; the crate ships `MistralHttpTransport` for production and `MockTransport` for hermetic tests.
+
+## Public surface
+
+The adapter owns the Mistral wire boundary and provenance stamp. The kernel owns policy evaluation. Provider responses must pass the shared bounded decoder before a caller receives a tool invocation.

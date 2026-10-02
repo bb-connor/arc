@@ -412,9 +412,6 @@ impl LocalCapabilityAuthority {
 }
 
 pub(crate) fn capability_authority_now_unix_secs(clock: &dyn Clock) -> Result<u64, KernelError> {
-    if let Some(now) = crate::fixed_runtime_unix_secs_for_current_thread() {
-        return Ok(now);
-    }
     clock
         .unix_millis()
         .map(chio_security_types::clock::UnixMillis::as_secs)

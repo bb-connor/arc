@@ -127,7 +127,7 @@ fn qualified_restart_recovers_pin_and_import_without_rediscovering_source() -> A
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     let runtime = identifier("runtime_authority_id", RUNTIME_ID);
@@ -153,7 +153,7 @@ fn qualified_restart_recovers_pin_and_import_without_rediscovering_source() -> A
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     let recovered = store
@@ -387,18 +387,18 @@ fn imported_retry_verifies_live_barriers_without_resealing_missing_source_histor
 #[test]
 fn migration_authority_clock_regression_rejects_reads_imports_and_new_namespaces(
 ) -> AnchoredTestResult {
+    let now = now_ms() / 1_000;
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
     let fixture = fixture();
     let source = Source::new(&fixture, false);
-    let now = now_ms() / 1_000;
     let expected = {
-        let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(now);
         pin(&fixture, &source)?
     };
     source.state.lock().expect("source state").calls.clear();
     let before = global_count(&fixture.store);
     {
-        let _clock =
-            chio_kernel::scope_fixed_runtime_for_current_thread(now - 1, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(now - 1);
         let errors = [
             load(&fixture).expect_err("historical reads still require a current authority clock"),
             import(&fixture, &source, &expected)
@@ -417,7 +417,7 @@ fn migration_authority_clock_regression_rejects_reads_imports_and_new_namespaces
         for error in errors {
             assert!(
                 matches!(error, AdmissionOperationStoreError::Invariant(ref message)
-                if message.contains("runtime replay migration authority time regressed")),
+                if message == chio_security_types::clock::ClockError::WallClockRegression.code()),
                 "{error:?}"
             );
         }

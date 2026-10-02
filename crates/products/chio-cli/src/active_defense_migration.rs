@@ -672,7 +672,7 @@ fn verify_registered_manifest(
         signer_key: registration.signed_envelope.signer_key.clone(),
     };
     verify_manifest(&signed, registered_key)
-        .map_err(|source| ShadowMigrationError::Manifest(source))?;
+        .map_err(ShadowMigrationError::Manifest)?;
 
     validate_deployment_inventory(&registration, &manifest)?;
     validate_server_runtime(&registration.server_runtime)?;

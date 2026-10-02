@@ -32,17 +32,13 @@ fn concurrent_exact_hydration_commits_only_one_initialization() -> AnchoredTestR
 
 #[test]
 fn independently_observed_clock_rollback_denies_hydration_and_readback() -> AnchoredTestResult {
-    let fixture = fixture();
     let now = now_ms() / 1_000 * 1_000;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
+    let fixture = fixture();
     let source = imported(&fixture, "source")?;
     let key = identifier("security_authority_id", "source");
     {
-        let _rollback = chio_kernel::scope_fixed_runtime_for_current_thread(
-            now / 1_000 - 1,
-            std::iter::empty(),
-        );
+        let _rollback = chio_test_support::clock::scope_unix_secs(now / 1_000 - 1);
         assert!(fixture
             .store
             .hydrate_security_participant_state(&key, source.expectation_id(), &fixture.fence, now)
@@ -55,10 +51,7 @@ fn independently_observed_clock_rollback_denies_hydration_and_readback() -> Anch
     assert_eq!(global_count(&*fixture.store.connection()?)?, 0);
     hydrate(&fixture, &source)?;
     {
-        let _rollback = chio_kernel::scope_fixed_runtime_for_current_thread(
-            now / 1_000 - 1,
-            std::iter::empty(),
-        );
+        let _rollback = chio_test_support::clock::scope_unix_secs(now / 1_000 - 1);
         assert!(fixture
             .store
             .load_security_participant_state(&key, &fixture.fence, now)
@@ -159,7 +152,7 @@ fn retry_and_new_owner_readback_need_no_remaining_source_file() -> AnchoredTestR
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     assert!(store
         .load_security_participant_state(record.security_authority_id(), &fence, now_ms())

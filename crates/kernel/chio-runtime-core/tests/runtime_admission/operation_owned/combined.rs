@@ -118,9 +118,10 @@ impl CombinedFixture {
         } = inner;
         drop(source);
         drop(authority);
-        let authority = SqliteAuthorityStore::open_serving(
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
             _directory.path().join("authority.sqlite3"),
             _directory.path().join("locks"),
+            chio_test_support::clock::clock(),
         )?;
         let source =
             SqliteRuntimeOrchestrationStore::open(_directory.path().join("runtime.sqlite3"))?;
@@ -185,7 +186,7 @@ impl CombinedFixture {
 #[test]
 fn combined_owned_dispatch_retains_all_three_resources_and_replays_without_reacquisition(
 ) -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = CombinedFixture::new()?;
     let kernel = fixture.kernel(fixture.hook()?)?;
     let response = kernel.evaluate_tool_call_blocking_with_metadata(
@@ -269,7 +270,7 @@ fn combined_owned_dispatch_retains_all_three_resources_and_replays_without_reacq
 
 #[test]
 fn combined_owned_denial_panic_and_source_loss_release_every_resource() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for fault in [
         faults::Fault::Deny,
         faults::Fault::Panic,
@@ -320,7 +321,7 @@ fn combined_owned_denial_panic_and_source_loss_release_every_resource() -> TestR
 #[test]
 fn combined_owned_imported_collision_in_any_resource_rejects_without_partial_custody() -> TestResult
 {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for kind in [
         RuntimeReplayParticipantKind::DestructiveLease,
         RuntimeReplayParticipantKind::TreatyContinuation,

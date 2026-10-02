@@ -97,7 +97,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<(Fixture, StoreMutationFence)>
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     Ok((
         Fixture {
             store: authority.admission_operation_store(),
@@ -222,7 +222,7 @@ fn authority_clock_regression_denies_before_source_access() -> AnchoredTestResul
     let source = Source::new(&fixture, true)?;
     let now = now_ms() / 1000 + 5;
     let expected = {
-        let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(now);
         fixture.store.expect_dpop_replay_source(
             &source.instance,
             &identifier("authority", AUTHORITY_ID),
@@ -231,7 +231,7 @@ fn authority_clock_regression_denies_before_source_access() -> AnchoredTestResul
             now * 1000,
         )?
     };
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now - 1, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now - 1);
     assert!(fixture
         .store
         .import_dpop_replay_source(
@@ -244,7 +244,7 @@ fn authority_clock_regression_denies_before_source_access() -> AnchoredTestResul
         .is_err());
     assert_eq!(source.calls(), ["preview"]);
     drop(_clock);
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
     assert!(fixture
         .store
         .import_dpop_replay_source(

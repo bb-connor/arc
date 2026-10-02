@@ -95,8 +95,7 @@ fn authenticated_caller_retains_cumulative_approval_and_settles_historical_cost(
         assert_state(&fixture, &request, "dispatch_committed")?;
         (request, authorization, report)
     };
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(request.capability.expires_at + 1, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(request.capability.expires_at + 1);
     let runtime = fixture.open()?;
     assert_state(&fixture, &request, "awaiting_caller_report")?;
     let response = runtime

@@ -139,7 +139,7 @@ The live-dispatch property and its type-enforced entry points (RP); the phase-aw
 real write paths (AC); the token-preserving parser itself, which rejects duplicate keys and
 precision aliases at every depth (SF); the sealed FROST round-2 envelope with its full negative
 matrix (SF); the enforced native launch path and prepared broker binding (NC); the closed
-discovery and ACP/A2A passthrough bypasses (PB); the terminal authorization proof and its four
+discovery and ACP-Client/A2A passthrough bypasses (PB); the terminal authorization proof and its four
 runtime-killed mutants (RC); the module refactors, with 845 test bodies and 219 selectors preserved
 (MO); and the four tamper-evidence repairs listed below.
 

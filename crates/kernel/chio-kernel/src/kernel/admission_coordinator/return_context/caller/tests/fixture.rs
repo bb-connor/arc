@@ -50,24 +50,27 @@ fn advance(
 
 pub(super) fn fixture() -> TestResult<Fixture> {
     let key = chio_core::Keypair::generate();
-    let kernel = ChioKernel::new(KernelConfig {
-        keypair: key.clone(),
-        ca_public_keys: vec![key.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: sha256_hex(b"caller-context-codec-test"),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: MemoryBudgetConfig::defaults(),
-        deadlines: HotPathDeadlineConfig::default(),
-    });
+    let kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: key.clone(),
+            ca_public_keys: vec![key.public_key()],
+            max_delegation_depth: 5,
+            policy_hash: sha256_hex(b"caller-context-codec-test"),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     let subject = chio_core::Keypair::generate().public_key();
     let capability = kernel.issue_capability(
         &subject,

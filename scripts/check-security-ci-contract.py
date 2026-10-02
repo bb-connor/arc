@@ -63,7 +63,7 @@ EXPECTED_APK_LOCK_SHA256 = (
     "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "67904d2a3d2ec99cfef68cdde03b62a52098b82eca2f97a415638b824f32dec0"
+    "05d699fa27c0a3fb59f7bcc31c5bf77993231c7602240d8e609b05b21d92d13a"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
@@ -96,10 +96,10 @@ EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
     "bf6b5b4c022a787673665bd78b466090f0a7830cb1505dc3710abfb641404480"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
-    "58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554"
+    "f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a"
 )
 EXPECTED_TEMPORAL_SELF_TEST_SHA256 = (
-    "af05bebc5c940b0145a64ae499eaf41ad62d1ee10b0f271745211565f2bdae06"
+    "606697a21a5f9ed1ce3af96dc1734cb98c5e95ba441ea2e68441d8382bb29fe1"
 )
 EXPECTED_TEMPORAL_STEP_SHELL = "/bin/bash --noprofile --norc -p -e {0}"
 EXPECTED_TEMPORAL_GATE_RUN = rf"""
@@ -1392,10 +1392,19 @@ EXPECTED_APALACHE_MATRIX = {
 }
 EXPECTED_APALACHE_VERDICT_NEEDS = {
     "apalache_contracts",
+    "response_lifecycle",
     "apalache_safety_shards",
     "apalache_scheduled_bounds_and_refinement",
     "apalache-negative",
 }
+# Bind the durable trace generation/refusal/model checks and their required
+# aggregate verdict together; adding a needs edge alone cannot qualify a run.
+EXPECTED_APALACHE_LIFECYCLE_JOB_SHA256 = (
+    "c52bd5c6019884f8187bba3b1664cbde2a6b39a7655407db3e632882f64cd6ba"
+)
+EXPECTED_APALACHE_VERDICT_JOB_SHA256 = (
+    "56cc98fc6d735549e2f3709d2ac3abe94d4945930bb94b63106fe56871ba450f"
+)
 EXPECTED_THREAT_CARGO_MUTANTS_RUN = r"""
 set -euo pipefail
 cargo install cargo-mutants --locked --version 25.3.1
@@ -4815,7 +4824,7 @@ def validate_isolated_execution_job(
 # changed inventory; hashing parsed jobs ignores YAML formatting and comments.
 EXPECTED_NONCE_FIPS_JOBS = {
     "threshold-crypto-floor": "ee2627806708706d8e70f8da457c4b59964a0c325e1db59bec9132fe95622d19",
-    "session-reports": "2580c99677a6d38a83365cbce616d73202b0d4ef25909f239f355b89d3bb1cd1",
+    "session-reports": "26f4afe70eb2eb0a53f0db676c21959f38a14091313a2d73bf7f53ab98b376cc",
     "fips-smoke": "2d300a5b16e51ea5260cfad2eb0c2d09f7b179a82cd0a24e30ca744352e9bc9b",
 }
 EXPECTED_NONCE_FIPS_PATHS = [
@@ -7845,6 +7854,19 @@ def validate(root: Path) -> None:
         )
 
     apalache_verdict = job(apalache, "apalache_verdict")
+    lifecycle = job(apalache, "response_lifecycle")
+    lifecycle_digest = hashlib.sha256(
+        json.dumps(lifecycle, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if lifecycle_digest != EXPECTED_APALACHE_LIFECYCLE_JOB_SHA256:
+        raise ContractError("full Apalache lifecycle evidence contract changed")
+    verdict_step = named_step(apalache_verdict, "Validate safety results")
+    if (
+        verdict_step.get("env", {}).get("LIFECYCLE_RESULT")
+        != "${{ needs.response_lifecycle.result }}"
+        or '|| "${LIFECYCLE_RESULT}" != "success"' not in verdict_step.get("run", "")
+    ):
+        raise ContractError("full Apalache verdict omits lifecycle success")
     verdict_needs = apalache_verdict.get("needs")
     if (
         apalache_verdict.get("name") != "apalache-subset"
@@ -7854,6 +7876,10 @@ def validate(root: Path) -> None:
         or "continue-on-error" in apalache_verdict
     ):
         raise ContractError("full Apalache verdict does not aggregate every required shard")
+    if hashlib.sha256(
+        json.dumps(apalache_verdict, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest() != EXPECTED_APALACHE_VERDICT_JOB_SHA256:
+        raise ContractError("full Apalache aggregate verdict contract changed")
 
     threat_events = threat_coverage.get("on")
     if not isinstance(threat_events, dict) or set(threat_events) != {

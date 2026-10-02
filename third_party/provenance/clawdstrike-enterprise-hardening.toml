@@ -82,7 +82,7 @@ modifications = "Only the sandboxed child process concept was retained; Chio ind
 [[inputs]]
 source_path = "crates/services/hush-cli/src/supervised_exec.rs"
 source_blob = "8a2b8b8cad3ff35c78daea86594cc766c6d57cfe"
-destinations = ["crates/security/chio-cage/src/enforcement.rs", "crates/security/chio-cage/src/launch.rs", "crates/security/chio-cage/src/launch/linux.rs"]
+destinations = ["crates/security/chio-cage-plan/src/enforcement.rs", "crates/security/chio-cage/src/launch.rs", "crates/security/chio-cage/src/launch/linux.rs"]
 reuse = "concept"
 copied = false
 modifications = "Only the supervisory lifecycle concept was retained; no seccomp-notify code was copied, and Chio independently uses descriptor-backed spawn, pidfd identity, ptrace exec observation, structured evidence, and fail-closed reaping"

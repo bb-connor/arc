@@ -5,9 +5,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
-use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Duration;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::receipt::{body::ChioReceipt, decision::Decision};
 use serde_json::{json, Value};
@@ -18,55 +16,9 @@ mod sampling_progress;
 #[path = "support/mcp_security.rs"]
 mod mcp_security;
 
-struct TestDir {
-    path: PathBuf,
-    _guard: MutexGuard<'static, ()>,
-}
-
-impl std::ops::Deref for TestDir {
-    type Target = Path;
-
-    fn deref(&self) -> &Self::Target {
-        self.path.as_path()
-    }
-}
-
-impl AsRef<Path> for TestDir {
-    fn as_ref(&self) -> &Path {
-        self.path.as_path()
-    }
-}
-
-impl Drop for TestDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
-    }
-}
-
-fn unique_test_dir() -> TestDir {
-    static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    let guard = TEST_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!("chio-cli-mcp-serve-{nonce}"));
-    let mut builder = fs::DirBuilder::new();
-    builder.recursive(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
-    }
-    builder.create(&path).expect("create private test dir");
-    TestDir {
-        path,
-        _guard: guard,
-    }
-}
+#[path = "mcp_serve/test_directory.rs"]
+mod test_directory;
+use test_directory::unique_test_dir;
 
 fn write_mock_server_script(dir: &Path) -> PathBuf {
     let script = r##"
@@ -285,7 +237,7 @@ def respond(payload):
     sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
 
-FILESYSTEM_RESOURCES = os.environ.get("CHIO_TEST_FILESYSTEM_RESOURCES") == "1"
+FILESYSTEM_RESOURCES = "--filesystem-resources" in sys.argv[1:]
 
 RESOURCES = [
     {
@@ -1350,10 +1302,13 @@ fn spawn_secured_mcp_serve(
 ) -> SecuredMcpChild {
     let target_command = mcp_security::resolve_executable("/usr/bin/python3");
     let script_path = fs::canonicalize(script_path).expect("canonicalize mock MCP server script");
-    let target_args = vec![script_path
+    let mut target_args = vec![script_path
         .to_str()
         .expect("mock MCP server path is UTF-8")
         .to_string()];
+    if filesystem_resources {
+        target_args.push("--filesystem-resources".to_string());
+    }
     let security = mcp_security::materialize_mcp_security(
         &dir.join("security"),
         Path::new(env!("CARGO_BIN_EXE_chio")),
@@ -1363,6 +1318,7 @@ fn spawn_secured_mcp_serve(
         "wrapped-mock",
         "Wrapped Mock",
         "0.1.0",
+        &[],
     );
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
@@ -1405,9 +1361,6 @@ fn spawn_secured_mcp_serve(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if filesystem_resources {
-        command.env("CHIO_TEST_FILESYSTEM_RESOURCES", "1");
-    }
     SecuredMcpChild::new(command.spawn().expect("spawn secured chio mcp serve"))
 }
 

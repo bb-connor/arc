@@ -8,7 +8,7 @@ use chio_kernel::caller_delivery::{
 
 #[test]
 fn authenticated_caller_report_uses_original_runtime_claim_after_lease_expiry() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
     let signer = Keypair::generate();
     let executor_key = Keypair::generate();
@@ -73,9 +73,10 @@ fn authenticated_caller_report_uses_original_runtime_claim_after_lease_expiry() 
     } = fixture;
     drop(authority);
     drop(source);
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
         _directory.path().join("authority.sqlite3"),
         _directory.path().join("locks"),
+        chio_test_support::clock::clock(),
     )?;
     let source = SqliteRuntimeOrchestrationStore::open(_directory.path().join("runtime.sqlite3"))?;
     let fixture = Fixture {
@@ -90,7 +91,7 @@ fn authenticated_caller_report_uses_original_runtime_claim_after_lease_expiry() 
     nonce_config(&mut kernel);
     kernel.set_caller_executor(executor)?;
     let observed = fixture.request.capability.expires_at + 1;
-    let _late = chio_kernel::scope_fixed_runtime_for_current_thread(observed, []);
+    let _late = chio_test_support::clock::scope_unix_secs(observed);
     kernel.reconcile_durable_admission_startup()?;
     let completed =
         kernel.reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;

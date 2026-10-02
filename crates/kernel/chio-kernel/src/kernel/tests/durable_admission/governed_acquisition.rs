@@ -395,7 +395,7 @@ fn foreign_prepared_kernel_cannot_claim_another_kernels_operation() {
     let (kernel, request, store, _) = fixture(Mode::Normal);
     let mut other_config = make_config();
     other_config.keypair = kernel.config.keypair.clone();
-    let other = ChioKernel::new(other_config);
+    let other = ChioKernel::new_with_clock(other_config, chio_test_support::clock::clock());
     let prepared = other
         .prepare_dispatch_credentials(
             &request,

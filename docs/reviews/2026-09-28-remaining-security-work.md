@@ -3,9 +3,27 @@
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
-Updated through the October 1 economy authority reader batch. Each batch has its own
+Updated through the October 2 CI and authority-time repair batch. Each batch has its own
 implementation and verification record below; this queue does not establish
 hosted or release qualification.
+
+## Current continuation (October 2, 2026)
+
+The [regression recovery record](2026-10-01-regression-recovery-execution.md)
+records published repairs and local acceptance for SR1/SR6, PB1, PR1/PB2/PR2 and
+PR6. The [CI and authority-time record](2026-10-02-ci-authority-time-repair-execution.md)
+records the current repair of RC1's challenge path, AC1, the remaining local
+CLI/proof/report failures and the CI fixture/source contracts. Its final
+qualification and publication boundaries govern those claims; the historical
+review lists below are not a fresh list of still-reproducible defects.
+
+The next implementation batch is PB3/PR3 clock-fault recovery, PR5 certificate
+collection, NC2 repeated response headers and TR2 unseen threat-intelligence
+results. Acceptance criteria are in the current execution record. Follow with
+AC2/AC3 explicit clock ownership and SF1/CA2 producer-specific decode contracts.
+Full required hosted CI, branch decomposition, remaining compliance/product
+findings and the parent assurance gates remain open. No broad reader census or
+new baseline count substitutes for those contracts.
 
 ## Current inventory
 
@@ -13,8 +31,8 @@ hosted or release qualification.
 | --- | --- | --- |
 | Decoder classification | 45 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers, the remaining 29 CLI readers, all 28 remaining protocol readers, all 35 pinned trust readers, all 33 guard/security readers, all 31 pinned platform readers, all 22 pinned economy readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
-| Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
-| Negative assertions | Baseline contains 1,257 assertions at 1,175 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
+| Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP-Client receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
+| Negative assertions | Baseline contains 1,256 assertions at 1,174 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
 | Schema/domain duplication | Wire lock records 163 identifiers declared in multiple files; domain gate has 32 shape exceptions and zero duplicate byte domains | Six duplicated byte domains and 37 schema duplicates retired with 43 canonical identity pins. Remaining schema consolidation and domain-shape repairs stay queued. |
 
@@ -87,15 +105,15 @@ readers, typed local rejection causes, fallible policy clocks and fenced A2A tas
 retention are implemented. The active-response and budget-test size overages are
 removed without cap increases. See the execution record for exact check status.
 
-The [remote lifecycle, ACP and native CI batch](2026-09-29-remote-lifecycle-acp-native-ci-execution.md)
+The [remote lifecycle, ACP-Client and native CI batch](2026-09-29-remote-lifecycle-acp-native-ci-execution.md)
 implements those four follow-up tasks: remote clock custody and transactional
-session renewal; complete ACP bypass removal; bounded original-byte ACP ingress
+session renewal; complete ACP-Client bypass removal; bounded original-byte ACP-Client ingress
 and typed local causes; and explicit native CI/SDK/example/conformance fixtures.
 Focused local evidence is recorded there. Native x86_64 execution and the
 Docker/provider-dependent mini-SWE campaigns remain separate acceptance gates.
 
-The [native consumer, ACP clock/error and OpenAPI batch](2026-09-29-native-consumers-acp-errors-openapi-execution.md)
-implements the three ACP/remote/OpenAPI owner tasks. ACP audit, signing and
+The [native consumer, ACP-Client clock/error and OpenAPI batch](2026-09-29-native-consumers-acp-errors-openapi-execution.md)
+implements the three ACP-Client/remote/OpenAPI owner tasks. ACP-Client audit, signing and
 compliance use a shared fenced clock; semantic failures retain local native
 causes; original OpenAPI bytes are bounded before duplicate-aware JSON/YAML
 projection. Native x86_64 discovery and the two process recovery campaigns now

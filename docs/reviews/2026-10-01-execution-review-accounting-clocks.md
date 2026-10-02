@@ -91,6 +91,13 @@ identifiers must remain, keep them behind a separate type that cannot affect tim
 **Confidence:** Confirmed. Source trace of the `a8b5f11d3e` diff and every consumer of
 the override at the tip.
 
+**October 2 resolution:** AC1 is repaired and locally qualified in the
+[CI and authority-time execution record](2026-10-02-ci-authority-time-repair-execution.md).
+The public ambient time override is removed; receipt identifier scope cannot
+change authority time. Kernel and SQLite controls prove the injected clock and
+regression fence remain authoritative. Harness and fixture owners now inject
+their clocks explicitly. AC2 and AC3 remain separate work.
+
 ## AC2. Medium: kernel and SQLite production paths read the process `SystemClock` instead of the injected clock
 
 The 4A item asks for direct wall-clock reads to be replaced "with the injected port".

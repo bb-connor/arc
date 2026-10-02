@@ -706,8 +706,9 @@ fn installed_issuance_admission_rejects_freeze_and_principal_substitution() {
 fn kernel_accepts_capabilities_from_configured_authority() {
     let authority_keypair = make_keypair();
     let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
         authority_keypair.clone(),
+        chio_test_support::clock::clock(),
     )));
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
@@ -731,8 +732,9 @@ fn kernel_reports_capability_issuer_trust() {
     let authority_keypair = make_keypair();
     let untrusted_keypair = make_keypair();
     let mut kernel = make_kernel(make_config());
-    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
         authority_keypair.clone(),
+        chio_test_support::clock::clock(),
     )));
 
     assert!(kernel.capability_issuer_is_trusted(&authority_keypair.public_key()));
@@ -801,8 +803,9 @@ fn sqlite_revocation_store_survives_kernel_restart() {
 
     let cap = {
         let mut kernel = make_kernel(make_config());
-        kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+        kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
             authority_keypair.clone(),
+            chio_test_support::clock::clock(),
         )));
         kernel.set_revocation_store(Box::new(SqliteRevocationStore::open(&path).unwrap()));
         kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -813,7 +816,10 @@ fn sqlite_revocation_store_survives_kernel_restart() {
     };
 
     let mut restarted = make_kernel(make_config());
-    restarted.set_capability_authority(Box::new(LocalCapabilityAuthority::new(authority_keypair)));
+    restarted.set_capability_authority(Box::new(LocalCapabilityAuthority::new_with_clock(
+        authority_keypair,
+        chio_test_support::clock::clock(),
+    )));
     restarted.set_revocation_store(Box::new(SqliteRevocationStore::open(&path).unwrap()));
     restarted.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 

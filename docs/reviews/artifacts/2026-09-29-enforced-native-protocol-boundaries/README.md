@@ -73,7 +73,7 @@ custody repair.
 The real enforcement/scaffold scenarios remain behind the existing privileged
 Linux feature. These local fixture runs do not establish native x86_64
 execution, hosted acceptance, M5/M11, integration, package publication or release.
-The next queue is remote MCP clock/lifecycle completion, ACP edge/proxy
+The next queue is remote MCP clock/lifecycle completion, ACP-Client edge/proxy
 hardening and native consumer CI fixture integration. See the execution record and remaining-work queue for broader scope.
 
 ## Final consumer migration

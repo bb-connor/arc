@@ -702,7 +702,8 @@ fn async_tool_server_event_drain_preserves_partial_events_after_error() {
         .unwrap();
 
     rt.block_on(async {
-        let mut kernel = ChioKernel::new(make_config());
+        let mut kernel =
+            ChioKernel::new_with_clock(make_config(), chio_test_support::clock::clock());
         kernel.register_tool_server(Box::new(EventDrainServer::new(
             "events",
             vec![ToolServerEvent::ResourcesListChanged],

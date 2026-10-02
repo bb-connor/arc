@@ -48,7 +48,7 @@ fn fixture() -> Fixture {
     }
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+        crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
     let fence = authority.mutation_fence();
     let cache = authority.economic_state_cache();
     Fixture {
@@ -995,7 +995,7 @@ fn operation_bound_stage_expiry_is_durable_and_ijson_bounded() -> TestResult {
             .expect("secure directory");
     }
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let cache = authority.economic_state_cache();
     let operations = authority.admission_operation_store();
@@ -1036,7 +1036,7 @@ fn operation_bound_stage_expiry_is_durable_and_ijson_bounded() -> TestResult {
     drop(cache);
     drop(authority);
 
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let loaded = reopened
         .economic_state_cache()
         .load_stage(&batch_id)?

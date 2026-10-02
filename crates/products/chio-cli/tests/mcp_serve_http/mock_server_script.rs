@@ -9,7 +9,7 @@ import threading
 import time
 
 CLIENT_CAPABILITIES = {}
-STARTUP_MARKER_PATH = os.environ.get("CHIO_MCP_STARTUP_MARKER_PATH")
+STARTUP_MARKER_PATH = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == "--startup-marker" else None
 WRITE_LOCK = threading.Lock()
 
 if STARTUP_MARKER_PATH:

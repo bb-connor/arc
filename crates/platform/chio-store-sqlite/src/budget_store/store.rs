@@ -1087,6 +1087,20 @@ impl SqliteBudgetStore {
     }
 
     pub fn list_all_usages(&self) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        self.list_all_usages_matching(None)
+    }
+
+    pub fn list_all_usages_for_capability(
+        &self,
+        capability_id: &str,
+    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        self.list_all_usages_matching(Some(capability_id))
+    }
+
+    fn list_all_usages_matching(
+        &self,
+        capability_id: Option<&str>,
+    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         let mut statement = transaction.prepare(
@@ -1100,10 +1114,11 @@ impl SqliteBudgetStore {
                 total_cost_exposed,
                 total_cost_realized_spend
             FROM capability_grant_budgets
+            WHERE (?1 IS NULL OR capability_id = ?1)
             ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
             "#,
         )?;
-        let rows = statement.query_map([], record_from_row)?;
+        let rows = statement.query_map(params![capability_id], record_from_row)?;
         let rows = rows.collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         transaction.rollback()?;

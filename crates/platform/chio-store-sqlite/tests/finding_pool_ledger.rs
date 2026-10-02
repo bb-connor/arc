@@ -431,24 +431,27 @@ fn debit_at_with_policy_and_authority_and_tenant(
         reject_verification: reject_purchase_verification,
         reject_admission: reject_purchase_admission,
     };
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: kernel_key,
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 1,
-        policy_hash: "finding-pool-ledger-test".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: MemoryBudgetConfig::defaults(),
-        deadlines: HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: kernel_key,
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 1,
+            policy_hash: "finding-pool-ledger-test".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     kernel
         .set_receipt_store_handle(fixture.receipt_store.clone())
         .test_expect("configure durable receipt store");
@@ -558,10 +561,7 @@ fn debit_at_with_policy_and_authority_and_tenant(
         &fixture.debit_signer,
     )
     .test_expect("sign purchaser debit authorization");
-    let _runtime = chio_kernel::scope_fixed_runtime_for_current_thread(
-        now_unix_ms / 1_000,
-        std::iter::empty::<String>(),
-    );
+    let _runtime = chio_test_support::clock::scope_unix_secs(now_unix_ms / 1_000);
     kernel.debit_finding_pool_purchase(FindingPoolDebitRequest {
         operation_context: &operation_context,
         allocation: &fixture.allocation,
@@ -1646,24 +1646,27 @@ fn cognition_market_kernel_refuses_pool_ledger_replacement() {
     .test_expect("open second qualified ledger");
     let fixture = fixture(100, &first);
     let receipt_directory = tempfile::tempdir().test_expect("create receipt directory");
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::from_seed(&[99_u8; 32]),
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 1,
-        policy_hash: "finding-pool-ledger-pinning-test".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: MemoryBudgetConfig::defaults(),
-        deadlines: HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: Keypair::from_seed(&[99_u8; 32]),
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 1,
+            policy_hash: "finding-pool-ledger-pinning-test".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     kernel
         .set_receipt_store(Box::new(
             SqliteReceiptStore::open_for_finding_pool(

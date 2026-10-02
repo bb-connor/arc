@@ -15,6 +15,8 @@
     "crates/core/chio-core-types/src/merkle.rs",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc",
     "crates/core/chio-core-types/src/wire_text.rs",
+    "crates/core/chio-response-model/src/simulation.rs",
+    "crates/core/chio-response-model/src/state.rs",
     "crates/economy/chio-anchor/src/witness.rs",
     "crates/economy/chio-anchor/src/witness/rekor.rs",
     "crates/economy/chio-anchor/src/witness/rekor/clock.rs",
@@ -514,8 +516,6 @@
     "crates/security/chio-quarantine/src/correlation.rs",
     "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc",
     "crates/security/chio-quarantine/src/rules.rs",
-    "crates/security/chio-quarantine/src/simulation.rs",
-    "crates/security/chio-quarantine/src/state_machine.rs",
     "crates/security/chio-secret-broker/src/audit.rs",
     "crates/security/chio-secret-broker/src/authority_ipc.rs",
     "crates/security/chio-secret-broker/src/daemon.rs",
@@ -2175,6 +2175,10 @@
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize",
     "crates/core/chio-core-types/src/wire_text.rs::schema::custom_deserialize",
+    "crates/core/chio-response-model/src/simulation.rs::decode::from_slice",
+    "crates/core/chio-response-model/src/state.rs::decode_response_record::from_slice",
+    "crates/core/chio-response-model/src/state.rs::validate_effect_contribution::from_slice",
+    "crates/core/chio-response-model/src/state.rs::validate_effect_plan_binding::from_slice",
     "crates/economy/chio-anchor/src/witness.rs::serialize::custom_deserialize",
     "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_slice",
     "crates/economy/chio-open-market/src/recovery.rs::verify_finding_recovery_context::from_value",
@@ -2357,10 +2361,6 @@
     "crates/security/chio-quarantine/src/correlation.rs::parse_verified_event::from_slice",
     "crates/security/chio-quarantine/src/correlation.rs::validate_stored_body::from_slice",
     "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc::decode_journal::from_slice",
-    "crates/security/chio-quarantine/src/simulation.rs::decode::from_slice",
-    "crates/security/chio-quarantine/src/state_machine.rs::decode_response_record::from_slice",
-    "crates/security/chio-quarantine/src/state_machine.rs::validate_effect_contribution::from_slice",
-    "crates/security/chio-quarantine/src/state_machine.rs::validate_effect_plan_binding::from_slice",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value",
@@ -4743,10 +4743,10 @@
     "crates/security/chio-quarantine/src/correlation.rs::parse_verified_event::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-quarantine/src/correlation.rs::validate_stored_body::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc::decode_journal::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/security/chio-quarantine/src/simulation.rs::decode::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/security/chio-quarantine/src/state_machine.rs::decode_response_record::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/security/chio-quarantine/src/state_machine.rs::validate_effect_contribution::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/security/chio-quarantine/src/state_machine.rs::validate_effect_plan_binding::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/core/chio-response-model/src/simulation.rs::decode::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/core/chio-response-model/src/state.rs::decode_response_record::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/core/chio-response-model/src/state.rs::validate_effect_contribution::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/core/chio-response-model/src/state.rs::validate_effect_plan_binding::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes.",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
@@ -6200,10 +6200,10 @@
     "crates/security/chio-quarantine/src/fuzz.rs": [
       "drive::from_slice"
     ],
-    "crates/security/chio-quarantine/src/simulation.rs": [
+    "crates/core/chio-response-model/src/simulation.rs": [
       "decode::from_slice"
     ],
-    "crates/security/chio-quarantine/src/state_machine.rs": [
+    "crates/core/chio-response-model/src/state.rs": [
       "decode_response_record::from_slice",
       "validate_effect_contribution::from_slice",
       "validate_effect_plan_binding::from_slice"
@@ -7215,11 +7215,11 @@
       "kind": "example-or-fuzz",
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration."
     },
-    "crates/security/chio-quarantine/src/simulation.rs": {
+    "crates/core/chio-response-model/src/simulation.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },
-    "crates/security/chio-quarantine/src/state_machine.rs": {
+    "crates/core/chio-response-model/src/state.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },
@@ -11991,11 +11991,11 @@
       "kind": "parser-internal-or-typed",
       "contract": "Temporal rule input has a 1 MiB original duplicate-aware native JSON gate before its closed typed rule projection. Parser errors retain redacted native sources; rule schema, action and window validation still run."
     },
-    "crates/security/chio-quarantine/src/simulation.rs": {
+    "crates/core/chio-response-model/src/simulation.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },
-    "crates/security/chio-quarantine/src/state_machine.rs": {
+    "crates/core/chio-response-model/src/state.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue."
     },

@@ -1,3 +1,4 @@
+use crate::test_authority::secure_directory as secure_temp_directory;
 use std::fs;
 
 use chio_core::canonical::canonical_json_bytes;
@@ -54,7 +55,7 @@ fn fixture() -> Fixture {
     secure_temp_directory(&lock_root);
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+        crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
     let market = authority.finding_market_store();
     let purchases = authority.finding_purchase_store();
     let store = authority.finding_challenge_store();
@@ -79,17 +80,6 @@ fn fixture() -> Fixture {
         store,
         allocation_id,
     }
-}
-
-fn secure_temp_directory(path: &std::path::Path) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
-            .expect("secure temp directory");
-    }
-    #[cfg(not(unix))]
-    let _ = path;
 }
 
 fn hex64(character: char) -> String {
@@ -4499,7 +4489,7 @@ fn schema_shape_is_verified_on_every_open() {
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     {
         let authority =
-            SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+            crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
         assert!(authority
             .finding_challenge_store()
             .get_challenge("challenge-absent")
@@ -4515,7 +4505,12 @@ fn schema_shape_is_verified_on_every_open() {
             .expect("drop the lifecycle trigger");
     }
     assert!(
-        SqliteAuthorityStore::open_serving(&database, &lock_root).is_err(),
+        SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        )
+        .is_err(),
         "a schema that differs from the canonical definition must fail the open"
     );
 
@@ -4526,6 +4521,6 @@ fn schema_shape_is_verified_on_every_open() {
         raw.execute_batch(FINDING_CHALLENGE_SCHEMA)
             .expect("restore the canonical schema");
     }
-    SqliteAuthorityStore::open_serving(&database, &lock_root).expect("reopen with intact schema");
+    crate::test_authority::open_serving(&database, &lock_root).expect("reopen with intact schema");
 }
 include!("finding_challenge_store_tests/effect_root_recovery.rs");

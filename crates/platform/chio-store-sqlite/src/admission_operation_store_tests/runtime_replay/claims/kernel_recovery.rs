@@ -9,24 +9,27 @@ use chio_kernel::admission_operation::runtime_participant::{
 use chio_kernel::{ChioKernel, KernelConfig};
 
 fn kernel(fixture: &Fixture) -> TestResult<ChioKernel> {
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![],
-        max_delegation_depth: 5,
-        policy_hash: sha256_hex(b"runtime-custody-recovery-test"),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys: vec![],
+            max_delegation_depth: 5,
+            policy_hash: sha256_hex(b"runtime-custody-recovery-test"),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     kernel.set_durable_admission_store(
         Arc::new(fixture.store.clone()),
         Arc::new(fixture.authority.tool_outcome_store()),
@@ -49,7 +52,7 @@ fn reopen(fixture: Fixture) -> TestResult<Fixture> {
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
     Ok(Fixture {

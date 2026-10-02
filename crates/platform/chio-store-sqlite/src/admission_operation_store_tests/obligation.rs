@@ -810,7 +810,7 @@ fn obligation_lifecycle_and_head_survive_serving_owner_restart() -> AnchoredTest
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let stored = authority
         .admission_operation_store()
         .load_obligation(atom.obligation_id())?
@@ -1043,7 +1043,7 @@ fn obligation_head_accepts_same_millisecond_serving_owner_rotation() -> Anchored
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     let fixture = Fixture {

@@ -111,6 +111,9 @@ jobs:
           run_gate python3 scripts/tests/release-sbom-rescan.test.py
           run_gate python3 scripts/tests/macos-release-portability.test.py
           run_gate python3 scripts/tests/msrv-cache-target.test.py
+          run_gate python3 scripts/check-native-protocol-ci.py
+          run_gate python3 scripts/tests/check-native-protocol-ci.test.py
+          run_gate python3 scripts/tests/prepare-enforced-native-fixture.test.py
           run_gate python3 -m unittest discover -s integrations/required-agents/qualification -p 'test_*.py'
           run_gate ./scripts/check-web3-contract-parity.sh
           run_gate ./scripts/check-workspace-layering.sh
@@ -143,6 +146,7 @@ jobs:
           run_gate bash ./scripts/check-http-egress-contract.sh
           run_gate bash ./scripts/tests/check-http-egress-contract.test.sh
           run_gate bash ./scripts/check-chio-proof-room-release-truth.sh
+          run_gate python3 ./scripts/tests/check-proof-room-copy-scope.test.py
           run_gate bash ./scripts/tests/check-chio-proof-room-release-truth.test.sh
           run_gate bash ./scripts/check-chio-schema-registry.sh
           run_gate bash ./scripts/tests/check-chio-schema-registry.test.sh
@@ -217,10 +221,10 @@ jobs:
           test -f "${temporal_self_test}"
           test ! -L "${temporal_self_test}"
           test -x "${temporal_self_test}"
-          printf '%s  %s\n' '58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
-          printf '%s  %s\n' 'af05bebc5c940b0145a64ae499eaf41ad62d1ee10b0f271745211565f2bdae06' "${temporal_self_test}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' 'f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' '606697a21a5f9ed1ce3af96dc1734cb98c5e95ba441ea2e68441d8382bb29fe1' "${temporal_self_test}" | /usr/bin/sha256sum --check --strict
           /bin/bash -p "${temporal_self_test}"
-          printf '%s  %s\n' '58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
+          printf '%s  %s\n' 'f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a' "${temporal_runner}" | /usr/bin/sha256sum --check --strict
           /bin/bash -p "${temporal_runner}"
 
       - name: Anchor batch async witness lint
@@ -318,6 +322,12 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: "1.3.3"
+
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
 
       - name: Workspace tests
         env:
@@ -482,7 +492,7 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
           cargo nextest run --profile ci --locked \
-            -p chio-cage -p chio-security-types -p chio-flow -p chio-decoy \
+            -p chio-cage -p chio-security-types -p chio-response-model -p chio-flow -p chio-decoy \
             -p chio-quarantine -p chio-keyring -p chio-security-kernel \
             -p chio-active-response-authority -p chio-secure-ipc -p chio-secret-broker
 
@@ -682,6 +692,13 @@ jobs:
 
       - name: Install Python workflow validators
         run: python -m pip install --disable-pip-version-check PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0
+
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
+        env:
+          CARGO_BUILD_JOBS: "1"
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-msrv-target
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
 
       - name: MSRV workspace lane
         env:

@@ -132,7 +132,12 @@ fn restoring_database_before_join_cannot_erase_acknowledged_mutation_history() -
     drop(store);
     drop(authority);
     fs::copy(backup, &database)?;
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     Ok(())
 }
 
@@ -212,7 +217,12 @@ fn external_row_tampering_with_restored_catalog_is_rejected_on_reopen() -> TestR
     connection.execute_batch(&native::schema::sql()?)?;
     assert!(native::verify_all(&connection).is_err());
     drop(connection);
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     Ok(())
 }
 
@@ -223,7 +233,7 @@ fn child_process_native_join_crash() -> TestResult {
         return Ok(());
     };
     let directory = PathBuf::from(directory);
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = crate::test_authority::open_serving(
         directory.join("authority.db"),
         directory.join("locks"),
     )?;
@@ -313,7 +323,7 @@ fn independent_process_abort_and_takeover_preserve_exact_mutation_custody() -> T
                 "family {family}, stage {stage}: {}",
                 String::from_utf8_lossy(&output.stdout)
             );
-            let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+            let authority = crate::test_authority::open_serving(&database, &lock_root)?;
             let store = authority.admission_operation_store();
             assert_eq!(
                 store.connection()?.query_row(

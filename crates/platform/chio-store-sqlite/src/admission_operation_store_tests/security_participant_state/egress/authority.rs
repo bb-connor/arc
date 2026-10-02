@@ -175,8 +175,7 @@ fn expired_fence_history_is_readable_but_cannot_be_committed() -> AnchoredTestRe
     let before = counts(&fixture)?;
     let expired = acquired.expires_at_unix_ms.div_ceil(1000) * 1000;
     assert!(expired < pending.lease.expires_at_unix_ms());
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(expired / 1000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(expired / 1000);
     assert!(fixture
         .store
         .commit_security_participant_egress(

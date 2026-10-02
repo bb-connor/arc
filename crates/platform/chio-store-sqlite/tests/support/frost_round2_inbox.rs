@@ -434,8 +434,11 @@ fn reopening_refuses_deleted_committed_acceptance() -> TestResult {
     let sql = rusqlite::Connection::open(&r.fixture.database)?;
     sql.execute("DELETE FROM frost_round2_acceptances", [])?;
     drop(sql);
-    let error = match SqliteAuthorityStore::open_serving(&r.fixture.database, &r.fixture.lock_root)
-    {
+    let error = match SqliteAuthorityStore::open_serving_with_clock(
+        &r.fixture.database,
+        &r.fixture.lock_root,
+        chio_test_support::clock::clock(),
+    ) {
         Ok(_) => panic!("deleted committed acceptance was accepted"),
         Err(error) => error,
     };

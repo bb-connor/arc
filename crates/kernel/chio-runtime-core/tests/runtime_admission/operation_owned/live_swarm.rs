@@ -4,7 +4,7 @@ use super::*;
 
 #[test]
 fn live_swarm_without_future_results_uses_durable_continuation_custody() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::with_request(true, |source| {
         let mut swarm = runtime_swarm_bundle(false)?;
         swarm.join_receipts.clear();

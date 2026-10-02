@@ -2,10 +2,9 @@ use super::*;
 
 #[test]
 fn v16_upgrade_preserves_old_hashes_and_anchors_then_appends_v2() -> AnchoredTestResult {
-    let fixture = fixture();
     let now = now_ms() / 1_000 * 1_000;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
+    let fixture = fixture();
     let legacy = legacy_clock::LegacyClock::enter();
     let operation = prepared_operation(
         &fixture.fence,
@@ -56,7 +55,7 @@ fn v16_upgrade_preserves_old_hashes_and_anchors_then_appends_v2() -> AnchoredTes
     )?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     {
         let connection = store.connection()?;
@@ -80,12 +79,9 @@ fn v16_upgrade_preserves_old_hashes_and_anchors_then_appends_v2() -> AnchoredTes
         "new-cap",
     );
     {
-        let _lagging = chio_kernel::scope_fixed_runtime_for_current_thread(
-            now / 1_000 - 1,
-            std::iter::empty(),
-        );
+        let _lagging = chio_test_support::clock::scope_unix_secs(now / 1_000 - 1);
         assert!(matches!(store.begin(&new, &fence, now),
-            Err(AdmissionOperationStoreError::Invariant(message)) if message.contains("authority time regressed")));
+            Err(AdmissionOperationStoreError::Invariant(message)) if message == chio_security_types::clock::ClockError::WallClockRegression.code()));
     }
     store.begin(&new, &fence, now - 1)?;
     let connection = store.connection()?;

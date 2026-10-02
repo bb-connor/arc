@@ -82,8 +82,8 @@ Recorded results:
 - `chio_core_types-final-tests.log`: 75 receipt tests pass, including required
   nullable budgets and full-width ceilings. `dpop-final-tests.log`: all 13 DPoP
   integration tests pass.
-- `consumer-check-1.log`: test targets compile for API Protect, ACP edge, credit,
-  settlement, SIEM and CLI. No warnings. The extracted ACP permission module
+- `consumer-check-1.log`: test targets compile for API Protect, ACP-Client edge, credit,
+  settlement, SIEM and CLI. No warnings. The extracted ACP-Client permission module
   retains the existing preview tests under its explicit source-directory path.
 - `dashboard-check.log`: dashboard TypeScript compilation passed.
 - `mutation-results.log`: a standalone harness compiles the actual replay and

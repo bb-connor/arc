@@ -702,7 +702,7 @@ pub(crate) fn build_budget_utilization_report(
 ) -> Result<BudgetUtilizationReport, Response> {
     let usages = if let Some(capability_id) = query.capability_id.as_deref() {
         budget_store
-            .list_usages(usize::MAX, Some(capability_id))
+            .list_all_usages_for_capability(capability_id)
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             })?
@@ -995,3 +995,7 @@ pub(crate) fn list_limit(requested: Option<usize>) -> usize {
 pub(crate) fn plain_http_error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
 }
+
+#[cfg(test)]
+#[path = "policy_support_tests.rs"]
+mod tests;

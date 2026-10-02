@@ -111,3 +111,7 @@ runtime-lifecycle contract. `chio-kernel` supplies `ChioKernel`, `Verdict`, `Too
 this crate's `metrics` module wraps into an independent counter instance.
 `serde` / `serde_json` back every wire type; `thiserror` derives
 `A2aEdgeError`.
+
+## Trust boundary
+
+The remote caller supplies untrusted JSON-RPC parameters. The edge delegates authority decisions to the kernel and returns its signed receipt; a transport response alone cannot grant a capability or bypass the guard pipeline.

@@ -80,8 +80,7 @@ fn authenticated_caller_start_retains_approval_without_legacy_replay_or_reacquis
         config.clone(),
         Box::new(chio_kernel::execution_nonce::InMemoryExecutionNonceStore::from_config(&config)),
     );
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(request.capability.expires_at + 1, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(request.capability.expires_at + 1);
     reopened.reconcile_durable_admission_startup()?;
     let completed =
         reopened.reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;

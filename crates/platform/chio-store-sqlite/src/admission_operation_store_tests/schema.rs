@@ -578,7 +578,7 @@ fn current_schema_reopen_rejects_assignment_results_without_evidence_columns() -
         "#,
     )?;
     drop(connection);
-    let error = match SqliteAuthorityStore::open_serving(&database, &lock_root) {
+    let error = match crate::test_authority::open_serving(&database, &lock_root) {
         Ok(_) => return Err("incomplete current assignment schema was accepted".into()),
         Err(error) => error,
     };
@@ -637,7 +637,7 @@ fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTest
     drop(connection);
 
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     let connection = store.connection()?;
     let primary_key_columns: String = connection.query_row(
@@ -714,8 +714,8 @@ fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
     drop(connection);
 
     SqliteAuthorityStore::provision(&database, &lock_root).expect("migrate v1 authority");
-    let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open migrated authority");
+    let authority = crate::test_authority::open_serving(&database, &lock_root)
+        .expect("open migrated authority");
     let store = authority.admission_operation_store();
     assert_eq!(
         store
@@ -754,7 +754,7 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
     drop(authority);
 
     let replacement =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("rotate serving owner");
+        crate::test_authority::open_serving(&database, &lock_root).expect("rotate serving owner");
     drop(replacement);
 
     let connection = Connection::open(&database).expect("open offline database");
@@ -871,8 +871,8 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
     drop(connection);
 
     SqliteAuthorityStore::provision(&database, &lock_root).expect("migrate v2 authority");
-    let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open migrated authority");
+    let authority = crate::test_authority::open_serving(&database, &lock_root)
+        .expect("open migrated authority");
     let store = authority.admission_operation_store();
     assert_eq!(
         store
@@ -906,8 +906,7 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
 #[test]
 fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> AnchoredTestResult {
     let _legacy = legacy_clock::LegacyClock::enter();
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now_ms() / 1_000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -1063,7 +1062,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
     drop(connection);
 
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     let mut connection = store.connection()?;

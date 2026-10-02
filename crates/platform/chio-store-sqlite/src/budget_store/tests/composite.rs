@@ -190,7 +190,7 @@ fn reopen(path: &Path) -> SqliteBudgetStore {
     let lock_root = path.join("locks");
     secure_create_dir_all(&lock_root, "create lock root");
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
-    SqliteAuthorityStore::open_serving(&database, &lock_root)
+    crate::test_authority::open_serving(&database, &lock_root)
         .expect("open serving authority")
         .budget_store()
 }
@@ -1345,7 +1345,7 @@ fn cumulative_approval_state_flip_cannot_skip_attachment() {
     drop(store);
 
     let database = path.join("authority.sqlite3");
-    let error = match SqliteAuthorityStore::open_serving(&database, path.join("locks")) {
+    let error = match crate::test_authority::open_serving(&database, path.join("locks")) {
         Ok(_) => panic!("serving must reject a cumulative approval state flip"),
         Err(error) => error,
     };
@@ -1382,7 +1382,7 @@ fn serving_rejects_structured_hold_event_frontier_corruption() {
             .expect("open raw database")
             .execute(corruption, [])
             .expect("corrupt structured hold frontier");
-        let error = match SqliteAuthorityStore::open_serving(&database, path.join("locks")) {
+        let error = match crate::test_authority::open_serving(&database, path.join("locks")) {
             Ok(_) => panic!("serving must reject structured {id} frontier corruption"),
             Err(error) => error,
         };
@@ -1428,7 +1428,7 @@ fn serving_rejects_cumulative_operation_corruption_hidden_by_account_totals() {
             .expect("open raw database")
             .execute_batch(corruption)
             .expect("corrupt cumulative projection");
-        let error = match SqliteAuthorityStore::open_serving(&database, path.join("locks")) {
+        let error = match crate::test_authority::open_serving(&database, path.join("locks")) {
             Ok(_) => panic!("serving must reject cumulative {id} corruption"),
             Err(error) => error,
         };

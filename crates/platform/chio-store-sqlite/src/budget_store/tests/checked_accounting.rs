@@ -20,7 +20,7 @@ fn open_store(path: &Path, composite: bool) -> SqliteBudgetStore {
     }
     crate::serving_owner::SqliteAuthorityStore::provision(path, &locks)
         .test_expect("provision owner");
-    crate::serving_owner::SqliteAuthorityStore::open_serving(path, &locks)
+    crate::test_authority::open_serving(path, &locks)
         .test_expect("serving owner")
         .budget_store()
 }

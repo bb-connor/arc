@@ -526,24 +526,27 @@ fn build_real_adapter_runtime(
         Ok(Some(threshold_requirement.clone()))
     });
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: operator_authority.clone(),
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 5,
-        policy_hash,
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: operator_authority.clone(),
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 5,
+            policy_hash,
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     kernel
         .set_active_response_submission_authority(submission_authority.public_key())
         .unwrap_or_else(|error| panic!("install real adapter submission authority: {error}"));

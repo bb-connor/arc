@@ -178,10 +178,10 @@ fn unbound_issuance_still_expires_before_execution() -> TestResult {
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "expired-before-binding")?;
     let issued_at = now();
-    let issuance_clock = chio_kernel::scope_fixed_runtime_for_current_thread(issued_at, []);
+    let issuance_clock = chio_test_support::clock::scope_unix_secs(issued_at);
     let nonce = preflight(&runtime, &request)?;
     drop(issuance_clock);
-    let _expired_clock = chio_kernel::scope_fixed_runtime_for_current_thread(issued_at + 2, []);
+    let _expired_clock = chio_test_support::clock::scope_unix_secs(issued_at + 2);
     let denied = evaluate(&runtime, &with_nonce(&request, &nonce))?;
     assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
     assert!(

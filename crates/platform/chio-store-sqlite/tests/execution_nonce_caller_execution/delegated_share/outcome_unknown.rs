@@ -49,7 +49,7 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
             .expires_at(),
     )?;
     let after_expiry = expiry.checked_add(1).ok_or("expiry overflow")?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(after_expiry, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(after_expiry);
     let mut runtime = fixture.open_with_reconcile(false)?;
     siblings.configure(&fixture, &mut runtime)?;
     runtime.kernel.reconcile_durable_admission_startup()?;

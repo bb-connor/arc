@@ -436,12 +436,12 @@ pub(super) fn advance_status_floor_locked(
                 "finding status operator authorization regressed".to_owned(),
             ));
         }
-        if authorization.operator.key_epoch == current.operator_key_epoch {
-            if current.operator_key != authorization.operator.key {
-                return Err(CliError::cli_other_error(
-                    "finding status operator key equivocated within one epoch",
-                ));
-            }
+        if authorization.operator.key_epoch == current.operator_key_epoch
+            && current.operator_key != authorization.operator.key
+        {
+            return Err(CliError::cli_other_error(
+                "finding status operator key equivocated within one epoch",
+            ));
         }
     }
 

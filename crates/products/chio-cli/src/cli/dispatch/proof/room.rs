@@ -43,7 +43,12 @@ pub(super) fn command_error(error: chio_proof_room::ProofRoomError) -> CliError 
     // Match only owner-defined prefixes. The remaining diagnostic can contain
     // rejected input and stays exclusively in the inspectable local source.
     if let Some(reason) = error.public_reason() {
-        return CliError::with_public_source(&TRANSACTION_RUNTIME_PROOF_REJECTED, reason, error);
+        let spec = if reason == "proof-room.schema-violation: artifact" {
+            &TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED
+        } else {
+            &TRANSACTION_RUNTIME_PROOF_REJECTED
+        };
+        return CliError::with_public_source(spec, reason, error);
     }
     let detail = match &error {
         ProofRoomError::Validation(message) => message.as_str(),
@@ -72,6 +77,14 @@ pub(super) fn command_error(error: chio_proof_room::ProofRoomError) -> CliError 
             "proof-room.report.hash-mismatch" => (
                 &TRANSACTION_ARTIFACT_HASH_MISMATCH,
                 "proof-room.report.hash-mismatch",
+            ),
+            "proof-room.report.mismatch" => (
+                &TRANSACTION_RUNTIME_PROOF_REJECTED,
+                "proof-room.report.mismatch",
+            ),
+            "proof-room.evidence-graph.authority-node-missing" => (
+                &TRANSACTION_GRAPH_NOT_CLOSED,
+                "proof-room.evidence-graph.authority-node-missing",
             ),
             "proof-room.artifact.unsafe-path" => (
                 &TRANSACTION_GRAPH_NOT_CLOSED,
@@ -107,9 +120,9 @@ pub(super) fn command_error(error: chio_proof_room::ProofRoomError) -> CliError 
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use chio_test_support::ctx::{TestUnwrap, TestUnwrapErr};
     use std::error::Error;
     #[test]
     fn public_proof_rejection_preserves_safe_reason_and_private_source() {
@@ -125,8 +138,62 @@ mod tests {
         assert!(error
             .source()
             .and_then(Error::source)
-            .unwrap()
+            .test_unwrap("proof rejection retains its local verification source")
             .downcast_ref::<chio_proof_room::ProofRoomError>()
             .is_some());
+    }
+
+    #[test]
+    fn proof_diagnostics_never_publish_rejected_detail_or_source_debug() {
+        use chio_proof_room::ProofRoomError;
+        let marker = "private-rejected-payload";
+        let schema_source = serde_json::from_str::<u64>(&format!("\"{marker}\""))
+            .test_unwrap_err("string payload rejects an integer schema");
+        let cases = [
+            (
+                ProofRoomError::Validation(format!(
+                    "proof-room.evidence-graph.authority-node-missing: {marker}"
+                )),
+                "proof-room.evidence-graph.authority-node-missing",
+            ),
+            (
+                ProofRoomError::Validation(format!("proof-room.report.mismatch: {marker}")),
+                "proof-room.report.mismatch",
+            ),
+            (
+                ProofRoomError::Validation(format!("proof-room.public-settlement-invalid: CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL eth_blockNumber rejected by HttpEgressContract: loopback egress target denied: {marker}")),
+                "loopback egress target denied",
+            ),
+            (
+                ProofRoomError::Validation(format!("proof-room.commerce-invalid: CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys: {marker}")),
+                "proof-room.verification.failed",
+            ),
+            (
+                ProofRoomError::Verification {
+                    context: "proof-room.source-verifier.failed",
+                    source: Box::new(chio_control_plane::transaction_passport::TransactionPassportError::Input(
+                        chio_core::canonical::UntrustedJsonError::Decode(schema_source).into(),
+                    )),
+                },
+                "proof-room.schema-violation: artifact",
+            ),
+        ];
+        for (source, expected) in cases {
+            let error = command_error(source);
+            assert_eq!(error.report().message, expected);
+            assert!(!format!("{error:?} {error} {:?}", error.report()).contains(marker));
+            let source = error
+                .source()
+                .and_then(Error::source)
+                .test_unwrap("proof rejection retains its local verification source");
+            assert!(source.downcast_ref::<ProofRoomError>().is_some());
+            let mut retained = Some(source);
+            let mut found_private_detail = false;
+            while let Some(cause) = retained {
+                found_private_detail |= cause.to_string().contains(marker);
+                retained = cause.source();
+            }
+            assert!(found_private_detail);
+        }
     }
 }

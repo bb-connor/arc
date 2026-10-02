@@ -180,9 +180,10 @@ async fn strict_nonce_subprocess() -> Result {
         serde_json::from_value(metadata["admission_operation"].clone())?;
     drop(runtime);
     drop(kernel);
-    let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving(
+    let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
         directory.join("authority.db"),
         directory.join("locks"),
+        chio_test_support::clock::clock(),
     )?;
     let now = u64::try_from(
         std::time::SystemTime::now()

@@ -718,12 +718,19 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
     let payment_calls = Arc::new(PaymentCalls::default());
 
     let (operation_id, capability_id, usage_before) = {
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = authority.tool_outcome_store();
         let budget = Arc::new(authority.budget_store());
-        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(kernel_keypair.clone()),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(
             operations.clone(),
             Arc::new(FailOnceOutcomeStore {
@@ -773,12 +780,19 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         )
     };
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let fence = authority.mutation_fence();
     let operations = Arc::new(authority.admission_operation_store());
     let outcomes = Arc::new(authority.tool_outcome_store());
     let budget = Arc::new(authority.budget_store());
-    let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    let mut recovered_kernel = ChioKernel::new_with_clock(
+        kernel_config(kernel_keypair),
+        chio_test_support::clock::clock(),
+    );
     recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
     recovered_kernel.set_budget_store_handle(budget.clone());
     recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -839,12 +853,19 @@ fn sqlite_restart_completes_a_committed_capture_without_request_replay(
         .store(true, Ordering::SeqCst);
 
     let (request, operation_id) = {
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
         let budget = Arc::new(authority.budget_store());
-        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(kernel_keypair.clone()),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
         kernel.set_budget_store_handle(budget);
         kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -876,12 +897,19 @@ fn sqlite_restart_completes_a_committed_capture_without_request_replay(
         (request, operation.binding().operation_id().clone())
     };
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let fence = authority.mutation_fence();
     let operations = Arc::new(authority.admission_operation_store());
     let outcomes = Arc::new(authority.tool_outcome_store());
     let budget = Arc::new(authority.budget_store());
-    let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    let mut recovered_kernel = ChioKernel::new_with_clock(
+        kernel_config(kernel_keypair),
+        chio_test_support::clock::clock(),
+    );
     recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
     recovered_kernel.set_budget_store_handle(budget);
     recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -927,12 +955,19 @@ fn sqlite_restart_completes_a_committed_release_without_request_replay(
         .store(true, Ordering::SeqCst);
 
     let (request, operation_id) = {
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
         let budget = Arc::new(authority.budget_store());
-        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(kernel_keypair.clone()),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
         kernel.set_budget_store_handle(budget);
         kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -972,12 +1007,19 @@ fn sqlite_restart_completes_a_committed_release_without_request_replay(
         (request, operation.binding().operation_id().clone())
     };
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let fence = authority.mutation_fence();
     let operations = Arc::new(authority.admission_operation_store());
     let outcomes = Arc::new(authority.tool_outcome_store());
     let budget = Arc::new(authority.budget_store());
-    let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    let mut recovered_kernel = ChioKernel::new_with_clock(
+        kernel_config(kernel_keypair),
+        chio_test_support::clock::clock(),
+    );
     recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
     recovered_kernel.set_budget_store_handle(budget);
     recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -1018,12 +1060,19 @@ fn sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome(
     let kernel_keypair = Keypair::generate();
     let invocations = Arc::new(AtomicU64::new(0));
     let (request, response, first_owner_epoch) = {
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let first_owner_epoch = fence.owner_epoch;
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
-        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(kernel_keypair.clone()),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(operations.clone(), outcomes.clone(), fence)?;
         kernel.register_tool_server(Box::new(MutationServer {
             invocations: invocations.clone(),
@@ -1063,12 +1112,19 @@ fn sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome(
         (request, response, first_owner_epoch)
     };
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let fence = authority.mutation_fence();
     assert!(fence.owner_epoch > first_owner_epoch);
     let operations = Arc::new(authority.admission_operation_store());
     let outcomes = Arc::new(authority.tool_outcome_store());
-    let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    let mut recovered_kernel = ChioKernel::new_with_clock(
+        kernel_config(kernel_keypair),
+        chio_test_support::clock::clock(),
+    );
     recovered_kernel.set_durable_admission_store(operations, outcomes, fence)?;
     recovered_kernel.register_tool_server(Box::new(MutationServer {
         invocations: invocations.clone(),
@@ -1094,12 +1150,19 @@ fn sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly(
     let kernel_keypair = Keypair::generate();
 
     let operation_id = {
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
         let budget = Arc::new(authority.budget_store());
-        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair));
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(kernel_keypair),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
         kernel.set_budget_store_handle(budget);
         kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter::default()));
@@ -1146,7 +1209,11 @@ fn sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly(
         metadata.operation_id
     };
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let fence = authority.mutation_fence();
     let operations = authority.admission_operation_store();
     let reopened = operations
@@ -1185,12 +1252,19 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
         let payment_calls = Arc::new(PaymentCalls::default());
 
         let (request, response, operation_id) = {
-            let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+            let authority = SqliteAuthorityStore::open_serving_with_clock(
+                &database,
+                &lock_root,
+                chio_test_support::clock::clock(),
+            )?;
             let fence = authority.mutation_fence();
             let operations = Arc::new(authority.admission_operation_store());
             let outcomes = Arc::new(authority.tool_outcome_store());
             let budget = Arc::new(authority.budget_store());
-            let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+            let mut kernel = ChioKernel::new_with_clock(
+                kernel_config(kernel_keypair.clone()),
+                chio_test_support::clock::clock(),
+            );
             kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
             kernel.set_budget_store_handle(budget);
             kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -1280,12 +1354,19 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
 
         // Restart: re-entering the denied operation returns the persisted
         // Deny without redispatching the tool or moving funds.
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
         let budget = Arc::new(authority.budget_store());
-        let mut recovered = ChioKernel::new(kernel_config(kernel_keypair));
+        let mut recovered = ChioKernel::new_with_clock(
+            kernel_config(kernel_keypair),
+            chio_test_support::clock::clock(),
+        );
         recovered.set_durable_admission_store(operations.clone(), outcomes, fence)?;
         recovered.set_budget_store_handle(budget);
         recovered.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -1337,12 +1418,19 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
         let payment_calls = Arc::new(PaymentCalls::default());
 
         let (request, response) = {
-            let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+            let authority = SqliteAuthorityStore::open_serving_with_clock(
+                &database,
+                &lock_root,
+                chio_test_support::clock::clock(),
+            )?;
             let fence = authority.mutation_fence();
             let operations = Arc::new(authority.admission_operation_store());
             let outcomes = Arc::new(authority.tool_outcome_store());
             let budget = Arc::new(authority.budget_store());
-            let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+            let mut kernel = ChioKernel::new_with_clock(
+                kernel_config(kernel_keypair.clone()),
+                chio_test_support::clock::clock(),
+            );
             kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
             kernel.set_budget_store_handle(budget);
             kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -1386,12 +1474,19 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
             (request, response)
         };
 
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
         let budget = Arc::new(authority.budget_store());
-        let mut recovered = ChioKernel::new(kernel_config(kernel_keypair));
+        let mut recovered = ChioKernel::new_with_clock(
+            kernel_config(kernel_keypair),
+            chio_test_support::clock::clock(),
+        );
         recovered.set_durable_admission_store(operations, outcomes, fence)?;
         recovered.set_budget_store_handle(budget);
         recovered.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -1422,12 +1517,19 @@ fn output_digest_delivery_contract_enforces_every_lane() -> Result<(), Box<dyn E
         SqliteAuthorityStore::provision(&database, &lock_root)?;
         let invocations = Arc::new(AtomicU64::new(0));
         let payment_calls = Arc::new(PaymentCalls::default());
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
         let budget = Arc::new(authority.budget_store());
-        let mut kernel = ChioKernel::new(kernel_config(Keypair::generate()));
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(Keypair::generate()),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(operations, outcomes, fence)?;
         kernel.set_budget_store_handle(budget);
         kernel.set_payment_adapter(Box::new(PrepaidFinalPaymentAdapter {
@@ -1486,12 +1588,19 @@ fn malformed_delivery_digests_are_rejected_before_dispatch() -> Result<(), Box<d
         SqliteAuthorityStore::provision(&database, &lock_root)?;
         let invocations = Arc::new(AtomicU64::new(0));
         let payment_calls = Arc::new(PaymentCalls::default());
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let fence = authority.mutation_fence();
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
         let budget = Arc::new(authority.budget_store());
-        let mut kernel = ChioKernel::new(kernel_config(Keypair::generate()));
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(Keypair::generate()),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(operations, outcomes, fence)?;
         kernel.set_budget_store_handle(budget);
         kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -1549,12 +1658,19 @@ fn delivery_marked_grant_cannot_fall_through_to_an_unmarked_sibling() -> Result<
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     let invocations = Arc::new(AtomicU64::new(0));
     let payment_calls = Arc::new(PaymentCalls::default());
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let fence = authority.mutation_fence();
     let operations = Arc::new(authority.admission_operation_store());
     let outcomes = Arc::new(authority.tool_outcome_store());
     let budget = Arc::new(authority.budget_store());
-    let mut kernel = ChioKernel::new(kernel_config(Keypair::generate()));
+    let mut kernel = ChioKernel::new_with_clock(
+        kernel_config(Keypair::generate()),
+        chio_test_support::clock::clock(),
+    );
     kernel.set_durable_admission_store(operations, outcomes, fence)?;
     kernel.set_budget_store_handle(budget);
     kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -1603,12 +1719,19 @@ fn output_digest_admission_rejects_malformed_commitments() -> Result<(), Box<dyn
     SqliteAuthorityStore::provision(&database, &lock_root)?;
     let invocations = Arc::new(AtomicU64::new(0));
     let payment_calls = Arc::new(PaymentCalls::default());
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let fence = authority.mutation_fence();
     let operations = Arc::new(authority.admission_operation_store());
     let outcomes = Arc::new(authority.tool_outcome_store());
     let budget = Arc::new(authority.budget_store());
-    let mut kernel = ChioKernel::new(kernel_config(Keypair::generate()));
+    let mut kernel = ChioKernel::new_with_clock(
+        kernel_config(Keypair::generate()),
+        chio_test_support::clock::clock(),
+    );
     kernel.set_durable_admission_store(operations, outcomes, fence)?;
     kernel.set_budget_store_handle(budget);
     kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -1708,9 +1831,16 @@ fn stream_delivery_cannot_satisfy_a_committed_output_digest() -> Result<(), Box<
         let lock_root = temp.path().join("locks");
         create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(&database, &lock_root)?;
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let invocations = Arc::new(AtomicU64::new(0));
-        let mut kernel = ChioKernel::new(kernel_config(Keypair::generate()));
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(Keypair::generate()),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(
             Arc::new(authority.admission_operation_store()),
             Arc::new(authority.tool_outcome_store()),
@@ -1738,11 +1868,18 @@ fn stream_delivery_cannot_satisfy_a_committed_output_digest() -> Result<(), Box<
     let lock_root = temp.path().join("locks");
     create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let invocations = Arc::new(AtomicU64::new(0));
     let payment_calls = Arc::new(PaymentCalls::default());
     let operations = Arc::new(authority.admission_operation_store());
-    let mut kernel = ChioKernel::new(kernel_config(Keypair::generate()));
+    let mut kernel = ChioKernel::new_with_clock(
+        kernel_config(Keypair::generate()),
+        chio_test_support::clock::clock(),
+    );
     kernel.set_durable_admission_store(
         operations.clone(),
         Arc::new(authority.tool_outcome_store()),

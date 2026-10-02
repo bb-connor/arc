@@ -113,7 +113,7 @@ fn pure_results_and_resolution_keep_every_entry_with_one_anchor_write() {
     drop(operations);
     drop(authority);
     let reopened =
-        SqliteAuthorityStore::open_serving(&database, &locks).expect("reopen anchored result");
+        crate::test_authority::open_serving(&database, &locks).expect("reopen anchored result");
     let outcomes = reopened.tool_outcome_store();
     assert_eq!(
         outcomes
@@ -379,7 +379,7 @@ fn pure_finalization_resumes_a_durable_prefix_under_a_new_owner() {
     drop(operations);
     drop(authority);
     let reopened =
-        SqliteAuthorityStore::open_serving(&database, &locks).expect("new serving owner");
+        crate::test_authority::open_serving(&database, &locks).expect("new serving owner");
     let fence = reopened.mutation_fence();
     let outcomes = reopened.tool_outcome_store();
     let operation_id = operation.binding().operation_id();

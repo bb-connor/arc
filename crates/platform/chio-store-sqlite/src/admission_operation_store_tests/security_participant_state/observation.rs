@@ -297,7 +297,7 @@ fn fresh_observation_requires_current_owner_but_preserves_original_initializatio
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(database, lock_root)?;
+    let authority = crate::test_authority::open_serving(database, lock_root)?;
     let current = authority.mutation_fence();
     assert!(current.owner_epoch > fence.owner_epoch);
     let store = authority.admission_operation_store();

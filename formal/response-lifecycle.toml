@@ -26,7 +26,7 @@ symbol = "all_applied_reversible_effects_restored"
 boundary = "snapshot rollback guard"
 
 [[hook]]
-path = "crates/security/chio-quarantine/src/simulation.rs"
+path = "crates/core/chio-response-model/src/simulation.rs"
 symbol = "evaluate_response_simulation"
 boundary = "independent overlapping contributions"
 

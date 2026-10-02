@@ -77,7 +77,9 @@ enterprise_engines = {
     "chio-cage",
 }
 enterprise_boundary_sources = {"chio-kernel", "chio-guards"}
-required_security_packages = security_engines | enterprise_engines | {"chio-security-types"}
+required_security_packages = security_engines | enterprise_engines | {
+    "chio-security-types", "chio-response-model"
+}
 pure_engines = {"chio-flow", "chio-decoy", "chio-quarantine"}
 violations = set()
 
@@ -115,6 +117,11 @@ for source_id, source_package in packages_by_id.items():
             forbidden = forbidden or destination_group in {"kernel", "guards", "platform"}
         if source_name == "chio-quarantine":
             forbidden = forbidden or destination_group == "trust"
+        if source_name == "chio-response-model":
+            forbidden = forbidden or destination_group in {
+                "kernel", "guards", "platform", "trust"
+            }
+            forbidden = forbidden or destination_name in security_engines | enterprise_engines
         if source_name == "chio-security-kernel" and destination_id in edges[source_id]:
             forbidden = forbidden or destination_group in {"guards", "trust", "platform"}
         if source_name == "chio-security-types" and destination_id in edges[source_id]:

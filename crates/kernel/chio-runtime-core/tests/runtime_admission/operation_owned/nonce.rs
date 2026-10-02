@@ -7,7 +7,7 @@ use chio_kernel::execution_nonce::{ExecutionNonceConfig, InMemoryExecutionNonceS
 #[test]
 fn owned_nonce_preflight_releases_before_issuance_and_dispatch_claims_a_new_episode() -> TestResult
 {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
     let mut kernel = fixture.kernel(fixture.hook()?, true, false)?;
     let config = ExecutionNonceConfig {

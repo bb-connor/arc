@@ -1,3 +1,5 @@
+use super::*;
+
 #[derive(Serialize)]
 struct RequestCommitment<'a> {
     tenant_id: &'a str,
@@ -6,7 +8,7 @@ struct RequestCommitment<'a> {
     created_at_unix_ms: u64,
 }
 
-fn request_id(plan: &ResponsePlan) -> Result<RecordId, StateMachineError> {
+pub(super) fn request_id(plan: &ResponsePlan) -> Result<RecordId, StateMachineError> {
     let digest = domain_hash(
         RESPONSE_REQUEST_ID_DOMAIN,
         &RequestCommitment {
@@ -16,11 +18,15 @@ fn request_id(plan: &ResponsePlan) -> Result<RecordId, StateMachineError> {
             created_at_unix_ms: plan.created_at_unix_ms,
         },
     )?;
-    Ok(RecordId::new(format!("response_request_{}", hex_bytes(digest.as_bytes())))
-        .map_err(CanonicalFailure::Identifier)?)
+    Ok(
+        RecordId::new(format!("response_request_{}", hex_bytes(digest.as_bytes())))
+            .map_err(CanonicalFailure::Identifier)?,
+    )
 }
 
-fn latest_evidence_id(snapshot: &ResponseSnapshot) -> Result<OpaqueReceiptRef, StateMachineError> {
+pub(super) fn latest_evidence_id(
+    snapshot: &ResponseSnapshot,
+) -> Result<OpaqueReceiptRef, StateMachineError> {
     let mutation_index = snapshot
         .mutations
         .len()
@@ -67,7 +73,7 @@ fn transition_id<T: Serialize>(
 
 #[derive(Serialize)]
 #[serde(tag = "record_type", rename_all = "snake_case")]
-enum CanonicalMutationBody {
+pub(super) enum CanonicalMutationBody {
     Transition {
         generation: u64,
         from_state: ResponseState,
@@ -326,7 +332,7 @@ fn canonical_mutation_id(
     transition_id("mutation", plan, expected_generation, body)
 }
 
-fn finalize_mutation(
+pub(super) fn finalize_mutation(
     plan: &ResponsePlan,
     body: CanonicalMutationBody,
 ) -> Result<ResponseMutationRecord, StateMachineError> {
@@ -334,7 +340,10 @@ fn finalize_mutation(
     Ok(body.into_record(transition_id))
 }
 
-fn domain_hash<T: Serialize>(domain: &[u8], value: &T) -> Result<Digest32, StateMachineError> {
+pub(super) fn domain_hash<T: Serialize>(
+    domain: &[u8],
+    value: &T,
+) -> Result<Digest32, StateMachineError> {
     let canonical = canonical_json_bytes(value).map_err(CanonicalFailure::Encoding)?;
     let mut input = Vec::with_capacity(domain.len() + canonical.len());
     input.extend_from_slice(domain);
@@ -342,17 +351,6 @@ fn domain_hash<T: Serialize>(domain: &[u8], value: &T) -> Result<Digest32, State
     Ok(Digest32::new(*sha256(&input).as_bytes()))
 }
 
-fn error_code(value: &str) -> Result<ErrorCode, StateMachineError> {
-    Ok(ErrorCode::new(value).map_err(CanonicalFailure::Identifier)?)
-}
-
-#[allow(clippy::indexing_slicing, reason = "The table has exactly 16 entries and each masked nibble is in 0..16.")]
-fn hex_bytes(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut output = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        output.push(char::from(HEX[usize::from(byte >> 4)]));
-        output.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    output
+pub(super) fn hex_bytes(bytes: &[u8]) -> String {
+    hex::encode(bytes)
 }

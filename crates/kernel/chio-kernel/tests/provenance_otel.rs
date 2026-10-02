@@ -109,7 +109,7 @@ fn make_request(request_id: &str, capability: &CapabilityToken) -> ToolCallReque
 }
 
 fn kernel_and_capability() -> Result<(ChioKernel, CapabilityToken), KernelError> {
-    let mut kernel = ChioKernel::new(make_config());
+    let mut kernel = ChioKernel::new_with_clock(make_config(), chio_test_support::clock::clock());
     kernel.register_tool_server(Box::new(EchoServer::new("srv", &["echo"])));
 
     let agent_keypair = Keypair::generate();

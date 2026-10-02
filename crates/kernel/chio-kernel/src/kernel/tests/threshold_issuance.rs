@@ -192,10 +192,7 @@ fn cumulative_proposal_clock_rechecks_expiry_after_policy_lookup() -> TestResult
     let requirement = fixture
         .kernel
         .threshold_approval_requirement(&fixture.request, current_unix_timestamp())?;
-    let _clock = crate::scope_fixed_runtime_for_current_thread(
-        proposal.body.proposal_deadline,
-        Vec::<String>::new(),
-    );
+    let _clock = chio_test_support::clock::scope_unix_secs(proposal.body.proposal_deadline);
     assert!(
         fixture
             .kernel
@@ -219,7 +216,7 @@ fn cumulative_proposal_clock_does_not_trust_future_artifact_time() -> TestResult
         .kernel
         .threshold_approval_requirement(&fixture.request, current_unix_timestamp())?;
     let now = proposal.body.proposal_created_at;
-    let _clock = crate::scope_fixed_runtime_for_current_thread(now, Vec::<String>::new());
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
     let mut body = proposal.body;
     body.proposal_created_at += 60;
     body.proposal_deadline = ThresholdApprovalProposalBody::proposal_deadline(

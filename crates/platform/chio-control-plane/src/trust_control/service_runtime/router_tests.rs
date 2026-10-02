@@ -42,6 +42,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         finding_market: None,
     };
     TrustServiceState {
+        finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
         config,
         authority_keyring: None,
         authority_keyring_seed_path: None,
@@ -103,7 +104,11 @@ async fn retained_hold_route_requires_service_auth_and_the_current_owner(
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(&locks, std::fs::Permissions::from_mode(0o700))?;
     SqliteAuthorityStore::provision(&database, &locks)?;
-    let authority = Arc::new(SqliteAuthorityStore::open_serving(&database, &locks)?);
+    let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?);
     let fence = authority.mutation_fence();
     let mut state = metrics_state("service-secret");
     state.joint_authority_store = Some(authority);
@@ -447,7 +452,11 @@ async fn live_structured_denial_has_no_invented_usage_sequence_or_cache_mutation
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let joint = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let joint = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let mut state = metrics_state("service-secret");
     state.joint_authority_store = Some(joint.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -561,7 +570,11 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let joint = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let joint = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let legacy = Arc::new(SqliteBudgetStore::open(
         temp.path().join("legacy-budget.sqlite3"),
     )?);
@@ -684,7 +697,11 @@ async fn v1_lifecycle_uses_current_joint_epoch_after_restart(
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let first = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let first = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let first_fence = first.mutation_fence();
     let capability_id = "restart-capability";
     let hold_id = "restart-hold";
@@ -727,7 +744,11 @@ async fn v1_lifecycle_uses_current_joint_epoch_after_restart(
     drop(first_budget);
     drop(first);
 
-    let restarted = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let restarted = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let restarted_fence = restarted.mutation_fence();
     assert_eq!(restarted_fence.store_uuid, first_fence.store_uuid);
     assert!(restarted_fence.owner_epoch > first_fence.owner_epoch);

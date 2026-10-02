@@ -5,7 +5,8 @@ fn non_durable_monetary_kernel_denies_before_ambiguous_dispatch() {
     // A non-durable monetary kernel must reverse the provisional budget hold and
     // deny before dispatch. It therefore cannot reach RequestIncomplete or add
     // an unrecoverable retained-hold sample.
-    let mut kernel = ChioKernel::new(make_monetary_config());
+    let mut kernel =
+        ChioKernel::new_with_clock(make_monetary_config(), chio_test_support::clock::clock());
     assert!(kernel.durable_admission_runtime.is_none());
     kernel.register_tool_server(Box::new(IncompleteServer {
         id: "broken".to_string(),

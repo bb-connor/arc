@@ -217,10 +217,9 @@ pub(crate) use receipt_support::*;
 // `crypto_floor=allow_classical`.
 #[cfg(not(loom))]
 pub use receipt_support::{
-    fixed_runtime_unix_secs_for_current_thread, kernel_signing_backend,
-    receipt_body_fields_coupled, scope_fixed_runtime_for_current_thread,
-    sign_receipt_body_hybrid_canonical, sign_receipt_body_with_backend, FixedRuntimeScope,
-    KernelCryptoFloor, KernelSigningBackendError, ReceiptCouplingExpectation, SignedHybridReceipt,
+    kernel_signing_backend, receipt_body_fields_coupled, scope_receipt_ids_for_current_thread,
+    sign_receipt_body_hybrid_canonical, sign_receipt_body_with_backend, KernelCryptoFloor,
+    KernelSigningBackendError, ReceiptCouplingExpectation, ReceiptIdScope, SignedHybridReceipt,
 };
 #[cfg(not(loom))]
 pub(crate) use request_matching::{

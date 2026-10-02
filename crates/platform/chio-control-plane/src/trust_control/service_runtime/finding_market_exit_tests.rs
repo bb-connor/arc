@@ -530,7 +530,9 @@ fn audit_pool_binding() -> FindingPoolBinding {
     }
 }
 
-include!("finding_market_exit_tests/market_config.rs");
+#[path = "finding_market_exit_tests/market_config.rs"]
+mod market_config_fixture;
+use market_config_fixture::market_config;
 
 /// Rail observer that always refuses the crash-before-observation activation leg.
 struct FailingRail;
@@ -601,6 +603,7 @@ fn market_state(
         finding_market: Some(config),
     };
     TrustServiceState {
+        finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
         config,
         authority_keyring: None,
         authority_keyring_seed_path: None,
@@ -1623,7 +1626,11 @@ fn provision_stack(
     std::fs::create_dir(&lock_root)?;
     secure_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let joint = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let joint = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?);
     let store = joint.finding_market_store();
     let web = MarketWeb::build(audit_epoch_length_secs, admission_expires_at)?;
     let config = market_config();

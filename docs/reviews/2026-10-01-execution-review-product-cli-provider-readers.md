@@ -100,7 +100,7 @@ The cost is not only style. The copies already chose different decode modes for 
 
 **Confidence:** Confirmed. The copies and their differing modes are cited above.
 
-## PR5. Medium: compliance certificates now fail for any ACP session with more than 4,096 receipts, and any one oversized row anywhere in the receipt table fails every session
+## PR5. Medium: compliance certificates now fail for any ACP-Client session with more than 4,096 receipts, and any one oversized row anywhere in the receipt table fails every session
 
 `load_session_receipts` (`crates/products/chio-cli/src/cert.rs:225-270`) now charges each row to the proof-collection `Budget` (`budget.enter(0)` at `:261`) and requests `MAX_ENTRIES + 1` rows (`:248`). Certificate generation (`:34`) and verification (`:106`) both call it. When a session has 4,097 receipts, the command fails with "artifact collection entry limit exceeded". It offers no streaming path or override, and the message names the wrong subsystem. Long agent sessions where every file read is a tool call reach this count, and before this commit the command handled them.
 

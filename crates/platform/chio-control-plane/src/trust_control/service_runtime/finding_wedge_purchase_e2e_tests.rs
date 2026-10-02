@@ -211,24 +211,12 @@ fn usd(units: u64) -> MonetaryAmount {
     }
 }
 
-fn digest_of<T: serde::Serialize>(value: &T) -> Result<String, AnyError> {
-    Ok(sha256_hex(&canonical_json_bytes(value)?))
-}
-
-fn canonical_string<T: serde::Serialize>(value: &T) -> Result<String, AnyError> {
-    Ok(String::from_utf8(canonical_json_bytes(value)?)?)
-}
+#[path = "finding_wedge_purchase_e2e_tests/canonical_fixture.rs"]
+mod canonical_fixture;
+use canonical_fixture::{canonical_string, digest_of, reveal_envelope};
 
 fn missing(context: &'static str) -> AnyError {
     Box::new(std::io::Error::other(context))
-}
-
-/// The exact two-field envelope the reveal server returns.
-fn reveal_envelope(media_type: &str, payload: &[u8]) -> serde_json::Value {
-    serde_json::json!({
-        "media_type": media_type,
-        "payload_b64": STANDARD.encode(payload),
-    })
 }
 
 fn authority_pin(seed: u8, label: &str) -> FindingAuthorityPin {
@@ -602,6 +590,7 @@ fn market_state(
         finding_market: Some(config),
     };
     TrustServiceState {
+        finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
         config,
         authority_keyring: None,
         authority_keyring_seed_path: None,
@@ -1567,9 +1556,10 @@ fn provision(case: RevealCase) -> Result<Deployment, AnyError> {
 
 impl Deployment {
     fn open(&self) -> Result<Arc<SqliteAuthorityStore>, AnyError> {
-        Ok(Arc::new(SqliteAuthorityStore::open_serving(
+        Ok(Arc::new(SqliteAuthorityStore::open_serving_with_clock(
             &self.database,
             &self.lock_root,
+            chio_test_support::clock::clock(),
         )?))
     }
 
@@ -1998,10 +1988,13 @@ fn recovery_authorities(
 }
 
 fn build_reveal_kernel(inputs: &RevealKernelInputs<'_>) -> Result<ChioKernel, AnyError> {
-    let mut kernel = ChioKernel::new(kernel_config(
-        inputs.kernel_keypair.clone(),
-        vec![inputs.web.operator.public_key()],
-    ));
+    let mut kernel = ChioKernel::new_with_clock(
+        kernel_config(
+            inputs.kernel_keypair.clone(),
+            vec![inputs.web.operator.public_key()],
+        ),
+        chio_test_support::clock::clock(),
+    );
     kernel.set_durable_admission_store(
         Arc::new(inputs.authority.admission_operation_store()),
         Arc::new(inputs.authority.tool_outcome_store()),
@@ -3493,7 +3486,7 @@ fn buyer_memory_write(
     let buyer_kernel_keypair = keypair(41);
     let mut config = kernel_config(buyer_kernel_keypair.clone(), Vec::new());
     config.checkpoint_batch_size = 0;
-    let mut kernel = ChioKernel::new(config);
+    let mut kernel = ChioKernel::new_with_clock(config, chio_test_support::clock::clock());
     kernel.set_receipt_store_handle(receipts.clone())?;
     kernel.set_durable_admission_store(
         Arc::new(authority.admission_operation_store()),

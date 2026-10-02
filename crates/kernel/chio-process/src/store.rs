@@ -27,6 +27,26 @@ impl Store {
         let path = private_file(path)?;
         let mut connection = Connection::open(path)?;
         connection.busy_timeout(Duration::from_secs(5))?;
+        let has_schema: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*')",
+            [],
+            |row| row.get(0),
+        )?;
+        if has_schema {
+            let has_binding: bool = connection.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'process_runtime')",
+                [],
+                |row| row.get(0),
+            )?;
+            if !has_binding {
+                return Err(ProcessError::Configuration(
+                    "unversioned process journal cannot grant runtime authority",
+                ));
+            }
+            // Check the existing binding before changing journal mode or
+            // creating current tables. Only empty stores may acquire a binding.
+            journal_namespace(&connection, authority, kernel_key)?;
+        }
         connection.pragma_update(None, "journal_mode", "WAL")?;
         connection.pragma_update(None, "synchronous", "FULL")?;
         connection.pragma_update(None, "foreign_keys", "ON")?;
@@ -37,15 +57,7 @@ impl Store {
              VALUES (1, ?1, ?2, ?3, ?4)",
             params![JOURNAL_VERSION, uuid::Uuid::new_v4().to_string(), authority, kernel_key],
         )?;
-        let (version, namespace, stored_authority, stored_key): (u32, String, String, String) = tx.query_row(
-            "SELECT version, namespace, authority, kernel_key FROM process_runtime WHERE singleton = 1",
-            [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )?;
-        if version != JOURNAL_VERSION || stored_authority != authority || stored_key != kernel_key {
-            return Err(ProcessError::Configuration(
-                "process journal belongs to a different durable authority, kernel key or version",
-            ));
-        }
+        let namespace = journal_namespace(&tx, authority, kernel_key)?;
         tx.commit()?;
         Ok(Self {
             connection,
@@ -252,6 +264,32 @@ impl Store {
         )?;
         tx.commit()?;
         Ok(count)
+    }
+}
+
+fn journal_namespace(
+    connection: &Connection,
+    authority: &str,
+    kernel_key: &str,
+) -> Result<String, ProcessError> {
+    let binding: Option<(u32, String, String, String)> = connection
+        .query_row(
+            "SELECT version, namespace, authority, kernel_key FROM process_runtime WHERE singleton = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()?;
+    match binding {
+        Some((version, namespace, stored_authority, stored_key))
+            if version == JOURNAL_VERSION
+                && stored_authority == authority
+                && stored_key == kernel_key =>
+        {
+            Ok(namespace)
+        }
+        _ => Err(ProcessError::Configuration(
+            "process journal belongs to a different durable authority, kernel key or version",
+        )),
     }
 }
 

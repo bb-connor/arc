@@ -2325,6 +2325,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-manifest",
+ "chio-security-types",
  "rcgen 0.13.2",
  "serde",
  "serde_json",
@@ -2346,6 +2347,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
+ "chio-security-types",
  "chio-test-support",
  "serde",
  "serde_json",
@@ -2364,6 +2366,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
+ "chio-security-types",
  "chio-test-support",
  "serde",
  "serde_json",
@@ -2379,6 +2382,7 @@ dependencies = [
  "chio-cross-protocol",
  "chio-kernel",
  "chio-manifest",
+ "chio-security-types",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -2450,6 +2454,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-security-types",
  "chio-spec-validate",
  "chio-test-support",
  "chio-web3-bindings",
@@ -2493,6 +2498,7 @@ dependencies = [
  "chio-kernel",
  "chio-metrics-spec",
  "chio-openapi",
+ "chio-security-types",
  "chio-store-sqlite",
  "chio-test-support",
  "chrono",
@@ -2639,12 +2645,14 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "aws-types",
+ "bytes",
  "chio-attest-verify",
  "chio-core-types",
  "chio-manifest",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "http 1.4.0",
+ "http-body 1.0.1",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3033,6 +3041,7 @@ dependencies = [
  "tower",
  "tower-http",
  "tracing",
+ "tracing-subscriber",
  "ureq 2.12.1",
  "url",
  "uuid",
@@ -3191,6 +3200,7 @@ dependencies = [
  "chio-guards",
  "chio-kernel",
  "chio-metering",
+ "chio-security-types",
  "regex",
  "regex-syntax",
  "serde",
@@ -3266,6 +3276,7 @@ dependencies = [
 name = "chio-egress-contract"
 version = "0.1.0"
 dependencies = [
+ "chio-core-types",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
@@ -3397,6 +3408,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3441,6 +3453,7 @@ dependencies = [
  "chio-finding-market-port",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-security-types",
  "chio-spec-validate",
  "chio-test-support",
  "hex",
@@ -3526,6 +3539,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-finding-market-store-postgres",
+ "chio-security-types",
  "futures-util",
  "libc",
  "nix",
@@ -3612,8 +3626,10 @@ name = "chio-guard-registry"
 version = "0.1.0"
 dependencies = [
  "chio-attest-verify",
+ "chio-core-types",
  "chio-egress-contract",
  "chio-reputation",
+ "libc",
  "oci-distribution",
  "reqwest 0.13.2",
  "serde",
@@ -3637,6 +3653,7 @@ dependencies = [
  "chio-security-types",
  "chio-store-sqlite",
  "glob",
+ "libc",
  "lru 0.18.2",
  "rand 0.8.6",
  "regex",
@@ -3652,20 +3669,8 @@ dependencies = [
 name = "chio-hosted-mcp"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "chio-control-plane",
- "chio-core-types",
- "chio-kernel",
- "chio-manifest",
- "chio-mcp-adapter",
  "chio-mcp-remote",
- "chio-security-types",
- "chio-siem",
- "reqwest 0.13.2",
- "serde_json",
- "sha2 0.10.9",
- "tokio",
- "url",
 ]
 
 [[package]]
@@ -3679,6 +3684,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-security-types",
  "chio-store-sqlite",
  "chio-test-support",
  "chrono",
@@ -3737,7 +3743,7 @@ dependencies = [
  "chio-log-redact",
  "chio-manifest",
  "chio-metrics-spec",
- "chio-quarantine",
+ "chio-response-model",
  "chio-security-types",
  "chio-settle",
  "chio-store-sqlite",
@@ -3935,6 +3941,7 @@ dependencies = [
  "chio-edge-metrics",
  "chio-kernel",
  "chio-manifest",
+ "chio-security-types",
  "chrono",
  "serde",
  "serde_json",
@@ -3961,7 +3968,9 @@ dependencies = [
  "chio-metrics-spec",
  "chio-secure-ipc",
  "chio-security-types",
+ "chio-siem",
  "chio-store-sqlite",
+ "chio-test-support",
  "hmac 0.12.1",
  "p256 0.13.2",
  "p384",
@@ -3973,6 +3982,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "subtle",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
  "url",
@@ -4053,6 +4063,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-provider-adapter-core",
+ "chio-security-types",
  "chio-tool-call-fabric",
  "criterion",
  "serde",
@@ -4153,6 +4164,7 @@ dependencies = [
  "chio-core",
  "chio-guards",
  "chio-kernel",
+ "chio-security-types",
  "chrono",
  "chrono-tz",
  "hex",
@@ -4177,6 +4189,7 @@ dependencies = [
  "chio-manifest",
  "chio-security-types",
  "chio-store-sqlite",
+ "chio-test-support",
  "hex",
  "rand 0.8.6",
  "rusqlite",
@@ -4211,6 +4224,7 @@ dependencies = [
  "chio-workflow-preflight",
  "hex",
  "jsonschema",
+ "libc",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
@@ -4231,6 +4245,7 @@ dependencies = [
  "chio-test-support",
  "chio-tool-call-fabric",
  "reqwest 0.13.2",
+ "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
@@ -4251,12 +4266,16 @@ dependencies = [
  "chio-mistral-tools-adapter",
  "chio-ollama-tools-adapter",
  "chio-openai-adapter",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "chrono",
  "clap 4.6.0",
+ "rustix",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]
@@ -4265,6 +4284,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-kernel",
+ "chio-response-model",
  "chio-security-types",
  "hex",
  "proptest",
@@ -4300,6 +4320,18 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tracing",
+]
+
+[[package]]
+name = "chio-response-model"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -4362,6 +4394,7 @@ dependencies = [
  "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-swarm-authority",
+ "chio-test-support",
  "chio-weights",
  "chrono",
  "criterion",
@@ -4713,6 +4746,9 @@ dependencies = [
 [[package]]
 name = "chio-test-support"
 version = "0.1.0"
+dependencies = [
+ "chio-security-types",
+]
 
 [[package]]
 name = "chio-tool-call-fabric"
@@ -4722,6 +4758,7 @@ dependencies = [
  "async-trait",
  "chio-core-types",
  "chio-manifest",
+ "chio-security-types",
  "proptest",
  "serde",
  "serde_json",
@@ -4799,6 +4836,7 @@ dependencies = [
  "criterion",
  "ed25519-dalek 2.2.0",
  "hex",
+ "libc",
  "loom",
  "notify",
  "pollster",

@@ -97,7 +97,7 @@ fn copies_all_actual_flow_and_declassification_history_but_never_activates_it() 
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     assert_eq!(
         authority
             .admission_operation_store()
@@ -226,18 +226,14 @@ fn competing_imports_converge_without_duplicate_history() -> AnchoredTestResult 
 #[test]
 fn observed_clock_rollback_cannot_be_hidden_by_a_plausible_caller_timestamp() -> AnchoredTestResult
 {
+    let now = now_ms() / 1_000 * 1_000;
+    let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
     let fixture = fixture();
     let source = source(&fixture)?;
-    let now = now_ms() / 1_000 * 1_000;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
     let expected = pin(&fixture, &source)?;
     let before = global_count(&fixture)?;
     {
-        let _rollback = chio_kernel::scope_fixed_runtime_for_current_thread(
-            now / 1_000 - 1,
-            std::iter::empty(),
-        );
+        let _rollback = chio_test_support::clock::scope_unix_secs(now / 1_000 - 1);
         assert!(fixture
             .store
             .import_security_participant_source(

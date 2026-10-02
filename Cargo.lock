@@ -4191,7 +4191,7 @@ dependencies = [
  "chio-log-redact",
  "chio-manifest",
  "chio-metrics-spec",
- "chio-quarantine",
+ "chio-response-model",
  "chio-security-types",
  "chio-settle",
  "chio-store-sqlite",
@@ -4476,6 +4476,7 @@ dependencies = [
  "chio-security-types",
  "chio-siem",
  "chio-store-sqlite",
+ "chio-test-support",
  "hmac 0.12.1",
  "p256 0.13.2",
  "p384",
@@ -4735,6 +4736,7 @@ dependencies = [
  "chio-manifest",
  "chio-security-types",
  "chio-store-sqlite",
+ "chio-test-support",
  "hex",
  "rand 0.8.6",
  "rusqlite",
@@ -4833,6 +4835,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-kernel",
+ "chio-response-model",
  "chio-security-types",
  "hex",
  "proptest",
@@ -4913,6 +4916,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-response-model"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-revocation-oracle"
 version = "0.1.0"
 dependencies = [
@@ -4972,6 +4987,7 @@ dependencies = [
  "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-swarm-authority",
+ "chio-test-support",
  "chio-weights",
  "chrono",
  "criterion",
@@ -5323,6 +5339,9 @@ dependencies = [
 [[package]]
 name = "chio-test-support"
 version = "0.1.0"
+dependencies = [
+ "chio-security-types",
+]
 
 [[package]]
 name = "chio-three-vendor-example"

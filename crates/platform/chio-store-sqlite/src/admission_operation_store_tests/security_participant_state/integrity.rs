@@ -70,7 +70,12 @@ fn restoring_private_database_before_hydration_cannot_erase_the_anchored_initial
     // Only this disposable test database is restored; its independent anchor
     // retains the acknowledged native initialization.
     fs::copy(&backup, &database)?;
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     Ok(())
 }
 

@@ -45,7 +45,7 @@ fn reopened_history_recovers_exact_claim_and_retains_dispatch_disposition() -> T
         } = fixture;
         drop(store);
         drop(authority);
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let store = authority.admission_operation_store();
         assert!(matches!(
             store.load_runtime_participant_history(

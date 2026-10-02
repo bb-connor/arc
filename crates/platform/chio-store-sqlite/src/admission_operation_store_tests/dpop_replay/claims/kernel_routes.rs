@@ -46,24 +46,27 @@ impl ToolServerConnection for Server {
 }
 
 fn kernel(fixture: &Fixture, signer: Keypair) -> AnchoredTestResult<ChioKernel> {
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: signer,
-        ca_public_keys: vec![],
-        max_delegation_depth: 5,
-        policy_hash: sha256_hex(b"dpop-custody-kernel"),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: signer,
+            ca_public_keys: vec![],
+            max_delegation_depth: 5,
+            policy_hash: sha256_hex(b"dpop-custody-kernel"),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        },
+        chio_test_support::clock::clock(),
+    );
     kernel.set_durable_admission_store(
         Arc::new(fixture.store.clone()),
         Arc::new(fixture.authority.tool_outcome_store()),

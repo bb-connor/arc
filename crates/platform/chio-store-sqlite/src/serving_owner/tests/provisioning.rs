@@ -12,7 +12,7 @@ fn a_transient_lock_root_failure_does_not_wedge_provisioning() {
     // The failed attempt cleans up after itself, so the store provisions normally
     // once the transient condition clears instead of wedging as a partial provision.
     SqliteAuthorityStore::provision(&database, &lock_root).expect("reprovision");
-    SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open serving");
+    crate::test_authority::open_serving(&database, &lock_root).expect("open serving");
 }
 
 #[test]
@@ -34,7 +34,11 @@ fn partial_provision_fails_closed() {
         Err(SqliteServingOwnerError::PartialProvision(_))
     ));
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        ),
         Err(SqliteServingOwnerError::PartialProvision(_))
     ));
     assert!(SqliteBudgetStore::open(&database).is_err());

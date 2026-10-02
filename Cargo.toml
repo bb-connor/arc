@@ -4,6 +4,7 @@ members = [
     # Core & types
     "crates/core/chio-core",
     "crates/core/chio-core-types",
+    "crates/core/chio-response-model",
     "crates/core/chio-errors",
     "crates/core/chio-adversarial-suite",
     "crates/core/chio-arena",
@@ -518,6 +519,7 @@ chio-custody-hw = { version = "=0.1.0", path = "crates/trust/chio-custody-hw", d
 chio-data-guards = { path = "crates/guards/chio-data-guards" }
 chio-data-guards-redactors-default = { version = "=0.1.0", path = "crates/guards/chio-data-guards/redactors/default" }
 chio-decoy = { path = "crates/security/chio-decoy" }
+chio-response-model = { path = "crates/core/chio-response-model" }
 chio-quarantine = { path = "crates/security/chio-quarantine" }
 chio-did = { version = "=0.1.0", path = "crates/trust/chio-did" }
 chio-disclosure-lineage = { version = "=0.1.0", path = "crates/trust/chio-disclosure-lineage" }

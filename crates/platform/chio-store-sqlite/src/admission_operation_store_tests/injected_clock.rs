@@ -188,3 +188,14 @@ fn stale_caller_time_cannot_extend_injected_authority_lease() -> AnchoredTestRes
     ));
     Ok(())
 }
+
+#[test]
+fn receipt_scope_cannot_replace_durable_authority_clock() -> AnchoredTestResult {
+    let (fixture, clock) = injected_fixture()?;
+    let _scope = chio_kernel::scope_receipt_ids_for_current_thread([]);
+    assert_eq!(fixture.store.observed_authority_time()?.get(), EPOCH);
+    clock.set(Err(ClockError::Unavailable))?;
+    assert!(matches!(fixture.store.observed_authority_time(),
+        Err(AdmissionOperationStoreError::Invariant(message)) if message == ClockError::Unavailable.code()));
+    Ok(())
+}

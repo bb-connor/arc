@@ -8,8 +8,8 @@ native record and evidence), `95f04d5d74` (OCI worker shutdown record),
 the native-launch parts of `93fbf2eb4d`, `cacaf69fc9` and `55e7439da3`; the
 protocol halves of those three belong to another reviewer. Plans: the native
 multi-route consumer plan, the native half of the enforced native and protocol
-boundaries plan, the native CI half of the remote lifecycle, ACP and native CI
-plan, and the native consumer half of the native consumers, ACP errors and
+boundaries plan, the native CI half of the remote lifecycle, ACP-Client and native CI
+plan, and the native consumer half of the native consumers, ACP-Client errors and
 OpenAPI plan. Contracts: `docs/security/native-launch-examples.md`,
 `docs/security/consumer-support.md` and `docs/security/broker-prepared-connections.md`.
 Records: the four matching `docs/reviews/2026-09-29-*-execution.md` files and

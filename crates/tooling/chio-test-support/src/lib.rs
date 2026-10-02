@@ -255,6 +255,9 @@ pub mod loopback {
     }
 }
 
+/// Explicitly injected clocks for runtime fixtures.
+pub mod clock;
+
 #[cfg(test)]
 mod tests {
     use std::panic::{self, Location, UnwindSafe};

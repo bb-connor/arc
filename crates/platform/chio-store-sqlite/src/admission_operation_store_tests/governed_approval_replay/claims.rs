@@ -307,7 +307,7 @@ fn expired_predispatch_claim_can_be_read_and_released_but_not_used() -> Anchored
         fixture
             .store
             .claim_governed_approval(&operation, &lease, &intent, now_ms())?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(expires);
     let now = expires * 1000;
     let lease = renew(&fixture, &operation, &lease, now)?;
     let (restored, history) = fixture

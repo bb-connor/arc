@@ -164,7 +164,7 @@ fn retained_request_reopens_under_the_current_fence_with_exact_bytes() -> TestRe
     assert!(!format!("{unheld:?}").contains("must-not-appear-in-debug"));
     drop(store);
     drop(authority);
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     assert!(matches!(
         store.load_retained_tool_admission_custody(
@@ -352,7 +352,12 @@ fn retained_request_tampering_or_removal_fails_reads_and_restart() -> TestResult
         drop(connection);
         drop(store);
         drop(authority);
-        assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+        assert!(SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        )
+        .is_err());
     }
     Ok(())
 }
@@ -423,7 +428,7 @@ fn retained_request_v9_migration_preserves_legacy_commits_without_inventing_cont
     )?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     let fence = reopened.mutation_fence();
     let connection = Connection::open(&database)?;
@@ -467,7 +472,12 @@ fn retained_request_orphan_is_rejected_at_restart() -> TestResult {
         params!["a".repeat(64), request.canonical_bytes()],
     )?;
     drop(connection);
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     Ok(())
 }
 
@@ -550,7 +560,7 @@ fn retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_byt
     )?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let current = reopened.admission_operation_store();
     let fence = reopened.mutation_fence();
     let (_, restored) = current

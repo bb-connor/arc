@@ -1320,6 +1320,9 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::sync::atomic::Ordering;
 
+    mod directory_fixtures;
+    use directory_fixtures::{write_issuers_with_min_version, write_local_binding_bundle_at};
+
     const NOW: u64 = 2_000_000;
 
     fn endpoint_from_seed(seed: u8) -> EndpointId {
@@ -2225,22 +2228,6 @@ mod tests {
         );
     }
 
-    /// Write a trusted-issuers file at `dir/issuers.json` pinning `min_version`
-    /// (camelCase on the wire) with the standard issuer key. Returns its path.
-    fn write_issuers_with_min_version(dir: &std::path::Path, min_version: u64) -> PathBuf {
-        let issuer = Keypair::from_seed(&[240u8; 32]);
-        let issuers_path = dir.join("issuers.json");
-        let issuers = serde_json::json!({
-            "issuers": [{
-                "issuer": "did:chio:issuer",
-                "keyId": "issuer-key-1",
-                "publicKey": issuer.public_key(),
-            }],
-            "minVersion": min_version,
-        });
-        std::fs::write(&issuers_path, serde_json::to_string(&issuers).unwrap()).unwrap();
-        issuers_path
-    }
 
     #[test]
     fn directory_reload_denies_newer_successor_below_raised_min_version() {
@@ -2607,30 +2594,6 @@ mod tests {
             state.version, 2,
             "last-good advances to the recovered successor"
         );
-    }
-
-    /// Write a signed successor to a FIXED `path` (so successive versions overwrite one
-    /// bundle the reloader re-reads), binding the LOCAL node at `local_transport_seed`
-    /// (pass [`LOCAL_TRANSPORT_SEED`] to REBIND this node, any other seed to ROTATE it
-    /// away), peer `did:chio:bob` live, chaining onto `previous_version_sha256`. Returns
-    /// the full-document body hash (the successor's chain pin).
-    fn write_local_binding_bundle_at(
-        path: &std::path::Path,
-        version: u64,
-        local_transport_seed: u8,
-        previous_version_sha256: Option<String>,
-    ) -> String {
-        let (bundle_json, _issuer) = build_signed_bundle_json(
-            vec![
-                local_relay_entry(local_transport_seed),
-                directory_entry("did:chio:bob", 7, 24),
-            ],
-            version,
-            previous_version_sha256,
-        );
-        std::fs::write(path, &bundle_json).unwrap();
-        let bundle: TransportDirectoryBundleDocument = crate::input::text(&bundle_json).unwrap();
-        sha256_hex(&canonical_json_bytes(&bundle).unwrap())
     }
 
     #[test]

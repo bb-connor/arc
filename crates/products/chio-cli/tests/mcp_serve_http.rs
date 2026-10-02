@@ -1,13 +1,11 @@
 #![allow(clippy::expect_used, clippy::too_many_arguments, clippy::unwrap_used)]
 
-use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -21,6 +19,9 @@ use serde_json::{json, Value};
 
 #[path = "support/mcp_security.rs"]
 mod mcp_security;
+#[path = "mcp_serve_http/security.rs"]
+mod security;
+use security::{http_security_material, spawn_secured_http_command};
 #[path = "mcp_serve_http/mock_server_script.rs"]
 mod mock_server_script;
 
@@ -152,98 +153,6 @@ where
     }
 
     unreachable!("bind retry loop must return or panic");
-}
-
-fn http_security_material(
-    dir: &Path,
-    script_path: &Path,
-) -> mcp_security::NativeMcpSecurityMaterial {
-    static MATERIALS: OnceLock<
-        Mutex<HashMap<PathBuf, Arc<OnceLock<mcp_security::NativeMcpSecurityMaterial>>>>,
-    > = OnceLock::new();
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
-            .expect("secure remote MCP test directory permissions");
-    }
-    let canonical_dir = fs::canonicalize(dir).expect("canonicalize remote MCP test directory");
-    let material = {
-        let mut materials = MATERIALS
-            .get_or_init(|| Mutex::new(HashMap::new()))
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        Arc::clone(
-            materials
-                .entry(canonical_dir.clone())
-                .or_insert_with(|| Arc::new(OnceLock::new())),
-        )
-    };
-
-    material
-        .get_or_init(|| {
-            let target_command = mcp_security::resolve_executable("/usr/bin/python3");
-            let script_path =
-                fs::canonicalize(script_path).expect("canonicalize mock MCP server script");
-            let target_args = vec![script_path
-                .to_str()
-                .expect("mock MCP server path is UTF-8")
-                .to_string()];
-            mcp_security::materialize_mcp_security(
-                &canonical_dir.join("security"),
-                Path::new(env!("CARGO_BIN_EXE_chio")),
-                &target_command,
-                &target_args,
-                &canonical_dir,
-                "wrapped-http-mock",
-                "Wrapped HTTP Mock",
-                "0.1.0",
-            )
-        })
-        .clone()
-}
-
-fn spawn_secured_http_command(
-    mut command: Command,
-    dir: &Path,
-    script_path: &Path,
-    label: &str,
-) -> ServerGuard {
-    let security = http_security_material(dir, script_path);
-    command
-        .current_dir(dir)
-        .args([
-            "--server-version",
-            "0.1.0",
-            "--signed-manifest",
-            security
-                .signed_manifest_path
-                .to_str()
-                .expect("signed manifest path"),
-            "--manifest-public-key",
-            &security.manifest_public_key,
-            "--cage-policy",
-            security
-                .cage_policy_path
-                .to_str()
-                .expect("cage policy path"),
-            "--cage-policy-signer",
-            &security.cage_policy_signer,
-            "--",
-            security
-                .target_command
-                .to_str()
-                .expect("MCP target command path"),
-        ])
-        .args(&security.target_args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
-    let child = command
-        .spawn()
-        .unwrap_or_else(|error| panic!("{label}: {error}"));
-    ServerGuard { child }
 }
 
 fn write_resume_hmac_keyring(dir: &Path) -> PathBuf {
@@ -6022,7 +5931,7 @@ fn spawn_http_server_with_unbound_upstream(dir: &Path, token: &str) -> Child {
     let script_path = write_mock_server_script(dir);
     let unbound_script = dir.join("unbound-mock-server.py");
     fs::copy(&script_path, &unbound_script).expect("copy mock server script");
-    let security = http_security_material(dir, &script_path);
+    let security = http_security_material(dir, &script_path, None);
     let session_db_path = dir.join("unbound-sessions.sqlite3");
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));

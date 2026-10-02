@@ -29,10 +29,7 @@ pub(crate) use receipt_scopes::{
     scope_post_invocation_guard_evidence, scope_pre_invocation_guard_evidence,
     GovernedCallChainReceiptEvidence,
 };
-pub use receipt_scopes::{
-    fixed_runtime_unix_secs_for_current_thread, scope_fixed_runtime_for_current_thread,
-    FixedRuntimeScope,
-};
+pub use receipt_scopes::{scope_receipt_ids_for_current_thread, ReceiptIdScope};
 pub use signing::{
     kernel_signing_backend, sign_receipt_body_hybrid_canonical, sign_receipt_body_with_backend,
     KernelCryptoFloor, KernelSigningBackendError, SignedHybridReceipt,

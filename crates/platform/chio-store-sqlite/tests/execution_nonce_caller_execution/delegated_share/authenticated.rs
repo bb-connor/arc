@@ -33,7 +33,7 @@ fn lost_authenticated_report_retains_sibling_share_until_original_settlement() -
         (siblings, first, authorization, report)
     };
     let expires = u64::try_from(first.execution_nonce.as_ref().ok_or("nonce")?.expires_at())?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires + 1, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
     assert!(expires + 1 < first.capability.expires_at);
     let mut runtime = fixture.open()?;
     siblings.configure(&fixture, &mut runtime)?;

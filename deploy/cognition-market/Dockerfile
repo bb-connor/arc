@@ -15,6 +15,7 @@ COPY third_party ./third_party
 COPY bench ./bench
 COPY contracts ./contracts
 COPY spec ./spec
+COPY docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json ./docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json
 COPY fixtures ./fixtures
 COPY formal ./formal
 COPY tests ./tests

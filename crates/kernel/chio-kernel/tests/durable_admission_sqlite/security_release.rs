@@ -69,8 +69,15 @@ fn run(zero_charge: bool, allowed: bool) -> TestResult {
     let payments = Arc::new(PaymentCalls::default());
     let releases = Arc::new(AtomicU64::new(0));
     let open = || -> Result<(SqliteAuthorityStore, ChioKernel), Box<dyn Error>> {
-        let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
-        let mut kernel = ChioKernel::new(kernel_config(keypair.clone()));
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &locks,
+            chio_test_support::clock::clock(),
+        )?;
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(keypair.clone()),
+            chio_test_support::clock::clock(),
+        );
         kernel.set_durable_admission_store(
             Arc::new(authority.admission_operation_store()),
             Arc::new(authority.tool_outcome_store()),

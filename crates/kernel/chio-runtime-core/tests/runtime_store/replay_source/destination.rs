@@ -48,7 +48,11 @@ fn real_activated_source_and_destination_survive_owner_restart_without_resealing
     drop(store);
     drop(authority);
     drop(source);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let store = authority.admission_operation_store();
     let source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
     let current = authority.mutation_fence();
@@ -88,7 +92,11 @@ fn destination_fixture() -> TestResult<(tempfile::TempDir, PathBuf, PathBuf, Sql
     let lock_root = directory.path().join("locks");
     std::fs::DirBuilder::new().mode(0o700).create(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     Ok((directory, database, lock_root, authority))
 }
 
@@ -283,7 +291,11 @@ fn import_exact_source_and_reopen(populated: bool) -> TestResult {
     drop(authority);
     drop(source);
 
-    let reopened_authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened_authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let reopened_fence = reopened_authority.mutation_fence();
     assert_eq!(reopened_fence.store_uuid, fence.store_uuid);
     assert!(reopened_fence.owner_epoch > fence.owner_epoch);

@@ -46,7 +46,7 @@ fn v22_upgrade_preserves_imported_approval_bytes_and_rejects_unqualified_claims(
             assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i32>(0))?, 22);
         } else {
             result?;
-            let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+            let authority = crate::test_authority::open_serving(&database, &lock_root)?;
             let store = authority.admission_operation_store();
             assert_eq!(
                 store.load_governed_approval_replay_migration(

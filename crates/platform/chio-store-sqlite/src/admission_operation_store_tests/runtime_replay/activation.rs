@@ -156,7 +156,7 @@ fn v21_upgrade_preserves_active_runtime_source_history() -> AnchoredTestResult {
     connection.execute_batch("UPDATE chio_store_schema_versions SET version = 21 WHERE store_key = 'admission_operation'")?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     assert_eq!(
         store.load_runtime_replay_migration(

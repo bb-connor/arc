@@ -281,7 +281,7 @@ fn durable_nonce_reservation_is_atomic_fenced_and_replays_after_restart() -> Tes
     } = fixture.fixture;
     drop(store);
     drop(authority);
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     assert!(matches!(
         store.load_execution_nonce_reservation(&operation_id, &fence, now_ms()),
@@ -470,7 +470,7 @@ fn durable_nonce_tampering_removal_and_oversized_storage_fail_reads_and_restart(
         let Fixture { _temp, database, lock_root, authority, store, .. } = fixture.fixture;
         drop(store);
         drop(authority);
-        assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+        assert!(SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()).is_err());
     }
     Ok(())
 }
@@ -568,7 +568,7 @@ fn durable_nonce_v11_migration_preserves_original_commits_without_inventing_rese
         UPDATE chio_store_schema_versions SET version = 11 WHERE store_key = 'admission_operation';")?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     let (_, retained) = store
         .load_retained_tool_request(

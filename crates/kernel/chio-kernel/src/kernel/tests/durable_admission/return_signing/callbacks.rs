@@ -21,7 +21,7 @@ struct SigningProbe {
     mode: Mode,
     calls: AtomicUsize,
     entered: AtomicUsize,
-    advanced_clock: Mutex<Option<crate::FixedRuntimeScope>>,
+    advanced_clock: Mutex<Option<chio_test_support::clock::ClockScope>>,
 }
 
 impl SigningBackend for SigningProbe {
@@ -62,10 +62,8 @@ impl SigningBackend for SigningProbe {
             // from another key. The core must independently reject the result.
             Mode::Replace => self.replacement.sign_bytes_with_identity(message),
             Mode::Expire => {
-                let advanced = crate::scope_fixed_runtime_for_current_thread(
-                    current_unix_timestamp() + 61,
-                    [],
-                );
+                let advanced =
+                    chio_test_support::clock::scope_unix_secs(current_unix_timestamp() + 61);
                 *self
                     .advanced_clock
                     .lock()

@@ -1,8 +1,19 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/private_fixture.rs"]
+mod private_fixture;
+use private_fixture::write_private_file;
+
+#[path = "support/fixture_paths.rs"]
+mod fixture_paths;
+use fixture_paths::{unique_path, workspace_root};
+
+#[path = "passport/replay.rs"]
+mod replay;
+
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -42,27 +53,11 @@ fn did_from_public_key(public_key: chio_core::PublicKey) -> DidChio {
     DidChio::from_public_key(public_key).expect("ed25519 key")
 }
 
-fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
-}
-
 fn current_unix_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_secs()
-}
-
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(3)
-        .expect("workspace root")
-        .to_path_buf()
 }
 
 struct ServerGuard {
@@ -728,7 +723,8 @@ fn passport_create_verify_and_present_roundtrip() {
         ["composite_score"]["value"]
         .as_f64()
         .expect("composite score");
-    fs::write(&holder_seed_path, format!("{}\n", subject.seed_hex())).expect("write holder seed");
+    write_private_file(&holder_seed_path, format!("{}\n", subject.seed_hex()))
+        .expect("write holder seed");
 
     let verify = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
@@ -1273,7 +1269,8 @@ fn passport_lifecycle_policy_enforcement_rejects_superseded_and_revoked_passport
         format!("issuerAllowlist:\n  - \"{issuer_did}\"\nrequireActiveLifecycle: true\n"),
     )
     .expect("write lifecycle policy");
-    fs::write(&holder_seed_path, format!("{}\n", subject.seed_hex())).expect("write holder seed");
+    write_private_file(&holder_seed_path, format!("{}\n", subject.seed_hex()))
+        .expect("write holder seed");
 
     let _publish_a = publish_passport_status(&passport_a_path, &registry_path);
     let publish_b = publish_passport_status(&passport_b_path, &registry_path);
@@ -1625,7 +1622,8 @@ fn passport_policy_reference_flow_is_replay_safe_locally() {
         ["composite_score"]["value"]
         .as_f64()
         .expect("composite score");
-    fs::write(&holder_seed_path, format!("{}\n", subject.seed_hex())).expect("write holder seed");
+    write_private_file(&holder_seed_path, format!("{}\n", subject.seed_hex()))
+        .expect("write holder seed");
     fs::write(
         &raw_policy_path,
         format!(
@@ -3111,7 +3109,8 @@ fn passport_public_holder_transport_fetch_submit_and_fail_closed_on_replay() {
         now + 86_400,
         "public-holder-transport",
     );
-    fs::write(&holder_seed_path, format!("{}\n", subject.seed_hex())).expect("write holder seed");
+    write_private_file(&holder_seed_path, format!("{}\n", subject.seed_hex()))
+        .expect("write holder seed");
 
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(2))
@@ -3255,12 +3254,7 @@ fn passport_public_holder_transport_fetch_submit_and_fail_closed_on_replay() {
         String::from_utf8_lossy(&replay.stdout),
         String::from_utf8_lossy(&replay.stderr)
     );
-    assert!(
-        String::from_utf8_lossy(&replay.stderr).contains("already been consumed"),
-        "stdout={}\nstderr={}",
-        String::from_utf8_lossy(&replay.stdout),
-        String::from_utf8_lossy(&replay.stderr)
-    );
+    replay::assert_remote_replay_rejected(&client, &create_json, &response_path, &replay);
 }
 
 #[test]
@@ -3474,7 +3468,7 @@ fn passport_portable_sd_jwt_metadata_and_issuance_roundtrip() {
     let now = current_unix_secs();
 
     let authority = Keypair::generate();
-    fs::write(&authority_seed_path, format!("{}\n", authority.seed_hex()))
+    write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
     let issuer = Keypair::generate();
@@ -3675,7 +3669,7 @@ fn passport_portable_jwt_vc_json_metadata_and_issuance_roundtrip() {
     let now = current_unix_secs();
 
     let authority = Keypair::generate();
-    fs::write(&authority_seed_path, format!("{}\n", authority.seed_hex()))
+    write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
     let issuer = Keypair::generate();
@@ -3837,7 +3831,7 @@ fn passport_issuance_rejects_mixed_portable_profile_request() {
     let now = current_unix_secs();
 
     let authority = Keypair::generate();
-    fs::write(&authority_seed_path, format!("{}\n", authority.seed_hex()))
+    write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
     let issuer = Keypair::generate();
@@ -3947,7 +3941,7 @@ fn passport_oid4vp_request_uri_and_direct_post_roundtrip_is_replay_safe() {
     let now = current_unix_secs();
 
     let authority = Keypair::generate();
-    fs::write(&authority_seed_path, format!("{}\n", authority.seed_hex()))
+    write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
     let issuer = Keypair::generate();
@@ -4259,12 +4253,13 @@ fn passport_oid4vp_cli_holder_adapter_supports_same_device_and_cross_device_laun
     let now = current_unix_secs();
 
     let authority = Keypair::generate();
-    fs::write(&authority_seed_path, format!("{}\n", authority.seed_hex()))
+    write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    fs::write(&holder_seed_path, format!("{}\n", subject.seed_hex())).expect("write holder seed");
+    write_private_file(&holder_seed_path, format!("{}\n", subject.seed_hex()))
+        .expect("write holder seed");
     let passport = write_passport_artifact(
         &passport_path,
         &subject,
@@ -4772,7 +4767,7 @@ fn passport_portable_sd_jwt_status_reference_projects_active_superseded_and_revo
     let now = current_unix_secs();
 
     let authority = Keypair::generate();
-    fs::write(&authority_seed_path, format!("{}\n", authority.seed_hex()))
+    write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
     let issuer = Keypair::generate();
@@ -5033,7 +5028,7 @@ fn passport_portable_lifecycle_stale_state_fails_closed_on_offer_and_public_reso
     let now = current_unix_secs();
 
     let authority = Keypair::generate();
-    fs::write(&authority_seed_path, format!("{}\n", authority.seed_hex()))
+    write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
     let issuer = Keypair::generate();
@@ -5295,7 +5290,7 @@ fn passport_public_discovery_surfaces_are_signed_and_informational_only() {
     let status_registry_path = unique_path("passport-public-discovery-status", ".json");
     let authority_seed_path = unique_path("passport-public-discovery-authority", ".seed");
     let authority = Keypair::generate();
-    fs::write(&authority_seed_path, format!("{}\n", authority.seed_hex()))
+    write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
     let listen = reserve_listen_addr();

@@ -853,7 +853,8 @@ fn default_governed_approval_replay_store_accepts_once_and_denies_replay(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server = "default-approval-replay-server";
     let tool = "compute";
-    let mut kernel = ChioKernel::new(make_monetary_config());
+    let mut kernel =
+        ChioKernel::new_with_clock(make_monetary_config(), chio_test_support::clock::clock());
     kernel.register_tool_server(Box::new(MonetaryCostServer::new(server, 1, "USD")));
     let agent = make_keypair();
     let capability = kernel.issue_capability(

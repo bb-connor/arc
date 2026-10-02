@@ -229,7 +229,7 @@ fn native_raw_return_recovery_requires_original_selection() -> TestResult {
     assert!(historical_native_response(&kernel, &request, &context(&request, 1)?).is_err());
     let operation = store.operation();
     assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
-    let _clock = crate::scope_fixed_runtime_for_current_thread(current_unix_timestamp() + 61, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(current_unix_timestamp() + 61);
     for changed in [
         None,
         Some(binding("native-store", "other", b"initialization")?),

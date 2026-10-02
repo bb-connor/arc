@@ -57,8 +57,12 @@ impl StoreFixture {
     }
 
     fn open(&self) -> (SqliteAuthorityStore, SqliteFrostStore) {
-        let authority = SqliteAuthorityStore::open_serving(&self.database, &self.lock_root)
-            .unwrap_or_else(|error| panic!("open authority: {error}"));
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &self.database,
+            &self.lock_root,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap_or_else(|error| panic!("open authority: {error}"));
         let frost = authority.frost_store();
         (authority, frost)
     }

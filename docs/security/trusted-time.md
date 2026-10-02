@@ -51,3 +51,14 @@ as well as production and must not be reported as a count of production defects.
 `scripts/check-security-clocks.py` prevents new reads or independent clock traits
 and permits only downward ratcheting. Its one permanent native exception is the
 shared system adapter. This inventory is a work queue, not a compatibility layer.
+
+Receipt identifier scopes have no time authority. Kernel admission, capability
+issuance and SQLite commits read their explicitly supplied clock even while a
+receipt identifier scope is active. Runtime harnesses pass the same fixed epoch
+to both kernel construction and `SqliteAuthorityStore::open_serving_with_clock`.
+Test fixtures inject a clock from `chio-test-support`; changing that fixture
+clock cannot change an owner constructed with the production clock.
+
+Finding challenge ingress samples filing time immediately before coordinator
+submission, after collecting the untrusted body and waiting for a blocking
+worker. An earlier availability probe cannot serve as the filing timestamp.

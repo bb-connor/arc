@@ -121,6 +121,14 @@ split-debuginfo = "off"
 debug = 0
 split-debuginfo = "off"
 
+# Native qualification authenticates complete executable images. Unoptimized
+# SHA intrinsics make hashing debug binaries dominate the discovery deadline.
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.test.package.sha2]
+opt-level = 3
+
 [workspace.dependencies]
 secrecy = { version = "=0.10.3", features = ["serde"] }
 async-trait = "0.1"
@@ -267,6 +275,7 @@ chio-custody-hw = { version = "=0.1.0", path = "crates/trust/chio-custody-hw", d
 chio-data-guards = { path = "crates/guards/chio-data-guards" }
 chio-data-guards-redactors-default = { version = "=0.1.0", path = "crates/guards/chio-data-guards/redactors/default" }
 chio-decoy = { path = "crates/security/chio-decoy" }
+chio-response-model = { path = "crates/core/chio-response-model" }
 chio-quarantine = { path = "crates/security/chio-quarantine" }
 chio-did = { version = "=0.1.0", path = "crates/trust/chio-did" }
 chio-disclosure-lineage = { version = "=0.1.0", path = "crates/trust/chio-disclosure-lineage" }

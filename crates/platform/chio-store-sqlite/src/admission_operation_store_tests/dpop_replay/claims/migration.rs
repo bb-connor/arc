@@ -46,7 +46,7 @@ fn v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_
             continue;
         }
         upgraded?;
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {
             store: authority.admission_operation_store(),
             fence: authority.mutation_fence(),

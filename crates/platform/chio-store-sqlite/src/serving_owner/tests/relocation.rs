@@ -19,7 +19,7 @@ fn restoring_pre_export_database_cannot_undo_retirement() {
     use std::io::Write;
     let (_temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
-    drop(SqliteAuthorityStore::open_serving(&database, &lock_root).expect("serve"));
+    drop(crate::test_authority::open_serving(&database, &lock_root).expect("serve"));
     let before = fs::read(&database).expect("snapshot before export");
     SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
     // Preserve the inode and all external custody artifacts, restoring only
@@ -31,7 +31,12 @@ fn restoring_pre_export_database_cannot_undo_retirement() {
         .expect("open inode");
     file.write_all(&before).expect("restore snapshot");
     file.sync_all().expect("sync snapshot");
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     assert!(SqliteAuthorityStore::export_for_relocation(&database, &lock_root).is_err());
 }
 
@@ -49,9 +54,15 @@ fn relocation_preserves_other_authorities_in_a_shared_lock_root() {
     SqliteAuthorityStore::import_relocated(&moved, &lock_root).expect("import in shared root");
     assert_eq!(fs::read(&marker).expect("retained marker"), marker_bytes);
     drop(
-        SqliteAuthorityStore::open_serving(&unrelated, &lock_root).expect("unrelated still serves"),
+        crate::test_authority::open_serving(&unrelated, &lock_root)
+            .expect("unrelated still serves"),
     );
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
 }
 
 #[test]
@@ -60,13 +71,13 @@ fn exported_store_refuses_serving_until_a_copy_is_imported_elsewhere() {
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
     let epoch_before = {
         let authority =
-            SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open serving");
+            crate::test_authority::open_serving(&database, &lock_root).expect("open serving");
         authority.mutation_fence().owner_epoch
     };
     let seal = SqliteAuthorityStore::export_for_relocation(&database, &lock_root).expect("export");
     assert_eq!(seal.owner_epoch, epoch_before);
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()),
         Err(SqliteServingOwnerError::Exported(id)) if id == seal.export_id
     ));
     assert!(matches!(
@@ -102,7 +113,7 @@ fn exported_store_refuses_serving_until_a_copy_is_imported_elsewhere() {
     assert!(SqliteAuthorityStore::import_relocated(&copied_import, &copied_locks).is_err());
     SqliteAuthorityStore::provision(&moved, &moved_lock_root).expect("re-provision at new path");
     let relocated =
-        SqliteAuthorityStore::open_serving(&moved, &moved_lock_root).expect("serve at new path");
+        crate::test_authority::open_serving(&moved, &moved_lock_root).expect("serve at new path");
     let fence = relocated.mutation_fence();
     assert_eq!(fence.store_uuid, seal.store_uuid);
     assert_eq!(fence.owner_epoch, epoch_before + 1);
@@ -115,10 +126,14 @@ fn exported_store_refuses_serving_until_a_copy_is_imported_elsewhere() {
         SqliteAuthorityStore::import_relocated(&moved, &moved_lock_root).is_err(),
         "a served import cannot reuse its seal"
     );
-    SqliteAuthorityStore::open_serving(&moved, &moved_lock_root)
+    crate::test_authority::open_serving(&moved, &moved_lock_root)
         .expect("relocated store keeps serving across reopen");
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        ),
         Err(SqliteServingOwnerError::Exported(_))
     ));
 }
@@ -127,7 +142,7 @@ fn exported_store_refuses_serving_until_a_copy_is_imported_elsewhere() {
 fn import_refuses_stores_that_were_not_exported_or_no_longer_match_their_seal() {
     let (temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
-    drop(SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open serving"));
+    drop(crate::test_authority::open_serving(&database, &lock_root).expect("open serving"));
     let (copy, copy_lock_root) = copy_store(temp.path(), &temp.path().join("unexported"));
     assert!(matches!(
         SqliteAuthorityStore::import_relocated(&copy, &copy_lock_root),
@@ -161,7 +176,7 @@ fn a_provisioned_store_that_never_served_relocates_and_serves_at_the_new_path() 
     SqliteAuthorityStore::import_relocated(&moved, &moved_lock_root).expect("import");
     SqliteAuthorityStore::provision(&moved, &moved_lock_root).expect("re-provision");
     let relocated =
-        SqliteAuthorityStore::open_serving(&moved, &moved_lock_root).expect("serve at new path");
+        crate::test_authority::open_serving(&moved, &moved_lock_root).expect("serve at new path");
     assert_eq!(relocated.mutation_fence().owner_epoch, 1);
     assert_eq!(relocated.mutation_fence().store_uuid, seal.store_uuid);
 }

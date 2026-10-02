@@ -3,6 +3,8 @@ use super::*;
 #[derive(Clone)]
 pub(crate) struct TrustServiceState {
     pub(crate) config: TrustServiceConfig,
+    /// Authority time for filing decisions, sampled after untrusted body I/O.
+    pub(crate) finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock>,
     /// Witnessed selector and verifier for production seed-file custody.
     pub(crate) authority_keyring: Option<crate::KeyringRuntimeComposition>,
     /// Seed path retained outside `config` so non-keyring signing helpers

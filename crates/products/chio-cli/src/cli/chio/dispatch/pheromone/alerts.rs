@@ -205,7 +205,7 @@ pub(crate) fn read_relay_alert_normalization_sources(
         let json = std::str::from_utf8(&bytes).map_err(|source| {
             CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
         })?;
-        let value: serde_json::Value = crate::input::text(&json).map_err(|error| {
+        let value: serde_json::Value = crate::input::text(json).map_err(|error| {
             CliError::cli_other_error(format!(
                 "Chio relay alert normalization input {}: {error}",
                 path.display()

@@ -36,25 +36,21 @@ pub(in crate::admission_operation_store) fn observe_authority_time(
     transaction: &Transaction<'_>,
     owner: &SqliteServingOwner,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let observed = match chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
-        Some(fixed) => fixed
-            .checked_mul(1_000)
-            .ok_or_else(|| invariant("authority clock exceeds the persisted trusted-time range"))?,
-        None => {
-            let mut fence = owner.clock_fence.lock().map_err(|_| {
-                invariant(chio_security_types::clock::ClockError::Unavailable.code())
-            })?;
-            fence
-                .observe(
-                    owner
-                        .clock
-                        .read()
-                        .map_err(|error| invariant(error.code()))?,
-                )
-                .map_err(|error| invariant(error.code()))?
-                .unix_millis()
-                .get()
-        }
+    let observed = {
+        let mut fence = owner
+            .clock_fence
+            .lock()
+            .map_err(|_| invariant(chio_security_types::clock::ClockError::Unavailable.code()))?;
+        fence
+            .observe(
+                owner
+                    .clock
+                    .read()
+                    .map_err(|error| invariant(error.code()))?,
+            )
+            .map_err(|error| invariant(error.code()))?
+            .unix_millis()
+            .get()
     };
     validate_trusted_time(observed, "observed_at_unix_ms")?;
     let high_water: i64 = transaction

@@ -205,7 +205,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<Fixture> {
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     Ok(Fixture {
         _temp,
         database,

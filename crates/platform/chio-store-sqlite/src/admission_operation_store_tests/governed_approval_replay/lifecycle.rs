@@ -70,7 +70,7 @@ fn pending_pin_and_import_survive_reopen_without_source_clock_or_inventory_chang
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fixture = Fixture {
         store: authority.admission_operation_store(),
         fence: authority.mutation_fence(),
@@ -102,7 +102,7 @@ fn pending_pin_and_import_survive_reopen_without_source_clock_or_inventory_chang
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fixture = Fixture {
         store: authority.admission_operation_store(),
         fence: authority.mutation_fence(),

@@ -34,7 +34,7 @@ impl DurableFixture {
     }
 
     fn open(&self) -> SqliteAuthorityStore {
-        SqliteAuthorityStore::open_serving(&self.database, &self.lock_root)
+        crate::test_authority::open_serving(&self.database, &self.lock_root)
             .expect("open serving authority")
     }
 }

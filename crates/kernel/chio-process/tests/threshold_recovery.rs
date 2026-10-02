@@ -113,9 +113,7 @@ fn threshold_recovery(controlled_clock: bool) -> TestResult {
             native.kernel.clone(),
         )?;
         let mut request = fixture.request(&native, "approval-process")?;
-        _clock = controlled_clock.then(|| {
-            chio_kernel::scope_fixed_runtime_for_current_thread(now() + 60, Vec::<String>::new())
-        });
+        _clock = controlled_clock.then(|| chio_test_support::clock::scope_unix_secs(now() + 60));
         process.create_root(
             "root",
             &request.capability,

@@ -1,11 +1,11 @@
 # SDD ledger - plan: docs/superpowers/plans/2026-09-29-native-consumers-acp-errors-openapi.md
 Base: cacaf69fc9. Tracked worktree clean; preserve output/.
 Ruling: user approved the four-task continuation and action-first inline execution. Use focused verification after substantial implementation; no repeated approval or broad baseline suite.
-Preflight: tasks 2 and 3 share ACP signer/interceptor errors and clock constructors; batch those APIs and their callers. Task 4 consumes shared original-input errors. Task 1 remains separate from local portable qualification.
+Preflight: tasks 2 and 3 share ACP-Client signer/interceptor errors and clock constructors; batch those APIs and their callers. Task 4 consumes shared original-input errors. Task 1 remains separate from local portable qualification.
 Ruling: this aarch64 non-root host cannot provide native Linux x86_64 enforcing-host evidence. Inspect available qualification surfaces, implement portable work, and retain unsupported native campaigns as explicit acceptance gates.
 
 Host authorization: user explicitly authorized provisioning OCI machines via the Mac Tailscale CLI. Restored retained qualification boot volume as chio-security-qualification-20260929, E4 Flex 8 OCPU/64GB. Native acceptance is now executable once the worker and retained anchor mount are ready. Never format retained volumes.
-Implementation: ACP clocks and semantic error migrations, bounded OpenAPI original-byte parsing in progress. Compile failures are intermediate migration evidence, not accepted checks.
+Implementation: ACP-Client clocks and semantic error migrations, bounded OpenAPI original-byte parsing in progress. Compile failures are intermediate migration evidence, not accepted checks.
 
 Implemented tasks 2-4; 513 owner tests passed. Review fixes retain certificate, sender-key and header native causes. Remote sender verification now groups clock/replay/config under one verifier owner. OpenAPI production conformance passes 4 tests.
 Native execution: restored worker and mounted retained independent anchor volume. Actual runs found and repaired dynamic/group-writable helper packaging, debug SHA-256 startup cost, missing discovery forbidden paths, invalid writable-directory fixtures, missing fsync, and fcntl F_GETFD denial. Static fixture uses exact source/control/output grants. The signed seccomp plan now represents OR alternatives of ANDed constraints, retaining target-FD and prlimit restrictions on every alternative; no old-shape decoder. Updated schema, generated wire types and canonical vectors.

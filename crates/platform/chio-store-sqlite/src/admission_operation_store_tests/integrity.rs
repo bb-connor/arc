@@ -100,7 +100,7 @@ fn a_new_serving_epoch_reclaims_an_unexpired_stale_owner_lease() {
     let lock_root = temp.path().join("locks");
     create_lock_root(&lock_root);
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
-    let first = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("first owner");
+    let first = crate::test_authority::open_serving(&database, &lock_root).expect("first owner");
     let first_fence = first.mutation_fence();
     let first_store = first.admission_operation_store();
     let operation = prepared_operation(
@@ -127,7 +127,7 @@ fn a_new_serving_epoch_reclaims_an_unexpired_stale_owner_lease() {
     drop(first_store);
     drop(first);
 
-    let second = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("second owner");
+    let second = crate::test_authority::open_serving(&database, &lock_root).expect("second owner");
     let second_fence = second.mutation_fence();
     let second_store = second.admission_operation_store();
     assert_eq!(
@@ -464,7 +464,11 @@ fn corrupt_rows_and_partial_current_schema_fail_closed() {
     drop(clean.store);
     drop(clean.authority);
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(database, lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(
+            database,
+            lock_root,
+            chio_test_support::clock::clock()
+        ),
         Err(SqliteServingOwnerError::Invalid(_))
     ));
 }

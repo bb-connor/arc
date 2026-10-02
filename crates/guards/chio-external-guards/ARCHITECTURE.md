@@ -117,3 +117,7 @@ host parsing.
   dispatch) is crate-private. Providers added inside this crate reuse it
   directly; out-of-crate implementers must build their own
   `chio_egress_contract::HttpEgressContract` dispatch.
+
+## Verification
+
+Unit tests exercise provider response decoding, fail-closed error handling and scoped async execution. The HTTP egress contract gate checks that outbound dispatch uses the shared bounded transport. Provider failures must never become an allow verdict.

@@ -86,8 +86,12 @@ pub fn kernel_with_artifacts(
     if !database.exists() {
         SqliteAuthorityStore::provision(&database, &locks)?;
     }
-    let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
-    let mut kernel = ChioKernel::new(config());
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?;
+    let mut kernel = ChioKernel::new_with_clock(config(), chio_test_support::clock::clock());
     kernel.set_capability_trust_root(
         issuer().public_key(),
         scope_hash(&scope(&["append", "read"]))?,

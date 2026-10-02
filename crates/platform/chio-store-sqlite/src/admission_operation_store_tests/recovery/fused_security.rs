@@ -58,9 +58,9 @@ fn fused_claim_cannot_fabricate_security_participant_custody() -> AnchoredTestRe
 
 #[test]
 fn fused_claim_rejects_expiry_at_the_authority_clock_before_callback() -> AnchoredTestResult {
-    let fixture = fixture();
     let now = now_ms() / 1_000 * 1_000;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
+    let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -72,7 +72,7 @@ fn fused_claim_rejects_expiry_at_the_authority_clock_before_callback() -> Anchor
     let connection = Connection::open(&fixture.database)?;
     let commits = admission_commit_rows(&connection)?;
     let generation = fixture.authority.anchor_generation()?;
-    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000 + 1, []);
+    let _expired = chio_test_support::clock::scope_unix_secs(now / 1_000 + 1);
     let mut called = false;
     let result = fixture.store.claim_and_compare_and_swap(
         RecoveryClaimRequest {

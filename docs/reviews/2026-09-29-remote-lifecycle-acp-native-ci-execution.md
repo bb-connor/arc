@@ -1,8 +1,8 @@
-# Remote lifecycle, ACP boundaries and native CI execution
+# Remote lifecycle, ACP-Client boundaries and native CI execution
 
 Date: September 29, 2026. Base: `723bf9ee97222bf64c7d8122ac704ed30bfde808`.
 Branch: `packet/3-retention-accounting`, worktree: `/tmp/arc-security-launch`.
-Plan: [remote lifecycle, ACP and native CI](../superpowers/plans/2026-09-29-remote-lifecycle-acp-native-ci.md).
+Plan: [remote lifecycle, ACP-Client and native CI](../superpowers/plans/2026-09-29-remote-lifecycle-acp-native-ci.md).
 
 The four planned implementation tasks and final-review repairs are delivered.
 Focused local verification passes. Native execution on an enforcing Linux
@@ -15,8 +15,8 @@ tests do not qualify native enforcement, a release or M5 acceptance.
 | Task | Delivered behavior | Acceptance state |
 | --- | --- | --- |
 | 1. Remote lifecycle and clocks | Five ambient production readers now use an injected, shared, fenced clock. OAuth grants, DPoP replay state, session renewal/recovery, rate windows and counters fail closed on clock, expiry, overflow and persistence errors. Kernel and local/SQLite authority composition share the configured clock. Session state is persisted before live authority is published. | Implementation and focused local verification complete. |
-| 2. ACP bypass removal | Removed `compatibility-surface`, the direct server wrapper, the ACP compatibility lifecycle variant and unused shared synchronous bridge. Notification and asynchronous invocation use kernel admission. Retained task results have bounded custody and fenced expiry. Behavioral scenarios use kernel execution or explicit test mocks. | Implementation, owning suites and no-bypass gate complete. |
-| 3. ACP original-byte ingress | Edge ingress bounds original bytes before duplicate-aware projection. Proxy callers construct an opaque bounded message; malformed, truncated or oversized frames poison the reader. Capability projection is separately bounded. Parser, transport, capability and kernel-checker causes remain typed locally; wire responses stay redacted. | Implementation, owning suites and reviewed-owner source contracts complete. Broader semantic error taxonomy remains queued. |
+| 2. ACP-Client bypass removal | Removed `compatibility-surface`, the direct server wrapper, the ACP-Client compatibility lifecycle variant and unused shared synchronous bridge. Notification and asynchronous invocation use kernel admission. Retained task results have bounded custody and fenced expiry. Behavioral scenarios use kernel execution or explicit test mocks. | Implementation, owning suites and no-bypass gate complete. |
+| 3. ACP-Client original-byte ingress | Edge ingress bounds original bytes before duplicate-aware projection. Proxy callers construct an opaque bounded message; malformed, truncated or oversized frames poison the reader. Capability projection is separately bounded. Parser, transport, capability and kernel-checker causes remain typed locally; wire responses stay redacted. | Implementation, owning suites and reviewed-owner source contracts complete. Broader semantic error taxonomy remains queued. |
 | 4. Native consumer CI and fixtures | A shared action builds the enforcing helper, requires a terminal privileged discovery probe and then provides independent anchors, identity and explicit read grants. Ordinary process-worker tests remain separate. SDK, recovery, repository-review, shared-resource, AI SDK and conformance callers receive explicit tool data/module grants and isolated writable state. | Wiring, portable tests and affected consumer compilation complete. Real native consumer campaigns and hosted qualification remain open. |
 
 The native action requires exactly one successful discovery test, not a skipped
@@ -27,7 +27,7 @@ ceiling is below the existing 256 MiB provisioner maximum; no source-gate size
 cap was raised. File-hygiene caps were tightened and their existing expiry
 dates retained.
 
-The ACP clock inventory now includes six preexisting calls: three production
+The ACP-Client clock inventory now includes six preexisting calls: three production
 receipt/compliance owners still queued and three fixtures. This expansion is an
 explicit inventory disposition, not a claim that those production clocks were
 migrated by task 1.
@@ -61,7 +61,7 @@ production, test and workflow inputs independently of generated evidence.
 
 | Check | Terminal result | Log |
 | --- | --- | --- |
-| `cargo test -p chio-mcp-remote -p chio-acp-edge -p chio-acp-proxy --lib --no-fail-fast` | ACP edge 96, ACP proxy 201, remote MCP 98 passed; zero failures | `owning-tests-5.log` |
+| `cargo test -p chio-mcp-remote -p chio-acp-edge -p chio-acp-proxy --lib --no-fail-fast` | ACP-Client edge 96, ACP-Client proxy 201, remote MCP 98 passed; zero failures | `owning-tests-5.log` |
 | `cargo test -p chio-store-sqlite --lib authority::` | 22 passed; zero failures | `sqlite-authority-tests.log` |
 | `cargo test -p chio-cross-protocol --lib` | 35 passed; zero failures | `cross-protocol-tests.log` |
 | `cargo test -p chio-conformance --lib runner::native_launch` | 4 passed; zero failures | `conformance-launch-tests.log` |
@@ -123,9 +123,9 @@ Historical logs are retained alongside terminal passing results:
    for mini-SWE. Run discovery, recovery, packaged SDK/examples and conformance
    on an enforcing Linux x86_64 host, preserving exact terminal evidence for
    each campaign.
-2. Migrate ACP proxy receipt, kernel-signer and compliance timestamps to a
+2. Migrate ACP-Client proxy receipt, kernel-signer and compliance timestamps to a
    configured fallible clock, with checked expiry, rollback and restart tests.
-3. Replace remaining string-only semantic errors in remote MCP and ACP with
+3. Replace remaining string-only semantic errors in remote MCP and ACP-Client with
    domain variants and registered codes, preserving local sources through
    caller responses, completion and receipt generation.
 4. Extend original-byte bounds and error provenance to the OpenAPI/MCP bridge

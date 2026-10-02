@@ -84,7 +84,7 @@ fn committed_activation_survives_source_loss_but_inactive_import_does_not_activa
         } = fixture;
         drop(store);
         drop(authority);
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {
             store: authority.admission_operation_store(),
             fence: authority.mutation_fence(),
@@ -205,7 +205,7 @@ fn activation_policy_tampering_is_covered_by_the_existing_global_chain() -> Anch
         let Fixture { _temp, database, lock_root, authority, store, .. } = fixture;
         drop(store);
         drop(authority);
-        assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+        assert!(SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()).is_err());
     }
     Ok(())
 }
@@ -337,7 +337,7 @@ fn v24_upgrade_preserves_import_events_and_bytes_without_inventing_activation() 
             assert_eq!(Connection::open(&database)?.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i32>(0))?, 24);
         } else {
             result?;
-            let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+            let authority = crate::test_authority::open_serving(&database, &lock_root)?;
             let store = authority.admission_operation_store();
             let fence = authority.mutation_fence();
             assert_eq!(

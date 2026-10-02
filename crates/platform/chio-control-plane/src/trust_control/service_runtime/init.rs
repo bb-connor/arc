@@ -158,6 +158,7 @@ async fn serve_async_inner(
     ));
     let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
     let state = TrustServiceState {
+        finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
         config,
         authority_keyring,
         authority_keyring_seed_path,

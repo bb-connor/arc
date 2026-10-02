@@ -104,6 +104,13 @@ the 30 s body window. The verifier rates it Low to Medium because the extension 
 that window plus blocking-pool queueing; it stays Medium here because it inverts the stated
 purpose of an authority-time check.
 
+**October 2 resolution:** The confirmed challenge path is repaired and locally
+qualified in the [CI and authority-time execution record](2026-10-02-ci-authority-time-repair-execution.md).
+The handler samples its injected clock inside the blocking worker immediately
+before submission. Delayed-body and unavailable-clock controls pass in the full
+143-test challenge suite. The separate leader-forward observations above are not
+closed by this repair.
+
 ## RC2. Medium: The kernel and authority "semantic dispositions" are a repeated sentence and a uniform 64 MiB bound, not the per-owner classification the plans required
 
 The kernel plan required each baseline owner to be dispositioned "against its
@@ -170,7 +177,7 @@ operation and the envelope outside this codebase.
 The records state that ordinary local completion supplies no participant
 (kernel record line 157), so this is not a false claim. It is a proportionality
 problem: about 700 lines of verifier and fixture close "the last uncovered
-SQLite table" for a participant whose producer, the ACP proxy authorization
+SQLite table" for a participant whose producer, the ACP-Client proxy authorization
 receipt format the verifier mirrors (`chio-acp-proxy/src/kernel_signer.rs`), is
 not wired to the kernel. Either wire the producer and requirement, or remove the
 participant and its table, and record which.
@@ -363,7 +370,7 @@ clock error.
 2. Rewrite the reviewed-owner dispositions so each states input provenance,
    signed or unsigned class and the owner's real bound; make the gate reject the
    generic sentence and the bare `64 * 1024 * 1024` literal in migrated sites.
-3. Decide the fate of the authorization-consumption participant: wire the ACP
+3. Decide the fate of the authorization-consumption participant: wire the ACP-Client
    authorization producer and requirement, or delete it.
 4. Give replay and substitution refusals typed variants (RC4) and restore the
    normative DSSE code (RC6) before external federation partners test against

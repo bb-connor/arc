@@ -141,7 +141,7 @@ pub(super) fn history(
 
 #[test]
 fn owned_allow_without_claim_or_after_second_attempt_never_dispatches() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for fault in [Fault::NoClaim, Fault::SecondClaim] {
         let fixture = Fixture::new(true)?;
         let kernel = fixture.kernel(
@@ -170,7 +170,7 @@ fn owned_allow_without_claim_or_after_second_attempt_never_dispatches() -> TestR
 
 #[test]
 fn owned_denial_panic_and_changed_source_release_exact_physical_claim() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for fault in [Fault::Deny, Fault::Panic, Fault::SourceBarrier] {
         let removes_barrier = matches!(fault, Fault::SourceBarrier);
         let fixture = Fixture::new(true)?;
@@ -216,7 +216,7 @@ fn owned_denial_panic_and_changed_source_release_exact_physical_claim() -> TestR
 
 #[test]
 fn real_trust_floor_write_failure_denies_and_releases_the_prior_claim() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
     let raw = rusqlite::Connection::open(fixture._directory.path().join("runtime.sqlite3"))?;
     raw.execute_batch("CREATE TRIGGER injected_floor_failure BEFORE INSERT ON runtime_trust_floors BEGIN SELECT RAISE(ABORT, 'injected trust floor write failure'); END;")?;
@@ -240,7 +240,7 @@ fn real_trust_floor_write_failure_denies_and_releases_the_prior_claim() -> TestR
 #[test]
 fn dropping_an_owned_dispatch_before_readiness_releases_custody_and_budget() -> TestResult {
     use std::future::Future;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
     let polls = Arc::new(AtomicU64::new(0));
     let kernel = fixture.kernel(

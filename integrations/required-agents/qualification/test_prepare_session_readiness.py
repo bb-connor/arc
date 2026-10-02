@@ -40,6 +40,12 @@ class ReadinessTests(unittest.TestCase):
         }
         self.save_operator()
         (self.state / 'kernel.pid').write_text(str(os.getpid()))
+        (self.state / 'kernel.pid').chmod(0o600)
+
+    def publish_signer(self, value):
+        with self.signer.open("x") as output:
+            os.fchmod(output.fileno(), 0o600)
+            output.write(value)
 
     def save_operator(self):
         path = self.state / 'operator.json'
@@ -52,7 +58,7 @@ class ReadinessTests(unittest.TestCase):
     def test_late_signer_waits_without_allocating_or_dispatching(self):
         def publish(_):
             self.assert_no_preparation()
-            self.signer.write_text('a' * 64 + '\n')
+            self.publish_signer('a' * 64 + '\n')
         with patch.object(MODULE, 'check_process'), patch.object(MODULE.time, 'sleep', side_effect=publish), \
                 patch.object(MODULE.subprocess, 'run') as run:
             operator, signer = MODULE.wait_for_owner(self.state, 2)
@@ -71,7 +77,7 @@ class ReadinessTests(unittest.TestCase):
         self.assert_no_preparation()
 
     def test_ready_owner_allocates_once_and_prepares_once(self):
-        self.signer.write_text('a' * 64)
+        self.publish_signer('a' * 64)
         with patch.object(MODULE, 'check_process'), patch.object(MODULE.subprocess, 'run',
                 return_value=subprocess.CompletedProcess([], 0, '', '')) as run:
             config = MODULE.prepare(self.state, self.bridge, 2)
@@ -83,7 +89,7 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(run.call_args.args[0][0], 'node')
 
     def test_failed_preparation_is_not_retried_and_retains_original_request(self):
-        self.signer.write_text('a' * 64)
+        self.publish_signer('a' * 64)
         with patch.object(MODULE, 'check_process'), patch.object(MODULE.subprocess, 'run',
                 return_value=subprocess.CompletedProcess([], 1, '', 'fixture error')) as run:
             with self.assertRaises(RuntimeError):
@@ -136,7 +142,7 @@ class ReadinessTests(unittest.TestCase):
                 elif variant == 'hardlink':
                     os.link(target, self.signer)
                 else:
-                    self.signer.write_text('a' * 64)
+                    self.publish_signer('a' * 64)
                     self.signer.chmod(0o666)
                 with patch.object(MODULE, 'check_process'), self.assertRaises((ValueError, OSError)):
                     MODULE.wait_for_owner(self.state, 1)
@@ -163,14 +169,14 @@ class ReadinessTests(unittest.TestCase):
         def change(_):
             self.operator['port'] = 59213
             self.save_operator()
-            self.signer.write_text('a' * 64)
+            self.publish_signer('a' * 64)
         with patch.object(MODULE, 'check_process'), patch.object(MODULE.time, 'sleep', side_effect=change), \
                 self.assertRaisesRegex(ValueError, 'identity changed'):
             MODULE.wait_for_owner(self.state, 1)
         self.assert_no_preparation()
 
     def test_deadline_and_record_change_during_final_hash_cannot_return_success(self):
-        self.signer.write_text('a' * 64)
+        self.publish_signer('a' * 64)
         original = MODULE.kernel_digest
         calls = 0
         def change(path, deadline):

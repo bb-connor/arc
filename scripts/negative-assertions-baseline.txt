@@ -439,7 +439,6 @@
 1	crates/platform/chio-control-plane/src/economic_state_anchor.rs	remote_read_requires_signed_value_or_absence_for_every_query_key	anchor.read_state(&query).is_err()
 1	crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs	handoff_verifier_requires_exact_submitted_state_version_and_store_fence	verifier .verify_handoff(operation.binding().operation_id().as_str(), &stale) .is_err()
 1	crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs	handoff_verifier_requires_exact_submitted_state_version_and_store_fence	verifier .verify_handoff(operation.binding().operation_id().as_str(), &wrong_lease) .is_err()
-1	crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs	old_same_epoch_snapshot_cannot_erase_an_economic_stage	SqliteAuthorityStore::open_serving(&database, &lock_root).is_err()
 1	crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs	prepared_effect_verifier_binds_operation_request_handoff_and_fences	verifier .verify_prepared_effect(&stale_approval_slot) .is_err()
 1	crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs	prepared_effect_verifier_binds_operation_request_handoff_and_fences	verifier.verify_prepared_effect(&mutation_slot).is_err()
 1	crates/platform/chio-control-plane/src/economic_state_recovery_tests.rs	prepared_effect_verifier_binds_operation_request_handoff_and_fences	verifier.verify_prepared_effect(&wrong_fence).is_err()

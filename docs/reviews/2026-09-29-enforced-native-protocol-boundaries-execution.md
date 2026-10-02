@@ -85,7 +85,7 @@ relocated active-response tests. Tenant-table and SQL principal counts remain
 85 and 170.
 
 The [remaining queue](2026-09-28-remaining-security-work.md) specifies remote MCP
-clock/lifecycle completion and ACP edge/proxy authority boundaries next. This
+clock/lifecycle completion and ACP-Client edge/proxy authority boundaries next. This
 batch makes no hosted, native x86_64, release, publication, M5 or M11 acceptance
 claim. It does not close broader semantic errors, remaining reader owners,
 structural/declaration work, original-scale retention or candidate qualification.

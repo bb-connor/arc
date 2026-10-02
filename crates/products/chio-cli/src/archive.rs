@@ -79,14 +79,13 @@ fn read_tar_archive_entries<R: Read>(
     let mut seen = BTreeSet::new();
     let mut seen_casefold = BTreeSet::new();
     let mut total_bytes = 0_u64;
-    let mut entry_count = 0_usize;
     let entries = archive.entries().map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to read {label} {}: {error}",
             archive_path.display()
         ))
     })?;
-    for entry in entries {
+    for (entry_count, entry) in entries.enumerate() {
         let mut entry = entry.map_err(|error| {
             CliError::cli_io_error(format!(
                 "failed to read {label} entry {}: {error}",
@@ -98,7 +97,6 @@ fn read_tar_archive_entries<R: Read>(
                 "{label} has too many members"
             )));
         }
-        entry_count += 1;
         let entry_path = entry.path().map_err(|error| {
             CliError::cli_io_error(format!(
                 "failed to read {label} entry path {}: {error}",

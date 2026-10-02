@@ -98,6 +98,7 @@ struct Fixture {
     target: PathBuf,
     repository: PathBuf,
     tools: PathBuf,
+    receipt_anchor: PathBuf,
 }
 
 impl Fixture {
@@ -116,6 +117,10 @@ impl Fixture {
         std::fs::create_dir(&repository).expect("repository");
         std::fs::write(repository.join("README.md"), "# reference\n").expect("readme");
         let tools = root.path().join("tools.json");
+        let receipt_anchor = root.path().join("receipt-anchors");
+        std::fs::create_dir(&receipt_anchor).expect("receipt anchor directory");
+        std::fs::set_permissions(&receipt_anchor, std::fs::Permissions::from_mode(0o700))
+            .expect("private receipt anchor directory");
         std::fs::write(
             &tools,
             serde_json::to_vec(&json!([
@@ -135,6 +140,7 @@ impl Fixture {
             target,
             repository,
             tools,
+            receipt_anchor,
         }
     }
 
@@ -177,7 +183,7 @@ impl Fixture {
             // native sink tests own the separate-filesystem requirement.
             command
                 .arg("--receipt-rollback-anchor-root")
-                .arg(self.root.path());
+                .arg(&self.receipt_anchor);
         }
         command.args(extra);
         command.output().expect("run provisioner")
@@ -215,7 +221,7 @@ fn broker_command(fixture: &Fixture, output: &Path, binding: &Path) -> Command {
         .arg("--broker-binding")
         .arg(binding)
         .arg("--receipt-rollback-anchor-root")
-        .arg(fixture.root.path())
+        .arg(&fixture.receipt_anchor)
         .args([
             "--execution-uid",
             "10001",

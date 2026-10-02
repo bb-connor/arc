@@ -3,10 +3,9 @@ use super::*;
 #[test]
 fn stale_decision_time_cannot_apply_expired_assignment_authority() -> AnchoredTestResult {
     for expiry in [Expiry::Authorization, Expiry::Request, Expiry::Offer] {
-        let fixture = fixture();
         let base = now_ms() / 1_000 * 1_000;
-        let _clock =
-            chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(base / 1_000);
+        let fixture = fixture();
         let receivable = persist_receivable(&fixture, AUTHORITY_A, "delayed-assignment", base)?;
         let factor_store = fixture.store.activate_factor_assignment_authorities(
             registry(&[AUTHORITY_A], &[])?,
@@ -34,10 +33,7 @@ fn stale_decision_time_cannot_apply_expired_assignment_authority() -> AnchoredTe
             "delayed-worker",
             case.commit_at,
         )?;
-        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
-            base / 1_000 + 1,
-            std::iter::empty(),
-        );
+        let _expired = chio_test_support::clock::scope_unix_secs(base / 1_000 + 1);
         let error = case
             .commit(&factor_store, &recovery, &fixture.fence, case.commit_at)
             .expect_err("delayed assignment used expired authority");

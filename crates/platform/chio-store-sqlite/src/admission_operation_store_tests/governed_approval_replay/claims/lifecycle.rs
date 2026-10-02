@@ -21,7 +21,7 @@ fn expiry_reclaims_live_capacity_without_deleting_legacy_evidence() -> AnchoredT
         .expect_err("live capacity must deny");
     assert!(error.to_string().contains("live capacity"), "{error}");
     assert_eq!(global_count(&fixture), count);
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(expires);
     let now = expires * 1000;
     let lease = renew(&fixture, &operation, &lease, now)?;
     fixture
@@ -89,8 +89,7 @@ fn expired_or_released_claim_cannot_cross_dispatch_commit() -> AnchoredTestResul
                 .store
                 .release_governed_approval(&operation, &lease, &reference, now_ms())?;
         }
-        let _clock =
-            chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+        let _clock = chio_test_support::clock::scope_unix_secs(expires);
         let now = expires * 1000;
         let lease = renew(&fixture, &operation, &lease, now)?;
         let count = global_count(&fixture);
@@ -157,10 +156,9 @@ fn committed_approval_survives_expiry_and_restart_without_release_authority() ->
     } = fixture;
     drop(store);
     drop(authority);
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(expires + 1, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
     let now = (expires + 1) * 1000;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     assert!(store
         .load_governed_approval_claim_history(committed.binding().operation_id(), &fence, now)
@@ -217,7 +215,7 @@ fn activation_waits_for_actual_authority_clock_and_never_uses_caller_skew() -> A
     assert!(load(&fixture)?
         .ok_or("history missing")?
         .imported_inactive());
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(high, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(high);
     let active = fixture.store.activate_governed_approval_replay_source(
         &binding,
         &source,

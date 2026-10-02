@@ -300,7 +300,7 @@ fn kernel(
     hook: Arc<dyn SettlementHook>,
     authority: &SqliteAuthorityStore,
 ) -> Result<(ChioKernel, CapabilityToken), KernelError> {
-    let mut kernel = ChioKernel::new(kernel_config());
+    let mut kernel = ChioKernel::new_with_clock(kernel_config(), chio_test_support::clock::clock());
     kernel
         .configure_durable_admission(DurableAdmissionMode::Monetary, false)
         .map_err(KernelError::from)?;
@@ -487,7 +487,11 @@ fn settlement_routing_sqlite_recovery_reclaims_work_and_rejects_stale_claims(
         std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
     }
     SqliteAuthorityStore::provision(&authority_path, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&authority_path, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &authority_path,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let receipts = Arc::new(SqliteReceiptStore::open(&path)?);
     let outcomes = Arc::new(SqliteSettlementOutcomeStore::open_alongside(&receipts)?);
 

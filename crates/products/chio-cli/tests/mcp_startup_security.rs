@@ -1,11 +1,10 @@
-#![allow(clippy::expect_used, clippy::unwrap_used)]
-
 use std::process::Command;
 
 use chio_core::Keypair;
 use chio_manifest::{
     sign_manifest, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
 };
+use chio_test_support::ctx::TestUnwrap;
 
 #[test]
 fn mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading() {
@@ -14,10 +13,16 @@ fn mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading() {
     // launches are exercised separately by the mcp_serve integration suite.
     for flow in [None, Some(ToolFlowDeclaration::public_egress())] {
         let requires_flow = flow.is_some();
-        let directory = tempfile::tempdir().expect("private startup directory");
+        let directory = tempfile::tempdir().test_unwrap("private startup directory");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+                .test_unwrap("restrict startup directory permissions");
+        }
         let policy_path = directory.path().join("policy.yaml");
         std::fs::write(&policy_path, "capabilities:\n  default:\n    tools: []\n")
-            .expect("write valid policy");
+            .test_unwrap("write valid policy");
         let signer = Keypair::from_seed(&[71; 32]);
         let manifest = ToolManifest {
             schema: chio_manifest::TOOL_MANIFEST_SCHEMA.to_string(),
@@ -42,10 +47,10 @@ fn mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading() {
         let manifest_path = directory.path().join("signed-manifest.json");
         std::fs::write(
             &manifest_path,
-            serde_json::to_vec(&sign_manifest(&manifest, &signer).expect("sign manifest"))
-                .expect("serialize signed manifest"),
+            serde_json::to_vec(&sign_manifest(&manifest, &signer).test_unwrap("sign manifest"))
+                .test_unwrap("serialize signed manifest"),
         )
-        .expect("write signed manifest");
+        .test_unwrap("write signed manifest");
         let admission_path = directory.path().join("admission.sqlite3");
         let receipt_path = directory.path().join("receipts.sqlite3");
         let output = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -65,7 +70,7 @@ fn mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading() {
             .args(["--cage-policy-signer", &signer.public_key().to_hex(), "--"])
             .arg(env!("CARGO_BIN_EXE_chio"))
             .output()
-            .expect("invoke public MCP serve startup");
+            .test_unwrap("invoke public MCP serve startup");
         assert!(!output.status.success());
         let error = String::from_utf8_lossy(&output.stderr);
         if requires_flow {
@@ -78,10 +83,7 @@ fn mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading() {
             assert!(!admission_path.exists());
             assert!(!receipt_path.exists());
         } else {
-            assert!(
-                error.contains("failed to read cage launch policy"),
-                "{error}"
-            );
+            assert!(error.contains("error [CHIO-CLI-IO]"), "{error}");
             assert!(admission_path.exists());
             assert!(receipt_path.exists());
         }

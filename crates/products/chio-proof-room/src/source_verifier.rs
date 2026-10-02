@@ -346,7 +346,9 @@ pub(crate) fn verify_transaction_passport_family_report_with_options(
             },
             &agent_web_trust,
         )
-        .map_err(|error| format!("proof-room.source-verifier.failed: {error}"))?;
+        .map_err(|error| {
+            ProofRoomError::verification("proof-room.source-verifier.failed", error)
+        })?;
         push_source_family_report(&mut family_reports, report)?;
     }
     if requirements.requires(CLAIM_PREFIX_ENTERPRISE) || risk_route.through_enterprise {
@@ -512,13 +514,13 @@ pub(crate) fn push_source_local_family_report(
             )
         }
         ProofRoomFixtureReportRoute::DisclosureLineage => {
+            let trust = crate::disclosure_lineage_verifier_trust_from_env()
+                .map_err(|error| format!("proof-room.disclosure-lineage-invalid: {error}"))?;
             let bundle = embedded_disclosure_lineage_bundle(
                 &context.evidence_graph_bytes,
                 &context.artifacts,
             )
             .map_err(|error| format!("proof-room.disclosure-lineage-invalid: {error}"))?;
-            let trust = crate::disclosure_lineage_verifier_trust_from_env()
-                .map_err(|error| format!("proof-room.disclosure-lineage-invalid: {error}"))?;
             push_source_local_family_result(
                 family_reports,
                 required_claims,
@@ -1290,7 +1292,7 @@ pub(crate) fn verify_transaction_passport_file_with_options(
             &trusted_root_signer_keys,
         )
     }
-    .map_err(|error| format!("proof-room.source-verifier.failed: {error}"))?;
+    .map_err(|error| ProofRoomError::verification("proof-room.source-verifier.failed", error))?;
     let mut report = serde_json::to_value(report)
         .map_err(|error| format!("proof-room.source-verifier.report-encode: {error}"))?;
     let context = SourceVerifierContext {

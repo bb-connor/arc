@@ -262,7 +262,7 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         },
         Arc::clone(&resolver),
     )?;
-    let mut holder_kernel = ChioKernel::new(kernel_config(keypair(42), Vec::new()));
+    let mut holder_kernel = ChioKernel::new_with_clock(kernel_config(keypair(42), Vec::new()), chio_test_support::clock::clock());
     holder_kernel.add_guard(Box::new(guard));
     holder_kernel.register_tool_server(Box::new(BuyerMemoryServer));
     let read_capability = holder_kernel.issue_capability(

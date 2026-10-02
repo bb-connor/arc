@@ -1,8 +1,8 @@
 # Execution review: protocol ingress and authority boundaries, October 1, 2026
 
 Scope: commits `53858afa39`, `68fb96f436`, `150f7bea8e`, `93fbf2eb4d`
-(protocol half), `cbd78cd8b1`, `cacaf69fc9` (remote lifecycle and ACP half) and
-`55e7439da3` (ACP errors and OpenAPI half), reviewed at tip `a2630c20a1` against
+(protocol half), `cbd78cd8b1`, `cacaf69fc9` (remote lifecycle and ACP-Client half) and
+`55e7439da3` (ACP-Client errors and OpenAPI half), reviewed at tip `a2630c20a1` against
 base `07e963e8f5`. Plans: `2026-09-29-protocol-authority-boundaries.md`,
 `2026-09-29-enforced-native-protocol-boundaries.md`,
 `2026-09-29-remote-lifecycle-acp-native-ci.md` and
@@ -17,10 +17,10 @@ below rests on a step-by-step source trace, and the High finding is also backed
 by an existing passing unit test that asserts its first link.
 
 **Judgment: The slice delivers real boundary work. Frame readers stop at the
-bound without reinterpreting the tail. The ACP and A2A compatibility
+bound without reinterpreting the tail. The ACP-Client and A2A compatibility
 passthroughs and the uncaged provisioning-discovery path are gone, with
-negative controls. A2A OAuth cache custody and ACP signer clock custody are
-correct, and the ACP signer consumes authorization only after time checks.
+negative controls. A2A OAuth cache custody and ACP-Client signer clock custody are
+correct, and the ACP-Client signer consumes authorization only after time checks.
 The most important defect is a regression in `cacaf69fc9`: a remote MCP
 service that crashes while holding a Ready session cannot restart once that
 session's persisted idle deadline passes (PB1). In two more places fail-closed
@@ -43,10 +43,10 @@ should be repaired before this work is called qualified.**
 | Enforced native 2: remote MCP and A2A edge ingress, typed local sources, redacted external errors | Complete | Partial | Bounds and duplicates done; A2A and remote still send peer and internal text outward (PB7); A2A envelope rejections keep no local cause (PB8). |
 | Enforced native review repair: uncaged provisioning discovery | Complete | Done | Two independent gates (`provision.rs:393`, `discovery/launch.rs:18`) and an end-to-end negative control. |
 | Remote lifecycle 1: shared fenced clock for remote owners | Complete | Done with a High regression | Ambient reads removed, propose-persist-publish verified; restore of an expired Ready session refuses startup (PB1). |
-| Remote lifecycle 2: remove ACP direct invocation | Complete | Done | Verified clean; no-bypass gate test rejects reintroduction. |
-| Remote lifecycle 3: ACP original-byte ingress | Complete | Done | Proxy reader bounds before extend, poisons on error, never resyncs. |
-| Native consumers 2: ACP clock owner | Complete | Done | Signer validates time before consuming authorization; tests drive the real signer. |
-| Native consumers 3: domain errors for remote MCP/ACP | Complete for these owners | Partial and overbroad | Remote covers OAuth and sender constraint only (PB7); ACP compliance and OpenAPI operator diagnostics erased (PB6). |
+| Remote lifecycle 2: remove ACP-Client direct invocation | Complete | Done | Verified clean; no-bypass gate test rejects reintroduction. |
+| Remote lifecycle 3: ACP-Client original-byte ingress | Complete | Done | Proxy reader bounds before extend, poisons on error, never resyncs. |
+| Native consumers 2: ACP-Client clock owner | Complete | Done | Signer validates time before consuming authorization; tests drive the real signer. |
+| Native consumers 3: domain errors for remote MCP/ACP-Client | Complete for these owners | Partial and overbroad | Remote covers OAuth and sender constraint only (PB7); ACP-Client compliance and OpenAPI operator diagnostics erased (PB6). |
 | Native consumers 4: OpenAPI original bytes | Complete | Done with defects | Bridge, fuzz and conformance callers migrated; `chio-api-protect` discovery not (PB9); JSON path uses signed numeric rules (PB2). |
 
 ## PB1. High: a remote MCP service that crashes with a Ready session cannot restart after that session's persisted idle deadline passes
@@ -299,7 +299,7 @@ print.
 
 **Confidence:** Confirmed. Direct reading of the error definitions and the CLI print path.
 
-## PB7. Low: peer-facing errors still carry peer input and internal text on A2A, remote MCP and ACP
+## PB7. Low: peer-facing errors still carry peer input and internal text on A2A, remote MCP and ACP-Client
 
 The enforced-native plan, task 2, requires "redacted external errors".
 `A2aEdge::jsonrpc_error_response` (`crates/protocol/chio-a2a-edge/src/edge.rs:297-311`)
@@ -310,7 +310,7 @@ variants go out as `other.to_string()`, including kernel and bridge errors.
 
 Remote MCP returns `spawn_session` error text, including policy and
 native-launch detail, to the peer (`http_service.rs:580`). It also returns
-negotiation detail (`:571`) and the body-read error (`:1064`). ACP sends kernel
+negotiation detail (`:571`) and the body-read error (`:1064`). ACP-Client sends kernel
 deny reasons to the agent verbatim (`chio-acp-proxy/src/interceptor.rs:765-780`).
 The remote-lifecycle record's "wire responses stay redacted" (line 19) holds
 only for parser, transport and checker causes. Fix: map these to registered
@@ -343,7 +343,7 @@ none of those, and the plan named only those. Fix: set the discovery contract's
 
 **Confidence:** Confirmed. Source trace.
 
-## PB10. Low: the ACP capability-check error path does not clear the request's capability context
+## PB10. Low: the ACP-Client capability-check error path does not clear the request's capability context
 
 Before `cacaf69fc9` a capability-check error produced a Block response, and the
 Block arm calls `clear_request_capability_context`. Now `CapabilityGate::Error`
@@ -395,7 +395,7 @@ these. No logging of these values was found; the risk is the next `{:?}`.
 
 At `chio-a2a-edge/src/edge.rs:797-809`, an orchestrator error leaves the task
 `Working`, so the next `task/get` (`:751-753`) runs the stored request again
-under the same request ID. The ACP sibling was changed to mark the task
+under the same request ID. The ACP-Client sibling was changed to mark the task
 `Failed` without redispatching (`chio-acp-edge/src/edge.rs:846-862`). The open
 question is whether the kernel can fail after the effect without deduplicating
 the retry.
@@ -440,7 +440,7 @@ the retry.
 | A2A notifications retain their local failure sidecar (enforced-native:15) | Partly true | Only for dispatch-stage errors (PB8). |
 | Remote: five ambient readers moved to a shared fenced clock; state persisted before publish (remote-lifecycle:17) | True, incomplete | Verified at `session.rs:309-391`; restart composition fails (PB1). |
 | Ready/touch repair has regressions (remote-lifecycle:41-46) | True | `clock_custody.rs:208`, `:257` drive the real session with SQLite and assert `idle_expires_at` unchanged after overflow. |
-| ACP edge 96, ACP proxy 201, remote 98 (remote-lifecycle:64) | True | Matches `owning-tests-5.log`. |
+| ACP-Client edge 96, ACP-Client proxy 201, remote 98 (remote-lifecycle:64) | True | Matches `owning-tests-5.log`. |
 | Wire responses stay redacted (remote-lifecycle:19) | Partly true | Kernel deny reasons and remote spawn errors still reach peers (PB7). |
 | Signing validates time before consuming authorization (native-consumers:23-24) | True | `kernel_signer.rs:442-449`; `attestation_clock.rs:30-110` drives the real signer and would fail if the old `SystemTime::now` fallback returned. |
 | 513 tests = 98 + 205 + 99 + 59 + 52 (native-consumers:105) | True as recorded, stale for the final source | Matches the log; remote had 101 tests after the later verifier refactor and only 7 focused tests were rerun. The record lists both. |
@@ -452,7 +452,7 @@ the retry.
   adapter readers (edge `framing.rs:35-85`, adapter `framing.rs:39-89`) check the bound before extending
   the buffer and return `TooLarge` without draining. The edge pump stops after
   `TooLarge` (`messaging.rs:98-111`), and the serve loop then sees disconnect.
-  The ACP proxy reader poisons on any error and never resyncs.
+  The ACP-Client proxy reader poisons on any error and never resyncs.
 - **The shared provider SSE parser bounds per-frame bytes before extending**
   (`sse.rs:120-127`), caps frame count, and is fed by a transport that bounds
   total bytes chunk by chunk with a whole-request timeout
@@ -473,15 +473,15 @@ the retry.
 - **The discovery bypass is closed** in both provisioning entry points, with
   two independent gates. No sibling tool-listing path spawns a target uncaged.
   The remaining `Command::new` sites in protocol crates are test-only or spawn
-  the ACP agent, which is not a tool.
-- **Compatibility passthroughs** are fully removed from the A2A and ACP
+  the ACP-Client agent, which is not a tool.
+- **Compatibility passthroughs** are fully removed from the A2A and ACP-Client
   edges. The no-bypass gate tests reintroduction.
 - **Remote principals.** POST, GET and DELETE check the session auth context
   before `touch` or any effect, including for terminal records. Approval,
   credential and admin routes require the admin token, compared in constant
   time. The authorization code is consumed only after PKCE, sender checks and
   signing succeed. The DPoP nonce is recorded last, after the signature check.
-- **ACP clock and signer custody.** `AcpClock` clones share one fence. The
+- **ACP-Client clock and signer custody.** `AcpClock` clones share one fence. The
   signer validates the clock and event time before verifying or consuming
   authorization, and consumption is in the same store operation as the
   receipt append.

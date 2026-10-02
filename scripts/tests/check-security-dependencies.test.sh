@@ -54,6 +54,7 @@ PY
 
 required_packages=(
   chio-security-types
+  chio-response-model
   chio-flow
   chio-security-kernel
   chio-decoy
@@ -117,6 +118,10 @@ write_metadata "$valid" \
   'chio-flow=chio-core-types' \
   'chio-decoy=chio-core-types' \
   'chio-quarantine=chio-core-types' \
+  'chio-quarantine=chio-response-model' \
+  'chio-kernel=chio-response-model' \
+  'chio-response-model=chio-core-types' \
+  'chio-response-model=chio-security-types' \
   'chio-security-kernel=chio-kernel' \
   'chio-security-kernel=chio-flow' \
   'chio-security-kernel=chio-decoy' \
@@ -178,6 +183,22 @@ assert_rejected_edge chio-core-types chio-store-sqlite \
   "core types cannot reach platform"
 assert_rejected_edge chio-quarantine chio-did \
   "containment cannot reach trust"
+for destination in chio-kernel chio-guards chio-control-plane chio-did \
+  chio-flow chio-decoy chio-quarantine chio-security-kernel \
+  chio-keyring chio-secret-broker chio-cage; do
+  assert_rejected_edge chio-response-model "$destination" \
+    "the pure response model cannot reach $destination"
+done
+for group in kernel guards platform trust; do
+  model_transitive="$work/model-transitive-$group.json"
+  write_metadata "$model_transitive" "${required_packages[@]}" \
+    "chio-future-owner@/workspace/crates/$group/chio-future-owner/Cargo.toml" \
+    'chio-response-model=model-helper' 'model-helper=chio-future-owner'
+  assert_rc "$(run_checker "$model_transitive" "$model_transitive.out" "$model_transitive.err")" 1 \
+    "the pure response model cannot transitively reach a new $group owner"
+  grep -F 'chio-response-model reaches forbidden dependency chio-future-owner' \
+    "$model_transitive.err" >/dev/null
+done
 assert_rejected_edge chio-store-sqlite chio-flow \
   "the SQLite store cannot reach a security engine"
 assert_rejected_edge chio-store-sqlite chio-security-kernel \

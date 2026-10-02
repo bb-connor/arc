@@ -1,3 +1,6 @@
+#[cfg(test)]
+use chio_test_support::ctx::TestUnwrap;
+
 use super::*;
 
 pub(super) fn pkce_s256(verifier: &str) -> String {
@@ -93,11 +96,11 @@ pub(super) fn html_escape(value: &str) -> String {
 
 #[cfg(test)]
 pub(super) fn unix_now() -> u64 {
-    RemoteClock::default().seconds().expect("test clock")
+    RemoteClock::default().seconds().test_unwrap("test clock")
 }
 #[cfg(test)]
 pub(super) fn session_now_millis() -> u64 {
-    RemoteClock::default().millis().expect("test clock")
+    RemoteClock::default().millis().test_unwrap("test clock")
 }
 
 pub(super) fn read_session_lifecycle_policy() -> SessionLifecyclePolicy {

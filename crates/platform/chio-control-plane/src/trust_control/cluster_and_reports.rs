@@ -25,42 +25,9 @@ mod cluster_and_reports_tests {
     #[path = "structured_authority.rs"]
     mod structured_authority;
 
-    fn base_config() -> TrustServiceConfig {
-        TrustServiceConfig {
-            listen: "127.0.0.1:0".parse().test_unwrap(),
-            service_token: "token".to_string(),
-            tenant_read_tokens: BTreeMap::new(),
-            authority_workload_token: None,
-            receipt_db_path: None,
-            revocation_db_path: None,
-            authority_seed_path: None,
-            authority_db_path: None,
-            authority_keyring_config_path: None,
-            authority_keyring_receipt_anchor_root: None,
-            budget_db_path: None,
-            joint_authority_db_path: None,
-            fiscal_runtime: None,
-            enterprise_providers_file: None,
-            federation_policies_file: None,
-            scim_lifecycle_file: None,
-            verifier_policies_file: None,
-            verifier_challenge_db_path: None,
-            passport_statuses_file: None,
-            passport_issuance_offers_file: None,
-            certification_registry_file: None,
-            certification_discovery_file: None,
-            issuance_policy: None,
-            runtime_assurance_policy: None,
-            advertise_url: None,
-            allow_local_peer_urls: true,
-            certification_public_metadata_ttl_seconds: 300,
-            peer_urls: Vec::new(),
-            cluster_sync_interval: Duration::from_millis(25),
-            roster_policy: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-            finding_market: None,
-        }
-    }
+    #[path = "config.rs"]
+    mod config;
+    use config::base_config;
 
     fn state_with_cluster(
         advertise_url: &str,
@@ -92,6 +59,7 @@ mod cluster_and_reports_tests {
             .test_unwrap()
             .map(Arc::new);
         let state = TrustServiceState {
+            finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
             config,
             authority_keyring: None,
             authority_keyring_seed_path: None,

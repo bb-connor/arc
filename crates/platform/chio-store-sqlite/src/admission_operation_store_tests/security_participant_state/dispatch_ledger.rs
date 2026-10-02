@@ -59,7 +59,7 @@ fn v30_upgrade_adds_empty_dispatch_ledger_without_rewriting_native_history() -> 
     assert_eq!(native::verify_all(&connection)?, vec![initialized]);
     drop(statement);
     drop(connection);
-    SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    crate::test_authority::open_serving(&database, &lock_root)?;
     Ok(())
 }
 

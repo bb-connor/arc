@@ -84,7 +84,12 @@ fn locally_rehashed_egress_history_cannot_replace_anchored_operation_custody() -
         assert!(native::verify_coverage(&connection).is_err(), "{damage}");
         drop(connection);
         assert!(
-            SqliteAuthorityStore::open_serving(&database, &lock_root).is_err(),
+            SqliteAuthorityStore::open_serving_with_clock(
+                &database,
+                &lock_root,
+                chio_test_support::clock::clock()
+            )
+            .is_err(),
             "{damage}"
         );
     }

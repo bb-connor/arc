@@ -89,7 +89,7 @@ fn monetary_exposure_survives_lost_report_and_settles_original_authenticated_cos
             .ok_or("nonce")?
             .expires_at(),
     )?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires + 1, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
     let runtime = fixture.open()?;
     assert_state(&fixture, &request, "awaiting_caller_report")?;
     assert_eq!(payment(&fixture)?, (1, "held".into(), 100));

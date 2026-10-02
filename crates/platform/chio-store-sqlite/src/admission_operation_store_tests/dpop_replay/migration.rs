@@ -47,7 +47,7 @@ fn v23_upgrade_adds_only_empty_dpop_history_and_rejects_unqualified_namespaces(
                     0
                 );
             }
-            SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+            crate::test_authority::open_serving(&database, &lock_root)?;
         }
     }
     Ok(())

@@ -92,6 +92,21 @@ class FipsContractTests(unittest.TestCase):
         with self.assertRaises(CHECKER.ContractError):
             self.validate(changed, CI)
 
+    def test_session_report_selector_requires_its_owning_module(self):
+        changed = copy.deepcopy(FIPS)
+        step = next(
+            step
+            for step in changed["jobs"]["session-reports"]["steps"]
+            if step.get("name") == "Exact kernel session reports"
+        )
+        step["run"] = step["run"].replace(
+            "kernel::tests::settlement_routing::settlement_routing_tests::",
+            "kernel::tests::settlement_routing_tests::",
+        )
+        self.assertNotEqual(changed, FIPS)
+        with self.assertRaises(CHECKER.ContractError):
+            self.validate(changed, CI)
+
     def test_job_privileges_and_bypass_flags_are_closed(self):
         for field, value in [
             ("permissions", {"contents": "write"}),

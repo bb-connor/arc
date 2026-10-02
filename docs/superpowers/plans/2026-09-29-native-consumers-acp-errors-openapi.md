@@ -1,10 +1,10 @@
-# Native consumers, ACP errors and OpenAPI input implementation plan
+# Native consumers, ACP-Client errors and OpenAPI input implementation plan
 
 > **For agentic workers:** Use superpowers:executing-plans inline in the existing isolated worktree. The user authorized this four-task continuation. Use one final reviewer.
 
-**Goal:** Complete the next native-consumer, ACP clock/error and OpenAPI ingress boundaries.
+**Goal:** Complete the next native-consumer, ACP-Client clock/error and OpenAPI ingress boundaries.
 
-**Architecture:** Keep Docker/provider authority outside native cages behind explicit mediated transports. Share an injected fenced clock across ACP audit/signing/certificate owners. Preserve domain errors and native sources locally, exposing registered redacted codes. Parse bounded original OpenAPI bytes before semantic projection.
+**Architecture:** Keep Docker/provider authority outside native cages behind explicit mediated transports. Share an injected fenced clock across ACP-Client audit/signing/certificate owners. Preserve domain errors and native sources locally, exposing registered redacted codes. Parse bounded original OpenAPI bytes before semantic projection.
 
 **Tech Stack:** Rust, shared security clocks and canonical input types, Python process SDK, GitHub Actions.
 
@@ -30,13 +30,13 @@ tests or compilation. Local commits are authorized; preserve the worktree.
 ## Tasks
 
 - [ ] 1. Complete mini-SWE native dependencies and mediated Docker/provider transport inputs. Update portable integration tests and CI campaign inputs. Execute available qualification and record unsupported-host gates.
-- [x] 2. Add an ACP clock owner and migrate audit logging, kernel receipt signing and compliance generation. Remove timestamp fallback; use checked sequence/time arithmetic and preserved sources. Test faults, regression, restart and custody.
-- [x] 3. Introduce domain errors for remote MCP/ACP semantic rejection paths and receipt completion, retaining source chains and registered redacted codes. Migrate callers and focused assertions.
+- [x] 2. Add an ACP-Client clock owner and migrate audit logging, kernel receipt signing and compliance generation. Remove timestamp fallback; use checked sequence/time arithmetic and preserved sources. Test faults, regression, restart and custody.
+- [x] 3. Introduce domain errors for remote MCP/ACP-Client semantic rejection paths and receipt completion, retaining source chains and registered redacted codes. Migrate callers and focused assertions.
 - [x] 4. Bound original OpenAPI bytes and preserve decoder errors through the bridge and actual conformance/fuzz callers. Add duplicate, oversize, malformed and YAML regressions; update reviewed-owner inventories.
 
 ## Execution and acceptance
 
-Implement tasks 2-4 together first because clock/error APIs share ACP callers;
+Implement tasks 2-4 together first because clock/error APIs share ACP-Client callers;
 then complete task 1 while Rust checks compile. Run owning suites and relevant
 source gates once implementation is ready, repairing actual failures. Perform
 one independent final review and verify substantive repairs. Archive terminal
@@ -63,13 +63,13 @@ for terminal checks, bounded native source identity and the remaining queue.
 
 Reviewed at `a2630c20a1` in the [protocol boundaries review](../../reviews/2026-10-01-execution-review-protocol-boundaries.md), [native consumers review](../../reviews/2026-10-01-execution-review-native-consumers.md). The cross-cutting verdict is in the [pass 9 execution review](../../reviews/2026-10-01-execution-review.md).
 
-**Verdict:** The native consumer half was honestly partial when recorded and was closed by the multi-route plan. The ACP clock owner is done and clean. Domain errors are partial and over-redacted. OpenAPI original-byte reading is done for the named callers, misses `chio-api-protect`, and uses the signed numeric rules.
+**Verdict:** The native consumer half was honestly partial when recorded and was closed by the multi-route plan. The ACP-Client clock owner is done and clean. Domain errors are partial and over-redacted. OpenAPI original-byte reading is done for the named callers, misses `chio-api-protect`, and uses the signed numeric rules.
 
 Open findings against this plan:
 
 - **PB6, Medium.** Peer redaction was applied to operator-local errors: compliance refusals print as "signing failed" and OpenAPI spec errors lose all detail.
 - **PB2, Medium.** The OpenAPI JSON path uses `decode_signed`, which rejects valid `10.00` and `1e-05`.
 - **PB9, Low.** `chio-api-protect` OpenAPI discovery buffers 64 MiB before its 8 MiB check.
-- **PB7, Low.** Remote MCP and ACP still send internal error text to peers.
+- **PB7, Low.** Remote MCP and ACP-Client still send internal error text to peers.
 
 **Next:** Decode OpenAPI JSON with ordinary numbers and duplicate-key rejection (PB2), and restore operator diagnostics (PB6).

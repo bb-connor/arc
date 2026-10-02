@@ -1132,6 +1132,13 @@ include!("fixtures_facets.rs");
 include!("fixtures_facets_meta.rs");
 include!("fixtures_facets_alert.rs");
 include!("fixtures_facets_assurance.rs");
+#[path = "fixtures_runtime_policy.rs"]
+mod runtime_policy;
+use runtime_policy::{
+    policy_decision_fixture, policy_envelope_fixture, policy_peer_weights_fixture,
+    policy_trust_floor_fixture,
+};
+
 include!("fixtures_runtime.rs");
 
 #[cfg(test)]

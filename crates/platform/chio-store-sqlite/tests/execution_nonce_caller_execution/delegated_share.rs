@@ -275,7 +275,7 @@ fn an_expired_caller_share_stays_owned_until_recovery_compensates_it() -> TestRe
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
     let fixture = Fixture::with_nonce_ttl(1)?;
     let (siblings, first) = {
         let mut runtime = fixture.open()?;
@@ -290,7 +290,7 @@ fn an_expired_caller_share_stays_owned_until_recovery_compensates_it() -> TestRe
             .ok_or("reserved nonce")?
             .expires_at(),
     )?;
-    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(expiry, []);
+    let _expired = chio_test_support::clock::scope_unix_secs(expiry);
     let mut runtime = fixture.open_with_reconcile(false)?;
     siblings.configure(&fixture, &mut runtime)?;
     let parent = AdmissionIdentifier::try_new("parent_id", siblings.parent.id.clone())?;

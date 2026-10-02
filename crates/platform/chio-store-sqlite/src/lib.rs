@@ -43,6 +43,9 @@
 #[cfg(test)]
 extern crate self as chio_store_sqlite;
 
+#[cfg(test)]
+mod test_authority;
+
 use std::path::{Path, PathBuf};
 
 // Budget, admission and suspension authorization reuse only compiled SQL.

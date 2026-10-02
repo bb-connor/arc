@@ -1,6 +1,7 @@
 //! Export actual supervised worker effects, then reject re-signed semantic substitutions.
 #![cfg(target_os = "linux")]
 
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -34,6 +35,7 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let directory = tempfile::tempdir()?;
     let root = directory.path().canonicalize()?;
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700))?;
     let output = Command::new("python3")
         .args(["-c", "import sys; from pathlib import Path; import swarm; swarm.exercise(sys.argv[1], Path(sys.argv[2]), supervisor_only=True)"])
         .arg(env!("CARGO_BIN_EXE_chio"))

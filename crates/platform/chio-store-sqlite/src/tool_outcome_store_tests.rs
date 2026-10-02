@@ -50,7 +50,7 @@ fn fixture() -> Fixture {
     }
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+        crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
     let fence = authority.mutation_fence();
     let operations = authority.admission_operation_store();
     let outcomes = authority.tool_outcome_store();
@@ -325,10 +325,8 @@ fn claimed_tool_return_and_post_return_begin_are_one_durable_write_each() {
     {
         let connection = rusqlite::Connection::open(&fixture.database).expect("connection");
         let snapshot = crate::tests::authority_snapshot(&connection).expect("snapshot");
-        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
-            request.expires_at_unix_ms / 1000 + 1,
-            [],
-        );
+        let _expired =
+            chio_test_support::clock::scope_unix_secs(request.expires_at_unix_ms / 1000 + 1);
         assert!(fixture
             .outcomes
             .claim_and_record_tool_returned(
@@ -383,10 +381,8 @@ fn claimed_tool_return_and_post_return_begin_are_one_durable_write_each() {
         let connection = rusqlite::Connection::open(&fixture.database).expect("connection");
         let snapshot = crate::tests::authority_snapshot(&connection).expect("snapshot");
         let anchor = fixture.authority.anchor_generation().expect("anchor");
-        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
-            request.expires_at_unix_ms / 1000 + 1,
-            [],
-        );
+        let _expired =
+            chio_test_support::clock::scope_unix_secs(request.expires_at_unix_ms / 1000 + 1);
         assert!(fixture
             .outcomes
             .claim_and_begin_post_return_evaluation(
@@ -673,7 +669,7 @@ fn outcome_journal_survives_owner_rotation_and_detects_tampering() {
     drop(operations);
     drop(authority);
 
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)
         .expect("reopen outcome authority");
     assert_eq!(
         reopened
@@ -697,7 +693,12 @@ fn outcome_journal_survives_owner_rotation_and_detects_tampering() {
         )
         .expect("tamper outcome commitment");
     drop(connection);
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
     drop(_temp);
 }
 

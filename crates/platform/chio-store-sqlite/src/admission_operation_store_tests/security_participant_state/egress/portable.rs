@@ -256,8 +256,7 @@ fn portable_history_survives_expiry_without_renewing_fence_or_lease() -> Anchore
     let before = counts(&fixture)?;
     let expired = pending.lease.expires_at_unix_ms().div_ceil(1000) * 1000;
     assert!(expired > acquired.expires_at_unix_ms);
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(expired / 1000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(expired / 1000);
     assert_eq!(read(&fixture, &pending)?, history);
     assert!(port
         .acquire_native_security_egress(&context(&pending, &binding), &pending.plan)

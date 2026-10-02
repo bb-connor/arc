@@ -36,7 +36,7 @@ impl ToolServerConnection for UncertainTool {
 #[test]
 fn combined_owned_nonce_preflight_releases_three_resources_before_fresh_dispatch_claim(
 ) -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = CombinedFixture::new()?;
     let mut kernel = fixture.kernel(fixture.hook()?)?;
     let config = ExecutionNonceConfig {
@@ -96,7 +96,7 @@ fn combined_owned_nonce_preflight_releases_three_resources_before_fresh_dispatch
 #[test]
 fn combined_owned_predispatch_drop_releases_all_resources_and_budget() -> TestResult {
     use std::future::Future;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = CombinedFixture::new()?;
     let polls = Arc::new(AtomicU64::new(0));
     let kernel = fixture.kernel(faults::FaultHook::new(
@@ -149,7 +149,7 @@ fn combined_owned_predispatch_drop_releases_all_resources_and_budget() -> TestRe
 fn combined_owned_tool_error_and_postdispatch_drop_retain_every_claim_and_captured_budget(
 ) -> TestResult {
     use std::future::Future;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for park in [false, true] {
         let fixture = CombinedFixture::new()?;
         let mut kernel = fixture.kernel(fixture.hook()?)?;

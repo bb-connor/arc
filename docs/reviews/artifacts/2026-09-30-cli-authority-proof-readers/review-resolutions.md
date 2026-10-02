@@ -14,7 +14,7 @@ The reviewer did not run builds or change files. Findings and dispositions:
    bytes. Receipt candidates are read once, schema/digest checked and indexed;
    repeated references cannot trigger unbounded rescanning. A repeated-reference
    control rejects above the budget and accepts the exact byte boundary.
-3. **Certificate session omission:** SQL filters exact signed ACP/session-context
+3. **Certificate session omission:** SQL filters exact signed ACP-Client/session-context
    metadata, independent of synthetic or real capability IDs. A valid signed
    receipt with a real capability ID is selected only for its exact session.
 4. **Read-only issuer-key creation:** metadata uses existing private custody;

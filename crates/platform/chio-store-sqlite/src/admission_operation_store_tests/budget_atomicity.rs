@@ -796,8 +796,9 @@ fn broker_registered(
 /// durable write each; a separately claimed authorization is two.
 #[test]
 fn claimed_joint_budget_transactions_are_one_durable_write_each() {
+    let begun_at = now_ms() / 1_000 * 1_000;
+    let _clock = chio_test_support::clock::scope_unix_secs(begun_at / 1_000);
     let fixture = fixture();
-    let begun_at = now_ms();
     let claimant = identifier("claimant_id", "joint-claim-worker");
     fn claim_of<'a>(
         fixture: &'a Fixture,
@@ -830,17 +831,20 @@ fn claimed_joint_budget_transactions_are_one_durable_write_each() {
     );
     let before = fixture.authority.anchor_generation().expect("anchor");
     let claimed = claim_of(&fixture, &claimant, &fused, begun_at + 4);
+    // Observe the short claim after its deadline without ever rolling the
+    // owner's clock backward. The normal claim remains live at this time.
+    let _decision_clock = chio_test_support::clock::scope_unix_secs(begun_at / 1_000 + 1);
     {
         let connection = Connection::open(&fixture.database).expect("connection");
         let snapshot = crate::tests::authority_snapshot(&connection).expect("snapshot");
-        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
-            (claimed.expires_at_unix_ms / 1000) + 1,
-            [],
-        );
+        let expired = RecoveryClaimRequest {
+            expires_at_unix_ms: begun_at + 500,
+            ..claimed
+        };
         let refused = fixture
             .store
             .claim_and_authorize_budget_and_commit_admission(
-                claimed,
+                expired,
                 &mut |_, _| panic!("expired authorization called lease callback"),
                 &fused,
                 request.clone(),
@@ -929,14 +933,14 @@ fn claimed_joint_budget_transactions_are_one_durable_write_each() {
     {
         let connection = Connection::open(&fixture.database).expect("connection");
         let snapshot = crate::tests::authority_snapshot(&connection).expect("snapshot");
-        let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
-            (claimed.expires_at_unix_ms / 1000) + 1,
-            [],
-        );
+        let expired = RecoveryClaimRequest {
+            expires_at_unix_ms: begun_at + 500,
+            ..claimed
+        };
         assert!(fixture
             .store
             .claim_and_capture_invocation_and_commit_dispatch(
-                claimed,
+                expired,
                 &mut |_, _| panic!("expired capture called lease callback"),
                 &dispatching,
                 capture,

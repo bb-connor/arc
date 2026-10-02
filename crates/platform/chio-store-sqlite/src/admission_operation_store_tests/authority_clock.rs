@@ -1,14 +1,14 @@
 use super::*;
 
-fn fixed_clock(milliseconds: u64) -> chio_kernel::FixedRuntimeScope {
-    chio_kernel::scope_fixed_runtime_for_current_thread(milliseconds / 1_000, std::iter::empty())
+fn fixed_clock(milliseconds: u64) -> chio_test_support::clock::ClockScope {
+    chio_test_support::clock::scope_unix_secs(milliseconds / 1_000)
 }
 
 #[test]
 fn authority_clock_rollback_is_rejected_without_mutating_history() -> AnchoredTestResult {
-    let fixture = fixture();
     let now = now_ms() / 1_000 * 1_000;
     let _clock = fixed_clock(now);
+    let fixture = fixture();
     let first = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -26,7 +26,7 @@ fn authority_clock_rollback_is_rejected_without_mutating_history() -> AnchoredTe
     let _rollback = fixed_clock(now - 1_000);
     assert!(matches!(
         fixture.store.begin(&second, &fixture.fence, now),
-        Err(AdmissionOperationStoreError::Invariant(message)) if message.contains("authority time regressed")
+        Err(AdmissionOperationStoreError::Invariant(message)) if message == chio_security_types::clock::ClockError::WallClockRegression.code()
     ));
     assert_eq!(
         load_admission_commit_head(&*fixture.store.connection()?)?,
@@ -41,9 +41,9 @@ fn authority_clock_rollback_is_rejected_without_mutating_history() -> AnchoredTe
 
 #[test]
 fn decision_order_is_local_but_observation_order_is_global() -> AnchoredTestResult {
-    let fixture = fixture();
     let now = now_ms() / 1_000 * 1_000;
     let _clock = fixed_clock(now);
+    let fixture = fixture();
     let first = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -103,7 +103,7 @@ fn decision_order_is_local_but_observation_order_is_global() -> AnchoredTestResu
     } = fixture;
     drop(store);
     drop(authority);
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     assert_eq!(
         reopened
             .admission_operation_store()
@@ -115,9 +115,9 @@ fn decision_order_is_local_but_observation_order_is_global() -> AnchoredTestResu
 
 #[test]
 fn delayed_time_cannot_create_revalidate_or_use_an_expired_lease() -> AnchoredTestResult {
-    let fixture = fixture();
     let now = now_ms() / 1_000 * 1_000;
     let _clock = fixed_clock(now);
+    let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,

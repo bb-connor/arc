@@ -23,6 +23,7 @@ COPY third_party ./third_party
 COPY examples/chio-3vendor/fixtures/runtime-spine/scenario.json ./examples/chio-3vendor/fixtures/runtime-spine/scenario.json
 COPY fixtures/proof-room ./fixtures/proof-room
 COPY spec ./spec
+COPY docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json ./docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json
 COPY wit ./wit
 # The trace validator and the conformance runner embed TLA models and
 # fixtures from this tree at compile time.

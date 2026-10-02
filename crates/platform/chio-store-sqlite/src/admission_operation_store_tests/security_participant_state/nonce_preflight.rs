@@ -31,7 +31,12 @@ fn missing_current_nonce_preflight_catalog_is_not_repaired() -> AnchoredTestResu
         let connection = Connection::open(&database)?;
         let before: (i64,String) = connection.query_row("SELECT head_sequence, head_chain_digest FROM authority_global_commit_meta WHERE singleton = 1", [], |row| Ok((row.get(0)?,row.get(1)?)))?;
         assert!(SqliteAuthorityStore::provision(&database, &lock_root).is_err());
-        assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+        assert!(SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        )
+        .is_err());
         assert_eq!(connection.query_row("SELECT head_sequence, head_chain_digest FROM authority_global_commit_meta WHERE singleton = 1", [], |row| Ok((row.get::<_,i64>(0)?,row.get::<_,String>(1)?)))?, before);
     }
     Ok(())
@@ -97,7 +102,7 @@ fn v32_upgrade_adds_empty_nonce_preflight_journal_without_rewriting_native_histo
     assert_eq!(native::verify_all(&connection)?, vec![initialized]);
     drop(statement);
     drop(connection);
-    SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    crate::test_authority::open_serving(&database, &lock_root)?;
     Ok(())
 }
 

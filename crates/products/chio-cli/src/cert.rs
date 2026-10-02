@@ -88,7 +88,7 @@ pub fn cmd_cert_verify(
     let cert_text = crate::input::read_text(certificate_path)
         .map_err(|e| CliError::cli_other_error(format!("failed to read certificate: {e}")))?;
 
-    let cert: ComplianceCertificate = crate::input::text(&cert_text).map_err(CliError::from)?;
+    let cert: ComplianceCertificate = crate::input::text(&cert_text)?;
 
     let mode = if full {
         VerificationMode::FullBundle
@@ -150,7 +150,7 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
     let cert_text = crate::input::read_text(certificate_path)
         .map_err(|e| CliError::cli_other_error(format!("failed to read certificate: {e}")))?;
 
-    let cert: ComplianceCertificate = crate::input::text(&cert_text).map_err(CliError::from)?;
+    let cert: ComplianceCertificate = crate::input::text(&cert_text)?;
 
     if json_output {
         println!(

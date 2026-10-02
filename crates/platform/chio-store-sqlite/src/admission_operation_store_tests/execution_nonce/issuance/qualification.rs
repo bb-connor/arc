@@ -3,12 +3,11 @@ use super::*;
 #[test]
 fn delayed_issuance_cannot_use_a_nonce_expired_at_the_authority() -> TestResult {
     let now = now_ms() / 1_000 * 1_000;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
     let fixture = prepared_nonce_fixture(None)?;
     let command = command(&fixture)?;
     let expires = u64::try_from(fixture.reservation.signed_nonce().expires_at())?;
-    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let _expired = chio_test_support::clock::scope_unix_secs(expires);
     let error = fixture
         .fixture
         .store

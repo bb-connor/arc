@@ -71,7 +71,7 @@ pub fn run_crash_reopen(boundary: CrashBoundary) -> Result<(), String> {
         SqliteBudgetStore::open(&files.budget)
             .map_err(|error| format!("open budget database: {error}"))?,
     );
-    let mut kernel = ChioKernel::new(kernel_config());
+    let mut kernel = ChioKernel::new_with_clock(kernel_config(), chio_test_support::clock::clock());
     configure_ephemeral_dst_kernel(&mut kernel)?;
     let crash_store: Arc<dyn ReceiptStore> = Arc::new(CrashReceiptStore {
         inner: Arc::clone(&sqlite_receipts),
@@ -164,7 +164,7 @@ pub fn run_child_flush_mutation(seed: u64, suppress_child_append: bool) -> Resul
         suppress_child_append,
     ));
     let budget = Arc::new(InMemoryBudgetStore::new());
-    let mut kernel = ChioKernel::new(kernel_config());
+    let mut kernel = ChioKernel::new_with_clock(kernel_config(), chio_test_support::clock::clock());
     configure_ephemeral_dst_kernel(&mut kernel)?;
     let receipt_handle: Arc<dyn ReceiptStore> = receipt_store.clone();
     kernel

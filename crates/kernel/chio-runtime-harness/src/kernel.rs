@@ -503,8 +503,7 @@ pub(crate) fn execute_runtime_loopback_step(
         })?;
     let receipt_metadata = runtime_loopback_receipt_metadata(step)?;
     let receipt_id_seed = format!("rcpt-runtime-loopback-{step_index}");
-    let _fixed_runtime_scope =
-        chio_kernel::scope_fixed_runtime_for_current_thread(now_unix_ms / 1000, [receipt_id_seed]);
+    let _fixed_runtime_scope = chio_kernel::scope_receipt_ids_for_current_thread([receipt_id_seed]);
     let response = runtime
         .block_on(kernel.evaluate_tool_call_with_metadata(&request, Some(receipt_metadata)))
         .map_err(|error| {

@@ -31,6 +31,7 @@ use chio_kernel::admission_operation::{
 use chio_kernel::ReceiptStore;
 use chio_store_sqlite::{
     SqliteAdmissionOperationStore, SqliteAuthorityStore, SqliteEconomicStateCache,
+    SqliteServingOwnerError,
 };
 use serde_json::json;
 use tempfile::TempDir;
@@ -54,8 +55,12 @@ fn fixture() -> Fixture {
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root).expect("create lock root");
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
-    let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )
+    .expect("open authority");
     let fence = authority.mutation_fence();
     let cache = authority.economic_state_cache();
     let operations = Arc::new(authority.admission_operation_store());
@@ -340,12 +345,9 @@ fn now_ms() -> u64 {
 
 /// Keep setup leases live while tests advance explicit decision timestamps.
 /// Lifecycle races and stage expiry must not depend on parallel test load.
-fn recovery_clock() -> (u64, chio_kernel::FixedRuntimeScope) {
+fn recovery_clock() -> (u64, chio_test_support::clock::ClockScope) {
     let now = now_ms() / 1_000;
-    (
-        now * 1_000,
-        chio_kernel::scope_fixed_runtime_for_current_thread(now, []),
-    )
+    (now * 1_000, chio_test_support::clock::scope_unix_secs(now))
 }
 
 fn prepared_economic_operation(
@@ -943,7 +945,11 @@ fn old_same_epoch_snapshot_cannot_erase_an_economic_stage() -> TestResult {
     let lock_root = temp.path().join("locks");
     crate::create_private_directory(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     fs::copy(&database, &snapshot)?;
     let fence = authority.mutation_fence();
     let cache = authority.economic_state_cache();
@@ -962,7 +968,17 @@ fn old_same_epoch_snapshot_cannot_erase_an_economic_stage() -> TestResult {
     for suffix in ["-wal", "-shm"] {
         let _ = fs::remove_file(format!("{}{suffix}", database.display()));
     }
-    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+    let restored = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    );
+    assert!(
+        matches!(&restored, Err(SqliteServingOwnerError::Invalid(reason))
+            if reason == "authority database is behind its rollback anchor"),
+        "unexpected restore error: {:?}",
+        restored.err()
+    );
     Ok(())
 }
 
@@ -1177,7 +1193,7 @@ fn compensation_and_unanchored_recovery_have_exactly_one_lifecycle_winner() -> T
         let barrier = barrier.clone();
         let batch_id = batch_id.clone();
         std::thread::spawn(move || {
-            let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, []);
+            let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
             barrier.wait();
             recovery.compensate_unanchored_stage_before_dispatch(&batch_id, now + 3)
         })
@@ -1187,7 +1203,7 @@ fn compensation_and_unanchored_recovery_have_exactly_one_lifecycle_winner() -> T
         let barrier = barrier.clone();
         let batch_id = batch_id.clone();
         std::thread::spawn(move || {
-            let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, []);
+            let _clock = chio_test_support::clock::scope_unix_secs(now / 1_000);
             barrier.wait();
             recovery.recover_stage(&batch_id, now + 4)
         })

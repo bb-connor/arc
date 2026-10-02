@@ -180,8 +180,7 @@ fn capture_callback_panics_retain_uncertainty_without_poisoning_recovery() -> Te
         // A panic must not unwind through the mutation sequencer. Recovery
         // reads the actual operation rather than assuming the write failed.
         drop(admission);
-        let _clock =
-            crate::scope_fixed_runtime_for_current_thread(current_unix_timestamp() + 61, []);
+        let _clock = chio_test_support::clock::scope_unix_secs(current_unix_timestamp() + 61);
         assert_eq!(kernel.reconcile_recoverable_admissions()?, 1);
         assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
         assert_eq!(

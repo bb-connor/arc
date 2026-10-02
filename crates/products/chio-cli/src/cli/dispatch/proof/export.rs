@@ -113,7 +113,7 @@ fn collect_proof_archive_entries(
     let root = snapshot.path();
     verify_static_proof_bundle(root)?;
     let mut entries = Vec::new();
-    collect_proof_archive_entries_from(&root, &root, &mut entries)?;
+    collect_proof_archive_entries_from(root, root, &mut entries)?;
     if matches!(redaction_profile, Some(ProofExportRedactProfile::Public)) {
         entries = redact_public_proof_archive_entries(root, entries)?;
         let redacted = crate::input::snapshot::Snapshot::from_entries(

@@ -112,7 +112,7 @@ fn fixture() -> Fixture {
     create_lock_root(&lock_root);
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
     let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open authority");
+        crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
     let fence = authority.mutation_fence();
     let store = authority.admission_operation_store();
     Fixture {
@@ -244,7 +244,7 @@ fn provider_attempt(
 }
 
 fn now_ms() -> u64 {
-    if let Some(fixed) = chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
+    if let Some(fixed) = chio_test_support::clock::scoped_unix_secs() {
         return fixed.checked_mul(1_000).expect("fixed millisecond clock");
     }
     u64::try_from(
@@ -738,7 +738,7 @@ fn terminal_projection_is_atomic_replayable_and_retained() {
     drop(store);
     drop(authority);
     let reopened =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("reopen authority");
+        crate::test_authority::open_serving(&database, &lock_root).expect("reopen authority");
     assert!(reopened
         .admission_operation_store()
         .load_terminal_replay(&replay_key)

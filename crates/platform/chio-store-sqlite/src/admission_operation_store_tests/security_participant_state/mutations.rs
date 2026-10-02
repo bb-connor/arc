@@ -399,7 +399,7 @@ fn native_join_errors_rollback_or_recover_exactly_one_committed_record() -> Test
         } = fixture;
         drop(store);
         drop(authority);
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {
             _temp,
             database,
@@ -452,7 +452,7 @@ fn owner_takeover_preserves_join_history_without_reacquiring_old_authority() -> 
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     assert_eq!(
         store.load_security_participant_state(

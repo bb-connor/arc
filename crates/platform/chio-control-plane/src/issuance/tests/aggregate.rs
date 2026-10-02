@@ -26,8 +26,9 @@ fn aggregate_issuance_retains_policy_refusals() -> Result<(), Box<dyn std::error
         (None, Some(test_runtime_assurance_policy())),
     ] {
         let authority = wrap_capability_authority(
-            Box::new(chio_kernel::LocalCapabilityAuthority::new(
+            Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
                 Keypair::generate(),
+                chio_test_support::clock::clock(),
             )),
             reputation,
             assurance,
@@ -50,7 +51,10 @@ fn aggregate_issuance_persists_the_actual_signed_family_root(
     let key = Keypair::generate();
     let subject = Keypair::generate().public_key();
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(key.clone())),
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
+            key.clone(),
+            chio_test_support::clock::clock(),
+        )),
         None,
         None,
         Some(&receipt_db),
@@ -81,11 +85,11 @@ fn legacy_authority_cannot_fall_back_to_an_unbudgeted_token(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let key = Keypair::generate();
     let subject = Keypair::generate().public_key();
-    let plain = chio_kernel::LocalCapabilityAuthority::new(key.clone()).issue_capability(
-        &subject,
-        scope(),
-        300,
-    )?;
+    let plain = chio_kernel::LocalCapabilityAuthority::new_with_clock(
+        key.clone(),
+        chio_test_support::clock::clock(),
+    )
+    .issue_capability(&subject, scope(), 300)?;
     let authority = wrap_capability_authority(
         Box::new(FixedResponseAuthority {
             response: plain,

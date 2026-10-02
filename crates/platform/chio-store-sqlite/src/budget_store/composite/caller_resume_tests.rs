@@ -89,10 +89,7 @@ fn approved_caller_replay_refuses_expired_lease_without_new_hold_or_event() -> s
     assert_eq!(replayed, operation);
     assert_eq!(crate::tests::authority_snapshot(&connection)?, before);
     assert_eq!(runtime.authority.anchor_generation()?, anchor);
-    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
-        lease.expires_at_unix_ms() / 1000 + 1,
-        [],
-    );
+    let _expired = chio_test_support::clock::scope_unix_secs(lease.expires_at_unix_ms() / 1000 + 1);
     let refused = store.authorize_budget_and_commit_admission(
         &operation, &lease, original, None, None, &fence, at,
     );

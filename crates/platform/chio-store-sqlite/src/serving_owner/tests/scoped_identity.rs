@@ -10,7 +10,7 @@ fn scoped_identity_qualifies_deterministic_authority_ids() {
         .expect("fixed identity scope");
 
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open");
+    let authority = crate::test_authority::open_serving(&database, &lock_root).expect("open");
 
     assert_eq!(
         authority.mutation_fence(),
@@ -38,7 +38,7 @@ fn scoped_identity_rejects_invalid_or_exhausted_ids() {
         .expect("empty fixed identity scope");
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()),
         Err(SqliteServingOwnerError::Invalid(message))
             if message == "fixed authority lease ID set is exhausted"
     ));
@@ -49,7 +49,7 @@ fn live_store_verifies_the_configured_database_identity() {
     let (temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
     let authority =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open serving");
+        crate::test_authority::open_serving(&database, &lock_root).expect("open serving");
 
     authority
         .verify_database_path(&database)

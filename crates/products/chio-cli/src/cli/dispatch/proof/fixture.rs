@@ -1353,7 +1353,7 @@ fn refresh_disclosure_negative_graph_and_passport(bundle: &Path) -> Result<(), C
 fn sign_disclosure_crypto_report_json(report: &mut serde_json::Value) -> Result<(), CliError> {
     report["signature"] = serde_json::Value::Null;
     let mut typed_report: chio_selective_disclosure::DisclosureCryptoContextReport =
-        crate::input::project(report.clone()).map_err(CliError::from)?;
+        crate::input::project(report.clone())?;
     typed_report.signature = Some(
         chio_selective_disclosure::sign_crypto_context_report(
             &typed_report,
@@ -2770,7 +2770,7 @@ fn sign_public_settlement_proof_bundle(
         .remove("bundle_signature");
     let keypair = Keypair::from_seed(&PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_SEED);
     let typed_bundle: chio_web3::settlement_proof::PublicSettlementProofBundle =
-        crate::input::project(settlement_proof.clone()).map_err(CliError::from)?;
+        crate::input::project(settlement_proof.clone())?;
     let (signature, _) = keypair.sign_canonical(&typed_bundle).map_err(|error| {
         CliError::cli_other_error(format!(
             "public settlement proof bundle signing failed: {}: {error}",
@@ -2912,7 +2912,7 @@ fn reseal_public_settlement_anchor_receipt(
             ))
         })?
         .clone();
-    let receipt: ChioReceipt = crate::input::project(receipt_value).map_err(CliError::from)?;
+    let receipt: ChioReceipt = crate::input::project(receipt_value)?;
     let mut receipt_body = receipt.body();
     receipt_body.id = governed_receipt_id.clone();
     receipt_body.content_hash = content_hash;
@@ -2965,8 +2965,7 @@ fn reseal_public_settlement_anchor_receipt(
                 ))
             })?
             .clone(),
-    )
-    .map_err(CliError::from)?;
+    )?;
     statement.tree_size = 1;
     statement.merkle_root = merkle_root;
     statement.kernel_key = anchor_keypair.public_key();
@@ -3021,7 +3020,7 @@ fn sign_public_settlement_oracle_evidence(
         return Ok(());
     };
     let mut evidence: chio_web3::anchors::OracleConversionEvidence =
-        crate::input::project(oracle_evidence.clone()).map_err(CliError::from)?;
+        crate::input::project(oracle_evidence.clone())?;
     chio_web3::anchors::sign_oracle_conversion_evidence(
         &mut evidence,
         &Keypair::from_seed(&PUBLIC_SETTLEMENT_ORACLE_SIGNATURE_SEED),
@@ -3484,7 +3483,7 @@ fn add_disclosure_agent_web_crypto_context_material(
         disclosure_sensitivity_classes_json(&disclosed_fields, &hidden_predicates);
     write_json_line_file(&privacy_profile_path, &privacy_profile)?;
     let typed_privacy_profile: chio_selective_disclosure::DisclosureVerifierPrivacyProfile =
-        crate::input::project(privacy_profile).map_err(CliError::from)?;
+        crate::input::project(privacy_profile)?;
     normalize_disclosure_leakage_ledger(
         bundle,
         &capsule_id,
@@ -3532,7 +3531,7 @@ fn add_disclosure_agent_web_crypto_context_material(
     let context_path = bundle.join("verification-context.json");
     write_json_line_file(&context_path, &context)?;
     let typed_context: chio_selective_disclosure::CryptoVerificationContext =
-        crate::input::project(context).map_err(CliError::from)?;
+        crate::input::project(context)?;
 
     let mut registry = chio_selective_disclosure::InMemoryIssuerRegistry::default();
     registry.insert(
@@ -5407,7 +5406,7 @@ fn refresh_signed_lineage_subgraph_digest(bundle: &Path) -> Result<(), CliError>
     let mut value = read_json_value(&path)?;
     normalize_signed_lineage_subgraph_metadata(bundle, &path, &mut value)?;
     let mut lineage: chio_selective_disclosure::SignedLineageSubgraph =
-        crate::input::project(value).map_err(CliError::from)?;
+        crate::input::project(value)?;
     lineage.subgraph_sha256 =
         chio_selective_disclosure::compute_signed_lineage_subgraph_digest(&lineage)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;

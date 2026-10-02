@@ -3,10 +3,17 @@
 #[path = "federated_issue/enterprise_provider_fixtures.rs"]
 mod enterprise_provider_fixtures;
 
+#[path = "support/private_fixture.rs"]
+mod private_fixture;
+use private_fixture::write_private_file;
+
+#[path = "support/fixture_paths.rs"]
+mod fixture_paths;
+use fixture_paths::{unique_path, workspace_root};
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::enterprise_federation::EnterpriseProviderRecord;
 use chio_control_plane::scim_lifecycle::{
@@ -24,22 +31,6 @@ use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use enterprise_provider_fixtures::{enterprise_provider_record, scim_enterprise_provider_record};
 use reqwest::blocking::Client;
-
-fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
-}
-
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(3)
-        .expect("workspace root")
-        .to_path_buf()
-}
 
 struct ServerGuard {
     child: Child,
@@ -717,7 +708,7 @@ fn setup_enterprise_federated_issue_case(
     provider_record_id: Option<&str>,
     provider_registry_records: Option<Vec<serde_json::Value>>,
 ) -> EnterpriseFederatedIssueHarness {
-    let dir = unique_dir(prefix);
+    let dir = unique_path(prefix, "");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
@@ -734,7 +725,7 @@ fn setup_enterprise_federated_issue_case(
     let enterprise_providers_path = dir.join("enterprise-providers.json");
 
     let subject_kp = Keypair::generate();
-    fs::write(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
+    write_private_file(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
         .expect("write holder seed");
     let subject_hex = seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp);
     write_enterprise_identity(
@@ -909,7 +900,7 @@ fn trust_service_federated_issue_consumes_challenge_bound_passport_response() {
         return;
     }
 
-    let dir = unique_dir("chio-cli-federated-issue");
+    let dir = unique_path("chio-cli-federated-issue", "");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
@@ -926,7 +917,7 @@ fn trust_service_federated_issue_consumes_challenge_bound_passport_response() {
     let delegation_policy_path = dir.join("delegation-policy.json");
 
     let subject_kp = Keypair::generate();
-    fs::write(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
+    write_private_file(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
         .expect("write holder seed");
     let subject_hex = seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp);
     create_passport(
@@ -1087,7 +1078,7 @@ fn trust_service_federated_issue_supports_stored_verifier_policy_references_and_
         return;
     }
 
-    let dir = unique_dir("chio-cli-federated-issue-policy-ref");
+    let dir = unique_path("chio-cli-federated-issue-policy-ref", "");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
@@ -1106,7 +1097,7 @@ fn trust_service_federated_issue_supports_stored_verifier_policy_references_and_
     let capability_policy_path = dir.join("capability-policy.yaml");
 
     let subject_kp = Keypair::generate();
-    fs::write(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
+    write_private_file(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
         .expect("write holder seed");
     let subject_hex = seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp);
     create_passport(
@@ -1271,7 +1262,7 @@ fn trust_service_federated_issue_requires_embedded_or_stored_verifier_policy() {
         return;
     }
 
-    let dir = unique_dir("chio-cli-federated-issue-no-policy");
+    let dir = unique_path("chio-cli-federated-issue-no-policy", "");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
@@ -1285,7 +1276,7 @@ fn trust_service_federated_issue_requires_embedded_or_stored_verifier_policy() {
     let capability_policy_path = dir.join("capability-policy.yaml");
 
     let subject_kp = Keypair::generate();
-    fs::write(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
+    write_private_file(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
         .expect("write holder seed");
     let subject_hex = seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp);
     create_passport(
@@ -1363,7 +1354,7 @@ fn trust_service_federated_issue_rejects_scope_outside_delegation_policy() {
         return;
     }
 
-    let dir = unique_dir("chio-cli-federated-issue-scope-deny");
+    let dir = unique_path("chio-cli-federated-issue-scope-deny", "");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
@@ -1380,7 +1371,7 @@ fn trust_service_federated_issue_rejects_scope_outside_delegation_policy() {
     let delegation_policy_path = dir.join("delegation-policy.json");
 
     let subject_kp = Keypair::generate();
-    fs::write(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
+    write_private_file(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
         .expect("write holder seed");
     let subject_hex = seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp);
     create_passport(
@@ -1498,7 +1489,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
         return;
     }
 
-    let dir = unique_dir("chio-cli-federated-issue-multi-hop");
+    let dir = unique_path("chio-cli-federated-issue-multi-hop", "");
     std::fs::create_dir_all(&dir).expect("create temp dir");
 
     let shared_signer_seed_path = dir.join("shared-signer-seed.txt");
@@ -1527,7 +1518,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     let delegation_policy_b_path = dir.join("delegation-policy-b.json");
 
     let subject_kp = Keypair::generate();
-    fs::write(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
+    write_private_file(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
         .expect("write holder seed");
     let subject_hex = seed_subject_history(&a_receipt_db_path, &a_budget_db_path, &subject_kp);
     create_passport(
@@ -1919,7 +1910,7 @@ fn federated_issue_scim_deprovisioned_identity_fails_closed() {
         return;
     }
 
-    let dir = unique_dir("chio-cli-enterprise-federated-scim-deprovision");
+    let dir = unique_path("chio-cli-enterprise-federated-scim-deprovision", "");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
@@ -1937,7 +1928,7 @@ fn federated_issue_scim_deprovisioned_identity_fails_closed() {
     let scim_lifecycle_path = dir.join("scim-lifecycle.json");
 
     let subject_kp = Keypair::generate();
-    fs::write(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
+    write_private_file(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
         .expect("write holder seed");
     let subject_hex = seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp);
     write_scim_enterprise_identity(

@@ -1,16 +1,16 @@
 //! Kernel-owned construction of fresh or durably verified response dispatches.
 //! Recovery mode is derived from a sealed execution request, never selected by
-//! callers of the fresh preparation API. Quarantine owns the pure projections.
+//! callers of the fresh preparation API. The shared response model owns pure projections.
 
 use chio_core::{canonical_json_bytes, sha256};
-use chio_quarantine::state_machine::{
+use chio_response_model::state::{
     encode_response_record,
     projection::{
         encode_normalized_dispatch_response_record, initial_response_snapshot,
         prepare_dispatch_transition,
     },
 };
-use chio_quarantine::{CanonicalFailure, StateMachineError};
+use chio_response_model::{CanonicalFailure, StateMachineError};
 use chio_security_types::ports::{
     CanonicalBody, Digest32, RecordId, ResponseDispatchApproval, ResponseDispatchAuthorization,
     ResponseDispatchAuthorizationBody, ResponseDispatchCommitMode, ResponseDispatchCommitRequest,

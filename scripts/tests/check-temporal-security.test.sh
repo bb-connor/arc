@@ -22,7 +22,7 @@ runner="scripts/check-temporal-security.sh"
 exact_runner="scripts/run-exact-cargo-test-inventory.sh"
 verifier="scripts/check-exact-cargo-test-inventory.py"
 python_bin="/usr/bin/python3"
-expected_runner_sha256="58e9245efb8d19ea1dc672b0463afa762c2355d9f585c132e7a0cf7be9d82554"
+expected_runner_sha256="f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a"
 test -x "${runner}"
 test -x "${exact_runner}"
 test -x "${verifier}"
@@ -67,6 +67,22 @@ def source_names(path: str, prefix: str, test_filter: str = "") -> list[str]:
         for name in TEST_PATTERN.findall(Path(path).read_text(encoding="utf-8"))
     ]
     return [name for name in names if test_filter in name]
+
+
+def event_consumer_names(test_filter: str) -> list[str]:
+    entrypoint = Path("crates/platform/chio-control-plane/src/security/event_consumer/tests.rs")
+    modules = re.findall(r"(?m)^mod ([A-Za-z0-9_]+);$", entrypoint.read_text())
+    prefix = "security::event_consumer::tests::"
+    names = []
+    for module in modules:
+        module_prefix = prefix + module + "::"
+        if test_filter.split("::", 1)[0] not in module:
+            continue
+        names.extend(source_names(
+            str(entrypoint.with_suffix("") / (module + ".rs")), module_prefix,
+            prefix + test_filter,
+        ))
+    return names
 
 
 def commitment(names: list[str]) -> tuple[int, str]:
@@ -179,40 +195,16 @@ source_contracts = {
     "signed security event verification": source_names(
         "crates/core/chio-core-types/tests/signed_security_event.rs", ""
     ),
-    "verified event provenance acceptance": source_names(
-        "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc",
-        "security::event_consumer::tests::",
-        "security::event_consumer::tests::verifier_accepts",
-    ),
-    "receipt-backed event provenance rejection": source_names(
-        "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc",
-        "security::event_consumer::tests::",
-        "security::event_consumer::tests::receipt_provenance",
-    ),
-    "corrupt event ingress rejection": source_names(
-        "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc",
-        "security::event_consumer::tests::",
-        "security::event_consumer::tests::corrupt",
-    ),
-    "untrusted event producer rejection": source_names(
-        "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc",
-        "security::event_consumer::tests::",
-        "security::event_consumer::tests::otherwise_valid_event",
-    ),
-    "unconfigured event policy rejection": source_names(
-        "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02.inc",
-        "security::event_consumer::tests::",
-        "security::event_consumer::tests::trusted_producer_signature",
-    ),
-    "verified event ingress mutation matrix": source_names(
-        "crates/platform/chio-control-plane/src/security/event_consumer_parts/part_02_temporal_ingress.inc",
-        "security::event_consumer::tests::",
-        "security::event_consumer::tests::verifier_ingress_rejects_",
-    ),
+    "verified event provenance acceptance": event_consumer_names("verifier_accepts"),
+    "receipt-backed event provenance rejection": event_consumer_names("receipt_provenance"),
+    "corrupt event ingress rejection": event_consumer_names("corrupt"),
+    "untrusted event producer rejection": event_consumer_names("otherwise_valid_event"),
+    "unconfigured event policy rejection": event_consumer_names("trusted_producer_signature"),
+    "verified event ingress mutation matrix": event_consumer_names("temporal_ingress::verifier_ingress_rejects_"),
 }
 
 expected_ingress_cases = sorted(
-    "security::event_consumer::tests::" + name
+    "security::event_consumer::tests::temporal_ingress::" + name
     for name in [
         "verifier_ingress_rejects_cross_tenant_event_without_persistence",
         "verifier_ingress_rejects_forged_event_without_persistence",
@@ -267,7 +259,7 @@ expected_commands = {
     ],
     "verified event ingress mutation matrix": [
         "cargo", "test", "-p", "chio-control-plane", "--lib",
-        "security::event_consumer::tests::verifier_ingress_rejects_",
+        "security::event_consumer::tests::temporal_ingress::verifier_ingress_rejects_",
     ],
 }
 
@@ -514,7 +506,7 @@ expected_calls = [
     exact_args(
         "verified event provenance acceptance",
         1,
-        "7806a32aafcb999dee16b3ba7fb2f9cd2e6630e1310a8500a85b322022259713",
+        "3e5a22878a3984c23efa565c39401ade413f34d9f35d6742568c5342b33e07d2",
         [
             "cargo",
             "test",
@@ -528,7 +520,7 @@ expected_calls = [
     exact_args(
         "receipt-backed event provenance rejection",
         2,
-        "7f58513090b4b1b09841047e9000f92ab0beaa5d786eaabfa91801ee7641710d",
+        "a25a37d34b9ea683b638663a72744c7efd0882d3a10cd778e5a23471f52fb692",
         [
             "cargo",
             "test",
@@ -542,7 +534,7 @@ expected_calls = [
     exact_args(
         "corrupt event ingress rejection",
         2,
-        "089f9974ccc2d7ac6ab0cf01e7272a549efa3930e73c388a3b4a4b9cc9745eb9",
+        "42eb4e862632e64040b8cdcaaa91545a498a9a3d13ac4437cb28238e439659f1",
         [
             "cargo",
             "test",
@@ -556,7 +548,7 @@ expected_calls = [
     exact_args(
         "untrusted event producer rejection",
         1,
-        "a9e1c7c6377dda82a1747deb7f5bcf0b6190c205fb46accbe75f66f9c3f90e12",
+        "ea2b6112ddb1c8e4fef055629ab54023e1d2e082f445ce4080c33bffeed57d2f",
         [
             "cargo",
             "test",
@@ -570,7 +562,7 @@ expected_calls = [
     exact_args(
         "unconfigured event policy rejection",
         1,
-        "b10498bfdde0e6bfae57ad7aa6fb284132c290171263c7c27849dba7ee03a074",
+        "fa4ae1ffe1524711f7d0b591b6288a1c197c5294d6571bb47b72b1bc6986d262",
         [
             "cargo",
             "test",
@@ -584,14 +576,14 @@ expected_calls = [
     exact_args(
         "verified event ingress mutation matrix",
         7,
-        "7472d4b71e744bc7c191eda45e9e18ceff0a239bda9963244a16df7f60dc60bb",
+        "e7ab22f7b585933fc20bb4adb48775549bc0c72f7f6bfff94699c8f6daa2c56d",
         [
             "cargo",
             "test",
             "-p",
             "chio-control-plane",
             "--lib",
-            "security::event_consumer::tests::verifier_ingress_rejects_",
+            "security::event_consumer::tests::temporal_ingress::verifier_ingress_rejects_",
         ],
         filtered=True,
     ),
@@ -893,7 +885,7 @@ command_endings = [
     "security::event_consumer::tests::corrupt",
     "security::event_consumer::tests::otherwise_valid_event",
     "security::event_consumer::tests::trusted_producer_signature",
-    "security::event_consumer::tests::verifier_ingress_rejects_",
+    "security::event_consumer::tests::temporal_ingress::verifier_ingress_rejects_",
 ]
 for position, ending in enumerate(command_endings, start=1):
     mutant = replace_once(

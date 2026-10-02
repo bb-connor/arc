@@ -84,6 +84,12 @@ DEFAULT_DOC_EXCLUDES = (
     "docs/papers/",
     "docs/research/",
 )
+# Captured Rust source is immutable review evidence, not release copy. Pin the
+# exact reviewed bytes so this path cannot become a home for unscanned claims.
+HISTORICAL_SOURCE_SNAPSHOTS = {
+    "docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/kernel-source-before.json":
+        "b2350e625a2c78448768c7f8c23dbd3a2ee461e40bb1053cb628534111fa52c2",
+}
 
 ALLOW_CONTEXT_RE = re.compile(
     r"\b("
@@ -525,6 +531,12 @@ def configured_docs(defaults: tuple[str, ...]) -> list[Path]:
 
 def is_default_doc_excluded(path: Path) -> bool:
     relative_path = relative(path)
+    if relative_path in HISTORICAL_SOURCE_SNAPSHOTS:
+        if sha256_file(path) != HISTORICAL_SOURCE_SNAPSHOTS[relative_path]:
+            raise SystemExit(
+                f"proof-room.release.source-snapshot-digest-mismatch: {relative_path}"
+            )
+        return True
     return any(relative_path.startswith(prefix) for prefix in DEFAULT_DOC_EXCLUDES)
 
 

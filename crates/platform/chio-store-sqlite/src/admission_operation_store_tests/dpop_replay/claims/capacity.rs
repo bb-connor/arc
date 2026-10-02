@@ -70,7 +70,7 @@ fn fresh_v2_domain_is_separate_from_preserved_full_legacy_inventory() -> Anchore
         .claim_dpop_replay(&other, &lease, &intent, now_ms())
         .expect_err("live v2 capacity exhausted");
     assert!(error.to_string().contains("capacity exhausted"), "{error}");
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
+    let _clock = chio_test_support::clock::scope_unix_secs(expires);
     let (fresh, lease, credential) = setup(
         &fixture,
         &domain,

@@ -75,11 +75,18 @@ fn sqlite_retained_federation_context_survives_owner_restart_without_redispatch(
     let invocations = Arc::new(AtomicU64::new(0));
 
     let (request, operation_id, raw_before) = {
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock(),
+        )?;
         let operations = Arc::new(authority.admission_operation_store());
         let outcomes = Arc::new(authority.tool_outcome_store());
-        let mut kernel = ChioKernel::new(kernel_config(keypair.clone()))
-            .with_federation_peers(vec![peer.clone()]);
+        let mut kernel = ChioKernel::new_with_clock(
+            kernel_config(keypair.clone()),
+            chio_test_support::clock::clock(),
+        )
+        .with_federation_peers(vec![peer.clone()]);
         kernel.set_federation_local_kernel_id("kernel.org-b");
         let receipt_store = SqliteReceiptStore::open(&receipts)?;
         receipt_store.flush_receipt_writes()?;
@@ -134,10 +141,17 @@ fn sqlite_retained_federation_context_survives_owner_restart_without_redispatch(
     };
 
     // Drop every old owner handle before reopening the physical authority.
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
     let outcomes = Arc::new(authority.tool_outcome_store());
-    let mut kernel =
-        ChioKernel::new(kernel_config(keypair.clone())).with_federation_peers(vec![peer]);
+    let mut kernel = ChioKernel::new_with_clock(
+        kernel_config(keypair.clone()),
+        chio_test_support::clock::clock(),
+    )
+    .with_federation_peers(vec![peer]);
     kernel.set_federation_local_kernel_id("kernel.org-b");
     let receipt_store = Arc::new(SqliteReceiptStore::open(&receipts)?);
     // Wait on the actor's verification barrier, not a timing-dependent sleep.

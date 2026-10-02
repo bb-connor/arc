@@ -274,6 +274,7 @@ if [[ "$args" == *" --all-targets "* ]] ||
       rejects_root_zero_unsorted_duplicate_and_primary_groups
       construction_rejects_constraints_for_unlisted_syscalls
       construction_rejects_unconfined_limits_and_invalid_arguments
+      empty_alternatives_cannot_introduce_unconditional_syscall_authority
       wire_decode_uses_the_same_plan_validator_and_closed_syscall_keys
     )
     init_tests=(
@@ -298,8 +299,10 @@ if [[ "$args" == *" --all-targets "* ]] ||
       dynamically_linked_cage_init_is_rejected_before_descriptor_transfer
       executable_runtime_file_gets_exact_execute_read_grant
       forbidden_hard_link_alias_is_rejected_before_compilation
+      overlapping_read_grants_retain_each_path_once_and_reject_hardlink_aliases
       header_only_cage_init_is_rejected_before_descriptor_transfer
       missing_write_parent_and_runtime_aliases_fail_closed
+      explicit_read_write_file_shares_one_retained_descriptor_and_requires_both_ceilings
       retained_grant_survives_path_replacement_without_reopening
       runtime_file_rebound_to_forbidden_descriptor_fails_closed
       script_target_is_rejected_before_launch
@@ -396,7 +399,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=79 probes=29 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=82 probes=29 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py

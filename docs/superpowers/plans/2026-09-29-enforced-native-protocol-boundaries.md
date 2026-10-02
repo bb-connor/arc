@@ -28,7 +28,7 @@ Reviewed at `a2630c20a1` in the [native consumers review](../../reviews/2026-10-
 
 Open findings against this plan:
 
-- **PB7, Low.** A2A, remote MCP and ACP still send peer input or internal error text to peers.
+- **PB7, Low.** A2A, remote MCP and ACP-Client still send peer input or internal error text to peers.
 - **PB8, Low.** A2A envelope rejections keep no local cause, and invalid notifications are dropped silently.
 - **NC7, Low.** The broker operator document still shows the single-route configuration the loader now rejects.
 

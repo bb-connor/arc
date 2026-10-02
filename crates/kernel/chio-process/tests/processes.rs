@@ -264,9 +264,8 @@ async fn invalid_process_lineage_produces_attributed_signed_denials_without_disp
             kernel.revoke_capability(&capability.id)?;
         }
         let request = runtime.tool_request(process_id, "read", "tools", "read", json!({}))?;
-        let _clock = (refusal == "expired").then(|| {
-            chio_kernel::scope_fixed_runtime_for_current_thread(capability.expires_at + 1, [])
-        });
+        let _clock = (refusal == "expired")
+            .then(|| chio_test_support::clock::scope_unix_secs(capability.expires_at + 1));
         let response = runtime.invoke(process_id, "read", &request).await?;
         assert_eq!(response.verdict, Verdict::Deny, "{refusal}");
         assert!(response.output.is_none());
@@ -551,7 +550,10 @@ fn opening_against_a_fresh_authority_or_ephemeral_kernel_is_rejected() -> Result
         ProcessRuntime::open(a.path().join("process.db"), fresh),
         Err(ProcessError::Configuration(_))
     ));
-    let ephemeral = Arc::new(ChioKernel::new(support::config()));
+    let ephemeral = Arc::new(ChioKernel::new_with_clock(
+        support::config(),
+        chio_test_support::clock::clock(),
+    ));
     assert!(matches!(
         ProcessRuntime::open(a.path().join("process.db"), ephemeral),
         Err(ProcessError::Configuration(_))
@@ -559,24 +561,39 @@ fn opening_against_a_fresh_authority_or_ephemeral_kernel_is_rejected() -> Result
     Ok(())
 }
 
+#[test]
+fn unversioned_journals_cannot_gain_dispatch_authority() -> Result {
+    for schema in [
+        "CREATE TABLE process_calls (process_id TEXT NOT NULL, operation_key TEXT NOT NULL, request_hash TEXT NOT NULL, PRIMARY KEY(process_id, operation_key))",
+        "CREATE TABLE process_runtime (singleton INTEGER PRIMARY KEY, version INTEGER NOT NULL, namespace TEXT NOT NULL, authority TEXT NOT NULL, kernel_key TEXT NOT NULL)",
+    ] {
+        let directory = tempfile::tempdir()?;
+        let journal = directory.path().join("process.db");
+        rusqlite::Connection::open(&journal)?.execute_batch(schema)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o600))?;
+        }
+        let before = std::fs::read(&journal)?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let kernel = kernel(directory.path(), server(&calls))?;
+        assert!(matches!(
+            ProcessRuntime::open(&journal, kernel),
+            Err(ProcessError::Configuration(_))
+        ));
+        assert_eq!(std::fs::read(&journal)?, before);
+        assert!(!directory.path().join("process.db-wal").exists());
+        assert!(!directory.path().join("process.db-shm").exists());
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
+}
+
 #[tokio::test]
-async fn journals_written_before_dispatch_attempts_keep_their_first_request_identity() -> Result {
+async fn first_dispatch_attempt_preserves_request_identity_and_exact_replay() -> Result {
     let dir = tempfile::tempdir()?;
     let journal = dir.path().join("process.db");
-    // The calls table of a journal written before attempts were recorded.
-    rusqlite::Connection::open(&journal)?.execute_batch(
-        "CREATE TABLE process_calls (
-            process_id TEXT NOT NULL REFERENCES processes(id),
-            operation_key TEXT NOT NULL,
-            request_hash TEXT NOT NULL,
-            PRIMARY KEY (process_id, operation_key)
-        )",
-    )?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&journal, std::fs::Permissions::from_mode(0o600))?;
-    }
     let calls = Arc::new(AtomicUsize::new(0));
     let kernel = kernel(dir.path(), server(&calls))?;
     let runtime = ProcessRuntime::open(&journal, kernel.clone())?;

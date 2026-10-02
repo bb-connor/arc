@@ -96,7 +96,7 @@ fn physical_snapshot(path: &Path) -> TestResult<PhysicalSnapshot> {
 }
 
 fn run_cut(cut: Cut, test: &str) -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     if let Some(path) = harness::child_directory(cut)? {
         return worker::run(&path, cut);
     }

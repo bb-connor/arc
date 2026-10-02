@@ -1789,22 +1789,17 @@ pub(crate) fn read_unix_timestamp() -> Result<u64, chio_security_types::clock::C
 }
 
 pub(crate) fn read_unix_timestamp_ms() -> Result<u64, chio_security_types::clock::ClockError> {
-    if let Some(now) = fixed_runtime_unix_secs_for_current_thread() {
-        return now
-            .checked_mul(1_000)
-            .ok_or(chio_security_types::clock::ClockError::Overflow);
-    }
     chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
         .map(|value| value.get())
 }
 
 #[cfg(test)]
 pub(crate) fn current_unix_timestamp() -> u64 {
-    read_unix_timestamp().expect("fixture clock")
+    chio_test_support::clock::unix_seconds()
 }
 #[cfg(test)]
 pub(crate) fn current_unix_timestamp_ms() -> u64 {
-    read_unix_timestamp_ms().expect("fixture clock")
+    chio_test_support::clock::unix_millis()
 }
 
 #[cfg(feature = "delegation")]

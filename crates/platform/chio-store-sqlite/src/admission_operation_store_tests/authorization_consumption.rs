@@ -407,7 +407,7 @@ fn signed_authorization_consumption_rejects_substitutions_and_reopens_exactly() 
     } = fixture;
     drop(store);
     drop(authority);
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     let replay = store
         .load_terminal_replay(&candidate.operation.replay_key())?

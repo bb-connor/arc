@@ -28,8 +28,8 @@ fn committed_dpop_survives_kernel_reopen_and_rejects_a_fresh_signature_for_the_s
     } = fixture;
     drop(store);
     drop(authority);
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let _clock = chio_test_support::clock::scope_unix_secs(expires);
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fixture = Fixture {
         store: authority.admission_operation_store(),
         fence: authority.mutation_fence(),
@@ -97,9 +97,8 @@ fn startup_releases_expired_pre_dispatch_dpop_without_recreating_the_source() ->
         } = fixture;
         drop(store);
         drop(authority);
-        let _clock =
-            chio_kernel::scope_fixed_runtime_for_current_thread(expires, std::iter::empty());
-        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let _clock = chio_test_support::clock::scope_unix_secs(expires);
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {
             store: authority.admission_operation_store(),
             fence: authority.mutation_fence(),

@@ -578,7 +578,8 @@ fn provision_native_mcp_security(
 ) -> Result<ConformanceNativeSecurity, RunnerError> {
     let cage_arguments = native_launch::configured_cage_arguments()?;
     let security_directory = runtime_state.root().join("native-mcp-security");
-    let target_executable = resolve_python_executable(&options.python_binary)?;
+    let upstream_python = native_launch::configured_upstream_python(&options.python_binary)?;
+    let target_executable = resolve_python_executable(&upstream_python)?;
     let source_upstream_server_script = fs::canonicalize(&options.upstream_server_script)?;
     let upstream_server_script = runtime_state.root().join("mock-mcp-server.py");
     write_private_file(
@@ -598,14 +599,12 @@ fn provision_native_mcp_security(
         .arg(&security_directory)
         .arg("--tools-fixture")
         .arg(&reviewed_tools_path)
-        .arg("--target")
-        .arg(&target_executable)
-        .arg("--target-arg")
-        .arg(&upstream_server_script)
+        .args(native_launch::upstream_launch_arguments(
+            &target_executable,
+            &upstream_server_script,
+        ))
         .arg("--working-directory")
         .arg(&working_directory)
-        .arg("--read-path")
-        .arg(&upstream_server_script)
         .arg("--server-id")
         .arg("conformance-mcp-core")
         .arg("--server-name")

@@ -96,7 +96,10 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
     let kernel_keypair = Keypair::generate();
     let agent = Keypair::generate();
 
-    let mut first_kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+    let mut first_kernel = ChioKernel::new_with_clock(
+        kernel_config(kernel_keypair.clone()),
+        chio_test_support::clock::clock(),
+    );
     first_kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     first_kernel.set_governed_approval_replay_store(Box::new(
         SqliteGovernedApprovalReplayStore::open(&path).test_expect("replay store opens"),
@@ -211,7 +214,10 @@ fn governed_dispatch_replay_is_denied_after_store_reopen() {
     );
     drop(first_kernel);
 
-    let mut reopened_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    let mut reopened_kernel = ChioKernel::new_with_clock(
+        kernel_config(kernel_keypair),
+        chio_test_support::clock::clock(),
+    );
     reopened_kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     reopened_kernel.set_governed_approval_replay_store(Box::new(
         SqliteGovernedApprovalReplayStore::open(&path).test_expect("replay store reopens"),

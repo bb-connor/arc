@@ -349,8 +349,9 @@ impl CapabilityAuthority for FixedResponseAuthority {
 fn probationary_subject_requires_constrained_read_scope_and_persists_snapshot() {
     let receipt_db_path = unique_path("issuance-policy-receipts", ".sqlite3");
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         Some(test_policy()),
         None,
@@ -397,8 +398,9 @@ fn probationary_subject_requires_constrained_read_scope_and_persists_snapshot() 
 fn deferred_lineage_wrapper_leaves_atomic_federated_projection_to_its_caller() {
     let receipt_db_path = unique_path("issuance-policy-deferred-lineage", ".sqlite3");
     let authority = wrap_capability_authority_with_deferred_lineage(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         None,
         None,
@@ -440,8 +442,9 @@ fn deferred_lineage_wrapper_leaves_atomic_federated_projection_to_its_caller() {
 fn probationary_subject_denied_broad_issue_request() {
     let receipt_db_path = unique_path("issuance-policy-deny", ".sqlite3");
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         Some(test_policy()),
         None,
@@ -478,8 +481,9 @@ fn probationary_subject_denied_broad_issue_request() {
 #[test]
 fn control_plane_issues_cumulative_approval_for_atomic_enforcement() {
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         None,
         None,
@@ -644,7 +648,10 @@ fn strong_local_history_allows_trusted_invoke_scope() {
     drop(receipt_store);
 
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(kernel_kp)),
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
+            kernel_kp,
+            chio_test_support::clock::clock(),
+        )),
         Some(test_policy()),
         None,
         Some(&receipt_db_path),
@@ -682,8 +689,9 @@ fn strong_local_history_allows_trusted_invoke_scope() {
 #[test]
 fn runtime_assurance_policy_denies_high_budget_without_attestation() {
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         None,
         Some(test_runtime_assurance_policy()),
@@ -724,8 +732,9 @@ fn runtime_assurance_policy_denies_high_budget_without_attestation() {
 #[test]
 fn runtime_assurance_policy_denies_raw_attestation_without_local_trust_boundary() {
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         None,
         Some(test_runtime_assurance_policy()),
@@ -828,8 +837,9 @@ fn issuance_verification_returns_verified_record_without_runtime_policy() {
 #[test]
 fn workload_identity_validation_denies_conflicting_attestation_without_policy() {
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         None,
         None,
@@ -892,8 +902,9 @@ fn workload_identity_validation_denies_conflicting_attestation_without_policy() 
 #[test]
 fn runtime_assurance_policy_rebinds_trusted_attestation_to_verified_tier() {
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         None,
         Some(test_trusted_runtime_assurance_policy()),
@@ -944,8 +955,9 @@ fn runtime_assurance_policy_rebinds_trusted_attestation_to_verified_tier() {
 #[test]
 fn runtime_assurance_policy_denies_untrusted_attestation_when_verifier_rules_exist() {
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         None,
         Some(test_trusted_runtime_assurance_policy()),
@@ -993,8 +1005,9 @@ fn runtime_assurance_policy_denies_untrusted_attestation_when_verifier_rules_exi
 #[test]
 fn runtime_assurance_policy_rebinds_google_attestation_to_verified_tier() {
     let authority = wrap_capability_authority(
-        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
+            chio_test_support::clock::clock(),
         )),
         None,
         Some(test_trusted_runtime_assurance_policy()),

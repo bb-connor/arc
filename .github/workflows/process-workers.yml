@@ -26,6 +26,9 @@ on:
       - "scripts/check-process-dependencies.py"
       - "scripts/tests/check-process-dependencies.test.py"
       - "scripts/tests/check-process-ci-inventory.test.py"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/tests/prepare-enforced-native-fixture.test.py"
       - "scripts/package-repository-review.py"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -64,6 +67,9 @@ on:
       - "scripts/check-process-dependencies.py"
       - "scripts/tests/check-process-dependencies.test.py"
       - "scripts/tests/check-process-ci-inventory.test.py"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/tests/prepare-enforced-native-fixture.test.py"
       - "scripts/package-repository-review.py"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -130,6 +136,9 @@ jobs:
           python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
           python3 scripts/tests/check-process-dependencies.test.py
           python3 scripts/tests/check-process-ci-inventory.test.py
+          python3 scripts/check-native-protocol-ci.py
+          python3 scripts/tests/check-native-protocol-ci.test.py
+          python3 scripts/tests/prepare-enforced-native-fixture.test.py
           python3 scripts/check-process-dependencies.py
           cargo test --locked -p chio-kernel --lib custody::tests
       - name: CLI host and ordinary worker coverage
@@ -151,6 +160,10 @@ jobs:
       - name: Qualify enforcing host and prepare native consumer fixture
         id: native_fixture
         uses: ./.github/actions/enforced-native-fixture
+      - name: Native protocol targets under enforced authority
+        env:
+          RUST_TEST_THREADS: "1"
+        run: cargo test --locked -p chio-cli --features real-linux-enforcement --no-fail-fast --test mcp_auth_server --test mcp_serve --test mcp_serve_http --test conformance_cli
       - name: Native MCP and worker recovery under enforced authority
         if: ${{ !cancelled() && steps.native_fixture.outcome == 'success' }}
         run: |

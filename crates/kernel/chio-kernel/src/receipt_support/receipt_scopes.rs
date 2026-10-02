@@ -25,7 +25,6 @@ thread_local! {
         const { RefCell::new(Vec::new()) };
     static POST_INVOCATION_GUARD_EVIDENCE: RefCell<Vec<GuardEvidence>> =
         const { RefCell::new(Vec::new()) };
-    static FIXED_RUNTIME_UNIX_SECS: RefCell<Option<u64>> = const { RefCell::new(None) };
     static FIXED_RUNTIME_RECEIPT_IDS: RefCell<Option<FixedRuntimeReceiptIds>> =
         const { RefCell::new(None) };
 }
@@ -35,17 +34,13 @@ struct FixedRuntimeReceiptIds {
     counter: u64,
 }
 
-pub struct FixedRuntimeScope {
-    previous_unix_secs: Option<u64>,
+pub struct ReceiptIdScope {
+    _thread_bound: std::marker::PhantomData<std::rc::Rc<()>>,
     previous_receipt_ids: Option<FixedRuntimeReceiptIds>,
 }
 
-impl Drop for FixedRuntimeScope {
+impl Drop for ReceiptIdScope {
     fn drop(&mut self) {
-        let previous_unix_secs = self.previous_unix_secs.take();
-        FIXED_RUNTIME_UNIX_SECS.with(|slot| {
-            *slot.borrow_mut() = previous_unix_secs;
-        });
         let previous_receipt_ids = self.previous_receipt_ids.take();
         FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
             *slot.borrow_mut() = previous_receipt_ids;
@@ -53,25 +48,20 @@ impl Drop for FixedRuntimeScope {
     }
 }
 
-pub fn scope_fixed_runtime_for_current_thread(
-    now_unix_secs: u64,
+/// Scope deterministic receipt identifiers on this thread. This never changes authority time.
+pub fn scope_receipt_ids_for_current_thread(
     receipt_ids: impl IntoIterator<Item = String>,
-) -> FixedRuntimeScope {
-    let previous_unix_secs = FIXED_RUNTIME_UNIX_SECS.with(|slot| slot.replace(Some(now_unix_secs)));
+) -> ReceiptIdScope {
     let previous_receipt_ids = FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
         slot.replace(Some(FixedRuntimeReceiptIds {
             ids: receipt_ids.into_iter().collect(),
             counter: 0,
         }))
     });
-    FixedRuntimeScope {
-        previous_unix_secs,
+    ReceiptIdScope {
+        _thread_bound: std::marker::PhantomData,
         previous_receipt_ids,
     }
-}
-
-pub fn fixed_runtime_unix_secs_for_current_thread() -> Option<u64> {
-    FIXED_RUNTIME_UNIX_SECS.with(|slot| *slot.borrow())
 }
 
 pub(crate) struct ScopedGovernedCallChainReceiptEvidence {
@@ -198,7 +188,7 @@ mod counter_tests {
     use super::*;
     #[test]
     fn deterministic_receipt_counter_refuses_exhaustion() {
-        let _scope = scope_fixed_runtime_for_current_thread(1, []);
+        let _scope = scope_receipt_ids_for_current_thread([]);
         FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
             if let Some(fixed) = slot.borrow_mut().as_mut() {
                 fixed.counter = u64::MAX;

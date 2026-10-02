@@ -28,7 +28,7 @@ def rust_tests(relative_path: str) -> list[str]:
 
 
 def rust_tests_with_exact_includes(
-    relative_path: str, expected_includes: set[str]
+    relative_path: str, expected_includes: set[str], expected_modules: dict[str, str]
 ) -> list[str]:
     entrypoint = ROOT / relative_path
     source = entrypoint.read_text(encoding="utf-8")
@@ -39,11 +39,16 @@ def rust_tests_with_exact_includes(
         raise SystemExit(
             f"{relative_path}: included Rust sources changed: {sorted(includes)!r}"
         )
+    modules = dict(re.findall(
+        r'(?m)^#\[path = "([^"]+\.rs)"\]\s*\nmod ([A-Za-z0-9_]+);', source
+    ))
+    if modules != expected_modules:
+        raise SystemExit(f"{relative_path}: Rust modules changed: {modules!r}")
     fragment_root = entrypoint.parent / entrypoint.stem
     fragments = {
         path.relative_to(entrypoint.parent) for path in fragment_root.rglob("*.rs")
     }
-    expected_fragments = {Path(include) for include in expected_includes}
+    expected_fragments = {Path(fragment) for fragment in expected_includes | expected_modules.keys()}
     if fragments != expected_fragments:
         raise SystemExit(
             f"{relative_path}: Rust source fragments changed: "
@@ -53,6 +58,11 @@ def rust_tests_with_exact_includes(
     tests = rust_tests(relative_path)
     for include in sorted(includes):
         tests.extend(rust_tests(str(entrypoint.parent.joinpath(include).relative_to(ROOT))))
+    for fragment, module in sorted(modules.items()):
+        tests.extend(
+            module + "::" + name
+            for name in rust_tests(str(entrypoint.parent.joinpath(fragment).relative_to(ROOT)))
+        )
     return tests
 
 
@@ -63,8 +73,8 @@ active_defense = rust_tests_with_exact_includes(
     "crates/tooling/chio-conformance/tests/active_defense.rs",
     {
         "active_defense/deception_dispatch.rs",
-        "active_defense/partial_rollback.rs",
     },
+    {"active_defense/partial_rollback.rs": "partial_rollback"},
 )
 
 expected = {

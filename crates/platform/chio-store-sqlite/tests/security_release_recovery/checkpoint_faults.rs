@@ -51,7 +51,7 @@ impl ToolOutcomeStore for FaultStore {
             // acknowledgement's original timestamp and lease unchanged while
             // the real authority observes that its 60-second lease has expired.
             let at = release.record().acknowledged_at_unix_ms() / 1_000 + 61;
-            let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(at, []);
+            let _clock = chio_test_support::clock::scope_unix_secs(at);
             let result = self.inner.record_security_release(release, lease);
             assert!(
                 result

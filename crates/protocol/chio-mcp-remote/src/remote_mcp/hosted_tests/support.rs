@@ -1,3 +1,4 @@
+#![cfg(test)]
 #![allow(clippy::expect_used, clippy::unwrap_used, dead_code)]
 
 use std::fs;

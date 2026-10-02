@@ -234,7 +234,7 @@ fn threshold_reservation_exact_replay_preserves_rows_and_reopens() {
     } = fixture;
     drop(store);
     drop(authority);
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("reopen");
+    let reopened = crate::test_authority::open_serving(&database, &lock_root).expect("reopen");
     assert_eq!(
         reopened
             .admission_operation_store()

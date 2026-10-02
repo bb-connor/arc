@@ -81,39 +81,39 @@ run_complete_inventory \
 
 run_filtered_inventory \
   "verified event provenance acceptance" \
-  1 7806a32aafcb999dee16b3ba7fb2f9cd2e6630e1310a8500a85b322022259713 \
+  1 3e5a22878a3984c23efa565c39401ade413f34d9f35d6742568c5342b33e07d2 \
   cargo test -p chio-control-plane --lib \
   security::event_consumer::tests::verifier_accepts
 
 run_filtered_inventory \
   "receipt-backed event provenance rejection" \
-  2 7f58513090b4b1b09841047e9000f92ab0beaa5d786eaabfa91801ee7641710d \
+  2 a25a37d34b9ea683b638663a72744c7efd0882d3a10cd778e5a23471f52fb692 \
   cargo test -p chio-control-plane --lib \
   security::event_consumer::tests::receipt_provenance
 
 run_filtered_inventory \
   "corrupt event ingress rejection" \
-  2 089f9974ccc2d7ac6ab0cf01e7272a549efa3930e73c388a3b4a4b9cc9745eb9 \
+  2 42eb4e862632e64040b8cdcaaa91545a498a9a3d13ac4437cb28238e439659f1 \
   cargo test -p chio-control-plane --lib \
   security::event_consumer::tests::corrupt
 
 run_filtered_inventory \
   "untrusted event producer rejection" \
-  1 a9e1c7c6377dda82a1747deb7f5bcf0b6190c205fb46accbe75f66f9c3f90e12 \
+  1 ea2b6112ddb1c8e4fef055629ab54023e1d2e082f445ce4080c33bffeed57d2f \
   cargo test -p chio-control-plane --lib \
   security::event_consumer::tests::otherwise_valid_event
 
 run_filtered_inventory \
   "unconfigured event policy rejection" \
-  1 b10498bfdde0e6bfae57ad7aa6fb284132c290171263c7c27849dba7ee03a074 \
+  1 fa4ae1ffe1524711f7d0b591b6288a1c197c5294d6571bb47b72b1bc6986d262 \
   cargo test -p chio-control-plane --lib \
   security::event_consumer::tests::trusted_producer_signature
 
 run_filtered_inventory \
   "verified event ingress mutation matrix" \
-  7 7472d4b71e744bc7c191eda45e9e18ceff0a239bda9963244a16df7f60dc60bb \
+  7 e7ab22f7b585933fc20bb4adb48775549bc0c72f7f6bfff94699c8f6daa2c56d \
   cargo test -p chio-control-plane --lib \
-  security::event_consumer::tests::verifier_ingress_rejects_
+  security::event_consumer::tests::temporal_ingress::verifier_ingress_rejects_
 
 if [[ "${completed_inventories}" -ne 10 ]] || [[ "${completed_tests}" -ne 40 ]]; then
   builtin printf '%s\n' \

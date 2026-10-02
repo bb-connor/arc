@@ -203,17 +203,9 @@ impl ChioKernel {
                 }
             }
         };
-        // A deterministic kernel clock may suppress locally measured duration,
-        // but it cannot rewrite elapsed time attested by the external executor.
-        let elapsed_millis = if fixed_runtime_unix_secs_for_current_thread().is_some()
-            && context.caller_delivery_evidence.is_none()
-        {
-            0
-        } else {
-            u64::try_from(elapsed.as_millis())
-                .unwrap_or(I_JSON_MAX_SAFE_INTEGER)
-                .min(I_JSON_MAX_SAFE_INTEGER)
-        };
+        let elapsed_millis = u64::try_from(elapsed.as_millis())
+            .unwrap_or(I_JSON_MAX_SAFE_INTEGER)
+            .min(I_JSON_MAX_SAFE_INTEGER);
         let matched_grant_index_usize = matched_grant_index;
         let matched_grant_index = u64::try_from(matched_grant_index_usize)
             .ok()

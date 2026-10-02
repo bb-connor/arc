@@ -8,7 +8,7 @@ fn child_process_crash() -> AnchoredTestResult {
     let directory = PathBuf::from(directory);
     let database = directory.join("authority.db");
     let lock_root = directory.join("locks");
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fixture = Fixture {
         _temp: tempfile::tempdir()?,
         database,
@@ -131,7 +131,7 @@ fn independent_process_abort_recovers_acquire_and_commit_without_partial_custody
                 String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stderr)
             );
-            let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+            let authority = crate::test_authority::open_serving(&database, &lock_root)?;
             let fixture = Fixture {
                 _temp,
                 database,

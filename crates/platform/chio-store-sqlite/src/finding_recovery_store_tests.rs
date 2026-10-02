@@ -23,7 +23,7 @@ fn fixture() -> Fixture {
     fs::create_dir(&lock_root).expect("lock root");
     secure(&lock_root);
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open");
+    let authority = crate::test_authority::open_serving(&database, &lock_root).expect("open");
     let store = authority.finding_recovery_store();
     seed_settled_purchase(&store);
     Fixture {
@@ -173,7 +173,7 @@ fn remint_and_restart_share_one_nonresettable_quota() {
     } = fixture;
     drop(store);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("restart");
+    let authority = crate::test_authority::open_serving(&database, &lock_root).expect("restart");
     let restarted = authority.finding_recovery_store();
     assert!(matches!(
         restarted.reserve_attempt(issuance(2).recovery_id, "request-3", 2, NOW + 4),

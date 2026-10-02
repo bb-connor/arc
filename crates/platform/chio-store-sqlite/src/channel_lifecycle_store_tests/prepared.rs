@@ -631,7 +631,7 @@ fn prepared_record_load_survives_serving_owner_takeover() -> TestResult {
     drop(store);
     drop(authority);
 
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let active_fence = authority.mutation_fence();
     assert!(active_fence.owner_epoch > historical_fence.owner_epoch);
     let store = authority.channel_lifecycle_store();
@@ -843,7 +843,11 @@ fn first_prepared_commit_cannot_be_removed_by_snapshot_restore() -> TestResult {
         let _ = fs::remove_file(PathBuf::from(format!("{}{suffix}", database.display())));
     }
     assert!(matches!(
-        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        ),
         Err(SqliteServingOwnerError::Invalid(_))
     ));
     drop(_temp);

@@ -60,7 +60,7 @@ fn populated_v19_upgrade_preserves_exact_commits_anchors_and_imported_source() -
     assert_eq!(commit_rows(&connection)?, commits);
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     assert_eq!(
         store.load_by_operation_id(operation.binding().operation_id())?,
@@ -197,7 +197,7 @@ fn populated_v20_upgrade_preserves_claims_releases_and_global_history() -> TestR
         }
         assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i32>(0))?, crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION);
     }
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     assert_eq!(
         store.load_runtime_participant_history(

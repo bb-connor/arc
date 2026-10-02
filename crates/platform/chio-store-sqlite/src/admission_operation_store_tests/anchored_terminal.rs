@@ -304,10 +304,7 @@ fn reserved_terminal_stage_refuses_expired_active_claim_without_mutation() -> An
     let before = crate::tests::authority_snapshot(&connection)?;
     let anchor = fixture.authority.anchor_generation()?;
     let original = lease.untrusted_claim();
-    let _expired = chio_kernel::scope_fixed_runtime_for_current_thread(
-        lease.expires_at_unix_ms() / 1000 + 1,
-        [],
-    );
+    let _expired = chio_test_support::clock::scope_unix_secs(lease.expires_at_unix_ms() / 1000 + 1);
     // The requested replacement window is still live. Only the retained claim
     // protecting the reserved terminal stage has expired in authority time.
     let result = fixture.store.claim_recovery(
@@ -764,7 +761,7 @@ fn anchored_terminal_projection_survives_expiry_and_same_store_owner_takeover() 
     drop(store);
     drop(authority);
 
-    let second = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let second = crate::test_authority::open_serving(&database, &lock_root)?;
     let second_fence = second.mutation_fence();
     assert_eq!(second_fence.store_uuid, first_fence.store_uuid);
     assert!(second_fence.owner_epoch > first_fence.owner_epoch);

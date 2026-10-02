@@ -990,7 +990,7 @@ pub fn run_episode(seed: u64) -> Result<EpisodeSummary, String> {
     let readiness_polls = Arc::new(AtomicU64::new(0));
     let server_starts = Arc::new(AtomicU64::new(0));
 
-    let mut kernel = ChioKernel::new(kernel_config());
+    let mut kernel = ChioKernel::new_with_clock(kernel_config(), chio_test_support::clock::clock());
     configure_ephemeral_dst_kernel(&mut kernel)?;
     let receipt_handle: Arc<dyn ReceiptStore> = receipt_store.clone();
     kernel
@@ -1058,7 +1058,7 @@ pub fn run_payment_journal_episode(inject_record_failure: bool) -> Result<(), St
 
     let mut config = kernel_config();
     config.dispatch_intent_journal = chio_kernel::DispatchIntentJournalMode::SideEffecting;
-    let mut kernel = ChioKernel::new(config);
+    let mut kernel = ChioKernel::new_with_clock(config, chio_test_support::clock::clock());
     let receipt_handle: Arc<dyn ReceiptStore> = receipt_store.clone();
     kernel
         .set_receipt_store_handle(receipt_handle)
@@ -1158,7 +1158,7 @@ pub fn run_payment_journal_restart_recovery_episode() -> Result<(), String> {
 
     let mut config = kernel_config();
     config.dispatch_intent_journal = chio_kernel::DispatchIntentJournalMode::SideEffecting;
-    let mut kernel = ChioKernel::new(config);
+    let mut kernel = ChioKernel::new_with_clock(config, chio_test_support::clock::clock());
     let receipt_handle: Arc<dyn ReceiptStore> = receipt_store.clone();
     kernel
         .set_receipt_store_handle(receipt_handle)
@@ -1250,7 +1250,8 @@ pub fn run_payment_journal_restart_recovery_episode() -> Result<(), String> {
     let mut recovered_config = kernel_config();
     recovered_config.dispatch_intent_journal =
         chio_kernel::DispatchIntentJournalMode::SideEffecting;
-    let mut recovered_kernel = ChioKernel::new(recovered_config);
+    let mut recovered_kernel =
+        ChioKernel::new_with_clock(recovered_config, chio_test_support::clock::clock());
     let reopened_budget_handle: Arc<dyn BudgetStore> = reopened_budget_wrapper;
     recovered_kernel.set_budget_store_handle(reopened_budget_handle);
     recovered_kernel

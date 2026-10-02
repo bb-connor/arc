@@ -84,10 +84,8 @@ fn retained_federation_context_recovery_uses_original_pin_time() -> TestResult {
         .as_u64()
         .ok_or("pin expiry")?;
     let (kernel, admissions) = recovered_kernel(&fixture)?;
-    let _clock = crate::scope_fixed_runtime_for_current_thread(
-        expiry.checked_add(1).ok_or("expiry overflow")?,
-        [],
-    );
+    let _clock =
+        chio_test_support::clock::scope_unix_secs(expiry.checked_add(1).ok_or("expiry overflow")?);
     let response = recover(&kernel, &fixture.request)?;
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(admissions.load(Ordering::SeqCst), 0);

@@ -85,10 +85,8 @@ fn an_external_effect_with_a_lost_report_cannot_be_refunded_at_nonce_expiry() ->
             .ok_or("reserved nonce")?
             .expires_at(),
     )?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        expiry.checked_add(1).ok_or("expiry overflow")?,
-        [],
-    );
+    let _clock =
+        chio_test_support::clock::scope_unix_secs(expiry.checked_add(1).ok_or("expiry overflow")?);
     let runtime = fixture.open()?;
     assert!(
         effect.metadata()?.len() > 0,
@@ -135,7 +133,7 @@ fn reservation_only_effect_reproduces_the_original_refund_counterexample() -> Te
             .ok_or("nonce")?
             .expires_at(),
     )?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires + 1, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
     let runtime = fixture.open()?;
     assert!(effect.metadata()?.len() > 0);
     let usage = grant_quota(&runtime, &execution)?;

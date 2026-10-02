@@ -250,10 +250,6 @@ pub(crate) async fn handle_submit_finding_challenge(
     AxumPath(finding_id): AxumPath<String>,
     request: Request,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
     let (config, store) = match finding_market_context(&state) {
         Ok(context) => context,
         Err(response) => return response,
@@ -281,6 +277,7 @@ pub(crate) async fn handle_submit_finding_challenge(
             Ok(collected) => collected,
             Err(response) => return response,
         };
+    let clock = Arc::clone(&state.finding_challenge_clock);
     let executor = Arc::clone(executor);
     let purchase_executor = state.finding_purchase_executor.clone();
     let service_token = state.config.service_token.clone();
@@ -402,6 +399,12 @@ pub(crate) async fn handle_submit_finding_challenge(
                 "challenge does not bind the stored finding",
             );
         }
+
+        // Body I/O and blocking-pool queueing cannot extend signed filing authority.
+        let clock_now = match clock.unix_millis() {
+            Ok(now) => now.as_secs(),
+            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+        };
 
         match executor.submit(&request, raw_challenge_envelope, &raw_finding, clock_now) {
             Ok(outcome) => Json(FindingChallengeSubmissionResponse::from(outcome)).into_response(),

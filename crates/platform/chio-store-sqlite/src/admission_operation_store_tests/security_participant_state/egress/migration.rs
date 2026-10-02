@@ -51,7 +51,7 @@ fn v29_upgrade_preserves_native_initialization_join_bytes_and_global_digests() -
     assert_eq!(native::verify_all(&connection)?, vec![initialized.clone()]);
     assert_eq!(connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i32>(0))?, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION);
     drop(connection);
-    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fixture = Fixture {
         _temp,
         database,
@@ -143,7 +143,12 @@ fn missing_current_egress_catalog_is_not_repaired() -> AnchoredTestResult {
         let connection = Connection::open(&database)?;
         let before = global_history(&connection)?;
         assert!(SqliteAuthorityStore::provision(&database, &lock_root).is_err());
-        assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+        assert!(SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &lock_root,
+            chio_test_support::clock::clock()
+        )
+        .is_err());
         assert_eq!(global_history(&connection)?, before);
     }
     Ok(())

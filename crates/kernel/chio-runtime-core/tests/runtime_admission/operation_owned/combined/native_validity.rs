@@ -15,7 +15,7 @@ type Hook = ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>;
 fn native_runtime_deadline_includes_the_verified_bilateral_capability_lease() -> TestResult {
     use base64::Engine;
     use chio_federation::bilateral_dsse::{pae, DsseSignature};
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     const UNTIL: u64 = NOW + 5_000;
     let fixture = CombinedFixture::with_treaty_input(None, |treaty, origin, local| {
         let (mut statement, _) = treaty.bilateral_dsse.decode_statement()?;
@@ -137,7 +137,7 @@ fn physical_input(
 #[test]
 fn native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_plan() -> TestResult
 {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = CombinedFixture::new()?;
     let hook = Arc::new(fixture.hook()?);
     let kernel = fixture.kernel(SharedHook(hook.clone()))?;
@@ -181,7 +181,7 @@ fn native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_p
 
 #[test]
 fn native_runtime_deadline_includes_every_selected_signed_time_bound() -> TestResult {
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     const UNTIL: u64 = NOW + 10_000;
     for selected in ["profile", "trust", "key", "policy", "weights", "report"] {
         let fixture = Fixture::new(true)?;

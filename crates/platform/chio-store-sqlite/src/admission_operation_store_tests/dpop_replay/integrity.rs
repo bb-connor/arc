@@ -29,7 +29,7 @@ fn local_rows_and_global_references_are_verified_without_external_write_detectio
         let Fixture { _temp, database, lock_root, authority, store, .. } = fixture;
         drop(store);
         drop(authority);
-        assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err(), "{mutation}");
+        assert!(SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()).is_err(), "{mutation}");
     }
     Ok(())
 }
@@ -126,7 +126,12 @@ fn current_schema_damage_is_not_repaired_on_reopen() -> AnchoredTestResult {
         let before: i64 =
             connection.query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| row.get(0))?;
         assert!(
-            SqliteAuthorityStore::open_serving(&database, &lock_root).is_err(),
+            SqliteAuthorityStore::open_serving_with_clock(
+                &database,
+                &lock_root,
+                chio_test_support::clock::clock()
+            )
+            .is_err(),
             "{sql}"
         );
         assert!(

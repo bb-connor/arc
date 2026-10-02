@@ -9,6 +9,38 @@ use super::RunnerError;
 
 const MAX_READ_GRANTS_BYTES: u64 = 64 * 1024;
 
+/// The wrapped server must use the interpreter whose runtime files were
+/// reviewed. The peer keeps its SDK-capable interpreter from the run options.
+pub(super) fn configured_upstream_python(peer_python: &OsString) -> Result<OsString, RunnerError> {
+    select_upstream_python(peer_python, std::env::var_os("CHIO_DEMO_PYTHON"))
+}
+
+fn select_upstream_python(
+    peer_python: &OsString,
+    packaged_python: Option<OsString>,
+) -> Result<OsString, RunnerError> {
+    match packaged_python {
+        Some(program) if Path::new(&program).is_absolute() => Ok(program),
+        Some(_) => Err(RunnerError::InvalidSecurityMaterial(
+            "CHIO_DEMO_PYTHON must name an absolute interpreter path".into(),
+        )),
+        None => Ok(peer_python.clone()),
+    }
+}
+
+pub(super) fn upstream_launch_arguments(target: &Path, script: &Path) -> Vec<OsString> {
+    vec![
+        "--target".into(),
+        target.as_os_str().to_owned(),
+        "--target-arg".into(),
+        script.as_os_str().to_owned(),
+        "--read-path".into(),
+        script.as_os_str().to_owned(),
+        "--runtime-file".into(),
+        script.as_os_str().to_owned(),
+    ]
+}
+
 pub(super) fn configured_cage_arguments() -> Result<Vec<OsString>, RunnerError> {
     cage_arguments(|name| std::env::var_os(name))
 }
@@ -146,6 +178,45 @@ fn required_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn configured_native_python_preserves_the_sdk_peer_interpreter() -> Result<(), RunnerError> {
+        let peer_python = OsString::from("/sdk virtualenv/bin/python");
+        let packaged_python = OsString::from("/reviewed runtime/python");
+        assert_eq!(
+            select_upstream_python(&peer_python, Some(packaged_python.clone()))?,
+            packaged_python
+        );
+        assert_eq!(peer_python, OsString::from("/sdk virtualenv/bin/python"));
+        assert_eq!(select_upstream_python(&peer_python, None)?, peer_python);
+        for invalid in ["", "python3", "relative/python"] {
+            assert!(matches!(
+                select_upstream_python(&peer_python, Some(invalid.into())),
+                Err(RunnerError::InvalidSecurityMaterial(_))
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn upstream_script_is_bound_as_an_argument_and_retained_runtime_file() {
+        let target = Path::new("/reviewed runtime/python");
+        let script = Path::new("/private run/mock server.py");
+        assert_eq!(
+            upstream_launch_arguments(target, script),
+            [
+                "--target",
+                "/reviewed runtime/python",
+                "--target-arg",
+                "/private run/mock server.py",
+                "--read-path",
+                "/private run/mock server.py",
+                "--runtime-file",
+                "/private run/mock server.py",
+            ]
+            .map(OsString::from)
+        );
+    }
 
     #[test]
     fn missing_enforcement_configuration_is_refused() {

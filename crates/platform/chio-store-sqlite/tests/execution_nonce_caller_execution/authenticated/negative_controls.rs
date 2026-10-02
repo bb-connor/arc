@@ -28,8 +28,7 @@ fn unused_expired_reservation_cannot_publish_start_authority() -> TestResult {
     let runtime = fixture.open()?;
     let request = reserve(&fixture, &runtime, "expired-before-start")?;
     let nonce = request.execution_nonce.as_ref().ok_or("nonce")?;
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(u64::try_from(nonce.expires_at())?, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(u64::try_from(nonce.expires_at())?);
     assert!(!matches!(
         runtime
             .kernel

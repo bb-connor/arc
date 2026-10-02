@@ -57,8 +57,7 @@ impl ProofRoomError {
     /// Owner-defined public reasons; no input-derived detail is exposed.
     pub fn public_reason(&self) -> Option<&'static str> {
         if let Self::Validation(message) = self {
-            return (message == "proof-room.commerce-invalid: CHIO_COMMERCE_TRUSTED_EVENT_AUTHORITY_RECEIPT_KERNEL_KEYS must pin trusted commerce event authority receipt kernel keys")
-                .then_some("CHIO_COMMERCE_TRUSTED_EVENT_AUTHORITY_RECEIPT_KERNEL_KEYS must pin trusted commerce event authority receipt kernel keys");
+            return validation_public_reason(message);
         }
         let Self::Verification { source, .. } = self else {
             return None;
@@ -90,25 +89,67 @@ impl ProofRoomError {
                 _ => None,
             };
         }
-        if let Some(
-            chio_transaction_passport::TransactionPassportError::RiskComptrollerClaimFailed(reason),
-        ) = source.downcast_ref::<chio_transaction_passport::TransactionPassportError>()
+        if let Some(error) = source.downcast_ref::<chio_web3::error::Web3ContractError>() {
+            use chio_web3::error::Web3ContractError;
+            return match error {
+                Web3ContractError::InvalidProof(reason)
+                    if reason == "public settlement independent head missing" =>
+                {
+                    Some("public settlement independent head missing")
+                }
+                Web3ContractError::InvalidSettlement(reason)
+                    if reason == "public settlement independent head block hash mismatch" =>
+                {
+                    Some("public settlement independent head block hash mismatch")
+                }
+                _ => None,
+            };
+        }
+        if let Some(error) =
+            source.downcast_ref::<chio_transaction_passport::TransactionPassportError>()
         {
-            return match reason.as_str() {
-                "risk facility lifecycle authority missing" => {
-                    Some("risk facility lifecycle authority missing")
+            use chio_transaction_passport::TransactionPassportError;
+            return match error {
+                TransactionPassportError::Input(_) => Some("proof-room.schema-violation: artifact"),
+                TransactionPassportError::AgentWebClaimFailed(reason)
+                    if reason == "missing Standard Webhooks verifier secret" =>
+                {
+                    Some("missing Standard Webhooks verifier secret")
                 }
-                "risk facility lifecycle evidence missing" => {
-                    Some("risk facility lifecycle evidence missing")
+                TransactionPassportError::RiskComptrollerClaimFailed(reason) => {
+                    match reason.as_str() {
+                        "risk facility lifecycle authority missing" => {
+                            Some("risk facility lifecycle authority missing")
+                        }
+                        "risk facility lifecycle evidence missing" => {
+                            Some("risk facility lifecycle evidence missing")
+                        }
+                        "risk reserve ledger receipt missing" => {
+                            Some("risk reserve ledger receipt missing")
+                        }
+                        "risk claim outside coverage" => Some("risk claim outside coverage"),
+                        _ => None,
+                    }
                 }
-                "risk reserve ledger receipt missing" => {
-                    Some("risk reserve ledger receipt missing")
-                }
-                "risk claim outside coverage" => Some("risk claim outside coverage"),
                 _ => None,
             };
         }
         None
+    }
+}
+
+fn validation_public_reason(message: &str) -> Option<&'static str> {
+    // The settlement RPC adapter still carries a string cause. Recognize only
+    // its complete owner-defined context and reason; never return the host.
+    if message.starts_with("proof-room.public-settlement-invalid: CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL eth_blockNumber rejected by HttpEgressContract: loopback egress target denied: ") {
+        return Some("loopback egress target denied");
+    }
+    match message {
+        "proof-room.commerce-invalid: CHIO_COMMERCE_TRUSTED_EVENT_AUTHORITY_RECEIPT_KERNEL_KEYS must pin trusted commerce event authority receipt kernel keys" => Some("CHIO_COMMERCE_TRUSTED_EVENT_AUTHORITY_RECEIPT_KERNEL_KEYS must pin trusted commerce event authority receipt kernel keys"),
+        "proof-room.commerce-invalid: CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys" => Some("CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys"),
+        "proof-room.disclosure-lineage-invalid: CHIO_DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS must pin trusted disclosure lineage signer keys" => Some("CHIO_DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS must pin trusted disclosure lineage signer keys"),
+        "proof-room.public-settlement-invalid: CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS must pin trusted public settlement chain IDs" => Some("CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS must pin trusted public settlement chain IDs"),
+        _ => None,
     }
 }
 
@@ -121,4 +162,46 @@ pub(crate) fn source_runtime_regeneration_error(
         "proof-room.runtime-regeneration.invalid"
     };
     ProofRoomError::verification(context, error)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_reasons_require_the_expected_owner_and_complete_literal() {
+        for (message, reason) in [
+            ("proof-room.commerce-invalid: CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys", "CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys"),
+            ("proof-room.disclosure-lineage-invalid: CHIO_DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS must pin trusted disclosure lineage signer keys", "CHIO_DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS must pin trusted disclosure lineage signer keys"),
+        ] {
+            assert_eq!(
+                ProofRoomError::Validation(message.into()).public_reason(),
+                Some(reason)
+            );
+            for unknown in [
+                format!("{message}: private-marker"),
+                format!("private-marker: {message}"),
+            ] {
+                assert_eq!(ProofRoomError::Validation(unknown).public_reason(), None);
+            }
+        }
+        let reason = "public settlement independent head block hash mismatch";
+        let valid = ProofRoomError::verification(
+            "proof-room.source-verifier.failed",
+            chio_web3::error::Web3ContractError::InvalidSettlement(reason.into()),
+        );
+        assert_eq!(valid.public_reason(), Some(reason));
+        let wrong_variant = ProofRoomError::verification(
+            "proof-room.source-verifier.failed",
+            chio_web3::error::Web3ContractError::InvalidProof(reason.into()),
+        );
+        assert_eq!(wrong_variant.public_reason(), None);
+        let injected_detail = ProofRoomError::verification(
+            "proof-room.source-verifier.failed",
+            chio_web3::error::Web3ContractError::InvalidSettlement(format!(
+                "{reason}: private-marker"
+            )),
+        );
+        assert_eq!(injected_detail.public_reason(), None);
+    }
 }

@@ -8,6 +8,9 @@
 mod budget_fixture;
 pub(crate) use budget_fixture::seed_budget_exposure;
 
+#[path = "private_fixture.rs"]
+mod private_fixture;
+
 pub(crate) use super::receipt_query_capital_authority::*;
 pub(crate) use super::receipt_query_helpers::*;
 
@@ -296,7 +299,7 @@ pub(crate) fn trust_service_authority_seed_path(receipt_db_path: &Path) -> PathB
 
 pub(crate) fn write_trust_service_authority_seed(receipt_db_path: &Path) -> PathBuf {
     let authority_seed_path = trust_service_authority_seed_path(receipt_db_path);
-    std::fs::write(&authority_seed_path, test_kernel_keypair().seed_hex())
+    private_fixture::write_private_file(&authority_seed_path, test_kernel_keypair().seed_hex())
         .expect("write authority seed file");
     authority_seed_path
 }

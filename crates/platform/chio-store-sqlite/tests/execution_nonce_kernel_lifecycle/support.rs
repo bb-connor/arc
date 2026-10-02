@@ -141,28 +141,32 @@ impl Fixture {
     }
 
     pub fn open_with_reconcile(&self, reconcile: bool) -> TestResult<Runtime> {
-        let authority = SqliteAuthorityStore::open_serving(
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
             self.database(),
             self.directory.path().join("locks"),
+            chio_test_support::clock::clock(),
         )?;
-        let mut kernel = ChioKernel::new(KernelConfig {
-            keypair: self.signer.clone(),
-            ca_public_keys: vec![self.signer.public_key()],
-            max_delegation_depth: 5,
-            policy_hash: chio_core::sha256_hex(b"kernel-nonce-lifecycle-policy"),
-            allow_sampling: false,
-            allow_sampling_tool_use: false,
-            allow_elicitation: false,
-            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-            require_web3_evidence: false,
-            allow_ephemeral_receipt_log: false,
-            allow_ephemeral_revocation_store: false,
-            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-            retention_config: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        });
+        let mut kernel = ChioKernel::new_with_clock(
+            KernelConfig {
+                keypair: self.signer.clone(),
+                ca_public_keys: vec![self.signer.public_key()],
+                max_delegation_depth: 5,
+                policy_hash: chio_core::sha256_hex(b"kernel-nonce-lifecycle-policy"),
+                allow_sampling: false,
+                allow_sampling_tool_use: false,
+                allow_elicitation: false,
+                max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+                max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+                require_web3_evidence: false,
+                allow_ephemeral_receipt_log: false,
+                allow_ephemeral_revocation_store: false,
+                checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+                retention_config: None,
+                memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+                deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            },
+            chio_test_support::clock::clock(),
+        );
         let receipts = SqliteReceiptStore::open(self.directory.path().join("receipts.db"))?;
         // Match production startup: opening spawns the writer, but does not
         // publish readiness until it has verified its durable head.

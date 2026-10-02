@@ -382,5 +382,5 @@ fn load_risk_comptroller_report_from_graph(
         trusted_authority_keys,
     )
     .map_err(map_proof_error)?;
-    crate::input::project(value).map_err(CliError::from)
+    crate::input::project(value)
 }

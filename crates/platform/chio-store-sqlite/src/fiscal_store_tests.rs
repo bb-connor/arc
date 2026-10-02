@@ -662,7 +662,7 @@ fn fiscal_schema_migrates_durable_admission_sequence() -> TestResult {
 fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;
-    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let authority = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.fiscal_store();
     store.initialize_genesis(
@@ -685,7 +685,7 @@ fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
     drop(store);
     drop(authority);
 
-    let reopened = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let reopened = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let reopened_store = reopened.fiscal_store();
     assert_eq!(reopened_store.load_authority_state()?, fixture.authority);
     assert_eq!(reopened_store.load_genesis_policy()?, fixture.policy);
@@ -715,7 +715,7 @@ fn fiscal_admission_is_store_assigned_and_one_per_proposal() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;
     let activation = fiscal_activation_fixture(&fixture)?;
-    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let authority = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.fiscal_store();
     store.initialize_genesis(
@@ -762,7 +762,7 @@ fn fiscal_admission_is_store_assigned_and_one_per_proposal() -> TestResult {
     drop(store);
     drop(authority);
 
-    let reopened = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let reopened = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let connection = rusqlite::Connection::open(&files.database)?;
     assert_eq!(
         connection.query_row(
@@ -780,7 +780,7 @@ fn fiscal_admission_is_store_assigned_and_one_per_proposal() -> TestResult {
 fn staged_fiscal_advance_is_invisible_until_anchor_ack_and_finalize() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;
-    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let authority = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.fiscal_store();
     store.initialize_genesis(
@@ -804,7 +804,7 @@ fn staged_fiscal_advance_is_invisible_until_anchor_ack_and_finalize() -> TestRes
     drop(store);
     drop(authority);
 
-    let reopened = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let reopened = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let reopened_fence = reopened.mutation_fence();
     let store = reopened.fiscal_store();
     assert_eq!(
@@ -838,7 +838,7 @@ fn activation_finalize_atomically_consumes_admission_and_flips_schedule() -> Tes
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;
     let activation = fiscal_activation_fixture(&fixture)?;
-    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let authority = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.fiscal_store();
     store.initialize_genesis(
@@ -903,7 +903,7 @@ fn charter_rotation_finalize_atomically_flips_charter_and_all_schedules() -> Tes
     let fixture = fiscal_fixture()?;
     let current = fiscal_activation_fixture(&fixture)?;
     let rotation = fiscal_rotation_fixture(&fixture, &current)?;
-    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let authority = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.fiscal_store();
     store
@@ -1047,7 +1047,7 @@ fn discarded_activation_stage_preserves_admission_and_candidate_state() -> TestR
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;
     let activation = fiscal_activation_fixture(&fixture)?;
-    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let authority = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.fiscal_store();
     store.initialize_genesis(
@@ -1145,7 +1145,7 @@ fn fiscal_rotation_projection(
 fn unanchored_fiscal_stage_can_be_discarded_without_advancing_authority() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;
-    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let authority = crate::test_authority::open_serving(&files.database, &files.lock_root)?;
     let fence = authority.mutation_fence();
     let store = authority.fiscal_store();
     store.initialize_genesis(

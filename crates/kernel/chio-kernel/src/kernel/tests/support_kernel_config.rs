@@ -21,7 +21,7 @@ pub(in crate::kernel::tests) fn make_config() -> KernelConfig {
 }
 
 pub(in crate::kernel::tests) fn make_kernel(config: KernelConfig) -> ChioKernel {
-    let mut kernel = ChioKernel::new(config);
+    let mut kernel = ChioKernel::new_with_clock(config, chio_test_support::clock::clock());
     kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     kernel
 }

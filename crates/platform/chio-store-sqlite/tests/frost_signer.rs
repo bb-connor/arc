@@ -99,8 +99,12 @@ impl StoreFixture {
     }
 
     fn open(&self) -> (SqliteAuthorityStore, SqliteFrostStore) {
-        let authority = SqliteAuthorityStore::open_serving(&self.database, &self.lock_root)
-            .unwrap_or_else(|error| panic!("open authority: {error}"));
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &self.database,
+            &self.lock_root,
+            chio_test_support::clock::clock(),
+        )
+        .unwrap_or_else(|error| panic!("open authority: {error}"));
         let frost = authority.frost_store();
         (authority, frost)
     }
@@ -1279,7 +1283,12 @@ fn frost_restored_pre_transition_signer_snapshot_is_rejected_by_global_anchor() 
     drop(authority);
 
     restore_database_in_place(&fixture.database, &snapshot);
-    assert!(SqliteAuthorityStore::open_serving(&fixture.database, &fixture.lock_root).is_err());
+    assert!(SqliteAuthorityStore::open_serving_with_clock(
+        &fixture.database,
+        &fixture.lock_root,
+        chio_test_support::clock::clock()
+    )
+    .is_err());
 }
 
 fn test_sealing_key_for(index: usize) -> chio_federation_authority::FrostSealingKey {
