@@ -35,7 +35,7 @@ impl chio_security_types::clock::Clock for ProtocolClock {
     }
 }
 
-fn edge_with_clock(clock: Arc<ProtocolClock>) -> ChioMcpEdge {
+fn edge_with_clock(clock: Arc<dyn chio_security_types::clock::Clock>) -> ChioMcpEdge {
     let (kernel, _) = make_kernel_with_clock(clock);
     let agent = Keypair::generate();
     let capabilities = issue_capabilities(&kernel, &agent);

@@ -1,5 +1,7 @@
 #![cfg(test)]
 use super::*;
+use chio_security_types::clock::{ClockError, ClockReading};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -123,6 +125,80 @@ fn serve_through_clock_failure(pending: bool) -> TestResult {
     if let Some(task) = task {
         assert!(edge.pending_background_tasks.is_empty());
         assert!(edge.tasks[&task].is_terminal());
+    }
+    Ok(())
+}
+
+struct ReadBudgetClock(AtomicUsize);
+
+impl chio_security_types::clock::Clock for ReadBudgetClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        self.0
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                remaining.checked_sub(1)
+            })
+            .map(|_| ProtocolClock::at(0))
+            .map_err(|_| ClockError::Unavailable)
+    }
+}
+
+struct CountingEchoServer(Arc<AtomicUsize>);
+
+#[async_trait::async_trait]
+impl ToolServerConnection for CountingEchoServer {
+    fn server_id(&self) -> &str {
+        "srv"
+    }
+    fn tool_names(&self) -> Vec<String> {
+        EchoServer.tool_names()
+    }
+    async fn invoke(
+        &self,
+        name: &str,
+        arguments: Value,
+        bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        EchoServer.invoke(name, arguments, bridge).await
+    }
+}
+
+#[test]
+fn clock_failure_after_evaluation_starts_retains_terminal_denial_without_automatic_retry(
+) -> TestResult {
+    for channel in [false, true] {
+        let clock = Arc::new(ReadBudgetClock(AtomicUsize::new(usize::MAX)));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut edge = edge_with_clock(clock.clone());
+        edge.kernel
+            .register_tool_server(Box::new(CountingEchoServer(calls.clone())));
+        let task = queue_task(&mut edge);
+        // Queue expiry succeeds; the evaluator's next authority read fails.
+        clock.0.store(1, Ordering::SeqCst);
+        let (_tx, mut rx) = mpsc::channel();
+        let (_cancel_tx, mut cancel_rx) = mpsc::channel();
+        if channel {
+            assert!(edge.process_background_tasks_with_channel(
+                &mut rx,
+                &mut cancel_rx,
+                &mut Vec::new()
+            )?);
+        } else {
+            assert!(edge.process_background_tasks()?);
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(edge.tasks[&task].is_terminal());
+        assert!(edge.pending_background_tasks.is_empty());
+        clock.0.store(usize::MAX, Ordering::SeqCst);
+        let result = edge.handle_tasks_result(json!(22), json!({"taskId":task}));
+        assert_eq!(result["result"]["isError"], true);
+        assert!(!edge.process_background_tasks()?);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        let fresh = queue_task(&mut edge);
+        assert!(edge.process_background_tasks()?);
+        let fresh = edge.tasks.get(&fresh).ok_or("missing fresh task")?;
+        assert_eq!(fresh.status, EdgeTaskStatus::Completed);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
     Ok(())
 }

@@ -78,3 +78,9 @@ clock cannot change an owner constructed with the production clock.
 Finding challenge ingress samples filing time immediately before coordinator
 submission, after collecting the untrusted body and waiting for a blocking
 worker. An earlier availability probe cannot serve as the filing timestamp.
+
+An MCP clock failure before background evaluation leaves the work queued. Once
+kernel evaluation has started, errors become retained terminal task results;
+the edge does not automatically retry them because effects or authority
+consumption may already have occurred. After recovery, the client can collect
+that result and submit fresh authorized work on the same session.

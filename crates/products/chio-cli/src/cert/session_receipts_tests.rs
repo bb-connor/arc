@@ -205,3 +205,35 @@ fn certificate_collection_rejects_uninspectable_rows_before_allocation() {
         assert!(load_session_receipts(&db, "target_%").is_err());
     }
 }
+
+#[test]
+fn certificate_collection_retains_row_context_for_invalid_utf8_text() {
+    let db = database();
+    db.execute("INSERT INTO chio_receipts (rowid, capability_id, json_data) VALUES (7, 'other', CAST(X'FF' AS TEXT))", []).test_unwrap();
+    let error = load_session_receipts(&db, "target_%").test_unwrap_err();
+    let row = std::error::Error::source(&error)
+        .and_then(std::error::Error::source)
+        .test_unwrap();
+    assert!(row.to_string().contains("receipt row 7"), "{row}");
+    assert!(row.source().is_some(), "native decoding cause must survive");
+}
+
+#[test]
+fn certificate_collection_preserves_sqlite_utf16_text_conversion() {
+    for encoding in ["UTF-16le", "UTF-16be"] {
+        let db = rusqlite::Connection::open_in_memory().test_unwrap();
+        db.execute_batch(&format!("PRAGMA encoding='{encoding}'; CREATE TABLE chio_receipts (capability_id TEXT, json_data TEXT);")).test_unwrap();
+        let observed = db
+            .pragma_query_value(None, "encoding", |row| row.get::<_, String>(0))
+            .test_unwrap();
+        assert_eq!(observed, encoding);
+        let signer = chio_core::Keypair::from_seed(&[42; 32]);
+        insert(
+            &db,
+            &serde_json::to_string(&receipt(&signer, 1)).test_unwrap(),
+        );
+        let entries = load_session_receipts(&db, "target_%").test_unwrap();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].receipt.verify_signature().test_unwrap());
+    }
+}

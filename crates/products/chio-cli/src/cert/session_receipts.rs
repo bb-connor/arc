@@ -98,15 +98,18 @@ pub(super) fn load_session_receipts(
     ).map_err(|source| CliError::with_source(&CLI_IO, source))?;
     let rows = statement
         .query_map([scan_bound], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
+            // Retain the row ID even if SQLite TEXT conversion fails. Reading
+            // TEXT also preserves SQLite's UTF-16-to-UTF-8 conversion semantics.
+            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)))
         })
         .map_err(|source| CliError::with_source(&CLI_IO, source))?;
     let mut entries = Vec::new();
     let mut budget = SessionBudget::default();
     for row in rows {
         let (seq, document) = row.map_err(|source| CliError::with_source(&CLI_IO, source))?;
-        let document =
-            document.ok_or_else(|| RowError::new(seq, "membership is not bounded text"))?;
+        let document = document
+            .map_err(|source| RowError::new(seq, "membership text is invalid").caused_by(source))?
+            .ok_or_else(|| RowError::new(seq, "membership is not bounded text"))?;
         // Validate original bytes before projecting metadata: SQL json_extract and
         // permissive Value decoding can conceal duplicate session identifiers.
         let value: Value = crate::input::json(document.as_bytes()).map_err(|source| {
