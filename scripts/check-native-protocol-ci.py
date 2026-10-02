@@ -25,7 +25,7 @@ COMMON_ENV = {
 }
 # Bind the reviewed helper build, terminal privileged probe, bounded Python
 # closure and validated authority grants, including their execution order.
-FIXTURE_ACTION_SHA256 = "2ff37d6fa410ea42145d9bb572062b66537d0b6a53b0b9a04089a9486aac2963"
+FIXTURE_ACTION_SHA256 = "a86df81b318660730af5bcea69433271a0040dee5d1390fcc292375e7ff6019a"
 NATIVE_ENV = {
     "CHIO_CAGE_INIT",
     "CHIO_RECEIPT_ANCHOR_ROOT",

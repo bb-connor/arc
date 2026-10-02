@@ -5,6 +5,7 @@ import copy
 import importlib.util
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -174,6 +175,32 @@ class NativeProtocolCiTests(unittest.TestCase):
                 actual[-2 * len(grants):],
                 [value for grant in grants for value in ("--read-path", str(grant))],
             )
+
+    def test_terminal_evidence_check_works_without_ripgrep(self):
+        # Exercise only the terminal evidence check with base runner tools.
+        # Native isolation remains the responsibility of the real host probe.
+        command = LIVE[2]["runs"]["steps"][1]["run"].splitlines()[-1]
+        grep = shutil.which("grep")
+        self.assertIsNotNone(grep)
+        with tempfile.TemporaryDirectory(prefix="native probe evidence ") as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            (binaries / "grep").symlink_to(grep)
+            for outcome, expected in (
+                ("test result: ok. 1 passed; 0 failed; 0 ignored", 0),
+                ("test result: ok. 0 passed; 0 failed; 0 ignored", 1),
+                ("test result: FAILED. 0 passed; 1 failed; 0 ignored", 1),
+            ):
+                with self.subTest(outcome=outcome):
+                    (directory / "native-discovery.log").write_text(outcome + "\n")
+                    result = subprocess.run(
+                        ["/bin/bash", "-euo", "pipefail", "-c", command],
+                        capture_output=True,
+                        text=True,
+                        env={"PATH": str(binaries), "RUNNER_TEMP": str(directory)},
+                    )
+                    self.assertEqual(result.returncode, expected, result.stderr)
 
     def test_contract_and_negative_checks_remain_enrolled(self):
         for document, job_id, name in (

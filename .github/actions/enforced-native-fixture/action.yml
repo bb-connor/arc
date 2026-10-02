@@ -29,7 +29,7 @@ runs:
         native_probe=$(cat "$RUNNER_TEMP/native-discovery-binary")
         helper=$(realpath "$RUNNER_TEMP/chio-cage-init")
         sudo env CHIO_CAGE_TEST_HELPER="$helper" "$native_probe" --exact privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup --nocapture 2>&1 | tee "$RUNNER_TEMP/native-discovery.log"
-        rg -q 'test result: ok\. 1 passed; 0 failed' "$RUNNER_TEMP/native-discovery.log"
+        grep -Fq 'test result: ok. 1 passed; 0 failed' "$RUNNER_TEMP/native-discovery.log"
     - name: Prepare independent authority fixture for non-root consumers
       shell: bash
       run: |
