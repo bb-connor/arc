@@ -48,6 +48,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/core/chio-bounded/**",
             "crates/core/chio-core-types/**",
             "crates/core/chio-core/**",
+            "crates/core/chio-response-model/**",
             "crates/platform/chio-http-core/**",
             "crates/platform/chio-http-session/**",
             "crates/platform/chio-manifest/**",
