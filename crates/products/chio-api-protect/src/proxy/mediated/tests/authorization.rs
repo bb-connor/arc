@@ -1182,7 +1182,7 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
-    let configured = build_budget_store(&config)
+    let configured = build_budget_store(&config, Arc::new(clock::ProxyClock::default()))
         .unwrap()
         .expect("a budget store must be built");
     assert!(configured.hold_capable);

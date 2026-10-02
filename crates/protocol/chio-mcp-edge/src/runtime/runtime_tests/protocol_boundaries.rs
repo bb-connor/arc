@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "clock_recovery.rs"]
+mod clock_recovery;
+
 struct ProtocolClock(
     std::sync::Mutex<
         Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>,

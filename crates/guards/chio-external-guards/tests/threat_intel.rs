@@ -17,6 +17,9 @@ use serde_json::json;
 use wiremock::matchers::{any, header, method, path, path_regex, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+#[path = "threat_intel/virustotal_outcomes.rs"]
+mod virustotal_outcomes;
+
 const KNOWN_BAD_HASH: &str = "44d88612fea8a8f36de82e1278abb02f44d88612fea8a8f36de82e1278abb02f";
 
 fn fast_retry() -> RetryConfig {

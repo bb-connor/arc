@@ -64,6 +64,13 @@ An exact retry recovers the same durable operation and completion even after
 the original approval expires; changing the intent or authorization fails
 closed.
 
+Upstream response headers are normalized and stably sorted by name before
+signing. Repeated fields such as `Vary` and `Link` retain their wire value order;
+the signed header digest commits to that order, and durable replay returns the
+same vector. Request header uniqueness and response framing checks (including
+ambiguous `Content-Length` or `Transfer-Encoding`) remain enforced. Credential
+stripping and raw header-count, byte and body limits apply before persistence.
+
 ## Deployment and recovery
 
 Run the daemon as a dedicated service identity. Supply a service-private canonical JSON configuration, absolute and distinct database paths, private socket directories, the two inherited sealed key descriptors, an externally anchored migration ledger and minimum heads, and a reachable authenticated authority socket. Brokerd adopts each distinct raw key descriptor exactly once, sets `CLOEXEC` on the adopted descriptor without reopening `/proc`, consumes the sealed key, and closes the descriptor before IPC readiness. Preserve the four broker databases together with the tenant master key and broker signing seed. Preserve and anchor the migration ledger independently so restoring a valid prefix cannot silently roll production back.

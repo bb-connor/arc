@@ -1083,10 +1083,10 @@ pub(crate) fn validate_durable_completed_response(
     let mut previous: Option<&str> = None;
     for header in &response.headers {
         if crate::protocol::HeaderField::normalized(&header.name, &header.value)? != *header
-            || previous.is_some_and(|name| name >= header.name.as_str())
+            || previous.is_some_and(|name| name > header.name.as_str())
         {
             return Err(BrokerError::ResponseRejected(
-                "completed broker response headers are not normalized and unique".to_string(),
+                "completed broker response headers are not normalized and sorted".to_string(),
             ));
         }
         previous = Some(&header.name);

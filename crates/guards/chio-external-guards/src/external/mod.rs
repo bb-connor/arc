@@ -27,7 +27,7 @@ pub use bedrock::{
 };
 pub use threat_intel::{
     SafeBrowsingConfig, SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity, VirusTotalConfig,
-    VirusTotalGuard,
+    VirusTotalGuard, VirusTotalUnseenPolicy,
 };
 pub use vertex_safety::{
     VertexDecisionDetails, VertexProbability, VertexRatingBreakdown, VertexSafetyConfig,

@@ -147,6 +147,65 @@ fn exact_retry_resumes_prepared_held_or_captured_without_a_second_send() {
 
 #[test]
 fn lost_completed_response_replays_exactly_after_service_and_store_restart() {
+    completed_response_after_restart(Vec::new());
+}
+
+#[test]
+fn repeated_response_headers_survive_dispatch_and_durable_replay_in_wire_value_order() {
+    let header =
+        |name: &str, value: &str| HeaderField::normalized(name, value.as_bytes()).test_unwrap();
+    let completed = completed_response_after_restart(vec![
+        header("Vary", "Origin"),
+        header("Link", "</second>"),
+        header("Vary", "Accept-Encoding"),
+        header("Link", "</first>"),
+        header("Set-Cookie", "private-cookie"),
+    ]);
+    assert_eq!(
+        completed.headers,
+        vec![
+            header("content-length", &completed.body.len().to_string()),
+            header("link", "</second>"),
+            header("link", "</first>"),
+            header("vary", "Origin"),
+            header("vary", "Accept-Encoding"),
+        ]
+    );
+    assert_eq!(completed.body, b"sanitized-upstream-response");
+    let signer = Keypair::from_seed(&[3; 32]).public_key();
+    crate::receipt::validate_durable_completed_response(&completed, &signer).test_unwrap();
+    let mut reordered = completed.clone();
+    reordered.headers.swap(1, 2);
+    assert!(
+        crate::receipt::validate_durable_completed_response(&reordered, &signer).is_err(),
+        "equal-name value order must be signed"
+    );
+    let mut unsorted = completed.clone();
+    unsorted.headers.swap(0, 1);
+    assert!(crate::receipt::validate_durable_completed_response(&unsorted, &signer).is_err());
+    assert!(
+        crate::protocol::normalize_headers(completed.headers).is_err(),
+        "request headers still require uniqueness"
+    );
+}
+
+struct RepeatedHeadersTransport {
+    inner: ObservingTransport,
+    extra_headers: Vec<HeaderField>,
+}
+
+impl PinnedHttpsTransport for RepeatedHeadersTransport {
+    fn dispatch(&self, request: PinnedHttpsRequest) -> Result<RawHttpsResponse> {
+        let mut response = self.inner.dispatch(request)?;
+        for header in &self.extra_headers {
+            response.response_head_bytes += header.name.len() + header.value.len() + 4;
+            response.headers.push(header.clone());
+        }
+        Ok(response)
+    }
+}
+
+fn completed_response_after_restart(extra_headers: Vec<HeaderField>) -> BrokerExecuteResponse {
     let directory = crate::private_tempdir().test_expect("tempdir");
     let trusted_directory =
         std::fs::canonicalize(directory.path()).test_expect("canonicalize database directory");
@@ -158,7 +217,7 @@ fn lost_completed_response_replays_exactly_after_service_and_store_restart() {
         crate::receipt::SqliteBrokerReceiptSink::open(&receipt_path, receipt_signer.public_key())
             .test_expect("receipt sink"),
     );
-    let fixture = fixture_with_stores(
+    let mut fixture = fixture_with_stores(
         1,
         false,
         false,
@@ -166,6 +225,24 @@ fn lost_completed_response_replays_exactly_after_service_and_store_restart() {
         receipt_sink,
         Arc::new(Mutex::new(Vec::new())),
     );
+    let https = Arc::new(GenericHttpsExecutor::new(
+        Arc::new(PublicResolver {
+            calls: Arc::clone(&fixture.resolver_calls),
+        }),
+        Arc::new(RepeatedHeadersTransport {
+            inner: ObservingTransport {
+                observed_authorizations: Arc::clone(&fixture.observed_authorizations),
+                fail: false,
+                redirect: false,
+            },
+            extra_headers,
+        }),
+        NetworkPolicy::production(),
+    ));
+    Arc::get_mut(&mut fixture.service)
+        .test_expect("unshared fixture service")
+        .https = Arc::clone(&https);
+    fixture.https = https;
     let (request, trusted) = execution(&fixture, 55, 1);
     register_execution(&fixture, &request, &trusted, 20);
     let completed = fixture
@@ -255,6 +332,7 @@ fn lost_completed_response_replays_exactly_after_service_and_store_restart() {
         1,
         "completed replay must not redispatch"
     );
+    completed
 }
 
 #[test]

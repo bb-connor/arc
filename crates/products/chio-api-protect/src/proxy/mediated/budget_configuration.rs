@@ -28,10 +28,12 @@ pub(crate) struct ConfiguredBudgetStore {
 /// nonce.
 pub(crate) fn build_budget_store(
     config: &ProtectConfig,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<Option<ConfiguredBudgetStore>, ProtectError> {
     if let Some(path) = config.budget_db.as_deref() {
-        let store = chio_store_sqlite::budget_store::SqliteBudgetStore::open(path)
-            .map_err(|error| ProtectError::Config(error.to_string()))?;
+        let store =
+            chio_store_sqlite::budget_store::SqliteBudgetStore::open_with_clock(path, clock)
+                .map_err(|error| ProtectError::Config(error.to_string()))?;
         return Ok(Some(ConfiguredBudgetStore {
             store: Arc::new(store),
             hold_capable: true,

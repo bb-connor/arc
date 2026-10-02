@@ -611,18 +611,10 @@ fn sanitize_response_headers(
             "upstream response header is invalid".to_string(),
         ));
     }
-    // Durable responses commit a unique, normalized header vector. Establish
-    // that representation before signing, independent of upstream wire order.
-    sanitized.sort_unstable_by(|left, right| left.name.cmp(&right.name));
-    if sanitized
-        .windows(2)
-        .any(|pair| matches!(pair, [left, right] if left.name == right.name))
-    {
-        zeroize_headers(&mut sanitized);
-        return Err(BrokerError::ResponseRejected(
-            "upstream response contains duplicate retained headers".to_string(),
-        ));
-    }
+    // Sign a name-sorted vector while retaining the wire value order of repeated
+    // response fields (RFC 9110 section 5.3). Request uniqueness is a separate
+    // contract; framing validation already rejects ambiguous length/encoding.
+    sanitized.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(sanitized)
 }
 
@@ -1223,7 +1215,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["content-length", "content-type", "server"]
         );
-        let error = sanitize_response_headers(
+        let repeated = sanitize_response_headers(
             vec![
                 HeaderField {
                     name: "X-Result".into(),
@@ -1236,8 +1228,14 @@ mod tests {
             ],
             &credential,
         )
-        .test_expect_err("duplicate normalized header refused");
-        assert!(matches!(error, BrokerError::ResponseRejected(_)));
+        .test_expect("repeated normalized response headers retained");
+        assert_eq!(
+            repeated,
+            vec![
+                HeaderField::normalized("x-result", b"one").test_unwrap(),
+                HeaderField::normalized("x-result", b"two").test_unwrap(),
+            ]
+        );
     }
 
     #[test]

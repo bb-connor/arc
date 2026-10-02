@@ -1105,7 +1105,7 @@ fn build_budget_store_local_sqlite_when_no_control_url() {
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
-    let configured = build_budget_store(&config).unwrap();
+    let configured = build_budget_store(&config, Arc::new(clock::ProxyClock::default())).unwrap();
     let configured = configured.expect("local sqlite budget store must be built");
     assert!(
         configured.hold_capable,
@@ -1137,7 +1137,7 @@ fn build_budget_store_remote_is_not_hold_capable() {
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
-    let configured = build_budget_store(&config).unwrap();
+    let configured = build_budget_store(&config, Arc::new(clock::ProxyClock::default())).unwrap();
     let configured = configured.expect("remote budget store must be built");
     assert!(
         !configured.hold_capable,
@@ -1172,7 +1172,7 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
-    let configured = build_budget_store(&config).unwrap();
+    let configured = build_budget_store(&config, Arc::new(clock::ProxyClock::default())).unwrap();
     let configured = configured.expect("a budget store must be built when both are configured");
     assert!(
         configured.hold_capable,

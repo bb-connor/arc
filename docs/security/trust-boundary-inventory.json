@@ -328,6 +328,7 @@
     "crates/products/chio-cli/src/archive.rs",
     "crates/products/chio-cli/src/archive/namespace.rs",
     "crates/products/chio-cli/src/cert.rs",
+    "crates/products/chio-cli/src/cert/session_receipts.rs",
     "crates/products/chio-cli/src/cli/chio/dispatch/authority.rs",
     "crates/products/chio-cli/src/cli/chio/dispatch/buyer.rs",
     "crates/products/chio-cli/src/cli/chio/dispatch/io.rs",
@@ -12198,6 +12199,10 @@
     "crates/trust/chio-weights/src/card.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding."
+    },
+    "crates/products/chio-cli/src/cert/session_receipts.rs": {
+      "contract": "Bounded single-snapshot certificate session scan: strict native signed JSON before unambiguous exact metadata selection, then shared typed projection. Per-row and aggregate session limits abort without truncation; selected signatures remain the generator/verifier responsibility. Duplicate, conflicting or unknown membership aborts with private row context.",
+      "kind": "reviewed-bounded-input"
     }
   }
 }

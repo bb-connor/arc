@@ -606,6 +606,9 @@ impl ChioMcpEdge {
         let mut processed_any = false;
 
         for _ in 0..MAX_BACKGROUND_TASKS_PER_TICK {
+            if self.pending_background_tasks.is_empty() {
+                break;
+            }
             // Every dispatch checks expiry, including tasks delayed behind other work.
             let observed = self.prune_expired_tasks()?;
             let Some(task_id) = self.pending_background_tasks.first().cloned() else {
@@ -658,6 +661,9 @@ impl ChioMcpEdge {
         let mut processed_any = false;
 
         for _ in 0..MAX_BACKGROUND_TASKS_PER_TICK {
+            if self.pending_background_tasks.is_empty() {
+                break;
+            }
             // Every dispatch checks expiry, including tasks delayed behind other work.
             let observed = self.prune_expired_tasks()?;
             let Some(task_id) = self.pending_background_tasks.first().cloned() else {
@@ -707,7 +713,10 @@ impl ChioMcpEdge {
         cancel_rx: &mut mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Result<(), AdapterError> {
-        let _ = self.process_background_tasks_with_channel(client_rx, cancel_rx, writer)?;
+        match self.process_background_tasks_with_channel(client_rx, cancel_rx, writer) {
+            Ok(_) | Err(AdapterError::Clock(_)) => {}
+            Err(error) => return Err(error),
+        }
         self.process_pending_actions_with_channel(client_rx, writer)?;
         self.forward_runtime_events();
         self.flush_pending_notifications(writer)?;

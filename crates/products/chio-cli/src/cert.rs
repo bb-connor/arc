@@ -5,10 +5,17 @@ use std::path::Path;
 
 use chio_acp_proxy::{
     generate_compliance_certificate, verify_compliance_certificate, ComplianceCertificate,
-    ComplianceConfig, ComplianceReceiptEntry, VerificationMode,
+    ComplianceConfig, VerificationMode,
 };
 
 use crate::CliError;
+
+mod session_receipts;
+use session_receipts::load_session_receipts;
+
+#[cfg(test)]
+#[path = "cert/session_receipts_tests.rs"]
+mod session_receipts_tests;
 
 /// `chio cert generate` -- walk the receipt store for a session and produce
 /// a signed compliance certificate.
@@ -216,57 +223,6 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
     }
 
     Ok(())
-}
-
-/// Load Chio receipts for a given session from the SQLite receipt store.
-///
-/// This queries the `chio_receipts` table for receipts whose
-/// signed metadata names the exact session, independent of capability ID.
-fn load_session_receipts(
-    conn: &rusqlite::Connection,
-    session_id: &str,
-) -> Result<Vec<ComplianceReceiptEntry>, CliError> {
-    let table_exists: bool = conn
-        .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chio_receipts'")
-        .and_then(|mut statement| statement.exists([]))
-        .map_err(|source| {
-            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
-        })?;
-    if !table_exists {
-        return Err(CliError::cli_other_error(
-            "receipt store has no chio_receipts table",
-        ));
-    }
-    let mut statement = conn.prepare(
-        "SELECT rowid, CASE WHEN typeof(json_data) = 'text' AND length(CAST(json_data AS BLOB)) <= ?2 THEN json_data ELSE NULL END FROM chio_receipts WHERE CASE WHEN typeof(json_data) = 'text' AND length(CAST(json_data AS BLOB)) <= ?2 AND json_valid(json_data) THEN COALESCE(CASE WHEN json_type(json_data, '$.metadata.acp.sessionId') = 'text' THEN json_extract(json_data, '$.metadata.acp.sessionId') END, CASE WHEN json_type(json_data, '$.metadata.receipt_context.session_id') = 'text' THEN json_extract(json_data, '$.metadata.receipt_context.session_id') END) = ?1 ELSE 1 END ORDER BY rowid LIMIT ?3"
-    ).map_err(|source| CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source))?;
-    let rows = statement
-        .query_map(
-            rusqlite::params![
-                session_id,
-                1024 * 1024,
-                crate::input::collection::MAX_ENTRIES as i64 + 1
-            ],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-        )
-        .map_err(|source| {
-            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
-        })?;
-    let mut budget = crate::input::collection::Budget::default();
-    let mut entries = Vec::new();
-    for row in rows {
-        let (seq, json_data) = row.map_err(|source| {
-            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
-        })?;
-        budget.enter(0)?;
-        budget.charge(json_data.len())?;
-        let seq = u64::try_from(seq).map_err(|source| {
-            CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
-        })?;
-        let receipt = crate::input::json(json_data.as_bytes())?;
-        entries.push(ComplianceReceiptEntry { receipt, seq });
-    }
-    Ok(entries)
 }
 
 #[cfg(test)]

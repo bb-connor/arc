@@ -2,7 +2,12 @@
 //!
 //! Signed records use Unix milliseconds. Local timeouts use monotonic ticks
 //! from one clock instance and never survive a process restart. Clock failure
-//! or regression denies the operation; neither is a timestamp of zero.
+//! denies the operation and never becomes a timestamp of zero. Strict fences
+//! also reject wall regression; services may explicitly choose an advancing
+//! monotonic epoch floor via [`AdvancingClockFence`].
+
+mod advancing;
+pub use advancing::AdvancingClockFence;
 
 use core::fmt;
 use core::time::Duration;
@@ -312,6 +317,6 @@ pub fn validate_future_skew(
 #[cfg(feature = "std")]
 mod system;
 #[cfg(feature = "std")]
-pub use system::SystemClock;
+pub use system::{AdvancingSystemClock, SystemClock};
 #[cfg(test)]
 mod tests;

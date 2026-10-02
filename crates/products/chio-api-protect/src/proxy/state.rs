@@ -74,6 +74,26 @@ fn prepare_authority_lock_root(path: &std::path::Path) -> Result<(), ProtectErro
     Ok(())
 }
 
+pub(super) fn open_durable_admission(
+    path: &str,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<DurableAdmissionStores, ProtectError> {
+    let (database, lock_root) = authority_sibling_paths(path);
+    prepare_authority_lock_root(&lock_root)?;
+    chio_store_sqlite::SqliteAuthorityStore::provision(&database, &lock_root)
+        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+    let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
+        &database, &lock_root, clock,
+    )
+    .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+    Ok(DurableAdmissionStores {
+        store: Arc::new(authority.admission_operation_store()),
+        outcome_store: Arc::new(authority.tool_outcome_store()),
+        fence: authority.mutation_fence(),
+        budget_store: Arc::new(authority.budget_store()),
+    })
+}
+
 /// Drain window for the proxy serve site, derived from the configured upstream
 /// hop ceiling.
 ///
@@ -634,22 +654,9 @@ impl ProtectProxy {
                 None => Some(Arc::new(chio_kernel::InMemoryRevocationStore::new())),
             };
 
+        let clock = clock::ProxyClock::default();
         let durable_admission = match durable_receipt_db {
-            Some(path) => {
-                let (database, lock_root) = authority_sibling_paths(path);
-                prepare_authority_lock_root(&lock_root)?;
-                chio_store_sqlite::SqliteAuthorityStore::provision(&database, &lock_root)
-                    .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-                let authority =
-                    chio_store_sqlite::SqliteAuthorityStore::open_serving(&database, &lock_root)
-                        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-                Some(DurableAdmissionStores {
-                    store: Arc::new(authority.admission_operation_store()),
-                    outcome_store: Arc::new(authority.tool_outcome_store()),
-                    fence: authority.mutation_fence(),
-                    budget_store: Arc::new(authority.budget_store()),
-                })
-            }
+            Some(path) => Some(open_durable_admission(path, Arc::new(clock.clone()))?),
             None if self.caller_executor.is_some() => {
                 return Err(ProtectError::Config(
                     "authenticated caller execution requires a durable budget authority".into(),
@@ -658,7 +665,6 @@ impl ProtectProxy {
             None => None,
         };
 
-        let clock = clock::ProxyClock::default();
         let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
             routes,
             keypair.clone(),
@@ -728,7 +734,7 @@ impl ProtectProxy {
         let http_client = client_builder_with_contract(&egress_contract)
             .timeout(self.config.upstream_request_timeout)
             .build()?;
-        let configured_budget_store = build_budget_store(&self.config)?;
+        let configured_budget_store = build_budget_store(&self.config, Arc::new(clock.clone()))?;
         // Under durable admission the authority's composite budget store backs
         // every reservation, so the mediation routes are hold-capable there.
         let mediation_hold_capable = durable_admission.is_some()

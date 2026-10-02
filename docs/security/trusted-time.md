@@ -16,6 +16,22 @@ Injected clocks must honor the same contract; `ClockFence` supports deterministi
 adapters. `FixedClock` is for fixed evaluation instants and fixtures, not advancing
 production deadlines.
 
+API-protect opts into `AdvancingSystemClock` and `AdvancingClockFence`. These
+project an epoch floor from a wall/monotonic anchor and return the greater of
+that floor and the current wall sample. Backward or stalled wall time cannot
+freeze expiry; elapsed fractions are retained across reads. Forward wall steps
+advance the anchor immediately. Unavailable samples, monotonic regression,
+poisoned state and overflow still refuse the operation. The service shares this
+clock with its HTTP authority, mediation kernel, replay stores, durable admission,
+local budget store and reaper. Existing strict `SystemClock` consumers retain
+their refusal behavior. This process-local projection does not replace durable
+rollback fences or establish a cross-host time authority.
+
+MCP background ticks preserve the session and pending work when authority time
+fails. They dispatch nothing until a valid observation succeeds, and skip time
+reads entirely when no background work is queued. Requests requiring time still
+return the typed clock rejection. Recovery does not refresh queued task expiry.
+
 Skew applies to a remote signed timestamp at a verification boundary. It never
 permits a local clock to regress or extends an already accepted expiry. The
 verifier's pinned policy supplies its maximum skew; `validate_future_skew`

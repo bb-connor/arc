@@ -10,6 +10,28 @@ Normative spec: `spec/COMPLIANCE-CERTIFICATE.md`
 > is retained as a non-normative companion for design rationale, regulatory
 > mapping, and integration details.
 
+## CLI receipt collection limits
+
+`chio cert generate` and `chio cert verify --full` read a single SQLite
+statement snapshot. Each selected session may contain at most 100,000 receipts
+and 128 MiB of original receipt JSON, with at most 1 MiB per selected receipt.
+These are certificate limits, independent of the 4,096-entry portable proof
+bundle limit. Exceeding a limit aborts the operation; no prefix is certified.
+
+Membership uses exact signed-document metadata (`acp.sessionId` or
+`receipt_context.session_id`), never the unsigned capability index. Original
+JSON is validated before selection. Duplicate fields, conflicting identifiers,
+malformed metadata, non-text rows and uninspectable rows abort collection.
+A row with unambiguous metadata naming another session is excluded even if its
+receipt body is invalid. Inspection is bounded at 16 MiB per row. This is a
+selection rule, not authentication of excluded receipts: selected receipt
+signatures are checked by the certificate generator or full-bundle verifier.
+
+Original SQLite row IDs remain the sequence numbers. Collection never renumbers
+gaps or claims to recover archived or deleted receipts. Failures retain the row
+ID and native parser cause in the local error chain; public diagnostics exclude
+receipt payloads. Repair or restore an uninspectable store before certification.
+
 ## 1. Problem Statement
 
 Enterprises deploying Chio-governed agent systems must demonstrate to auditors,

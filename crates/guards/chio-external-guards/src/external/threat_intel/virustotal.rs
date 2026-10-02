@@ -35,6 +35,25 @@ pub const DEFAULT_MIN_DETECTIONS: u64 = 5;
 /// Default request timeout.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Policy for a documented VirusTotal `NotFoundError`, distinct from service failure.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum VirusTotalUnseenPolicy {
+    /// Unknown reputation cannot authorize the operation (the default).
+    #[default]
+    Deny,
+    /// Explicitly permit targets VirusTotal has never seen.
+    Allow,
+}
+
+impl VirusTotalUnseenPolicy {
+    fn verdict(self) -> Verdict {
+        match self {
+            Self::Deny => Verdict::Deny,
+            Self::Allow => Verdict::Allow,
+        }
+    }
+}
+
 /// Configuration for [`VirusTotalGuard`].
 #[derive(Clone)]
 pub struct VirusTotalConfig {
@@ -47,6 +66,8 @@ pub struct VirusTotalConfig {
     pub min_detections: u64,
     /// Per-request HTTP timeout.
     pub timeout: Duration,
+    /// Decision for a valid, documented unseen result. Provider failures still error.
+    pub unseen_policy: VirusTotalUnseenPolicy,
 }
 
 impl std::fmt::Debug for VirusTotalConfig {
@@ -56,6 +77,7 @@ impl std::fmt::Debug for VirusTotalConfig {
             .field("base_url", &self.base_url)
             .field("min_detections", &self.min_detections)
             .field("timeout", &self.timeout)
+            .field("unseen_policy", &self.unseen_policy)
             .finish()
     }
 }
@@ -68,6 +90,7 @@ impl VirusTotalConfig {
             base_url: None,
             min_detections: DEFAULT_MIN_DETECTIONS,
             timeout: DEFAULT_TIMEOUT,
+            unseen_policy: VirusTotalUnseenPolicy::default(),
         }
     }
 
@@ -80,6 +103,12 @@ impl VirusTotalConfig {
     /// Override the detection threshold.
     pub fn with_min_detections(mut self, threshold: u64) -> Self {
         self.min_detections = threshold.max(1);
+        self
+    }
+
+    /// Choose the decision for unseen URLs and hashes, independently of circuit policy.
+    pub fn with_unseen_policy(mut self, policy: VirusTotalUnseenPolicy) -> Self {
+        self.unseen_policy = policy;
         self
     }
 
@@ -106,6 +135,21 @@ struct VirusTotalArgs {
 struct VirusTotalResponse {
     #[serde(default)]
     data: Option<VirusTotalData>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VirusTotalErrorResponse {
+    error: VirusTotalApiError,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VirusTotalApiError {
+    code: String,
+    // Require the documented string shape, but never expose provider text.
+    #[serde(rename = "message")]
+    _message: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -257,6 +301,12 @@ impl ExternalGuard for VirusTotalGuard {
         )
         .await?;
 
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            let error: VirusTotalErrorResponse = super::super::input::response(resp.body())?;
+            if error.error.code == "NotFoundError" {
+                return Ok(self.cfg.unseen_policy.verdict());
+            }
+        }
         let parsed: VirusTotalResponse = http_egress::response_json(GUARD_NAME, resp)?;
 
         let (malicious, suspicious) = parsed

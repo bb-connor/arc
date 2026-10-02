@@ -1,5 +1,7 @@
-//! One clock and high-water fence for every owner in a remote service.
-use chio_security_types::clock::{Clock, ClockError, ClockFence, ClockReading, SystemClock};
+//! One advancing epoch clock for every authority owner in a remote service.
+use chio_security_types::clock::{
+    AdvancingClockFence, AdvancingSystemClock, Clock, ClockError, ClockReading,
+};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
@@ -7,14 +9,14 @@ pub struct ProxyClock(Arc<ClockOwner>);
 
 struct ClockOwner {
     source: Arc<dyn Clock>,
-    fence: Mutex<ClockFence>,
+    fence: Mutex<AdvancingClockFence>,
 }
 
 impl ProxyClock {
     pub fn new(source: Arc<dyn Clock>) -> Self {
         Self(Arc::new(ClockOwner {
             source,
-            fence: Mutex::new(ClockFence::default()),
+            fence: Mutex::new(AdvancingClockFence::default()),
         }))
     }
 
@@ -33,7 +35,7 @@ impl ProxyClock {
 
 impl Default for ProxyClock {
     fn default() -> Self {
-        Self::new(Arc::new(SystemClock))
+        Self::new(Arc::new(AdvancingSystemClock::default()))
     }
 }
 
@@ -59,6 +61,10 @@ pub(crate) fn rejection(error: ClockError) -> axum::response::Response {
 }
 
 #[cfg(test)]
+#[path = "clock_recovery_tests.rs"]
+mod recovery_tests;
+
+#[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
@@ -80,11 +86,11 @@ mod tests {
     fn clones_share_high_water_and_faults_do_not_reset_it() {
         let source = Arc::new(Mutable(Mutex::new(reading(10, 20))));
         let clock = ProxyClock::new(source.clone());
-        assert_eq!(clock.millis().unwrap(), 10);
+        assert_eq!(clock.millis(), Ok(10));
         *source.0.lock().unwrap() = Err(ClockError::Unavailable);
         assert_eq!(clock.clone().read(), Err(ClockError::Unavailable));
         *source.0.lock().unwrap() = reading(9, 21);
-        assert_eq!(clock.read(), Err(ClockError::WallClockRegression));
+        assert_eq!(clock.millis(), Ok(10));
         *source.0.lock().unwrap() = reading(11, 19);
         assert_eq!(clock.read(), Err(ClockError::MonotonicRegression));
         *source.0.lock().unwrap() = reading(11, 22);
