@@ -183,9 +183,9 @@ Internet-Draft                Chio Protocol                 October 2026
      11.4.  Session States . . . . . . . . . . . . . . . . . . . . . 102
      11.5.  Notification Stream and Replay . . . . . . . . . . . . . 103
      11.6.  Tool Calls . . . . . . . . . . . . . . . . . . . . . . . 104
-     11.7.  Model Metadata . . . . . . . . . . . . . . . . . . . . . 108
+     11.7.  Model Metadata . . . . . . . . . . . . . . . . . . . . . 109
    12. Trust-Control Interface . . . . . . . . . . . . . . . . . . . 109
-     12.1.  Capability Issuance  . . . . . . . . . . . . . . . . . . 109
+     12.1.  Capability Issuance  . . . . . . . . . . . . . . . . . . 110
      12.2.  Delegated Issuance . . . . . . . . . . . . . . . . . . . 111
      12.3.  Receipt Query  . . . . . . . . . . . . . . . . . . . . . 115
        12.3.1.  Paging . . . . . . . . . . . . . . . . . . . . . . . 117
@@ -200,24 +200,24 @@ Internet-Draft                Chio Protocol                 October 2026
      15.3.  Token Theft and Replay . . . . . . . . . . . . . . . . . 123
      15.4.  Kernel Impersonation and Receipt Trust . . . . . . . . . 123
        15.4.1.  Signing Roles and Key Lifecycle  . . . . . . . . . . 124
-     15.5.  Delegation Abuse . . . . . . . . . . . . . . . . . . . . 124
+     15.5.  Delegation Abuse . . . . . . . . . . . . . . . . . . . . 125
      15.6.  Signature Algorithm Downgrade  . . . . . . . . . . . . . 125
      15.7.  Canonicalization . . . . . . . . . . . . . . . . . . . . 125
-     15.8.  Runtime Enforcement Profiles . . . . . . . . . . . . . . 125
+     15.8.  Runtime Enforcement Profiles . . . . . . . . . . . . . . 126
        15.8.1.  Tool Server Confinement  . . . . . . . . . . . . . . 126
-       15.8.2.  Credential Custody . . . . . . . . . . . . . . . . . 126
+       15.8.2.  Credential Custody . . . . . . . . . . . . . . . . . 127
        15.8.3.  Information-Flow Control . . . . . . . . . . . . . . 127
-       15.8.4.  Active Response  . . . . . . . . . . . . . . . . . . 127
+       15.8.4.  Active Response  . . . . . . . . . . . . . . . . . . 128
      15.9.  Resource Exhaustion  . . . . . . . . . . . . . . . . . . 128
      15.10. Budgets and Approvals  . . . . . . . . . . . . . . . . . 128
-     15.11. Checkpoint Equivocation  . . . . . . . . . . . . . . . . 128
-     15.12. Provenance Inflation . . . . . . . . . . . . . . . . . . 128
+     15.11. Checkpoint Equivocation  . . . . . . . . . . . . . . . . 129
+     15.12. Provenance Inflation . . . . . . . . . . . . . . . . . . 129
      15.13. Attestation  . . . . . . . . . . . . . . . . . . . . . . 129
      15.14. Time and Deadlines . . . . . . . . . . . . . . . . . . . 129
-   16. Privacy Considerations  . . . . . . . . . . . . . . . . . . . 129
-   17. IANA Considerations . . . . . . . . . . . . . . . . . . . . . 130
+   16. Privacy Considerations  . . . . . . . . . . . . . . . . . . . 130
+   17. IANA Considerations . . . . . . . . . . . . . . . . . . . . . 131
      17.1.  Chio Error Codes . . . . . . . . . . . . . . . . . . . . 131
-     17.2.  Chio Signature Suites  . . . . . . . . . . . . . . . . . 132
+     17.2.  Chio Signature Suites  . . . . . . . . . . . . . . . . . 133
 
 
 
@@ -227,12 +227,12 @@ Internet-Draft                Chio Protocol                 October 2026
 
 
      17.3.  Chio Native Message Types  . . . . . . . . . . . . . . . 133
-     17.4.  Chio Signed Artifact Schemas . . . . . . . . . . . . . . 133
-   18. Implementation Status . . . . . . . . . . . . . . . . . . . . 134
-   19. References  . . . . . . . . . . . . . . . . . . . . . . . . . 135
-     19.1.  Normative References . . . . . . . . . . . . . . . . . . 135
-     19.2.  Informative References . . . . . . . . . . . . . . . . . 137
-   Appendix A.  Examples . . . . . . . . . . . . . . . . . . . . . . 139
+     17.4.  Chio Signed Artifact Schemas . . . . . . . . . . . . . . 134
+   18. Implementation Status . . . . . . . . . . . . . . . . . . . . 135
+   19. References  . . . . . . . . . . . . . . . . . . . . . . . . . 136
+     19.1.  Normative References . . . . . . . . . . . . . . . . . . 136
+     19.2.  Informative References . . . . . . . . . . . . . . . . . 138
+   Appendix A.  Examples . . . . . . . . . . . . . . . . . . . . . . 140
      A.1.  Capability Token  . . . . . . . . . . . . . . . . . . . . 140
      A.2.  Tool Call Request Frame . . . . . . . . . . . . . . . . . 142
      A.3.  Receipt . . . . . . . . . . . . . . . . . . . . . . . . . 143
@@ -2828,10 +2828,12 @@ Internet-Draft                Chio Protocol                 October 2026
    MUST prevent dispatch.  For authorization artifacts representable by
    the typed digest structures, the kernel returns a signed denial with
    decision deny and guard kernel; the native result is policy_denied.
-   Structurally inconsistent approvals can fail receipt-metadata
-   construction and return internal_error instead.  A fallback error
-   receipt lacks the governed context and is not authenticated under the
-   configured kernel key (Section 10.4).
+   Structurally inconsistent approvals can prevent construction of the
+   usual governed metadata.  If the kernel can still authenticate the
+   request and persist a valid denial, it returns internal_error with a
+   receipt under its configured receipt authority.  Otherwise it
+   terminates the exchange as specified in Section 10.3.  An
+   unconfigured signing key is never an error-recovery mechanism.
 
 8.2.  Governed Intent
 
@@ -2848,8 +2850,6 @@ Internet-Draft                Chio Protocol                 October 2026
    |                   |              |        |copies it to the      |
    |                   |              |        |receipt.              |
    +-------------------+--------------+--------+----------------------+
-   |server_id          |string        |REQUIRED|Target tool server.   |
-   +-------------------+--------------+--------+----------------------+
 
 
 
@@ -2858,6 +2858,8 @@ Whelan                    Expires 5 April 2027                 [Page 51]
 Internet-Draft                Chio Protocol                 October 2026
 
 
+   |server_id          |string        |REQUIRED|Target tool server.   |
+   +-------------------+--------------+--------+----------------------+
    |tool_name          |string        |REQUIRED|Target tool.          |
    +-------------------+--------------+--------+----------------------+
    |purpose            |string        |REQUIRED|Free text; can be     |
@@ -2897,8 +2899,6 @@ Internet-Draft                Chio Protocol                 October 2026
    +-------------------+--------------+--------+----------------------+
 
                     Table 15: Governed Intent Members
-
-
 
 
 
@@ -3452,9 +3452,10 @@ Internet-Draft                Chio Protocol                 October 2026
 
    5.  decision is approved.
 
-   6.  approver is the kernel's own key, a configured capability-
-       authority key, or another issuer key trusted by the kernel
-       (Section 5.8), and the signature verifies.
+   6.  approver is explicitly authorized by the applicable approval
+       policy, and the signature verifies under that key and its
+       configured suite policy.  Trust as a receipt signer or capability
+       issuer alone does not confer approval authority (Section 15.4.1).
 
    7.  expires_at - issued_at is at most 3600 seconds.
 
@@ -3465,7 +3466,6 @@ Internet-Draft                Chio Protocol                 October 2026
    for dispatch, the kernel records the tuple of the subject key, the
    request identifier, and the intent hash until the token's expires_at.
    The kernel MUST deny the call as a replay if the tuple is already
-   recorded and has not expired.  Because the record is keyed by the
 
 
 
@@ -3474,6 +3474,7 @@ Whelan                    Expires 5 April 2027                 [Page 62]
 Internet-Draft                Chio Protocol                 October 2026
 
 
+   recorded and has not expired.  Because the record is keyed by the
    tuple and not by the token's id, a second token for the same subject,
    request, and intent is also refused.  The kernel releases an owned
    replay reservation only after definite pre-effect rejection with
@@ -3517,10 +3518,9 @@ Internet-Draft                Chio Protocol                 October 2026
 
    *  a timeout from 1 to 3600 seconds.
 
-   The eligible set digest is the lowercase hexadecimal SHA-256 digest
-   of the ASCII bytes chio.approver-set.v1, one zero byte, and the
-   canonical JSON of the array of eligible approvers, sorted by
-   identifier and then by public_key.
+
+
+
 
 
 
@@ -3529,6 +3529,18 @@ Whelan                    Expires 5 April 2027                 [Page 63]
 
 Internet-Draft                Chio Protocol                 October 2026
 
+
+   For durable threshold coordination, the call's request identifier,
+   server identifier, and tool name MUST each contain 1 to 256 UTF-8
+   octets, with no leading or trailing whitespace or control characters.
+   This profile's bound applies even when a transport permits a longer
+   request identifier.  An unsupported identifier MUST be rejected
+   before creating a proposal or consuming approval authority.
+
+   The eligible set digest is the lowercase hexadecimal SHA-256 digest
+   of the ASCII bytes chio.approver-set.v1, one zero byte, and the
+   canonical JSON of the array of eligible approvers, sorted by
+   identifier and then by public_key.
 
 8.5.1.  Proposal
 
@@ -3566,6 +3578,14 @@ Internet-Draft                Chio Protocol                 October 2026
    +-------------------------------+-------+--------+------------------+
    | policy_hash                   |string |REQUIRED|Policy hash of    |
    |                               |       |        |the requirement.  |
+
+
+
+Whelan                    Expires 5 April 2027                 [Page 64]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
    +-------------------------------+-------+--------+------------------+
    | threshold                     |integer|REQUIRED|Quorum size.      |
    +-------------------------------+-------+--------+------------------+
@@ -3578,14 +3598,6 @@ Internet-Draft                Chio Protocol                 October 2026
    +-------------------------------+-------+--------+------------------+
    | proposal_deadline             |integer|REQUIRED|End of the voting |
    |                               |       |        |window,           |
-
-
-
-Whelan                    Expires 5 April 2027                 [Page 64]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    |                               |       |        |exclusive, Unix   |
    |                               |       |        |seconds.          |
    +-------------------------------+-------+--------+------------------+
@@ -3613,18 +3625,6 @@ Internet-Draft                Chio Protocol                 October 2026
 
    The following proposal is taken from the schema fixtures of the
    reference implementation; its digests and signature are placeholders.
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -5044,9 +5044,11 @@ Internet-Draft                Chio Protocol                 October 2026
 
 10.3.  Tool Call Results
 
-   For each tool_call_request, the kernel sends zero or more
-   tool_call_chunk messages and then one tool_call_response.  Each
-   carries the request's id, and the agent correlates them by that
+   For each tool_call_request whose exchange completes, the kernel sends
+   zero or more tool_call_chunk messages and then one
+   tool_call_response.  Transport, signing, or durable-state failures
+   can terminate the exchange without a response, as specified below.
+   Each carries the request's id, and the agent correlates them by that
    value.  Table 34 lists the members of tool_call_response.
 
        +=================+========+==========+=====================+
@@ -5091,61 +5093,59 @@ Internet-Draft                Chio Protocol                 October 2026
 
 
 
-
-
 Whelan                    Expires 5 April 2027                 [Page 91]
 
 Internet-Draft                Chio Protocol                 October 2026
 
 
-    +==================+=================+============+===============+
-    | status           | Other members   | Decision   | Meaning       |
-    +==================+=================+============+===============+
-    | ok               | value (JSON     | allow      | The call      |
-    |                  | value)          |            | completed.    |
-    |                  |                 |            | value is the  |
-    |                  |                 |            | output, or    |
-    |                  |                 |            | null if there |
-    |                  |                 |            | is none.      |
-    +------------------+-----------------+------------+---------------+
-    | stream_complete  | total_chunks    | allow      | The call      |
-    |                  | (integer)       |            | completed     |
-    |                  |                 |            | after         |
-    |                  |                 |            | streaming     |
-    |                  |                 |            | total_chunks  |
-    |                  |                 |            | chunks.       |
-    +------------------+-----------------+------------+---------------+
-    | cancelled        | reason          | cancelled  | The call was  |
-    |                  | (string),       |            | canceled.     |
-    |                  | chunks_received |            |               |
-    |                  | (integer)       |            |               |
-    +------------------+-----------------+------------+---------------+
-    | incomplete       | reason          | incomplete | The call      |
-    |                  | (string),       |            | ended before  |
-    |                  | chunks_received |            | completion.   |
-    |                  | (integer)       |            |               |
-    +------------------+-----------------+------------+---------------+
-    | err              | error (object,  | deny       | The kernel    |
-    |                  | Section 10.4)   |            | denied the    |
-    |                  |                 |            | call or       |
-    |                  |                 |            | failed to     |
-    |                  |                 |            | evaluate it.  |
-    +------------------+-----------------+------------+---------------+
-    | pending_approval | proposal        | deny       | Execution     |
-    |                  | (object,        |            | awaits        |
-    |                  | Section 8.5.1)  |            | approval; no  |
-    |                  |                 |            | tool was      |
-    |                  |                 |            | dispatched.   |
-    +------------------+-----------------+------------+---------------+
+   +==================+=================+============+================+
+   | status           | Other members   | Decision   | Meaning        |
+   +==================+=================+============+================+
+   | ok               | value (JSON     | allow      | The call       |
+   |                  | value)          |            | completed.     |
+   |                  |                 |            | value is the   |
+   |                  |                 |            | output, or     |
+   |                  |                 |            | null if there  |
+   |                  |                 |            | is none.       |
+   +------------------+-----------------+------------+----------------+
+   | stream_complete  | total_chunks    | allow      | The call       |
+   |                  | (integer)       |            | completed      |
+   |                  |                 |            | after          |
+   |                  |                 |            | streaming      |
+   |                  |                 |            | total_chunks   |
+   |                  |                 |            | chunks.        |
+   +------------------+-----------------+------------+----------------+
+   | cancelled        | reason          | cancelled  | The call was   |
+   |                  | (string),       |            | canceled.      |
+   |                  | chunks_received |            |                |
+   |                  | (integer)       |            |                |
+   +------------------+-----------------+------------+----------------+
+   | incomplete       | reason          | incomplete | The call ended |
+   |                  | (string),       |            | before         |
+   |                  | chunks_received |            | completion.    |
+   |                  | (integer)       |            |                |
+   +------------------+-----------------+------------+----------------+
+   | err              | error (object,  | deny       | The kernel     |
+   |                  | Section 10.4)   |            | denied the     |
+   |                  |                 |            | call or failed |
+   |                  |                 |            | to evaluate    |
+   |                  |                 |            | it; this       |
+   |                  |                 |            | status does    |
+   |                  |                 |            | not establish  |
+   |                  |                 |            | absence of an  |
+   |                  |                 |            | external       |
+   |                  |                 |            | effect.        |
+   +------------------+-----------------+------------+----------------+
+   | pending_approval | proposal        | deny       | Execution      |
+   |                  | (object,        |            | awaits         |
+   |                  | Section 8.5.1)  |            | approval; no   |
+   |                  |                 |            | tool was       |
+   |                  |                 |            | dispatched.    |
+   +------------------+-----------------+------------+----------------+
 
-                        Table 35: Tool Call Results
+                       Table 35: Tool Call Results
 
-   A pending_approval result contains exactly status and proposal.  It
-   ends this request-response exchange but does not finalize the logical
-   operation.  The kernel MUST send no output chunks and MUST omit
-   execution_nonce.  A client that does not support this result MUST
-   stop; it MUST NOT interpret it as an allowed call.  Resumption
-   follows Section 8.5.3.
+
 
 
 
@@ -5153,6 +5153,13 @@ Whelan                    Expires 5 April 2027                 [Page 92]
 
 Internet-Draft                Chio Protocol                 October 2026
 
+
+   A pending_approval result contains exactly status and proposal.  It
+   ends this request-response exchange but does not finalize the logical
+   operation.  The kernel MUST send no output chunks and MUST omit
+   execution_nonce.  A client that does not support this result MUST
+   stop; it MUST NOT interpret it as an allowed call.  Resumption
+   follows Section 8.5.3.
 
    In cancelled and incomplete results, chunks_received is the number of
    chunks that the kernel sent for the call.
@@ -5195,13 +5202,6 @@ Internet-Draft                Chio Protocol                 October 2026
    generated, unauthenticated key.  It terminates or resets the affected
    exchange and preserves recoverable operation state.  A closed
    transport does not establish that an external effect was absent.
-
-
-
-
-
-
-
 
 
 
@@ -5277,6 +5277,12 @@ Internet-Draft                Chio Protocol                 October 2026
    as internal_error.  An agent can therefore receive either form for
    the same condition.
 
+   A diagnostic code identifies the failure, not whether a committed
+   effect occurred.  If dispatch has been committed and the effect
+   cannot be resolved, the kernel MUST preserve the operation as
+   incomplete under Section 3.4.  A denial receipt or tool_server_error
+   MUST NOT be used to justify refund or redispatch of that operation.
+
    The following err result reports an expired token in the second form.
 
    {
@@ -5306,12 +5312,6 @@ Internet-Draft                Chio Protocol                 October 2026
    *  If Length exceeds 16,777,216, the receiver MUST reject the frame
       without reading or allocating its payload.
 
-   *  If the payload is not exactly one JSON object that forms a valid
-      message of the kind the receiver expects (for example, it is
-      empty, it is not JSON, a REQUIRED member is missing, a member has
-      the wrong type, or type is unknown), the receiver MUST reject the
-      frame.
-
 
 
 
@@ -5321,6 +5321,12 @@ Whelan                    Expires 5 April 2027                 [Page 95]
 
 Internet-Draft                Chio Protocol                 October 2026
 
+
+   *  If the payload is not exactly one JSON object that forms a valid
+      message of the kind the receiver expects (for example, it is
+      empty, it is not JSON, a REQUIRED member is missing, a member has
+      the wrong type, or type is unknown), the receiver MUST reject the
+      frame.
 
    The transport defines no marker from which a receiver could find the
    next frame boundary, and a receiver MUST NOT attempt to
@@ -5367,12 +5373,6 @@ Internet-Draft                Chio Protocol                 October 2026
 
 
 
-
-
-
-
-
-
 Whelan                    Expires 5 April 2027                 [Page 96]
 
 Internet-Draft                Chio Protocol                 October 2026
@@ -5382,8 +5382,9 @@ Internet-Draft                Chio Protocol                 October 2026
     | Method | Use                    | Success response             |
     +========+========================+==============================+
     | POST   | Send one JSON-RPC      | 200 with an event stream for |
-    |        | request, notification, | a request; 202, or 200 with  |
-    |        | or response            | an event stream, otherwise   |
+    |        | request, notification, | an accepted request; 202     |
+    |        | or response            | with no body for an accepted |
+    |        |                        | notification or response     |
     +--------+------------------------+------------------------------+
     | GET    | Open the notification  | 200 with an event stream     |
     |        | stream (Section 11.5)  |                              |
@@ -5394,7 +5395,6 @@ Internet-Draft                Chio Protocol                 October 2026
                     Table 38: Hosted Endpoint Methods
 
    Table 39 lists the request headers that the edge examines.
-
 
 
 
@@ -5440,25 +5440,26 @@ Internet-Draft                Chio Protocol                 October 2026
     | Authorization        | every      | A Bearer credential         |
     |                      | request    | (Section 11.2)              |
     +----------------------+------------+-----------------------------+
-    | Origin               | any        | If present, its host is     |
-    |                      | request    | localhost, 127.0.0.1, or    |
-    |                      |            | ::1                         |
+    | Origin               | any        | If present, its complete    |
+    |                      | request    | origin matches the          |
+    |                      |            | configured allowlist        |
     +----------------------+------------+-----------------------------+
     | Accept               | POST, GET  | POST lists application/json |
     |                      |            | and text/event-stream; GET  |
     |                      |            | lists text/event-stream     |
     +----------------------+------------+-----------------------------+
-    | Content-Type         | POST       | Begins with application/    |
-    |                      |            | json                        |
+    | Content-Type         | POST       | Parsed media type equals    |
+    |                      |            | application/json            |
     +----------------------+------------+-----------------------------+
     | MCP-Session-Id       | every      | The session identifier      |
     |                      | request    |                             |
     |                      | after      |                             |
     |                      | initialize |                             |
     +----------------------+------------+-----------------------------+
-    | MCP-Protocol-Version | any        | If present, equals the      |
-    |                      | request in | session's version           |
-    |                      | a session  |                             |
+    | MCP-Protocol-Version | every      | Client sends the negotiated |
+    |                      | request    | version; server             |
+    |                      | after      | compatibility handling      |
+    |                      | initialize | follows Section 13          |
     +----------------------+------------+-----------------------------+
     | Last-Event-ID        | GET        | Replay cursor               |
     |                      |            | (Section 11.5)              |
@@ -5481,7 +5482,6 @@ Internet-Draft                Chio Protocol                 October 2026
        browser origin.
 
    2.  Admission fails (Section 11.2): 401.
-
 
 
 
@@ -5612,6 +5612,14 @@ Internet-Draft                Chio Protocol                 October 2026
    requests; the edge does not pass the proof to the kernel
    (Section 11.6).
 
+   A present cnf MUST select at least one supported sender-key or
+   certificate binding, and every selected binding MUST be verified.
+   The edge MUST reject malformed, empty, or unsupported confirmation
+   methods; it MUST NOT silently treat such a token as an unconstrained
+   bearer.  In particular, a jkt confirmation requires the separately
+   implemented OAuth DPoP binding and cannot be satisfied by the Chio
+   proof format.
+
    The Chio object carried in this binding's DPoP header is not the JWT
    proof format of [RFC9449].  Implementations MUST NOT advertise this
    binding as OAuth DPoP interoperability.  Deployments needing that
@@ -5643,20 +5651,17 @@ Internet-Draft                Chio Protocol                 October 2026
        Session-Id header with any value.  It creates no session in
        either case.
 
-   2.  The edge creates a session in state initializing, with a new
-       session identifier, a new kernel session, an agent key, and
-       capability tokens for that key.  It generates the session
-       identifier from fresh randomness; clients treat it as opaque.
-
-
-
-
 
 
 Whelan                    Expires 5 April 2027                [Page 101]
 
 Internet-Draft                Chio Protocol                 October 2026
 
+
+   2.  The edge creates a session in state initializing, with a new
+       session identifier, a new kernel session, an agent key, and
+       capability tokens for that key.  It generates the session
+       identifier from fresh randomness; clients treat it as opaque.
 
    3.  The edge answers with an event stream that holds a priming event
        and then the initialize response.  If the response is a result,
@@ -5701,11 +5706,6 @@ Internet-Draft                Chio Protocol                 October 2026
    the idle period, which is 15 minutes by default.  Each POST or GET
    that the edge accepts restarts the idle period; an open stream does
    not.  An operator can drain a ready session, which then becomes
-   deleted when a grace period ends, 5 seconds by default.  A DELETE
-   moves any session that is not in a terminal state to deleted, and an
-   operator shutdown moves it to closed.
-
-
 
 
 
@@ -5713,6 +5713,10 @@ Whelan                    Expires 5 April 2027                [Page 102]
 
 Internet-Draft                Chio Protocol                 October 2026
 
+
+   deleted when a grace period ends, 5 seconds by default.  A DELETE
+   moves any session that is not in a terminal state to deleted, and an
+   operator shutdown moves it to closed.
 
    The states deleted, expired, and closed are terminal, and a terminal
    session never changes state.  The edge answers a request to an
@@ -5749,16 +5753,12 @@ Internet-Draft                Chio Protocol                 October 2026
    current request POST.  A request stream also carries the edge's
    requests to the client, which have both method and id.
 
-   Each event has an identifier of the form <session-id>-<n>, where <n>
-   is a decimal counter.  The counter starts at 1 and counts every event
-   of the session on every stream, priming events included.  The counter
-   is allocated when the edge creates an event, so its value does not
-   establish delivery order across streams or buffered events.  For a
-   non-priming event, data is one JSON-RPC message; a priming event has
-   empty data.  The edge sets no event field.  The edge retains the last
-   64 notifications for replay and retains no other events.  Delivery on
-   an open stream is best effort: the edge drops events, without notice,
-   for a reader that falls too far behind.
+
+
+
+
+
+
 
 
 
@@ -5769,6 +5769,17 @@ Whelan                    Expires 5 April 2027                [Page 103]
 
 Internet-Draft                Chio Protocol                 October 2026
 
+
+   Each event has an identifier of the form <session-id>-<n>, where <n>
+   is a decimal counter.  The counter starts at 1 and counts every event
+   of the session on every stream, priming events included.  The counter
+   is allocated when the edge creates an event, so its value does not
+   establish delivery order across streams or buffered events.  For a
+   non-priming event, data is one JSON-RPC message; a priming event has
+   empty data.  The edge sets no event field.  The edge retains the last
+   64 notifications for replay and retains no other events.  Delivery on
+   an open stream is best effort: the edge drops events, without notice,
+   for a reader that falls too far behind.
 
    A GET with a Last-Event-ID header asks the edge to replay the
    notifications that followed that event.  The edge splits the value at
@@ -5808,23 +5819,18 @@ Internet-Draft                Chio Protocol                 October 2026
    (Section 5.8).  The submission carries no sender proof: the kernel
    denies a call for which a matching grant requires one (Section 5.4).
 
-   The members of params._meta in Table 40 carry the other inputs of a
-   native request (Table 32).  When a member and its alias are both
-   present, the edge uses the member. _meta has to be an object, and
-   each member has to have the structure of its native equivalent; the
-   edge answers -32602 otherwise.
-
-
-
-
-
-
 
 
 Whelan                    Expires 5 April 2027                [Page 104]
 
 Internet-Draft                Chio Protocol                 October 2026
 
+
+   The members of params._meta in Table 40 carry the other inputs of a
+   native request (Table 32).  When a member and its alias are both
+   present, the edge uses the member. _meta has to be an object, and
+   each member has to have the structure of its native equivalent; the
+   edge answers -32602 otherwise.
 
         +===========================+=============================+
         | Member                    | Native equivalent           |
@@ -5850,6 +5856,32 @@ Internet-Draft                Chio Protocol                 October 2026
 
                Table 40: Chio Members of _meta in tools/call
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 105]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
     +===========================+=====================================+
     | Member                    | Accepted alias                      |
     +===========================+=====================================+
@@ -5874,14 +5906,6 @@ Internet-Draft                Chio Protocol                 October 2026
 
                   Table 41: Accepted Chio Metadata Aliases
 
-
-
-
-Whelan                    Expires 5 April 2027                [Page 105]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    chioRequestId is a non-empty string of at most 2048 UTF-8 octets,
    with no leading or trailing whitespace and no control characters.
    The kernel uses it as the request identifier.  Without it, the edge
@@ -5890,10 +5914,29 @@ Internet-Draft                Chio Protocol                 October 2026
    approval members or supplementalAuthorization MUST carry
    chioRequestId, and the approval members have to follow the
    combination rules of Section 10.2; the edge answers -32602 otherwise.
-   The kernel records routeSelection, an object, in the receipt's
-   metadata as route_selection.
+   Calls requiring durable threshold coordination also satisfy the
+   narrower identifier bounds in Section 8.5.  The kernel records
+   routeSelection, an object, in the receipt's metadata as
+   route_selection.
 
    The following request is illustrative.
+
+
+
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 106]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    {
      "jsonrpc": "2.0",
@@ -5929,15 +5972,6 @@ Internet-Draft                Chio Protocol                 October 2026
       streamed error instead describes the stream delivery in content
       and records the reason in structuredContent.chioToolStream.reason.
 
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 106]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    *  For pending approval, content is an empty array, isError is false,
       and structuredContent is the native pending result: status:
       pending_approval and the complete signed proposal.  This is a
@@ -5946,6 +5980,19 @@ Internet-Draft                Chio Protocol                 October 2026
 
    *  For a call that needs a URL elicitation, the edge returns JSON-RPC
       error -32042 with data.elicitations.
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 107]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    For a kernel outcome, the edge includes the signed receipt in
    result._meta.chio.receipt, its identifier in receiptId, the projected
@@ -5956,18 +6003,21 @@ Internet-Draft                Chio Protocol                 October 2026
    for that exchange (Section 8.5.3).
 
    The edge also returns result._meta.chioEvidence, with schema
-   chio.mcp.execution-evidence.v1, the signed receipt, the kernel
-   requestId, outputKind, output, and diagnostic terminalState.  For an
-   allowed scalar or object result, outputKind is value and output
-   contains the original value whose canonical bytes the kernel bound.
-   A projected MCP wrapper is not a substitute for that original value.
-   For a stream, outputKind is stream and output is null; stream content
-   verification requires the ordered chunks and their binding profile.
-   When no releasable value is available, outputKind is none and output
-   is null.  The evidence wrapper is not separately signed; consumers
-   MUST verify the enclosed receipt and all claimed bindings.  They MUST
-   NOT infer permission from an unsigned diagnostic field or from MCP's
-   isError alone.
+   chio.mcp.execution-evidence.v1, the signed receipt, requestId,
+   outputKind, output, and diagnostic terminalState. requestId is the
+   request identifier from signed receipt metadata, or null when that
+   metadata is absent.  Consumers MUST compare a present identifier with
+   the expected request; a null value cannot establish request
+   correlation by itself.  For an allowed scalar or object result,
+   outputKind is value and output contains the original value whose
+   canonical bytes the kernel bound.  A projected MCP wrapper is not a
+   substitute for that original value.  For a stream, outputKind is
+   stream and output is null; stream content verification requires the
+   ordered chunks and their binding profile.  When no releasable value
+   is available, outputKind is none and output is null.  The evidence
+   wrapper is not separately signed; consumers MUST verify the enclosed
+   receipt and all claimed bindings.  They MUST NOT infer permission
+   from an unsigned diagnostic field or from MCP's isError alone.
 
    The edge MUST construct these metadata namespaces from the actual
    kernel response, replacing conflicting tool-supplied metadata.  It
@@ -5986,20 +6036,19 @@ Internet-Draft                Chio Protocol                 October 2026
    structuredContent.chioToolStream then has mode set to
    notification_stream.  Otherwise a retained stream's chioToolStream
    has mode set to collapsed_result and carries every chunk in chunks.
-
-
-
-Whelan                    Expires 5 April 2027                [Page 107]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    In both cases chioToolStream also carries totalChunks and
    terminalState, which is completed or incomplete in retained streamed
    results.  Cancellation is an exception: the edge returns a reason-
    only error result and omits the stream summary and collapsed chunks.
    Chunk notifications can already have been queued before that
    cancellation result.
+
+
+
+Whelan                    Expires 5 April 2027                [Page 108]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
 11.7.  Model Metadata
 
@@ -6040,16 +6089,6 @@ Internet-Draft                Chio Protocol                 October 2026
      }
    }
 
-
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 108]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
 12.  Trust-Control Interface
 
    The trust-control service offers an HTTP interface [RFC9110] whose
@@ -6058,6 +6097,14 @@ Internet-Draft                Chio Protocol                 October 2026
    receipts, and attestation statements keep their own member names.
    This section specifies four endpoints: issuance, delegated issuance,
    receipt query, and revocation.
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 109]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    A caller authenticates with an Authorization header that carries the
    Bearer scheme and the service token.  The service compares the token
@@ -6080,31 +6127,6 @@ Internet-Draft                Chio Protocol                 October 2026
    with an empty delegation chain.  Table 43 lists the request members.
    A 200 response has one member, capability, which holds the token
    (Section 5.1).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 109]
-
-Internet-Draft                Chio Protocol                 October 2026
-
 
      +====================+=========+==========+=====================+
      | Field              | Type    | Presence | Meaning             |
@@ -6133,6 +6155,13 @@ Internet-Draft                Chio Protocol                 October 2026
    requested scope, to whose grants the service's issuance policy can
    add constraints.  The service answers:
 
+
+
+Whelan                    Expires 5 April 2027                [Page 110]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
    *  400 if subjectPublicKey is not a valid key, or if
       runtimeAttestation has a malformed workload_identity or one that
       conflicts with a SPIFFE URI in runtime_identity;
@@ -6144,23 +6173,6 @@ Internet-Draft                Chio Protocol                 October 2026
       configuration conflicts with the issuance mode;
 
    *  500 for any other failure.
-
-
-
-
-
-
-
-
-
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 110]
-
-Internet-Draft                Chio Protocol                 October 2026
-
 
    A runtime attestation statement is a normalized result from an
    attestation verifier, with members schema, verifier, tier (none,
@@ -6182,18 +6194,6 @@ Internet-Draft                Chio Protocol                 October 2026
    presentations are outside the scope of this document; this section
    specifies the delegation policy and the checks that bound the issued
    token.  Only the service token authenticates this endpoint.
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -6338,8 +6338,10 @@ Internet-Draft                Chio Protocol                 October 2026
 
    3.  If delegationPolicy is present, the requested token is within its
        ceiling: the requested scope is a subset of the policy's scope
-       (Section 5.6), ttl <= ttlSeconds, and now plus ttl, saturating at
-       the unsigned 64-bit maximum, is at most expiresAt (403).
+       (Section 5.6), ttl is greater than zero and no greater than
+       ttlSeconds, and checked addition of now plus ttl is representable
+       and no greater than expiresAt (403).  Overflow MUST reject
+       issuance; it MUST NOT be replaced by a saturated expiry.
 
    4.  upstreamCapabilityId, if present, equals the policy's
        parentCapabilityId, and a policy parentCapabilityId is present
@@ -6367,8 +6369,6 @@ Internet-Draft                Chio Protocol                 October 2026
    in the token's delegation chain (Section 5.5).
 
    A 200 response has the members in Table 46.
-
-
 
 
 
@@ -6650,9 +6650,9 @@ Internet-Draft                Chio Protocol                 October 2026
 
    The numeric registry has eight categories: protocol, auth,
    capability, guard, budget, tool, internal, and transaction.
-   Section 17.1 gives every initial allocation.  The transaction entries
-   reserve identifiers used by related evidence profiles; this document
-   does not define those profiles.
+   Section 17.1 gives every initial allocation.  The transaction range
+   reserves identifiers for related evidence profiles; this document
+   does not allocate individual codes or define those profiles.
 
    A transient flag describes whether a changed condition can permit a
    later attempt.  It is not permission to repeat the same request
@@ -6778,61 +6778,43 @@ Whelan                    Expires 5 April 2027                [Page 121]
 Internet-Draft                Chio Protocol                 October 2026
 
 
-   +===============+==============+====================+===============+
-   | Surface       | TLS          | Mutual TLS         | Without       |
-   |               |              |                    | transport     |
-   |               |              |                    | security      |
-   +===============+==============+====================+===============+
-   | Native        | REQUIRED     | REQUIRED when the  | Conformant    |
-   | transport     | across hosts | peer's identity is | only over a   |
-   |               | or untrusted | part of the        | same-host     |
-   |               | networks     | authorization      | socket or     |
-   |               |              | decision           | loopback,     |
-   |               |              |                    | for           |
-   |               |              |                    | development   |
-   +---------------+--------------+--------------------+---------------+
-   | MCP binding   | REQUIRED for | REQUIRED when the  | Conformant    |
-   |               | any non-     | session's sender   | only on       |
-   |               | loopback     | binding is an mTLS | loopback or   |
-   |               | deployment   | certificate        | in a test     |
-   |               |              | thumbprint         | harness       |
-   +---------------+--------------+--------------------+---------------+
-   | Trust-control | REQUIRED for | REQUIRED for       | Conformant    |
-   | interface     | any non-     | service-to-service | only on       |
-   |               | loopback     | deployments that   | loopback      |
-   |               | deployment   | rely on transport  |               |
-   |               |              | identity           |               |
-   +---------------+--------------+--------------------+---------------+
-   | Kernel to     | Provided by  | REQUIRED over TCP  | Not           |
-   | tool server   | mutual TLS   | across processes   | conformant    |
-   |               | when         | or hosts           | for           |
-   |               | networked    |                    | production    |
-   |               |              |                    | over a        |
-   |               |              |                    | network       |
-   +---------------+--------------+--------------------+---------------+
+   +=============+============+====================+==================+
+   |Surface      |TLS         | Mutual TLS         | Without          |
+   |             |            |                    | transport        |
+   |             |            |                    | security         |
+   +=============+============+====================+==================+
+   |Native       |REQUIRED    | REQUIRED when TLS  | Authenticated    |
+   |transport    |across hosts| peer identity      | same-host IPC is |
+   |             |or untrusted| supplies           | permitted;       |
+   |             |networks    | authorization      | unauthenticated  |
+   |             |            | identity           | loopback is      |
+   |             |            |                    | development-only |
+   +-------------+------------+--------------------+------------------+
+   |MCP binding  |REQUIRED for| REQUIRED when the  | Conformant only  |
+   |             |any non-    | session's sender   | on loopback or   |
+   |             |loopback    | binding is an mTLS | in a test        |
+   |             |deployment  | certificate        | harness          |
+   |             |            | thumbprint         |                  |
+   +-------------+------------+--------------------+------------------+
+   |Trust-control|REQUIRED for| REQUIRED for       | Conformant only  |
+   |interface    |any non-    | service-to-service | on loopback      |
+   |             |loopback    | deployments that   |                  |
+   |             |deployment  | rely on transport  |                  |
+   |             |            | identity           |                  |
+   +-------------+------------+--------------------+------------------+
+   |Kernel to    |Provided by | REQUIRED over TCP  | Not conformant   |
+   |tool server  |mutual TLS  | across processes   | for production   |
+   |             |when        | or hosts           | over a network   |
+   |             |networked   |                    |                  |
+   +-------------+------------+--------------------+------------------+
 
-                 Table 48: Transport Security Requirements
+                Table 48: Transport Security Requirements
 
    A deployment that is missing a transport property that Table 48
    requires MUST deny the request or restrict itself to a local
    development configuration.  A deployment MUST NOT claim
    confidentiality, peer authentication, or replay resistance for
    traffic it carries in plaintext across a network.
-
-
-
-
-
-
-
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 122]
-
-Internet-Draft                Chio Protocol                 October 2026
-
 
    A hosted edge can run behind a proxy that terminates TLS and passes
    the client certificate's thumbprint to the edge in a request header.
@@ -6842,6 +6824,15 @@ Internet-Draft                Chio Protocol                 October 2026
    proxy.  Same-host IPC used for authority decisions MUST authenticate
    peer identity and socket ownership; a pathname or loopback address
    alone is insufficient.
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 122]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
 15.3.  Token Theft and Replay
 
@@ -6881,7 +6872,16 @@ Internet-Draft                Chio Protocol                 October 2026
    distributes kernel keys; this document does not define a public
    transparency system for them (Section 9.6).
 
+   In the same way, a kernel accepts a capability token only from an
+   issuer in its configured set of trusted issuer keys (Section 5.8).
+   Distributions SHOULD pin or securely provision kernel keys, issuer
+   keys, and certificates, rather than learning them from the traffic
+   they protect.
 
+   A basic capability token has no general audience member.  Without an
+   additional binding, its issuer trust and grants can make it usable at
+   more than one kernel.  The security-context caveat in Section 5.6.1
+   restricts use to its authenticated context; it is not a generic OAuth
 
 
 
@@ -6890,17 +6890,9 @@ Whelan                    Expires 5 April 2027                [Page 123]
 Internet-Draft                Chio Protocol                 October 2026
 
 
-   In the same way, a kernel accepts a capability token only from an
-   issuer in its configured set of trusted issuer keys (Section 5.8).
-   Distributions SHOULD pin or securely provision kernel keys, issuer
-   keys, and certificates, rather than learning them from the traffic
-   they protect.
-
-   Capability tokens carry no audience.  Any kernel that trusts a
-   token's issuer accepts the token for the grants it names.  Operators
-   that run kernels in different trust domains SHOULD use a distinct
-   issuer key for each domain, so that a token issued for one domain is
-   not accepted in another.
+   audience.  Operators that run kernels in different trust domains
+   SHOULD use distinct issuer keys and MUST configure the context and
+   target checks required by each domain.
 
 15.4.1.  Signing Roles and Key Lifecycle
 
@@ -6909,6 +6901,23 @@ Internet-Draft                Chio Protocol                 October 2026
    broker, or active-response authority.  Deployments MUST authorize
    those roles explicitly and SHOULD use separate keys for independent
    trust domains.
+
+   Signing keys MUST be generated or derived using cryptographic secret
+   material appropriate to their suite.  Public identifiers, user names,
+   workload names, and public-key bytes MUST NOT be used alone to derive
+   a private key.  Issuance to a subject public key does not authorize
+   an adapter to replace that key with one it can reconstruct from
+   public inputs.
+
+   Changes to issuer sets, signing roles, or key epochs MUST come from
+   an authenticated authority authorized to make that change.  A
+   replication peer's connectivity or possession of a general service
+   credential is insufficient.  Replicated trust state MUST bind its
+   authority domain and monotonic revision, reject rollback and cross-
+   domain substitution, and be durably applied before it authorizes
+   operations.  A profile MUST specify its protected replication channel
+   and authenticated update format; an unsigned snapshot over an
+   unprotected channel is invalid.
 
    A key lifecycle profile MUST specify activation, retirement,
    compromise handling, and historical verification.  Rotation MUST have
@@ -6928,6 +6937,15 @@ Internet-Draft                Chio Protocol                 October 2026
    companion-profile concerns; a receipt checkpoint alone does not
    supply a key-rotation protocol.
 
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 124]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
 15.5.  Delegation Abuse
 
    An attacker who holds a delegated token can try to widen its scope,
@@ -6937,14 +6955,6 @@ Internet-Draft                Chio Protocol                 October 2026
    root or the previous delegation link, and delegated issuance at the
    trust-control service cannot exceed its signed delegation policy
    (Section 12.2).
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 124]
-
-Internet-Draft                Chio Protocol                 October 2026
-
 
    The kernel checks the revocation state of a token and of each
    ancestor that its delegation chain names (Section 5.8), so revoking a
@@ -6983,6 +6993,15 @@ Internet-Draft                Chio Protocol                 October 2026
    canonical bytes (Section 10.5).  They MUST NOT add unauthenticated
    members and represent them as part of the signed statement.
 
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 125]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
 15.8.  Runtime Enforcement Profiles
 
    Kernel admission controls entry to an operation.  Confinement,
@@ -6993,21 +7012,17 @@ Internet-Draft                Chio Protocol                 October 2026
    control is unavailable.  It MUST NOT fall back to a less restrictive
    execution path.
 
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 125]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
 15.8.1.  Tool Server Confinement
 
    A confined execution profile MUST bind the selected tool to an
    authenticated manifest and an independently configured operator
-   ceiling.  The effective authority is their intersection.  A signed
-   manifest is accepted only from a publisher authorized for that
+   ceiling.  The effective authority is their intersection.  An adapter
+   MUST apply the operator's authenticated policy to every exposed
+   operation, including routes absent from an upstream API description.
+   It MUST NOT infer an exemption from an HTTP method, a tool-supplied
+   side-effect annotation, or an untrusted schema.  Anonymous or
+   unrestricted operations require an explicit operator policy.  A
+   signed manifest is accepted only from a publisher authorized for that
    workload; signature validity alone does not authorize its requested
    privileges.
 
@@ -7029,6 +7044,20 @@ Internet-Draft                Chio Protocol                 October 2026
    claims about confinement require authenticated evidence from that
    host and its stated trust assumptions.
 
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 126]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
 15.8.2.  Credential Custody
 
    A credential-custody profile MUST keep provider secrets outside the
@@ -7047,16 +7076,6 @@ Internet-Draft                Chio Protocol                 October 2026
    independent local counters do not establish a composite spend bound.
    An upstream timeout preserves an uncertain committed operation rather
    than restoring spend authority.
-
-
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 126]
-
-Internet-Draft                Chio Protocol                 October 2026
-
 
 15.8.3.  Information-Flow Control
 
@@ -7083,6 +7102,18 @@ Internet-Draft                Chio Protocol                 October 2026
    do not establish elimination of timing, traffic-volume, or other
    covert channels.
 
+
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 127]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
 15.8.4.  Active Response
 
    An active-response profile treats containment actions as governed
@@ -7106,13 +7137,6 @@ Internet-Draft                Chio Protocol                 October 2026
    ownership before the affected execution domain becomes ready.  These
    requirements use the governance model in Section 8 without defining a
    separate quorum or approval protocol.
-
-
-
-Whelan                    Expires 5 April 2027                [Page 127]
-
-Internet-Draft                Chio Protocol                 October 2026
-
 
 15.9.  Resource Exhaustion
 
@@ -7138,6 +7162,14 @@ Internet-Draft                Chio Protocol                 October 2026
    use (Section 8.4, Section 8.5), and a kernel records the ones it has
    accepted.  Both singular and threshold approvals require durable
    replay protection.  Threshold approval MUST use the admission
+
+
+
+Whelan                    Expires 5 April 2027                [Page 128]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
    reservation in Section 8.5.2 and MUST deny admission when that
    authority is unavailable.  Reconstructing a request after restart
    MUST NOT produce a new approval or reservation for an already
@@ -7163,19 +7195,19 @@ Internet-Draft                Chio Protocol                 October 2026
    context as asserted (Section 8.6, Section 11.7).  A report or export
    MUST NOT present asserted context as observed or verified.
 
-
-
-Whelan                    Expires 5 April 2027                [Page 128]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
 15.13.  Attestation
 
    Attestation evidence can inform issuance (Section 12.1), but it does
-   not authorize a call by itself.  A profile that binds an attestation
-   digest to a token MUST also bind the request to the token's sender,
-   by a sender proof or by mutual TLS continuity, on the same request.
+   not authorize a call by itself.  A verifier MUST validate the
+   evidence under an independently configured attester trust policy,
+   including the signature or authenticated verification result,
+   workload measurements, freshness, and challenge or session binding
+   required by the profile.  Agent-supplied assurance labels, verifier
+   names, and evidence digests do not satisfy those checks.  A receipt
+   MUST NOT label such assertions as verified attestation without that
+   validation.  A profile that binds an attestation digest to a token
+   MUST also bind the request to the token's sender, by a sender proof
+   or by mutual TLS continuity, on the same request.
 
 15.14.  Time and Deadlines
 
@@ -7184,6 +7216,15 @@ Internet-Draft                Chio Protocol                 October 2026
    timestamp acceptance can use only the skew allowance specified by
    that artifact's profile.  An allowance for remote clocks MUST NOT
    excuse regression or failure of the kernel's own trusted clock.
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 129]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    The kernel MUST use checked time arithmetic and reject an unreadable,
    regressed, or unrepresentable clock value when it affects authority.
@@ -7216,16 +7257,6 @@ Internet-Draft                Chio Protocol                 October 2026
    output field.  Free-form metadata can still contain output or other
    sensitive data.
 
-
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 129]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    Parameters are the most sensitive part.  Because a receipt signs the
    parameters that the agent sent, anyone who can read the receipt can
    read them, including secrets or personal data that the agent placed
@@ -7240,6 +7271,16 @@ Internet-Draft                Chio Protocol                 October 2026
    reveals who delegated to whom.  A party that sees many receipts can
    build a profile of an agent's activity and of the organization behind
    it.
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 130]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    The redaction_mode field records how much of a receipt's detail was
    redacted when it was signed or exported.  It describes the receipt;
@@ -7272,16 +7313,6 @@ Internet-Draft                Chio Protocol                 October 2026
    compatibility decoders can accept other key spellings as specified in
    Section 4.4.
 
-
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 130]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    A registration identifies its value, name, description, and a stable
    specification.  The designated experts check uniqueness, complete
    encoding and verification rules, and whether the specification states
@@ -7299,6 +7330,14 @@ Internet-Draft                Chio Protocol                 October 2026
    to their separate namespace and are not values in this registry.
    Experts check that the retry guidance distinguishes a changed
    condition from repeating an unsafe side effect.  The initial
+
+
+
+Whelan                    Expires 5 April 2027                [Page 131]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
    allocations follow.  Core allocations reference this document.
    Values 7100 through 7113 are reserved for related transaction
    profiles, rather than allocated by this document.  A future
@@ -7331,13 +7370,6 @@ Internet-Draft                Chio Protocol                 October 2026
       retry retry_after_reissue.  Native name: capability_expired.
       Issue or obtain a fresh capability before retrying.
 
-
-
-Whelan                    Expires 5 April 2027                [Page 131]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    2102 (capability_revoked):  Category capability; transient false;
       retry retry_after_reissue.  Native name: capability_revoked.
       Obtain a newly issued capability; the revoked capability must not
@@ -7354,6 +7386,13 @@ Internet-Draft                Chio Protocol                 October 2026
    5100 (tool_server_error):  Category tool; transient true; retry
       retry_with_backoff.  Native name: tool_server_error.  Establish
       safe recovery or idempotency before a bounded retry.
+
+
+
+Whelan                    Expires 5 April 2027                [Page 132]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    6100 (internal_error):  Category internal; transient true; retry
       retry_with_backoff.  Native name: internal_error.  Resolve the
@@ -7386,14 +7425,6 @@ Internet-Draft                Chio Protocol                 October 2026
 
    *  p384+mldsa65: ECDSA P-384 and ML-DSA-65, composite encoding.
 
-
-
-
-Whelan                    Expires 5 April 2027                [Page 132]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    The envelope hint hybrid identifies a composite.  It is not a seventh
    suite and does not select its components.  The composite's encoded
    algorithm set selects them.
@@ -7404,6 +7435,20 @@ Internet-Draft                Chio Protocol                 October 2026
    or kernel to agent); payload fields and types; terminal or streaming
    behavior; and reference.  Experts check that state transitions,
    correlation, and failure behavior are defined.  Initial values are:
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 133]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
           +====================+=================+==============+
           | Value              | Direction       | Reference    |
@@ -7442,14 +7487,6 @@ Internet-Draft                Chio Protocol                 October 2026
 
    Initial values in the scope of this document are:
 
-
-
-
-Whelan                    Expires 5 April 2027                [Page 133]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    *  chio.capability.v1: capability token (Section 5).
 
    *  chio.receipt.v1: receipt signing projection (Section 6).
@@ -7461,6 +7498,13 @@ Internet-Draft                Chio Protocol                 October 2026
 
    *  chio.execution_nonce.v2: operation-owned execution nonce
       (Section 7.7.1).
+
+
+
+Whelan                    Expires 5 April 2027                [Page 134]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    *  chio.dpop_proof.v1: Chio sender proof (Section 5.4).
 
@@ -7498,14 +7542,6 @@ Internet-Draft                Chio Protocol                 October 2026
    The implementation provides the signed capability and receipt
    formats, framed native transport, hosted MCP binding, trust-control
    interfaces, authenticated attenuation, budget accounting, governed
-
-
-
-Whelan                    Expires 5 April 2027                [Page 134]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    approvals, and receipt checkpoints specified here.  The runtime
    composes these with authenticated process context, durable execution
    and recovery, confined tool processes, brokered credentials,
@@ -7518,6 +7554,14 @@ Internet-Draft                Chio Protocol                 October 2026
    guarantee is single_node_atomic; it does not advertise
    ha_linearizable merely because multiple clients or processes use that
    authority.  Native confinement is a platform profile, not a property
+
+
+
+Whelan                    Expires 5 April 2027                [Page 135]
+
+Internet-Draft                Chio Protocol                 October 2026
+
+
    inferred from an artifact verifier or transport adapter.  Public
    checkpoint witnessing and cross-operator federation have separate
    trust and availability requirements.
@@ -7553,15 +7597,6 @@ Internet-Draft                Chio Protocol                 October 2026
               DOI 10.6028/NIST.FIPS.204, August 2024,
               <https://doi.org/10.6028/NIST.FIPS.204>.
 
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 135]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    [ISO4217]  International Organization for Standardization, "Codes for
               the representation of currencies", ISO 4217:2015, August
               2015, <https://www.iso.org/iso-4217-currency-codes.html>.
@@ -7573,6 +7608,15 @@ Internet-Draft                Chio Protocol                 October 2026
               Specification, Version 2025-11-25", 25 November 2025,
               <https://modelcontextprotocol.io/
               specification/2025-11-25>.
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 136]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
               Requirement Levels", BCP 14, RFC 2119,
@@ -7611,13 +7655,6 @@ Internet-Draft                Chio Protocol                 October 2026
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
 
-
-
-Whelan                    Expires 5 April 2027                [Page 136]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    [RFC8259]  Bray, T., Ed., "The JavaScript Object Notation (JSON) Data
               Interchange Format", STD 90, RFC 8259,
               DOI 10.17487/RFC8259, December 2017,
@@ -7626,6 +7663,16 @@ Internet-Draft                Chio Protocol                 October 2026
    [RFC8446]  Rescorla, E., "The Transport Layer Security (TLS) Protocol
               Version 1.3", RFC 8446, DOI 10.17487/RFC8446, August 2018,
               <https://www.rfc-editor.org/rfc/rfc8446>.
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 137]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    [RFC8725]  Sheffer, Y., Hardt, D., and M. Jones, "JSON Web Token Best
               Current Practices", BCP 225, RFC 8725,
@@ -7666,14 +7713,6 @@ Internet-Draft                Chio Protocol                 October 2026
 
 19.2.  Informative References
 
-
-
-
-Whelan                    Expires 5 April 2027                [Page 137]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    [A2A]      Linux Foundation A2A Project, "Agent2Agent (A2A) Protocol
               Specification",
               <https://a2a-protocol.org/latest/specification/>.
@@ -7681,6 +7720,15 @@ Internet-Draft                Chio Protocol                 October 2026
    [BISCUIT]  Eclipse Biscuit, "Biscuit, a bearer token with offline
               attenuation and decentralized verification",
               <https://doc.biscuitsec.org/reference/specifications>.
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 138]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    [I-D.ietf-wimse-arch-08]
               Salowey, J. A., Rosomakho, Y., and H. Tschofenig,
@@ -7723,17 +7771,20 @@ Internet-Draft                Chio Protocol                 October 2026
               DOI 10.17487/RFC8693, January 2020,
               <https://www.rfc-editor.org/rfc/rfc8693>.
 
-
-
-Whelan                    Expires 5 April 2027                [Page 138]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
    [RFC8792]  Watsen, K., Auerswald, E., Farrel, A., and Q. Wu,
               "Handling Long Lines in Content of Internet-Drafts and
               RFCs", RFC 8792, DOI 10.17487/RFC8792, June 2020,
               <https://www.rfc-editor.org/rfc/rfc8792>.
+
+
+
+
+
+
+Whelan                    Expires 5 April 2027                [Page 139]
+
+Internet-Draft                Chio Protocol                 October 2026
+
 
    [RFC9334]  Birkholz, H., Thaler, D., Richardson, M., Smith, N., and
               W. Pan, "Remote ATtestation procedureS (RATS)
@@ -7773,19 +7824,6 @@ Appendix A.  Examples
    69 characters are folded as described in [RFC8792], and each folded
    block begins with the header line that document defines.
 
-
-
-
-
-
-
-
-
-Whelan                    Expires 5 April 2027                [Page 139]
-
-Internet-Draft                Chio Protocol                 October 2026
-
-
 A.1.  Capability Token
 
    The following case is capability/v1.json case
@@ -7793,44 +7831,6 @@ A.1.  Capability Token
    is a token with one delegation link and one tool grant, pretty-
    printed here for reading.  The corpus omits the schema member from
    its tokens.  Capability tokens are defined in Section 5.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

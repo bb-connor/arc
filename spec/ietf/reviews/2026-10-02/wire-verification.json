@@ -1,6 +1,6 @@
 {
   "scope": "Independent JSON Schema validation and Ed25519 preimage separation; no runtime tests",
-  "source_commit": "122414b48ef1bc7999a9e32c7ae303d561fcd429",
+  "source_commit": "df9f1791b32b3bd18fd83bb5758587607a20e753",
   "fixture_sha256": "09dfe019db30351196de29c7a57edb21af89b2213a4d1132caff53392b4ff946",
   "source_fixture_count": 38,
   "checks": [

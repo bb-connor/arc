@@ -6,7 +6,7 @@ Review date: 2026-10-02. Author of the draft: Connor Whelan, Backbay Industries.
 
 This review prepares the document for the completed security-roadmap release, as explicitly requested by the owner. The normative draft describes that intended release in present tense. It does not repeat temporary implementation gaps as permanent protocol limitations.
 
-This internal record distinguishes source-supported wire behavior, requirements synthesized from the completed roadmap, and deliberate standards or security corrections that the release implementation must satisfy. It does not mark runtime milestones complete, authorize a Datatracker submission, or change the published site. Confidence is high for the pinned source comparison and documented wire deltas; runtime and independent interoperability acceptance are separate evidence.
+This internal record distinguishes source-supported wire behavior, requirements synthesized from the completed roadmap, and deliberate standards or security corrections that the release implementation must satisfy. It does not mark runtime milestones complete, authorize a Datatracker submission, or perform a Datatracker submission. The subsequent documentation release publishes the reviewed document independently of runtime acceptance. Confidence is high for the pinned source comparison and documented wire deltas; runtime and independent interoperability acceptance are separate evidence.
 
 The original draft was based on a much older main snapshot. Its most serious problems were incomplete authority binding, recovery semantics described as optional, and transport descriptions that had fallen behind the security integration. Stronger architectural language alone would not have corrected those defects.
 
@@ -14,7 +14,7 @@ The original draft was based on a much older main snapshot. Its most serious pro
 
 The starting draft is `201582139476cfb5dfe7b2e12fe0b32377565f9a`. Its September 30 claim review used implementation `f5566d9a765c21cb36652a99c79de64968a656bf`.
 
-The combined security integration is `f25cd61f49fbf9a15a70396da82d9808ba4e1da2` on `integration/process-security-m4`, 717 commits ahead of the inspected remote main. The newer `packet/3-retention-accounting` tip, `122414b48ef1bc7999a9e32c7ae303d561fcd429`, contains that integration and 69 further commits. It is the primary implementation snapshot for this review. `packet/2-runtime-boundaries` is contained in it.
+The combined security integration is `f25cd61f49fbf9a15a70396da82d9808ba4e1da2` on `integration/process-security-m4`, 717 commits ahead of the inspected remote main. The newer `packet/3-retention-accounting` tip, `122414b48ef1bc7999a9e32c7ae303d561fcd429`, contains that integration and 69 further commits. It was the first-pass implementation snapshot. The second pass refreshed the same branch to `df9f1791b3`, seven commits later (793 ahead of remote main), including the authority-clock repair and compliance/product-truth review. The manifest pins the full refreshed revision. `packet/2-runtime-boundaries` is contained in it.
 
 The dry-run, measurement, receipt-boundary, and checkpoint-snapshot branches were compared using patch equivalence as well as ancestry. Their remaining divergent commits are represented in the selected snapshot. The gates, fuzz/model, and adversarial-case branches contain additional work. They were inspected as complementary assurance and intended-invariant sources, not silently treated as merged runtime behavior. The older launch-integration and security-execution branches were not substituted for the newer combined source.
 
@@ -115,3 +115,26 @@ Primary specifications checked during this review:
 ## Acceptance evidence
 
 See [verification](verification.md), [wire verification](wire-verification.json), and the [normative inventory](normative-inventory.json). The previous claim ledger is preserved as [historical evidence](previous-claims.md), not represented as a new review of this source.
+
+## Second pass and publication review
+
+A second read after the first committed review found cross-section contradictions. These corrections are included in the final source:
+
+| ID | Correction | Basis |
+|---|---|---|
+| R29 | Remove the governed-error paragraph permitting unconfigured receipt keys. | Agrees with configured receipt authority and native failure rules. |
+| R30 | Require explicit singular approver authorization instead of automatically trusting receipt/issuer keys. | Role separation; updated compliance review AP3/KG2. |
+| R31 | Reconcile MCP endpoint/header tables with bodyless 202, full-Origin allowlisting, parsed media types, and version headers. | Same primary MCP/HTTP standards as the first pass. |
+| R32 | Reject malformed, empty, and unsupported confirmation methods rather than silently accepting bearer semantics. | Sender-binding contract; updated compliance review AP5; RFC 7800 and RFC 8725. |
+| R33 | Replace delegated-issuance saturated expiry with checked arithmetic and a positive TTL. | Trusted-time contract, now backed by removal of receipt-ID clock overrides. |
+| R34 | Distinguish completed request-response exchanges from transport/signing/storage failure; preserve incomplete committed operations despite diagnostic errors. | Durable execution contract and native response consistency. |
+| R35 | Permit authenticated same-host production IPC while retaining the network TLS requirement. | Production confined native execution and IPC peer/descriptor authentication. |
+| R36 | State secure private-key generation and authenticated, revision-bound trust-state replication. | Updated compliance review AP1/KG1 and the completed key-custody target. |
+| R37 | Require attestation verification against trusted evidence, freshness, measurements, and context; labels and digests alone cannot establish it. | Updated compliance review KG7/KG8. |
+| R38 | Require operator-authorized route coverage; upstream descriptions and HTTP methods cannot grant admission exemptions. | Updated compliance review AP4 and no adapter bypass. |
+| R39 | Document the 256-byte durable threshold routing bounds and nullable MCP evidence request ID. | Exact source types and response construction. |
+| R40 | Clarify context-bound capabilities versus generic audience and remove obsolete transaction-registry allocation wording. | Cross-section consistency. |
+
+No basic signing projection or generated cryptographic vector changed. The additional release reconciliation obligations are explicit approver roles, supported confirmation enforcement, secure subject keys, authenticated trust-state updates, actual attestation validation, and operator-controlled route coverage. They are requirements of the prepared production profile, not newly executed runtime qualification. The relevant newly reviewed implementation record is `docs/reviews/2026-10-01-compliance-product-truth-review.md` at the refreshed source revision.
+
+Public publication carries only the document, renderings, a public review summary, and submission instructions. This detailed internal provenance remains in the working repository. Datatracker submission is still deferred by the owner.

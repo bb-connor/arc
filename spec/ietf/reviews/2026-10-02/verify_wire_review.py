@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-EXPECTED = '122414b48ef1bc7999a9e32c7ae303d561fcd429'
+EXPECTED = 'df9f1791b32b3bd18fd83bb5758587607a20e753'
 source = Path(sys.argv[1]).resolve()
 head = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
 if head != EXPECTED:

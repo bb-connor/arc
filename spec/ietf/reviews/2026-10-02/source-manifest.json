@@ -3,19 +3,19 @@
   "draft_base": "201582139476cfb5dfe7b2e12fe0b32377565f9a",
   "remote_main": "f5566d9a765c21cb36652a99c79de64968a656bf",
   "combined_integration": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
-  "selected_source": "122414b48ef1bc7999a9e32c7ae303d561fcd429",
-  "selected_source_ahead_of_main": 786,
+  "selected_source": "df9f1791b32b3bd18fd83bb5758587607a20e753",
+  "selected_source_ahead_of_main": 793,
   "branches": [
     {
       "branch": "integration/process-security-m4",
       "commit": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
-      "selected_only_commits": 69,
+      "selected_only_commits": 76,
       "branch_only_commits": 0,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/3-retention-accounting",
-      "commit": "122414b48ef1bc7999a9e32c7ae303d561fcd429",
+      "commit": "df9f1791b32b3bd18fd83bb5758587607a20e753",
       "selected_only_commits": 0,
       "branch_only_commits": 0,
       "patch_unique_to_branch": []
@@ -23,35 +23,35 @@
     {
       "branch": "packet/2-runtime-boundaries",
       "commit": "4c35ce78671998b6ade1ff9cf6d47b0dde7790d3",
-      "selected_only_commits": 68,
+      "selected_only_commits": 75,
       "branch_only_commits": 0,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/1-dry-run",
       "commit": "1cee5017f542867f15ae600e6123c08827ec0a76",
-      "selected_only_commits": 122,
+      "selected_only_commits": 129,
       "branch_only_commits": 9,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/9-measurement",
       "commit": "4ea4a1851697c99329fdbaad1787156e4fbb3868",
-      "selected_only_commits": 122,
+      "selected_only_commits": 129,
       "branch_only_commits": 5,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/j-receipt-boundaries",
       "commit": "1346b5b78be16f67d208bd1261a1eed7731b41b7",
-      "selected_only_commits": 93,
+      "selected_only_commits": 100,
       "branch_only_commits": 1,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/0-gates",
       "commit": "f75b4069d67b2c667fc6d28a8d30255667bd09e1",
-      "selected_only_commits": 136,
+      "selected_only_commits": 143,
       "branch_only_commits": 5,
       "patch_unique_to_branch": [
         "eb0bb3fabc2a560c2b6850d26ad34a171d3091c1 ci(gates): gate cryptographic domain separation on value, shape and reach",
@@ -62,7 +62,7 @@
     {
       "branch": "packet/m-fuzz-model",
       "commit": "806b42c12ca8d9adc6875eab6cc39d18c959f92a",
-      "selected_only_commits": 117,
+      "selected_only_commits": 124,
       "branch_only_commits": 1,
       "patch_unique_to_branch": [
         "806b42c12ca8d9adc6875eab6cc39d18c959f92a chore(wip): preserve unfinished response and revocation models"
@@ -71,7 +71,7 @@
     {
       "branch": "fix/security-adversarial-cases-20260922",
       "commit": "21b32859b972623b82bb04d3f13b7ffc8512742e",
-      "selected_only_commits": 354,
+      "selected_only_commits": 361,
       "branch_only_commits": 1,
       "patch_unique_to_branch": [
         "21b32859b972623b82bb04d3f13b7ffc8512742e chore(wip): preserve adversarial restoration and lifecycle fixtures"
@@ -80,49 +80,49 @@
     {
       "branch": "fix/security-checkpoint-snapshot-20260922",
       "commit": "534e8040c392f1280a2bb1975b27d06cefc76f93",
-      "selected_only_commits": 350,
+      "selected_only_commits": 357,
       "branch_only_commits": 1,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/10-poison-policy",
       "commit": "3b596d22bbc436679abda019ff8f1d751bed0910",
-      "selected_only_commits": 100,
+      "selected_only_commits": 107,
       "branch_only_commits": 0,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/k-gates",
       "commit": "d0469ce384970e5474084cb881c09c340c1413d3",
-      "selected_only_commits": 108,
+      "selected_only_commits": 115,
       "branch_only_commits": 0,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/x-ffi-buffers",
       "commit": "4c5d43dfe543f5632a485164ca481c248af4f687",
-      "selected_only_commits": 104,
+      "selected_only_commits": 111,
       "branch_only_commits": 0,
       "patch_unique_to_branch": []
     },
     {
       "branch": "packet/ci-regressions",
       "commit": "24779051963cfc1db03da8a4fbde74e6b2d2f057",
-      "selected_only_commits": 134,
+      "selected_only_commits": 141,
       "branch_only_commits": 0,
       "patch_unique_to_branch": []
     },
     {
       "branch": "security/launch-integration",
       "commit": "5d1a9ec0d900bd03ce55de903919d972be852d79",
-      "selected_only_commits": 652,
+      "selected_only_commits": 659,
       "branch_only_commits": 0,
       "patch_unique_to_branch": []
     },
     {
       "branch": "codex/chio-security-execution",
       "commit": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac",
-      "selected_only_commits": 1692,
+      "selected_only_commits": 1699,
       "branch_only_commits": 230,
       "patch_unique_to_branch": [
         "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac fix(evidence): make trusted refresh reproducible",
@@ -361,23 +361,39 @@
   "inspected_sources": [
     {
       "path": "docs/security/launch-execution-plan.md",
-      "sha256": "e31840ab92f2958e90f496a973eb573f04554f6bf4375f682ec5dbb9d72cf977"
+      "sha256": "aa5068411b96ed2fa961fd3c55f1c4a765bf2597beff604e2421d2c668d12102"
     },
     {
       "path": "docs/security/signed-json-boundaries.md",
       "sha256": "f2828d6dd975fda35931c385215b2871a96c3a46ee6514cc001fc02687b142d6"
     },
     {
+      "path": "docs/reviews/2026-10-01-compliance-product-truth-review.md",
+      "sha256": "1089149e346531b73a4d9aec727594d2460e8950190b7608234310aa1a5f734f"
+    },
+    {
+      "path": "docs/security/sidecar-control-authority.md",
+      "sha256": "86b5e7fc20c68b9d6791dc46d929117fafdd71d8e7ce82c91e8d3a89fa39f15c"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/clock.rs",
+      "sha256": "f93fb6660f36921dfc91d715dc9bc8b070bad0cb70003f01cca485f7bc99bdf8"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/clock.rs",
+      "sha256": "97f7e5b875aac26e1453c7e2c04b989746ce76d64c84f1a891dd823207d7279a"
+    },
+    {
       "path": "docs/security/crypto-wire-decoding.md",
-      "sha256": "3410bbae7e215cedf03c522bfbbe23856c363e19bbbd2b70c1cc765b0984d372"
+      "sha256": "6b6ab09d49dfe97b445b6c1bf16dd0b105bfdf45a14762950498fb5e6f86990f"
     },
     {
       "path": "docs/security/kernel-signing-authority.md",
-      "sha256": "987654d6cedef5ceb1a0a0c228f805f96b26809bb63bdf1b9caa5d72467f0254"
+      "sha256": "9ee3882395983cd124ba92960a8f38fef8fd88f4b67aa552e5b3b0f5baab076e"
     },
     {
       "path": "docs/security/trusted-time.md",
-      "sha256": "e4a11f6b0b310e27c2aa7ab35bffbb37e6b02c0a212416e9b9bda3afe8eccf60"
+      "sha256": "f45bf0771f2cf60fadc1af521557b157342b7c8986dbd7664b879ec97fffb7c7"
     },
     {
       "path": "docs/security/authenticated-caller-delivery.md",
@@ -389,11 +405,11 @@
     },
     {
       "path": "docs/security/tenant-read-contracts.md",
-      "sha256": "ae4256eb6ea88d6327b82083d5dcbe800bd9747729e9b880b3538803b88bbc99"
+      "sha256": "d3cecc63296ed6248a5503e91b45c28b153c94cb9d27960f7c7c7617b987fa5a"
     },
     {
       "path": "docs/security/threshold-approval-collection.md",
-      "sha256": "648e5e8bf4c6ee0243b379a97d7cece40fada28521124f89fed447a6d037520f"
+      "sha256": "6bff24856db507ad94cc99597f86f55449a16582dd3c92e12957719e5305a26a"
     },
     {
       "path": "docs/security/active-defense-rollout.md",

@@ -1,13 +1,13 @@
 {
-  "source_sha256": "b89aa4e1b6bc52b750c5f8290a452fadbf9b0cc9545bbb18b16e4c8b89a8c892",
+  "source_sha256": "cae1fbda1afccfbc87e12a5bbe400084bc1a8bb72018c3e96ba5ca2f3d5e40c1",
   "scope": "All BCP 14-bearing Markdown source blocks. Generated appendix bytes are checked separately by make check.",
-  "block_count": 221,
-  "keyword_count": 570,
+  "block_count": 227,
+  "keyword_count": 591,
   "review_basis_counts": {
-    "release_requirement": 69,
-    "inherited_wire_requirement": 123,
-    "source_update": 20,
-    "external_standard": 9
+    "release_requirement": 78,
+    "inherited_wire_requirement": 118,
+    "source_update": 21,
+    "external_standard": 10
   },
   "blocks": [
     {
@@ -1368,9 +1368,9 @@
       "keywords": [
         "MUST"
       ],
-      "text": "Unless this section says otherwise, a governed validation failure MUST\nprevent dispatch. For authorization artifacts representable by the typed\ndigest structures, the kernel returns a signed denial with decision\n`deny` and guard `kernel`; the native result is `policy_denied`.\nStructurally inconsistent approvals can fail receipt-metadata\nconstruction and return `internal_error` instead. A fallback error\nreceipt lacks the governed context and is not authenticated under the\nconfigured kernel key ({{native-errors}}).",
-      "normalized_sha256": "a35d0ef1fe638b32a0276cbe077852d04df379ec10a8c26846dd5c07ef6c4652",
-      "review_basis": "inherited_wire_requirement",
+      "text": "Unless this section says otherwise, a governed validation failure MUST\nprevent dispatch. For authorization artifacts representable by the typed\ndigest structures, the kernel returns a signed denial with decision\n`deny` and guard `kernel`; the native result is `policy_denied`.\nStructurally inconsistent approvals can prevent construction of the\nusual governed metadata. If the kernel can still authenticate the\nrequest and persist a valid denial, it returns `internal_error` with a\nreceipt under its configured receipt authority. Otherwise it terminates\nthe exchange as specified in {{tool-call-results}}. An unconfigured\nsigning key is never an error-recovery mechanism.",
+      "normalized_sha256": "2f2989df38b3ff0870cbe9639fb7c999c2fe3055ba16e53f1e7320f1758f7a47",
+      "review_basis": "release_requirement",
       "source_paths": [
         "crates/core/chio-core-types/src/capability/governance.rs",
         "crates/kernel/chio-kernel/src/kernel/governed_validation.rs",
@@ -1383,7 +1383,7 @@
       "id": "BCP14-0072",
       "section": "governed-intent",
       "top_section": "governed-transactions",
-      "line": 1985,
+      "line": 1987,
       "keywords": [
         "OPTIONAL"
       ],
@@ -1402,7 +1402,7 @@
       "id": "BCP14-0073",
       "section": "governed-intent",
       "top_section": "governed-transactions",
-      "line": 1990,
+      "line": 1992,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -1432,7 +1432,7 @@
       "id": "BCP14-0074",
       "section": "governed-intent",
       "top_section": "governed-transactions",
-      "line": 2006,
+      "line": 2008,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -1453,7 +1453,7 @@
       "id": "BCP14-0075",
       "section": "governed-intent",
       "top_section": "governed-transactions",
-      "line": 2013,
+      "line": 2015,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -1476,7 +1476,7 @@
       "id": "BCP14-0076",
       "section": "governed-intent",
       "top_section": "governed-transactions",
-      "line": 2022,
+      "line": 2024,
       "keywords": [
         "REQUIRED",
         "OPTIONAL"
@@ -1496,7 +1496,7 @@
       "id": "BCP14-0077",
       "section": "bound-tool-intent",
       "top_section": "governed-transactions",
-      "line": 2069,
+      "line": 2071,
       "keywords": [
         "MUST"
       ],
@@ -1515,7 +1515,7 @@
       "id": "BCP14-0078",
       "section": "bound-tool-intent",
       "top_section": "governed-transactions",
-      "line": 2076,
+      "line": 2078,
       "keywords": [
         "MUST",
         "MUST",
@@ -1536,7 +1536,7 @@
       "id": "BCP14-0079",
       "section": "bound-tool-intent",
       "top_section": "governed-transactions",
-      "line": 2083,
+      "line": 2085,
       "keywords": [
         "MUST NOT",
         "MUST"
@@ -1556,7 +1556,7 @@
       "id": "BCP14-0080",
       "section": "bound-tool-intent",
       "top_section": "governed-transactions",
-      "line": 2091,
+      "line": 2093,
       "keywords": [
         "MUST"
       ],
@@ -1575,7 +1575,7 @@
       "id": "BCP14-0081",
       "section": "governed-intent-checks",
       "top_section": "governed-transactions",
-      "line": 2111,
+      "line": 2113,
       "keywords": [
         "MUST",
         "MUST"
@@ -1595,7 +1595,7 @@
       "id": "BCP14-0082",
       "section": "governed-metered-billing",
       "top_section": "governed-transactions",
-      "line": 2172,
+      "line": 2174,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -1617,7 +1617,7 @@
       "id": "BCP14-0083",
       "section": "governed-metered-billing",
       "top_section": "governed-transactions",
-      "line": 2180,
+      "line": 2182,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -1642,7 +1642,7 @@
       "id": "BCP14-0084",
       "section": "governed-metered-billing",
       "top_section": "governed-transactions",
-      "line": 2191,
+      "line": 2193,
       "keywords": [
         "MUST"
       ],
@@ -1661,7 +1661,7 @@
       "id": "BCP14-0085",
       "section": "governed-metered-billing",
       "top_section": "governed-transactions",
-      "line": 2211,
+      "line": 2213,
       "keywords": [
         "MUST"
       ],
@@ -1680,7 +1680,7 @@
       "id": "BCP14-0086",
       "section": "governed-metered-billing",
       "top_section": "governed-transactions",
-      "line": 2224,
+      "line": 2226,
       "keywords": [
         "MUST"
       ],
@@ -1699,7 +1699,7 @@
       "id": "BCP14-0087",
       "section": "intent-constraints",
       "top_section": "governed-transactions",
-      "line": 2245,
+      "line": 2247,
       "keywords": [
         "MUST"
       ],
@@ -1718,7 +1718,7 @@
       "id": "BCP14-0088",
       "section": "intent-constraints",
       "top_section": "governed-transactions",
-      "line": 2249,
+      "line": 2251,
       "keywords": [
         "MUST"
       ],
@@ -1737,7 +1737,7 @@
       "id": "BCP14-0089",
       "section": "intent-constraints",
       "top_section": "governed-transactions",
-      "line": 2261,
+      "line": 2263,
       "keywords": [
         "MUST",
         "MUST"
@@ -1757,7 +1757,7 @@
       "id": "BCP14-0090",
       "section": "intent-constraints",
       "top_section": "governed-transactions",
-      "line": 2266,
+      "line": 2268,
       "keywords": [
         "MUST",
         "MUST"
@@ -1777,7 +1777,7 @@
       "id": "BCP14-0091",
       "section": "intent-constraints",
       "top_section": "governed-transactions",
-      "line": 2272,
+      "line": 2274,
       "keywords": [
         "MUST"
       ],
@@ -1796,7 +1796,7 @@
       "id": "BCP14-0092",
       "section": "approval-tokens",
       "top_section": "governed-transactions",
-      "line": 2290,
+      "line": 2292,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -1825,7 +1825,7 @@
       "id": "BCP14-0093",
       "section": "approval-tokens",
       "top_section": "governed-transactions",
-      "line": 2339,
+      "line": 2341,
       "keywords": [
         "MUST",
         "MUST"
@@ -1845,7 +1845,7 @@
       "id": "BCP14-0094",
       "section": "approval-tokens",
       "top_section": "governed-transactions",
-      "line": 2361,
+      "line": 2364,
       "keywords": [
         "MUST",
         "MUST",
@@ -1867,7 +1867,7 @@
       "id": "BCP14-0095",
       "section": "threshold-approval",
       "top_section": "governed-transactions",
-      "line": 2388,
+      "line": 2391,
       "keywords": [
         "MUST"
       ],
@@ -1884,9 +1884,29 @@
     },
     {
       "id": "BCP14-0096",
+      "section": "threshold-approval",
+      "top_section": "governed-transactions",
+      "line": 2411,
+      "keywords": [
+        "MUST",
+        "MUST"
+      ],
+      "text": "For durable threshold coordination, the call's request identifier,\nserver identifier, and tool name MUST each contain 1 to 256 UTF-8 octets,\nwith no leading or trailing whitespace or control characters. This\nprofile's bound applies even when a transport permits a longer request\nidentifier. An unsupported identifier MUST be rejected before creating\na proposal or consuming approval authority.",
+      "normalized_sha256": "1eafd9fab236d985bba8585c43720026671bc005f59d29c52fe8f32076b0a9f1",
+      "review_basis": "release_requirement",
+      "source_paths": [
+        "crates/core/chio-core-types/src/capability/governance.rs",
+        "crates/kernel/chio-kernel/src/kernel/governed_validation.rs",
+        "crates/kernel/chio-kernel/src/threshold_approval/verification.rs",
+        "docs/security/threshold-approval-collection.md"
+      ],
+      "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
+    },
+    {
+      "id": "BCP14-0097",
       "section": "threshold-proposal",
       "top_section": "governed-transactions",
-      "line": 2418,
+      "line": 2428,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -1915,10 +1935,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0097",
+      "id": "BCP14-0098",
       "section": "threshold-verification",
       "top_section": "governed-transactions",
-      "line": 2479,
+      "line": 2489,
       "keywords": [
         "MUST",
         "MUST"
@@ -1935,10 +1955,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0098",
+      "id": "BCP14-0099",
       "section": "threshold-verification",
       "top_section": "governed-transactions",
-      "line": 2520,
+      "line": 2530,
       "keywords": [
         "MUST",
         "MUST",
@@ -1957,10 +1977,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0099",
+      "id": "BCP14-0100",
       "section": "threshold-verification",
       "top_section": "governed-transactions",
-      "line": 2545,
+      "line": 2555,
       "keywords": [
         "MUST",
         "MUST",
@@ -1979,10 +1999,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0100",
+      "id": "BCP14-0101",
       "section": "threshold-kernel-proposals",
       "top_section": "governed-transactions",
-      "line": 2555,
+      "line": 2565,
       "keywords": [
         "MUST NOT"
       ],
@@ -1998,10 +2018,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0101",
+      "id": "BCP14-0102",
       "section": "threshold-kernel-proposals",
       "top_section": "governed-transactions",
-      "line": 2567,
+      "line": 2577,
       "keywords": [
         "MUST",
         "MUST",
@@ -2020,10 +2040,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0102",
+      "id": "BCP14-0103",
       "section": "provenance",
       "top_section": "governed-transactions",
-      "line": 2602,
+      "line": 2612,
       "keywords": [
         "MUST",
         "MUST"
@@ -2040,10 +2060,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0103",
+      "id": "BCP14-0104",
       "section": "call-chain-continuation",
       "top_section": "governed-transactions",
-      "line": 2630,
+      "line": 2640,
       "keywords": [
         "MUST"
       ],
@@ -2059,10 +2079,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0104",
+      "id": "BCP14-0105",
       "section": "call-chain-continuation",
       "top_section": "governed-transactions",
-      "line": 2644,
+      "line": 2654,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -2093,10 +2113,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0105",
+      "id": "BCP14-0106",
       "section": "call-chain-continuation",
       "top_section": "governed-transactions",
-      "line": 2664,
+      "line": 2674,
       "keywords": [
         "MUST",
         "MUST"
@@ -2113,10 +2133,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0106",
+      "id": "BCP14-0107",
       "section": "call-chain-continuation",
       "top_section": "governed-transactions",
-      "line": 2682,
+      "line": 2692,
       "keywords": [
         "OPTIONAL"
       ],
@@ -2132,10 +2152,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0107",
+      "id": "BCP14-0108",
       "section": "governed-receipts",
       "top_section": "governed-transactions",
-      "line": 2722,
+      "line": 2732,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -2159,10 +2179,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0108",
+      "id": "BCP14-0109",
       "section": "governed-receipts",
       "top_section": "governed-transactions",
-      "line": 2745,
+      "line": 2755,
       "keywords": [
         "OPTIONAL"
       ],
@@ -2178,10 +2198,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0109",
+      "id": "BCP14-0110",
       "section": "checkpoint-statement",
       "top_section": "checkpoints",
-      "line": 2775,
+      "line": 2785,
       "keywords": [
         "MUST"
       ],
@@ -2196,10 +2216,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0110",
+      "id": "BCP14-0111",
       "section": "checkpoint-statement",
       "top_section": "checkpoints",
-      "line": 2780,
+      "line": 2790,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -2223,10 +2243,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0111",
+      "id": "BCP14-0112",
       "section": "checkpoint-statement",
       "top_section": "checkpoints",
-      "line": 2808,
+      "line": 2818,
       "keywords": [
         "OPTIONAL",
         "MUST",
@@ -2244,10 +2264,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0112",
+      "id": "BCP14-0113",
       "section": "checkpoint-statement",
       "top_section": "checkpoints",
-      "line": 2817,
+      "line": 2827,
       "keywords": [
         "MUST",
         "MUST"
@@ -2263,10 +2283,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0113",
+      "id": "BCP14-0114",
       "section": "checkpoint-statement",
       "top_section": "checkpoints",
-      "line": 2823,
+      "line": 2833,
       "keywords": [
         "MUST",
         "MUST"
@@ -2282,10 +2302,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0114",
+      "id": "BCP14-0115",
       "section": "merkle-tree",
       "top_section": "checkpoints",
-      "line": 2841,
+      "line": 2851,
       "keywords": [
         "MUST",
         "MUST"
@@ -2301,10 +2321,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0115",
+      "id": "BCP14-0116",
       "section": "merkle-tree",
       "top_section": "checkpoints",
-      "line": 2848,
+      "line": 2858,
       "keywords": [
         "MUST",
         "MUST"
@@ -2320,10 +2340,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0116",
+      "id": "BCP14-0117",
       "section": "merkle-tree",
       "top_section": "checkpoints",
-      "line": 2856,
+      "line": 2866,
       "keywords": [
         "MUST"
       ],
@@ -2338,10 +2358,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0117",
+      "id": "BCP14-0118",
       "section": "merkle-tree",
       "top_section": "checkpoints",
-      "line": 2866,
+      "line": 2876,
       "keywords": [
         "MUST",
         "MUST",
@@ -2359,10 +2379,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0118",
+      "id": "BCP14-0119",
       "section": "merkle-tree",
       "top_section": "checkpoints",
-      "line": 2875,
+      "line": 2885,
       "keywords": [
         "MUST"
       ],
@@ -2377,10 +2397,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0119",
+      "id": "BCP14-0120",
       "section": "consistency-proofs",
       "top_section": "checkpoints",
-      "line": 2883,
+      "line": 2893,
       "keywords": [
         "MUST",
         "MUST",
@@ -2397,10 +2417,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0120",
+      "id": "BCP14-0121",
       "section": "consistency-proofs",
       "top_section": "checkpoints",
-      "line": 2895,
+      "line": 2905,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -2429,10 +2449,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0121",
+      "id": "BCP14-0122",
       "section": "consistency-proofs",
       "top_section": "checkpoints",
-      "line": 2933,
+      "line": 2943,
       "keywords": [
         "MUST"
       ],
@@ -2447,10 +2467,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0122",
+      "id": "BCP14-0123",
       "section": "consistency-proofs",
       "top_section": "checkpoints",
-      "line": 2941,
+      "line": 2951,
       "keywords": [
         "MUST",
         "MUST"
@@ -2466,10 +2486,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0123",
+      "id": "BCP14-0124",
       "section": "consistency-proofs",
       "top_section": "checkpoints",
-      "line": 2949,
+      "line": 2959,
       "keywords": [
         "MUST",
         "MUST",
@@ -2486,10 +2506,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0124",
+      "id": "BCP14-0125",
       "section": "consistency-proofs",
       "top_section": "checkpoints",
-      "line": 2956,
+      "line": 2966,
       "keywords": [
         "MUST"
       ],
@@ -2504,10 +2524,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0125",
+      "id": "BCP14-0126",
       "section": "consistency-proofs",
       "top_section": "checkpoints",
-      "line": 2965,
+      "line": 2975,
       "keywords": [
         "MUST"
       ],
@@ -2522,10 +2542,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0126",
+      "id": "BCP14-0127",
       "section": "consistency-proofs",
       "top_section": "checkpoints",
-      "line": 2974,
+      "line": 2984,
       "keywords": [
         "MUST NOT"
       ],
@@ -2540,10 +2560,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0127",
+      "id": "BCP14-0128",
       "section": "inclusion-proofs",
       "top_section": "checkpoints",
-      "line": 2999,
+      "line": 3009,
       "keywords": [
         "MUST",
         "MUST",
@@ -2560,10 +2580,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0128",
+      "id": "BCP14-0129",
       "section": "inclusion-proofs",
       "top_section": "checkpoints",
-      "line": 3017,
+      "line": 3027,
       "keywords": [
         "MUST"
       ],
@@ -2578,10 +2598,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0129",
+      "id": "BCP14-0130",
       "section": "inclusion-proofs",
       "top_section": "checkpoints",
-      "line": 3023,
+      "line": 3033,
       "keywords": [
         "MUST",
         "MUST"
@@ -2597,10 +2617,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0130",
+      "id": "BCP14-0131",
       "section": "inclusion-proofs",
       "top_section": "checkpoints",
-      "line": 3032,
+      "line": 3042,
       "keywords": [
         "MUST",
         "MUST"
@@ -2616,10 +2636,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0131",
+      "id": "BCP14-0132",
       "section": "checkpoint-verification",
       "top_section": "checkpoints",
-      "line": 3046,
+      "line": 3056,
       "keywords": [
         "MUST",
         "MUST"
@@ -2635,10 +2655,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0132",
+      "id": "BCP14-0133",
       "section": "checkpoint-verification",
       "top_section": "checkpoints",
-      "line": 3054,
+      "line": 3064,
       "keywords": [
         "MUST",
         "MUST"
@@ -2654,10 +2674,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0133",
+      "id": "BCP14-0134",
       "section": "checkpoint-retention",
       "top_section": "checkpoints",
-      "line": 3072,
+      "line": 3082,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -2673,10 +2693,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0134",
+      "id": "BCP14-0135",
       "section": "checkpoint-retention",
       "top_section": "checkpoints",
-      "line": 3078,
+      "line": 3088,
       "keywords": [
         "MUST",
         "MUST",
@@ -2693,10 +2713,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0135",
+      "id": "BCP14-0136",
       "section": "checkpoint-retention",
       "top_section": "checkpoints",
-      "line": 3085,
+      "line": 3095,
       "keywords": [
         "MUST NOT",
         "MUST"
@@ -2712,10 +2732,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0136",
+      "id": "BCP14-0137",
       "section": "native-framing",
       "top_section": "native-transport",
-      "line": 3146,
+      "line": 3156,
       "keywords": [
         "MUST NOT",
         "MUST"
@@ -2731,10 +2751,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0137",
+      "id": "BCP14-0138",
       "section": "native-framing",
       "top_section": "native-transport",
-      "line": 3151,
+      "line": 3161,
       "keywords": [
         "MUST",
         "MUST"
@@ -2750,10 +2770,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0138",
+      "id": "BCP14-0139",
       "section": "native-messages",
       "top_section": "native-transport",
-      "line": 3162,
+      "line": 3172,
       "keywords": [
         "MUST NOT"
       ],
@@ -2768,10 +2788,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0139",
+      "id": "BCP14-0140",
       "section": "native-messages",
       "top_section": "native-transport",
-      "line": 3179,
+      "line": 3189,
       "keywords": [
         "OPTIONAL"
       ],
@@ -2786,10 +2806,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0140",
+      "id": "BCP14-0141",
       "section": "native-messages",
       "top_section": "native-transport",
-      "line": 3183,
+      "line": 3193,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -2813,10 +2833,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0141",
+      "id": "BCP14-0142",
       "section": "native-messages",
       "top_section": "native-transport",
-      "line": 3215,
+      "line": 3225,
       "keywords": [
         "MUST NOT",
         "MUST",
@@ -2833,10 +2853,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0142",
+      "id": "BCP14-0143",
       "section": "native-messages",
       "top_section": "native-transport",
-      "line": 3250,
+      "line": 3260,
       "keywords": [
         "MAY"
       ],
@@ -2851,10 +2871,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0143",
+      "id": "BCP14-0144",
       "section": "native-messages",
       "top_section": "native-transport",
-      "line": 3262,
+      "line": 3272,
       "keywords": [
         "MAY"
       ],
@@ -2869,10 +2889,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0144",
+      "id": "BCP14-0145",
       "section": "tool-call-results",
       "top_section": "native-transport",
-      "line": 3274,
+      "line": 3286,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -2891,10 +2911,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0145",
+      "id": "BCP14-0146",
       "section": "tool-call-results",
       "top_section": "native-transport",
-      "line": 3283,
+      "line": 3295,
       "keywords": [
         "MUST"
       ],
@@ -2909,10 +2929,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0146",
+      "id": "BCP14-0147",
       "section": "tool-call-results",
       "top_section": "native-transport",
-      "line": 3300,
+      "line": 3312,
       "keywords": [
         "MUST",
         "MUST",
@@ -2930,10 +2950,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0147",
+      "id": "BCP14-0148",
       "section": "tool-call-results",
       "top_section": "native-transport",
-      "line": 3313,
+      "line": 3325,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -2951,10 +2971,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0148",
+      "id": "BCP14-0149",
       "section": "tool-call-results",
       "top_section": "native-transport",
-      "line": 3321,
+      "line": 3333,
       "keywords": [
         "MAY"
       ],
@@ -2969,10 +2989,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0149",
+      "id": "BCP14-0150",
       "section": "tool-call-results",
       "top_section": "native-transport",
-      "line": 3333,
+      "line": 3345,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -2988,10 +3008,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0150",
+      "id": "BCP14-0151",
       "section": "native-errors",
       "top_section": "native-transport",
-      "line": 3375,
+      "line": 3387,
       "keywords": [
         "SHOULD",
         "MAY"
@@ -3007,10 +3027,29 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0151",
+      "id": "BCP14-0152",
+      "section": "native-errors",
+      "top_section": "native-transport",
+      "line": 3395,
+      "keywords": [
+        "MUST",
+        "MUST"
+      ],
+      "text": "A diagnostic code identifies the failure, not whether a committed effect\noccurred. If dispatch has been committed and the effect cannot be\nresolved, the kernel MUST preserve the operation as incomplete under\n{{execution-lifecycle}}. A denial receipt or `tool_server_error` MUST\nNOT be used to justify refund or redispatch of that operation.",
+      "normalized_sha256": "6b0d9fcf26a9a4c71efeef5c7cf1d6d8b8c31b200fe80929182b7423ade6652a",
+      "review_basis": "release_requirement",
+      "source_paths": [
+        "crates/core/chio-core-types/src/message.rs",
+        "crates/products/chio-cli/src/cli/session/response.rs",
+        "spec/schemas/chio-wire/v1/kernel/tool_call_response.schema.json"
+      ],
+      "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
+    },
+    {
+      "id": "BCP14-0153",
       "section": "native-receiver",
       "top_section": "native-transport",
-      "line": 3409,
+      "line": 3427,
       "keywords": [
         "MUST"
       ],
@@ -3025,10 +3064,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0152",
+      "id": "BCP14-0154",
       "section": "native-receiver",
       "top_section": "native-transport",
-      "line": 3412,
+      "line": 3430,
       "keywords": [
         "REQUIRED",
         "MUST"
@@ -3044,10 +3083,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0153",
+      "id": "BCP14-0155",
       "section": "native-receiver",
       "top_section": "native-transport",
-      "line": 3417,
+      "line": 3435,
       "keywords": [
         "MUST NOT"
       ],
@@ -3062,10 +3101,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0154",
+      "id": "BCP14-0156",
       "section": "native-receiver",
       "top_section": "native-transport",
-      "line": 3425,
+      "line": 3443,
       "keywords": [
         "MUST",
         "MAY"
@@ -3081,10 +3120,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0155",
+      "id": "BCP14-0157",
       "section": "hosted-endpoints",
       "top_section": "hosted-mcp",
-      "line": 3516,
+      "line": 3534,
       "keywords": [
         "MUST",
         "MUST"
@@ -3099,10 +3138,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0156",
+      "id": "BCP14-0158",
       "section": "hosted-admission",
       "top_section": "hosted-mcp",
-      "line": 3536,
+      "line": 3554,
       "keywords": [
         "MUST"
       ],
@@ -3116,10 +3155,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0157",
+      "id": "BCP14-0159",
       "section": "hosted-admission",
       "top_section": "hosted-mcp",
-      "line": 3549,
+      "line": 3567,
       "keywords": [
         "MUST",
         "MUST"
@@ -3134,10 +3173,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0158",
+      "id": "BCP14-0160",
       "section": "hosted-admission",
       "top_section": "hosted-mcp",
-      "line": 3561,
+      "line": 3579,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -3152,10 +3191,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0159",
+      "id": "BCP14-0161",
       "section": "hosted-admission",
       "top_section": "hosted-mcp",
-      "line": 3570,
+      "line": 3588,
       "keywords": [
         "MUST",
         "MUST"
@@ -3170,10 +3209,30 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0160",
+      "id": "BCP14-0162",
       "section": "hosted-admission",
       "top_section": "hosted-mcp",
-      "line": 3586,
+      "line": 3604,
+      "keywords": [
+        "MUST",
+        "MUST",
+        "MUST",
+        "MUST NOT"
+      ],
+      "text": "A present `cnf` MUST select at least one supported sender-key or\ncertificate binding, and every selected binding MUST be verified. The\nedge MUST reject malformed, empty, or unsupported confirmation methods;\nit MUST NOT silently treat such a token as an unconstrained bearer.\nIn particular, a `jkt` confirmation requires the separately implemented\nOAuth DPoP binding and cannot be satisfied by the Chio proof format.",
+      "normalized_sha256": "54adb8f7d6b02f9643c680d39176fca1e2e0c7212826b674d3effe20da31bf80",
+      "review_basis": "external_standard",
+      "source_paths": [
+        "crates/protocol/chio-mcp-edge/src/runtime/protocol/tool_results.rs",
+        "crates/protocol/chio-cross-protocol/src/execution.rs"
+      ],
+      "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
+    },
+    {
+      "id": "BCP14-0163",
+      "section": "hosted-admission",
+      "top_section": "hosted-mcp",
+      "line": 3611,
       "keywords": [
         "MUST NOT"
       ],
@@ -3187,10 +3246,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0161",
+      "id": "BCP14-0164",
       "section": "hosted-admission",
       "top_section": "hosted-mcp",
-      "line": 3591,
+      "line": 3616,
       "keywords": [
         "MUST",
         "MUST",
@@ -3206,10 +3265,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0162",
+      "id": "BCP14-0165",
       "section": "hosted-admission",
       "top_section": "hosted-mcp",
-      "line": 3599,
+      "line": 3624,
       "keywords": [
         "MUST",
         "MUST"
@@ -3224,10 +3283,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0163",
+      "id": "BCP14-0166",
       "section": "hosted-sessions",
       "top_section": "hosted-mcp",
-      "line": 3676,
+      "line": 3701,
       "keywords": [
         "MUST"
       ],
@@ -3241,16 +3300,16 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0164",
+      "id": "BCP14-0167",
       "section": "hosted-tool-calls",
       "top_section": "hosted-mcp",
-      "line": 3784,
+      "line": 3809,
       "keywords": [
         "MUST"
       ],
-      "text": "`chioRequestId` is a non-empty string of at most 2048 UTF-8 octets, with\nno leading or trailing whitespace and no control characters. The kernel\nuses it as the request identifier. Without it, the edge uses the request\nidentifier bound in a presented execution nonce, or assigns a new\nidentifier to each call. A request that carries approval members or\n`supplementalAuthorization` MUST carry `chioRequestId`, and the approval\nmembers have to follow the combination rules of {{native-messages}}; the\nedge answers -32602 otherwise. The kernel records `routeSelection`, an\nobject, in the receipt's metadata as `route_selection`.",
-      "normalized_sha256": "e0fd747f4484d114660e3889192d74b1a1364451da45a958bc65b59bbd34b913",
-      "review_basis": "inherited_wire_requirement",
+      "text": "`chioRequestId` is a non-empty string of at most 2048 UTF-8 octets, with\nno leading or trailing whitespace and no control characters. The kernel\nuses it as the request identifier. Without it, the edge uses the request\nidentifier bound in a presented execution nonce, or assigns a new\nidentifier to each call. A request that carries approval members or\n`supplementalAuthorization` MUST carry `chioRequestId`, and the approval\nmembers have to follow the combination rules of {{native-messages}}; the\nedge answers -32602 otherwise. Calls requiring durable threshold\ncoordination also satisfy the narrower identifier bounds in\n{{threshold-approval}}. The kernel records `routeSelection`, an\nobject, in the receipt's metadata as `route_selection`.",
+      "normalized_sha256": "c038d3ffa14eccafa347e0a59759679a3a974cc849db8835e75ea689c193c04e",
+      "review_basis": "source_update",
       "source_paths": [
         "crates/protocol/chio-mcp-edge/src/runtime/protocol/tool_results.rs",
         "crates/protocol/chio-cross-protocol/src/execution.rs"
@@ -3258,10 +3317,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0165",
+      "id": "BCP14-0168",
       "section": "hosted-tool-calls",
       "top_section": "hosted-mcp",
-      "line": 3840,
+      "line": 3867,
       "keywords": [
         "MUST NOT"
       ],
@@ -3275,16 +3334,17 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0166",
+      "id": "BCP14-0169",
       "section": "hosted-tool-calls",
       "top_section": "hosted-mcp",
-      "line": 3848,
+      "line": 3875,
       "keywords": [
+        "MUST",
         "MUST",
         "MUST NOT"
       ],
-      "text": "The edge also returns `result._meta.chioEvidence`, with schema\n`chio.mcp.execution-evidence.v1`, the signed `receipt`, the kernel\n`requestId`, `outputKind`, `output`, and diagnostic `terminalState`. For\nan allowed scalar or object result, `outputKind` is `value` and `output`\ncontains the original value whose canonical bytes the kernel bound. A\nprojected MCP wrapper is not a substitute for that original value. For a\nstream, `outputKind` is `stream` and `output` is `null`; stream content\nverification requires the ordered chunks and their binding profile. When\nno releasable value is available, `outputKind` is `none` and `output` is\n`null`. The evidence wrapper is not separately signed; consumers MUST\nverify the enclosed receipt and all claimed bindings. They MUST NOT\ninfer permission from an unsigned diagnostic field or from MCP's\n`isError` alone.",
-      "normalized_sha256": "0cc9454ff1e5a1bdfb0d11ff71ec95b59a3fcfb68d1293b11d10000d831c77ff",
+      "text": "The edge also returns `result._meta.chioEvidence`, with schema\n`chio.mcp.execution-evidence.v1`, the signed `receipt`, `requestId`,\n`outputKind`, `output`, and diagnostic `terminalState`. `requestId` is\nthe request identifier from signed receipt metadata, or `null` when that\nmetadata is absent. Consumers MUST compare a present identifier with the\nexpected request; a null value cannot establish request correlation by\nitself. For\nan allowed scalar or object result, `outputKind` is `value` and `output`\ncontains the original value whose canonical bytes the kernel bound. A\nprojected MCP wrapper is not a substitute for that original value. For a\nstream, `outputKind` is `stream` and `output` is `null`; stream content\nverification requires the ordered chunks and their binding profile. When\nno releasable value is available, `outputKind` is `none` and `output` is\n`null`. The evidence wrapper is not separately signed; consumers MUST\nverify the enclosed receipt and all claimed bindings. They MUST NOT\ninfer permission from an unsigned diagnostic field or from MCP's\n`isError` alone.",
+      "normalized_sha256": "c42c49b226d8e56e451eb87894f6a68b4269651d5993bb14aefa37aff188b73c",
       "review_basis": "source_update",
       "source_paths": [
         "crates/protocol/chio-mcp-edge/src/runtime/protocol/tool_results.rs",
@@ -3293,10 +3353,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0167",
+      "id": "BCP14-0170",
       "section": "hosted-tool-calls",
       "top_section": "hosted-mcp",
-      "line": 3862,
+      "line": 3893,
       "keywords": [
         "MUST",
         "MUST",
@@ -3313,10 +3373,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0168",
+      "id": "BCP14-0171",
       "section": "model-metadata",
       "top_section": "hosted-mcp",
-      "line": 3890,
+      "line": 3921,
       "keywords": [
         "REQUIRED",
         "OPTIONAL",
@@ -3333,10 +3393,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0169",
+      "id": "BCP14-0172",
       "section": "model-metadata",
       "top_section": "hosted-mcp",
-      "line": 3898,
+      "line": 3929,
       "keywords": [
         "MUST"
       ],
@@ -3350,10 +3410,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0170",
+      "id": "BCP14-0173",
       "section": "issuance",
       "top_section": "trust-control",
-      "line": 3949,
+      "line": 3980,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -3371,10 +3431,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0171",
+      "id": "BCP14-0174",
       "section": "issuance",
       "top_section": "trust-control",
-      "line": 3957,
+      "line": 3988,
       "keywords": [
         "MUST",
         "MUST"
@@ -3390,10 +3450,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0172",
+      "id": "BCP14-0175",
       "section": "issuance",
       "top_section": "trust-control",
-      "line": 3977,
+      "line": 4008,
       "keywords": [
         "OPTIONAL"
       ],
@@ -3408,10 +3468,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0173",
+      "id": "BCP14-0176",
       "section": "delegated-issuance",
       "top_section": "trust-control",
-      "line": 3998,
+      "line": 4029,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -3432,10 +3492,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0174",
+      "id": "BCP14-0177",
       "section": "delegated-issuance",
       "top_section": "trust-control",
-      "line": 4013,
+      "line": 4044,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -3460,10 +3520,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0175",
+      "id": "BCP14-0178",
       "section": "delegated-issuance",
       "top_section": "trust-control",
-      "line": 4028,
+      "line": 4059,
       "keywords": [
         "MUST"
       ],
@@ -3478,10 +3538,29 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0176",
+      "id": "BCP14-0179",
       "section": "delegated-issuance",
       "top_section": "trust-control",
       "line": 4071,
+      "keywords": [
+        "MUST",
+        "MUST NOT"
+      ],
+      "text": "3. If `delegationPolicy` is present, the requested token is within its\n   ceiling: the requested scope is a subset of the policy's `scope`\n   ({{attenuation}}), `ttl` is greater than zero and no greater than\n   `ttlSeconds`, and checked addition of now plus `ttl` is representable\n   and no greater than `expiresAt` (403). Overflow MUST reject issuance;\n   it MUST NOT be replaced by a saturated expiry.",
+      "normalized_sha256": "511af59fba021573a472dc507aacad01bafc1017aea862620764c9a2e2071280",
+      "review_basis": "release_requirement",
+      "source_paths": [
+        "docs/security/tenant-read-contracts.md",
+        "docs/security/trusted-time.md",
+        "spec/PROTOCOL.md"
+      ],
+      "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
+    },
+    {
+      "id": "BCP14-0180",
+      "section": "delegated-issuance",
+      "top_section": "trust-control",
+      "line": 4104,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -3501,10 +3580,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0177",
+      "id": "BCP14-0181",
       "section": "receipt-query",
       "top_section": "trust-control",
-      "line": 4084,
+      "line": 4117,
       "keywords": [
         "OPTIONAL"
       ],
@@ -3519,10 +3598,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0178",
+      "id": "BCP14-0182",
       "section": "receipt-query",
       "top_section": "trust-control",
-      "line": 4104,
+      "line": 4137,
       "keywords": [
         "MUST",
         "MUST"
@@ -3538,10 +3617,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0179",
+      "id": "BCP14-0183",
       "section": "receipt-query",
       "top_section": "trust-control",
-      "line": 4110,
+      "line": 4143,
       "keywords": [
         "MAY",
         "MUST",
@@ -3558,10 +3637,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0180",
+      "id": "BCP14-0184",
       "section": "revocation",
       "top_section": "trust-control",
-      "line": 4149,
+      "line": 4182,
       "keywords": [
         "REQUIRED"
       ],
@@ -3576,10 +3655,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0181",
+      "id": "BCP14-0185",
       "section": "revocation",
       "top_section": "trust-control",
-      "line": 4178,
+      "line": 4211,
       "keywords": [
         "MUST"
       ],
@@ -3594,10 +3673,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0182",
+      "id": "BCP14-0186",
       "section": "revocation",
       "top_section": "trust-control",
-      "line": 4193,
+      "line": 4226,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -3613,10 +3692,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0183",
+      "id": "BCP14-0187",
       "section": "versioning",
       "top_section": "versioning",
-      "line": 4206,
+      "line": 4239,
       "keywords": [
         "MUST",
         "MUST"
@@ -3628,10 +3707,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0184",
+      "id": "BCP14-0188",
       "section": "versioning",
       "top_section": "versioning",
-      "line": 4222,
+      "line": 4255,
       "keywords": [
         "MUST",
         "MUST"
@@ -3643,10 +3722,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0185",
+      "id": "BCP14-0189",
       "section": "versioning",
       "top_section": "versioning",
-      "line": 4230,
+      "line": 4263,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -3658,10 +3737,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0186",
+      "id": "BCP14-0190",
       "section": "security-boundaries",
       "top_section": "security",
-      "line": 4323,
+      "line": 4356,
       "keywords": [
         "MUST"
       ],
@@ -3678,10 +3757,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0187",
+      "id": "BCP14-0191",
       "section": "security-transport",
       "top_section": "security",
-      "line": 4334,
+      "line": 4367,
       "keywords": [
         "REQUIRED",
         "REQUIRED",
@@ -3691,9 +3770,9 @@
         "REQUIRED",
         "REQUIRED"
       ],
-      "text": "| Surface | TLS | Mutual TLS | Without transport security |\n|---|---|---|---|\n| Native transport | REQUIRED across hosts or untrusted networks | REQUIRED when the peer's identity is part of the authorization decision | Conformant only over a same-host socket or loopback, for development |\n| MCP binding | REQUIRED for any non-loopback deployment | REQUIRED when the session's sender binding is an mTLS certificate thumbprint | Conformant only on loopback or in a test harness |\n| Trust-control interface | REQUIRED for any non-loopback deployment | REQUIRED for service-to-service deployments that rely on transport identity | Conformant only on loopback |\n| Kernel to tool server | Provided by mutual TLS when networked | REQUIRED over TCP across processes or hosts | Not conformant for production over a network |\n{: #tab-transport-security title=\"Transport Security Requirements\"}",
-      "normalized_sha256": "d1768260ea850236adc3538bf2970b5d1464c819383e15b869e675e33ead2c0a",
-      "review_basis": "inherited_wire_requirement",
+      "text": "| Surface | TLS | Mutual TLS | Without transport security |\n|---|---|---|---|\n| Native transport | REQUIRED across hosts or untrusted networks | REQUIRED when TLS peer identity supplies authorization identity | Authenticated same-host IPC is permitted; unauthenticated loopback is development-only |\n| MCP binding | REQUIRED for any non-loopback deployment | REQUIRED when the session's sender binding is an mTLS certificate thumbprint | Conformant only on loopback or in a test harness |\n| Trust-control interface | REQUIRED for any non-loopback deployment | REQUIRED for service-to-service deployments that rely on transport identity | Conformant only on loopback |\n| Kernel to tool server | Provided by mutual TLS when networked | REQUIRED over TCP across processes or hosts | Not conformant for production over a network |\n{: #tab-transport-security title=\"Transport Security Requirements\"}",
+      "normalized_sha256": "8730761c88fc3d56c0f283a2f38517d5d60e810ca57c342d02b85c1be2004be8",
+      "review_basis": "release_requirement",
       "source_paths": [
         "docs/security/launch-execution-plan.md",
         "docs/security/active-defense-rollout.md",
@@ -3704,10 +3783,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0188",
+      "id": "BCP14-0192",
       "section": "security-transport",
       "top_section": "security",
-      "line": 4342,
+      "line": 4375,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -3725,10 +3804,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0189",
+      "id": "BCP14-0193",
       "section": "security-transport",
       "top_section": "security",
-      "line": 4348,
+      "line": 4381,
       "keywords": [
         "MUST",
         "MUST",
@@ -3747,10 +3826,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0190",
+      "id": "BCP14-0194",
       "section": "security-token-theft",
       "top_section": "security",
-      "line": 4365,
+      "line": 4398,
       "keywords": [
         "SHOULD",
         "SHOULD",
@@ -3769,10 +3848,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0191",
+      "id": "BCP14-0195",
       "section": "security-token-theft",
       "top_section": "security",
-      "line": 4375,
+      "line": 4408,
       "keywords": [
         "MUST",
         "MUST",
@@ -3792,10 +3871,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0192",
+      "id": "BCP14-0196",
       "section": "security-kernel-trust",
       "top_section": "security",
-      "line": 4384,
+      "line": 4417,
       "keywords": [
         "MUST"
       ],
@@ -3812,10 +3891,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0193",
+      "id": "BCP14-0197",
       "section": "security-kernel-trust",
       "top_section": "security",
-      "line": 4393,
+      "line": 4426,
       "keywords": [
         "SHOULD"
       ],
@@ -3832,16 +3911,17 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0194",
+      "id": "BCP14-0198",
       "section": "security-kernel-trust",
       "top_section": "security",
-      "line": 4399,
+      "line": 4432,
       "keywords": [
-        "SHOULD"
+        "SHOULD",
+        "MUST"
       ],
-      "text": "Capability tokens carry no audience. Any kernel that trusts a token's\nissuer accepts the token for the grants it names. Operators that run\nkernels in different trust domains SHOULD use a distinct issuer key for\neach domain, so that a token issued for one domain is not accepted in\nanother.",
-      "normalized_sha256": "b85ba3203cd2454533b4853b8ae9ce6e214f0f629462e95d5f29646e0b8a8f38",
-      "review_basis": "inherited_wire_requirement",
+      "text": "A basic capability token has no general audience member. Without an\nadditional binding, its issuer trust and grants can make it usable at\nmore than one kernel. The security-context caveat in\n{{capability-security-context}} restricts use to its authenticated\ncontext; it is not a generic OAuth audience. Operators that run kernels\nin different trust domains SHOULD use distinct issuer keys and MUST\nconfigure the context and target checks required by each domain.",
+      "normalized_sha256": "d2041f1462434013cab86c73fdc83d8309fde9485df00acf555cea2eb35a9aa6",
+      "review_basis": "release_requirement",
       "source_paths": [
         "docs/security/launch-execution-plan.md",
         "docs/security/active-defense-rollout.md",
@@ -3852,10 +3932,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0195",
+      "id": "BCP14-0199",
       "section": "security-key-lifecycle",
       "top_section": "security",
-      "line": 4407,
+      "line": 4442,
       "keywords": [
         "MUST NOT",
         "MUST",
@@ -3874,10 +3954,53 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0196",
+      "id": "BCP14-0200",
       "section": "security-key-lifecycle",
       "top_section": "security",
-      "line": 4412,
+      "line": 4447,
+      "keywords": [
+        "MUST",
+        "MUST NOT"
+      ],
+      "text": "Signing keys MUST be generated or derived using cryptographic secret\nmaterial appropriate to their suite. Public identifiers, user names,\nworkload names, and public-key bytes MUST NOT be used alone to derive a\nprivate key. Issuance to a subject public key does not authorize an\nadapter to replace that key with one it can reconstruct from public\ninputs.",
+      "normalized_sha256": "073f0ef1d14bd511312a0d9a5e8b07d3b4fc9682687f27e68888ad4ad8a71e1e",
+      "review_basis": "release_requirement",
+      "source_paths": [
+        "docs/security/launch-execution-plan.md",
+        "docs/security/active-defense-rollout.md",
+        "docs/security/trusted-time.md",
+        "docs/security/native-restart-safety.md",
+        "docs/security/kernel-signing-authority.md"
+      ],
+      "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
+    },
+    {
+      "id": "BCP14-0201",
+      "section": "security-key-lifecycle",
+      "top_section": "security",
+      "line": 4454,
+      "keywords": [
+        "MUST",
+        "MUST",
+        "MUST"
+      ],
+      "text": "Changes to issuer sets, signing roles, or key epochs MUST come from an\nauthenticated authority authorized to make that change. A replication\npeer's connectivity or possession of a general service credential is\ninsufficient. Replicated trust state MUST bind its authority domain and\nmonotonic revision, reject rollback and cross-domain substitution, and\nbe durably applied before it authorizes operations. A profile MUST\nspecify its protected replication channel and authenticated update\nformat; an unsigned snapshot over an unprotected channel is invalid.",
+      "normalized_sha256": "e904cd91c6b2adbe2d84f3676bc7b3e393c8a6cf5ab3b8f8ffb4399b3c41560b",
+      "review_basis": "release_requirement",
+      "source_paths": [
+        "docs/security/launch-execution-plan.md",
+        "docs/security/active-defense-rollout.md",
+        "docs/security/trusted-time.md",
+        "docs/security/native-restart-safety.md",
+        "docs/security/kernel-signing-authority.md"
+      ],
+      "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
+    },
+    {
+      "id": "BCP14-0202",
+      "section": "security-key-lifecycle",
+      "top_section": "security",
+      "line": 4463,
       "keywords": [
         "MUST",
         "MUST",
@@ -3898,10 +4021,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0197",
+      "id": "BCP14-0203",
       "section": "security-key-lifecycle",
       "top_section": "security",
-      "line": 4420,
+      "line": 4471,
       "keywords": [
         "MUST",
         "MUST",
@@ -3920,10 +4043,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0198",
+      "id": "BCP14-0204",
       "section": "security-delegation",
       "top_section": "security",
-      "line": 4440,
+      "line": 4491,
       "keywords": [
         "SHOULD"
       ],
@@ -3940,10 +4063,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0199",
+      "id": "BCP14-0205",
       "section": "security-downgrade",
       "top_section": "security",
-      "line": 4454,
+      "line": 4505,
       "keywords": [
         "MUST",
         "MUST"
@@ -3961,10 +4084,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0200",
+      "id": "BCP14-0206",
       "section": "security-canonicalization",
       "top_section": "security",
-      "line": 4465,
+      "line": 4516,
       "keywords": [
         "MUST",
         "MUST",
@@ -3984,10 +4107,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0201",
+      "id": "BCP14-0207",
       "section": "security-runtime",
       "top_section": "security",
-      "line": 4478,
+      "line": 4529,
       "keywords": [
         "MUST",
         "MUST",
@@ -4006,15 +4129,17 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0202",
+      "id": "BCP14-0208",
       "section": "security-tool-servers",
       "top_section": "security",
-      "line": 4487,
+      "line": 4538,
       "keywords": [
-        "MUST"
+        "MUST",
+        "MUST",
+        "MUST NOT"
       ],
-      "text": "A confined execution profile MUST bind the selected tool to an\nauthenticated manifest and an independently configured operator ceiling.\nThe effective authority is their intersection. A signed manifest is\naccepted only from a publisher authorized for that workload; signature\nvalidity alone does not authorize its requested privileges.",
-      "normalized_sha256": "a333bb94bbf2b7b302fd3461a58607517861e88f7d91f106a862da62d0c692a8",
+      "text": "A confined execution profile MUST bind the selected tool to an\nauthenticated manifest and an independently configured operator ceiling.\nThe effective authority is their intersection. An adapter MUST apply the\noperator's authenticated policy to every exposed operation, including\nroutes absent from an upstream API description. It MUST NOT infer an\nexemption from an HTTP method, a tool-supplied side-effect annotation, or\nan untrusted schema. Anonymous or unrestricted operations require an\nexplicit operator policy. A signed manifest is\naccepted only from a publisher authorized for that workload; signature\nvalidity alone does not authorize its requested privileges.",
+      "normalized_sha256": "be25fdd84f9b8f77a83be608f7f701e18d3e22b940cae9bac9ef70888ff38705",
       "review_basis": "release_requirement",
       "source_paths": [
         "docs/security/launch-execution-plan.md",
@@ -4026,10 +4151,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0203",
+      "id": "BCP14-0209",
       "section": "security-tool-servers",
       "top_section": "security",
-      "line": 4493,
+      "line": 4549,
       "keywords": [
         "MUST",
         "MUST",
@@ -4049,10 +4174,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0204",
+      "id": "BCP14-0210",
       "section": "security-tool-servers",
       "top_section": "security",
-      "line": 4501,
+      "line": 4557,
       "keywords": [
         "MUST",
         "MUST"
@@ -4070,10 +4195,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0205",
+      "id": "BCP14-0211",
       "section": "security-credential-custody",
       "top_section": "security",
-      "line": 4512,
+      "line": 4568,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -4091,10 +4216,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0206",
+      "id": "BCP14-0212",
       "section": "security-credential-custody",
       "top_section": "security",
-      "line": 4519,
+      "line": 4575,
       "keywords": [
         "MUST",
         "MUST",
@@ -4113,10 +4238,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0207",
+      "id": "BCP14-0213",
       "section": "security-information-flow",
       "top_section": "security",
-      "line": 4530,
+      "line": 4586,
       "keywords": [
         "MUST",
         "MUST",
@@ -4135,10 +4260,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0208",
+      "id": "BCP14-0214",
       "section": "security-information-flow",
       "top_section": "security",
-      "line": 4537,
+      "line": 4593,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -4156,10 +4281,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0209",
+      "id": "BCP14-0215",
       "section": "security-information-flow",
       "top_section": "security",
-      "line": 4543,
+      "line": 4599,
       "keywords": [
         "MUST",
         "MUST",
@@ -4179,10 +4304,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0210",
+      "id": "BCP14-0216",
       "section": "security-active-response",
       "top_section": "security",
-      "line": 4554,
+      "line": 4610,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -4200,10 +4325,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0211",
+      "id": "BCP14-0217",
       "section": "security-active-response",
       "top_section": "security",
-      "line": 4561,
+      "line": 4617,
       "keywords": [
         "MUST",
         "MUST NOT",
@@ -4225,10 +4350,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0212",
+      "id": "BCP14-0218",
       "section": "security-active-response",
       "top_section": "security",
-      "line": 4569,
+      "line": 4625,
       "keywords": [
         "MUST"
       ],
@@ -4245,10 +4370,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0213",
+      "id": "BCP14-0219",
       "section": "security-dos",
       "top_section": "security",
-      "line": 4578,
+      "line": 4634,
       "keywords": [
         "MUST",
         "MUST",
@@ -4267,10 +4392,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0214",
+      "id": "BCP14-0220",
       "section": "security-budgets",
       "top_section": "security",
-      "line": 4594,
+      "line": 4650,
       "keywords": [
         "MUST",
         "MUST",
@@ -4289,10 +4414,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0215",
+      "id": "BCP14-0221",
       "section": "security-provenance",
       "top_section": "security",
-      "line": 4621,
+      "line": 4677,
       "keywords": [
         "MUST"
       ],
@@ -4309,16 +4434,18 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0216",
+      "id": "BCP14-0222",
       "section": "security-attestation",
       "top_section": "security",
-      "line": 4628,
+      "line": 4684,
       "keywords": [
+        "MUST",
+        "MUST NOT",
         "MUST"
       ],
-      "text": "Attestation evidence can inform issuance ({{issuance}}), but it does not\nauthorize a call by itself. A profile that binds an attestation digest\nto a token MUST also bind the request to the token's sender, by a sender\nproof or by mutual TLS continuity, on the same request.",
-      "normalized_sha256": "802da3730d6debe752712f065d0a2095809bb0f602c8b0d6dcf6a24792b32e92",
-      "review_basis": "inherited_wire_requirement",
+      "text": "Attestation evidence can inform issuance ({{issuance}}), but it does not\nauthorize a call by itself. A verifier MUST validate the evidence under\nan independently configured attester trust policy, including the\nsignature or authenticated verification result, workload measurements,\nfreshness, and challenge or session binding required by the profile.\nAgent-supplied assurance labels, verifier names, and evidence digests do\nnot satisfy those checks. A receipt MUST NOT label such assertions as\nverified attestation without that validation. A profile that binds an attestation digest\nto a token MUST also bind the request to the token's sender, by a sender\nproof or by mutual TLS continuity, on the same request.",
+      "normalized_sha256": "a523bc59ff08fd06b45c4c1904ee531e73bd64bc24c3fe904e6b4df023e2d351",
+      "review_basis": "release_requirement",
       "source_paths": [
         "docs/security/launch-execution-plan.md",
         "docs/security/active-defense-rollout.md",
@@ -4329,10 +4456,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0217",
+      "id": "BCP14-0223",
       "section": "security-clock-skew",
       "top_section": "security",
-      "line": 4635,
+      "line": 4697,
       "keywords": [
         "MUST NOT"
       ],
@@ -4349,10 +4476,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0218",
+      "id": "BCP14-0224",
       "section": "security-clock-skew",
       "top_section": "security",
-      "line": 4641,
+      "line": 4703,
       "keywords": [
         "MUST",
         "MUST NOT"
@@ -4370,10 +4497,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0219",
+      "id": "BCP14-0225",
       "section": "security-clock-skew",
       "top_section": "security",
-      "line": 4647,
+      "line": 4709,
       "keywords": [
         "MUST",
         "MUST NOT",
@@ -4392,10 +4519,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0220",
+      "id": "BCP14-0226",
       "section": "privacy",
       "top_section": "privacy",
-      "line": 4671,
+      "line": 4733,
       "keywords": [
         "SHOULD",
         "SHOULD",
@@ -4410,10 +4537,10 @@
       "disposition": "reviewed in release-target scope; runtime acceptance not inferred"
     },
     {
-      "id": "BCP14-0221",
+      "id": "BCP14-0227",
       "section": "privacy",
       "top_section": "privacy",
-      "line": 4696,
+      "line": 4758,
       "keywords": [
         "SHOULD"
       ],

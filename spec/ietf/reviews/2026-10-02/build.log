@@ -5,6 +5,7 @@ kramdown-rfc draft-whelan-chio-protocol.md > draft-whelan-chio-protocol-00.raw.x
 ** simplified markup "<spanx style=\"verb\">status</spanx>" into "status" in table heading
 ** simplified markup "<spanx style=\"verb\">code</spanx>" into "code" in table heading
 ** simplified markup "<spanx style=\"verb\">detail</spanx>" into "detail" in table heading
+.refcache/reference.I-D.ietf-wimse-arch-08.xml: renewing (stale by 0.3 days) from https://datatracker.ietf.org/doc/bibxml3/draft-ietf-wimse-arch-08.xml
 python3 tools/normalize_xml.py draft-whelan-chio-protocol-00.raw.xml.tmp draft-whelan-chio-protocol-00.raw.xml
 rm -f draft-whelan-chio-protocol-00.raw.xml.tmp
 python3 tools/check_xml.py draft-whelan-chio-protocol-00.raw.xml

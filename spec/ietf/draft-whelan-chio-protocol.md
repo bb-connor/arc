@@ -1975,10 +1975,12 @@ Unless this section says otherwise, a governed validation failure MUST
 prevent dispatch. For authorization artifacts representable by the typed
 digest structures, the kernel returns a signed denial with decision
 `deny` and guard `kernel`; the native result is `policy_denied`.
-Structurally inconsistent approvals can fail receipt-metadata
-construction and return `internal_error` instead. A fallback error
-receipt lacks the governed context and is not authenticated under the
-configured kernel key ({{native-errors}}).
+Structurally inconsistent approvals can prevent construction of the
+usual governed metadata. If the kernel can still authenticate the
+request and persist a valid denial, it returns `internal_error` with a
+receipt under its configured receipt authority. Otherwise it terminates
+the exchange as specified in {{tool-call-results}}. An unconfigured
+signing key is never an error-recovery mechanism.
 
 ## Governed Intent {#governed-intent}
 
@@ -2349,9 +2351,10 @@ current time `now`, and MUST deny the call if a step fails:
 
 5. `decision` is `approved`.
 
-6. `approver` is the kernel's own key, a configured capability-authority
-   key, or another issuer key trusted by the kernel
-   ({{capability-verification}}), and the signature verifies.
+6. `approver` is explicitly authorized by the applicable approval policy,
+   and the signature verifies under that key and its configured suite
+   policy. Trust as a receipt signer or capability issuer alone does not
+   confer approval authority ({{security-key-lifecycle}}).
 
 7. `expires_at - issued_at` is at most 3600 seconds.
 
@@ -2404,6 +2407,13 @@ out of scope ({{scope}}). A requirement has:
 * a threshold from 1 to the number of eligible approvers;
 
 * a timeout from 1 to 3600 seconds.
+
+For durable threshold coordination, the call's request identifier,
+server identifier, and tool name MUST each contain 1 to 256 UTF-8 octets,
+with no leading or trailing whitespace or control characters. This
+profile's bound applies even when a transport permits a longer request
+identifier. An unsupported identifier MUST be rejected before creating
+a proposal or consuming approval authority.
 
 The eligible set digest is the lowercase hexadecimal SHA-256 digest of
 the ASCII bytes `chio.approver-set.v1`, one zero byte, and the canonical
@@ -3266,8 +3276,10 @@ depends on the revoked capability is denied ({{revocation}}).
 
 ## Tool Call Results {#tool-call-results}
 
-For each `tool_call_request`, the kernel sends zero or more
-`tool_call_chunk` messages and then one `tool_call_response`. Each
+For each `tool_call_request` whose exchange completes, the kernel sends
+zero or more `tool_call_chunk` messages and then one
+`tool_call_response`. Transport, signing, or durable-state failures can
+terminate the exchange without a response, as specified below. Each
 carries the request's `id`, and the agent correlates them by that value.
 {{tab-tool-call-response}} lists the members of `tool_call_response`.
 
@@ -3293,7 +3305,7 @@ evidence for this response.
 | `stream_complete` | `total_chunks` (integer) | `allow` | The call completed after streaming `total_chunks` chunks. |
 | `cancelled` | `reason` (string), `chunks_received` (integer) | `cancelled` | The call was canceled. |
 | `incomplete` | `reason` (string), `chunks_received` (integer) | `incomplete` | The call ended before completion. |
-| `err` | `error` (object, {{native-errors}}) | `deny` | The kernel denied the call or failed to evaluate it. |
+| `err` | `error` (object, {{native-errors}}) | `deny` | The kernel denied the call or failed to evaluate it; this status does not establish absence of an external effect. |
 | `pending_approval` | `proposal` (object, {{threshold-proposal}}) | `deny` | Execution awaits approval; no tool was dispatched. |
 {: #tab-tool-call-result title="Tool Call Results"}
 
@@ -3380,6 +3392,12 @@ instead report any denial as `policy_denied` with `guard` set to
 expired", and any evaluation failure as `internal_error`. An agent can
 therefore receive either form for the same condition.
 
+A diagnostic code identifies the failure, not whether a committed effect
+occurred. If dispatch has been committed and the effect cannot be
+resolved, the kernel MUST preserve the operation as incomplete under
+{{execution-lifecycle}}. A denial receipt or `tool_server_error` MUST
+NOT be used to justify refund or redispatch of that operation.
+
 The following `err` result reports an expired token in the second form.
 
 ~~~ json
@@ -3452,7 +3470,7 @@ The edge serves one endpoint path, `/mcp`, with the methods in
 
 | Method | Use | Success response |
 |---|---|---|
-| POST | Send one JSON-RPC request, notification, or response | 200 with an event stream for a request; 202, or 200 with an event stream, otherwise |
+| POST | Send one JSON-RPC request, notification, or response | 200 with an event stream for an accepted request; 202 with no body for an accepted notification or response |
 | GET | Open the notification stream ({{hosted-replay}}) | 200 with an event stream |
 | DELETE | End the session | 204 |
 {: #tab-hosted-methods title="Hosted Endpoint Methods"}
@@ -3463,11 +3481,11 @@ examines.
 | Header | Sent with | Rule |
 |---|---|---|
 | `Authorization` | every request | A `Bearer` credential ({{hosted-admission}}) |
-| `Origin` | any request | If present, its host is `localhost`, `127.0.0.1`, or `::1` |
+| `Origin` | any request | If present, its complete origin matches the configured allowlist |
 | `Accept` | POST, GET | POST lists `application/json` and `text/event-stream`; GET lists `text/event-stream` |
-| `Content-Type` | POST | Begins with `application/json` |
+| `Content-Type` | POST | Parsed media type equals `application/json` |
 | `MCP-Session-Id` | every request after `initialize` | The session identifier |
-| `MCP-Protocol-Version` | any request in a session | If present, equals the session's version |
+| `MCP-Protocol-Version` | every request after `initialize` | Client sends the negotiated version; server compatibility handling follows {{versioning}} |
 | `Last-Event-ID` | GET | Replay cursor ({{hosted-replay}}) |
 | `DPoP` | any request | Sender proof, when the access token requires one ({{hosted-admission}}) |
 {: #tab-hosted-headers title="Hosted Request Headers"}
@@ -3582,6 +3600,13 @@ already seen for the same `jti`. For `x5t#S256` and
 respectively, with a value equal to the claim. A failed check is 401.
 These checks authenticate HTTP requests; the edge does not pass the
 proof to the kernel ({{hosted-tool-calls}}).
+
+A present `cnf` MUST select at least one supported sender-key or
+certificate binding, and every selected binding MUST be verified. The
+edge MUST reject malformed, empty, or unsupported confirmation methods;
+it MUST NOT silently treat such a token as an unconstrained bearer.
+In particular, a `jkt` confirmation requires the separately implemented
+OAuth DPoP binding and cannot be satisfied by the Chio proof format.
 
 The Chio object carried in this binding's `DPoP` header is not the JWT
 proof format of {{RFC9449}}. Implementations MUST NOT advertise this
@@ -3788,7 +3813,9 @@ identifier bound in a presented execution nonce, or assigns a new
 identifier to each call. A request that carries approval members or
 `supplementalAuthorization` MUST carry `chioRequestId`, and the approval
 members have to follow the combination rules of {{native-messages}}; the
-edge answers -32602 otherwise. The kernel records `routeSelection`, an
+edge answers -32602 otherwise. Calls requiring durable threshold
+coordination also satisfy the narrower identifier bounds in
+{{threshold-approval}}. The kernel records `routeSelection`, an
 object, in the receipt's metadata as `route_selection`.
 
 The following request is illustrative.
@@ -3846,8 +3873,12 @@ In particular, a pending result's receipt records denied execution for
 that exchange ({{threshold-kernel-proposals}}).
 
 The edge also returns `result._meta.chioEvidence`, with schema
-`chio.mcp.execution-evidence.v1`, the signed `receipt`, the kernel
-`requestId`, `outputKind`, `output`, and diagnostic `terminalState`. For
+`chio.mcp.execution-evidence.v1`, the signed `receipt`, `requestId`,
+`outputKind`, `output`, and diagnostic `terminalState`. `requestId` is
+the request identifier from signed receipt metadata, or `null` when that
+metadata is absent. Consumers MUST compare a present identifier with the
+expected request; a null value cannot establish request correlation by
+itself. For
 an allowed scalar or object result, `outputKind` is `value` and `output`
 contains the original value whose canonical bytes the kernel bound. A
 projected MCP wrapper is not a substitute for that original value. For a
@@ -4039,8 +4070,10 @@ request at the first that fails:
 
 3. If `delegationPolicy` is present, the requested token is within its
    ceiling: the requested scope is a subset of the policy's `scope`
-   ({{attenuation}}), `ttl` <= `ttlSeconds`, and now plus `ttl`, saturating
-   at the unsigned 64-bit maximum, is at most `expiresAt` (403).
+   ({{attenuation}}), `ttl` is greater than zero and no greater than
+   `ttlSeconds`, and checked addition of now plus `ttl` is representable
+   and no greater than `expiresAt` (403). Overflow MUST reject issuance;
+   it MUST NOT be replaced by a saturated expiry.
 
 4. `upstreamCapabilityId`, if present, equals the policy's
    `parentCapabilityId`, and a policy `parentCapabilityId` is present
@@ -4251,8 +4284,8 @@ idempotency contract.
 The numeric registry has eight categories: `protocol`, `auth`,
 `capability`, `guard`, `budget`, `tool`, `internal`, and `transaction`.
 {{iana-error-codes}} gives every initial allocation. The transaction
-entries reserve identifiers used by related evidence profiles;
-this document does not define those profiles.
+range reserves identifiers for related evidence profiles; this document
+does not allocate individual codes or define those profiles.
 
 A transient flag describes whether a changed condition can permit a
 later attempt. It is not permission to repeat the same request without
@@ -4333,7 +4366,7 @@ surface. TLS supplies channel protection; {{RFC8446}} defines TLS 1.3.
 
 | Surface | TLS | Mutual TLS | Without transport security |
 |---|---|---|---|
-| Native transport | REQUIRED across hosts or untrusted networks | REQUIRED when the peer's identity is part of the authorization decision | Conformant only over a same-host socket or loopback, for development |
+| Native transport | REQUIRED across hosts or untrusted networks | REQUIRED when TLS peer identity supplies authorization identity | Authenticated same-host IPC is permitted; unauthenticated loopback is development-only |
 | MCP binding | REQUIRED for any non-loopback deployment | REQUIRED when the session's sender binding is an mTLS certificate thumbprint | Conformant only on loopback or in a test harness |
 | Trust-control interface | REQUIRED for any non-loopback deployment | REQUIRED for service-to-service deployments that rely on transport identity | Conformant only on loopback |
 | Kernel to tool server | Provided by mutual TLS when networked | REQUIRED over TCP across processes or hosts | Not conformant for production over a network |
@@ -4396,11 +4429,13 @@ in its configured set of trusted issuer keys
 provision kernel keys, issuer keys, and certificates, rather than
 learning them from the traffic they protect.
 
-Capability tokens carry no audience. Any kernel that trusts a token's
-issuer accepts the token for the grants it names. Operators that run
-kernels in different trust domains SHOULD use a distinct issuer key for
-each domain, so that a token issued for one domain is not accepted in
-another.
+A basic capability token has no general audience member. Without an
+additional binding, its issuer trust and grants can make it usable at
+more than one kernel. The security-context caveat in
+{{capability-security-context}} restricts use to its authenticated
+context; it is not a generic OAuth audience. Operators that run kernels
+in different trust domains SHOULD use distinct issuer keys and MUST
+configure the context and target checks required by each domain.
 
 ### Signing Roles and Key Lifecycle {#security-key-lifecycle}
 
@@ -4408,6 +4443,22 @@ Trust is role-specific. Configuring a key to sign receipts MUST NOT make
 it a capability issuer, manifest publisher, approver, credential broker,
 or active-response authority. Deployments MUST authorize those roles
 explicitly and SHOULD use separate keys for independent trust domains.
+
+Signing keys MUST be generated or derived using cryptographic secret
+material appropriate to their suite. Public identifiers, user names,
+workload names, and public-key bytes MUST NOT be used alone to derive a
+private key. Issuance to a subject public key does not authorize an
+adapter to replace that key with one it can reconstruct from public
+inputs.
+
+Changes to issuer sets, signing roles, or key epochs MUST come from an
+authenticated authority authorized to make that change. A replication
+peer's connectivity or possession of a general service credential is
+insufficient. Replicated trust state MUST bind its authority domain and
+monotonic revision, reject rollback and cross-domain substitution, and
+be durably applied before it authorizes operations. A profile MUST
+specify its protected replication channel and authenticated update
+format; an unsigned snapshot over an unprotected channel is invalid.
 
 A key lifecycle profile MUST specify activation, retirement, compromise
 handling, and historical verification. Rotation MUST have one
@@ -4486,7 +4537,12 @@ It MUST NOT fall back to a less restrictive execution path.
 
 A confined execution profile MUST bind the selected tool to an
 authenticated manifest and an independently configured operator ceiling.
-The effective authority is their intersection. A signed manifest is
+The effective authority is their intersection. An adapter MUST apply the
+operator's authenticated policy to every exposed operation, including
+routes absent from an upstream API description. It MUST NOT infer an
+exemption from an HTTP method, a tool-supplied side-effect annotation, or
+an untrusted schema. Anonymous or unrestricted operations require an
+explicit operator policy. A signed manifest is
 accepted only from a publisher authorized for that workload; signature
 validity alone does not authorize its requested privileges.
 
@@ -4626,7 +4682,13 @@ NOT present `asserted` context as `observed` or `verified`.
 ## Attestation {#security-attestation}
 
 Attestation evidence can inform issuance ({{issuance}}), but it does not
-authorize a call by itself. A profile that binds an attestation digest
+authorize a call by itself. A verifier MUST validate the evidence under
+an independently configured attester trust policy, including the
+signature or authenticated verification result, workload measurements,
+freshness, and challenge or session binding required by the profile.
+Agent-supplied assurance labels, verifier names, and evidence digests do
+not satisfy those checks. A receipt MUST NOT label such assertions as
+verified attestation without that validation. A profile that binds an attestation digest
 to a token MUST also bind the request to the token's sender, by a sender
 proof or by mutual TLS continuity, on the same request.
 
