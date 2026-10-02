@@ -1,34 +1,34 @@
 # Submission package for draft-whelan-chio-protocol-00
 
-Prepared September 30, 2026. This is an individual Internet-Draft with intended status Standards Track. It has not been posted: the Datatracker document URL returned HTTP 404 on September 30. The draft is not an adopted working-group document or an RFC.
+Prepared October 2, 2026 for publication with the completed security-roadmap release. This is an individual Internet-Draft with intended status Standards Track. The document does not claim working-group adoption. No mailing-list affiliation is assigned by this package.
 
-The single source is `draft-whelan-chio-protocol.md`. The upload file is `draft-whelan-chio-protocol-00.xml`, the expanded RFCXML v3 rendering. The prepped XML is the docs reader's source; the text and PDF are companion renderings. `CLAIMS.md` contains the independent implementation review and its claim limits.
+The source is `draft-whelan-chio-protocol.md`. The upload file is `draft-whelan-chio-protocol-00.xml`, the expanded RFCXML v3 rendering. The prepped XML is the docs reader's source; text and PDF are companion renderings. [CLAIMS.md](CLAIMS.md) links the comprehensive review and its release acceptance contract.
 
-Author: Connor Whelan, Backbay Industries, `connor@backbay.io`. Discussion: `agentproto@ietf.org`; public issues: <https://github.com/backbay-labs/chio/issues>.
+Author: Connor Whelan, Backbay Industries, `connor@backbay.io`. Public source and issues: <https://github.com/backbay-labs/chio>.
 
-## Owner submission steps
+## Release and submission steps
 
-1. Review the source, claim ledger, and rendered PDF. Set the source's `date` to the actual submission date if it differs from September 30, 2026, then regenerate and check all outputs. A date change also requires refreshing the website's generated document and downloads.
-2. Open <https://datatracker.ietf.org/submit/> and upload `draft-whelan-chio-protocol-00.xml`.
-3. Confirm the extracted name, revision `00`, title, author email, IETF stream, Standards Track intended status, date, and generated expiry. Confirm the author's BCP 78/79 declarations in the submission tool.
-4. Submit and complete the confirmation email sent to `connor@backbay.io`. Confirm that <https://datatracker.ietf.org/doc/draft-whelan-chio-protocol/> shows revision `00` and the intended metadata.
-5. Verify the public Chio source revision used by the website, regenerate its pin/data/downloads, and merge the site PR only after posting. Check the deployed page, downloads, source links, official anchors, and OG image against the posted document.
+1. Reconcile the completed release with the review's explicit [implementation acceptance items](reviews/2026-10-02/README.md#changes-that-require-release-reconciliation). Preserve the source, build, wire, and operational evidence separately.
+2. Review the source and rendered PDF. Set `date` to the actual submission date and regenerate all outputs. Confirm the draft name and revision against any preceding submission before reusing `-00`.
+3. Publish the approved source revision to the public Chio repository. Verify that the website's source link resolves there, then regenerate the reader, downloads, search data, citations, and expiry from that public revision. The owner has authorized app shipment independently of the later Datatracker upload; there is no inherited site-after-upload gate.
+4. When the owner proceeds with submission, upload the expanded XML at <https://datatracker.ietf.org/submit/>. Confirm name, revision, title, author email, IETF stream, intended status, date, and expiry. Complete the BCP 78/79 declarations and author confirmation.
+5. After posting, compare the Datatracker rendering and official anchors with the site and downloads. Record the posted revision and URLs. Do not infer working-group adoption from an individual submission.
 
 ## Intellectual property answer
 
-The owner answered the submission-checklist question about known patents or patent applications held by the owner, Backbay Industries, or another party: **"None that I am aware of."** This records the answer supplied; it is not a patent search. The author completes the submission tool's declarations and any required disclosure at <https://datatracker.ietf.org/ipr/>.
+The owner answered the question about known patents or patent applications held by the owner, Backbay Industries, or another party: **"None that I am aware of."** Preserve that answer for the author's submission declarations. Any required disclosure is made at <https://datatracker.ietf.org/ipr/>.
 
-## Deadline
+## Timing
 
-The internal posting target remains November 1. The [official IETF 127 deadline](https://datatracker.ietf.org/meeting/127/important-dates/) is **November 2, 2026 at 23:59 UTC**, for all Internet-Drafts, including `-00` (verified September 30, 2026). IETF 127 begins November 14 in San Francisco.
+The internal posting target is November 1. Recheck the [IETF 127 important dates](https://datatracker.ietf.org/meeting/127/important-dates/) when scheduling the actual upload; this document's preparation date is not a submission timestamp.
 
 ## Regeneration and validation
 
-Use kramdown-rfc 1.7.43, xml2rfc 3.34.1, WeasyPrint 70.0, aasvg 0.5.7, idnits 3.1.0, Python 3, Fontconfig, and `pdftotext`. The workflow installs the matching tool versions and native dependencies. The unmodified OFL font files in `tools/fonts` are pinned by immutable upstream URL and digest; `FONTCONFIG_FILE` isolates PDF rendering from host font versions and fallback glyphs. Place the Ruby gem's executable directory on PATH; `KRAMDOWN=/path/to/kramdown-rfc` is also supported.
+Use kramdown-rfc 1.7.43, xml2rfc 3.34.1, WeasyPrint 70.0, aasvg 0.5.7, idnits 3.1.0, Python 3, Fontconfig, and `pdftotext`. The workflow installs the matching tool versions and native dependencies. The bundled OFL fonts and isolated `FONTCONFIG_FILE` pin PDF rendering. Put the Ruby gem's executable directory on PATH, or supply `KRAMDOWN=/path/to/kramdown-rfc`.
 
 ```sh
 make -C spec/ietf
 make -C spec/ietf check
 ```
 
-The check regenerates all renderings, checks the vector corpus and folded bytes, compares XML/prepped XML/text and extracted PDF text, rejects writer diagnostics and incomplete validation runs, enforces 72-column text, and rejects all idnits errors or warnings. PDF layout comparison uses the bundled fonts; Linux CI is the independent cross-platform verification.
+The check verifies generated examples and folded bytes, compares fresh XML/prepped XML/text and extracted PDF text, rejects writer warnings, enforces 72-column text, and rejects idnits errors or warnings. The review additionally checks the selected roadmap source's protocol fixtures and signing-input separation; its reproducible command is in [verification.md](reviews/2026-10-02/verification.md).

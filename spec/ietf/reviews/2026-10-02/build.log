@@ -1,0 +1,26 @@
+python3 tools/render_vectors.py --vectors ../../tests/bindings/vectors --out generated
+kramdown-rfc draft-whelan-chio-protocol.md > draft-whelan-chio-protocol-00.raw.xml.tmp || { draft_status=$?; rm -f draft-whelan-chio-protocol-00.raw.xml.tmp; exit $draft_status; }
+** simplified markup "<spanx style=\"verb\">type</spanx>" into "type" in table heading
+** simplified markup "<spanx style=\"verb\">type</spanx>" into "type" in table heading
+** simplified markup "<spanx style=\"verb\">status</spanx>" into "status" in table heading
+** simplified markup "<spanx style=\"verb\">code</spanx>" into "code" in table heading
+** simplified markup "<spanx style=\"verb\">detail</spanx>" into "detail" in table heading
+python3 tools/normalize_xml.py draft-whelan-chio-protocol-00.raw.xml.tmp draft-whelan-chio-protocol-00.raw.xml
+rm -f draft-whelan-chio-protocol-00.raw.xml.tmp
+python3 tools/check_xml.py draft-whelan-chio-protocol-00.raw.xml
+xml2rfc --v2v3 draft-whelan-chio-protocol-00.raw.xml -o draft-whelan-chio-protocol-00.v3.xml.tmp
+ Created file draft-whelan-chio-protocol-00.v3.xml.tmp
+python3 tools/normalize_xml.py draft-whelan-chio-protocol-00.v3.xml.tmp draft-whelan-chio-protocol-00.v3.xml
+rm -f draft-whelan-chio-protocol-00.v3.xml.tmp
+xml2rfc --v3 --expand draft-whelan-chio-protocol-00.v3.xml -o draft-whelan-chio-protocol-00.xml.tmp
+ Created file draft-whelan-chio-protocol-00.xml.tmp
+python3 tools/normalize_xml.py draft-whelan-chio-protocol-00.xml.tmp draft-whelan-chio-protocol-00.xml
+rm -f draft-whelan-chio-protocol-00.xml.tmp
+python3 tools/check_xml.py draft-whelan-chio-protocol-00.xml
+xml2rfc --v3 --preptool draft-whelan-chio-protocol-00.xml -o draft-whelan-chio-protocol-00.prepped.xml
+ Prepping draft-whelan-chio-protocol-00.xml
+ Created file draft-whelan-chio-protocol-00.prepped.xml
+xml2rfc --v3 --text draft-whelan-chio-protocol-00.xml -o draft-whelan-chio-protocol-00.txt
+ Created file draft-whelan-chio-protocol-00.txt
+xml2rfc --v3 --pdf draft-whelan-chio-protocol-00.xml -o draft-whelan-chio-protocol-00.pdf
+ Created file draft-whelan-chio-protocol-00.pdf

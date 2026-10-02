@@ -1,0 +1,22 @@
+{
+  "draft-whelan-chio-protocol.md": {
+    "sha256": "b89aa4e1b6bc52b750c5f8290a452fadbf9b0cc9545bbb18b16e4c8b89a8c892",
+    "bytes": 247884
+  },
+  "draft-whelan-chio-protocol-00.xml": {
+    "sha256": "277bf718b4817c18041b6849e89241e8f58470cfe66ca1650138b01e09eaa98b",
+    "bytes": 579370
+  },
+  "draft-whelan-chio-protocol-00.prepped.xml": {
+    "sha256": "933adf70fcf7b43f4d5c5227fd667134ff7c97d7cac3e0466738e0551da11e28",
+    "bytes": 753936
+  },
+  "draft-whelan-chio-protocol-00.txt": {
+    "sha256": "4d029d953d85255b75ae676548baf3fde50baaed259e08908b24a8c6dd74aa3f",
+    "bytes": 388588
+  },
+  "draft-whelan-chio-protocol-00.pdf": {
+    "sha256": "712560f7f87c967f6fbf6bd6aef9d7006ecb9e70b6b076af714de96323182342",
+    "bytes": 600351
+  }
+}

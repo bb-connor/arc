@@ -1,0 +1,216 @@
+{
+  "scope": "Independent JSON Schema validation and Ed25519 preimage separation; no runtime tests",
+  "source_commit": "122414b48ef1bc7999a9e32c7ae303d561fcd429",
+  "fixture_sha256": "09dfe019db30351196de29c7a57edb21af89b2213a4d1132caff53392b4ff946",
+  "source_fixture_count": 38,
+  "checks": [
+    {
+      "name": "source-fixture/receipt-internal-origin",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/receipt-unknown-origin",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/receipt-null-origin",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/caller-dispatch-authorization",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/caller-authorization-rejects-numeric-boolean",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/caller-delivery-report-explicit-null",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/caller-delivery-report-realized-cost",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/caller-report-rejects-numeric-boolean",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/caller-report-rejects-unknown-executor-field",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/legacy-execution-nonce",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/operation-execution-nonce",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/operation-execution-nonce-with-caller-context",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/pending-approval-result",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/pending-approval-with-unknown-field",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/pending-approval-with-invalid-proposal-binding",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/capability-with-aggregate-budget",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/capability-with-direct-cumulative-approval",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/aggregate-capability-budget",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/aggregate-budget-with-noninteger-maximum",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/threshold-proposal",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/threshold-proposal-with-nonstring-capability-binding",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/governed-approval-token",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/governed-approval-token-with-nonstring-decision",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/active-response-intent",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/active-response-intent-with-nonstring-effect",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/combined-capture-metadata",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/combined-capture-with-noninteger-revocation-commit",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/opaque-supplemental-authorization",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/supplemental-authorization-with-caller-claim",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/execution-nonce-rejects-numeric-boolean",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/aggregate-budget-rejects-numeric-boolean",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/threshold-proposal-rejects-coerced-integer",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/governed-approval-rejects-numeric-boolean",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/active-response-rejects-coerced-integer",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/combined-capture-rejects-numeric-boolean",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/pending-approval-rejects-missing-request-binding",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/capability-with-dpop-required",
+      "passed": true
+    },
+    {
+      "name": "source-fixture/capability-rejects-coerced-dpop-required",
+      "passed": true
+    },
+    {
+      "name": "bound-intent/valid",
+      "passed": true
+    },
+    {
+      "name": "bound-intent/missing-capability",
+      "passed": true
+    },
+    {
+      "name": "bound-intent/missing-hash",
+      "passed": true
+    },
+    {
+      "name": "bound-intent/unknown-binding",
+      "passed": true
+    },
+    {
+      "name": "bound-intent/uppercase-hash",
+      "passed": true
+    },
+    {
+      "name": "bound-intent/no-prefix",
+      "passed": true
+    },
+    {
+      "name": "bound-intent/parameter-substitution-changes-digest",
+      "passed": true
+    },
+    {
+      "name": "operation-nonce/exact-wrapper",
+      "passed": true
+    },
+    {
+      "name": "operation-nonce/reject-body-only-v1-preimage",
+      "passed": true
+    },
+    {
+      "name": "operation-nonce/reject-other-operation",
+      "passed": true
+    },
+    {
+      "name": "operation-nonce/reject-schema-substitution",
+      "passed": true
+    },
+    {
+      "name": "pending/frame-shape",
+      "passed": true
+    },
+    {
+      "name": "pending/no-execution-nonce",
+      "passed": true
+    }
+  ],
+  "passed": 51,
+  "bound_arguments_canonical_utf8": "{\"amount\":1250,\"destination\":\"merchant-a\"}",
+  "bound_arguments_sha256": "0xc341742635947eddc245b346aed665a8ad1e77fc3ffa697f5919d1b8f65a0254",
+  "operation_nonce_signing_input_utf8": "{\"nonce\":{\"bound_to\":{\"capability_id\":\"capability\",\"parameter_hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"request_id\":\"request\",\"subject_id\":\"subject\",\"tool_name\":\"tool\",\"tool_server\":\"server\"},\"expires_at\":130,\"issued_at\":100,\"nonce_id\":\"schema-fixture-nonce\",\"schema\":\"chio.execution_nonce.v2\"},\"operation_id\":\"operation-review-1\",\"schema\":\"chio.admission-execution-nonce-signature.v1\"}"
+}

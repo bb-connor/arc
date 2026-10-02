@@ -1,0 +1,511 @@
+{
+  "review_date": "2026-10-02",
+  "draft_base": "201582139476cfb5dfe7b2e12fe0b32377565f9a",
+  "remote_main": "f5566d9a765c21cb36652a99c79de64968a656bf",
+  "combined_integration": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
+  "selected_source": "122414b48ef1bc7999a9e32c7ae303d561fcd429",
+  "selected_source_ahead_of_main": 786,
+  "branches": [
+    {
+      "branch": "integration/process-security-m4",
+      "commit": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
+      "selected_only_commits": 69,
+      "branch_only_commits": 0,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/3-retention-accounting",
+      "commit": "122414b48ef1bc7999a9e32c7ae303d561fcd429",
+      "selected_only_commits": 0,
+      "branch_only_commits": 0,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/2-runtime-boundaries",
+      "commit": "4c35ce78671998b6ade1ff9cf6d47b0dde7790d3",
+      "selected_only_commits": 68,
+      "branch_only_commits": 0,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/1-dry-run",
+      "commit": "1cee5017f542867f15ae600e6123c08827ec0a76",
+      "selected_only_commits": 122,
+      "branch_only_commits": 9,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/9-measurement",
+      "commit": "4ea4a1851697c99329fdbaad1787156e4fbb3868",
+      "selected_only_commits": 122,
+      "branch_only_commits": 5,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/j-receipt-boundaries",
+      "commit": "1346b5b78be16f67d208bd1261a1eed7731b41b7",
+      "selected_only_commits": 93,
+      "branch_only_commits": 1,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/0-gates",
+      "commit": "f75b4069d67b2c667fc6d28a8d30255667bd09e1",
+      "selected_only_commits": 136,
+      "branch_only_commits": 5,
+      "patch_unique_to_branch": [
+        "eb0bb3fabc2a560c2b6850d26ad34a171d3091c1 ci(gates): gate cryptographic domain separation on value, shape and reach",
+        "441c4d966aadb0ac540756f9c7b3192875e87f14 ci(gates): bound unchecked arithmetic in the accounting modules",
+        "19809a63c7869c1810182edd0f38ab3da3252496 build(profile): keep overflow checks in the profiles that ship"
+      ]
+    },
+    {
+      "branch": "packet/m-fuzz-model",
+      "commit": "806b42c12ca8d9adc6875eab6cc39d18c959f92a",
+      "selected_only_commits": 117,
+      "branch_only_commits": 1,
+      "patch_unique_to_branch": [
+        "806b42c12ca8d9adc6875eab6cc39d18c959f92a chore(wip): preserve unfinished response and revocation models"
+      ]
+    },
+    {
+      "branch": "fix/security-adversarial-cases-20260922",
+      "commit": "21b32859b972623b82bb04d3f13b7ffc8512742e",
+      "selected_only_commits": 354,
+      "branch_only_commits": 1,
+      "patch_unique_to_branch": [
+        "21b32859b972623b82bb04d3f13b7ffc8512742e chore(wip): preserve adversarial restoration and lifecycle fixtures"
+      ]
+    },
+    {
+      "branch": "fix/security-checkpoint-snapshot-20260922",
+      "commit": "534e8040c392f1280a2bb1975b27d06cefc76f93",
+      "selected_only_commits": 350,
+      "branch_only_commits": 1,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/10-poison-policy",
+      "commit": "3b596d22bbc436679abda019ff8f1d751bed0910",
+      "selected_only_commits": 100,
+      "branch_only_commits": 0,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/k-gates",
+      "commit": "d0469ce384970e5474084cb881c09c340c1413d3",
+      "selected_only_commits": 108,
+      "branch_only_commits": 0,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/x-ffi-buffers",
+      "commit": "4c5d43dfe543f5632a485164ca481c248af4f687",
+      "selected_only_commits": 104,
+      "branch_only_commits": 0,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "packet/ci-regressions",
+      "commit": "24779051963cfc1db03da8a4fbde74e6b2d2f057",
+      "selected_only_commits": 134,
+      "branch_only_commits": 0,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "security/launch-integration",
+      "commit": "5d1a9ec0d900bd03ce55de903919d972be852d79",
+      "selected_only_commits": 652,
+      "branch_only_commits": 0,
+      "patch_unique_to_branch": []
+    },
+    {
+      "branch": "codex/chio-security-execution",
+      "commit": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac",
+      "selected_only_commits": 1692,
+      "branch_only_commits": 230,
+      "patch_unique_to_branch": [
+        "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac fix(evidence): make trusted refresh reproducible",
+        "4aa6960313507b7a009784cc735f38a9deaa2323 chore: merge security definition baseline",
+        "dc3db2a5ecfcb8b13db6c75fccf52c63fa521ef1 chore(ci): rotate enterprise definition pin",
+        "5a29d1e7b5d97be892b7a98dc24de5453cfc84eb fix(ci): bind capture dispatch by workflow identity",
+        "79f5c6341c1f4efbee32f245638ea6471879c2e4 fix(evidence): bind federated imports to trusted signers",
+        "57b7483d13d0b8ffb7bf83a23a10e38e5200beb4 fix(sqlite): compact abandoned sequence ranges",
+        "0b3d540de92e813f403ff83659c8141a7d0d0433 fix(sqlite): validate legacy budget persistence",
+        "62e5f93c037fffbd2ed82e4c6bdf8b804833d448 fix(sqlite): preserve exact payment journal state",
+        "b3782ee2b19e8bbec647e625ed4e644bf0708720 test(security): refresh promoted mutation evidence",
+        "18df64a880ab2845f826380a592abb63fdc1eb1f fix(sqlite): reject unrepresentable security values",
+        "3a27da08046beb9ec42d3df8c7e63e7b1415a224 chore(deps): document codegen duplicate boundary",
+        "252e516f84dd833a908e8a94d2cd62878c163265 test(conformance): satisfy strict lint contract",
+        "e8490eb3d826b85551829c72a2e374faf8025d58 test(conformance): align proxy denial opacity",
+        "a77e523d65e55f349732342b979417192d1b520d fix(schema): restore economy artifact registry union",
+        "acbf0c2f4bd369e637932c3c55137654222720d2 test(conformance): integrate durable spend authority",
+        "eba5eaef0b02a59d33aa60d59c8a96411b05e999 chore(codegen): refresh integrated wire types",
+        "e0a0720ed72721916f9a29ad765b0e2ceb0f92f6 test(security): preserve merged Merkle coverage",
+        "6f3b0117c90ab40efdeda905e6cf629966909fd8 fix(ci): stabilize security graph hashing",
+        "edf88eee5d717ba0fe28bb80c961360333485eaf ci(security): pin reviewed enterprise definition",
+        "bb375752ae4b3b6f02df591b79c61ef50c14f0e5 Merge remote-tracking branch 'origin/main' into codex/chio-security-execution",
+        "348f9b951f99ac71f0b5470a557a006a09e56b0c fix(cli): expand all workload grant ceilings",
+        "bca9168d13855a429053b27ae842e74a87a4b864 fix(sqlite): migrate legacy provenance replays",
+        "7b3a7667f5b0dcececd7fddddba4b413e0e68893 fix(security): bind tlog timing to matched entries",
+        "1b46930548bf3a8e3d79cd8db58b39fae988d279 fix: reject oversized reserved budgets",
+        "8a47ebb2c2a9457aa89dc908e62108aebb01c208 fix: complete security admission evidence paths",
+        "ca69f68274f47e80e3af4abf89fdd8e50c9957da fix(security): deduplicate memory provenance receipts",
+        "1b43032869c9ed5ad514b881b2882580452d9b47 fix(security): retain ambiguous budget holds",
+        "3fb1085d15726b5f9116e47f0b03f1922461e7b3 fix(security): align workload reputation issuance",
+        "4222475bcaed80e030ac7237db4406b0619292ff fix(security): validate authority state at admission",
+        "2fce19b9c562fde0b4e0e11d70466f81f1fd4ecf test(security): align export report fixtures",
+        "c6351fa184e891a60ff796f6e56e3cbeac92f041 fix(security): bind persistence and log evidence",
+        "5e668652a1e5b76438601b46f17d3bdb4cec61d9 fix(sigstore): bind sct to trusted signing time",
+        "7fb356e2bf11de31e2f48c0e01db445a5e0b098f test(security): preserve report signer continuity",
+        "20a6113df834ba1a4effa871484ad704a5876e8d test(security): align report authority fixture",
+        "b9222fb03fe1db184cfa7527c7c79f42b4c85217 fix(security): close settlement and lineage review gaps",
+        "7971b8c54b9e9c05026c18426b5d39d20ba71915 test(security): align capital export custody",
+        "b88f0038fc0568d2ed6f6dba2acfeebc8966a8f7 test(security): stabilize replay collection contract",
+        "a9a2ede09bd38986603ab483a573ca439c97a47b fix(sigstore): verify redundant time and log proofs",
+        "1a7a801012ef7d768b99f2b2b61385aae75b2c5a test(security): use dedicated authority admin token",
+        "0ccc0884dada8a08574779702b67a318daf0ac8d fix(security): consume review edge cases",
+        "666c4a372c42d74166efce8d9314d2f471211904 fix(security): close evidence review findings",
+        "371a4a56569346c9ab4eb327b079cd2daac7f847 fix(security): restore remote custody invariants",
+        "9fec8a1574451d650457f7615d8530f1dd35a774 fix(security): complete mainline semantic integration",
+        "944cd9e0c32b459810bb9e930654126f85cc6d26 fix(sigstore): bind timestamp authority evidence",
+        "abf6b585592ee093f59673b6767fd543f8d10bc5 fix(sigstore): enforce transparency authority proofs",
+        "90bdfed2ec411fb82daaca47d57e7812775e471e fix(security): integrate durable admission semantics",
+        "141db49bb1d4c2a154275934ea0895ee36cc5ffc fix(security): bind V1 log time to verified content",
+        "8a9bcb7387cea320b8f567a10d3ff2aad5b9c037 test(security): include authority binding attack class",
+        "f1ff2c30ef35f91ab1142982817b376ad09c9e98 test(acp): register deferred authenticated session",
+        "76351eb159da59b403fb51b518636ffacf439e39 fix(kernel): preserve authenticated session dispatch state",
+        "0478be993d4cbbbcf4bcc56f07c9100979b3d15c fix(security): bind V2 evidence to authenticated time",
+        "c22489c930199476c84818164c26b8d63f074441 fix(workspace): complete mainline security integration",
+        "92f19eb773b93690684ad97b13af9dde786a8578 fix(loadgen): initialize security request state",
+        "4f419b872c2e15934d967956cf246b38975058e6 fix(security): reject ambiguous DSSE timestamp binding",
+        "772bc531b7b44d03463b3586c11226f4017130d7 fix(security): bind logged signers and terminal receipt time",
+        "aa5f623d00c7eb7cfd31cf4d88f889ddecf68ea9 fix(security): restore fiscal gates and timestamp binding",
+        "f5976346937f37143e1a3789e3d9a6fe5d4c3873 fix(kernel): preserve authority across ambiguous outcomes",
+        "40171477b950b7af68fb2e886e582315fa7c3abe fix(sigstore): enforce skip policy boundaries",
+        "14ad381e32e2feb9404f3ac6afba3ec71a0eb4f2 fix(mcp): preserve nonce retry identity",
+        "9f1cd6f62e1b3b598b48331ee58a5c01a770d3aa fix(security): bind controller event head correctly",
+        "a265670a85229ac67c510178ff0f92ec11c627af fix(security): close final review startup gaps",
+        "97974514f8fd544d6cc554e0030861a33418c277 fix(security): close review and CI integration gaps",
+        "b01e967767a1999350b601be1ee38d9967f9ff4d test: refresh security mutation evidence",
+        "81bc436ef25c012cc4114a328a3cf2faa78b39c7 chore: integrate main into security execution",
+        "914cc5f6bbac5685dac782b87cda7b4aeb540a17 fix: reconcile security and economy semantics",
+        "c79e094c4fd7c4b509260f57a2141c187f6d0505 merge: integrate main security and agent economy",
+        "17f3ff6214a9b35a2588965efca09fb2f5dd863b fix(security): validate settlement and sigstore bindings",
+        "3c759c82b10edd61a99c5c19afaa226cbf99afa5 test(security): refresh evidence after settlement hardening",
+        "ab5009d371b93e06366d5a644ec2b8ed7d3d9de2 fix(settlement): close runtime review gaps",
+        "dfc9ea7d493ae78d3054374588a180db1c87a730 test(security): refresh mutation evidence after review fix",
+        "b8bf67806d6795cc6a3b10c1ce26d740891c39cd fix(settlement): validate recovered observer outcomes",
+        "4bab45f54cc530073af0a4339d4760f5d97edccc fix(security): integrate main and harden evidence refresh",
+        "a2560b01f6f1a735384bc6ecd75e32b4cefc8241 Merge remote-tracking branch 'origin/main' into codex/chio-security-execution",
+        "2e388cacccb9f226c027f709a8f86df7ed3fdf4d test(security): refresh evidence and close vet audits",
+        "88e046944c212398a684916a67a52329f665fe40 test(security): enforce portable aggregate authority denial",
+        "1a670073e6a4c5629ff2d9cdc04d9e991849ddd8 fix(security): close semantic authority and evidence gaps",
+        "4cb6311a6bb180ee3e86af8c77aa2c8004083013 fix(ci): verify interleaved Rust test output",
+        "f45b6ca80f5d68e0a4200116572fd0cb32ce6b44 fix(security): make mutation refresh target-scoped",
+        "680ecc9769dba6457d65254c2e04aa5679a9475c fix(security): close Sigstore and cargo-vet gaps",
+        "0fa6aeb0a6ae1e66bbed0e6f2a123df991275ff9 test(security): refresh ingest time evidence",
+        "e65be294d960d8e3496f863913566f2baf90f529 test(security): refresh unsigned manifest evidence",
+        "2f1cfbb0c8a8ce2f90ffabb4d804780c1b7905b1 test(security): refresh partial enforcement evidence",
+        "0db7a107f00097ea2106bff275cf2992a7e9a7d9 test(security): refresh sandbox environment leak evidence",
+        "6b107d0a7724557868c6f68437cfae24976b4db1 test(security): refresh false exec success evidence",
+        "7f9ae4867c3753ac74f400f5ced99e24eed7ed90 test(security): refresh unwitnessed signing evidence",
+        "203e99dbc66dac257047efa3702b9ba2988edc67 test(security): refresh rotation partial commit evidence",
+        "d77f4c20894a0bf1a052eebc9842090ad8b30f92 test(security): refresh key-backdating evidence",
+        "d71979d0a32b6cbc304416e242235b4d87118d53 test(security): refresh grant-replay evidence",
+        "805ac82dabd2efd1285573764cd2406a762a6007 test(security): refresh flow-store evidence",
+        "79a0b5b65ccee36fb2b54ea90b6af7973198fcbb test(security): refresh clearance evidence",
+        "f9d1696661705cb772073c2da1da81244ecb9df8 test(security): refresh label-order evidence",
+        "24b276c0c69600efd38ed570ef973ba3d676ff60 test(security): refresh key-log split-view evidence",
+        "11ae7f78d536d7b476056b1c4db0fb8e066c93b3 test(security): refresh key-log omission evidence",
+        "21a143ba3ddc1b1f24274d6bb062338eaa7b2deb test(security): refresh key-log sync evidence",
+        "c4455ef1d1226cc32eff83933eaebea045aa89a1 test(security): refresh key-log consistency evidence",
+        "decd05c1114a99d6081cb42b25b05b2ab1eafe69 test(security): refresh containment-lift evidence",
+        "60d476e5e54bf9020b71a034bb0bb0bc7741f2a3 test(security): refresh rollback-lift evidence",
+        "c935b4ffa148481d68cba023f78822afa205c391 test(security): refresh approval-plan evidence",
+        "7a7c3eedd67b98b7f119fb603266ca06fbd3ac79 test(security): refresh truncation mutation evidence",
+        "4c45facecf130302a954e4eca262498fff1db1c6 test(security): refresh tripwire mutation evidence",
+        "771e5cfcebf9b101a5d609b25254235ee325b70f test(security): refresh proof-binding evidence",
+        "c0e0741f41b912f9f37794b03efa9b693707dde5 test(security): refresh secret-boundary evidence",
+        "9fec74a3cd64ccbf14c1d38dc6a20550c4a01c40 test(security): refresh broker revocation evidence",
+        "5e4d9b894ef17aaf637ac90d785d3a3396702bf7 test(security): refresh broker replay evidence",
+        "4ea13d3fe07c8db2bfc1b76120c4f692c8551480 test(security): refresh parent double-charge evidence",
+        "499353826add7e23e41f9a2dadefecfb4603914d test(security): refresh orphan-hold mutation evidence",
+        "881e9341f479ed0bd4b1a9f8d751471fcddd9e0c fix(ci): ratchet enterprise workflow pin",
+        "9c654e6d483782e3f65f71c50831dc432dfa4014 test(security): refresh broker mutation evidence",
+        "7dbea568198cf1c692debb2e89d63a3e56abff68 fix(ci): ratchet enterprise workflow pin",
+        "692e32a19970f32cec735344a86d5f80f6d6e5b0 fix(capability): restore cumulative approval verification",
+        "d093334d211be55b01bec291b5c8a4798729d771 fix(ci): ratchet enterprise workflow pin",
+        "e2202455c704597a74b75dacfec3157a97c36254 fix(settlement): fail closed on retry evidence",
+        "3f5ffd3e404aeb33f2e5c9b8f066de435e7c120f merge: integrate cognition-market main",
+        "a7923a48d34f920a7575c2355eb6711acf57f0c5 fix(ci): ratchet enterprise workflow pin",
+        "c9ed03b59f5655a5e198bf1e0ea35aafe817393c fix(test): compile secret broker Linux boundary",
+        "cf39f77b2900c8523f5fa8f4065174a6505091ba fix(ci): ratchet enterprise workflow pin",
+        "d44607073e867f5beb6a119f6cd13029d71fe09a fix(ci): stabilize Python AST commitments",
+        "c34111c1f889a8b0ad84b89b9d085898f8e5d1ac fix(ci): ratchet enterprise workflow pin",
+        "91b29661a3d3de0875afdcc2642aa6297f7b4397 fix(ci): harden SDK fixture and protocol inventories",
+        "823436c440e00a94d2142ef3af0ced6738fafc41 fix(ci): ratchet enterprise workflow pin",
+        "1bd2b72bd0b1db81ae7f0481e8d92b5fd87bcfa4 fix(ci): repair merged security integration lanes",
+        "11a2996ed260eddcbf5f1850611ee5c6d43919d6 fix(ci): ratchet enterprise workflow pin",
+        "76211afcc40ab833e307f3657870cd28df49e69b fix(ci): close hosted integration regressions",
+        "eabbbc2d1260a93ba79b8a1f3c3da3cef84491c6 fix(ci): repair integrated security verification lanes",
+        "145d319af60c901216ef7df24ea2237f87d2aaec fix(ci): advance authenticated evidence bootstrap",
+        "651dfff7fb7e5a3cf58475d88699aab742b2daf1 fix(sdk): regenerate merged protocol surfaces",
+        "1dca668bd16f758dc88ea05dad4ee0c1d328c376 test(sdk): bind restored delegation markers in ffi",
+        "0caa5593809c016e1dacba038696e88d1c2177a0 fix(security): preserve authority across integrated lineage",
+        "88270fd3504b42f33e0755f645f5ed53715d1984 fix(security): authenticate merge binding attestation",
+        "31db891445d322dd4ea5c4da9880a259533910e2 fix(ci): install semantic vector validator",
+        "d64dec62548f6aa2618cff4a50f3eb7009eed928 fix(sdk): close protocol conformance drift",
+        "c5a9a75e1a6ec8e885ccc9525a9eaa3075aa3f07 merge: integrate programmable sovereignty main",
+        "e61285e0baae10e502c05c4c1ceff2f2f334b662 fix(sdk): regenerate Go protocol models",
+        "500f8ea0051b51d1693324f1316cbc1e057551cb merge: integrate main security and agent economy",
+        "23d66c863b296d42ee5b67532c2c990b77e2f8da fix(ci): align capture contract with bounded dispatch",
+        "2d450e494d3669b8979a8604c9cd6caeb2d3572e fix(ci): repair enterprise capture dispatch",
+        "d0419dbe0fed9fbe9298ec1559e01bacc232ccbe feat(security): complete enterprise hardening implementation",
+        "fe7e88b271ec1ab668396b19ca0b6c1eead412dc refactor(security): expose adversarial mutation targets",
+        "9a309520b4b345002e586f06d22be895fec94b00 refactor(kernel): invert enterprise authority dependencies",
+        "da630765531160d9af1c8435a84c40d5e17eef92 fix(sqlite): close receipt stores without lifecycle leaks",
+        "26b088f2067b782305a2ce25a9f71e9a612dbf26 fix(test-support): make sqlite root reaping retryable",
+        "3fb51c71d5ac3e01faa6e9ce3b98989de1f13d9e fix(security): repair adversarial campaign preconditions",
+        "90261e6b3ce98f5aac0f6ef01fcd1e276174f946 Merge remote-tracking branch 'origin/main' into codex/chio-security-execution",
+        "441f1456eb20e026692c1173b46a4d9df2f6e9e2 docs(security): regenerate threat coverage and align operations guidance",
+        "f1d991fa6707fa73721463bd119ffe572183d732 test(security): cover payment durability, retention freeze, and lifecycle closes",
+        "0b47eded1a8cc1897d6249fb3b9c9a8b1799f939 feat(security): durable payment execution and hardened storage authorities",
+        "ada2487c35c2c36e19d0a5fcf6e7bc9f87d864be ci(security): bind threat evidence to source and honest pending states",
+        "8b9b78aa19fe232558c1c858206cd098b5864153 Merge remote-tracking branch 'origin/main' into codex/chio-security-execution",
+        "d7492b73f806555fede53e2a763495402de9af3b chore: synchronize security execution with main",
+        "81216706cc70da5da2d4c898b14b23daed9c3cc5 docs(security): document hardened operations",
+        "606eb3c4283fd503870b38a4d580beeedc06a7af test(security): enforce adversarial and release contracts",
+        "4d9e08665f46e54387524bfbafd37e87e1299f97 feat(security): complete protocol and enterprise enforcement",
+        "84d0a073acd24d97ad91c5216d597f191224c00d ci(security): bootstrap enterprise evidence workflows",
+        "302be88bd381fa7fba779b9c95b8b9c73456a10d test(security): bind mutation evidence inputs",
+        "0a275ed328cff914cefe695afbfa203205a9ca53 fix(security): compact response authorization bodies",
+        "93727b1b1adc671c33d64471c2a5a8e8d3a2ca48 feat(security): sign detector events",
+        "cd9e90285bd748eec384f6cfbd7a0d9fb8be4618 feat(security): expose response authorization body",
+        "a985c10ca735066e3b1d82f94aef5a57c7af1bf1 feat(security): add brokered secret execution",
+        "4f945558c504722526fdcbd8279bd61549aee632 feat(security): add temporal response engine",
+        "90e14953b8f1d109860b6b9198d97cbb9a4ec852 feat(store): persist active defense state",
+        "1d65f884365c331c3f0059be9e1204dd35a92696 feat(security): define active defense contracts",
+        "51d8dfa797b298b0402a4b3be607081c37331075 ci(security): add enterprise hardening gates",
+        "5d280a4866c1f54dc5152751adbbc8d07706df62 test(formal): verify protocol primitive invariants",
+        "16f792e137e3952e1efd0997af9cfbeb5720abb9 test(registry): require live Zot integration",
+        "c75163e0ef40480051e93e868569e60b309787fb test(wasm): require TypeScript guard round trip",
+        "bc22d93c5ee94010f5f4cf0e497e7cb963132229 test(lsp): remove stale ignored-harness claim",
+        "23076fe6600b1c135fc9defbe8021d7c8959a9db test(cli): run session restore expiry case",
+        "629c1a9838d0dd7a4ee98369d7663923dd63d623 test(formal): require live SDK differentials",
+        "a945fea3f39768e6cbfc12e5f434c07d35efe931 test(replay): remove inert opt-in cases",
+        "63e6cbcdd46aa114f175741e5c678f024f2bffc7 test(fixtures): remove mutating test writers",
+        "31cc31a4cddbf649d9a72a93a0a5952d051633ac test(attest): remove impossible historical schema case",
+        "4b9d7d1633c9384ddd67ea050d6ca13a14289d1e test(guards): run lifecycle gate by default",
+        "a7bc1586aaa54680f0a6799c15e8d26131fe79d2 feat(security): define durable security ports",
+        "db8c720e8cb68f40ac72587ee6562c441afe3d3e chore(security): pin linux enforcement stack",
+        "08db6c2c0bd8ab1c21d92b6a427de7e1027ee616 chore(security): pin enterprise source provenance",
+        "b84adf78fd74f0e2d783b54d87b9614bbbb5c865 feat(security): enforce portable information flow lattice",
+        "641e2806a15bb3dcd287d06f6ef2121b9bc23955 style(store-sqlite): normalize replication formatting",
+        "5e51b320b58be86ce28b7962b15c8fab78a1374a chore(security): enforce provenance and dependency boundaries",
+        "6a4c6798c1d39e97de87998d0d62e8e187d59b20 feat(kernel): verify threshold governed approvals",
+        "048efeaf3b904f47b9443fb6676faa722c656431 feat(control-plane): linearize admission authority",
+        "4a918351e9b355051dd8e0224c74dc7d92738a7d feat(core): verify Merkle consistency proofs",
+        "1cece1b1b233e6ab4dc35e6920fdf8aa6bb09a92 fix(store-sqlite): derive managed mutation sequence from authority state",
+        "8b31e7df0e86cc422ac0bb170d85d7f75be370fc fix(store-sqlite): fence combined admission state",
+        "5bfef8da3b05b4e9f3c17948f1819f61b2a42aa8 feat(kernel): persist operation-owned execution nonces",
+        "de08dd15cbeceae6835f5bb8bb7a044970bd4664 feat(kernel): persist operation-owned approval sets",
+        "fb0d8cf10e35993a935e0aad5962147817dab134 feat(kernel): require durable admission saga authority",
+        "1966a16a7e13a966c445f0c76b17ae737d1f7400 refactor(kernel): validate before budget mutation",
+        "15d0b8c32c97e3fd4811b94c85cdda2393d2c7ee feat(control-plane): add strict composite budget routes",
+        "1352d812a2509bde43168c6d1ecb8df351119e31 feat(store-sqlite): persist admission operations",
+        "05e09de665c698622a177ad2740d10c4d2a736b6 feat(store-sqlite): linearize revocation and capture",
+        "6afdf249ffcb90cc5a2243daddbe78efab611c75 fix(store-sqlite): require combined artifact capture",
+        "7a2804c85ef6e9fd4aed4986eb6caf4f3d38413b fix(kernel): validate persisted admission participants",
+        "60c56a87c56d148341007fdc5164747e648bf5f9 feat(kernel): define durable admission operation state",
+        "a11028c485986a8405b0eb313ae1fcd0e868728c test(kernel): assert composite realized spend totals",
+        "0767c65fb430115125e61e7565126e6d02a48769 feat(store-sqlite): bind authorization artifacts to holds",
+        "be4f40ce8ce4a9220d92403a366eae085efc21c9 feat(store-sqlite): persist composite hold lifecycle",
+        "8119e7f4fa1211991afe2a709b3330bc023abddb feat(control-plane): define composite admission wire contracts",
+        "cc6f2282979961dfc2d35a673f4d0de0cf1ffec6 fix(store-sqlite): fence composite-managed grants",
+        "4bcef83c288d78b3e4fe9881970302fbfdd21f1f feat(kernel): define atomic admission capture authority",
+        "9dc77f157f97047e34769b16cd1c9ad3bb694d95 feat(store-sqlite): capture invocation reservations durably",
+        "bc8dbfa1b91a82ec699406fb5fa471267888e05e feat(store-sqlite): persist composite invocation holds",
+        "def8092379c7e2625fb594e5da3d053d92fa1547 feat(kernel): rehydrate composite budget evidence",
+        "27881ddc8dea89f15559f185dcbc49af250fcadd test(kernel): gate composite quota concurrency",
+        "e4898f5e335a8c3bcf3ea1209099e3bcf05e00d3 feat(kernel): authorize composite invocation quotas atomically",
+        "e91fdbbc8a4c12746fb86471d4888d14679f59a7 feat(core-types): negotiate aggregate invocation budgets",
+        "a1b4b54ae649de5d618f4d05cddbdc2d56268b6e feat(control-plane): pin remote authority boundaries",
+        "119ecc3b7c652cd85ffff58d69ccdc9602dbfbaa fix(store-sqlite): harden existing family root reads",
+        "a7ba10b063829b422855b47a5f70ee306ec99510 feat(kernel): validate prospective web3 receipt stores",
+        "afcf6926418824bf826bb0fa97f702fe5133b3b6 feat(store-sqlite): open existing authority state",
+        "b3f67f7ca8e3965d5b301e587ccd5fd2806e81e3 fix(core-types): bound aggregate root identifiers",
+        "83d51c80c2a4e36ea1629e1710ea2664a4e520f9 feat(store-sqlite): snapshot family root lookups",
+        "0a59ff8f61641062924430574402cb87ba769dbf refactor(core-types): unify direct root verification",
+        "848e3a8ef0e7b703f50656138e100854d9ea0d93 feat(store-sqlite): replicate authenticated family roots",
+        "bf0b021807fdabe6483ab75e7058e14cd54b6dd8 fix(control-plane): bind issued capability output",
+        "84d2eb06a0d51a03f6a9c26223e35c069b6d7f5f feat(kernel): install aggregate root resolvers",
+        "cdb15b13bf4b6e81f30b032f225d1ad3954e9c25 feat(store-sqlite): atomically capture issued roots",
+        "76779ce18aad9a9818b043f9bf53750dd1a9fbc6 feat(store-sqlite): persist aggregate family roots",
+        "6f154d73a6760b8d78c73c93a87360dbec471a1f fix(core-types): bind aggregate receipts to family roots",
+        "c0fbd25d1fbb7affdf9fa7eedff4995eaa356f4f feat(core-types): preserve aggregate family attenuation",
+        "0788a62072bf3917b4da747d157a7a8ee0b5a8d8 fix(core-types): separate aggregate root and leaf trust",
+        "dfdc3c154c9d220dcd8b4cdb9e1eaaf41b081042 feat(core-types): verify aggregate family descendants",
+        "8190b7b562711b7712d153fd2369e0f9bafc196f fix(core-types): verify backend capability issuance",
+        "ce74788e35c8192fe0cca94f561aa071d12433cf feat(core-types): authenticate aggregate family roots",
+        "5b4d67c1a1b8ef7dee1e1daf4c7900ca8495f186 test(kernel): lock aggregate denial ordering",
+        "bf8c7747de9bbb91ed58d85aa5593678dd656435 fix(kernel-core): deny unenforced aggregate budgets",
+        "e40cd6b66287df3f656921755f491c3c3796b6f9 feat(core-types): add aggregate budget wire model",
+        "4a4cda0cad1f2d0d4c6956c23f4b525e4575e5ac chore: align toolchain quality gates",
+        "977b19de1cbbc6ff3d4dc1a5a3c849adc747d88a fix(kernel): reserve budget receipt namespace",
+        "4687769fdc645938180dcf49bfe3313e1708f824 fix(kernel): attest post-dispatch cleanup faults",
+        "c59331bbd2b6c522d0d498642693b90451197717 fix(kernel): retain dispatched invocation usage"
+      ]
+    }
+  ],
+  "inspected_sources": [
+    {
+      "path": "docs/security/launch-execution-plan.md",
+      "sha256": "e31840ab92f2958e90f496a973eb573f04554f6bf4375f682ec5dbb9d72cf977"
+    },
+    {
+      "path": "docs/security/signed-json-boundaries.md",
+      "sha256": "f2828d6dd975fda35931c385215b2871a96c3a46ee6514cc001fc02687b142d6"
+    },
+    {
+      "path": "docs/security/crypto-wire-decoding.md",
+      "sha256": "3410bbae7e215cedf03c522bfbbe23856c363e19bbbd2b70c1cc765b0984d372"
+    },
+    {
+      "path": "docs/security/kernel-signing-authority.md",
+      "sha256": "987654d6cedef5ceb1a0a0c228f805f96b26809bb63bdf1b9caa5d72467f0254"
+    },
+    {
+      "path": "docs/security/trusted-time.md",
+      "sha256": "e4a11f6b0b310e27c2aa7ab35bffbb37e6b02c0a212416e9b9bda3afe8eccf60"
+    },
+    {
+      "path": "docs/security/authenticated-caller-delivery.md",
+      "sha256": "6a2abfa41a7ca00671d3da5b426d8ab0fff9ab61a5730b39cc37ab3903c49e0a"
+    },
+    {
+      "path": "docs/security/native-restart-safety.md",
+      "sha256": "1af02a4acd03d4ccd327a341a05e0a541b66008350e52fff900ac5c724301f24"
+    },
+    {
+      "path": "docs/security/tenant-read-contracts.md",
+      "sha256": "ae4256eb6ea88d6327b82083d5dcbe800bd9747729e9b880b3538803b88bbc99"
+    },
+    {
+      "path": "docs/security/threshold-approval-collection.md",
+      "sha256": "648e5e8bf4c6ee0243b379a97d7cece40fada28521124f89fed447a6d037520f"
+    },
+    {
+      "path": "docs/security/active-defense-rollout.md",
+      "sha256": "39e9aa56918f6c53d4b94467b65208d033b03fb9ca64a3f5fafd80fb9c892000"
+    },
+    {
+      "path": "docs/security/public-witness-semantics.md",
+      "sha256": "9a57df9f3db7c498ee93fa64e69ba9b1e3af606d3b315643d3c961e4baf3a289"
+    },
+    {
+      "path": "docs/security/retention-diagnostic-2026-09-26.md",
+      "sha256": "593bd1e4786c56f27f4174273b69ab8e4c125f3aee730b8594cb27bb0a874747"
+    },
+    {
+      "path": "spec/PROTOCOL.md",
+      "sha256": "4993414d4ce6c086e7dc32ac7b38506f6d0abf948d610409432c9b7535169c23"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/message.rs",
+      "sha256": "36e0adaabdcd8899011c3d63f71f464e2f57c153eeea1ee0f545e8c8eb0394e4"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/capability/caveat.rs",
+      "sha256": "061c2a04a0797dcace92aaedce3bb61ac08f7b817789e9b33211c56ca9fecc4b"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/capability/token.rs",
+      "sha256": "e21a3d2628277e6f3f0ea2d991e546c470f091a2c236e85a5c03a713d7537f30"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/capability/features.rs",
+      "sha256": "5bd1ea634b9b4da3569bbb82dfbe7fd05c94436779e5fc31d6279b41c1e979da"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/capability/governance.rs",
+      "sha256": "a130e81be191360f4315506665bf4cf843b10cbc4bb7b39524b7a966601addf8"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/capability/attenuation.rs",
+      "sha256": "f5174be67c33377194ea87f4e094891ac4dcdab810680f297b6f688dedbba4ee"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/capability/threshold_approval.rs",
+      "sha256": "1b942e6265085629c92afba19fbd27df218aeded118555afbdd66c64ba39583e"
+    },
+    {
+      "path": "crates/core/chio-core-types/src/canonical/signed_json.rs",
+      "sha256": "7302106e21e4977208865613c2ad17fddd85d2599a699940d5c4a8a0bdf79bfe"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/threshold_approval/verification.rs",
+      "sha256": "37a82533133aa7e17b1ea416d8e988e11d43da25d86b446f86608521bebd5e85"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/governed_validation.rs",
+      "sha256": "1706dfe9187f3a3aa2e97f3abbb20e5aa07531b602bac7bc520e2b2b1b5d19aa"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/responses/pending_responses.rs",
+      "sha256": "ff45535c8292129f7b6f58f34d4cb1ac64ddcf2be9f9449a3666949b77c803d4"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/execution_nonce.rs",
+      "sha256": "10dad23eea8506e55f49ebecd49ed156a80f6b2e121224f3eadf9be92fe7f527"
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/session/response.rs",
+      "sha256": "71871c425c23f30de3044c1eda7e9524cb8cc0522de155050e815d561c1ca8e8"
+    },
+    {
+      "path": "crates/products/chio-cli/src/cli/process_host/receipt_evidence.rs",
+      "sha256": "888a51515f48be1f1ce8d188232e495056bf1ff53cdf7aec8243328f377eba99"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-edge/src/runtime/protocol/tool_results.rs",
+      "sha256": "624518496f736817f520e614801829057e1bc3cecc90c0ed176bb3d94ee28264"
+    },
+    {
+      "path": "crates/protocol/chio-cross-protocol/src/execution.rs",
+      "sha256": "9e6061724419e1eb571011eba2a45ce911811278d18a0c668412633b86e7b58b"
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
+      "sha256": "ad61a8d35548dec7339ca5859313a102e2d12b1cca7f018faf5928973d203671"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/agent/governed-transaction-intent.schema.json",
+      "sha256": "a52aa001c16dfe0527ba8c716925f04b29955e4a5757f3a6f837a15175f0a1f7"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/result/pending_approval.schema.json",
+      "sha256": "ec27af1c0736b7b17ac4f7c2f6e4500bdbb754106fbb08247f9458a8a02cb350"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/kernel/tool_call_response.schema.json",
+      "sha256": "c7a66cea5b9a856eae0b0bf0ae3123ca16618bb4e3f69b33c47fa64b43766f7c"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/kernel/execution_nonce.schema.json",
+      "sha256": "f91b9c2bc6f58d486db21a658296692924287f7d1786b1365d81986106ec2b00"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/receipt/record.schema.json",
+      "sha256": "869d7719635ecd7a345ce488a456189aa8051f186a82bb58fd58698bc3da79e5"
+    },
+    {
+      "path": "spec/schemas/chio-wire/v1/capability/token.schema.json",
+      "sha256": "da6de204285c7a68c1969d0e8ba01ed1ef67bf75904c671d326d90e7b240ae46"
+    },
+    {
+      "path": "tests/bindings/fixtures/protocol-primitives-v1.json",
+      "sha256": "09dfe019db30351196de29c7a57edb21af89b2213a4d1132caff53392b4ff946"
+    }
+  ]
+}
