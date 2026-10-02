@@ -25,6 +25,11 @@ fn host_authority_uses_injected_epoch_and_refuses_clock_outage(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for epoch in [3_600_000, 4_000_000_000_000] {
         let directory = tempfile::tempdir()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+        }
         let policy_path = directory.path().join("policy.yaml");
         std::fs::write(
             &policy_path,
