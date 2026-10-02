@@ -669,9 +669,15 @@ mod tests {
             .test_expect("old row inserts");
         drop(connection);
 
+        let error = store
+            .get("old-1")
+            .test_expect_err("legacy body must be rejected");
+        let DeadLetterStoreError::UntrustedInput(error) = error else {
+            panic!("expected a typed legacy-body decoding error, got {error:?}");
+        };
         assert!(matches!(
-            store.get("old-1"),
-            Err(DeadLetterStoreError::InvalidRecord(_))
+            error.as_ref(),
+            chio_core::canonical::UntrustedJsonError::Decode(source) if source.is_data()
         ));
     }
 

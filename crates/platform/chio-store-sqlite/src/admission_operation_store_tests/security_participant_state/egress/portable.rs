@@ -146,6 +146,8 @@ fn portable_commands_preserve_both_phases_and_read_current_operation() -> Anchor
 #[test]
 fn portable_commands_recheck_selected_binding_live_material_and_actual_lease() -> AnchoredTestResult
 {
+    // Exercise state transitions independently of wall time spent validating the catalog.
+    let _clock = chio_test_support::clock::scope_unix_secs(1_800_000_000);
     let fixture = fixture();
     hydrate(&fixture, &imported(&fixture, "source")?)?;
     let other = hydrate(&fixture, &imported(&fixture, "other")?)?;

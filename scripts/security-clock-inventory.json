@@ -97,7 +97,6 @@
     "crates/platform/chio-store-sqlite/src/revocation_store.rs::unique_db_path": 1,
     "crates/platform/chio-store-sqlite/src/serving_owner/rollback_anchor.rs::now_ms": 1,
     "crates/platform/chio-store-sqlite/src/serving_owner/tests.rs::joint_capture_replays_after_supplemental_authorization_expires": 2,
-    "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs::now_ms": 1,
     "crates/platform/chio-store-sqlite/tests/approval_store.rs::unique_path": 1,
     "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs::expired_permission_can_replay_a_retained_report_but_cannot_execute": 3,
     "crates/platform/chio-store-sqlite/tests/caller_execution_ledger.rs::fixture": 1,
