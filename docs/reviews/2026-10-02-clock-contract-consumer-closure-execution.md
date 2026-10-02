@@ -7,6 +7,10 @@ from base `491f585e9013dcb6335589c82d00ac219efbf0a6` on
 separately below. This is bounded progress on the roadmap, not full security,
 merge, release or operator acceptance.
 
+**Status:** All five tasks in this batch are complete: named authority-clock
+owners, expanded clock enforcement, checked decoding contracts, consumer CI
+repairs and qualification, and review/evidence/source publication.
+
 ## Implemented work
 
 | Task | Implemented boundary | Acceptance controls |
@@ -132,14 +136,33 @@ when its dependencies were cancelled. It supplies no passing hosted acceptance.
 
 The corrected exact-source retry,
 [37043188904](https://github.com/bb-connor/arc/actions/runs/37043188904),
-runs `d7a33ba9341b78458cd639df352ad5618d31e38c` and remains in progress. Scoped
-hosted acceptance is pending; its eventual terminal result must be recorded before
-closing the consumer-qualification task.
+completed successfully at 19:24 UTC on October 2 for
+`d7a33ba9341b78458cd639df352ad5618d31e38c`. Every step in all five required jobs
+passed: binary preparation, native host/protocol tests, authenticated workers,
+installed native consumers and the aggregate result. The optional standard-release
+optimized-comparison job was intentionally skipped by the dispatch input; it is
+not part of this acceptance claim.
+
+Installed acceptance covers the actual verified binary transfer, a fresh consumer
+host enforcement probe, Docker and native mini-SWE recovery, explicitly provisioned
+coding sessions, repository review, installed Python/Node packages, shared-resource
+recovery, the offline adaptive kit, AI SDK 6/7 native tool/model recovery and the
+one-trial research-swarm comparison. This does not establish a performance claim.
+The build job took 50 minutes 45 seconds and installed consumer qualification took
+44 minutes 41 seconds, each within its unchanged 90-minute job limit.
+
+All five terminal job logs and all eleven workflow artifacts were downloaded.
+Archive digests match the GitHub metadata, and the qualification artifact records
+the source, conclusions and log/archive hashes. The final installed-consumer log
+has SHA-256 `707409285881ca514a2a388483bb194598e691f4dad8d68cea9f6a3e409563e4`.
+Commits after the qualified source update only review records and plans; they do
+not change the qualified source/configuration. Source changes and evidence are
+published on `packet/3-retention-accounting`.
 
 All production Rust behavior changes are in
 `604549fb854741201483f3eda7792209c0cc3c23`. Later source commits repair test
 fixtures, their clock inventory and the consumer job layout. No full required-CI,
-merge, release, publication or operator-activation result is implied.
+merge, release, package-publication or operator-activation result is implied.
 
 ## Next execution queue
 

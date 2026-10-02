@@ -1,6 +1,11 @@
 # Clock, decoding contract and consumer qualification closure
 
-**Goal:** Close AC2/AC3 and SF1/CA2 against current code and repair the failed hosted consumer workflow.
+**Goal:** Close the named AC2 owner gaps, AC3 scope enforcement and SF1/CA2 contracts against current code, and repair the failed hosted consumer workflow.
+
+**Status:** Complete within the stated scope. Local acceptance and the successful
+exact-source hosted run are recorded in the
+[execution report](../../reviews/2026-10-02-clock-contract-consumer-closure-execution.md).
+Remaining ambient-clock debt and wider roadmap gates remain explicit there.
 
 **Architecture:** Authority owners share an explicit fallible clock and reject faults before mutations. Native clocks are selected at composition boundaries. Source gates derive coverage from actual trust boundaries, pin decoder contracts and require code evidence for non-baseline claims. Hosted consumer prerequisites are checked before qualification.
 
@@ -58,7 +63,7 @@
 
 - [x] Reproduce missing compiler setup and Ruff formatting; trace missing adapter export to build outcome.
 - [x] Provision prerequisites at their owning action and validate executable exports; fix formatting without weakening runtime acceptance.
-- [ ] Run workflow/script checks, commit and push the source, dispatch the repaired exact-source workflow and retain its terminal result. Repair further failures within this qualification boundary.
+- [x] Run workflow/script checks, commit and push the source, dispatch the repaired exact-source workflow and retain its terminal result. Repair further failures within this qualification boundary.
 
 ### Task 5: review, qualification and publication
 
@@ -66,4 +71,4 @@
 
 - [x] Run changed-owner warnings-denied Clippy, formatting and affected source gates.
 - [x] Obtain one independent final review, resolve findings with meaningful regressions and verify any fix pass.
-- [ ] Publish all authorized security changes, verify remote SHA, record per-task completion and the next remaining queue. Keep local and hosted acceptance distinct.
+- [x] Publish all authorized security changes, verify remote SHA, record per-task completion and the next remaining queue. Keep local and hosted acceptance distinct.

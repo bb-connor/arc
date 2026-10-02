@@ -114,17 +114,17 @@
     "run": 37043188904,
     "url": "https://github.com/bb-connor/arc/actions/runs/37043188904",
     "source_commit": "d7a33ba9341b78458cd639df352ad5618d31e38c",
-    "status": "in_progress",
-    "conclusion": "",
+    "status": "completed",
+    "conclusion": "success",
     "disposition": "Exact-source workflow for the corrected consumer job layout. Only a terminal success establishes scoped hosted acceptance.",
-    "metadata_sha256": "759055f6582d64708a7d77b5482cff11826585ed4eb030e5624b39317d3abee3",
+    "metadata_sha256": "79abf57a0bc5f0f24c2269c304e50f7ae67a4ed3083a7053c6f1839660060b1d",
     "jobs": [
       {
         "id": 110958076216,
         "name": "Prepared native consumer binaries",
-        "status": "in_progress",
-        "conclusion": "",
-        "log_sha256": null,
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "50ab163f185fb79b5ce59eaa68845baf5f2d31b16d9ee04f4825316d99061077",
         "steps": [
           {
             "name": "Set up job",
@@ -168,57 +168,67 @@
           },
           {
             "name": "Build optimized enforcing CLI",
-            "status": "in_progress",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Build prepared native broker consumers",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Package prepared native binaries",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Preserve prepared native binaries",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Build prepared native broker consumers",
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
       {
         "id": 110958076439,
         "name": "Native host and protocol tests",
-        "status": "in_progress",
-        "conclusion": "",
-        "log_sha256": null,
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "2307d3ead2b92397fca527c8774f6831c00007fed37efaa38b14dbdd79608b8b",
         "steps": [
           {
             "name": "Set up job",
@@ -267,67 +277,72 @@
           },
           {
             "name": "Default kernel and worker dependency boundary",
-            "status": "in_progress",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "CLI host and ordinary worker coverage",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Qualify enforcing host and prepare native consumer fixture",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Native protocol targets under enforced authority",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Native MCP and worker recovery under enforced authority",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Preserve native host qualification evidence",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
       {
         "id": 110958076560,
         "name": "Authenticated Python and JavaScript workers",
-        "status": "in_progress",
-        "conclusion": "",
-        "log_sha256": null,
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "ea1c70e415fca9c75378872766f1454d479e05cb7cfaa9adf4aa08a79373ff17",
         "steps": [
           {
             "name": "Set up job",
@@ -376,48 +391,53 @@
           },
           {
             "name": "Process protocol and host crash recovery",
-            "status": "in_progress",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "LangGraph application recovery",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "LangGraph 0.6 compatibility",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Keep graph recovery evidence",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
           },
           {
             "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
-            "status": "pending",
-            "conclusion": ""
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
           }
         ]
       },
@@ -428,9 +448,268 @@
         "conclusion": "skipped",
         "log_sha256": null,
         "steps": []
+      },
+      {
+        "id": 110976962669,
+        "name": "Installed native consumer recovery",
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "707409285881ca514a2a388483bb194598e691f4dad8d68cea9f6a3e409563e4",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Rust toolchain",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run ./.github/actions/apt-install",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Python integration style",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Download prepared native binaries",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify and install prepared native binaries",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Qualify enforcing host and prepare native consumer fixture",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Preserve installed consumer host qualification evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Installed mini-SWE-agent recovery through Chio and Docker",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Installed coding session with explicit operator provisioning",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep mini-SWE-agent recovery evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Repository review through the public process host",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Installed Python and Node packages outside the checkout",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Shared-resource recovery through the public host",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep nonsecret shared-resource recovery evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Offline adaptive review with installed SDKs",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Installed AI SDK 6 and 7 with native tool and model recovery",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Research swarm benchmark against a local-callback baseline",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep the research swarm benchmark evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep installed AI SDK process packages and evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep the offline adaptive review kit and evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep qualified process starter and evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep repository review evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 110993518274,
+        "name": "MCP process host and enforced native recovery",
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "29375df5f1673f922af2da2efcdac6156b97f0c5995db5955e1dcb6bac0bc475",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Require every process qualification result",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
       }
     ],
-    "artifacts": []
+    "artifacts": [
+      {
+        "id": 11247665677,
+        "name": "chio-review-kit-Linux-X64",
+        "sha256": "d01ec40d9245e0ebdd19e87876a87d572cf019d1c4832edd91f7d37ca39ff56d"
+      },
+      {
+        "id": 11247545722,
+        "name": "mini-swe-process-recovery",
+        "sha256": "a1ed0f7c40cc97336ea2af7c35183f348ae3de2049a847d68f75bdd407ded6da"
+      },
+      {
+        "id": 11247523332,
+        "name": "repository-review-recovery",
+        "sha256": "bd9883731503b7da99a54ea0920a2380ec305e082898401ebf604e4d49181dcd"
+      },
+      {
+        "id": 11247523278,
+        "name": "ai-sdk-benchmark-Linux-X64",
+        "sha256": "71f0e0363feae1535c233d51fffbc0bb5e84b56e9dc0ca60af5d92ee0482c948"
+      },
+      {
+        "id": 11247398556,
+        "name": "ai-sdk-process-Linux-X64",
+        "sha256": "009ef7769273d96cbb4b27d295a934b21fed8cd2843ce258e952af24f6f37f8b"
+      },
+      {
+        "id": 11247068992,
+        "name": "chio-process-starter-Linux-X64",
+        "sha256": "d01e30bcd2deb20eb6ef2a604a147ac5e4484ce0fdae188cfa40a40606593d2b"
+      },
+      {
+        "id": 11246628505,
+        "name": "shared-resource-recovery",
+        "sha256": "0bae66d77869d99eb4ab4bf872dc5bbf7a871ca6fbd59712bdcfa2c5bcaf6d00"
+      },
+      {
+        "id": 11245877481,
+        "name": "installed-consumer-host-qualification",
+        "sha256": "32595efff1a011fbab4f68320a5e0b8ca1b70bfc9afe456568a4ca888695c2f7"
+      },
+      {
+        "id": 11245622967,
+        "name": "native-consumer-binaries-d7a33ba9341b78458cd639df352ad5618d31e38c-1",
+        "sha256": "3d491266d519e16756402e0979fe9e169bb0ac31e1c8df70a2d95fc7cba50832"
+      },
+      {
+        "id": 11244882285,
+        "name": "native-consumer-host-qualification",
+        "sha256": "348fb886ba5f8884376b61051efd8efb07764f5dcd27fcc285625e0fb1e6f67b"
+      },
+      {
+        "id": 11243411602,
+        "name": "langgraph-process-recovery",
+        "sha256": "23d6e2c8a6ab15f2ccf2665362417836a3e16b3ef4c59deaec16d8770cfcfb2c"
+      }
+    ]
   },
   "hosted_history": [
     {
