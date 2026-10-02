@@ -326,7 +326,7 @@ impl SqliteReceiptStore {
     ) -> Result<ChioOAuthAuthorizationMetadataReport, ReceiptStoreError> {
         Ok(ChioOAuthAuthorizationMetadataReport {
             schema: CHIO_OAUTH_AUTHORIZATION_METADATA_SCHEMA.to_string(),
-            generated_at: unix_now()?,
+            generated_at: unix_now(&self.clock)?,
             profile: ChioOAuthAuthorizationProfile::default(),
             report_schema: CHIO_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA.to_string(),
             discovery: ChioOAuthAuthorizationDiscoveryMetadata {
@@ -436,7 +436,7 @@ impl SqliteReceiptStore {
 
         Ok(ChioOAuthAuthorizationReviewPack {
             schema: CHIO_OAUTH_AUTHORIZATION_REVIEW_PACK_SCHEMA.to_string(),
-            generated_at: unix_now()?,
+            generated_at: unix_now(&self.clock)?,
             filters: query.clone(),
             metadata,
             summary: ChioOAuthAuthorizationReviewPackSummary {

@@ -10,6 +10,7 @@ use chio_keyring::{
     KeyLogPolicyDocument, KeyringArtifactSignature, SignedArtifactTimeAnchor,
     SqlitePinnedKeyLogVerifier, SystemClock,
 };
+use chio_security_types::clock::Clock;
 use serde::{Deserialize, Serialize};
 
 use super::state::error;
@@ -40,13 +41,21 @@ impl Config {
     }
 
     pub fn verifier(&self, path: &Path) -> Result<SqlitePinnedKeyLogVerifier, CliError> {
+        self.verifier_with_clock(path, Arc::new(SystemClock))
+    }
+
+    fn verifier_with_clock(
+        &self,
+        path: &Path,
+        clock: Arc<dyn Clock>,
+    ) -> Result<SqlitePinnedKeyLogVerifier, CliError> {
         SqlitePinnedKeyLogVerifier::open(
             path,
             self.verification_policy
                 .clone()
                 .into_policy()
                 .map_err(error)?,
-            Arc::new(SystemClock),
+            clock,
         )
         .map_err(|cause| error(format!("cannot open pinned key-log verifier: {cause}")))
     }
@@ -65,23 +74,30 @@ impl HostKeyring {
         }))
     }
 
-    pub fn open(config: &Config, directory: &Path, initializing: bool) -> Result<Self, CliError> {
+    pub fn open(
+        config: &Config,
+        directory: &Path,
+        initializing: bool,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, CliError> {
         config.validate()?;
         // Preserve the original audit signer. These authority receipts cannot
         // enter the kernel's single-signer call checkpoint stream.
         let receipts = Arc::new(
-            chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool(
+            chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool_with_clock(
                 directory.join("keyring-receipts.db"),
                 &config.receipt_anchor_directory,
+                clock.clone(),
             )?,
         );
         receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
         // This loader completes an existing rotation handoff or refuses a stale
         // seed. Never replace governed signing with the host's receipt key.
-        let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed(
+        let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed_with_clock(
             &config.runtime_config,
             &config.authority_seed_file,
             receipts,
+            clock.clone(),
         )?;
         let path = directory.join("keylog-verifier.db");
         let verifier = if initializing {
@@ -92,11 +108,11 @@ impl HostKeyring {
                     .clone()
                     .into_policy()
                     .map_err(error)?,
-                Arc::new(SystemClock),
+                clock.clone(),
             )
             .map_err(error)?
         } else {
-            config.verifier(&path)?
+            config.verifier_with_clock(&path, clock)?
         };
         let base = verifier.pin().map_err(error)?;
         verifier

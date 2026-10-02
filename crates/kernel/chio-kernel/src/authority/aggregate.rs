@@ -14,8 +14,9 @@ pub fn validate_issued_aggregate_family_root_response(
     requested_ttl_seconds: u64,
     current_issuer: &PublicKey,
     max_invocations: u32,
+    now: chio_security_types::clock::UnixMillis,
 ) -> Result<(), KernelError> {
-    let now = capability_authority_now_unix_secs(&SystemClock)?;
+    let now = now.as_secs();
     validate_issued_response_at(
         capability,
         requested_subject,
@@ -96,6 +97,7 @@ mod tests {
                 300,
                 &key.public_key(),
                 limit,
+                chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
             )
         };
         validate(&root, 2)?;
@@ -107,6 +109,7 @@ mod tests {
             &scope,
             300,
             &key.public_key(),
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         )
         .is_err());
         let plain = authority.issue_capability(&subject, scope.clone(), 300)?;
@@ -134,6 +137,7 @@ mod tests {
             1,
             &key.public_key(),
             2,
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         )
         .is_err());
         Ok(())
@@ -156,6 +160,7 @@ mod tests {
             300,
             &key.public_key(),
             2,
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         )?;
         Ok(())
     }

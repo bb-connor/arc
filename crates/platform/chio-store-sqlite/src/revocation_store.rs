@@ -12,6 +12,7 @@ use crate::store_connection::StoreConnection;
 
 #[derive(Clone)]
 pub struct SqliteRevocationStore {
+    clock: crate::store_clock::StoreClock,
     connection: Arc<StoreConnection>,
     serving_owner: Option<Arc<crate::serving_owner::SqliteServingOwner>>,
     /// Whether the backing database lives only in process memory and so loses
@@ -66,7 +67,7 @@ const REVOCATION_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"]
 
 impl SqliteRevocationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
-        Self::open_with_replication_epoch(path, false)
+        Self::open_with_clock(path, Arc::new(chio_security_types::clock::SystemClock))
     }
 
     /// Open a store that will advertise its delta stream to replication peers.
@@ -76,12 +77,30 @@ impl SqliteRevocationStore {
     /// therefore cannot reuse sequence numbers under an identity cached by a
     /// follower. Ordinary non-serving opens retain the stored identity.
     pub fn open_replication_source(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
-        Self::open_with_replication_epoch(path, true)
+        Self::open_replication_source_with_clock(
+            path,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, RevocationStoreError> {
+        Self::open_with_replication_epoch(path, false, clock)
+    }
+
+    pub fn open_replication_source_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, RevocationStoreError> {
+        Self::open_with_replication_epoch(path, true, clock)
     }
 
     fn open_with_replication_epoch(
         path: impl AsRef<Path>,
         rotate_replication_epoch: bool,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, RevocationStoreError> {
         let path = path.as_ref();
         let ephemeral = path_opens_in_memory(path);
@@ -118,7 +137,9 @@ impl SqliteRevocationStore {
         )
         .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
         verify_revocation_foreign_keys(&connection)?;
+        let clock = crate::store_clock::StoreClock::new(clock);
         if rotate_replication_epoch {
+            clock.unix_millis()?;
             rotate_revocation_stream_identity(&mut connection)?;
         }
 
@@ -126,6 +147,7 @@ impl SqliteRevocationStore {
         // and its delta-log entry land in one RAII transaction and nothing
         // outside the database records them.
         Ok(Self {
+            clock,
             connection: Arc::new(StoreConnection::transaction_only("revocation", connection)),
             serving_owner: None,
             ephemeral,
@@ -137,6 +159,10 @@ impl SqliteRevocationStore {
         serving_owner: Arc<crate::serving_owner::SqliteServingOwner>,
     ) -> Self {
         Self {
+            clock: crate::store_clock::StoreClock::with_fence(
+                serving_owner.clock.clone(),
+                serving_owner.clock_fence.clone(),
+            ),
             connection,
             serving_owner: Some(serving_owner),
             ephemeral: false,
@@ -159,6 +185,10 @@ impl SqliteRevocationStore {
             owner
                 .verify_authority_anchor(&transaction)
                 .map_err(map_serving_owner_error)?;
+            crate::admission_operation_store::observe_authority_time(&transaction, owner)
+                .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+        } else {
+            self.clock.unix_millis()?;
         }
         Ok(transaction)
     }
@@ -619,15 +649,9 @@ impl RevocationStore for SqliteRevocationStore {
     }
 
     fn revoke(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
-        let revoked_at = i64::try_from(
-            chio_security_types::clock::Clock::unix_millis(
-                &chio_security_types::clock::SystemClock,
-            )?
-            .as_secs(),
-        )
-        .map_err(|_| chio_security_types::clock::ClockError::Overflow)?;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
+        let revoked_at = self.clock.now_secs()?;
         if !self.record_revocation(&transaction, capability_id, revoked_at)? {
             transaction.rollback()?;
             return Ok(false);

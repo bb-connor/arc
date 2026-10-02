@@ -1,11 +1,9 @@
 use super::*;
 
-pub(crate) fn unix_timestamp_now_i64() -> Result<i64, ReceiptStoreError> {
-    Ok(i64::try_from(
-        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
-            .as_secs(),
-    )
-    .map_err(|_| chio_security_types::clock::ClockError::Overflow)?)
+pub(crate) fn unix_timestamp_now_i64(
+    clock: &crate::store_clock::StoreClock,
+) -> Result<i64, ReceiptStoreError> {
+    Ok(clock.now_secs()?)
 }
 
 pub(crate) fn sqlite_i64(value: u64, field: &str) -> Result<i64, ReceiptStoreError> {

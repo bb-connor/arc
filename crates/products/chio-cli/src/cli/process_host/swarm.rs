@@ -13,7 +13,6 @@ use plan::{Graph, Plan};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_control_plane::{DurableAdmissionRuntime, PreparedPrivateDirectory};
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, Keypair, Signature};
@@ -41,8 +40,17 @@ pub(super) fn bootstrap_host(
     runtime: &ProcessRuntime,
     issuer: &Keypair,
 ) -> Result<(), CliError> {
-    let receipt =
-        requests::bootstrap(runtime, record, issuer, now_ms()?, "provision_process_host")?;
+    let receipt = requests::bootstrap(
+        runtime,
+        record,
+        issuer,
+        runtime
+            .authority_clock()
+            .unix_millis()
+            .map_err(error)?
+            .get(),
+        "provision_process_host",
+    )?;
     write_secret(
         directory,
         std::ffi::OsStr::new("process-bootstrap.json"),
@@ -87,16 +95,6 @@ fn hash<T: Serialize>(value: &T) -> Result<String, CliError> {
     canonical_json_bytes(value)
         .map(|bytes| sha256_hex(&bytes))
         .map_err(error)
-}
-
-fn now_ms() -> Result<u64, CliError> {
-    u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(error)?
-            .as_millis(),
-    )
-    .map_err(error)
 }
 
 pub(super) fn load_plan(path: &Path) -> Result<Plan, CliError> {
@@ -154,7 +152,11 @@ pub(super) fn provision(
             "this swarm profile requires a fixed direct-child topology",
         ));
     }
-    let now = now_ms()?;
+    let now = runtime
+        .authority_clock()
+        .unix_millis()
+        .map_err(error)?
+        .get();
     let root = runtime.process("root").map_err(error)?;
     let budget = root
         .capability
@@ -196,8 +198,11 @@ pub(super) fn provision(
         issued_at_unix_ms: now,
         expires_at_unix_ms: expires,
     };
-    let source =
-        SqliteRuntimeOrchestrationStore::open(directory.path().join(SOURCE)).map_err(error)?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.path().join(SOURCE),
+        runtime.authority_clock(),
+    )
+    .map_err(error)?;
     let mut calls = Vec::new();
     for (graph, bundle) in plan.graphs.iter().zip(&bundles) {
         calls.extend(requests::prepare(
@@ -219,7 +224,17 @@ pub(super) fn provision(
     let runtime_id = AdmissionIdentifier::try_new("runtime_id", runtime.runtime_id().to_owned())
         .map_err(error)?;
     let expected = store
-        .expect_runtime_replay_source(&source_id, &runtime_id, &source, &fence, now_ms()?)
+        .expect_runtime_replay_source(
+            &source_id,
+            &runtime_id,
+            &source,
+            &fence,
+            runtime
+                .authority_clock()
+                .unix_millis()
+                .map_err(error)?
+                .get(),
+        )
         .map_err(error)?;
     store
         .import_runtime_replay_source(
@@ -227,13 +242,26 @@ pub(super) fn provision(
             expected.expectation_id(),
             &source,
             &fence,
-            now_ms()?,
+            runtime
+                .authority_clock()
+                .unix_millis()
+                .map_err(error)?
+                .get(),
         )
         .map_err(error)?;
     let binding =
         RuntimeParticipantAuthorityBindingV1::new(runtime_id, expected.expectation_id().clone());
     store
-        .activate_runtime_replay_source(&binding, &source, &fence, now_ms()?)
+        .activate_runtime_replay_source(
+            &binding,
+            &source,
+            &fence,
+            runtime
+                .authority_clock()
+                .unix_millis()
+                .map_err(error)?
+                .get(),
+        )
         .map_err(error)?;
     let body = ProfileBody {
         schema: SCHEMA.into(),
@@ -300,7 +328,11 @@ pub(super) fn install(
     if signed.body.record_sha256 != hash(&record)? {
         return Err(error("swarm profile does not match the initialized host"));
     }
-    let source = SqliteRuntimeOrchestrationStore::open(directory.join(SOURCE)).map_err(error)?;
+    let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+        directory.join(SOURCE),
+        kernel.authority_clock(),
+    )
+    .map_err(error)?;
     let (store, fence) = authority
         .local_runtime_participant()
         .ok_or_else(|| error("swarm source requires a local qualified authority"))?;
@@ -308,7 +340,7 @@ pub(super) fn install(
         .load_runtime_replay_migration(
             signed.body.binding.runtime_authority_id(),
             &fence,
-            now_ms()?,
+            kernel.authority_clock().unix_millis().map_err(error)?.get(),
         )
         .map_err(error)?
         .ok_or_else(|| error("missing activated swarm source"))?;

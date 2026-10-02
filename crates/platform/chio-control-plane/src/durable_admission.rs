@@ -34,6 +34,15 @@ pub struct DurableAdmissionRuntime {
 
 impl DurableAdmissionRuntime {
     pub fn open(path: &Path) -> Result<Self, CliError> {
+        Self::open_with_clock(path, Arc::new(chio_security_types::clock::SystemClock))
+    }
+
+    /// Use the service's authority clock for the complete joint durable store.
+    pub fn open_with_clock(
+        path: &Path,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, CliError> {
+        clock.read().map_err(std::io::Error::other)?;
         if path
             .to_str()
             .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
@@ -47,7 +56,9 @@ impl DurableAdmissionRuntime {
         let lock_root = durable_admission_lock_root(path)?;
         create_private_directory(&lock_root)?;
         SqliteAuthorityStore::provision(path, &lock_root)?;
-        let authority = Arc::new(SqliteAuthorityStore::open_serving(path, &lock_root)?);
+        let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+            path, &lock_root, clock,
+        )?);
         let budget = authority.budget_store();
         let revocations = authority.revocation_store();
         let kernel_keypair =

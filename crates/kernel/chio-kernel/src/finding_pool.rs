@@ -730,7 +730,7 @@ impl ChioKernel {
         &self,
         request: FindingPoolDebitRequest<'_>,
     ) -> Result<FindingPoolDebitReceipt, FindingPoolDebitError> {
-        self.debit_finding_pool_purchase_at(request, crate::kernel::read_unix_timestamp_ms()?)
+        self.debit_finding_pool_purchase_at(request, self.read_authority_time()?.get())
     }
 
     fn debit_finding_pool_purchase_at(
@@ -1001,7 +1001,7 @@ impl ChioKernel {
         }
         let mut drained = 0_usize;
         for _ in 0..FINDING_POOL_OUTBOX_BATCH_LIMIT {
-            let claimed_at = crate::kernel::read_unix_timestamp_ms()?;
+            let claimed_at = self.read_authority_time()?.get();
             let mut claimed = ledger.claim_pending_mutation_receipts(
                 &self.finding_pool_outbox_worker_id,
                 claimed_at,
@@ -1016,7 +1016,7 @@ impl ChioKernel {
             ledger.acknowledge_mutation_receipt(
                 &receipt.id,
                 &self.finding_pool_outbox_worker_id,
-                crate::kernel::read_unix_timestamp_ms()?,
+                self.read_authority_time()?.get(),
             )?;
             drained = drained.checked_add(1).ok_or_else(|| {
                 FindingPoolLedgerError::Receipt(
@@ -1239,7 +1239,7 @@ impl ChioKernel {
         }
         let decision = Self::finding_pool_terminal_decision(purchase, disposition)?;
         let occurred_at_unix_ms =
-            ledger.advance_trusted_time_floor(crate::kernel::read_unix_timestamp_ms()?)?;
+            ledger.advance_trusted_time_floor(self.read_authority_time()?.get())?;
         let terminal = AuthorizedFindingPoolTerminal {
             durable_admission_operation_id: durable_admission_operation_id.to_owned(),
             purchase_id: purchase.purchase_intent_id.clone(),

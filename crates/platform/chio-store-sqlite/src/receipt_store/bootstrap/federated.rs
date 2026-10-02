@@ -119,12 +119,10 @@ impl SqliteReceiptStore {
         &mut self,
         import: &FederatedEvidenceShareImport,
     ) -> Result<FederatedEvidenceShareSummary, ReceiptStoreError> {
-        let imported_at = chio_security_types::clock::Clock::unix_millis(
-            &chio_security_types::clock::SystemClock,
-        )?
-        .as_secs();
+        let clock = self.clock.clone();
         let import_owned = import.clone();
         self.writer_handle().run_write(move |connection| {
+            let imported_at = clock.unix_millis()?.as_secs();
             let import = &import_owned;
             let imported_at_sqlite = sqlite_i64(imported_at, "federated share imported_at")?;
             let exported_at_sqlite = sqlite_i64(import.exported_at, "federated share exported_at")?;

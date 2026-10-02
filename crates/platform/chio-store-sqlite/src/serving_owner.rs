@@ -1783,8 +1783,3 @@ mod windows_platform_tests {
         Ok(())
     }
 }
-
-fn now_ms() -> Result<i64, SqliteServingOwnerError> {
-    use chio_security_types::clock::{Clock, ClockError, SystemClock};
-    Ok(i64::try_from(SystemClock.unix_millis()?.get()).map_err(|_| ClockError::Overflow)?)
-}

@@ -5,8 +5,9 @@ records the actual input check before signature verification or digesting. It is
 not a claim that the whole TCB migration is complete. Production simulation now
 uses the signed receipt boundary described below.
 
-Choose the decoder from the producer and its numeric contract. Every entry first
-uses `UntrustedJsonText::from_wire` with the original byte limit and UTF-8 check.
+Choose the decoder from the producer and its numeric contract.
+`UntrustedJsonText::from_wire` checks the original byte limit and UTF-8;
+the separate `new` constructor does not enforce a size bound.
 Parsing alone never authenticates a signature, issuer, tenant or authority window.
 
 | Method | Contract and intended producer |
@@ -63,11 +64,11 @@ records the report implementation and its focused verification separately.
 ## Constrained input migration (2026-09-27)
 
 `chio_core_types::canonical::UntrustedJsonText` now owns the parsing decision.
-It borrows the original bounded text, so database readback does not copy a large
+It borrows the original text, so database readback does not copy a large
 string just to mark it untrusted. It has no raw accessor, implicit string
 conversion, serde implementation or payload-bearing Debug. `from_wire` checks
-byte bounds and UTF-8; `new` marks an already bounded owner buffer. Neither
-constructor asserts signature validity or authorization.
+byte bounds and UTF-8; `new` only marks an owner buffer and does not enforce a
+size bound. Neither constructor asserts signature validity or authorization.
 
 - `canonicalize`: strict external I-JSON.
 - `decode_signed`: token-preserving native JSON with full-width integers.
@@ -178,16 +179,61 @@ and debug output. String-only external adapters retain registered redacted
 projections. The [execution record](../reviews/2026-09-28-kernel-admission-reader-execution.md)
 records runtime checks and the deliberate parser and tenant-binding mutations.
 
+## Checked decoding contracts (October 2, 2026)
+
+The inventory now records `path::reader::constructor#occurrence::method` in
+`decoding_contracts`. Function bodies are balanced, and repeated function names
+receive occurrence suffixes. Each constructor is matched to its own method
+chain, closure receiver or local binding, including direct local aliases.
+Switching signed, canonical or external decoding to `decode_document` changes
+the contract even when all constructor and method totals remain equal.
+Unresolved constructor receivers fail the check and cannot be approved by
+copying their observation into the inventory.
+
+Unsigned provider and operator documents keep their explicit document methods.
+Discarded `from_wire` results are recorded as `bounds_only`: they enforce size
+and UTF-8 but do not establish duplicate rejection or a numeric contract. This
+preserves the direct private seed, YAML and streaming readers without claiming
+that every `UntrustedJsonText` construction decodes JSON.
+
+Each non-baseline `decoder_file_contracts` entry also supplies named `readers`
+and their checked source APIs. The scanner independently derives their raw
+decoder sites and requires the evidence in the same function, or an actual
+call to a named constrained helper. A declaration, comment, string, nested
+uninvoked helper or unrelated function cannot supply that evidence. Closed
+checkpoint decoding also checks the source DTO's denied unknown fields and
+integer/string/hash/key field types. Private producer re-parses have explicit
+source rules linking the named producer and validation APIs. The inventory
+cannot define new API patterns or turn an unchecked observation into evidence.
+
+Typed `from_value` projections and `Deserializer` callbacks retain their
+existing classifications. Their evidence establishes a typed conversion site,
+not original-byte validation, a byte limit or authentication. Example/fuzz and
+test-only dispositions require matching source location or conditional scope.
+Repeated identical callback evidence is compacted only after checking every
+function body. A failed body remains a separate failed observation.
+
+These checks close the documented inventory-only promotion and method-downgrade
+paths without changing the 45 raw-input baseline classifications. They remain
+lexical review tripwires. They do not resolve Rust types, expand macros, follow
+arbitrary re-exports, prove control flow, or establish that a constrained call
+consumes the same bytes as another call in its function. A source and inventory
+change together still requires review. Runtime tests own duplicate/number
+semantics, signature and issuer verification, row identity and authority checks.
+
 ## Execution review (October 1, 2026)
 
 Reviewed at `a2630c20a1` in the [signed input and FROST review](../reviews/2026-10-01-execution-review-signed-input-frost.md), [trust, guard, platform and economy readers review](../reviews/2026-10-01-execution-review-trust-guard-platform-economy-readers.md), [campaign audit](../reviews/2026-10-01-execution-review-campaign-audit.md). The cross-cutting verdict is in the [pass 9 execution review](../reviews/2026-10-01-execution-review.md).
 
-**Verdict:** Stale since September 28: ten later reader batches are not reflected, and three methods added to `UntrustedJsonText` since (`decode_external`, `decode_document`, `decode_canonical_with`) are not described. The numeric contract of each strict mode, measured against the real functions, is in the pass 9 index.
+**Review verdict at that checkpoint:** The document omitted ten later reader batches and three methods added to `UntrustedJsonText` (`decode_external`, `decode_document`, `decode_canonical_with`). The method table above now records all six contracts; historical batch counts below their dated headings remain checkpoint observations.
 
-Open findings against this plan:
+Findings at that review checkpoint:
 
 - **TR10, Low.** This document still describes three of the six decode methods.
-- **SF1, Medium.** Nothing checks that a reader uses the mode this document assigns it.
+- **SF1, Medium (review snapshot).** The gate then pinned constructors only.
+  The October 2 contract gate above adds scoped method and raw-reader evidence.
 - **CA8, Medium.** Its counts disagree with the inventory and the working queue.
 
-**Next:** Describe all six methods with their measured numeric behavior and state which producer each serves.
+The checked-contract section above records the subsequent SF1/CA2 gate changes.
+It does not close the remaining raw-reader migration or establish exhaustive
+workspace ingress coverage.

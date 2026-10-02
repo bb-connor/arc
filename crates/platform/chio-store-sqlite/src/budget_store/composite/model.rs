@@ -3,9 +3,9 @@ use super::*;
 use rusqlite::{params, OptionalExtension, Transaction};
 
 /// Upper bound for a supplemental authorization expiry, in seconds since the Unix
-/// epoch (2100-01-01T00:00:00Z). Capture compares the expiry against SQLite's
-/// `unixepoch()`, which is also seconds, so a millisecond-shaped value would never
-/// expire against that clock. Such values are rejected rather than accepted.
+/// epoch (2100-01-01T00:00:00Z). Capture converts the supplied authority clock
+/// to seconds, so a millisecond-shaped expiry would never expire against it.
+/// Such values are rejected rather than accepted.
 pub(super) const MAX_SUPPLEMENTAL_AUTHORIZATION_EXPIRES_AT_SECONDS: u64 = 4_102_444_800;
 
 #[derive(Clone)]

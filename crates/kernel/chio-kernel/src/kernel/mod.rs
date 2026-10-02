@@ -1253,6 +1253,7 @@ impl PreExecutionBudgetMutation {
 }
 
 struct SessionNestedFlowBridge<'a, C> {
+    clock: Arc<dyn chio_security_types::clock::Clock>,
     sessions: &'a DashMap<SessionId, Arc<Session>>,
     child_receipts: &'a mut Vec<ChildRequestReceipt>,
     nested_interaction_observed: &'a std::sync::atomic::AtomicBool,
@@ -1315,6 +1316,7 @@ impl<C> SessionNestedFlowBridge<'_, C> {
         operation_kind: OperationKind,
         result: &Result<T, KernelError>,
     ) -> Result<(), KernelError> {
+        let now = self.clock.unix_millis()?;
         let terminal_state = child_terminal_state(&child_context.request_id, result);
         complete_session_request_with_terminal_state_in_sessions(
             self.sessions,
@@ -1330,6 +1332,7 @@ impl<C> SessionNestedFlowBridge<'_, C> {
             operation_kind,
             terminal_state,
             child_outcome_payload(result)?,
+            now,
         )?;
         self.child_receipts.push(receipt);
         Ok(())
@@ -1782,15 +1785,6 @@ pub(crate) struct ReceiptParams<'a> {
     /// MUST be derived from session / auth context, not caller-provided
     /// request fields (see `STRUCTURAL-SECURITY-FIXES.md` section 6).
     tenant_id: Option<String>,
-}
-
-pub(crate) fn read_unix_timestamp() -> Result<u64, chio_security_types::clock::ClockError> {
-    read_unix_timestamp_ms().map(|millis| millis / 1_000)
-}
-
-pub(crate) fn read_unix_timestamp_ms() -> Result<u64, chio_security_types::clock::ClockError> {
-    chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
-        .map(|value| value.get())
 }
 
 #[cfg(test)]

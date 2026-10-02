@@ -10,8 +10,10 @@
 //! per import; importing the same copy twice is the operator's responsibility
 //! to avoid, and both imports would share history only up to the seal.
 
+use chio_security_types::clock::{Clock, ClockError, SystemClock, UnixMillis};
 use std::fs::{self, File};
 use std::path::Path;
+use std::sync::Arc;
 
 use rusqlite::{config::DbConfig, params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
@@ -21,7 +23,7 @@ use super::lease_history::initialize_serving_lease_schema;
 use super::rollback_anchor::RollbackAnchor;
 use super::{
     acquire_serving_lock, canonical_lock_root, create_lock_file, database_parent,
-    load_provisioning_record, load_provisioning_record_tx, metadata_device, metadata_inode, now_ms,
+    load_provisioning_record, load_provisioning_record_tx, metadata_device, metadata_inode,
     open_existing_database, open_lock_file, owner_table_exists, path_identity, path_text, read_u64,
     sqlite_u64, validate_database_identity, validate_database_metadata,
     validate_database_path_component, validate_lock_metadata, validate_open_lock_file,
@@ -227,7 +229,18 @@ impl SqliteAuthorityStore {
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
     ) -> Result<RelocationSeal, SqliteServingOwnerError> {
+        Self::export_for_relocation_with_clock(database_path, lock_root, Arc::new(SystemClock))
+    }
+
+    /// Execute this offline composition command with the supplied time authority.
+    pub fn export_for_relocation_with_clock(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<RelocationSeal, SqliteServingOwnerError> {
         Self::ensure_serving_supported()?;
+        let clock = crate::store_clock::StoreClock::new(clock);
+        clock.unix_millis()?;
         let database_path = database_path.as_ref();
         validate_database_path_component(database_path)?;
         let database_path = fs::canonicalize(database_path)?;
@@ -277,9 +290,14 @@ impl SqliteAuthorityStore {
             record.lock_device,
             record.lock_inode,
         )?;
-        rollback_anchor.reconcile_startup(&connection)?;
         let admission = verify_admission_commit_chain(&connection)?;
         let global = verify_global_commit_chain(&connection)?;
+        relocation_time(
+            &clock,
+            &connection,
+            admission.trusted_time_high_water_unix_ms,
+        )?;
+        rollback_anchor.reconcile_startup(&connection)?;
         if let Some(seal) = prior_export {
             if seal.store_uuid != record.store_uuid
                 || seal.owner_epoch != record.owner_epoch
@@ -299,7 +317,12 @@ impl SqliteAuthorityStore {
             format: RELOCATION_SEAL_FORMAT.to_string(),
             store_uuid: record.store_uuid.clone(),
             export_id: next_relocation_id(),
-            exported_at_ms: read_u64(now_ms()?, "exported_at_ms")?,
+            exported_at_ms: relocation_time(
+                &clock,
+                &connection,
+                admission.trusted_time_high_water_unix_ms,
+            )?
+            .get(),
             owner_epoch: record.owner_epoch,
             admission_commit_head: admission.head_sequence,
             admission_commit_chain_digest: admission.chain_digest,
@@ -362,7 +385,16 @@ impl SqliteAuthorityStore {
         database_path: impl AsRef<Path>,
         lock_root: impl AsRef<Path>,
     ) -> Result<RelocationImport, SqliteServingOwnerError> {
-        Self::import_relocated_inner(database_path, lock_root, None, |_| Ok(()))
+        Self::import_relocated_with_clock(database_path, lock_root, Arc::new(SystemClock))
+    }
+
+    /// Execute this offline composition command with the supplied time authority.
+    pub fn import_relocated_with_clock(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<RelocationImport, SqliteServingOwnerError> {
+        Self::import_relocated_inner(database_path, lock_root, None, |_| Ok(()), clock)
     }
 
     /// Verify an external manifest before the first import mutation. A retry
@@ -376,12 +408,35 @@ impl SqliteAuthorityStore {
         expected: &RelocationSeal,
         verify_exported: impl FnOnce() -> Result<(), SqliteServingOwnerError>,
     ) -> Result<RelocationImport, SqliteServingOwnerError> {
-        Self::import_relocated_inner(database_path, lock_root, Some(expected), |phase| {
-            if phase == RelocationImportPhase::Exported {
-                verify_exported()?;
-            }
-            Ok(())
-        })
+        Self::import_relocated_checked_with_clock(
+            database_path,
+            lock_root,
+            expected,
+            verify_exported,
+            Arc::new(SystemClock),
+        )
+    }
+
+    /// Execute this offline composition command with the supplied time authority.
+    pub fn import_relocated_checked_with_clock(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        expected: &RelocationSeal,
+        verify_exported: impl FnOnce() -> Result<(), SqliteServingOwnerError>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<RelocationImport, SqliteServingOwnerError> {
+        Self::import_relocated_inner(
+            database_path,
+            lock_root,
+            Some(expected),
+            |phase| {
+                if phase == RelocationImportPhase::Exported {
+                    verify_exported()?;
+                }
+                Ok(())
+            },
+            clock,
+        )
     }
 
     /// Verify all relocated files after the store qualifies the import phase.
@@ -394,7 +449,30 @@ impl SqliteAuthorityStore {
         expected: &RelocationSeal,
         verify_files: impl FnOnce(RelocationImportPhase) -> Result<(), SqliteServingOwnerError>,
     ) -> Result<RelocationImport, SqliteServingOwnerError> {
-        Self::import_relocated_inner(database_path, lock_root, Some(expected), verify_files)
+        Self::import_relocated_checked_with_phase_and_clock(
+            database_path,
+            lock_root,
+            expected,
+            verify_files,
+            Arc::new(SystemClock),
+        )
+    }
+
+    /// Execute this offline composition command with the supplied time authority.
+    pub fn import_relocated_checked_with_phase_and_clock(
+        database_path: impl AsRef<Path>,
+        lock_root: impl AsRef<Path>,
+        expected: &RelocationSeal,
+        verify_files: impl FnOnce(RelocationImportPhase) -> Result<(), SqliteServingOwnerError>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<RelocationImport, SqliteServingOwnerError> {
+        Self::import_relocated_inner(
+            database_path,
+            lock_root,
+            Some(expected),
+            verify_files,
+            clock,
+        )
     }
 
     fn import_relocated_inner(
@@ -402,8 +480,11 @@ impl SqliteAuthorityStore {
         lock_root: impl AsRef<Path>,
         expected: Option<&RelocationSeal>,
         verify_files: impl FnOnce(RelocationImportPhase) -> Result<(), SqliteServingOwnerError>,
+        clock: Arc<dyn Clock>,
     ) -> Result<RelocationImport, SqliteServingOwnerError> {
         Self::ensure_serving_supported()?;
+        let clock = crate::store_clock::StoreClock::new(clock);
+        clock.unix_millis()?;
         let database_path = database_path.as_ref();
         validate_database_path_component(database_path)?;
         let database_path = fs::canonicalize(database_path)?;
@@ -435,6 +516,7 @@ impl SqliteAuthorityStore {
                 ));
             }
         };
+        relocation_time(&clock, &connection, seal.exported_at_ms)?;
         if expected.is_some_and(|expected| *expected != seal) {
             return Err(SqliteServingOwnerError::Invalid(
                 "authority seal differs from the relocation manifest".to_string(),
@@ -471,6 +553,12 @@ impl SqliteAuthorityStore {
             )?;
             anchor.verify_extends(&connection, &anchor.committed_record()?)?;
             verify_files(RelocationImportPhase::Committed)?;
+            relocation_time(
+                &clock,
+                &connection,
+                seal.exported_at_ms
+                    .max(admission.trusted_time_high_water_unix_ms),
+            )?;
             connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, false)?;
             anchor.reconcile_startup(&connection)?;
             path_identity::ensure(&lock_root, &database_path, &record.store_uuid)?;
@@ -481,6 +569,12 @@ impl SqliteAuthorityStore {
         }
 
         verify_files(RelocationImportPhase::Exported)?;
+        relocation_time(
+            &clock,
+            &connection,
+            seal.exported_at_ms
+                .max(admission.trusted_time_high_water_unix_ms),
+        )?;
         // Verification refusals are read-only. From here, authorized I/O can
         // partially complete and retains the normal import retry semantics.
         connection.set_db_config(DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, false)?;
@@ -544,7 +638,20 @@ impl SqliteAuthorityStore {
             SET state = 'imported', import_id = ?1, imported_at_ms = ?2
             WHERE singleton = 1 AND state = 'exported' AND export_id = ?3
             "#,
-            params![&import_id, now_ms()?, &seal.export_id],
+            params![
+                &import_id,
+                i64::try_from(
+                    relocation_time(
+                        &clock,
+                        &transaction,
+                        seal.exported_at_ms
+                            .max(admission.trusted_time_high_water_unix_ms)
+                    )?
+                    .get()
+                )
+                .map_err(|_| ClockError::Overflow)?,
+                &seal.export_id
+            ],
         )?;
         if marked != 1 {
             return Err(SqliteServingOwnerError::Invalid(
@@ -600,6 +707,24 @@ fn remove_previous_lock_artifacts(
     }
     File::open(lock_root)?.sync_all()?;
     Ok(previous_lock)
+}
+
+/// Bound offline relocation time to retained serving and admission history.
+fn relocation_time(
+    clock: &crate::store_clock::StoreClock,
+    connection: &Connection,
+    durable_floor: u64,
+) -> Result<UnixMillis, SqliteServingOwnerError> {
+    let opened_at: i64 = connection.query_row(
+        "SELECT COALESCE(opened_at_ms, 0) FROM chio_serving_owner WHERE singleton = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    let floor = read_u64(opened_at, "opened_at_ms")?.max(durable_floor);
+    let observed = clock.unix_millis()?;
+    observed.duration_since(UnixMillis::new(floor))?;
+    i64::try_from(observed.get()).map_err(|_| ClockError::Overflow)?;
+    Ok(observed)
 }
 
 /// SQLite reports a busy checkpoint as a result row, not an execution error.

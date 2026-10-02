@@ -1,11 +1,12 @@
 //! Brokered tools composed with the process host's original durable authority.
 
+use chio_security_types::clock::Clock;
 use std::collections::BTreeMap;
 use std::os::unix::fs::{FileTypeExt, MetadataExt};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 #[cfg(target_os = "linux")]
 use chio_control_plane::security::adapters::NativeFlowResolver;
@@ -50,13 +51,8 @@ mod payload;
 #[path = "native_broker/preparation.rs"]
 pub(super) mod preparation;
 
-fn now_ms() -> Result<u64, CliError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(error)?
-        .as_millis()
-        .try_into()
-        .map_err(error)
+fn now_ms(clock: &dyn Clock) -> Result<u64, CliError> {
+    clock.unix_millis().map(|now| now.get()).map_err(error)
 }
 
 pub(super) fn prepare_call(
@@ -87,7 +83,7 @@ pub(super) fn prepare_call(
         .iter()
         .find(|route| route.quota.audience == capability.body.audience)
         .ok_or_else(|| error("broker capability audience is not an installed route"))?;
-    let now = now_ms()? / 1000;
+    let now = now_ms(host.kernel.authority_clock().as_ref())? / 1000;
     chio_secret_broker::capability::verify_capability(
         &capability,
         &route.quota.issuer,
@@ -146,6 +142,7 @@ fn native_binding(
     directory: &Path,
     authority: &SqliteAuthorityStore,
     initializing: bool,
+    clock: Arc<dyn Clock>,
 ) -> Result<NativeSecurityAuthorityBindingV1, CliError> {
     // Changing the classifier or isolation policy cannot silently reset the
     // flow state of an existing host. Only initialization imports a source.
@@ -158,10 +155,19 @@ fn native_binding(
     let fence = authority.mutation_fence();
     if initializing {
         let path = directory.join("native-source.db");
-        drop(SqliteSecurityStateStore::open(&path).map_err(error)?);
+        drop(
+            SqliteSecurityStateStore::open_with_trusted_clock(&path, clock.clone())
+                .map_err(error)?,
+        );
         let source = SqliteSecurityParticipantSource::open(path).map_err(error)?;
         let expected = store
-            .expect_security_participant_source(&selected, &selected, &source, &fence, now_ms()?)
+            .expect_security_participant_source(
+                &selected,
+                &selected,
+                &source,
+                &fence,
+                now_ms(clock.as_ref())?,
+            )
             .map_err(error)?;
         store
             .import_security_participant_source(
@@ -169,7 +175,7 @@ fn native_binding(
                 expected.expectation_id(),
                 &source,
                 &fence,
-                now_ms()?,
+                now_ms(clock.as_ref())?,
             )
             .map_err(error)?;
         store
@@ -177,12 +183,12 @@ fn native_binding(
                 &selected,
                 expected.expectation_id(),
                 &fence,
-                now_ms()?,
+                now_ms(clock.as_ref())?,
             )
             .map_err(error)?;
     }
     store
-        .load_security_participant_state(&selected, &fence, now_ms()?)
+        .load_security_participant_state(&selected, &fence, now_ms(clock.as_ref())?)
         .map_err(error)?
         .ok_or_else(|| {
             error("process broker flow authority is absent or differs from initialization")
@@ -205,7 +211,7 @@ struct Components {
     routes: Arc<BrokerRouteSet>,
 }
 
-fn components(host: &HostConfig) -> Result<Components, CliError> {
+fn components(host: &HostConfig, clock: Arc<dyn Clock>) -> Result<Components, CliError> {
     let config = host
         .native_broker
         .as_ref()
@@ -264,13 +270,7 @@ fn components(host: &HostConfig) -> Result<Components, CliError> {
             launches.insert(server.id.clone(), RouteLaunch { registry, factory });
         }
     }
-    let routes = Arc::new(
-        BrokerRouteSet::new(
-            route_configs,
-            Arc::new(chio_secret_broker::daemon::SystemClock),
-        )
-        .map_err(error)?,
-    );
+    let routes = Arc::new(BrokerRouteSet::new(route_configs, clock).map_err(error)?);
     Ok(Components {
         #[cfg(target_os = "linux")]
         registry: Arc::new(merged),
@@ -295,12 +295,18 @@ pub(super) fn completion_evidence(
         .native_broker
         .as_ref()
         .ok_or_else(|| error("host has no broker route"))?;
-    let selected = components(&host.record.config)?;
+    let selected = components(&host.record.config, host.kernel.authority_clock())?;
     let store = host
         .authority
         .local_authority_store()
         .ok_or_else(|| error("missing local broker custody"))?;
-    let native = native_binding(config, host.lease.directory.path(), &store, false)?;
+    let native = native_binding(
+        config,
+        host.lease.directory.path(),
+        &store,
+        false,
+        host.kernel.authority_clock(),
+    )?;
     let participant = selected.routes.participant(server, tool).map_err(error)?;
     let reader = BrokerNativeCaptureReader::new(
         &store,
@@ -336,17 +342,23 @@ pub(super) fn connect(
         .native_broker
         .as_ref()
         .ok_or_else(|| error("missing broker host configuration"))?;
-    let selected = components(host)?;
+    let selected = components(host, kernel.authority_clock())?;
     let store = authority
         .local_authority_store()
         .ok_or_else(|| error("native broker requires the host's local authority"))?;
-    let native = native_binding(config, directory, &store, initializing)?;
+    let native = native_binding(
+        config,
+        directory,
+        &store,
+        initializing,
+        kernel.authority_clock(),
+    )?;
     let (classifier, flow_config) = config.classification()?;
     let resolver = NativeFlowResolver::new(
         native.clone(),
         selected.registry.clone(),
         Arc::new(classifier),
-        Arc::new(chio_security_kernel::SystemClock),
+        kernel.authority_clock(),
         flow_config,
     )
     .map_err(error)?

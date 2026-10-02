@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_core::receipt::decision::ToolCallAction;
 use chio_kernel::budget_store::{BudgetQuotaKey, BudgetQuotaProfile, BudgetStore};
 
@@ -29,13 +27,12 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
     } else {
         vec![read_json(&directory.join("swarm-bundle.json"))?]
     };
-    let now = u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(error)?
-            .as_millis(),
-    )
-    .map_err(error)?;
+    let now = host
+        .kernel
+        .authority_clock_reading()
+        .map_err(error)?
+        .unix_millis()
+        .get();
     let planned: Value = read_json(&directory.join("swarm-calls.json"))?;
     require(
         planned["runtime_id"] == host.runtime.runtime_id(),

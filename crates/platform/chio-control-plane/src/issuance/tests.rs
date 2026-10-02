@@ -193,7 +193,7 @@ fn test_trusted_runtime_assurance_policy() -> RuntimeAssuranceIssuancePolicy {
 }
 
 fn test_azure_runtime_attestation() -> RuntimeAttestationEvidence {
-    let now = unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+    let now = unix_now();
     RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
         verifier: "https://maa.contoso.test/".to_string(),
@@ -212,7 +212,7 @@ fn test_azure_runtime_attestation() -> RuntimeAttestationEvidence {
 }
 
 fn test_google_runtime_attestation() -> RuntimeAttestationEvidence {
-    let now = unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+    let now = unix_now();
     RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.google-confidential-vm.jwt.v1".to_string(),
         verifier: "https://confidentialcomputing.googleapis.com".to_string(),
@@ -621,7 +621,7 @@ fn strong_local_history_allows_trusted_invoke_scope() {
     let kernel_kp = Keypair::generate();
     let subject_hex = subject_kp.public_key().to_hex();
     let issuer_hex = issuer_kp.public_key().to_hex();
-    let now = unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+    let now = unix_now();
     let subject_capability = make_subject_capability(
         "cap-history-001",
         &subject_kp,
@@ -786,7 +786,7 @@ fn issuance_verification_returns_canonical_subject_and_provenance() {
     let verified = verify_runtime_attestation_for_issuance(
         Some(&test_azure_runtime_attestation()),
         Some(&policy),
-        unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+        unix_now(),
     )
     .test_expect("trusted attestation should verify")
     .test_expect("verified record should be returned when runtime policy is present");
@@ -810,13 +810,9 @@ fn issuance_verification_returns_canonical_subject_and_provenance() {
 #[test]
 fn issuance_verification_returns_verified_record_without_runtime_policy() {
     let evidence = test_azure_runtime_attestation();
-    let verified = verify_runtime_attestation_for_issuance(
-        Some(&evidence),
-        None,
-        unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
-    )
-    .test_expect("attestation should pass local binding validation")
-    .test_expect("verified record should still be returned without runtime policy");
+    let verified = verify_runtime_attestation_for_issuance(Some(&evidence), None, unix_now())
+        .test_expect("attestation should pass local binding validation")
+        .test_expect("verified record should still be returned without runtime policy");
 
     assert!(!verified.policy_outcome.trust_policy_configured);
     assert!(!verified.is_locally_accepted());
@@ -847,7 +843,7 @@ fn workload_identity_validation_denies_conflicting_attestation_without_policy() 
         None,
     );
     let subject_kp = Keypair::generate();
-    let now = unix_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+    let now = unix_now();
     let requested_scope = ChioScope {
         grants: vec![ToolGrant {
             server_id: "payments".to_string(),
@@ -1057,3 +1053,108 @@ fn runtime_assurance_policy_rebinds_google_attestation_to_verified_tier() {
 
 #[path = "tests/aggregate.rs"]
 mod aggregate;
+
+#[test]
+fn injected_policy_authority_uses_the_service_epoch() -> Result<(), Box<dyn std::error::Error>> {
+    use chio_security_types::clock::FixedClock;
+    use std::sync::Arc;
+    for now in [3_600_000, 4_000_000_000_000] {
+        let clock = Arc::new(FixedClock::from_millis(now));
+        let authority = wrap_capability_authority_with_clock(
+            Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
+                Keypair::generate(),
+                clock.clone(),
+            )),
+            None,
+            None,
+            None,
+            None,
+            clock,
+        );
+        let subject = Keypair::generate().public_key();
+        let scope = ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "files".into(),
+                tool_name: "read".into(),
+                operations: vec![Operation::Read],
+                constraints: Vec::new(),
+                max_invocations: Some(2),
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: None,
+            }],
+            resource_grants: Vec::new(),
+            prompt_grants: Vec::new(),
+        };
+        let capability = authority.issue_capability(&subject, scope.clone(), 60)?;
+        assert_eq!(capability.issued_at, now / 1000);
+        assert_eq!(capability.expires_at, now / 1000 + 60);
+        assert!(capability.verify_signature()?);
+        let aggregate = authority.issue_aggregate_family_root(&subject, scope, 60, 2)?;
+        assert_eq!(aggregate.issued_at, now / 1000);
+        assert!(aggregate.verify_signature()?);
+    }
+    Ok(())
+}
+
+#[test]
+fn injected_reputation_time_cannot_decay_denials_into_authority(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_security_types::clock::FixedClock;
+    use std::sync::Arc;
+    let now = 31 * 86_400;
+    let clock = Arc::new(FixedClock::from_millis(now * 1000));
+    let directory = tempfile::tempdir()?;
+    let database = directory.path().join("receipts.db");
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability =
+        make_subject_capability("old-parent", &subject, &issuer, now - 86_400, Some(10));
+    let store = SqliteReceiptStore::open_with_clock(&database, clock.clone())?;
+    store.record_capability_snapshot(&capability, None)?;
+    let receipt = make_receipt(
+        "recent-denial",
+        &capability.id,
+        &subject.public_key().to_hex(),
+        &issuer.public_key().to_hex(),
+        now,
+        &issuer,
+    );
+    let mut body = receipt.body();
+    body.decision = Some(Decision::Deny {
+        reason: "blocked".into(),
+        guard: "policy".into(),
+    });
+    store.append_chio_receipt(&ChioReceipt::sign(body, &issuer)?)?;
+    drop(store);
+    let mut policy = test_policy();
+    policy.probationary_min_days = 0;
+    policy.probationary_receipt_count = 0;
+    policy.scoring.temporal_decay_half_life_days = 1;
+    policy.scoring.weights = chio_reputation::ReputationWeights {
+        boundary_pressure: 1.0,
+        resource_stewardship: 0.0,
+        least_privilege: 0.0,
+        history_depth: 0.0,
+        tool_diversity: 0.0,
+        delegation_hygiene: 0.0,
+        reliability: 0.0,
+        incident_correlation: 0.0,
+    };
+    let authority = wrap_capability_authority_with_clock(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
+            issuer,
+            clock.clone(),
+        )),
+        Some(policy),
+        None,
+        Some(&database),
+        None,
+        clock,
+    );
+    assert!(matches!(
+        authority.issue_capability(&subject.public_key(), capability.scope, 30),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+    Ok(())
+}

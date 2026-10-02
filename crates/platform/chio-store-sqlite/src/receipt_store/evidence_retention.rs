@@ -519,13 +519,12 @@ fn compute_archival_watermark(
 fn resolve_rotation_cutoff(
     connection: &rusqlite::Connection,
     config: &RetentionConfig,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<Option<u64>, ReceiptStoreError> {
+    let now = clock.unix_millis()?.as_secs();
     if let Some(cutoff) = config.explicit_cutoff_unix_secs {
         return Ok(Some(cutoff));
     }
-    let now =
-        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
-            .as_secs();
     let time_cutoff =
         now.saturating_sub(config.retention_days.checked_mul(86_400).ok_or_else(|| {
             ReceiptStoreError::ReadBoundary("retention duration overflow".into())
@@ -823,10 +822,12 @@ pub(super) fn rotate_on_writer_connection(
     config: &RetentionConfig,
     verified_checkpoint_ceiling: Option<u64>,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
     if config.tenant_id.is_some() {
         return Err(ReceiptStoreError::RetentionTenantScopeUnsupported);
     }
+    clock.unix_millis()?;
     // One-time migration: enable incremental auto-vacuum on a legacy store
     // that predates this pragma so the first rotation on the drained writer
     // starts reclaiming freed pages. A no-op once migrated.
@@ -842,7 +843,7 @@ pub(super) fn rotate_on_writer_connection(
     // on a missing table after the archive copy has already run and roll the
     // whole rotation back into an endless retry.
     super::support::ensure_receipt_retention_watermark_table(connection)?;
-    let Some(cutoff) = resolve_rotation_cutoff(connection, config)? else {
+    let Some(cutoff) = resolve_rotation_cutoff(connection, config, clock)? else {
         return Ok(0);
     };
     archive_range(
@@ -851,6 +852,7 @@ pub(super) fn rotate_on_writer_connection(
         &config.archive_path,
         verified_checkpoint_ceiling,
         rollback_anchor,
+        clock,
     )
 }
 
@@ -865,6 +867,7 @@ fn archive_range(
     archive_path: &str,
     verified_checkpoint_ceiling: Option<u64>,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
     // Never archive past the checkpoint boundary the caller has verified. The
     // ceiling is itself a checkpoint `batch_end_seq`, and `compute_archival_watermark`
@@ -912,6 +915,7 @@ fn archive_range(
             cutoff_unix_secs,
             &archive_path,
             rollback_anchor,
+            clock,
         )?;
         Ok(archived)
     })();
@@ -1582,10 +1586,9 @@ pub(super) fn delete_archived_prefix_in_tx(
     cutoff_unix_secs: u64,
     archive_path: &str,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<(), ReceiptStoreError> {
-    let now =
-        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
-            .as_secs();
+    let now = clock.unix_millis()?.as_secs();
     let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     let rollback_generation = rollback_anchor
         .map(|anchor| {
@@ -1716,7 +1719,9 @@ pub(super) fn delete_archived_prefix_in_tx(
 pub(super) fn retention_repair_on_writer(
     connection: &mut rusqlite::Connection,
     archive_path: &str,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
+    clock.unix_millis()?;
     // 1. extra = claim-log receipt_ids absent from BOTH source tables.
     let extras: Vec<(i64, String)> = {
         let mut stmt = connection.prepare(
@@ -1906,10 +1911,7 @@ pub(super) fn retention_repair_on_writer(
     //    (DETACH cannot run inside an open transaction).
     let removed = crate::integer::count(extras.len());
     let repair_result = (|| -> Result<(), ReceiptStoreError> {
-        let now = chio_security_types::clock::Clock::unix_millis(
-            &chio_security_types::clock::SystemClock,
-        )?
-        .as_secs();
+        let now = clock.unix_millis()?.as_secs();
         let rounded_i64 = sqlite_i64(rounded_watermark, "repair rounded watermark")?;
         let now_i64 = sqlite_i64(now, "repair tombstone timestamp")?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;

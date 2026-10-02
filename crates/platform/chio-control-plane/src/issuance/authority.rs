@@ -1,4 +1,6 @@
+use chio_security_types::clock::{Clock, SystemClock};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use chio_core::capability::{
     runtime_attestation::RuntimeAttestationEvidence, scope::ChioScope, token::CapabilityToken,
@@ -13,9 +15,8 @@ use chio_store_sqlite::SqliteReceiptStore;
 use crate::policy::{ReputationIssuancePolicy, RuntimeAssuranceIssuancePolicy};
 
 use super::attestation::verify_runtime_attestation_for_issuance;
-use super::reputation::enforce_reputation_policy;
+use super::reputation::{enforce_reputation_policy, ReputationInspectionContext};
 use super::scope::enforce_runtime_assurance_policy;
-use super::util::unix_now;
 
 pub fn wrap_capability_authority(
     inner: Box<dyn CapabilityAuthority>,
@@ -24,6 +25,25 @@ pub fn wrap_capability_authority(
     receipt_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
 ) -> Box<dyn CapabilityAuthority> {
+    wrap_capability_authority_with_clock(
+        inner,
+        issuance_policy,
+        runtime_assurance_policy,
+        receipt_db_path,
+        budget_db_path,
+        Arc::new(SystemClock),
+    )
+}
+
+/// Wrap a service authority without introducing another time owner.
+pub fn wrap_capability_authority_with_clock(
+    inner: Box<dyn CapabilityAuthority>,
+    issuance_policy: Option<ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    clock: Arc<dyn Clock>,
+) -> Box<dyn CapabilityAuthority> {
     wrap_capability_authority_with_lineage_mode(
         inner,
         issuance_policy,
@@ -31,6 +51,7 @@ pub fn wrap_capability_authority(
         receipt_db_path,
         budget_db_path,
         true,
+        clock,
     )
 }
 
@@ -48,6 +69,7 @@ pub(crate) fn wrap_capability_authority_with_deferred_lineage(
         receipt_db_path,
         budget_db_path,
         false,
+        Arc::new(SystemClock),
     )
 }
 
@@ -58,8 +80,10 @@ fn wrap_capability_authority_with_lineage_mode(
     receipt_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
     persist_lineage_immediately: bool,
+    clock: Arc<dyn Clock>,
 ) -> Box<dyn CapabilityAuthority> {
     Box::new(PolicyBackedCapabilityAuthority {
+        clock,
         inner,
         issuance_policy,
         runtime_assurance_policy,
@@ -70,6 +94,7 @@ fn wrap_capability_authority_with_lineage_mode(
 }
 
 struct PolicyBackedCapabilityAuthority {
+    clock: Arc<dyn Clock>,
     inner: Box<dyn CapabilityAuthority>,
     issuance_policy: Option<ReputationIssuancePolicy>,
     runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
@@ -126,7 +151,7 @@ impl PolicyBackedCapabilityAuthority {
         runtime_attestation: Option<RuntimeAttestationEvidence>,
         aggregate_family_limit: Option<u32>,
     ) -> Result<CapabilityToken, KernelError> {
-        let clock_now = unix_now()?;
+        let clock_now = self.clock.unix_millis()?.as_secs();
         let mut scope = scope;
         let now = clock_now;
         let verified_runtime_attestation = verify_runtime_attestation_for_issuance(
@@ -156,7 +181,11 @@ impl PolicyBackedCapabilityAuthority {
                 policy,
                 self.receipt_db_path.as_deref(),
                 self.budget_db_path.as_deref(),
-                &trusted_keys,
+                ReputationInspectionContext {
+                    clock: self.clock.clone(),
+                    trusted_kernel_keys: &trusted_keys,
+                    read_context: &chio_kernel::ReceiptReadContext::local_operator_admin_all(),
+                },
             )?;
         }
 
@@ -186,6 +215,7 @@ impl PolicyBackedCapabilityAuthority {
                     ttl_seconds,
                     &self.inner.authority_public_key(),
                     limit,
+                    self.clock.unix_millis()?,
                 )?;
                 capability
             }
@@ -199,6 +229,7 @@ impl PolicyBackedCapabilityAuthority {
                     &scope,
                     ttl_seconds,
                     &self.inner.authority_public_key(),
+                    self.clock.unix_millis()?,
                 )?;
                 capability
             }
@@ -208,7 +239,7 @@ impl PolicyBackedCapabilityAuthority {
             let Some(path) = self.receipt_db_path.as_deref() else {
                 return Ok(capability);
             };
-            let store = SqliteReceiptStore::open(path)
+            let store = SqliteReceiptStore::open_with_clock(path, self.clock.clone())
                 .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
             store
                 .record_capability_snapshot(&capability, None)

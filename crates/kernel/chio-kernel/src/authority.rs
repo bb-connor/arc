@@ -101,8 +101,9 @@ pub fn validate_issued_capability_response(
     requested_scope: &ChioScope,
     requested_ttl_seconds: u64,
     current_issuer: &PublicKey,
+    now: chio_security_types::clock::UnixMillis,
 ) -> Result<(), KernelError> {
-    let now = capability_authority_now_unix_secs(&SystemClock)?;
+    let now = now.as_secs();
     validate_issued_capability_response_at(
         capability,
         requested_subject,
@@ -114,7 +115,7 @@ pub fn validate_issued_capability_response(
     )
 }
 
-/// Validate a security-bound authority response against the current wall clock.
+/// Validate a security-bound authority response against the supplied authority time.
 pub fn validate_issued_capability_response_with_binding(
     capability: &CapabilityToken,
     requested_subject: &PublicKey,
@@ -122,8 +123,9 @@ pub fn validate_issued_capability_response_with_binding(
     requested_ttl_seconds: u64,
     current_issuer: &PublicKey,
     expected_security_binding: Option<&CapabilitySecurityBinding>,
+    now: chio_security_types::clock::UnixMillis,
 ) -> Result<(), KernelError> {
-    let now = capability_authority_now_unix_secs(&SystemClock)?;
+    let now = now.as_secs();
     validate_issued_capability_response_with_binding_at(
         capability,
         requested_subject,
@@ -897,6 +899,9 @@ mod tests {
                     &requested_scope,
                     60,
                     &issuer.public_key(),
+                    chio_security_types::clock::UnixMillis::new(
+                        chio_test_support::clock::unix_millis()
+                    ),
                 ),
                 Err(KernelError::CapabilityIssuanceFailed(_))
             ));
@@ -936,6 +941,9 @@ mod tests {
                     &scope,
                     60,
                     &issuer.public_key(),
+                    chio_security_types::clock::UnixMillis::new(
+                        chio_test_support::clock::unix_millis()
+                    ),
                 ),
                 Err(KernelError::CapabilityIssuanceFailed(_))
             ));
@@ -969,6 +977,7 @@ mod tests {
                 &aggregate_scope,
                 60,
                 &issuer.public_key(),
+                chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
             ),
             Err(KernelError::CapabilityIssuanceDenied(_))
         ));

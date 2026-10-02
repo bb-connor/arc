@@ -59,14 +59,40 @@ The original portable, keyring and external-guard clock traits are removed.
 Other migrated adapters re-export this same trait. Durable Finding status time
 also checks its authenticated database floor before returning a native reading.
 
-The repository-wide migration is incomplete. Kernel replay/retention and session
-helpers, several SQLite evidence timestamps, and the transaction-scoped
-`FindingStatusCommitClock` still need conversion. The exact remaining source
-inventory is `scripts/security-clock-inventory.json`; it includes test fixtures
-as well as production and must not be reported as a count of production defects.
-`scripts/check-security-clocks.py` prevents new reads or independent clock traits
-and permits only downward ratcheting. Its one permanent native exception is the
-shared system adapter. This inventory is a work queue, not a compatibility layer.
+Kernel aggregate issuance and its validators, finding-pool decisions, governed
+active-response execution, child receipts and security-release acknowledgments
+share the kernel's fenced authority clock. Release acknowledgments resample it
+after callbacks. SQLite receipt writers, checkpoints, retention, finding payloads
+and operator payment stores accept explicit clocks. Joint revocation uses the
+admission store's durable time floor, including after restart. Relocation checks
+time again after verifier callbacks and before replacing lock artifacts.
+
+Process-host composition passes its clock to durable admission, policy-backed
+issuance, keyring issuance and storage, native broker routes, source import,
+swarm orchestration, reputation scoring and its storage owners, and evidence export.
+Remote issuance probes this clock before sending the mutating RPC, then samples
+it again when validating the response. Native convenience constructors delegate
+to explicit-clock variants. Supplying a service clock must never select a fresh
+native adapter inside that owner.
+
+The repository-wide migration remains incomplete. The clock gate derives scope
+from complete crates in the trust-boundary and TCB-library catalogs. Its October 2
+base-source scan found 471 observations, including 317 omitted by the old scanner.
+The immutable `clock-scope-evidence-2026-10-02.json` retains their provenance at
+`491f585e9013dcb6335589c82d00ac219efbf0a6`. These are measurements of pre-existing
+source, not newly introduced bypasses or completed migrations.
+
+`scripts/security-clock-inventory.json` separates legacy debt, newly covered
+pre-existing debt and exact native composition functions. Counts include fixtures
+and cannot be reported as counts of production defects. Debt cannot exceed the
+pinned source evidence; `--ratchet` only removes debt. New native compositions
+require separate reviewed source contracts in `security_clock_compositions.py`.
+The two native receipt-writer test constructors remain explicit fixture compositions.
+No entire crate or source file is exempted as a composition boundary. The scanner
+recognizes aliases, function references, epoch elapsed calls, native adapters and
+time-returning traits and SQL clock functions in Rust string literals, including
+escaped quoted SQLite time arguments. This lexical gate is a review tripwire,
+not semantic proof that every time-dependent decision uses the intended owner.
 
 Receipt identifier scopes have no time authority. Kernel admission, capability
 issuance and SQLite commits read their explicitly supplied clock even while a
@@ -84,3 +110,8 @@ kernel evaluation has started, errors become retained terminal task results;
 the edge does not automatically retry them because effects or authority
 consumption may already have occurred. After recovery, the client can collect
 that result and submit fresh authorized work on the same session.
+
+Public capability-response validators now take an explicit `UnixMillis` reading as
+the final argument. Embedding services must supply their fenced authority time.
+Checkpoint owners use `CheckpointSigningContext` and the `_at` builder variants;
+the original checkpoint builder names remain native convenience APIs.

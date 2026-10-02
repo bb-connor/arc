@@ -37,7 +37,7 @@ impl super::ChioKernel {
             .observe(self.clock.read()?)
     }
 
-    pub(super) fn read_authority_time(&self) -> Result<UnixMillis, ClockError> {
+    pub(crate) fn read_authority_time(&self) -> Result<UnixMillis, ClockError> {
         read(self.clock.as_ref(), &self.clock_fence)
     }
 

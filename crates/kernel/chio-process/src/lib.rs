@@ -84,6 +84,11 @@ pub struct ProcessRuntime {
 }
 
 impl ProcessRuntime {
+    /// Share the kernel-owned time source with host lifecycle and evidence owners.
+    pub fn authority_clock(&self) -> Arc<dyn chio_kernel::authority::Clock> {
+        self.kernel.authority_clock()
+    }
+
     /// Open a process journal. The containing directory must be private to the
     /// trusted host: it stores capabilities and agent checkpoints.
     /// Tool dispatch, including read-only tools, uses durable kernel admission.

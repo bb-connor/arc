@@ -21,9 +21,19 @@ _spec = importlib.util.spec_from_file_location("accounting_lexer", ROOT / "scrip
 _lexer = importlib.util.module_from_spec(_spec)
 sys.modules[_spec.name] = _lexer
 _spec.loader.exec_module(_lexer)
+_contracts_spec = importlib.util.spec_from_file_location("trust_boundary_contracts", ROOT / "scripts/trust_boundary_contracts.py")
+_contracts = importlib.util.module_from_spec(_contracts_spec)
+_contracts_spec.loader.exec_module(_contracts)
 LITERALS = re.compile(r'r(?P<hashes>#{0,16})"(?P<raw>.*?)"(?P=hashes)|"(?P<quoted>(?:\\.|[^"\\])*)"', re.S)
 CREATE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(", re.I)
 DECODERS = "from_str|from_slice|from_reader|from_value"
+DECODER_KINDS = {
+    "raw-input-baseline", "typed-value-conversion", "parser-internal-or-typed",
+    "reviewed-signed-owner", "reviewed-protocol-reader", "example-or-fuzz",
+    "reviewed-bounded-input", "bounded-original-reader",
+    "bounded-original-and-typed-projection", "typed-field-deserializer",
+    "durable-internal-state", "strict-preflight-reparse", "validated-worker-input",
+}
 
 
 def json_decoders(code):
@@ -126,13 +136,20 @@ def sql_statements(path, text):
 
 
 def scan(root, catalog):
-    found = {"constructors": [], "raw_decoders": [], "schemas": {}, "unscoped_sql": [], "decoder_census": {}}
+    found = {"constructors": [], "raw_decoders": [], "schemas": {}, "unscoped_sql": [], "decoder_census": {}, "decoding_contracts": [], "decoding_contract_errors": [], "reader_evidence": {}}
     files = dict(sources(root))
+    supports = {path: _lexer.blank_rust_noise(files.get(path, "")) for path in _contracts.SUPPORT_PATHS}
     decoder_owners = set(catalog["signed_input_files"])
     for path, text in files.items():
         code = _lexer.blank_rust_noise(text)
+        decoding, contract_errors = _contracts.decoding_contracts(code)
+        found["decoding_contracts"].extend(f"{path}::{contract}" for contract in decoding)
+        found["decoding_contract_errors"].extend(f"{path}: {error}" for error in contract_errors)
         decoders = list(json_decoders(code))
         if decoders:
+            found["reader_evidence"][path] = _contracts.reader_evidence(
+                path, code, decoders, _lexer.blank_test_scoped_items(code), supports
+            )
             found["decoder_census"][path] = sorted(
                 f"{owner_at(code, offset)}::{decoder}" for offset, decoder in decoders
             )
@@ -160,7 +177,7 @@ def scan(root, catalog):
                 continue
             digest = hashlib.sha256(sql.encode()).hexdigest()
             found["unscoped_sql"].append({"path": path, "owner": owner, "sha256": digest, "tables": touched, "sql": sql})
-    for name in ("constructors", "raw_decoders"):
+    for name in ("constructors", "raw_decoders", "decoding_contracts"):
         found[name].sort()
     found["unscoped_sql"].sort(key=lambda row: (row["path"], row["owner"], row["sha256"]))
     return found, files
@@ -169,9 +186,31 @@ def scan(root, catalog):
 def check(root, catalog):
     found, files = scan(root, catalog)
     errors = []
+    errors.extend(found["decoding_contract_errors"])
+    if found["decoding_contracts"] != catalog.get("decoding_contracts"):
+        errors.append("decoding contracts changed; review constructor, owner and method together")
     if found["decoder_census"] != catalog.get("decoder_census"):
         errors.append("workspace decoder census changed; classify new files and entry points")
     contracts = catalog.get("decoder_file_contracts", {})
+    for path, contract in contracts.items():
+        kind = contract.get("kind")
+        if kind not in DECODER_KINDS:
+            errors.append(f"reader evidence has an unknown classification: {path}")
+        if contract.get("kind") == "raw-input-baseline":
+            continue
+        evidence = found["reader_evidence"].get(path, [])
+        if not evidence or not all(row["checked"] for row in evidence) or contract.get("readers") != evidence:
+            errors.append(f"reader evidence is missing, invalid or changed: {path}")
+        if contract.get("kind") == "typed-value-conversion" and any(
+            row["decoders"] != ["from_value"] * len(row["decoders"]) for row in evidence
+        ):
+            errors.append(f"reader evidence does not support typed-value-conversion: {path}")
+        if kind == "typed-field-deserializer" and any(
+            any(decoder != "custom_deserialize" for decoder in row["decoders"]) for row in evidence
+        ):
+            errors.append(f"reader evidence does not support typed-field-deserializer: {path}")
+        if kind == "example-or-fuzz" and not ("examples" in path.split("/") or path.endswith("/fuzz.rs")):
+            errors.append(f"reader evidence does not support example-or-fuzz: {path}")
     for registry, label in (("reviewed_kernel_sqlite_owners", "kernel/SQLite"),
                             ("reviewed_authority_owners", "authority"),
                             ("reviewed_product_readers", "product reader")):

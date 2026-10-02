@@ -68,7 +68,8 @@ pub mod trust_control;
 pub use chio_trust_market_context as trust_market;
 pub use keyring_runtime::{
     key_log_verification_migration_posture_digest, load_keyring_runtime_composition,
-    load_keyring_runtime_from_authority_seed, KeyringRuntimeAuthorityStatus,
+    load_keyring_runtime_composition_with_clock, load_keyring_runtime_from_authority_seed,
+    load_keyring_runtime_from_authority_seed_with_clock, KeyringRuntimeAuthorityStatus,
     KeyringRuntimeComposition,
 };
 struct LoadedThresholdApprovalResolver(ThresholdApprovalRequirement);
@@ -277,7 +278,10 @@ pub fn configure_receipt_store(
                         .to_string(),
                 ));
             }
-            let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
+            let store = chio_store_sqlite::SqliteReceiptStore::open_with_clock(
+                path,
+                kernel.authority_clock(),
+            )?;
             store.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
             kernel.set_receipt_store(Box::new(store))?;
         }
@@ -309,9 +313,12 @@ pub fn configure_revocation_store(
             ));
         }
         (Some(path), None) => {
-            kernel.set_revocation_store(Box::new(chio_store_sqlite::SqliteRevocationStore::open(
-                path,
-            )?));
+            kernel.set_revocation_store(Box::new(
+                chio_store_sqlite::SqliteRevocationStore::open_with_clock(
+                    path,
+                    kernel.authority_clock(),
+                )?,
+            ));
         }
         (None, Some(url)) => {
             let token = require_control_token(control_token)?;
@@ -351,8 +358,8 @@ pub fn configure_capability_authority(
         }
         let token = require_control_token(control_token)?;
         kernel.set_capability_authority(
-            trust_control::service_runtime::remote_authority::build_remote_capability_authority(
-                url, token,
+            trust_control::service_runtime::remote_authority::build_remote_capability_authority_with_clock(
+                url, token, kernel.authority_clock(),
             )?,
         );
         return Ok(());
@@ -366,7 +373,7 @@ pub fn configure_capability_authority(
         }
         (Some(path), None) => {
             let keypair = load_or_create_authority_keypair(path)?;
-            kernel.set_capability_authority(issuance::wrap_capability_authority(
+            kernel.set_capability_authority(issuance::wrap_capability_authority_with_clock(
                 Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
                     keypair,
                     kernel.authority_clock(),
@@ -375,10 +382,11 @@ pub fn configure_capability_authority(
                 runtime_assurance_policy,
                 receipt_db_path,
                 budget_db_path,
+                kernel.authority_clock(),
             ));
         }
         (None, Some(path)) => {
-            kernel.set_capability_authority(issuance::wrap_capability_authority(
+            kernel.set_capability_authority(issuance::wrap_capability_authority_with_clock(
                 Box::new(
                     chio_store_sqlite::SqliteCapabilityAuthority::open_with_clock(
                         path,
@@ -389,6 +397,7 @@ pub fn configure_capability_authority(
                 runtime_assurance_policy,
                 receipt_db_path,
                 budget_db_path,
+                kernel.authority_clock(),
             ));
         }
         (None, None) => {
@@ -396,7 +405,7 @@ pub fn configure_capability_authority(
                 || runtime_assurance_policy.is_some()
                 || receipt_db_path.is_some()
             {
-                kernel.set_capability_authority(issuance::wrap_capability_authority(
+                kernel.set_capability_authority(issuance::wrap_capability_authority_with_clock(
                     Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
                         default_authority_keypair.clone(),
                         kernel.authority_clock(),
@@ -405,6 +414,7 @@ pub fn configure_capability_authority(
                     runtime_assurance_policy,
                     receipt_db_path,
                     budget_db_path,
+                    kernel.authority_clock(),
                 ));
             }
         }

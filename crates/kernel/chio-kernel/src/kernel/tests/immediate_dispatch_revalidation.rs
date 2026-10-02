@@ -346,6 +346,7 @@ fn nested_bridge_cancellation_blocks_next_child_and_drop_clears_dispatch_scope(
     let nested_interaction_observed = AtomicBool::new(false);
     {
         let mut bridge = SessionNestedFlowBridge {
+            clock: kernel.authority_clock(),
             sessions: &kernel.sessions,
             child_receipts: &mut child_receipts,
             nested_interaction_observed: &nested_interaction_observed,

@@ -25,7 +25,10 @@ pub(super) fn worker_service(host: &Host) -> Result<WorkerService, CliError> {
     });
     if let Some(config) = &host.record.config.native_broker {
         service = service.with_invocation_preparer(std::sync::Arc::new(
-            super::native_broker::preparation::Preparer::new(config)?,
+            super::native_broker::preparation::Preparer::new(
+                config,
+                host.kernel.authority_clock(),
+            )?,
         ));
     }
     Ok(service)

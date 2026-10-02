@@ -229,12 +229,11 @@ impl SqliteBudgetStore {
                 }
             }
         }
-        let trusted_time = if self.serving_owner.is_some() {
-            let value =
-                transaction.query_row("SELECT unixepoch()", [], |row| row.get::<_, i64>(0))?;
-            Some(u64::try_from(value).map_err(|_| {
-                BudgetStoreError::Invariant("negative sqlite authority time".to_string())
-            })?)
+        let trusted_time = if let Some(owner) = self.serving_owner.as_deref() {
+            let observed =
+                crate::admission_operation_store::observe_authority_time(&transaction, owner)
+                    .map_err(|error| map_admission_error(self, error))?;
+            Some(chio_security_types::clock::UnixMillis::new(observed).as_secs())
         } else {
             request.trusted_time
         };

@@ -58,14 +58,20 @@ def worker():
         received = client.invoke(
             "read", "chio-ipc", "receive_jobs", {"after_sequence": "0", "limit": 1}
         )
-        assert received["output"]["value"]["messages"][0]["payload"] == {"text": "ready"}
-        result = client.invoke("publish", "reports", "append", {"report": "one publication"})
+        assert received["output"]["value"]["messages"][0]["payload"] == {
+            "text": "ready"
+        }
+        result = client.invoke(
+            "publish", "reports", "append", {"report": "one publication"}
+        )
         write(directory / f"publish-{attempt}.json", result)
         assert result["verdict"] == "allow", result
         if attempt == 1:
             os._exit(76)
         assert (
-            client.invoke("ack", "chio-ipc", "ack_jobs", {"through_sequence": "1"})["verdict"]
+            client.invoke("ack", "chio-ipc", "ack_jobs", {"through_sequence": "1"})[
+                "verdict"
+            ]
             == "allow"
         )
     print(connection["credential"], flush=True)
@@ -222,7 +228,9 @@ def exercise(binary, directory, host_crash):
     assert not (state / "run-status.json").exists()
     args = [binary, "process", "run", "--state", str(state), "--plan", str(path)]
     if host_crash:
-        first = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        first = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         try:
             wait_for(directory / "send-1.json", first)
             old = json.loads((directory / "reader-1-started.json").read_text())
@@ -258,7 +266,9 @@ def exercise(binary, directory, host_crash):
             if first.poll() is None:
                 first.kill()
                 first.communicate(timeout=10)
-        resumed = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        resumed = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         try:
             new = wait_for(directory / "reader-2-started.json", resumed)
             assert not old_socket.parent.exists(), "old endpoint survived recovery"
@@ -266,9 +276,13 @@ def exercise(binary, directory, host_crash):
             observed = json.loads(command(binary, "status", "--state", state).stdout)
             assert observed["host_lock_held"] is True
             assert observed["run"]["run_id"] != live["run"]["run_id"]
-            reader = next(w for w in observed["run"]["workers"] if w["process"] == "reader")
+            reader = next(
+                w for w in observed["run"]["workers"] if w["process"] == "reader"
+            )
             assert reader["attempts"] == 2 and reader["max_attempts"] == 3
-            stale = ProcessClient(new["connection"]["socket_path"], old["connection"]["credential"])
+            stale = ProcessClient(
+                new["connection"]["socket_path"], old["connection"]["credential"]
+            )
             try:
                 stale.inspect()
                 raise AssertionError("old credential accepted by resumed host")
@@ -283,25 +297,37 @@ def exercise(binary, directory, host_crash):
                 resumed.kill()
                 resumed.communicate(timeout=10)
     else:
-        result = json.loads(command(binary, "run", "--state", state, "--plan", path).stdout)
+        result = json.loads(
+            command(binary, "run", "--state", state, "--plan", path).stdout
+        )
     assert result["complete"]
     with sqlite3.connect(state / "runner.db") as db:
         assert db.execute("SELECT COUNT(*) FROM run_socket_leases").fetchone()[0] == 0
-    assert all(w["state"] == "completed" and w["attempts"] == 2 for w in result["workers"])
+    assert all(
+        w["state"] == "completed" and w["attempts"] == 2 for w in result["workers"]
+    )
     assert all(w["peak_resident_bytes"] > 0 for w in result["workers"])
-    assert len((directory / "tool-data" / "publications.jsonl").read_text().splitlines()) == 1
+    assert (
+        len((directory / "tool-data" / "publications.jsonl").read_text().splitlines())
+        == 1
+    )
     for action in ("send", "publish"):
         first = json.loads((directory / f"{action}-1.json").read_text())
         second = json.loads((directory / f"{action}-2.json").read_text())
         assert first["receipt_json"] == second["receipt_json"]
-    repeated = json.loads(command(binary, "run", "--state", state, "--plan", path).stdout)
+    repeated = json.loads(
+        command(binary, "run", "--state", state, "--plan", path).stdout
+    )
     assert repeated == result
     completed = json.loads(command(binary, "status", "--state", state).stdout)
     assert completed["host_lock_held"] is False
     assert all(
-        w["state"] == "completed" and not w["waiting_on"] for w in completed["run"]["workers"]
+        w["state"] == "completed" and not w["waiting_on"]
+        for w in completed["run"]["workers"]
     )
-    logs = command(binary, "logs", "--state", state, "--process", "reader", "--attempt", 2)
+    logs = command(
+        binary, "logs", "--state", state, "--process", "reader", "--attempt", 2
+    )
     assert "[REDACTED]" in json.loads(logs.stdout)["logs"]["stdout"]
     secrets = [
         json.loads(p.read_text())["connection"]["credential"]
@@ -325,7 +351,12 @@ def concurrency(binary, directory, parallel):
         db.execute("INSERT INTO counts VALUES(0,0)")
     plan["workers"][0]["depends_on"] = ["publisher"]
     write(path, plan)
-    assert "cycle" in command(binary, "run", "--state", state, "--plan", path, success=False).stderr
+    assert (
+        "cycle"
+        in command(
+            binary, "run", "--state", state, "--plan", path, success=False
+        ).stderr
+    )
     assert not (state / "runner.db").exists()
     template = plan["workers"][0]
     plan["max_parallel"] = parallel
@@ -368,8 +399,13 @@ def unknown(binary, directory):
     failed = command(binary, "run", "--state", state, "--plan", path, success=False)
     report = json.loads(failed.stdout)
     assert not report["complete"]
-    assert next(w for w in report["workers"] if w["process"] == "publisher")["state"] == "failed"
-    assert len(publications.read_text().splitlines()) == 1, "uncertain effect was redispatched"
+    assert (
+        next(w for w in report["workers"] if w["process"] == "publisher")["state"]
+        == "failed"
+    )
+    assert len(publications.read_text().splitlines()) == 1, (
+        "uncertain effect was redispatched"
+    )
 
     for attempt in (2, 3):
         response = json.loads((directory / f"publish-{attempt}.json").read_text())
@@ -474,7 +510,9 @@ def limited(binary, directory):
     report = json.loads(result.stdout)
     assert not report["complete"]
     reader = report["workers"][0]
-    assert reader["state"] == "failed" and reader["outcome"] == "resident_memory_ceiling"
+    assert (
+        reader["state"] == "failed" and reader["outcome"] == "resident_memory_ceiling"
+    )
     assert reader["peak_resident_bytes"] > 16 << 20
 
 
@@ -493,7 +531,9 @@ def relocation_failures(binary, directory):
     manifest.mkdir()
     command(binary, "export", "--state", state, success=False)
     with sqlite3.connect(database) as db:
-        retired_id = db.execute("SELECT export_id FROM chio_serving_relocation").fetchone()[0]
+        retired_id = db.execute(
+            "SELECT export_id FROM chio_serving_relocation"
+        ).fetchone()[0]
     manifest.rmdir()
     exported = json.loads(command(binary, "export", "--state", state).stdout)
     assert exported["export_id"] == retired_id
@@ -525,7 +565,9 @@ def relocated(binary, directory):
     """A host interrupted mid-run is exported, copied elsewhere and resumed there."""
     state, path, _plan = prepare(binary, directory, host_crash=True)
     args = [binary, "process", "run", "--state", str(state), "--plan", str(path)]
-    first = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    first = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
     try:
         wait_for(directory / "send-1.json", first)
         old = json.loads((directory / "reader-1-started.json").read_text())
@@ -551,7 +593,9 @@ def relocated(binary, directory):
     # A copy whose manifest names another process ABI is refused before any
     # file is verified or the authority touched.
     other_abi = directory / "moved-other-abi"
-    shutil.copytree(state, other_abi, ignore=shutil.ignore_patterns("host.lock", "run-sockets"))
+    shutil.copytree(
+        state, other_abi, ignore=shutil.ignore_patterns("host.lock", "run-sockets")
+    )
     manifest_path = other_abi / "relocation.json"
     manifest = json.loads(manifest_path.read_text())
     assert manifest["abi"] == "chio.process.abi.v3"
@@ -562,7 +606,9 @@ def relocated(binary, directory):
     assert f"process ABI {unsupported_abi}" in refused.stderr
     assert (other_abi / "authority.db").read_bytes() == authority_before
     moved = directory / "moved"
-    shutil.copytree(state, moved, ignore=shutil.ignore_patterns("host.lock", "run-sockets"))
+    shutil.copytree(
+        state, moved, ignore=shutil.ignore_patterns("host.lock", "run-sockets")
+    )
     original_manifest = (moved / "relocation.json").read_bytes()
     imported = json.loads(command(binary, "import", "--state", moved).stdout)
     assert imported["imported"] and imported["export_id"] == exported["export_id"]
@@ -589,7 +635,10 @@ def relocated(binary, directory):
             resumed.kill()
             resumed.communicate(timeout=10)
     assert result["complete"]
-    assert len((directory / "tool-data" / "publications.jsonl").read_text().splitlines()) == 1
+    assert (
+        len((directory / "tool-data" / "publications.jsonl").read_text().splitlines())
+        == 1
+    )
     for action in ("send", "publish"):
         first_receipt = json.loads((directory / f"{action}-1.json").read_text())
         second = json.loads((directory / f"{action}-2.json").read_text())
@@ -644,7 +693,11 @@ def exhausted(binary, directory):
         "outcome": "timeout",
     }
     assert (
-        json.loads(command(binary, "run", "--state", state, "--plan", path, success=False).stdout)
+        json.loads(
+            command(
+                binary, "run", "--state", state, "--plan", path, success=False
+            ).stdout
+        )
         == report
     )
     with sqlite3.connect(state / "runner.db") as db:

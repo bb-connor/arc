@@ -116,6 +116,7 @@ impl SqliteReceiptStore {
         request: &UnderwritingAppealCreateRequest,
     ) -> Result<UnderwritingAppealRecord, ReceiptStoreError> {
         let request_owned = request.clone();
+        let clock = self.clock.clone();
         self.writer_handle().run_write(move |connection| {
             let request = &request_owned;
             let tx = connection.transaction()?;
@@ -150,7 +151,7 @@ impl SqliteReceiptStore {
                 )));
             }
 
-            let created_at = unix_now()?;
+            let created_at = unix_now(&clock)?;
             let appeal_id = format!(
                 "uwa-{}",
                 chio_core::sha256_hex(
@@ -203,6 +204,7 @@ impl SqliteReceiptStore {
         request: &UnderwritingAppealResolveRequest,
     ) -> Result<UnderwritingAppealRecord, ReceiptStoreError> {
         let request_owned = request.clone();
+        let clock = self.clock.clone();
         self.writer_handle().run_write(move |connection| {
         let request = &request_owned;
         let tx = connection.transaction()?;
@@ -250,7 +252,7 @@ impl SqliteReceiptStore {
             UnderwritingAppealResolution::Accepted => UnderwritingAppealStatus::Accepted,
             UnderwritingAppealResolution::Rejected => UnderwritingAppealStatus::Rejected,
         };
-        record.updated_at = unix_now()?;
+        record.updated_at = unix_now(&clock)?;
         record.note = request.note.clone().or(record.note);
         record.resolved_by = Some(request.resolved_by.clone());
         record.replacement_decision_id = request.replacement_decision_id.clone();
@@ -380,7 +382,7 @@ impl SqliteReceiptStore {
         }
 
         Ok(UnderwritingDecisionListReport {
-            generated_at: unix_now()?,
+            generated_at: unix_now(&self.clock)?,
             filters: normalized,
             summary: UnderwritingDecisionSummary {
                 matching_decisions,
@@ -412,6 +414,7 @@ impl SqliteReceiptStore {
         }
 
         let facility_owned = facility.clone();
+        let clock = self.clock.clone();
         self.writer_handle().run_write(move |connection| {
             let facility = &facility_owned;
             let artifact = &facility.body;
@@ -454,7 +457,7 @@ impl SqliteReceiptStore {
                 if state.0
                     != credit_facility_lifecycle_state_label(CreditFacilityLifecycleState::Active)
                     || state.1.is_some()
-                    || u64::try_from(state.2.max(0)).unwrap_or_default() <= unix_now()?
+                    || u64::try_from(state.2.max(0)).unwrap_or_default() <= unix_now(&clock)?
                 {
                     return Err(ReceiptStoreError::Conflict(format!(
                         "credit facility `{supersedes_facility_id}` is not active"
@@ -510,7 +513,7 @@ impl SqliteReceiptStore {
         query: &CreditFacilityListQuery,
     ) -> Result<CreditFacilityListReport, ReceiptStoreError> {
         let normalized = query.normalized();
-        let now = unix_now()?;
+        let now = unix_now(&self.clock)?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state, superseded_by_facility_id
@@ -573,7 +576,7 @@ impl SqliteReceiptStore {
 
         Ok(CreditFacilityListReport {
             schema: CREDIT_FACILITY_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now()?,
+            generated_at: unix_now(&self.clock)?,
             query: normalized,
             summary: CreditFacilityListSummary {
                 matching_facilities,
@@ -600,6 +603,7 @@ impl SqliteReceiptStore {
         }
 
         let bond_owned = bond.clone();
+        let clock = self.clock.clone();
         self.writer_handle().run_write(move |connection| {
             let bond = &bond_owned;
             let artifact = &bond.body;
@@ -641,7 +645,7 @@ impl SqliteReceiptStore {
                     })?;
                 if state.0 != credit_bond_lifecycle_state_label(CreditBondLifecycleState::Active)
                     || state.1.is_some()
-                    || u64::try_from(state.2.max(0)).unwrap_or_default() <= unix_now()?
+                    || u64::try_from(state.2.max(0)).unwrap_or_default() <= unix_now(&clock)?
                 {
                     return Err(ReceiptStoreError::Conflict(format!(
                         "credit bond `{supersedes_bond_id}` is not active"
@@ -696,7 +700,7 @@ impl SqliteReceiptStore {
         query: &CreditBondListQuery,
     ) -> Result<CreditBondListReport, ReceiptStoreError> {
         let normalized = query.normalized();
-        let now = unix_now()?;
+        let now = unix_now(&self.clock)?;
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state, superseded_by_bond_id
@@ -761,7 +765,7 @@ impl SqliteReceiptStore {
 
         Ok(CreditBondListReport {
             schema: CREDIT_BOND_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now()?,
+            generated_at: unix_now(&self.clock)?,
             query: normalized,
             summary: CreditBondListSummary {
                 matching_bonds,
@@ -972,7 +976,7 @@ impl SqliteReceiptStore {
 
         Ok(CreditLossLifecycleListReport {
             schema: CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA.to_string(),
-            generated_at: unix_now()?,
+            generated_at: unix_now(&self.clock)?,
             query: normalized,
             summary: CreditLossLifecycleListSummary {
                 matching_events,

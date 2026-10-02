@@ -1410,6 +1410,7 @@ impl ChioKernel {
             let context = crate::ToolInvocationContext::from_request(request)?
                 .with_dispatch(dispatch_context.clone());
             let mut bridge = SessionNestedFlowBridge {
+                clock: self.authority_clock(),
                 sessions: &self.sessions,
                 child_receipts: post_admission_drop_guard.child_receipts_mut(),
                 nested_interaction_observed: &nested_interaction_observed,

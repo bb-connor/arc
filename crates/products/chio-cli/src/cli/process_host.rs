@@ -418,3 +418,7 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
         ))
     }
 }
+
+#[cfg(test)]
+#[path = "process_host/state_clock_tests.rs"]
+mod state_clock_tests;

@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_core::receipt::decision::ToolCallAction;
 use chio_kernel::admission_operation::{AdmissionIdentifier, AdmissionOperationStore};
 
@@ -20,13 +18,12 @@ pub(crate) fn export(
     if host.record.config.execution_nonces || host.record.config.native_broker.is_some() {
         host.checkpoint_receipts()?;
     }
-    let now = u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(error)?
-            .as_millis(),
-    )
-    .map_err(error)?;
+    let now = host
+        .kernel
+        .authority_clock_reading()
+        .map_err(error)?
+        .unix_millis()
+        .get();
     let signed = observe(&host, request, context, response, now)?;
     let bytes = canonical_json_bytes(&signed).map_err(error)?;
     require(bytes.len() as u64 <= LIMIT, "call evidence exceeds 32 MiB")?;

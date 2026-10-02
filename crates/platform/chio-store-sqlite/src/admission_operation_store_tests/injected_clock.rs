@@ -199,3 +199,72 @@ fn receipt_scope_cannot_replace_durable_authority_clock() -> AnchoredTestResult 
         Err(AdmissionOperationStoreError::Invariant(message)) if message == ClockError::Unavailable.code()));
     Ok(())
 }
+
+#[test]
+fn sqlite_revocation_uses_the_joint_authority_epoch() -> AnchoredTestResult {
+    use chio_kernel::RevocationStore;
+    let (fixture, _) = injected_fixture()?;
+    assert!(fixture
+        .authority
+        .revocation_store()
+        .revoke("injected-revocation")?);
+    let revoked_at: i64 = fixture.store.connection()?.query_row(
+        "SELECT revoked_at FROM revoked_capabilities WHERE capability_id = ?1",
+        ["injected-revocation"],
+        |row| row.get(0),
+    )?;
+    assert_eq!(revoked_at, i64::try_from(EPOCH / 1_000)?);
+    Ok(())
+}
+
+#[test]
+fn sqlite_revocation_clock_fault_denies_an_exact_replay() -> AnchoredTestResult {
+    use chio_kernel::RevocationStore;
+    let (fixture, clock) = injected_fixture()?;
+    let revocations = fixture.authority.revocation_store();
+    assert!(revocations.revoke("injected-revocation-replay")?);
+    let before = crate::tests::authority_snapshot(&*fixture.store.connection()?)?;
+    clock.set(Err(ClockError::Unavailable))?;
+    assert!(revocations.revoke("injected-revocation-replay").is_err());
+    assert_eq!(
+        crate::tests::authority_snapshot(&*fixture.store.connection()?)?,
+        before
+    );
+    Ok(())
+}
+
+#[test]
+fn sqlite_revocation_preserves_admission_clock_floor_across_restart() -> AnchoredTestResult {
+    use chio_kernel::RevocationStore;
+    let (fixture, clock) = injected_fixture()?;
+    let operation = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "revocation-clock-floor",
+        "clock-cap",
+    );
+    fixture.store.begin(&operation, &fixture.fence, EPOCH)?;
+    let Fixture {
+        _temp,
+        database,
+        lock_root,
+        authority,
+        store,
+        ..
+    } = fixture;
+    drop(store);
+    drop(authority);
+    clock.set(Ok(TestClock::reading(EPOCH - 1_000, 200)))?;
+    let reopened = SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, clock)?;
+    let store = reopened.admission_operation_store();
+    let before = crate::tests::authority_snapshot(&*store.connection()?)?;
+    assert!(reopened
+        .revocation_store()
+        .revoke("revocation-after-clock-rollback")
+        .is_err());
+    assert_eq!(
+        crate::tests::authority_snapshot(&*store.connection()?)?,
+        before
+    );
+    Ok(())
+}

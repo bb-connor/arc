@@ -25,11 +25,11 @@ impl AuthorityService {
             .native_broker
             .as_ref()
             .ok_or_else(|| error("missing broker host configuration"))?;
-        let selected = components(host)?;
+        let selected = components(host, kernel.authority_clock())?;
         let store = authority
             .local_authority_store()
             .ok_or_else(|| error("native broker requires the host's local authority"))?;
-        let native = native_binding(config, directory, &store, false)?;
+        let native = native_binding(config, directory, &store, false, kernel.authority_clock())?;
         let mut endpoints = Vec::with_capacity(config.routes.len());
         for route in &config.routes {
             let participant = selected

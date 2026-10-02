@@ -5,10 +5,23 @@ pub fn build_remote_capability_authority(
     control_url: &str,
     control_token: &str,
 ) -> Result<Box<dyn CapabilityAuthority>, CliError> {
+    build_remote_capability_authority_with_clock(
+        control_url,
+        control_token,
+        Arc::new(chio_security_types::clock::SystemClock),
+    )
+}
+
+pub fn build_remote_capability_authority_with_clock(
+    control_url: &str,
+    control_token: &str,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<Box<dyn CapabilityAuthority>, CliError> {
     let client = build_client(control_url, control_token)?;
     let status = client.authority_status()?;
     let cache = AuthorityKeyCache::from_status(&status)?;
     Ok(Box::new(RemoteCapabilityAuthority {
+        clock,
         client,
         cache: Mutex::new(cache),
         refresh_lock: Mutex::new(()),
@@ -34,6 +47,7 @@ pub fn build_pinned_remote_capability_authority(
     let cache = AuthorityKeyCache::from_status(&status)?;
     validate_authority_pins(&cache, &pinned_current, &pinned_trusted)?;
     Ok(Box::new(RemoteCapabilityAuthority {
+        clock: Arc::new(chio_security_types::clock::SystemClock),
         client,
         cache: Mutex::new(cache),
         refresh_lock: Mutex::new(()),
@@ -151,6 +165,7 @@ impl RemoteCapabilityAuthority {
                 requested_scope,
                 requested_ttl_seconds,
                 &current,
+                self.clock.unix_millis()?,
             );
         }
 
@@ -187,6 +202,7 @@ impl RemoteCapabilityAuthority {
             requested_scope,
             requested_ttl_seconds,
             current,
+            self.clock.unix_millis()?,
         )?;
         self.install_status_cache(refreshed).map_err(|error| {
             chio_kernel::KernelError::CapabilityIssuanceFailed(error.to_string())
@@ -252,6 +268,8 @@ impl CapabilityAuthority for RemoteCapabilityAuthority {
         runtime_attestation: Option<RuntimeAttestationEvidence>,
     ) -> Result<CapabilityToken, chio_kernel::KernelError> {
         chio_kernel::ensure_capability_issuance_supported(&scope)?;
+        // Reject a failed owner clock before the remote authority can persist issuance.
+        self.clock.unix_millis()?;
         let capability = self
             .client
             .issue_capability_with_attestation(
@@ -372,6 +390,58 @@ mod tests {
     use super::*;
     use chio_kernel::LocalCapabilityAuthority;
 
+    #[test]
+    fn unavailable_clock_prevents_remote_issuance_rpc() -> Result<(), Box<dyn std::error::Error>> {
+        use chio_security_types::clock::{Clock, ClockError, ClockReading};
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        struct UnavailableClock;
+        impl Clock for UnavailableClock {
+            fn read(&self) -> Result<ClockReading, ClockError> {
+                Err(ClockError::Unavailable)
+            }
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        listener.set_nonblocking(true)?;
+        let mut remote = remote_with_trusted_key(Keypair::generate().public_key())?;
+        remote.client = build_client(&format!("http://{}", listener.local_addr()?), "test-token")?;
+        remote.clock = Arc::new(UnavailableClock);
+        let stopped = Arc::new(AtomicBool::new(false));
+        let server_stopped = stopped.clone();
+        let server = std::thread::spawn(move || -> std::io::Result<usize> {
+            let mut requests = 0;
+            while !server_stopped.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        requests += 1;
+                        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+                        stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")?;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(1));
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            Ok(requests)
+        });
+        let result =
+            remote.issue_capability(&Keypair::generate().public_key(), ChioScope::default(), 60);
+        stopped.store(true, Ordering::SeqCst);
+        let requests = server
+            .join()
+            .map_err(|_| std::io::Error::other("test server panicked"))??;
+        assert_eq!(requests, 0, "clock failure must precede any issuance RPC");
+        assert!(matches!(
+            result,
+            Err(chio_kernel::KernelError::Clock(ClockError::Unavailable))
+        ));
+        Ok(())
+    }
+
     struct IssuedTestCapability {
         capability: CapabilityToken,
         subject: PublicKey,
@@ -398,6 +468,7 @@ mod tests {
         public_key: PublicKey,
     ) -> Result<RemoteCapabilityAuthority, CliError> {
         Ok(RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(public_key.clone()),
@@ -442,6 +513,7 @@ mod tests {
             &issued.scope,
             issued.ttl_seconds,
             &current,
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         );
 
         assert!(matches!(
@@ -464,6 +536,7 @@ mod tests {
             &issued.scope,
             issued.ttl_seconds,
             &authority.authority_public_key(),
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         );
 
         assert!(matches!(
@@ -544,6 +617,7 @@ mod tests {
         let authority = LocalCapabilityAuthority::new(Keypair::generate());
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: None,
@@ -624,6 +698,7 @@ mod tests {
         let authority = LocalCapabilityAuthority::new(Keypair::generate());
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(authority.authority_public_key()),
@@ -656,6 +731,7 @@ mod tests {
         let older_key = Keypair::generate().public_key();
         let newer_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(newer_key.clone()),
@@ -690,6 +766,7 @@ mod tests {
         let historical_key = Keypair::generate().public_key();
         let equivocated_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(current_key.clone()),
@@ -740,6 +817,7 @@ mod tests {
         let current_key = Keypair::generate().public_key();
         let next_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(current_key.clone()),
@@ -810,6 +888,7 @@ mod tests {
         let first_key = Keypair::generate().public_key();
         let second_key = Keypair::generate().public_key();
         let remote = Arc::new(RemoteCapabilityAuthority {
+            clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(Keypair::generate().public_key()),

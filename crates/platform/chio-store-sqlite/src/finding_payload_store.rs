@@ -9,8 +9,10 @@
 //! plaintext digest again and fail closed on missing, altered, or cross-tenant
 //! records.
 
+use chio_security_types::clock::{Clock, SystemClock};
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use chio_finding::finding_payload_sha256;
 use r2d2::Pool;
@@ -99,28 +101,49 @@ impl From<BlobStoreError> for FindingPayloadStoreError {
 
 /// SQLite-backed encrypted sealed-payload store.
 pub struct SqliteFindingPayloadStore {
+    clock: crate::store_clock::StoreClock,
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl SqliteFindingPayloadStore {
     /// Open a durable store, creating its parent directory when needed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, FindingPayloadStoreError> {
+        Self::open_with_clock(path, Arc::new(SystemClock))
+    }
+
+    /// Open with the time authority shared by the composing service.
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, FindingPayloadStoreError> {
         let path = path.as_ref();
         if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
             fs::create_dir_all(parent)?;
         }
         let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
         let pool = Pool::builder().max_size(8).build(manager)?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
 
     /// Open an isolated in-memory store for tests.
     pub fn open_in_memory() -> Result<Self, FindingPayloadStoreError> {
+        Self::open_in_memory_with_clock(Arc::new(SystemClock))
+    }
+
+    pub fn open_in_memory_with_clock(
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, FindingPayloadStoreError> {
         let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
         let pool = Pool::builder().max_size(1).build(manager)?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
@@ -174,6 +197,7 @@ impl SqliteFindingPayloadStore {
         payload_sha256: &str,
         payload: &[u8],
     ) -> Result<FindingPayloadPutOutcome, FindingPayloadStoreError> {
+        let now = self.now_secs()?;
         validate_input(tenant_id, finding_id, media_type, payload_sha256, payload)?;
         if finding_payload_sha256(media_type, payload)
             .map_err(|_| FindingPayloadStoreError::AuthenticationFailed)?
@@ -221,7 +245,7 @@ impl SqliteFindingPayloadStore {
                 payload_sha256,
                 encrypted.nonce.as_slice(),
                 encrypted.ciphertext,
-                now_secs()?,
+                now,
             ],
         )?;
         tx.commit()?;
@@ -351,12 +375,10 @@ fn payload_aad(
     .into_bytes()
 }
 
-fn now_secs() -> Result<i64, FindingPayloadStoreError> {
-    Ok(i64::try_from(
-        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
-            .as_secs(),
-    )
-    .map_err(|_| chio_security_types::clock::ClockError::Overflow)?)
+impl SqliteFindingPayloadStore {
+    fn now_secs(&self) -> Result<i64, FindingPayloadStoreError> {
+        Ok(self.clock.now_secs()?)
+    }
 }
 
 #[cfg(test)]

@@ -129,6 +129,7 @@ impl ChioKernel {
             },
             runtime.fence.clone(),
             input.trusted_now_unix_ms,
+            self.authority_clock().as_ref(),
             |context| self.prepare_durable_native_output(input.admission, input.lease, context),
         )?;
         self.reach_durable_finalization_cutpoint(

@@ -1345,3 +1345,6 @@ fn assert_finalization_crash_recovers(
     assert_eq!(replay.output, recovered.output);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
+
+#[path = "durable_admission/clock_ownership.rs"]
+mod clock_ownership;
