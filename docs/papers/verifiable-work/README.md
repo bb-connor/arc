@@ -25,6 +25,7 @@ including ERC-8183, and retains the matching ordinary-escrow result.
 - `PUBLICATION.json`: fail-closed high-bar readiness gates.
 - `EXTERNAL-TRIAL.md`, `trial/`: independent operator handoff, frozen analysis rules and data templates; no completed trial is implied.
 - `PROGRESS.md`: execution decisions and remaining work.
+- `REVIEW.md`: fresh review, reproduced checks, documentation fixes and its limits.
 
 ```sh
 make build

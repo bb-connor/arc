@@ -60,7 +60,7 @@ reported rather than silently set to zero.
 
 ## Readout
 
-For H1-H5 and Q1-Q9, state supported, contradicted or inconclusive, with the
+For H1-H5 and Q1-Q10, state supported, contradicted or inconclusive, with the
 exact scope, evidence and strongest counterexample. Distinguish implementation
 independence, administrative independence and protocol compatibility. Explain
 any benefit using observed mechanisms and cost, not the number of passing tests.

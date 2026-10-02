@@ -31,36 +31,36 @@
 
 Files: `docs/papers/verifiable-work/evidence/`, `ARTIFACT.md`, `sources.json`.
 
-- [ ] Record candidate topology, current PR state, dependency manifests and the merge probe.
-- [ ] Resolve funded/security compatibility in the delegated isolated worktree; test actual funded boundaries and document residual gates.
-- [ ] Refresh primary prior art with versioned citations and a concrete overlap matrix.
-- [ ] Run funded models, Python checks and real escrow bytecode regressions; retain exact commands, hashes, exit codes and durations.
+- [x] Record candidate topology, current PR state, dependency manifests and the merge probe.
+- [x] Resolve funded/security compatibility in the delegated isolated worktree; test actual funded boundaries and document residual gates.
+- [x] Refresh primary prior art with versioned citations and a concrete overlap matrix.
+- [x] Run funded models, Python checks and real escrow bytecode regressions; retain exact commands, hashes, exit codes and durations.
 
 ## Task 2: Establish the argument and comparison
 
 Files: `formal/`, `tools/compare.py`, `evidence/comparison.json`, `CLAIMS.json`.
 
-- [ ] Formalize conservation, irreversible earned claims and independent child settlement, including premises and capital cost.
-- [ ] Execute a matched ordinary escrow construction under the same fault schedule; retain equivalence and negative results.
-- [ ] Test missing backing, expiry of earned claims, and unavailable verification as distinct boundaries.
-- [ ] Map every headline claim to code, proof/model, measured evidence, counterexample and scope.
+- [x] Formalize conservation, irreversible earned claims and independent child settlement, including premises and capital cost.
+- [x] Execute a matched ordinary escrow construction under the same fault schedule; retain equivalence and negative results.
+- [x] Test missing backing, expiry of earned claims, and unavailable verification as distinct boundaries.
+- [x] Map every headline claim to code, proof/model, measured evidence, counterexample and scope.
 
 ## Task 3: Write the manuscript
 
 Files: `paper.tex`, `sections/01-problem.tex` through `09-conclusion.tex`, `bib.bib`.
 
-- [ ] Write one complete, compact argument, one successful exchange and one failed intermediary.
-- [ ] Explain terms, authority, acceptance, funding, uncertain execution and observable transitions precisely.
-- [ ] Present actual refreshed results, strongest baseline, limitations and related work without unsupported novelty claims.
-- [ ] Separate the main paper from implementation and reproduction detail in the artifact companion.
+- [x] Write one complete, compact argument, one successful exchange and one failed intermediary.
+- [x] Explain terms, authority, acceptance, funding, uncertain execution and observable transitions precisely.
+- [x] Present actual refreshed results, strongest baseline, limitations and related work without unsupported novelty claims.
+- [x] Separate the main paper from implementation and reproduction detail in the artifact companion.
 
 ## Task 4: Package and verify
 
-Files: `Makefile`, `tools/check.py`, `README.md`, `paper.pdf`, `PUBLICATION.md`.
+Files: `Makefile`, `tools/check.py`, `README.md`, `paper.pdf`, `PUBLICATION.json`.
 
-- [ ] Build the PDF, reject missing citations/references and layout defects, inspect rendered pages.
-- [ ] Verify all material claims and evidence hashes; fail closed if release gates are incomplete.
-- [ ] Obtain fresh critical review of mechanism, comparison, provenance and manuscript; fix substantive findings.
-- [ ] Commit a reviewable publication candidate and give an exact readiness judgment with any external gates.
+- [x] Build the PDF, reject missing citations/references and layout defects, inspect rendered pages.
+- [x] Verify all material claims and evidence hashes; fail closed if release gates are incomplete.
+- [x] Obtain fresh critical review of mechanism, comparison, provenance and manuscript; fix substantive findings.
+- [x] Commit a reviewable publication candidate and give an exact readiness judgment with any external gates.
 
 The work continues through all reachable gates. A publication-quality bounded result can exist without satisfying the breakthrough hypothesis; neither status will be silently substituted for the other.

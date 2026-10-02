@@ -1,172 +1,313 @@
 {
-  "schema": "chio.paper.claims.v1",
+  "schema": "chio.paper.claims.v2",
   "claims": [
     {
-      "id": "C01",
-      "claim": "Receivers authorize execution using locally selected authority; incoming evidence does not install an issuer.",
-      "status": "implemented-design",
-      "evidence": [
-        "examples/federated-work/src/funded_work/authority_enrollment.rs"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "honest local enforcement"
       ],
-      "limitation": "Does not prove a dishonest receiver executed honestly."
+      "limitation": "Does not prove a dishonest receiver executed honestly.",
+      "claim_id": "C01",
+      "exact_claim": "Receivers authorize execution using locally selected authority; incoming evidence does not install an issuer.",
+      "evidence_paths": [
+        "examples/federated-work/src/funded_work/authority_enrollment.rs",
+        "docs/papers/verifiable-work/evidence/integration/standalone-all-final.log"
+      ],
+      "profile": "Experimental native funded v2; honest receiver kernel",
+      "adversary": "Remote issuer substitution, malicious agent or courier",
+      "supporting_source_version": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3; v2 execution source manifest 0c318a449ef0c5c67fadcb421af4a680716ee6ae30cf32905fa7651348c1ce53; sole v3 delta retained in evidence/integration/v2-to-final.patch",
+      "counterexample": "Would falsify: arriving evidence activates an unselected issuer or permits unauthorized dispatch. Dishonest local enforcement is excluded.",
+      "baseline_result": "Ordinary receiver-issued credentials or capabilities plus signed application fields can implement this rule; no expressiveness impossibility is claimed.",
+      "next_decisive_test": "Independent receiver implementation plus hostile issuer/caller substitution at actual dispatch.",
+      "original_hypotheses": [
+        "H1"
+      ]
     },
     {
-      "id": "C02",
-      "claim": "The native funded agreement binds the original request, authority, Finding policy and funding domain.",
-      "status": "implemented-design",
-      "evidence": [
-        "examples/federated-work/src/funded_work/agreement.rs"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "canonical signatures",
         "local policy"
       ],
-      "limitation": "Experimental W0 amount is fixed to 100; not a universal work wire format."
+      "limitation": "Experimental W0 amount is fixed to 100; not a universal work wire format.",
+      "claim_id": "C02",
+      "exact_claim": "The native funded agreement binds the original request, authority, Finding policy and funding domain.",
+      "evidence_paths": [
+        "examples/federated-work/src/funded_work/agreement.rs",
+        "docs/papers/verifiable-work/evidence/integration/standalone-all-final.log"
+      ],
+      "profile": "Experimental native funded v2, fixed 100 mock units",
+      "adversary": "Counterparty substitutes request, authority, Finding context or funding domain",
+      "supporting_source_version": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3; v2 execution source manifest 0c318a449ef0c5c67fadcb421af4a680716ee6ae30cf32905fa7651348c1ce53; sole v3 delta retained in evidence/integration/v2-to-final.patch",
+      "counterexample": "Would falsify: substituted bound terms retain a valid admission or payable decision. Conceptual agreement tuple is not itself a wire grammar.",
+      "baseline_result": "Ordinary receiver-issued credentials or capabilities plus signed application fields can implement this rule; no expressiveness impossibility is claimed.",
+      "next_decisive_test": "Cross-implementation agreement vectors and native substitution tests on independent operators.",
+      "original_hypotheses": [
+        "H1",
+        "H3"
+      ]
     },
     {
-      "id": "C03",
-      "claim": "Atomic reservations and terminal transfers conserve deposited funds in the abstract model.",
-      "status": "modeled",
-      "evidence": [
-        "docs/papers/verifiable-work/formal/WorkClaims.lean",
-        "docs/papers/verifiable-work/evidence/lean.log"
+      "status": [
+        "modeled"
       ],
       "assumptions": [
         "natural-number accounts",
         "atomic transitions"
       ],
-      "limitation": "No refinement proof to Solidity or Rust."
+      "limitation": "No refinement proof to Solidity or Rust.",
+      "claim_id": "C03",
+      "exact_claim": "Atomic reservations and terminal transfers conserve deposited funds in the abstract model.",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/formal/WorkClaims.lean",
+        "docs/papers/verifiable-work/evidence/lean.log"
+      ],
+      "profile": "Lean abstract atomic account relation",
+      "adversary": "Any allowed finite transition sequence; not an adversarial implementation",
+      "supporting_source_version": "3363ac67ec12304e6ed782f4e13fe6a3aaf21225",
+      "counterexample": "A reserve, payment or refund breaking conservation falsifies the theorem; malicious token reporting lies outside its premises.",
+      "baseline_result": "Ordinary SQL matches all 312 replayed steps; ERC-8183 matches the tested economic outcomes under the same capital and evaluator assumptions.",
+      "next_decisive_test": "Coupled account-and-claim model and implementation refinement, or stronger independently authored concrete trace evidence.",
+      "original_hypotheses": [
+        "H1"
+      ]
     },
     {
-      "id": "C04",
-      "claim": "Recorded earned claims cannot transition to refund in the specified state machine.",
-      "status": "modeled-and-locally-tested",
-      "evidence": [
-        "docs/papers/verifiable-work/evidence/claim-traces.json",
-        "docs/papers/verifiable-work/evidence/contracts.log"
+      "status": [
+        "modeled",
+        "locally-tested"
       ],
       "assumptions": [
         "settlement finality",
         "honest token semantics"
       ],
-      "limitation": "An off-chain signature alone is not a recorded earned claim."
+      "limitation": "An off-chain signature alone is not a recorded earned claim.",
+      "claim_id": "C04",
+      "exact_claim": "Recorded earned claims cannot transition to refund in the specified state machine.",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/evidence/claim-traces.json",
+        "docs/papers/verifiable-work/evidence/contracts.log"
+      ],
+      "profile": "F1 experimental escrow and finite claim model",
+      "adversary": "Replay, conflicting decisions, timeout and administration changes after acceptance",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "Observed negative control: permitting payable expiry produces submission, acceptance, refund. The unmodified contract rejects that schedule.",
+      "baseline_result": "Ordinary SQL matches all 312 replayed steps; ERC-8183 matches the tested economic outcomes under the same capital and evaluator assumptions.",
+      "next_decisive_test": "Independent implementation and selected real-rail finality profile under the same earned-state rule.",
+      "original_hypotheses": [
+        "H1"
+      ]
     },
     {
-      "id": "C05",
-      "claim": "A separately funded earned child can collect after parent refund.",
-      "status": "locally-tested",
-      "evidence": [
-        "contracts/scripts/work-claim-escrow.test.mjs",
-        "docs/papers/verifiable-work/evidence/contracts.log"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "distinct allocations",
         "available settlement and beneficiary key"
       ],
-      "limitation": "Neither novel escrow nor guaranteed progress under failed verifier."
+      "limitation": "Neither novel escrow nor guaranteed progress under failed verifier.",
+      "claim_id": "C05",
+      "exact_claim": "A separately funded earned child can collect after parent refund.",
+      "evidence_paths": [
+        "contracts/scripts/work-claim-escrow.test.mjs",
+        "docs/papers/verifiable-work/evidence/contracts.log"
+      ],
+      "profile": "Two separately funded F1 allocations; 100 parent plus 60 child",
+      "adversary": "Parent fails or refuses cooperation after child acceptance",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "Would falsify: the parent refund consumes the earned child reserve or changes its eligibility. Verifier failure before recorded acceptance is an explicit non-guarantee.",
+      "baseline_result": "Ordinary SQL matches all 312 replayed steps; ERC-8183 matches the tested economic outcomes under the same capital and evaluator assumptions.",
+      "next_decisive_test": "Separate operators exercise uncollected child payment after parent death, with independent rail observation.",
+      "original_hypotheses": [
+        "H1"
+      ]
     },
     {
-      "id": "C06",
-      "claim": "The finite explorer checks 5508 states and 132192 transitions.",
-      "status": "locally-tested",
-      "evidence": [
-        "docs/papers/verifiable-work/evidence/claim-traces.json"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "two prefunded obligations",
         "nine timestamps",
         "fixed alphabet"
       ],
-      "limitation": "Not exhaustive arbitrary work graphs or all code."
+      "limitation": "Not exhaustive arbitrary work graphs or all code.",
+      "claim_id": "C06",
+      "exact_claim": "The finite explorer checks 5508 states and 132192 transitions.",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/evidence/claim-traces.json"
+      ],
+      "profile": "Finite model: two prefunded edges, nine timestamps, fixed symbolic actors",
+      "adversary": "All events in the declared finite exploration alphabet",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "A reproducible count drift or reachable invariant violation falsifies this exact corpus claim; larger graphs are outside it.",
+      "baseline_result": "The same selected traces feed the SQL and bytecode comparisons; count alone is not an advantage.",
+      "next_decisive_test": "Independently extend the state alphabet and funding/concurrency boundaries; report new counts separately.",
+      "original_hypotheses": [
+        "H1"
+      ]
     },
     {
-      "id": "C07",
-      "claim": "118 selected model traces are replayed against actual escrow bytecode.",
-      "status": "locally-tested",
-      "evidence": [
-        "contracts/scripts/work-claim-model.test.mjs",
-        "docs/papers/verifiable-work/evidence/contracts.log"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "Ganache development chain"
       ],
-      "limitation": "Not all model transitions; no public finality."
+      "limitation": "Not all model transitions; no public finality.",
+      "claim_id": "C07",
+      "exact_claim": "118 selected model traces are replayed against actual escrow bytecode.",
+      "evidence_paths": [
+        "contracts/scripts/work-claim-model.test.mjs",
+        "docs/papers/verifiable-work/evidence/contracts.log"
+      ],
+      "profile": "118 selected model traces on compiled Solidity with private Ganache",
+      "adversary": "Selected role, timing, replay and terminal-state schedules",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "A model/bytecode snapshot mismatch or skipped trace falsifies this replay claim; 132192 transitions were not all replayed.",
+      "baseline_result": "SQL matches the same 118 traces; upstream ERC-8183 has its own selected paired scenarios.",
+      "next_decisive_test": "Independently authored transition corpus and additional fault injection against the exact deployed profile.",
+      "original_hypotheses": [
+        "H1"
+      ]
     },
     {
-      "id": "C08",
-      "claim": "Ordinary SQL matches 312 steps along the same 118 monetary traces.",
-      "status": "locally-tested",
-      "evidence": [
-        "docs/papers/verifiable-work/evidence/comparison.json",
-        "docs/papers/verifiable-work/tools/compare.py"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "trusted sequential SQL",
         "symbolic authenticated roles"
       ],
-      "limitation": "Not a full networked alternative or independent authorship."
+      "limitation": "Not a full networked alternative or independent authorship.",
+      "claim_id": "C08",
+      "exact_claim": "Ordinary SQL matches 312 steps along the same 118 monetary traces.",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/evidence/comparison.json",
+        "docs/papers/verifiable-work/tools/compare.py"
+      ],
+      "profile": "In-memory sequential SQLite escrow, authenticated symbolic roles",
+      "adversary": "Duplicate and conflicting operations in the retained corpus; no Byzantine SQL owner",
+      "supporting_source_version": "3363ac67ec12304e6ed782f4e13fe6a3aaf21225",
+      "counterexample": "A divergent state, denied-operation mutation or broken balance invariant falsifies trace equivalence. Full networked integration was not compared.",
+      "baseline_result": "This is the successful ordinary baseline result, not evidence of Chio superiority.",
+      "next_decisive_test": "Build and measure the full ordinary cross-company composition with the same rail, checker and authority guarantees.",
+      "original_hypotheses": [
+        "H1",
+        "H3",
+        "H5"
+      ]
     },
     {
-      "id": "C09",
-      "claim": "Negative model and bytecode mutations detect refund of an earned claim.",
-      "status": "locally-tested",
-      "evidence": [
-        "docs/papers/verifiable-work/evidence/expiry-counterexample.json",
-        "docs/papers/verifiable-work/evidence/contract-mutation.log"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "specific expiry mutation"
       ],
-      "limitation": "One negative control does not establish complete fault detection."
+      "limitation": "One negative control does not establish complete fault detection.",
+      "claim_id": "C09",
+      "exact_claim": "Negative model and bytecode mutations detect refund of an earned claim.",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/evidence/expiry-counterexample.json",
+        "docs/papers/verifiable-work/evidence/contract-mutation.log"
+      ],
+      "profile": "Specific expire-payable model and in-memory Solidity mutations",
+      "adversary": "Intentionally corrupted earned-state expiry guard",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "The explorer returns an accepted-then-refunded trace; the mutated bytecode fails with Missing expected rejection. Arbitrary build failure would not qualify.",
+      "baseline_result": "Both safety-preserving implementations deny this transition; the mutation is a calibration, not a competing system.",
+      "next_decisive_test": "Add independent mutations at allocation, transfer and recovery boundaries without claiming complete fault detection.",
+      "original_hypotheses": [
+        "H1"
+      ]
     },
     {
-      "id": "C10",
-      "claim": "Missing checker or custody evidence yields no decision rather than rejection.",
-      "status": "implemented-design",
-      "evidence": [
-        "examples/funded-work/verifier.py",
-        "examples/federated-work/src/funded_work/verification.rs"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "trusted checker and observer"
       ],
-      "limitation": "Verifier outage may still cause eventual timeout refund."
+      "limitation": "Verifier outage may still cause eventual timeout refund.",
+      "claim_id": "C10",
+      "exact_claim": "Missing checker or custody evidence yields no decision rather than rejection.",
+      "evidence_paths": [
+        "examples/funded-work/verifier.py",
+        "examples/federated-work/src/funded_work/verification.rs",
+        "docs/papers/verifiable-work/evidence/python-tests-integrated-v2.log",
+        "docs/papers/verifiable-work/evidence/integration/standalone-all-final.log"
+      ],
+      "profile": "Artifact-only funded W0 and native funded v2 selected-verifier paths",
+      "adversary": "Unavailable or tampered custody/checker evidence",
+      "supporting_source_version": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3; v2 execution source manifest 0c318a449ef0c5c67fadcb421af4a680716ee6ae30cf32905fa7651348c1ce53; sole v3 delta retained in evidence/integration/v2-to-final.patch",
+      "counterexample": "Would falsify: missing required evidence is signed as acceptance or substantive rejection. An available checked mismatch is separately rejected.",
+      "baseline_result": "A conventional trusted checker can preserve the same three outcomes; no unique mechanism is claimed.",
+      "next_decisive_test": "Off-host custody/verifier outages with independently written participants and exact signed decision inspection.",
+      "original_hypotheses": [
+        "H1",
+        "H2"
+      ]
     },
     {
-      "id": "C11",
-      "claim": "Execution uncertainty is not erased by monetary resolution.",
-      "status": "modeled-and-historical",
-      "evidence": [
-        "examples/funded-work-model/claim_model.py",
-        "docs/market/open-agent-work/execution/21-native-resolution-earned-child.md"
+      "status": [
+        "modeled",
+        "locally-tested"
       ],
       "assumptions": [
         "retained native history"
       ],
-      "limitation": "Historical process evidence is not current merged qualification."
+      "limitation": "Fresh local v2 process evidence preserves unknown history; it does not qualify independently operated recovery or final-source whole-workspace behavior.",
+      "claim_id": "C11",
+      "exact_claim": "Execution uncertainty is not erased by monetary resolution.",
+      "evidence_paths": [
+        "examples/funded-work-model/claim_model.py",
+        "docs/market/open-agent-work/execution/21-native-resolution-earned-child.md",
+        "docs/papers/verifiable-work/evidence/integration/refund-resolution-final.log",
+        "docs/papers/verifiable-work/evidence/integration/public-bindings-v2.json"
+      ],
+      "profile": "Native funded v2 incident/waiver recovery; model unknown bit",
+      "adversary": "Process death and later financial resolution with uncertain original execution",
+      "supporting_source_version": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3; v2 execution source manifest 0c318a449ef0c5c67fadcb421af4a680716ee6ae30cf32905fa7651348c1ce53; sole v3 delta retained in evidence/integration/v2-to-final.patch",
+      "counterexample": "Would falsify: financial release rewrites OutcomeUnknownAfterDispatch as successful or no-effect, or re-admits the original operation.",
+      "baseline_result": "Durable workflows and ordinary ledgers can retain an unknown terminal independently of payment resolution.",
+      "next_decisive_test": "Independent-operator crash/recovery with retained original identities and authoritative money reconciliation.",
+      "original_hypotheses": [
+        "H1"
+      ]
     },
     {
-      "id": "C12",
-      "claim": "The selected verifier and settlement domain remain trusted.",
-      "status": "explicit-assumption",
-      "evidence": [
-        "contracts/src/experimental/ChioWorkClaimEscrow.sol"
+      "status": [
+        "narrowed"
       ],
       "assumptions": [
         "F1 profile"
       ],
-      "limitation": "Public rechecking does not force a dishonest verifier to sign correctly."
+      "limitation": "Public rechecking does not force a dishonest verifier to sign correctly.",
+      "claim_id": "C12",
+      "exact_claim": "The selected verifier and settlement domain remain trusted.",
+      "evidence_paths": [
+        "contracts/src/experimental/ChioWorkClaimEscrow.sol"
+      ],
+      "profile": "F1 selected verifier and settlement domain",
+      "adversary": "Compromised verifier or settlement authority demonstrates the assumption boundary",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "A malicious pinned signer can authorize acceptance without a true application predicate; withheld decisions may cause refund despite performed work.",
+      "baseline_result": "The tested ERC-8183 and ordinary escrow constructions also trust their selected evaluator and ledger.",
+      "next_decisive_test": "Explicit dishonest-verifier and unavailable-authority trial cases; a proof-based profile would need a separate analysis.",
+      "original_hypotheses": [
+        "H1",
+        "H2"
+      ]
     },
     {
-      "id": "C13",
-      "claim": "Pinned upstream ERC-8183 reproduces the child-payment economic outcome under equal capital and evaluator assumptions.",
-      "status": "locally-tested",
-      "evidence": [
-        "docs/papers/verifiable-work/evidence/erc8183/REPORT.json",
-        "docs/papers/verifiable-work/evidence/erc8183/logs/verified-comparison-traces.log"
+      "status": [
+        "locally-tested"
       ],
       "assumptions": [
         "local Cancun EVM",
@@ -174,41 +315,198 @@
         "unmodified upstream commit 142e669c1f",
         "same 100 plus 60 funding"
       ],
-      "limitation": "Strong counterexample to an exclusive economic primitive; no independent operators or full admission-profile comparison."
+      "limitation": "Strong counterexample to an exclusive economic primitive; no independent operators or full admission-profile comparison.",
+      "claim_id": "C13",
+      "exact_claim": "Pinned upstream ERC-8183 reproduces the child-payment economic outcome under equal capital and evaluator assumptions.",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/evidence/erc8183/REPORT.json",
+        "docs/papers/verifiable-work/evidence/erc8183/logs/verified-comparison-traces.log"
+      ],
+      "profile": "ERC-8183 142e669c1f versus Chio F1; local Cancun EVM, equal 100+60 capital",
+      "adversary": "Parent failure, evaluator outage, attempted overcommitment and selected admin changes",
+      "supporting_source_version": "ERC-8183 142e669c1fd318486a4628395b629f033654dd06; Chio 7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "Actual counterexample to an exclusive Chio economic primitive: upstream child payment survives parent refund, and a 60-unit milestone survives refund of the remaining 40.",
+      "baseline_result": "76 unmodified upstream tests and 20 paired tests pass. Distinct deadline/withdrawal policies are not a proof of superiority.",
+      "next_decisive_test": "Independently reproduce the pinned pair, then measure full integration cost with equally capable application profiles.",
+      "original_hypotheses": [
+        "H1",
+        "H3",
+        "H5"
+      ]
     },
     {
-      "id": "H02",
-      "claim": "Useful outputs can be verified materially more cheaply than produced.",
-      "status": "not-established",
-      "evidence": [],
-      "assumptions": [],
-      "limitation": "The deterministic OpenAPI inventory is inexpensive for the buyer to recompute."
+      "claim_id": "H01",
+      "exact_claim": "Payable work agreements compose across dishonest counterparties while each honest participant's authorized financial exposure stays bounded.",
+      "profile": "Original H1, narrowed here to modeled allocations and selected local F1/native paths",
+      "adversary": "Dishonest counterparty, forked payer promises and process failures; honest local enforcement and agreed funding authority",
+      "assumptions": [
+        "selected verifier and settlement domain",
+        "honest local enforcement"
+      ],
+      "supporting_source_version": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3; v2 execution source manifest 0c318a449ef0c5c67fadcb421af4a680716ee6ae30cf32905fa7651348c1ce53; sole v3 delta retained in evidence/integration/v2-to-final.patch",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/formal/WorkClaims.lean",
+        "docs/papers/verifiable-work/evidence/contracts.log",
+        "docs/papers/verifiable-work/evidence/integration-summary.json"
+      ],
+      "counterexample": "Any unbacked admitted obligation, excess authorized exposure or dependence on the dishonest payer journal defeats H1. The finite/local evidence does not exhaust that adversary.",
+      "baseline_result": "Ordinary SQL matches all 312 replayed steps; ERC-8183 matches the tested economic outcomes under the same capital and evaluator assumptions.",
+      "status": [
+        "hypothesis",
+        "narrowed"
+      ],
+      "next_decisive_test": "Independently operated fork, concurrent admission and crash trials under a qualified deployment profile.",
+      "original_hypotheses": [
+        "H1"
+      ],
+      "limitation": "Supporting component claims C01-C07 and C09-C12 do not close the full independent-administration hypothesis."
     },
     {
-      "id": "H03",
-      "claim": "One public contract substantially reduces repeated partner integration.",
-      "status": "not-established",
-      "evidence": [],
-      "assumptions": [],
-      "limitation": "Requires independently implemented provider and matched integration trial."
-    },
-    {
-      "id": "H04",
-      "claim": "Live agents form economically useful teams with bounded loss.",
-      "status": "not-established",
-      "evidence": [],
-      "assumptions": [],
-      "limitation": "No live-agent economics or held-out commercial work result."
-    },
-    {
-      "id": "H05",
-      "claim": "The composition is a foundational breakthrough beyond existing mechanisms.",
-      "status": "not-established",
-      "evidence": [
-        "docs/papers/verifiable-work/sources.json"
+      "status": [
+        "hypothesis"
       ],
       "assumptions": [],
-      "limitation": "ERC-8183 and conventional escrow overlap substantially; no measured advantage yet."
+      "limitation": "The deterministic OpenAPI inventory is inexpensive for the buyer to recompute.",
+      "claim_id": "H02",
+      "exact_claim": "Useful outputs can be verified materially more cheaply than produced.",
+      "evidence_paths": [],
+      "profile": "Prospective W1 useful-work trial; not demonstrated by W0",
+      "adversary": "Weak checker, useless passing output, cherry-picked accepted-only costs",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "The current deterministic inventory is cheap for the buyer to compute; it supplies no production-versus-verification advantage.",
+      "baseline_result": "Direct buyer C0 and matched C1 receive identical models, checker and total resources.",
+      "next_decisive_test": "Frozen held-out W1 evaluation with full cost accounting and the original verification-cost thresholds.",
+      "original_hypotheses": [
+        "H2"
+      ]
+    },
+    {
+      "status": [
+        "hypothesis"
+      ],
+      "assumptions": [],
+      "limitation": "Requires independently implemented provider and matched integration trial.",
+      "claim_id": "H03",
+      "exact_claim": "One public contract substantially reduces repeated partner integration.",
+      "evidence_paths": [],
+      "profile": "Prospective independent-provider and newcomer trial",
+      "adversary": "Bespoke partner glue, hidden assistance or an intentionally weak comparator",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "Financial equivalence already exists; comparable ordinary integration effort or required per-pair code would defeat the stronger claim.",
+      "baseline_result": "Give C1 the same escrow, checker, signed fields, local authority and persistence; integration effort remains unmeasured.",
+      "next_decisive_test": "At least six paired independent onboarding exercises with all technical assistance and initial implementation cost retained.",
+      "original_hypotheses": [
+        "H3"
+      ]
+    },
+    {
+      "status": [
+        "hypothesis"
+      ],
+      "assumptions": [],
+      "limitation": "No live-agent economics or held-out commercial work result.",
+      "claim_id": "H04",
+      "exact_claim": "Live agents form economically useful teams with bounded loss.",
+      "evidence_paths": [],
+      "profile": "Prospective C2 live procurement versus C3 fixed suppliers",
+      "adversary": "Uncounted failures/subsidies, selection bias and apparent profits from test balances",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "A fixed workflow matching useful output and full cost would defeat the autonomous-choice benefit; no live economic result is reported.",
+      "baseline_result": "C0, C1 and C3 control production, integration and procurement effects under matched resources.",
+      "next_decisive_test": "Freeze the C2/C3 primary endpoint after the unscored pilot, then run the original held-out four-arm evaluation.",
+      "original_hypotheses": [
+        "H4"
+      ]
+    },
+    {
+      "status": [
+        "hypothesis"
+      ],
+      "assumptions": [],
+      "limitation": "ERC-8183 and conventional escrow overlap substantially; no measured advantage yet.",
+      "claim_id": "H05",
+      "exact_claim": "A compact general rule explains the gains beyond one application.",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/sources.json"
+      ],
+      "profile": "Prospective generalization of the work-contract composition",
+      "adversary": "Task-specific glue or hidden application coordinator",
+      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "counterexample": "Matching standard escrow outcomes narrow novelty; dependence on bespoke unrelated mechanisms would defeat the general-rule hypothesis.",
+      "baseline_result": "Ordinary composed systems, Agent Contracts, AgentBound and ERC-8183 provide substantial parts; an integration advantage is unmeasured.",
+      "next_decisive_test": "Two task families, removal experiments and independent critique, preserving the original H5 design.",
+      "original_hypotheses": [
+        "H5"
+      ]
+    },
+    {
+      "claim_id": "B01",
+      "exact_claim": "The composition is a foundational breakthrough beyond existing mechanisms.",
+      "profile": "User-requested ambition, contingent on H1-H5 rather than a separate demonstrated protocol property",
+      "adversary": "Strong closest prior art and a fully capable ordinary composition",
+      "assumptions": [
+        "the original H1-H5 research gates are retained"
+      ],
+      "supporting_source_version": "3363ac67ec12304e6ed782f4e13fe6a3aaf21225",
+      "evidence_paths": [
+        "docs/papers/verifiable-work/evidence/erc8183/REPORT.json",
+        "docs/papers/verifiable-work/PUBLICATION.json"
+      ],
+      "counterexample": "Pinned ERC-8183 reproduces the headline economic pattern and supports partial settlement. No distinct integration or economic advantage has been measured.",
+      "baseline_result": "Current evidence supports a bounded implementation and composition argument; it does not support foundational novelty.",
+      "status": [
+        "hypothesis",
+        "narrowed"
+      ],
+      "next_decisive_test": "Complete the independent trial and two-task-family mechanism/removal study, then seek independent expert critique.",
+      "original_hypotheses": [
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H5"
+      ],
+      "limitation": "Neither passing tests nor the approved title establishes a breakthrough."
     }
-  ]
+  ],
+  "hypothesis_source": "docs/market/open-agent-work/01-thesis.md at 7755d3762baa5e0fda0d171835a9000c26de9033",
+  "hypothesis_crosswalk": {
+    "H1": [
+      "H01",
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "C06",
+      "C07",
+      "C09",
+      "C10",
+      "C11",
+      "C12"
+    ],
+    "H2": [
+      "H02",
+      "C10",
+      "C12"
+    ],
+    "H3": [
+      "H03",
+      "C02",
+      "C08",
+      "C13"
+    ],
+    "H4": [
+      "H04"
+    ],
+    "H5": [
+      "H05",
+      "C08",
+      "C13"
+    ],
+    "requested_breakthrough_bar": [
+      "B01"
+    ]
+  },
+  "status_note": "Statuses are evidence dimensions, not one maturity ladder. Hypothesis remains unestablished; narrowed requires reading the limitation. Local test evidence does not establish independent administration."
 }

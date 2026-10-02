@@ -1,0 +1,78 @@
+{
+  "collected_at": "2026-10-02 16:11:20 UTC",
+  "source": "GitHub gh pr view read-only",
+  "local_candidate": {
+    "branch": "paper/verifiable-work-20261002",
+    "integration_commit": "71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3",
+    "published": false,
+    "hosted_qualification": false
+  },
+  "prs": [
+    {
+      "argv": [
+        "gh",
+        "pr",
+        "view",
+        "1160",
+        "--repo",
+        "bb-connor/arc",
+        "--json",
+        "number,url,state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,updatedAt"
+      ],
+      "exit_code": 0,
+      "baseRefName": "main",
+      "headRefName": "integration/process-security-m4",
+      "headRefOid": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
+      "isDraft": true,
+      "mergeStateStatus": "BLOCKED",
+      "number": 1160,
+      "state": "OPEN",
+      "updatedAt": "2026-10-01T13:25:58Z",
+      "url": "https://github.com/bb-connor/arc/pull/1160"
+    },
+    {
+      "argv": [
+        "gh",
+        "pr",
+        "view",
+        "1161",
+        "--repo",
+        "bb-connor/arc",
+        "--json",
+        "number,url,state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,updatedAt"
+      ],
+      "exit_code": 0,
+      "baseRefName": "main",
+      "headRefName": "feat/funded-native-admission",
+      "headRefOid": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "isDraft": true,
+      "mergeStateStatus": "BLOCKED",
+      "number": 1161,
+      "state": "OPEN",
+      "updatedAt": "2026-09-15T20:52:08Z",
+      "url": "https://github.com/bb-connor/arc/pull/1161"
+    },
+    {
+      "argv": [
+        "gh",
+        "pr",
+        "view",
+        "1159",
+        "--repo",
+        "bb-connor/arc",
+        "--json",
+        "number,url,state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,updatedAt"
+      ],
+      "exit_code": 0,
+      "baseRefName": "main",
+      "headRefName": "paper/roadmap-phase-0-1",
+      "headRefOid": "2b3b5af8cbfbc6f16ce6005de3f97cd149803b81",
+      "isDraft": true,
+      "mergeStateStatus": "BLOCKED",
+      "number": 1159,
+      "state": "OPEN",
+      "updatedAt": "2026-09-15T18:18:11Z",
+      "url": "https://github.com/bb-connor/arc/pull/1159"
+    }
+  ]
+}

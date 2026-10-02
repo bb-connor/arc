@@ -6,13 +6,17 @@
   "gates": [
     {
       "id": "manuscript",
-      "status": "in-progress",
-      "acceptance": "Complete argument, exact sources, no unresolved scientific-review blockers."
+      "status": "passed",
+      "acceptance": "Complete argument, exact sources, no unresolved scientific-review blockers.",
+      "evidence": "REVIEW.md",
+      "result": "Complete bounded manuscript; fresh review found no Critical/Important defect. Both minor traceability findings were closed. External scientific validation remains separate."
     },
     {
       "id": "artifact",
-      "status": "in-progress",
-      "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree."
+      "status": "passed",
+      "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
+      "evidence": "artifact-manifest.json",
+      "result": "Fresh byte-identical scratch PDF rebuild; retained command logs, exact source inventories, numerical results, references and artifact hashes checked. Final check rerun after documentation fixes."
     },
     {
       "id": "funded-security-integration",

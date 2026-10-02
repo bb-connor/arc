@@ -52,7 +52,7 @@ original two-jurisdiction phase; none is inferred from hosting regions.
 Qualify the chosen off-host authenticated endpoints, custody, observer/finality
 rules, rollback protection, capacity and sandbox before scored work. The
 paper's local integration logs do not pass that gate. Use the original
-[Q1-Q9 qualification matrix](../../../market/open-agent-work/05-qualification.md),
+[Q1-Q10 qualification matrix](../../../market/open-agent-work/05-qualification.md),
 including the adversary and recovery schedule, and record unsupported cases.
 Do not disable local authority or replace finality with a cached balance to
 make a pairing run.
