@@ -1,0 +1,319 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+error[E0432]: unresolved import `chio_kernel::admission_operation::DurableFinalizationCutpoint`
+ --> crates/kernel/chio-kernel/tests/three_owner_composition/fixture.rs:6:5
+  |
+6 | use chio_kernel::admission_operation::DurableFinalizationCutpoint;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `DurableFinalizationCutpoint` in `admission_operation`
+  |
+help: consider importing one of these enums instead
+  |
+6 - use chio_kernel::admission_operation::DurableFinalizationCutpoint;
+6 + use crate::DurableFinalizationCutpoint;
+  |
+6 - use chio_kernel::admission_operation::DurableFinalizationCutpoint;
+6 + use chio_kernel::DurableFinalizationCutpoint;
+  |
+
+error[E0277]: the trait bound `u64: FromSql` is not satisfied
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:52:39
+    |
+ 52 |             [id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)))?;
+    |                                       ^^^ the trait `FromSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `FromSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+note: required by a bound in `Row::<'_>::get`
+   --> /home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rusqlite-0.39.0/src/row.rs:285:32
+    |
+285 |     pub fn get<I: RowIndex, T: FromSql>(&self, idx: I) -> Result<T> {
+    |                                ^^^^^^^ required by this bound in `Row::<'_>::get`
+
+error[E0277]: the trait bound `u64: FromSql` is not satisfied
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:52:59
+    |
+ 52 |             [id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)))?;
+    |                                                           ^^^ the trait `FromSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `FromSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+note: required by a bound in `Row::<'_>::get`
+   --> /home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rusqlite-0.39.0/src/row.rs:285:32
+    |
+285 |     pub fn get<I: RowIndex, T: FromSql>(&self, idx: I) -> Result<T> {
+    |                                ^^^^^^^ required by this bound in `Row::<'_>::get`
+
+error[E0277]: the trait bound `u64: ToSql` is not satisfied
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:63:72
+    |
+ 63 |         tx.execute("UPDATE accounts SET balance=balance-? WHERE id=0", [amount])?;
+    |            ------- required by a bound introduced by this call         ^^^^^^^^ the trait `ToSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `ToSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+    = note: required for `[u64; 1]` to implement `Params`
+note: required by a bound in `Connection::execute`
+   --> /home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rusqlite-0.39.0/src/lib.rs:611:23
+    |
+611 |     pub fn execute<P: Params>(&self, sql: &str, params: P) -> Result<usize> {
+    |                       ^^^^^^ required by this bound in `Connection::execute`
+
+error[E0277]: the trait bound `u64: ToSql` is not satisfied
+  --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:64:72
+   |
+64 |         tx.execute("UPDATE accounts SET balance=balance+? WHERE id=?", params![charge,self.role])?;
+   |                                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `ToSql` is not implemented for `u64`
+   |
+   = help: the following other types implement trait `ToSql`:
+             f32
+             f64
+             i16
+             i32
+             i64
+             i8
+             isize
+             u16
+           and 2 others
+   = note: required for the cast from `&u64` to `&dyn ToSql`
+   = note: this error originates in the macro `params` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `u64: FromSql` is not satisfied
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:75:38
+    |
+ 75 |         Ok(query.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?)
+    |                                      ^^^ the trait `FromSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `FromSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+note: required by a bound in `Row::<'_>::get`
+   --> /home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rusqlite-0.39.0/src/row.rs:285:32
+    |
+285 |     pub fn get<I: RowIndex, T: FromSql>(&self, idx: I) -> Result<T> {
+    |                                ^^^^^^^ required by this bound in `Row::<'_>::get`
+
+error[E0277]: the trait bound `u64: ToSql` is not satisfied
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:97:80
+    |
+ 97 |                 tx.execute("UPDATE accounts SET balance=balance+? WHERE id=0", [request.amount_units])?;
+    |                    ------- required by a bound introduced by this call         ^^^^^^^^^^^^^^^^^^^^^^ the trait `ToSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `ToSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+    = note: required for `[u64; 1]` to implement `Params`
+note: required by a bound in `Connection::execute`
+   --> /home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rusqlite-0.39.0/src/lib.rs:611:23
+    |
+611 |     pub fn execute<P: Params>(&self, sql: &str, params: P) -> Result<usize> {
+    |                       ^^^^^^ required by this bound in `Connection::execute`
+
+error[E0277]: the trait bound `u64: ToSql` is not satisfied
+  --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:96:21
+   |
+96 |                     params![request.amount_units,self.payer()])?;
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `ToSql` is not implemented for `u64`
+   |
+   = help: the following other types implement trait `ToSql`:
+             f32
+             f64
+             i16
+             i32
+             i64
+             i8
+             isize
+             u16
+           and 2 others
+   = note: required for the cast from `&u64` to `&dyn ToSql`
+   = note: this error originates in the macro `params` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `chio_kernel::KernelError`
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/fixture.rs:209:37
+    |
+207 | pub fn evaluate(kernel: &ChioKernel, request: &ToolCallRequest) -> std::result::Result<ToolCallResponse,KernelError> {
+    |                                                                    ------------------------------------------------- expected `chio_kernel::KernelError` because of this
+208 |     let context = SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
+209 |         TenantId::new("composition")?,SessionId::new("original-session")?,
+    |         ----------------------------^ the trait `From<IdError>` is not implemented for `chio_kernel::KernelError`
+    |         |
+    |         this can't be annotated with `?` because it has type `Result<_, IdError>`
+    |
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+    = help: the following other types implement trait `From<T>`:
+              `chio_kernel::KernelError` implements `From<ApprovalReplayError>`
+              `chio_kernel::KernelError` implements `From<BudgetStoreError>`
+              `chio_kernel::KernelError` implements `From<ClockError>`
+              `chio_kernel::KernelError` implements `From<DpopError>`
+              `chio_kernel::KernelError` implements `From<ExecutionNonceError>`
+              `chio_kernel::KernelError` implements `From<ReceiptStoreError>`
+              `chio_kernel::KernelError` implements `From<RevocationStoreError>`
+              `chio_kernel::KernelError` implements `From<SessionError>`
+            and 4 others
+
+error[E0277]: `?` couldn't convert the error to `chio_kernel::KernelError`
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/fixture.rs:209:73
+    |
+207 | pub fn evaluate(kernel: &ChioKernel, request: &ToolCallRequest) -> std::result::Result<ToolCallResponse,KernelError> {
+    |                                                                    ------------------------------------------------- expected `chio_kernel::KernelError` because of this
+208 |     let context = SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
+209 |         TenantId::new("composition")?,SessionId::new("original-session")?,
+    |                                       ----------------------------------^ the trait `From<IdError>` is not implemented for `chio_kernel::KernelError`
+    |                                       |
+    |                                       this can't be annotated with `?` because it has type `Result<_, IdError>`
+    |
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+    = help: the following other types implement trait `From<T>`:
+              `chio_kernel::KernelError` implements `From<ApprovalReplayError>`
+              `chio_kernel::KernelError` implements `From<BudgetStoreError>`
+              `chio_kernel::KernelError` implements `From<ClockError>`
+              `chio_kernel::KernelError` implements `From<DpopError>`
+              `chio_kernel::KernelError` implements `From<ExecutionNonceError>`
+              `chio_kernel::KernelError` implements `From<ReceiptStoreError>`
+              `chio_kernel::KernelError` implements `From<RevocationStoreError>`
+              `chio_kernel::KernelError` implements `From<SessionError>`
+            and 4 others
+
+error[E0277]: `?` couldn't convert the error to `chio_kernel::KernelError`
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/fixture.rs:210:51
+    |
+207 | pub fn evaluate(kernel: &ChioKernel, request: &ToolCallRequest) -> std::result::Result<ToolCallResponse,KernelError> {
+    |                                                                    ------------------------------------------------- expected `chio_kernel::KernelError` because of this
+...
+210 |         PrincipalId::new(request.agent_id.clone())?,IsolationEpochId::new("original-isolation")?,
+    |         ------------------------------------------^ the trait `From<LabelValidationError>` is not implemented for `chio_kernel::KernelError`
+    |         |
+    |         this can't be annotated with `?` because it has type `Result<_, LabelValidationError>`
+    |
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+    = help: the following other types implement trait `From<T>`:
+              `chio_kernel::KernelError` implements `From<ApprovalReplayError>`
+              `chio_kernel::KernelError` implements `From<BudgetStoreError>`
+              `chio_kernel::KernelError` implements `From<ClockError>`
+              `chio_kernel::KernelError` implements `From<DpopError>`
+              `chio_kernel::KernelError` implements `From<ExecutionNonceError>`
+              `chio_kernel::KernelError` implements `From<ReceiptStoreError>`
+              `chio_kernel::KernelError` implements `From<RevocationStoreError>`
+              `chio_kernel::KernelError` implements `From<SessionError>`
+            and 4 others
+
+error[E0277]: `?` couldn't convert the error to `chio_kernel::KernelError`
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/fixture.rs:210:96
+    |
+207 | pub fn evaluate(kernel: &ChioKernel, request: &ToolCallRequest) -> std::result::Result<ToolCallResponse,KernelError> {
+    |                                                                    ------------------------------------------------- expected `chio_kernel::KernelError` because of this
+...
+210 |         PrincipalId::new(request.agent_id.clone())?,IsolationEpochId::new("original-isolation")?,
+    |                                                     -------------------------------------------^ the trait `From<IdError>` is not implemented for `chio_kernel::KernelError`
+    |                                                     |
+    |                                                     this can't be annotated with `?` because it has type `Result<_, IdError>`
+    |
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+    = help: the following other types implement trait `From<T>`:
+              `chio_kernel::KernelError` implements `From<ApprovalReplayError>`
+              `chio_kernel::KernelError` implements `From<BudgetStoreError>`
+              `chio_kernel::KernelError` implements `From<ClockError>`
+              `chio_kernel::KernelError` implements `From<DpopError>`
+              `chio_kernel::KernelError` implements `From<ExecutionNonceError>`
+              `chio_kernel::KernelError` implements `From<ReceiptStoreError>`
+              `chio_kernel::KernelError` implements `From<RevocationStoreError>`
+              `chio_kernel::KernelError` implements `From<SessionError>`
+            and 4 others
+
+error[E0277]: `?` couldn't convert the error to `chio_kernel::KernelError`
+   --> crates/kernel/chio-kernel/tests/three_owner_composition/fixture.rs:211:54
+    |
+207 | pub fn evaluate(kernel: &ChioKernel, request: &ToolCallRequest) -> std::result::Result<ToolCallResponse,KernelError> {
+    |                                                                    ------------------------------------------------- expected `chio_kernel::KernelError` because of this
+...
+211 |         LineageId::new(request.capability.id.clone())?,1));
+    |         ---------------------------------------------^ the trait `From<IdError>` is not implemented for `chio_kernel::KernelError`
+    |         |
+    |         this can't be annotated with `?` because it has type `Result<_, IdError>`
+    |
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+    = help: the following other types implement trait `From<T>`:
+              `chio_kernel::KernelError` implements `From<ApprovalReplayError>`
+              `chio_kernel::KernelError` implements `From<BudgetStoreError>`
+              `chio_kernel::KernelError` implements `From<ClockError>`
+              `chio_kernel::KernelError` implements `From<DpopError>`
+              `chio_kernel::KernelError` implements `From<ExecutionNonceError>`
+              `chio_kernel::KernelError` implements `From<ReceiptStoreError>`
+              `chio_kernel::KernelError` implements `From<RevocationStoreError>`
+              `chio_kernel::KernelError` implements `From<SessionError>`
+            and 4 others
+
+error[E0277]: the trait bound `u64: FromSql` is not satisfied
+   --> crates/kernel/chio-kernel/tests/three_owner_composition.rs:65:88
+    |
+ 65 |         let rows: u64=db.query_row("SELECT count(*) FROM admission_operations",[],|r|r.get(0))?;
+    |                                                                                        ^^^ the trait `FromSql` is not implemented for `u64`
+    |
+    = help: the following other types implement trait `FromSql`:
+              f32
+              f64
+              i16
+              i32
+              i64
+              i8
+              isize
+              u16
+            and 2 others
+note: required by a bound in `Row::<'_>::get`
+   --> /home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rusqlite-0.39.0/src/row.rs:285:32
+    |
+285 |     pub fn get<I: RowIndex, T: FromSql>(&self, idx: I) -> Result<T> {
+    |                                ^^^^^^^ required by this bound in `Row::<'_>::get`
+
+Some errors have detailed explanations: E0277, E0432.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `chio-kernel` (test "three_owner_composition") due to 14 previous errors

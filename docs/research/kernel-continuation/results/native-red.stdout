@@ -1,0 +1,15 @@
+
+running 1 test
+test approved_artifacts_and_earned_child_survive_parent_finalization_loss ... FAILED
+
+failures:
+
+---- approved_artifacts_and_earned_child_survive_parent_finalization_loss stdout ----
+Error: "connected native trajectory not implemented"
+
+
+failures:
+    approved_artifacts_and_earned_child_survive_parent_finalization_loss
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

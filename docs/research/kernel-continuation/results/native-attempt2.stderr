@@ -1,0 +1,61 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+error[E0597]: `db` does not live long enough
+  --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:75:25
+   |
+74 |         let db = Connection::open(root.join("bank.db"))?;
+   |             -- binding `db` declared here
+75 |         let mut query = db.prepare("SELECT balance FROM accounts ORDER BY id")?;
+   |                         ^^ borrowed value does not live long enough
+76 |         Ok(query.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?)
+   |            ---------------------------------- a temporary with access to the borrow is created here ...
+77 |     }
+   |     -
+   |     |
+   |     `db` dropped here while still borrowed
+   |     ... and the borrow might be used here, when that temporary is dropped and runs the destructor for type `ControlFlow<std::result::Result<Infallible, rusqlite::Error>, MappedRows<'_, {closure@crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:76:32: 76:35}>>`
+   |
+   = note: the temporary is part of an expression at the end of a block;
+           consider forcing this temporary to be dropped sooner, before the block's local variables are dropped
+help: for example, you could save the expression's value in a new local variable `x` and then make `x` be the expression at the end of the block
+   |
+76 |         let x = Ok(query.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?); x
+   |         +++++++                                                                              +++
+
+error[E0597]: `query` does not live long enough
+  --> crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:76:12
+   |
+75 |         let mut query = db.prepare("SELECT balance FROM accounts ORDER BY id")?;
+   |             --------- binding `query` declared here
+76 |         Ok(query.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?)
+   |            ^^^^^-----------------------------
+   |            |
+   |            borrowed value does not live long enough
+   |            a temporary with access to the borrow is created here ...
+77 |     }
+   |     -
+   |     |
+   |     `query` dropped here while still borrowed
+   |     ... and the borrow might be used here, when that temporary is dropped and runs the destructor for type `ControlFlow<std::result::Result<Infallible, rusqlite::Error>, MappedRows<'_, {closure@crates/kernel/chio-kernel/tests/three_owner_composition/bank.rs:76:32: 76:35}>>`
+   |
+   = note: the temporary is part of an expression at the end of a block;
+           consider forcing this temporary to be dropped sooner, before the block's local variables are dropped
+help: for example, you could save the expression's value in a new local variable `x` and then make `x` be the expression at the end of the block
+   |
+76 |         let x = Ok(query.query_map([], |r| r.get(0))?.collect::<rusqlite::Result<Vec<_>>>()?); x
+   |         +++++++                                                                              +++
+
+For more information about this error, try `rustc --explain E0597`.
+error: could not compile `chio-kernel` (test "three_owner_composition") due to 2 previous errors
