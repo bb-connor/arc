@@ -1,4 +1,4 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
      Running unittests src/lib.rs (labs/kernel-work-composition/target/debug/deps/kernel_work_composition-33e7eb69bccb1479)
      Running unittests src/bin/explore.rs (labs/kernel-work-composition/target/debug/deps/explore-80f43bfa11737253)
      Running tests/scenarios.rs (labs/kernel-work-composition/target/debug/deps/scenarios-99b10135bce22f23)

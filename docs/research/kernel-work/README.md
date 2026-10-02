@@ -32,7 +32,7 @@ Start with these documents in order:
 6. [Common model](MODEL.md), [fixtures](fixtures.json), [witness](WITNESS.md) and
    [G1 decision](G1-DECISION.md): shared semantics, repaired alternatives and the
    narrowed scientific route registered before implementation.
-7. [G2 results and reproducibility](results/G2.md): 57 variants per arm, bounded
+7. [G2 results and reproducibility](results/G2.md): 66 variants per arm, bounded
    exploration, controls, corrections and the exact evidence limits.
 
 ```mermaid

@@ -45,6 +45,13 @@ pub fn obligations(s: &State, c: &Command) -> Vec<Check> {
             let o = &s.ops[*op];
             check!("identity", *issuance > 0 && *envelope > 0);
             check!(
+                "identity_owner",
+                s.ops.iter().enumerate().all(|(index, other)| index == *op
+                    || other
+                        .finalized
+                        .is_none_or(|f| f.0 != *issuance && f.1 != *envelope))
+            );
+            check!(
                 "custody",
                 o.finalized
                     .is_none_or(|f| f == (*issuance, *envelope, o.basis))
@@ -166,6 +173,7 @@ pub fn obligations(s: &State, c: &Command) -> Vec<Check> {
                 .contains(&channel.as_str())
             );
             check!("receiver", *recipient == 5);
+            check!("audience", channel != "result" || s.read);
             check!("bounded", channel != "return" || *bounded);
             check!("claim_bound", claims.len() <= 16);
             check!(

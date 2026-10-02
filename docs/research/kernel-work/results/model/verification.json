@@ -1,24 +1,24 @@
 {
   "schema": "chio.kernel-work.verification.v1",
-  "repository_head_at_run": "9b7083ee23e899be879e57036b6b60a9a8b7497c",
+  "repository_head_at_run": "f8c67dfe678b205fca4d60e7840e536e2a23abac",
   "sources": {
     "docs/research/kernel-work/G1-DECISION.md": "a782ba3ed8492366626adea547ea360db7175df5ae5d90a5d7b8bb5fbf4c2a42",
-    "docs/research/kernel-work/MODEL.md": "aa8caf3b9595bced2e1df1f65ebca8e94b1bbf50b848fe870c28ac165181ef37",
+    "docs/research/kernel-work/MODEL.md": "b557abf38c3d4250d31da0bc678dffbb40dde18da1be119187df59136575305b",
     "docs/research/kernel-work/WITNESS.md": "dc9c077f14f84f77d03b80d33305a02aa931cee2bf48f3f84d976598d381debe",
-    "docs/research/kernel-work/fixtures.json": "5f5c48e95a0e331be309ff00da2f6b8a2363155f3258c439b3bf9512bec357f8",
+    "docs/research/kernel-work/fixtures.json": "06eefba4e2a00b927589a231d10090a898cfe74d317a9e003dd7817fc7d15c08",
     "docs/research/kernel-work/recovery-baseline.json": "d3aa0d749badc2d7536e7e4169274d3e4c57a318bac51218cf7fc825ae8ab73b",
     "docs/research/kernel-work/task3-sources.json": "93ece993ff5ecbd7beba0c7eaaa1f3cd69990996d73213ed3ebbdb887a7fe75c",
     "labs/kernel-work-composition/Cargo.lock": "e03e42a170fa008809fdd2ad214a010d2e30726c971fb4762e93770518af9e24",
     "labs/kernel-work-composition/Cargo.toml": "0929d242c8072004b6717af28a909c10172908f561ca1f1bb659ece1a8085e5f",
-    "labs/kernel-work-composition/README.md": "bdd1548595dac7b8a969a4543397e16a1c70757c79b49a2501b262ce99f7c0aa",
+    "labs/kernel-work-composition/README.md": "02acf386f5d0b62e4fc08f1e44f1fd39e8ba8146511e0ac499cf5db52777d424",
     "labs/kernel-work-composition/rust-toolchain.toml": "f53198ae4fdecfd87da36fe431c771b54c51e975d01c0e99f653bc14d5d48211",
-    "labs/kernel-work-composition/src/baseline.rs": "6c6d99a36afa032d7e4c90de2a7126440e5d5e6057520a52e5f22d0fa10b2849",
+    "labs/kernel-work-composition/src/baseline.rs": "a5d2fe3b0542e784e512abceac24908c958cb0f3906df4e5ed597c8da4bd83fa",
     "labs/kernel-work-composition/src/bin/explore.rs": "1684338fbbcacb94dec2e2a83131d85e2ebce93caa82e6bf0aca5382fb51ef57",
-    "labs/kernel-work-composition/src/continuation.rs": "4c8411da3b70ef02190ab383f61f736570ff23f68ff94a6088a2cbbdab2c4f5d",
-    "labs/kernel-work-composition/src/exploration.rs": "6dcea18aa9cc877ff6b797fc3767338c72720fe4710e86abeb2060f8e136af3f",
+    "labs/kernel-work-composition/src/continuation.rs": "1f74833212f672090548e0d57a4f9908a3f089492d57083e09f308daf3589ad1",
+    "labs/kernel-work-composition/src/exploration.rs": "c9b77478be871f688207a177e2eff6d8031d67bbf27220936e10b3b196c66682",
     "labs/kernel-work-composition/src/lib.rs": "79e20dcd1c30f3931041e26660e080b4261c20f6c06208b80ad5b1a0059d8849",
     "labs/kernel-work-composition/src/model.rs": "6339f4c63adeec2521ff43753011a694babd84bfd8636caacbb66bb9023d06cc",
-    "labs/kernel-work-composition/tests/scenarios.rs": "30cc194f15c9f7f3738300c073a4b55068ad5904b1df8e33c1a74c1ee347139f",
+    "labs/kernel-work-composition/tests/scenarios.rs": "2e82b087cb5bac7df0ea5dc6d87ed7e11923008bf75c9b1d27658f3dcb6b6e30",
     "labs/kernel-work-composition/verify.py": "3048d70ee2e137dd0e9fa6160fb7769d9739968aa83843be4c2a4d5a42059abc"
   },
   "commands": [
@@ -31,11 +31,11 @@
         "labs/kernel-work-composition/Cargo.toml"
       ],
       "exit_code": 0,
-      "elapsed_seconds_diagnostic_only": 18.88,
+      "elapsed_seconds_diagnostic_only": 31.549,
       "stdout": "docs/research/kernel-work/results/model/tests.stdout",
       "stderr": "docs/research/kernel-work/results/model/tests.stderr",
-      "stdout_sha256": "dfb82ffa7851f4849c866835253585a9707518d38866914e2e00a9e6d1db648e",
-      "stderr_sha256": "a6db86d9c21b47e565a22c9919db10c787c941c6f10f352002265f1cd29841be"
+      "stdout_sha256": "71c23737a8222e711de2cf8f8c07d0a99d8f81c56c69c8fffa42be534d4e1616",
+      "stderr_sha256": "282570a6c44f4b4b3ca297dc9e034f7181bc97ffb7a44657459260e3c2fb6eb2"
     },
     {
       "argv": [
@@ -47,7 +47,7 @@
         "--check"
       ],
       "exit_code": 0,
-      "elapsed_seconds_diagnostic_only": 0.117,
+      "elapsed_seconds_diagnostic_only": 0.108,
       "stdout": "docs/research/kernel-work/results/model/format.stdout",
       "stderr": "docs/research/kernel-work/results/model/format.stderr",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -66,11 +66,11 @@
         "warnings"
       ],
       "exit_code": 0,
-      "elapsed_seconds_diagnostic_only": 0.137,
+      "elapsed_seconds_diagnostic_only": 0.965,
       "stdout": "docs/research/kernel-work/results/model/clippy.stdout",
       "stderr": "docs/research/kernel-work/results/model/clippy.stderr",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr_sha256": "99f71393b9903dca098310bb446022a4bdee195ea9996f351a787195555210a6"
+      "stderr_sha256": "8d1102b454ebd8e1fa06f91ead268997ec8c780cb2abbecdd4438f84256dd2d3"
     },
     {
       "argv": [
@@ -83,10 +83,10 @@
         "explore"
       ],
       "exit_code": 0,
-      "elapsed_seconds_diagnostic_only": 18.848,
+      "elapsed_seconds_diagnostic_only": 31.274,
       "stdout": "docs/research/kernel-work/results/model/explorer.stdout",
       "stderr": "docs/research/kernel-work/results/model/explorer.stderr",
-      "stdout_sha256": "d0fbd868d161ead872190929c1da23ef3f165a87410fdbffe3eacd2795388942",
+      "stdout_sha256": "643e980275589836f42bf6c5fa89e06b363857b3058b55a5910cc902f8cc5569",
       "stderr_sha256": "4308ec222dc29b99777493aa7ce8f4a0f475877ce6d0bc0495951f7399d379ae"
     },
     {
@@ -95,7 +95,7 @@
         "docs/research/kernel-work/verify_task1.py"
       ],
       "exit_code": 0,
-      "elapsed_seconds_diagnostic_only": 0.211,
+      "elapsed_seconds_diagnostic_only": 0.317,
       "stdout": "docs/research/kernel-work/results/model/provenance.stdout",
       "stderr": "docs/research/kernel-work/results/model/provenance.stderr",
       "stdout_sha256": "d96d9b7ce927188e0542df428eb4540b252ef87d1fdc29ef1951dc0f6c77bf1d",

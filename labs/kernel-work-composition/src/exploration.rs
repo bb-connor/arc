@@ -55,6 +55,16 @@ fn invariants(old: &State, s: &State, old_oracle: &Oracle, oracle: &Oracle) -> b
         return false;
     }
     for (i, o) in s.ops.iter().enumerate() {
+        if let Some((issuance, envelope, _)) = o.finalized {
+            for other in s.ops.iter().skip(i + 1) {
+                if other
+                    .finalized
+                    .is_some_and(|f| f.0 == issuance || f.1 == envelope)
+                {
+                    return false;
+                }
+            }
+        }
         if oracle.effects[i] > 1 || o.nonces != o.captures || o.captures > 1 {
             return false;
         }
@@ -308,6 +318,38 @@ pub fn explore() -> Result<Value, String> {
             ],
         ),
     ];
+    let mut groups = groups;
+    groups.push((
+        "cross_operation_identity",
+        "F04_unknown_both",
+        12,
+        vec![
+            json!({"kind":"finalize","op":1,"issuance":11,"envelope":21}),
+            json!({"kind":"finalize","op":1,"issuance":11,"envelope":22}),
+            json!({"kind":"finalize","op":1,"issuance":12,"envelope":21}),
+            json!({"kind":"finalize","op":1,"issuance":12,"envelope":22}),
+            cap(1, 2),
+            send(1),
+            json!({"kind":"gc","op":0}),
+            json!({"kind":"crash"}),
+        ],
+    ));
+    let result_commands = fixture(&data, "F08_result")?["commands"]
+        .as_array()
+        .ok_or("release commands")?;
+    groups.push((
+        "result_audience",
+        "F01_exact",
+        6,
+        vec![
+            json!({"kind":"permission","name":"read","value":false}),
+            json!({"kind":"permission","name":"read","value":true}),
+            json!({"kind":"read_result","op":0}),
+            result_commands[0].clone(),
+            result_commands[1].clone(),
+            json!({"kind":"settle","op":0,"epoch":1}),
+        ],
+    ));
     let mut schedules = Vec::new();
     let mut total = 0;
     let mut violations = 0;

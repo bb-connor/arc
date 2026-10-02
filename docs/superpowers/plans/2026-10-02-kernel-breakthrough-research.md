@@ -216,7 +216,7 @@ all expected states derive from the common model. A table of denials alone fails
 this task. Existing PR #1172 trajectories supply baseline cases; add cross-owner
 assertions instead of rewriting their entire suite.
 
-**Completion record:** [KW1 model](../../research/kernel-work/MODEL.md) and [52 fixture variants](../../research/kernel-work/fixtures.json); structural checks passed. Execution assertions are qualified in Task 4, not presumed here.
+**Completion record:** [KW1 model](../../research/kernel-work/MODEL.md) and [fixture families and variants](../../research/kernel-work/fixtures.json); structural checks passed. Execution assertions are qualified in Task 4, not presumed here.
 
 ## Task 3: Find a nontrivial witness and choose the smallest contribution
 
@@ -269,25 +269,25 @@ directory with an explicit pinned toolchain and one documented build command.
 **Produces:** a checked argument/counterexample corpus with an honest proof scope,
 an executable conventional baseline, and evidence for safety plus useful progress.
 
-- [ ] Add the named F01-F16 scenario assertions for the selected profile before
+- [x] Add the named F01-F16 scenario assertions for the selected profile before
   implementing the candidate reducer. Observe their expected initial failures.
   Encode known-good baseline behavior without disabling any permitted mechanism.
-- [ ] Implement the smallest pure state transition and continuation procedure
+- [x] Implement the smallest pure state transition and continuation procedure
   described by G1. Use existing pure recovery semantics as specified inputs;
   never label a spec adapter a production implementation.
-- [ ] Enumerate bounded schedules including duplicate delivery, concurrent
+- [x] Enumerate bounded schedules including duplicate delivery, concurrent
   admission, crash/reopen, stale epochs and contradictory evidence. Preserve
   concrete counterexamples and the bounds/source hashes in machine-readable output.
-- [ ] Compare the candidate against the strongest selected baseline and explicit
+- [x] Compare the candidate against the strongest selected baseline and explicit
   deny-all/retry-all controls. The former must lose useful progress; the latter
   must violate safety in the ambiguous effect case.
-- [ ] Run removal experiments only on the candidate mechanism. Attribute each
+- [x] Run removal experiments only on the candidate mechanism. Attribute each
   lost property to the intended missing rule, with a positive matched case.
-- [ ] Prove the selected statements if the claim requires them. Do not replace
+- [x] Prove the selected statements if the claim requires them. Do not replace
   an arbitrary-trace theorem with finite exploration or present generic conserved
   arithmetic as the cross-owner composition theorem. Record assumptions and any
   unproved implementation correspondence beside each result.
-- [ ] Record G2 as passed, narrowed or failed. Report safe progress, uncertainty
+- [x] Record G2 as passed, narrowed or failed. Report safe progress, uncertainty
   and algorithm/state cost together; reject a win purchased by hidden knowledge,
   extra trusted authority, weaker policy or reduced workload semantics.
 
@@ -295,6 +295,8 @@ an executable conventional baseline, and evidence for safety plus useful progres
 and the documented deterministic explorer/proof commands. Every process must
 finish and retain its exit code. A proof of protocol semantics is distinct from
 proof of production Rust correctness.
+
+**Completion record:** [G2 result and acceptance](../../research/kernel-work/results/G2.md), [fresh review and one correction pass](../../research/kernel-work/results/REVIEW.md), and [source-bound verification](../../research/kernel-work/results/model/verification.json). All 36 tests, 66 variants per arm, 126,893 bounded transitions, controls and removals pass their declared expectations. Scientific result remains narrowed; no native, arbitrary-trace or breakthrough claim is promoted.
 
 ## Task 5: Connect the result to actual kernel behavior
 

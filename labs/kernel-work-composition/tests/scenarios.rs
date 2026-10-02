@@ -57,6 +57,18 @@ fn check_family(id: &str, arm: Arm) -> Result<(), Box<dyn std::error::Error>> {
                     <= step["wallet"].as_u64().ok_or("wallet")?
             );
             assert_eq!(step["captures"], step["nonces"]);
+            for identity in ["issuances", "envelopes"] {
+                let values = step[identity].as_array().ok_or("identity vector")?;
+                let mut seen = std::collections::BTreeSet::new();
+                for value in values {
+                    let id = value.as_u64().ok_or("identity")?;
+                    assert!(
+                        id == 0 || seen.insert(id),
+                        "duplicate {identity} in {}",
+                        fixture["id"]
+                    );
+                }
+            }
             let knowledge = step["knowledge"].as_u64().ok_or("knowledge")?;
             assert_eq!(knowledge & 3, 3);
         }

@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--manifest-path",
+    "labs/kernel-work-composition/Cargo.toml",
+    "--test",
+    "scenarios",
+    "--",
+    "--skip",
+    "bounded_schedules_preserve_safety_and_match_b1"
+  ],
+  "exit_code": 101,
+  "purpose": "fresh-review cross-operation identity replay and revoked-audience release bypass"
+}

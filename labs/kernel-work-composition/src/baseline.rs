@@ -23,6 +23,13 @@ pub fn decide(s: &State, c: &Command) -> (bool, usize) {
         } => {
             require!(*op < 3);
             require!(*issuance != 0 && *envelope != 0);
+            for (index, other) in s.ops.iter().enumerate() {
+                if index != *op
+                    && let Some((used_issuance, used_envelope, _)) = other.finalized
+                {
+                    require!(used_issuance != *issuance && used_envelope != *envelope);
+                }
+            }
             if let Some((old_i, old_e, basis)) = s.ops[*op].finalized {
                 require!(old_i == *issuance && old_e == *envelope && basis == s.ops[*op].basis);
             }
@@ -139,6 +146,7 @@ pub fn decide(s: &State, c: &Command) -> (bool, usize) {
                     | "approval"
             ));
             require!(*recipient == 5 && (channel != "return" || *bounded) && claims.len() <= 16);
+            require!(channel != "result" || s.read);
             let mut represented = 0u8;
             for approval in claims {
                 if approval.channel == *channel

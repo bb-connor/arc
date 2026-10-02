@@ -177,3 +177,21 @@ and verifies context/coverage/retention without requiring a new call. This split
 corrects the initial fixtures' overly broad use of the evidence command for both
 operations. Finalization ACK loss requires exact original readback before capture.
 The state and ports are specified in the [lab README](../../../labs/kernel-work-composition/README.md).
+
+## Final review clarifications
+
+All three executable native operations originate in P's local authority domain;
+the child operation is P's request to C, whose receiving-host semantics are an
+explicit qualification assumption. Issuance and finalized-envelope identifiers
+have one owning local operation across all three records and retained tombstones.
+No global uniqueness service across independent domains is implied.
+
+Generic releases refer to the prepared immutable artifact version 1. The
+publication operation's changed bytes are a separate ActionIntent basis. This
+model does not establish a shared-source binding between those two abstractions.
+The `read` predicate is current audience authority for result releases through
+both the native-result and generic-artifact entry points. Other channel-specific
+current permissions are supplied constants in KW1, not an implementation of
+general revocation. Nine review regressions combine revocation with generic
+release and identity replay with uncertainty/refund or terminal GC/restart;
+distinct-identity and reauthorization counterparts remain useful.

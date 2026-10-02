@@ -38,7 +38,7 @@ routes them to their owning ports. `exploration.rs` enumerates all permitted
 prefixes through depth five for each recorded alphabet, without random sampling
 or state deduplication. Repeated visits are schedules, not distinct states.
 
-F01-F16 contain 57 directed variants after five boundary regressions were added.
+F01-F16 contain 66 directed variants after five boundary regressions and nine review regressions were added.
 Thirty-two named family/arm tests execute every variant and its expected decisions
 and state. Additional tests check the E2 observation pair, deny/retry controls,
 five candidate removals and bounded schedules. Deny-all and retry-all are negative
@@ -57,7 +57,12 @@ against an equivocating provider on which authoritative truth depends.
 
 The aggregate simulator state is a product used by the experiment, not a proposed
 shared execution database. The fixed topology and symbolic bindings are the
-model's edges; there is no dynamic cross-owner DAG runtime in this lab.
+model's edges; there is no dynamic cross-owner DAG runtime in this lab. All three
+modeled native operations originate in P's local authority domain; the child
+operation is P's request to the qualified C host. Issuance/envelope ownership is
+unique within that local domain across these records, including retained
+terminal tombstones. This is not global identity uniqueness across independent
+owners or a new shared identity service.
 
 | Commands | Owning decision boundary and visible facts |
 | --- | --- |
@@ -90,6 +95,16 @@ therefore cannot catch a shared adapter defect alone. Independent fixture/oracle
 assertions did catch capture-crash ownership, globally scoped dependencies and
 misleading planner advice; the failing and passing runs are retained. The final
 review and future native correspondence must examine this shared assumption.
+
+A generic `release` uses the prepared immutable artifact version 1. Publication
+`change` commands alter operation 0's ActionIntent basis, not that retained
+artifact. The model does not establish a binding between a newly materialized
+publication payload and the generic artifact. Current audience permission still
+applies to every result-release entry point, including this generic one; exact
+owner coverage cannot replace it. Other channel permissions are fixed supplied
+facts in KW1. The final review exposed this audience bypass and cross-operation
+identity reuse; both have combined negative/reauthorization or distinct-identity
+regressions and dedicated exploration alphabets.
 
 ## Evidence limits
 

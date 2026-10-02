@@ -1,0 +1,82 @@
+
+running 35 tests
+test baseline_f12 ... ok
+test baseline_f10 ... ok
+test baseline_f02 ... ok
+test baseline_f01 ... ok
+test baseline_f06 ... ok
+test baseline_f08 ... ok
+test baseline_f14 ... ok
+test baseline_f09 ... ok
+test baseline_f03 ... ok
+test candidate_f01 ... ok
+test baseline_f13 ... ok
+test baseline_f11 ... ok
+test baseline_f07 ... FAILED
+test baseline_f04 ... FAILED
+test baseline_f05 ... ok
+test baseline_f15 ... ok
+test baseline_f16 ... ok
+test candidate_f05 ... ok
+test candidate_f02 ... ok
+test candidate_f10 ... ok
+test candidate_f07 ... FAILED
+test candidate_f04 ... FAILED
+test candidate_f09 ... ok
+test candidate_f03 ... ok
+test candidate_f12 ... ok
+test candidate_f14 ... ok
+test candidate_f08 ... ok
+test candidate_f11 ... ok
+test candidate_f16 ... ok
+test candidate_f06 ... ok
+test candidate_f15 ... ok
+test controls_fail_for_progress_and_safety_respectively ... ok
+test candidate_f13 ... ok
+test opaque_histories_have_identical_controller_views ... ok
+test removals_have_named_counterexamples ... ok
+
+failures:
+
+---- baseline_f07 stdout ----
+
+thread 'baseline_f07' (1546899) panicked at tests/scenarios.rs:42:17:
+assertion `left == right` failed: "F07_result_release_permission" Baseline releases
+  left: Number(2)
+ right: Number(1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- baseline_f04 stdout ----
+
+thread 'baseline_f04' (1546896) panicked at tests/scenarios.rs:42:17:
+assertion `left == right` failed: "F04_unknown_both" Baseline effects
+  left: Array [Number(1), Number(1), Number(0)]
+ right: Array [Number(1), Number(0), Number(0)]
+
+---- candidate_f07 stdout ----
+
+thread 'candidate_f07' (1546915) panicked at tests/scenarios.rs:42:17:
+assertion `left == right` failed: "F07_result_release_permission" Candidate releases
+  left: Number(2)
+ right: Number(1)
+
+---- candidate_f04 stdout ----
+
+thread 'candidate_f04' (1546912) panicked at tests/scenarios.rs:42:17:
+assertion `left == right` failed: "F04_unknown_both" Candidate effects
+  left: Array [Number(1), Number(1), Number(0)]
+ right: Array [Number(1), Number(0), Number(0)]
+
+
+failures:
+    baseline_f04
+    baseline_f07
+    candidate_f04
+    candidate_f07
+
+test result: FAILED. 31 passed; 4 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.14s
+
+   Compiling kernel-work-composition v0.1.0 (/tmp/chio-verifiable-work-paper/labs/kernel-work-composition)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.99s
+     Running tests/scenarios.rs (labs/kernel-work-composition/target/debug/deps/scenarios-99b10135bce22f23)
+error: test failed, to rerun pass `--test scenarios`

@@ -1435,6 +1435,1486 @@
               false
             ]
           }
+        },
+        {
+          "id": "F04_unknown_both",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_unknown_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_unknown_issuance",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 11,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_unknown_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_unknown_envelope",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_unknown_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_unknown_distinct",
+          "profile": "E2",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "refund_parent"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [
+            {
+              "at": 5,
+              "applied": true,
+              "ack": false
+            }
+          ],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_unknown_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              1,
+              0
+            ],
+            "outcomes": [
+              "unknown",
+              "applied",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              1,
+              0
+            ],
+            "issuances": [
+              11,
+              12,
+              0
+            ],
+            "envelopes": [
+              21,
+              22,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        },
+        {
+          "id": "F04_closed_gc_both",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_closed_gc_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_closed_gc_issuance",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 11,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_closed_gc_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_closed_gc_envelope",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_closed_gc_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "fresh",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              0,
+              0
+            ],
+            "issuances": [
+              11,
+              0,
+              0
+            ],
+            "envelopes": [
+              21,
+              0,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false
+            ]
+          }
+        },
+        {
+          "id": "F04_closed_gc_distinct",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "gc",
+              "op": 0
+            },
+            {
+              "kind": "crash"
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 1,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 1,
+              "issuance": 12,
+              "envelope": 22
+            },
+            {
+              "kind": "capture",
+              "op": 1,
+              "epoch": 2,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 1
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F04_closed_gc_distinct",
+          "expected_effects": {
+            "effects": [
+              1,
+              1,
+              0
+            ],
+            "outcomes": [
+              "applied",
+              "applied",
+              "fresh"
+            ]
+          },
+          "expected_authority": {
+            "nonces": [
+              1,
+              1,
+              0
+            ],
+            "issuances": [
+              11,
+              12,
+              0
+            ],
+            "envelopes": [
+              21,
+              22,
+              0
+            ]
+          },
+          "expected_knowledge": {},
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
         }
       ]
     },
@@ -2790,6 +4270,160 @@
               true,
               true,
               false
+            ]
+          }
+        },
+        {
+          "id": "F07_result_release_permission",
+          "profile": "E1",
+          "initial_state": {},
+          "commands": [
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 0,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 1,
+              "role": "confidentiality",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "approve",
+              "op": 0,
+              "principal": 2,
+              "role": "integrity",
+              "basis": [
+                1,
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "finalize",
+              "op": 0,
+              "issuance": 11,
+              "envelope": 21
+            },
+            {
+              "kind": "capture",
+              "op": 0,
+              "epoch": 1,
+              "mode": "live"
+            },
+            {
+              "kind": "send",
+              "op": 0
+            },
+            {
+              "kind": "permission",
+              "name": "read",
+              "value": false
+            },
+            {
+              "kind": "read_result",
+              "op": 0
+            },
+            {
+              "kind": "release",
+              "channel": "result",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            },
+            {
+              "kind": "permission",
+              "name": "read",
+              "value": true
+            },
+            {
+              "kind": "release",
+              "channel": "result",
+              "recipient": 5,
+              "bounded": true,
+              "claims": [
+                {
+                  "principal": 0,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                },
+                {
+                  "principal": 1,
+                  "channel": "result",
+                  "recipient": 5,
+                  "version": 1,
+                  "role": "confidentiality"
+                }
+              ]
+            }
+          ],
+          "faults": [],
+          "observations": {
+            "controller": "local records, owner updates and returned outcomes only",
+            "oracle_only": "fault application and physical effect counts"
+          },
+          "positive_counterpart": "F07_result_release_permission",
+          "expected_effects": {
+            "effects": [
+              1,
+              0,
+              0
+            ]
+          },
+          "expected_authority": {},
+          "expected_knowledge": {
+            "releases": 1
+          },
+          "expected_resources": {},
+          "expected_obligations": {},
+          "expected_progress": {
+            "accepted": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              true,
+              true
             ]
           }
         }
