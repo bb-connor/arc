@@ -226,24 +226,24 @@ assertions instead of rewriting their entire suite.
 **Produces:** a selected mechanism and exact experimental specification, or a
 preserved negative result with no premature implementation.
 
-- [ ] Work through at least one identical-observation pair and one useful
+- [x] Work through at least one identical-observation pair and one useful
   cross-owner remedy by hand. Name the fact, authority or dependency that
   determines whether the next action is legal.
-- [ ] Try to reproduce the same result in B1-B3. Repair those constructions
+- [x] Try to reproduce the same result in B1-B3. Repair those constructions
   wherever ordinary engineering permits. Record the minimal additional state,
   trust, coordination or application logic on both sides.
-- [ ] State the candidate composition theorem and its premises, or the proposed
+- [x] State the candidate composition theorem and its premises, or the proposed
   algorithm and its complexity/progress claim. Explain the consequence beyond
   K1-K4 holding individually. A definition equivalent to its own checker is not
   an adequate theorem contribution.
-- [ ] If the contribution is a systems tradeoff, preregister the primary metric,
+- [x] If the contribution is a systems tradeoff, preregister the primary metric,
   important effect size and workload boundary before measuring it. Keep the
   original H2-H4 thresholds where those claims are used; do not invent favorable
   targets after seeing results.
-- [ ] Choose `pursue`, `narrow` or `reject` for each claim with the strongest
+- [x] Choose `pursue`, `narrow` or `reject` for each claim with the strongest
   objection attached. A new implementation of an old rule may be valuable; say
   exactly whether that leaves a scientific contribution to investigate.
-- [ ] For `pursue`, write the small experiment design: selected transitions,
+- [x] For `pursue`, write the small experiment design: selected transitions,
   algorithm inputs/outputs, baseline ports, proof statements, named scenario
   assertions, resource bounds, run commands and source files. This completes
   the mechanism-specific design before Task 4 writes code.
@@ -252,6 +252,8 @@ preserved negative result with no premature implementation.
 already settled by the counterdesign. It can come from the shipped-assumed
 recovery architecture itself. A negative decision is a completed research result,
 not permission to relabel the existing escrow paper a breakthrough.
+
+**Completion record:** [witness and counterdesign repairs](../../research/kernel-work/WITNESS.md), [G1 decision and preregistration](../../research/kernel-work/G1-DECISION.md). R1 narrowed, R2 algorithm novelty rejected, R3 pursued conditionally; no foundational result established.
 
 ## Task 4: Establish the mechanism with proofs and executable controls
 
