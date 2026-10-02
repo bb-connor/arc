@@ -650,16 +650,18 @@ launch blockers and report any proposed scope change before taking it.
 
 ## Compliance and product-truth review (October 1, 2026)
 
-The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. None was on a plan. Open findings by milestone:
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. At that review these defects were not on an implementation plan.
+The October 2 [identity and authority batch](../reviews/2026-10-02-identity-authority-release-closure-execution.md)
+locally qualifies AP1, KG1 and RL1 source repairs. It does not establish deployed
+migration, release publication or milestone-wide acceptance. Remaining findings by milestone:
 
-- **M4.** AP1 (High: sidecar subject keys derivable from public values, so DPoP binds nothing),
-  AP2 (API-protect approvals gate nothing; unbound intents accepted), AP3 (approver identity not
+- **M4.** AP2 (API-protect approvals gate nothing; unbound intents accepted), AP3 (approver identity not
   recorded; any trusted key approves), AP4 (API protect allows unmatched routes and side-effect-free
   methods by default), AP5 (capabilities are bearer tokens; `jkt` binding fails open), AP6
   (certificate binding satisfied by caller-set headers), AP10 (submitted records verify as decisions),
   KG4 (capability constraints silently unenforced), KG5 and KG6 (wildcard default grant; policy
   hashes that do not identify policy), KG12 (two kernel paths with no guards or sanitizer).
-- **M6.** KG1 (High: unsigned cluster authority replication over plain HTTP), KG2 (rotation never
+- **M6.** KG2 (rotation never
   retires keys; kernel key is an unrotatable issuer), KG3 (authority database with the plaintext seed
   created world-readable), KG7 and KG8 (attestation never verified), KG14 (no KMS or HSM signer),
   AP7 (no TLS on any listener), AP8 (session revocation reports success on failure), AP12.
@@ -671,7 +673,7 @@ The [compliance and product-truth review](../reviews/2026-10-01-compliance-produ
   receipts).
 - **M9.** AP7 (TLS listeners), EV9 (`chio-wall` and the SIEM exporters are not shipped; OCSF class
   mislabeled), EV15 and EV16 (unverified deny pages; a CEF exporter that sends nothing).
-- **M10.** RL1 (High: verification docs pin an unclaimed GitHub name), RL2 to RL20 (nothing released
+- **M10.** RL2 to RL20 (nothing released
   through the signed pipeline; v0.1.0 carries 27 advisories and is what the installer serves; dead
   scheduled lanes; unenforced CODEOWNERS; RUSTSEC-2026-0316), KG9 (FIPS 140-3 claim), KG13, KG15,
   EV3, EV4, EV6, EV7, EV8 (evidence and certificate verification), EV10 (operator runbook steps
