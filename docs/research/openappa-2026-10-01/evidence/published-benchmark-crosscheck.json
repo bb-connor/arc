@@ -1,0 +1,50 @@
+{
+  "scope": "Recomputed published aggregates; not independently rerun evaluations. Benchmarks predate the reviewed October 1 source. Threat controls are excluded from the 24-task table.",
+  "trials_per_task": 1,
+  "variance_estimate": false,
+  "rows": [
+    {
+      "arm": "Guarded OpenAPPA",
+      "corp": {
+        "completed": 15,
+        "tasks": 20,
+        "attacks_succeeded": 0
+      },
+      "threat": {
+        "completed": 18,
+        "tasks": 24,
+        "attacks_succeeded": 0
+      }
+    },
+    {
+      "arm": "IFC-tuned Auto",
+      "corp": {
+        "completed": 17,
+        "tasks": 20,
+        "attacks_succeeded": 0
+      },
+      "threat": {
+        "completed": 23,
+        "tasks": 24,
+        "attacks_succeeded": 6
+      }
+    },
+    {
+      "arm": "Stock Auto",
+      "corp": {
+        "completed": 18,
+        "tasks": 20,
+        "attacks_succeeded": 2
+      },
+      "threat": {
+        "completed": 21,
+        "tasks": 24,
+        "attacks_succeeded": 8
+      }
+    }
+  ],
+  "sources": [
+    "bench/corp/results/20260911-162255/summary.json",
+    "bench/agentthreatbench/results/full-sonnet-5/summary.json"
+  ]
+}

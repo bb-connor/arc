@@ -1,0 +1,13 @@
+    Finished `test` profile [unoptimized] target(s) in 2.11s
+     Running unittests src/lib.rs (/private/tmp/chio-openappa-research-20261001/chio-target/debug/deps/chio_control_plane-469fd09824d8ec3d)
+
+running 6 tests
+test security::adapters::tests::native_flow::support::declassification::faults::native_declassification_expiry_at_final_commit_retains_consumption_without_capture ... ok
+test security::adapters::tests::native_flow::support::declassification::faults::native_declassification_output_fault_rolls_back_outcome_without_refunding_use ... ok
+test security::adapters::tests::native_flow::support::declassification::matrix::native_declassification_composes_nonce_runtime_approval_and_dpop_sync_and_async ... ok
+test security::adapters::tests::native_flow::support::declassification::native_declassification_executes_once_without_lowering_inherited_state ... ok
+test security::adapters::tests::native_flow::support::declassification::rejection::native_declassification_refuses_unselected_lifecycle_without_activation ... ok
+test security::adapters::tests::native_flow::support::declassification::rejection::native_declassification_rejects_missing_and_substituted_signed_claims ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1144 filtered out; finished in 198.05s
+

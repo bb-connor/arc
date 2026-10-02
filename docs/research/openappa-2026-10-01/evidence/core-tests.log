@@ -1,0 +1,858 @@
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded toml_writer v1.1.2+spec-1.1.0
+  Downloaded smallvec v1.15.2
+  Downloaded toml v1.1.6+spec-1.1.0
+  Downloaded pkg-config v0.3.33
+  Downloaded bitflags v2.13.1
+  Downloaded cc v1.3.0
+  Downloaded indexmap v2.14.0
+  Downloaded rusqlite v0.40.2
+  Downloaded zerocopy v0.8.55
+  Downloaded syn v3.0.3
+  Downloaded libsqlite3-sys v0.38.2
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling serde_core v1.0.229
+   Compiling cfg-if v1.0.4
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.151
+   Compiling once_cell v1.21.4
+   Compiling serde v1.0.229
+   Compiling syn v3.0.3
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling syn v2.0.119
+   Compiling typenum v1.20.1
+   Compiling hybrid-array v0.4.15
+   Compiling serde_derive v1.0.229
+   Compiling tracing-core v0.1.36
+   Compiling pin-project-lite v0.2.17
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling const-oid v0.10.2
+   Compiling thiserror v2.0.20
+   Compiling rustix v1.1.5
+   Compiling bitflags v2.13.1
+   Compiling digest v0.11.3
+   Compiling thiserror-impl v2.0.20
+   Compiling errno v0.3.14
+   Compiling cpufeatures v0.3.0
+   Compiling getrandom v0.3.4
+   Compiling ryu-js v1.0.3
+   Compiling getrandom v0.4.3
+   Compiling tracing-attributes v0.1.31
+   Compiling appa-runtime-api v0.30.0 (/private/tmp/chio-openappa-research-20261001/OpenAPPA/appa-runtime-api)
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling sha2 v0.11.0
+   Compiling tracing v0.1.44
+   Compiling fastrand v2.5.0
+   Compiling zerocopy v0.8.55
+   Compiling rand_core v0.9.5
+   Compiling appa-engine v0.30.0 (/private/tmp/chio-openappa-research-20261001/OpenAPPA/appa-engine)
+   Compiling tempfile v3.27.0
+   Compiling autocfg v1.5.1
+   Compiling winnow v1.0.4
+   Compiling num-traits v0.2.19
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling serde_spanned v1.1.1
+   Compiling wait-timeout v0.2.1
+   Compiling bit-vec v0.8.0
+   Compiling toml_writer v1.1.2+spec-1.1.0
+   Compiling fnv v1.0.7
+   Compiling quick-error v1.2.3
+   Compiling toml v1.1.6+spec-1.1.0
+   Compiling rusty-fork v0.3.1
+   Compiling bit-set v0.8.0
+   Compiling rand v0.9.5
+   Compiling rand_xorshift v0.4.0
+   Compiling shlex v2.0.1
+   Compiling unarray v0.1.4
+   Compiling find-msvc-tools v0.1.9
+   Compiling regex-syntax v0.8.11
+   Compiling cc v1.3.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling pkg-config v0.3.33
+   Compiling rand_chacha v0.9.0
+   Compiling vcpkg v0.2.15
+   Compiling fallible-iterator v0.3.0
+   Compiling smallvec v1.15.2
+   Compiling proptest v1.11.0
+   Compiling libsqlite3-sys v0.38.2
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling appa-adapter-kagent v0.30.0 (/private/tmp/chio-openappa-research-20261001/OpenAPPA/appa-adapter-kagent)
+   Compiling appa-adapter-claude-code v0.30.0 (/private/tmp/chio-openappa-research-20261001/OpenAPPA/appa-adapter-claude-code)
+   Compiling appa-policy v0.30.0 (/private/tmp/chio-openappa-research-20261001/OpenAPPA/appa-policy)
+   Compiling rusqlite v0.40.2
+   Compiling appa-eventlog v0.30.0 (/private/tmp/chio-openappa-research-20261001/OpenAPPA/appa-eventlog)
+    Finished `test` profile [unoptimized] target(s) in 1m 25s
+     Running unittests src/lib.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/appa_adapter_claude_code-41d4abf7cd709b3f)
+
+running 58 tests
+test identity::tests::each_raw_spelling_maps_onto_its_canonical_identity ... ok
+test identity::tests::a_canonical_id_outside_the_range_has_no_host_spelling ... ok
+test children::tests::a_calls_arguments_name_the_family_children_they_spell ... ok
+test children::tests::a_child_file_is_found_wherever_a_path_token_ends ... ok
+test identity::tests::a_spelling_outside_the_domain_is_a_named_refusal ... ok
+test children::tests::a_path_that_merely_contains_the_spelling_names_no_child ... ok
+test environment::tests::only_a_sessions_environment_has_session_scoped_variables ... ok
+test identity::tests::identification_carries_the_canonical_identity_and_spawn ... ok
+test children::tests::a_workflow_agents_transcript_names_it_and_the_runs_journal_names_no_one ... ok
+test parse::tests::a_blank_agent_id_names_no_child ... ok
+test parse::tests::a_failed_edit_preserves_the_native_error_observation ... ok
+test parse::tests::a_post_tool_use_maps_its_response_shape_onto_one_outcome ... ok
+test parse::tests::a_launch_acknowledgement_names_the_child_and_carries_no_message ... ok
+test parse::tests::a_failed_tool_run_parses_to_a_typed_failure ... ok
+test parse::tests::a_pre_tool_use_parses_to_a_tool_call_with_cc_ids ... ok
+test parse::tests::a_subagent_start_names_the_spawn_in_flight ... ok
+test parse::tests::a_pre_tool_use_carries_the_working_directory ... ok
+test parse::tests::a_subagent_stop_is_the_childs_return ... ok
+test parse::tests::a_subagents_structured_output_is_its_return_and_its_run_reports_nothing ... ok
+test parse::tests::a_workflow_agent_starts_under_the_prompt_its_workflow_was_released_in ... ok
+test parse::tests::an_agent_result_parses_to_the_spawn_result_naming_the_child ... ok
+test parse::tests::an_agent_id_attributes_the_event_to_the_child ... ok
+test parse::tests::an_anonymous_or_empty_agent_result_carries_what_it_spells ... ok
+test parse::tests::a_task_notification_settles_the_call_it_names ... ok
+test parse::tests::an_unreadable_body_is_refused_with_the_wire_detail ... ok
+test parse::tests::duplicate_argument_members_reach_the_runtime_unresolved ... ok
+test parse::tests::ask_user_question_input_is_normalized_of_injected_answers ... ok
+test parse::tests::every_post_use_of_the_spawns_tool_is_a_spawn_result ... ok
+test parse::tests::every_turn_end_hook_names_the_actor_that_finished ... ok
+test parse::tests::missing_required_fields_are_named_refusals ... ok
+test parse::tests::only_the_session_and_its_workflow_agents_name_the_prompt_a_call_serves ... ok
+test parse::tests::result_hooks_preserve_the_tool_use_id ... ok
+test parse::tests::non_text_agent_content_is_the_message_as_spelled ... ok
+test parse::tests::the_agent_tool_call_is_the_spawn ... ok
+test parse::tests::unmapped_hooks_parse_to_no_event ... ok
+test redact::tests::a_known_tools_content_field_carries_the_text ... ok
+test redact::tests::a_withheld_spawn_result_replaces_the_subagents_message ... ok
+test redact::tests::an_mcp_result_is_restated_as_one_text_block ... ok
+test redact::tests::an_unrecognized_response_under_the_spawns_tool_carries_nothing_across ... ok
+test redact::tests::only_a_fixed_value_under_a_discriminator_key_keeps_its_text ... ok
+test redact::tests::the_remaining_slots_carry_the_text_and_an_undelivered_outcome_falls_back ... ok
+test render::tests::a_decision_without_a_delivered_response_blocks_instead ... ok
+test redact::tests::the_text_takes_the_place_of_the_longest_string_once ... ok
+test render::tests::a_post_tool_decision_replaces_the_result_in_the_tools_own_shape ... ok
+test render::tests::a_post_use_hook_missing_either_half_of_its_result_is_answered_by_the_reason ... ok
+test render::tests::a_structured_return_runs_or_is_denied_with_what_crosses ... ok
+test render::tests::an_unreadable_post_use_hook_still_withholds_the_result_it_reports ... ok
+test render::tests::every_child_end_decision_renders_its_exact_wire_body ... ok
+test render::tests::every_pre_tool_decision_renders_its_exact_wire_body ... ok
+test render::tests::every_event_and_decision_renders_on_one_channel ... ok
+test render::tests::session_start_context_reaches_the_root_actor ... ok
+test render::tests::only_a_post_use_hooks_bytes_report_a_result_to_withhold ... ok
+test tests::the_adapter_serves_claude_code ... ok
+test identity::tests::laws::a_spelled_identity_is_the_one_its_spelling_maps_to ... ok
+test identity::tests::laws::an_mcp_server_segment_never_contains_a_double_underscore ... ok
+test identity::tests::laws::an_accepted_spelling_parses_back_and_is_control_only_when_registered ... ok
+test identity::tests::laws::the_inverse_spells_every_mapped_identity_back ... ok
+test identity::tests::laws::the_map_is_injective ... ok
+
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/appa_adapter_kagent-d273d54115920b20)
+
+running 9 tests
+test tests::a_canonical_id_outside_the_range_has_no_host_spelling ... ok
+test tests::the_adapter_serves_kagent ... ok
+test tests::no_kagent_call_names_a_family_child ... ok
+test tests::each_raw_spelling_maps_onto_its_canonical_identity ... ok
+test tests::a_spelling_outside_the_domain_is_a_named_refusal ... ok
+test tests::laws::the_inverse_spells_every_identified_tool_back ... ok
+test tests::laws::a_spelled_identity_is_the_one_its_spelling_maps_to ... ok
+test tests::laws::an_accepted_spelling_parses_back_and_is_control_only_when_registered ... ok
+test tests::laws::the_map_is_injective ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running unittests src/lib.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/appa_engine-5c6521cfe7094024)
+
+running 486 tests
+test admit::tests::raw_admits_contract_output_label_and_effects ... ok
+test admit::tests::a_bound_dispatch_admits_only_its_sanitizers_derivation ... ok
+test admit::tests::a_bound_derivation_missing_a_membership_answer_asks_for_it ... ok
+test admit::tests::failure_admits_no_value_no_effects ... ok
+test admit::tests::a_success_checkpoint_commits_effects_once_and_pins_the_close_family ... ok
+test admit::tests::a_foreign_trajectory_cannot_close_a_dispatch ... ok
+test admit::tests::an_ordinary_dispatch_checkpoints_at_typed_success ... ok
+test admit::tests::an_acceptance_without_a_matching_candidate_is_refused ... ok
+test admit::tests::file_failure_body_is_admitted_at_the_result_label_without_success_effects ... ok
+test admit::tests::an_unbound_dispatch_refuses_a_derivation ... ok
+test audience::tests::a_malformed_template_is_unrepresentable ... ok
+test audience::tests::a_reported_reader_is_an_address_or_the_sources_own_qualified_id ... ok
+test audience::tests::an_unsourced_self_is_routable_only_under_a_principal ... ok
+test audience::tests::a_session_principal_is_an_address ... ok
+test audience::tests::a_session_principal_answers_self_in_place_of_its_sources ... ok
+test audience::tests::evidence_validation_refuses_duplicates_and_malformed_readers ... ok
+test audience::tests::expansions_recompute_the_closure_from_primitives ... ok
+test audience::tests::needed_primitives_follow_the_symmetric_closure ... ok
+test audience::tests::a_redirected_provider_seats_its_qualified_members_through_pinned_lookups ... ok
+test audience::tests::under_a_principal_groups_within_self_widen_only_internal ... ok
+test admit::tests::swapped_call_and_unopened_rejected ... ok
+test audience::tests::lookups_canonicalize_and_not_found_is_definitive ... ok
+test audience::tests::unroutable_atoms_are_operational ... ok
+test audience::tests::templates_match_segment_wise ... ok
+test authority::tests::a_hint_is_bounded_in_characters_whichever_way_it_is_built ... ok
+test authority::tests::a_symbolic_from_may_admit_only_a_raw_covering_its_literal_readers ... ok
+test authority::tests::a_chain_only_transition_derives_by_the_chain_order_and_asks_only_below_its_from ... ok
+test branch::tests::a_fork_snapshot_carries_the_parents_sources_and_seed ... ok
+test branch::tests::a_resume_folds_the_parents_label_into_the_child ... ok
+test branch::tests::a_post_fork_source_stays_private_to_the_branch_that_admitted_it ... ok
+test branch::tests::a_void_return_ends_the_branch_and_contributes_nothing ... ok
+test branch::tests::an_in_flight_child_dispatch_reserves_against_the_parent ... ok
+test branch::tests::a_nested_fork_flattens_its_inherited_set ... ok
+test branch::tests::a_crossing_lands_in_one_batch_and_folds_into_the_parent ... ok
+test branch::tests::abandoned_child_egress_is_visible_to_the_parent ... ok
+test branch::tests::fork_seeds_child_at_parent_current_label ... ok
+test check::tests::a_produced_annotation_never_reads_a_placeholder ... ok
+test contract::tests::a_delta_placeholder_serializes_as_its_spelling ... ok
+test check::tests::a_static_declaration_is_its_own_annotation_and_takes_no_pin ... ok
+test contract::tests::a_declaration_dispatches_between_its_static_and_annotated_forms ... ok
+test check::tests::copy_source_is_checked_without_narrowing_the_trajectory ... ok
+test check::tests::public_is_always_within_an_audience_mandate ... ok
+test check::tests::a_produced_annotation_stays_within_its_mandate ... ok
+test check::tests::a_produced_symbolic_audience_is_admitted_inside_its_mandate ... ok
+test check::tests::an_annotated_declaration_requires_its_annotators_pin ... ok
+test contract::tests::a_pin_materializes_the_declarations_metadata_and_its_own_semantics ... ok
+test contract::tests::a_pinned_annotation_round_trips_and_binds_its_call ... ok
+test contract::tests::a_pin_records_its_context_and_a_pin_without_one_keeps_its_wire_shape ... ok
+test contract::tests::a_placeholder_instantiates_only_into_writable_mentions ... ok
+test engine::tests::a_calls_own_emits_never_fail_its_own_check ... ok
+test engine::tests::a_call_approval_extends_the_offered_calls_pins ... ok
+test engine::tests::a_batch_identity_is_bound_to_its_exposed_results_and_their_trajectory ... ok
+test engine::tests::a_block_binds_one_durable_offer_to_each_of_its_plans ... ok
+test engine::tests::a_blocked_proposal_leaves_every_basis_component_where_it_was ... ok
+test engine::tests::a_bound_sanitizer_checkpoints_before_it_asks_for_the_derivation ... ok
+test engine::tests::a_chain_only_output_sanitizer_is_offered_and_admitted_without_membership ... ok
+test engine::tests::a_batch_admits_every_result_it_exposed ... ok
+test engine::tests::a_child_boxed_by_its_floor_with_no_return_sanitizer_is_told_not_to_delegate ... ok
+test engine::tests::a_contains_placeholder_requires_the_collection_the_call_spells ... ok
+test engine::tests::a_decision_cannot_record_a_release_the_check_refuses ... ok
+test engine::tests::a_child_stop_carries_its_parents_declared_floor_to_a_grandchild ... ok
+test engine::tests::a_declaration_that_disagrees_with_its_records_is_refused ... ok
+test engine::tests::a_delta_placeholder_filled_from_an_array_binds_the_union ... ok
+test engine::tests::a_child_return_crosses_and_a_repeat_answers_from_the_record ... ok
+test engine::tests::a_crossing_replays_only_with_its_admission_and_its_merge ... ok
+test engine::tests::a_confined_stage_is_left_by_a_hop_or_by_accepting_its_residual ... ok
+test engine::tests::a_contains_placeholder_filled_from_an_array_requires_every_collection ... ok
+test engine::tests::a_decision_releases_exactly_what_the_ordered_composition_allows ... ok
+test engine::tests::a_denial_by_an_unassigned_authority_is_refused ... ok
+test engine::tests::a_confined_stage_goes_stale_with_its_basis_and_is_planned_again ... ok
+test engine::tests::a_delta_placeholder_labels_the_result_with_the_collection_the_call_spells ... ok
+test engine::tests::a_denial_inside_an_offer_execution_is_held_to_that_offer ... ok
+test engine::tests::a_denial_ends_the_plans_that_named_the_authority_and_re_offers_the_rest ... ok
+test engine::tests::a_failure_body_on_a_call_that_touches_no_file_is_refused ... ok
+test engine::tests::a_failed_dispatch_evaporates_its_reservation ... ok
+test engine::tests::a_forged_offer_record_is_refused ... ok
+test engine::tests::a_fan_out_spawn_is_offered_every_return_route_but_the_attestation ... ok
+test engine::tests::a_forged_release_cannot_depart_from_the_approval_it_spends ... ok
+test engine::tests::a_forged_approval_record_is_refused ... ok
+test engine::tests::a_fork_preparation_replays_only_as_its_marked_release ... ok
+test engine::tests::a_forged_answer_neither_persists_on_a_candidate_nor_releases_one ... ok
+test engine::tests::a_derivation_releases_one_of_two_identical_siblings_and_blocks_the_other ... ok
+test engine::tests::a_derivation_that_no_longer_covers_does_not_starve_the_one_that_does ... ok
+test engine::tests::a_fork_records_the_return_policy_its_spawn_approved ... ok
+test engine::tests::a_fully_denied_block_re_plans_to_an_empty_menu_that_replays ... ok
+test engine::tests::a_group_from_output_sanitizer_still_asks_for_exactly_the_members_its_derivation_needs ... ok
+test engine::tests::a_fan_out_child_starts_at_the_parents_label_including_earlier_siblings_returns ... ok
+test engine::tests::a_mandate_placeholder_admits_the_collection_each_call_spells ... ok
+test engine::tests::a_malformed_sibling_mediates_none_of_them_and_the_admissions_stand ... ok
+test engine::tests::a_marked_spawn_blocks_with_one_return_declaration_per_untagged_output_sanitizer ... ok
+test engine::tests::a_group_placeholder_reads_the_acts_pinned_answer ... ok
+test engine::tests::a_later_basis_change_does_not_revoke_an_open_dispatch ... ok
+test engine::tests::a_marked_spawn_prepares_its_fork_and_the_child_binds_to_it ... ok
+test engine::tests::a_matching_proposal_consumes_its_approval_and_opens_the_dispatch ... ok
+test engine::tests::a_member_fork_replays_only_under_its_fan_out_spawn_and_for_its_own_child ... ok
+test engine::tests::a_marked_spawn_is_offered_no_input_hop_while_its_identical_sibling_is ... ok
+test engine::tests::a_produced_symbolic_delta_narrows_without_a_membership_read ... ok
+test engine::tests::a_proposal_missing_its_annotation_refuses_the_event_and_appends_nothing ... ok
+test engine::tests::a_marked_spawn_prepares_its_fork_from_its_own_position ... ok
+test engine::tests::a_narrowing_derivation_stages_its_candidate_instead_of_admitting_it ... ok
+test engine::tests::a_produced_symbolic_audience_reads_membership_per_act_and_replays_from_the_pin ... ok
+test engine::tests::a_neutral_release_advances_no_basis_component ... ok
+test engine::tests::a_hop_goes_stale_with_its_basis_and_a_taken_one_stops_answering ... ok
+test engine::tests::a_proposal_naming_a_provider_run_tool_is_malformed_at_every_fresh_entry_point ... ok
+test engine::tests::a_provider_admission_advances_flow_only_when_it_moves_the_label_and_family_only_for_its_effects ... ok
+test engine::tests::a_provider_run_result_the_response_hides_establishes_no_effect ... ok
+test engine::tests::a_read_that_narrows_into_the_cap_passes_the_cap ... ok
+test engine::tests::a_release_advances_the_family_and_leaves_the_flow_to_its_admission ... ok
+test engine::tests::a_public_placeholder_argument_is_the_public_audience ... ok
+test engine::tests::a_named_sanitizer_stages_its_derivation_until_the_child_echoes_it ... ok
+test engine::tests::a_raw_return_crosses_at_the_fold_and_the_child_may_return_again ... ok
+test engine::tests::a_refused_sibling_is_planned_against_the_batchs_final_state ... ok
+test engine::tests::a_release_replays_only_as_the_records_its_decision_obliged ... ok
+test engine::tests::a_release_that_declares_no_advance_cannot_spend_its_approval ... ok
+test engine::tests::a_repeat_matches_each_sibling_to_the_dispatch_its_own_annotation_opened ... ok
+test engine::tests::a_repeated_selection_answers_from_the_record ... ok
+test engine::tests::a_repeat_of_a_multi_sibling_batch_answers_each_position_from_the_record ... ok
+test engine::tests::a_repeat_returns_the_recorded_outcome_of_a_dispatch_that_already_ran ... ok
+test engine::tests::a_report_after_an_indeterminate_close_is_refused_on_its_own_ground ... ok
+test engine::tests::a_reported_outcome_closes_once_and_repeats_answer_from_the_record ... ok
+test engine::tests::a_repeat_of_a_block_that_has_lifted_reports_a_spent_identity ... ok
+test engine::tests::a_repeat_of_an_unapproved_acceptance_answers_a_refusal ... ok
+test engine::tests::a_repeated_batch_identity_returns_its_recorded_decision_and_a_reused_one_is_refused ... ok
+test engine::tests::a_result_replays_only_for_a_successful_close ... ok
+test engine::tests::a_replacement_the_engine_cannot_bind_leaves_the_hop_unspent ... ok
+test engine::tests::a_repeat_of_a_hop_answers_with_the_same_call_until_a_proposal_takes_it ... ok
+test engine::tests::a_repeated_block_answers_with_the_offers_it_already_opened ... ok
+test engine::tests::a_retry_of_a_malformed_batch_admits_its_results_once_and_then_decides ... ok
+test engine::tests::a_resume_folds_the_parents_label_into_the_child_and_drops_its_staged_derivation ... ok
+test engine::tests::a_resume_that_moves_the_childs_label_ends_the_approvals_granted_under_the_old_one ... ok
+test engine::tests::a_return_sanitizer_that_does_not_admit_the_narrowed_value_is_no_sanitized_route ... ok
+test engine::tests::a_return_declaration_is_held_to_its_plan_and_to_the_parents_label ... ok
+test engine::tests::a_return_after_a_resume_is_a_new_crossing_even_when_its_bytes_repeat ... ok
+test engine::tests::a_resume_that_moves_the_childs_label_ends_the_offers_opened_under_the_old_one ... ok
+test engine::tests::a_rewrite_into_the_classified_declaration_records_its_effect_and_carries_no_annotation ... ok
+test engine::tests::a_rewrite_into_a_contract_reading_a_group_asks_for_its_answer_afresh ... ok
+test engine::tests::a_rewrite_into_a_contract_the_sanitizer_does_not_reach_is_refused ... ok
+test engine::tests::a_rewrite_that_selects_a_contract_with_other_gaps_is_no_remedy_for_this_block ... ok
+test engine::tests::a_root_folds_from_its_openings_starting_label ... ok
+test engine::tests::a_root_fork_carries_its_parent_familys_effects_and_unsettled_reservations ... ok
+test engine::tests::a_rewritten_admitted_label_is_refused_at_every_provenance ... ok
+test audience::tests::ledger::settlement_is_the_same_live_and_record_by_record ... ok
+test engine::tests::a_sibling_offer_is_held_to_the_same_menu_as_the_offer_that_derived_it ... ok
+test engine::tests::a_sanitizer_settlement_replays_only_where_the_deployment_confines_the_result ... ok
+test engine::tests::a_root_fork_opening_that_forks_the_root_from_itself_is_refused ... ok
+test engine::tests::a_rewrite_that_selects_another_contract_is_judged_under_it_with_the_answers_consulted_for_it ... ok
+test engine::tests::a_siblings_release_is_state_for_the_siblings_after_it ... ok
+test engine::tests::a_substitution_that_selects_another_ordered_contract_is_a_new_call_under_it ... ok
+test engine::tests::a_success_checkpoint_settles_while_the_dispatch_stays_open ... ok
+test engine::tests::a_rewrite_within_the_declaration_is_annotated_afresh ... ok
+test engine::tests::a_substitution_that_leaves_a_gap_re_plans_over_the_derived_call ... ok
+test engine::tests::a_substitution_that_clears_the_last_gap_approves_the_call_the_model_then_proposes ... ok
+test engine::tests::a_spawn_mark_takes_declared_context_control ... ok
+test engine::tests::a_spend_refuses_a_fresh_answer_that_contradicts_a_pinned_key ... ok
+test engine::tests::a_trust_floor_reads_the_committed_label ... ok
+test engine::tests::a_single_spawn_releases_while_a_fan_out_fork_is_open ... ok
+test engine::tests::a_value_admitted_under_an_unopened_dispatch_is_refused_on_replay ... ok
+test engine::tests::a_root_fork_starts_at_the_forked_trajectorys_label_while_it_is_open ... ok
+test engine::tests::a_surfacing_offers_its_whole_menu_exactly_once_under_one_block ... ok
+test engine::tests::accepting_one_offer_ends_every_sibling_on_its_candidate ... ok
+test engine::tests::an_admission_only_batch_decides_and_an_empty_one_is_no_event ... ok
+test engine::tests::an_acceptance_whose_batch_prepares_no_approval_is_refused ... ok
+test engine::tests::an_admission_after_a_checkpoint_carries_the_bytes_it_observed ... ok
+test engine::tests::a_spend_of_an_offer_the_log_never_accepted_is_refused ... ok
+test engine::tests::an_annotated_release_leaves_an_approval_standing ... ok
+test engine::tests::an_approval_releases_once ... ok
+test engine::tests::an_approval_declaring_a_return_policy_spends_only_at_the_marked_spawn ... ok
+test engine::tests::an_approval_is_spent_only_by_a_singleton_batch ... ok
+test engine::tests::an_exact_declaration_beats_the_wildcard_on_a_proposal ... ok
+test engine::tests::an_executed_offer_prepares_its_call_and_releases_nothing ... ok
+test engine::tests::an_exposed_result_of_a_tool_this_deployment_releases_is_refused ... ok
+test engine::tests::an_exposed_provider_run_result_is_history_for_every_sibling ... ok
+test engine::tests::an_includes_requirement_reads_the_committed_label ... ok
+test engine::tests::an_ended_branch_releases_nothing_more ... ok
+test engine::tests::an_incomplete_or_misreviewed_evidence_set_is_refused ... ok
+test engine::tests::an_identity_admission_leaves_the_approval_its_own_batch_spends_current ... ok
+test engine::tests::an_attested_return_crosses_in_canonical_form_at_the_raised_rank ... ok
+test engine::tests::an_indeterminate_close_keeps_the_reservation ... ok
+test engine::tests::an_opening_records_the_label_the_call_was_proposed_at ... ok
+test engine::tests::an_opening_names_the_position_the_decision_released_it_for ... ok
+test engine::tests::an_open_dispatch_reserves_its_emits_for_no_prior_only ... ok
+test engine::tests::an_unanswered_group_refuses_the_batch_with_no_fact ... ok
+test engine::tests::an_output_sanitizer_plan_binds_its_sanitizer_when_the_approval_releases ... ok
+test engine::tests::an_input_hop_is_offered_before_the_ruling_that_covers_the_same_gap ... ok
+test engine::tests::an_unopened_trajectory_has_no_views_and_takes_no_event ... ok
+test engine::tests::an_offer_whose_basis_moved_is_refused ... ok
+test engine::tests::attention_is_always_a_gap ... ok
+test engine::tests::clean_call_allows ... ok
+test engine::tests::an_unknown_or_foreign_offer_is_refused ... ok
+test engine::tests::audience_evidence_is_batch_payload ... ok
+test engine::tests::fork_of_answers_the_same_advanced_or_rebuilt_and_a_refused_bind_leaves_it ... ok
+test engine::tests::evidence_gathered_for_one_offer_cannot_approve_another ... ok
+test engine::tests::cold_replay_verifies_the_opening_strictly ... ok
+test engine::tests::includes_missing_placeholder_is_an_invalid_call_and_still_fails_closed_underneath ... ok
+test engine::tests::permuted_effect_declarations_produce_byte_identical_dispatch_facts ... ok
+test engine::tests::one_fan_out_declaration_backs_a_member_fork_per_child ... ok
+test engine::tests::evidence_is_scoped_to_the_asked_atoms_and_the_registered_sources ... ok
+test engine::tests::ordered_selectors_choose_once_before_schema_validation ... ok
+test engine::tests::one_call_carries_one_current_approval ... ok
+test engine::tests::recovery_routes::a_route_reads_the_ordered_contract_the_standing_call_selected ... ok
+test engine::tests::offer_consults_names_the_external_work_each_offer_needs ... ok
+test engine::tests::only_a_moved_label_stales_an_approval ... ok
+test engine::tests::recovery_routes::depth_one_through_the_engine_is_the_offers_the_block_opened ... ok
+test engine::tests::provider_run_tools_leave_every_plan_family ... ok
+test engine::tests::held_view_law::the_law_walk_reaches_offers_approvals_outcomes_forks_and_returns ... ok
+test engine::tests::repeat_at_same_label_is_not_a_narrowing ... ok
+test engine::tests::replay_refuses_a_corrupt_dispatched_call ... ok
+test engine::tests::replay_names_the_refusal_of_a_duplicated_pin ... ok
+test engine::tests::recovery_routes::only_a_blocked_standing_call_has_routes ... ok
+test engine::tests::replay_refuses_a_later_contract_for_arguments_matching_an_earlier_one ... ok
+test engine::tests::replay_refuses_a_rewritten_provider_admission ... ok
+test engine::tests::replay_refuses_a_decision_whose_own_declaration_is_missing ... ok
+test engine::tests::replay_refuses_a_released_tool_nothing_covers_and_a_forged_wildcard_record ... ok
+test engine::tests::replay_refuses_a_provider_admission_no_act_declared ... ok
+test engine::tests::replay_refuses_one_batchs_admissions_split_across_two_decisions ... ok
+test engine::tests::replay_refuses_pinned_evidence_no_operation_requested ... ok
+test engine::tests::replay_holds_a_fork_to_its_parents_frozen_basis ... ok
+test engine::tests::replay_rejects_a_dispatch_switched_to_a_later_overlapping_contract ... ok
+test engine::tests::required_rulings_route_each_gap_to_its_authority ... ok
+test engine::tests::replay_refuses_tampered_audience_evidence ... ok
+test engine::tests::schema_invalid_arguments_are_an_invalid_call_at_every_fresh_entry_point ... ok
+test engine::tests::resolve_call_owns_tool_lookup_scanning_and_schema_binding ... ok
+test engine::tests::symbolic_audiences::a_provider_run_delta_writing_a_group_admits_at_the_symbolic_audience ... ok
+test engine::tests::symbolic_audiences::a_cap_written_with_a_group_decides_by_the_answer_and_an_empty_answer_is_valid ... ok
+test engine::tests::selector_order_and_matchers_move_policy_identity_but_normalized_wildcards_do_not ... ok
+test engine::tests::symbolic_audiences::a_route_reads_the_answers_the_block_recorded_over_any_fresh_answer ... ok
+test engine::tests::symbolic_audiences::a_planned_state_that_reads_an_unanswered_group_refuses_the_search_instead_of_resolving_it ... ok
+test engine::tests::sibling_blocks_of_one_batch_are_each_held_to_their_own_menu ... ok
+test engine::tests::symbolic_audiences::a_sanitizer_to_writing_a_group_derives_at_the_symbolic_audience ... ok
+test engine::tests::the_boundary_releases_an_allowed_proposal_with_its_dispatch ... ok
+test engine::tests::the_boundary_plans_a_blocked_proposal_and_opens_nothing ... ok
+test engine::tests::the_approval_window_admits_no_ending_from_before_the_offer_it_approves ... ok
+test engine::tests::symbolic_audiences::a_reader_ceiling_writing_a_group_is_read_when_the_block_is_planned ... ok
+test engine::tests::symbolic_audiences::a_sanitizers_transition_is_policy_identity_not_a_records_claim ... ok
+test engine::tests::symbolic_audiences::the_audience_configuration_is_policy_identity ... ok
+test engine::tests::symbolic_audiences::one_act_reads_one_answer_for_a_group_two_sites_read ... ok
+test engine::tests::the_opening_batch_carries_the_identity_and_derived_vectors ... ok
+test engine::tests::symbolic_audiences::a_staged_derivation_seals_and_replays_with_its_pinned_answers ... ok
+test engine::tests::two_reservations_of_one_kind_settle_independently ... ok
+test engine::tests::the_ruling_binds_the_payload_by_digest_and_never_copies_it ... ok
+test engine::tests::the_reserved_route_is_declared_only_with_its_shape ... ok
+test engine::tests::the_floor_removes_acceptances_below_it_from_the_childs_menu ... ok
+test execute::tests::a_gap_no_ruling_claims_is_refused ... ok
+test engine::tests::wildcard_fallback_does_not_bypass_a_matched_contract_schema ... ok
+test execute::tests::a_ruling_by_an_unregistered_authority_is_refused ... ok
+test execute::tests::a_mandate_that_reaches_the_gap_admits_it ... ok
+test fact::tests::a_denial_fact_round_trips_through_serde ... ok
+test execute::tests::a_ruling_outside_its_authoritys_mandate_is_refused ... ok
+test execute::tests::a_ruling_claiming_a_gap_the_block_does_not_carry_is_refused ... ok
+test fact::tests::an_effect_set_is_canonical_and_refuses_duplicates ... ok
+test hex32::tests::a_digest_round_trips_through_its_hex_form ... ok
+test hex32::tests::every_byte_renders_as_two_lowercase_digits ... ok
+test hex32::tests::malformed_hex_is_refused ... ok
+test label::tests::a_clause_unions_and_a_union_of_chains_is_their_maximum ... ok
+test engine::tests::the_lowest_declarable_return_trust_is_the_own_floors_unless_its_sanitizer_raises_trust ... ok
+test label::tests::a_label_round_trips_through_serde_verbatim ... ok
+test label::tests::a_reader_off_the_wire_normalizes_like_a_constructed_one ... ok
+test label::tests::a_qualified_recipient_canonicalizes_before_comparison ... ok
+test label::tests::a_record_holds_canonical_audiences_only ... ok
+test label::tests::an_unproved_check_asks_instead_of_denying ... ok
+test label::tests::bottom_folds_fail_closed ... ok
+test label::tests::canonicalization_rules_are_exactly_three ... ok
+test label::tests::floor_holds_at_or_above ... ok
+test label::tests::group_references_use_one_grammar ... ok
+test label::tests::canonicalization_is_idempotent ... ok
+test label::tests::reserved_spellings_are_never_readers ... ok
+test label::tests::combine_is_idempotent ... ok
+test label::tests::the_chain_derives_without_answers ... ok
+test label::tests::nobody_absorbs ... ok
+test label::tests::combine_is_commutative ... ok
+test label::tests::within_assertions_derive_but_never_canonicalize ... ok
+test names::tests::a_placeholder_argument_spells_an_audience_a_group_or_one_reader ... ok
+test params::tests::a_conforming_schema_compiles_and_an_authored_gap_normalizes ... ok
+test params::tests::a_number_schema_names_only_values_an_argument_could_carry ... ok
+test params::tests::a_scalar_node_carries_const_xor_enum ... ok
+test params::tests::a_selector_argument_may_be_an_array_of_strings ... ok
+test params::tests::bounds_must_form_nonempty_intervals ... ok
+test params::tests::canonical_bytes_follow_rfc_8785 ... ok
+test label::tests::universal_edges_decide_without_membership ... ok
+test label::tests::top_is_identity ... ok
+test params::tests::const_and_enum_validate_by_exact_value ... ok
+test label::tests::symbolic_answers_are_sound ... ok
+test params::tests::deserialize_accepts_only_the_exact_normalized_form ... ok
+test params::tests::every_foreign_schema_form_is_a_load_error ... ok
+test params::tests::key_order_is_utf16_code_units_not_code_points ... ok
+test params::tests::normalization_is_deterministic_across_authored_spellings ... ok
+test params::tests::number_forms_are_bounded_and_exactly_representable ... ok
+test params::tests::numeric_constraints_survive_canonical_round_trips ... ok
+test params::tests::persisted_arguments_round_trip_and_refuse_tampering ... ok
+test params::tests::required_names_must_be_unique_and_declared ... ok
+test label::tests::canonicalization_preserves_denotation ... ok
+test params::tests::schema_validation_neither_coerces_nor_defaults_nor_strips ... ok
+test params::tests::requiring_a_string_adds_or_promotes_a_top_level_property_and_refuses_another_type ... ok
+test params::tests::the_compat_and_raw_paths_share_one_digest_domain ... ok
+test params::tests::the_scanner_rejects_what_serde_json_absorbs ... ok
+test plan::tests::a_cap_redispatch_claims_only_what_it_actually_clears ... ok
+test plan::tests::a_catch_all_authority_remedies_any_mark_but_leaves_blocked_terminal ... ok
+test plan::tests::a_denial_binds_the_exact_rendered_call ... ok
+test params::tests::input_limits_hold_at_threshold_and_refuse_one_over ... ok
+test plan::tests::a_denial_recorded_for_the_named_tools_own_call_does_not_remove_the_offer ... ok
+test plan::tests::a_denied_authority_is_excluded_and_the_surviving_sibling_keeps_its_id ... ok
+test plan::tests::a_direct_emitter_is_offered_without_path_verification ... ok
+test params::tests::schema_limits_hold_at_threshold_and_refuse_one_over ... ok
+test plan::tests::a_hint_never_changes_the_presented_order ... ok
+test plan::tests::a_mutual_prerequisite_cycle_does_not_gate_the_direct_offer ... ok
+test plan::tests::a_duplicated_requirement_entry_is_one_gap_and_mints_no_permuted_duplicates ... ok
+test plan::tests::a_pinned_annotation_uses_its_audience_for_sanitizer_plans ... ok
+test plan::tests::a_placeholder_bearing_emitter_is_advertised_like_any_other ... ok
+test plan::tests::a_narrowing_block_offers_each_applicable_output_sanitizer ... ok
+test plan::tests::a_reservation_at_the_emitters_own_block_does_not_suppress_the_offer ... ok
+test plan::tests::a_reservation_caused_no_prior_gap_enumerates_its_waiver_plans ... ok
+test plan::tests::a_sanitize_plan_still_carries_every_requirement_ruling ... ok
+test plan::tests::a_sole_denied_authority_makes_the_block_terminally_planless ... ok
+test plan::tests::a_target_denial_does_not_suppress_the_direct_redispatch ... ok
+test plan::tests::a_weaker_authority_registered_later_still_leads_the_menu ... ok
+test plan::tests::a_trust_floor_block_reads_no_group_a_reader_ceiling_writes ... ok
+test plan::tests::acceptance_plan_for_pure_narrowing ... ok
+test plan::tests::alternative_authorities_yield_one_plan_per_assignment ... ok
+test plan::tests::an_annotated_tool_keeps_its_input_substitution_hops ... ok
+test plan::tests::an_emitters_own_unmet_static_includes_does_not_gate_the_offer ... ok
+test plan::tests::an_undecided_mandate_refuses_enumeration_with_its_atom_never_a_smaller_menu ... ok
+test plan::tests::an_input_hop_does_not_stand_in_for_the_redispatch_that_clears_a_prior_gap ... ok
+test plan::tests::attention_gap_routes_by_mark_not_scope ... ok
+test plan::tests::attention_with_wrong_mark_is_terminal ... ok
+test plan::tests::authorize_plan_clears_a_trust_floor_gap ... ok
+test plan::tests::crossing_ceilings_are_incomparable_and_keep_enumeration_order ... ok
+test plan::tests::gathering::a_plan_reads_its_rulings_as_far_as_their_gaps_consult_the_mandate ... ok
+test plan::tests::gathering::a_block_reads_each_component_the_gap_it_carries_consults ... ok
+test plan::tests::multi_gap_dominance_orders_the_menu_and_crossing_assignments_keep_enumeration_order ... ok
+test plan::tests::no_competent_authority_is_terminal ... ok
+test plan::tests::one_authority_covering_both_gaps_is_one_grouped_ruling ... ok
+test plan::tests::one_tool_clearing_several_gaps_is_one_offer_with_the_complete_claim ... ok
+test plan::tests::only_an_established_static_contribution_claims_a_cap_clear ... ok
+test label::tests::combine_is_associative ... ok
+test plan::tests::prior_gap_cured_by_a_redispatch ... ok
+test plan::tests::prior_gap_with_multiple_emitters_surfaces_every_curative_redispatch ... ok
+test plan::tests::prior_gap_without_emitter_is_terminal ... ok
+test plan::tests::reader_ceilings_order_by_inclusion_and_public_is_maximal ... ok
+test plan::tests::waiver_sets_order_by_inclusion_ignoring_vector_order_and_duplicates ... ok
+test profile::tests::a_coverage_slot_naming_an_unregistered_tool_is_refused ... ok
+test profile::tests::a_fully_enforced_deployment_derives_no_vectors ... ok
+test profile::tests::a_profile_round_trips_through_serde_and_revalidates_on_the_way_in ... ok
+test profile::tests::a_provider_run_contract_may_declare_only_a_static_delta ... ok
+test profile::tests::a_provider_run_result_point_cannot_be_declared_confined ... ok
+test profile::tests::a_redundant_exception_naming_an_unregistered_tool_still_refuses ... ok
+test profile::tests::a_scoped_output_sanitizer_needs_a_confined_result_its_scope_reaches ... ok
+test profile::tests::a_sources_declared_templates_render_in_the_identity_and_move_it ... ok
+test profile::tests::an_annotator_mandate_renders_its_audience_vocabulary_in_the_identity_document ... ok
+test profile::tests::an_exception_equal_to_the_default_normalizes_away ... ok
+test profile::tests::an_output_sanitizer_needs_some_confined_application_point ... ok
+test profile::tests::an_unconfined_result_point_offers_no_sanitizer_settlement ... ok
+test profile::tests::declaration_order_moves_the_identity_only_where_order_is_semantic ... ok
+test label::tests::combine_never_widens ... ok
+test profile::tests::duplicate_set_members_do_not_move_the_identity ... ok
+test profile::tests::hints_never_move_the_identity ... ok
+test profile::tests::every_semantic_edit_moves_the_identity ... ok
+test profile::tests::overlapping_provider_run_contracts_reject_in_either_authored_order ... ok
+test profile::tests::overlapping_declaration_order_is_part_of_the_policy_identity ... ok
+test profile::tests::provider_run_name_rules_cannot_hide_conflicting_precise_executors ... ok
+test profile::tests::rescoping_a_sanitizer_moves_the_identity ... ok
+test profile::tests::provider_run_candidates_leave_the_planner_cap_bound ... ok
+test profile::tests::server_independent_coverage_keeps_confinement_and_reports_rule_scope ... ok
+test profile::tests::the_no_coverage_default_loads_plain_policies_and_refuses_coverage_needing_constructs ... ok
+test profile::tests::the_starting_label_must_be_in_the_deployment_vocabulary ... ok
+test profile::tests::vectors_derive_one_per_weak_choice_in_canonical_order ... ok
+test projection::tests::a_child_inherits_denials_recorded_before_its_fork_and_not_after ... ok
+test projection::tests::a_cold_replay_reports_the_ended_trajectory ... ok
+test projection::tests::a_dangling_basis_source_folds_fail_closed_to_bottom ... ok
+test profile::tests::unconfined_points_leave_the_sanitizer_factors_out_of_the_cap ... ok
+test projection::tests::a_denial_scopes_to_its_trajectory_and_rendered_call ... ok
+test projection::tests::a_pinned_annotation_is_not_reused_once_no_act_stands_on_its_call ... ok
+test projection::tests::a_proposal_is_read_back_only_for_the_position_its_own_trajectory_decided ... ok
+test projection::tests::a_tool_results_provenance_resolves_to_its_producing_tool ... ok
+test projection::tests::an_admission_moves_the_label_when_it_narrows_the_bound ... ok
+test projection::tests::an_indeterminate_close_leaves_the_reservation_standing ... ok
+test projection::tests::effects_are_family_wide_and_commit_only_on_success ... ok
+test projection::tests::failure_commits_nothing ... ok
+test projection::tests::value_ids_index_in_log_order ... ok
+test projection::tests::label_fold_is_branch_local ... ok
+test registry::tests::a_call_proposing_the_wildcards_own_spelling_resolves_to_no_declaration ... ok
+test registry::tests::a_catch_all_authority_covers_every_declared_mark_but_the_reserved_denial ... ok
+test registry::tests::a_configured_planner_cap_replaces_the_default_bound ... ok
+test registry::tests::a_confined_stage_bound_counts_only_the_sanitizers_whose_scope_reaches_it ... ok
+test registry::tests::a_declaration_may_route_only_through_a_registered_annotator ... ok
+test registry::tests::a_duplicate_annotator_is_refused ... ok
+test registry::tests::a_mandate_filled_from_an_array_admits_only_the_listed_collections ... ok
+test registry::tests::a_name_no_declaration_and_no_wildcard_covers_has_no_contract ... ok
+test registry::tests::a_tool_clearing_both_gap_species_counts_once ... ok
+test registry::tests::a_trust_transition_is_refused_at_the_input_point ... ok
+test registry::tests::a_wildcard_declares_no_statics_no_metadata_and_registers_once ... ok
+test registry::tests::a_zero_planner_cap_is_unrepresentable ... ok
+test registry::tests::a_vacuous_public_cap_arms_no_redispatch_count ... ok
+test registry::tests::an_annotated_candidate_stays_counted_wherever_a_cap_could_match_it ... ok
+test registry::tests::an_annotated_declaration_takes_the_worst_case_on_every_mandate_dimension ... ok
+test registry::tests::an_array_argument_matches_when_every_element_does ... ok
+test registry::tests::an_audience_vocabulary_lists_admissible_spellings_only ... ok
+test registry::tests::an_audience_vocabulary_round_trips_as_its_entry_list_and_is_validated_on_the_way_in ... ok
+test registry::tests::an_authority_naming_the_reserved_denial_is_refused ... ok
+test registry::tests::an_omitted_audience_bound_admits_every_surface_the_policy_writes ... ok
+test registry::tests::an_audience_argument_binding_implies_a_required_top_level_string ... ok
+test registry::tests::an_omitted_mandate_bound_leaves_other_annotators_placeholders_behind ... ok
+test registry::tests::an_omitted_mandate_bound_resolves_to_the_whole_policy_vocabulary ... ok
+test registry::tests::an_unannotated_tool_composes_with_history_and_attention_requirements ... ok
+test registry::tests::annotator_bounds_are_validated_against_the_policy_vocabulary ... ok
+test registry::tests::audience_provider_and_group_names_are_shaped_at_load ... ok
+test registry::tests::builds_and_indexes ... ok
+test registry::tests::chain_maps_names_and_ranks ... ok
+test registry::tests::declared_readers_form_a_closed_audience_vocabulary_with_public ... ok
+test registry::tests::duplicate_checkable_tools_are_ordered_variants ... ok
+test registry::tests::every_argument_clause_must_match_for_the_contract_to_select ... ok
+test registry::tests::every_declared_audience_refuses_a_reserved_or_group_reader ... ok
+test registry::tests::families_that_fit_alone_still_refuse_when_their_sum_exceeds_the_cap ... ok
+test registry::tests::malformed_selector_forms_are_refused ... ok
+test registry::tests::one_reserved_member_spoils_an_otherwise_literal_set ... ok
+test registry::tests::input_hops_add_to_the_call_stage_bound_and_only_where_they_are_in_scope ... ok
+test registry::tests::public_and_the_empty_set_stay_loadable_audiences ... ok
+test registry::tests::overlapping_names_preserve_authored_order_and_canonical_annotation_identity ... ok
+test registry::tests::refuses_duplicate_trust_rank ... ok
+test registry::tests::refuses_empty_mandate ... ok
+test registry::tests::refuses_overlong_trust_chain ... ok
+test registry::tests::refuses_rank_out_of_chain ... ok
+test registry::tests::return_declarations_multiply_every_menu_only_under_context_control ... ok
+test registry::tests::sanitizer_chains_do_not_multiply_either_stage_bound ... ok
+test registry::tests::selector_grammar_and_unicode_wildcards_are_exact ... ok
+test registry::tests::server_independent_names_match_only_concrete_mcp_tools ... ok
+test registry::tests::static_requirements_declare_attention_vocabulary_without_an_authority ... ok
+test registry::tests::the_alternative_bound_counts_every_sanitizer_for_an_annotated_declaration ... ok
+test registry::tests::the_bound_counts_every_direct_prior_emitter ... ok
+test registry::tests::the_bound_counts_only_static_restricted_contributions_for_a_cap ... ok
+test registry::tests::the_default_planner_cap_refuses_an_over_wide_registry_at_four_thousand_ninety_six ... ok
+test registry::tests::the_group_mark_is_a_prefix_and_never_a_substring ... ok
+test registry::tests::the_reserved_attest_schema_declaration_is_validated_at_load ... ok
+test registry::tests::the_wildcard_covers_every_name_the_policy_does_not_write ... ok
+test registry::tests::the_wildcard_parses_apart_from_every_tool_name ... ok
+test registry::tests::unmatched_argument_selectors_fall_through_to_the_wildcard ... ok
+test route::tests::a_cap_gap_is_cleared_by_the_call_whose_committed_label_stays_within_it ... ok
+test registry::tests::the_cap_counts_only_the_authorities_a_literal_contains_can_reach ... ok
+test route::tests::a_prior_gap_finds_the_emitter_as_a_preceding_call_beyond_depth_one ... ok
+test route::tests::a_preceding_call_that_drops_the_trust_floor_invalidates_the_route_it_would_complete ... ok
+test route::tests::a_ruling_binds_to_the_rendered_call_and_a_denial_on_that_digest_excludes_its_authority ... ok
+test route::tests::a_reservation_holds_across_the_route_and_a_narrowing_delta_reopens_an_audience_gap ... ok
+test route::tests::an_acceptance_alone_is_the_one_guaranteed_route ... ok
+test route::tests::a_substitution_precedes_a_ruling_and_less_disclosure_precedes_more ... ok
+test route::tests::an_input_hop_is_a_prefix_that_resumes_from_the_derived_candidate ... ok
+test route::tests::depth_one_routes_are_exactly_the_stage_plans ... ok
+test route::tests::every_way_a_preceding_call_stays_undetermined_ends_the_route_as_a_prefix ... ok
+test route::tests::mutually_prerequisite_emitters_end_the_search_with_no_route ... ok
+test route::tests::hops_over_a_gap_a_preceding_call_opens_rank_by_their_substitution_power ... ok
+test route::tests::prior_derivations_compose_until_the_depth_ends_them ... ok
+test route::tests::the_search_is_total_within_the_bound ... ok
+test route::tests::two_narrow_rulings_precede_one_broad_ruling_whatever_the_step_count ... ok
+test shape::tests::a_bounded_decimal_compiles_and_admits_its_values ... ok
+test shape::tests::a_bounded_structure_compiles_and_admits_its_values ... ok
+test shape::tests::a_nonconforming_return_is_named_by_path ... ok
+test shape::tests::an_unbounded_or_precision_free_number_is_refused ... ok
+test shape::tests::formats_admit_one_spelling_per_value ... ok
+test shape::tests::free_text_carriage_is_unrepresentable ... ok
+test shape::tests::every_engine_cap_refuses_its_excess ... ok
+test shape::tests::open_and_unbounded_forms_are_refused ... ok
+test shape::tests::the_strict_parse_gate_precedes_the_schema_walk ... ok
+test transition::tests::a_record_on_an_unopened_trajectory_is_refused ... ok
+test shape::tests::only_the_normalized_rendering_deserializes ... ok
+test transition::tests::a_view_takes_no_batch_from_another_family_or_policy ... ok
+test transition::tests::advancing_a_view_matches_rebuilding_it_from_the_records ... ok
+test value::tests::a_malformed_offer_id_is_refused_not_guessed ... ok
+test transition::tests::pinned_file_basis_changes_batch_authorization ... ok
+test value::tests::a_pinned_annotation_is_part_of_the_batch_identity ... ok
+test value::tests::a_pinned_annotation_round_trips_through_the_calls_wire_form ... ok
+test value::tests::a_substitution_drops_the_pinned_annotation ... ok
+test value::tests::an_offer_id_round_trips_through_its_hex_wire_form ... ok
+test value::tests::copy_and_move_keep_source_only_in_file_content_label ... ok
+test value::tests::digest_is_deterministic_and_key_order_independent ... ok
+test value::tests::digest_separates_distinct_calls ... ok
+test value::tests::dispatch_id_distinguishes_occurrences ... ok
+test value::tests::every_identity_takes_its_hex_form_on_the_record ... ok
+test value::tests::file_basis_distinguishes_read_replace_and_edit_labels ... ok
+test value::tests::process_result_and_file_inherit_every_input_but_not_replaced_destination ... ok
+test value::tests::raw_result_digest_binds_bytes ... ok
+test params::tests::canonical_expansion_cannot_create_an_unreplayable_payload ... ok
+test plan::tests::planner_agrees_with_reference_oracle ... ok
+test label::tests::every_admitted_value_has_one_concrete_label ... ok
+test plan::tests::planner_enumerates_exactly_the_sound_assignments ... ok
+test plan::tests::every_call_stage_menu_fits_the_recomputed_bound ... ok
+test params::tests::the_authored_source_limit_counts_canonical_bytes_and_deserialize_does_not_reapply_it ... ok
+test engine::tests::admission_law::an_offer_outlives_exactly_the_admissions_that_leave_the_label_unchanged ... ok
+test engine::tests::held_view_law::a_view_advanced_by_its_sealed_batches_is_the_cold_replay_at_every_prefix ... ok
+
+test result: ok. 486 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.67s
+
+     Running tests/opening_wire.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/opening_wire-49087f80d96c50b3)
+
+running 2 tests
+test a_principal_opening_forks_with_its_principal_and_replay_holds_it_to_shape ... ok
+test ordinary_and_forked_openings_preserve_stored_bytes_and_replay ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/appa_eventlog-d2bc880051ba63da)
+
+running 69 tests
+test encoding::tests::decode_dispatches_on_the_first_non_whitespace_byte ... ok
+test files::tests::binding_reads_no_file_contents ... ok
+test files::tests::a_read_whose_file_changed_during_the_call_is_refused ... ok
+test files::tests::a_reservation_binds_once_and_finishes_only_after_binding ... ok
+test files::tests::abandoning_releases_only_an_undisturbed_workspace ... ok
+test files::tests::absolute_paths_through_a_symlinked_workspace_alias_resolve_to_the_workspace ... ok
+test files::tests::a_path_whose_parent_cannot_be_inspected_is_refused ... ok
+test files::tests::file_digest_preserves_sha256_lowercase_hex ... ok
+test encoding::tests::stored_batch_bytes_are_frozen ... ok
+test files::tests::failed_transfer_releases_only_when_both_paths_are_unchanged ... ok
+test files::tests::a_parent_swapped_for_a_symlink_after_prepare_is_never_followed ... ok
+test files::tests::process_refuses_missing_or_aliased_inputs_and_quarantines_partial_failure ... ok
+test files::tests::move_marks_source_absent_preserves_history_and_allows_reuse ... ok
+test files::tests::rejects_missing_ledger_traversal_symlinks_and_hardlinks ... ok
+test files::tests::process_pins_raw_multi_inputs_and_publishes_all_dependencies ... ok
+test files::tests::receipts_carry_the_label_of_what_each_operation_consumed ... ok
+test files::tests::stores_over_the_same_workspace_are_isolated_in_memory ... ok
+test files::tests::mismatch_and_failed_partial_write_stay_pending ... ok
+test files::tests::links_anywhere_in_the_workspace_refuse_binding ... ok
+test files::tests::first_touch_adopts_current_bytes_and_later_drift_is_caught ... ok
+test files::tests::copy_tracks_raw_content_source_not_same_byte_destination ... ok
+test files::tests::transfer_reserves_both_paths_and_partial_failure_quarantines ... ok
+test files::tests::a_failed_call_whose_source_or_input_changed_is_quarantined ... ok
+test files::tests::replace_uses_bound_label_and_edit_records_dependency ... ok
+test files::tests::transfers_and_process_from_untouched_sources_carry_the_initial_label ... ok
+test receipts::tests::completing_an_absent_receipt_is_not_pending ... ok
+test receipts::tests::a_caller_bound_operation_row_without_a_caller_is_a_storage_failure ... ok
+test receipts::tests::a_claimed_receipt_refuses_a_second_claim_and_other_input ... ok
+test receipts::tests::a_completed_processed_result_replays ... ok
+test receipts::tests::a_session_bound_operation_ignores_the_caller ... ok
+test receipts::tests::a_completed_receipt_accepts_only_its_own_completion_again ... ok
+test sqlite::tests::a_damaged_file_is_refused ... ok
+test receipts::tests::operation_receipts_refuse_another_scope_without_writing ... ok
+test receipts::tests::operation_receipts_store_the_frozen_v1_input_envelope ... ok
+test sqlite::tests::a_fresh_sqlite_store_has_the_frozen_schema ... ok
+test sqlite::tests::a_stamped_database_without_its_tables_is_damaged ... ok
+test receipts::tests::processed_results_refuse_another_scope_without_writing ... ok
+test sqlite::tests::an_unstamped_database_that_already_holds_tables_is_refused ... ok
+test tests::a_missing_stored_policy_file_refuses_the_read ... ok
+test tests::a_log_with_a_sequence_gap_refuses_the_read ... ok
+test tests::a_key_finds_the_roots_that_named_it_and_no_others ... ok
+test receipts::tests::receipts_record_the_caller_that_claimed_them ... ok
+test tests::a_second_root_under_one_id_is_refused ... ok
+test tests::a_policy_file_the_opening_does_not_name_is_refused ... ok
+test tests::an_append_on_a_stale_read_conflicts_and_writes_nothing ... ok
+test receipts::tests::pending_receipts_are_found_by_their_root_alone ... ok
+test tests::an_opened_root_reads_back_with_its_records_and_its_policy_file ... ok
+test tests::an_opening_that_does_not_lead_with_its_record_is_refused ... ok
+test tests::appends_advance_the_position_and_read_back_in_order ... ok
+test tests::an_unknown_root_does_not_read_as_empty_history ... ok
+test tests::host_and_fact_appends_share_one_compare_and_swap ... ok
+test tests::an_object_that_is_not_a_host_record_refuses_the_read ... ok
+test tests::facts_and_an_observation_land_in_one_batch ... ok
+test tests::memory_typed_receipts_are_idempotent_and_fail_closed ... ok
+test sqlite::tests::a_database_at_another_schema_version_is_refused ... ok
+test tests::memory_organizations_sharing_a_session_id_keep_their_receipts_apart ... ok
+test tests::store_error_classes_serialize_to_their_frozen_wire_names ... ok
+test tests::memory_receipts_do_not_leak_across_stores ... ok
+test tests::the_memory_backend_is_private_to_its_store ... ok
+test tests::the_append_position_follows_the_highest_stored_seq ... ok
+test tests::two_roots_under_one_policy_file_share_the_stored_row ... ok
+test tests::sqlite_typed_receipts_are_idempotent_and_fail_closed ... ok
+test tests::sqlite_organizations_sharing_a_session_id_keep_their_receipts_apart ... ok
+test tests::committed_state_survives_a_reopen ... ok
+test tests::two_connections_serialize_through_the_conflict ... ok
+test tests::host_observations_survive_reopen_without_changing_the_policy_or_engine_facts ... ok
+test receipts::tests::a_corrupt_operation_row_is_a_storage_failure ... ok
+test receipts::tests::a_corrupt_processed_result_row_is_a_storage_failure ... ok
+test receipts::tests::operation_input_outside_the_v1_envelope_is_a_storage_failure ... ok
+
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running unittests src/lib.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/appa_policy-f4790a69a8ce3981)
+
+running 41 tests
+test tests::a_duplicate_annotator_is_refused ... ok
+test tests::a_description_input_needs_a_declared_description ... ok
+test tests::a_second_wildcard_tool_is_refused ... ok
+test tests::a_mapped_argument_input_needs_a_required_top_level_property ... ok
+test tests::a_string_token_and_a_reader_list_are_different_audience_shapes ... ok
+test tests::a_sanitizer_transition_and_a_component_tag_list_keep_every_member ... ok
+test tests::a_provider_enters_the_policy_when_a_contract_or_mandate_names_it ... ok
+test tests::a_catch_all_attention_permit_loads_and_the_wildcard_never_mixes_with_names ... ok
+test tests::a_tool_requires_a_registered_annotator ... ok
+test tests::a_tool_names_an_annotator_or_declares_static_semantics_never_both ... ok
+test tests::a_wildcard_covers_a_confined_result_the_policy_never_names ... ok
+test tests::a_wildcard_tool_with_static_semantics_is_refused ... ok
+test tests::a_wildcard_tool_with_metadata_is_refused ... ok
+test tests::a_written_audience_list_refuses_a_repeated_entry ... ok
+test tests::a_selector_placeholder_reads_one_declared_collection_per_call ... ok
+test tests::a_declared_group_mention_loads_when_routed_and_refuses_at_load_when_not ... ok
+test tests::an_annotator_audience_bound_lists_symbolic_audiences_and_readers ... ok
+test tests::an_annotator_carries_the_stock_builtin_on_its_declaration ... ok
+test tests::an_absent_deployment_table_is_the_no_coverage_default_and_refuses_covered_constructs ... ok
+test tests::an_annotator_hint_is_runtime_owned_and_bounded ... ok
+test tests::an_annotator_name_is_an_opaque_non_empty_string ... ok
+test tests::an_annotator_mandate_placeholder_binds_to_each_routed_tools_arguments ... ok
+test tests::an_annotator_mandate_resolves_omitted_bounds_to_the_whole_vocabulary ... ok
+test tests::an_audience_source_selector_must_fit_its_level ... ok
+test tests::an_empty_annotator_audience_mandate_closes_it_to_public_answers ... ok
+test tests::an_audience_argument_binding_implies_a_required_string_in_parameters ... ok
+test tests::an_inline_binding_on_the_reserved_attest_schema_is_refused ... ok
+test tests::compiled_tool_parameters_are_normalized_in_policy_identity ... ok
+test tests::an_input_sanitizer_registers_with_its_scope_and_refuses_a_trust_mandate ... ok
+test tests::declaration_only_policy_builds_the_engine_registry ... ok
+test tests::deployment_tokens_and_exception_conflicts_are_load_errors ... ok
+test tests::an_input_reads_a_tool_call_value ... ok
+test tests::every_inline_implementation_site_is_refused ... ok
+test tests::the_audience_tables_compile_into_the_registered_configuration ... ok
+test tests::the_wildcard_is_part_of_the_policy_identity ... ok
+test tests::the_deployment_table_compiles_into_the_validated_profile ... ok
+test tests::hints_and_limits_never_move_the_policy_identity ... ok
+test tests::server_qualification_preserves_argument_selectors ... ok
+test tests::server_qualification_rejects_ambiguous_or_unspellable_names ... ok
+test tests::the_wildcard_tool_loads_with_an_annotator_and_nothing_else ... ok
+test tests::server_qualification_preserves_the_contract_and_deployment_references ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/characterization.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/characterization-4f8f43be212bd7fb)
+
+running 15 tests
+test every_input_source_spelling_round_trips_through_parse ... ok
+test an_invalid_trust_chain_is_refused ... ok
+test a_sanitizer_permits_exactly_one_transition ... ok
+test a_sanitizer_point_outside_tool_input_and_tool_output_is_refused ... ok
+test parse_delta_reads_the_delta_spelling_against_a_chain ... ok
+test parse_delta_refuses_an_unknown_rank_and_a_malformed_audience ... ok
+test a_tool_parameters_schema_outside_the_dialect_is_refused ... ok
+test only_the_supported_dialect_version_loads ... ok
+test a_tool_declaring_one_effect_twice_is_refused ... ok
+test a_zero_planner_cap_is_refused ... ok
+test the_boundary_table_converts_trust_and_a_reader_audience ... ok
+test a_custom_trust_chain_replaces_the_default_ranks ... ok
+test the_deployment_table_accepts_every_surface_mode_binding_and_context_control ... ok
+test a_hint_is_bounded_in_characters_for_every_component_kind ... ok
+test an_unknown_key_is_a_parse_error_in_every_table ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/claude_code_examples.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/claude_code_examples-b4ac08306289cc49)
+
+running 1 test
+test every_shipped_example_loads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/tool_loading.rs (/private/tmp/chio-openappa-research-20261001/target/debug/deps/tool_loading-6752376d8bb376fc)
+
+running 2 tests
+test a_declared_tool_with_history_or_attention_requirements_loads ... ok
+test a_declared_tool_with_a_label_requirement_and_no_delta_loads_neutral ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests appa_adapter_claude_code
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests appa_adapter_kagent
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests appa_engine
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests appa_eventlog
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests appa_policy
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,276 @@
+{
+  "research_date": "2026-10-01",
+  "platform": "Apple Silicon macOS",
+  "toolchain": "Rust 1.94.1",
+  "scope": "Selected current development tests and local prototypes, not full workspace or hosted qualification",
+  "runs": [
+    {
+      "target": "current_flow",
+      "command": [
+        "cargo",
+        "+1.94.1",
+        "test",
+        "--locked",
+        "-p",
+        "chio-flow",
+        "--features",
+        "std"
+      ],
+      "log_sha256": "845f688ee36e7e490a6614bc4d34ae09d72a5adfd0b129e75f61c55c5bf0988e",
+      "exit_code": 0,
+      "summaries": [
+        {
+          "passed": 47,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "passed": 47,
+      "failed": 0,
+      "ignored": 0,
+      "retained_log_kind": "Local development lab; raw logs are not public artifacts"
+    },
+    {
+      "target": "prototype",
+      "command": [
+        "cargo",
+        "+1.94.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "labs/openappa-recovery/Cargo.toml"
+      ],
+      "log_sha256": "7eb9045e85936c7c41b419ee0bc0de6341344d0f89ea178d56bda8fcfdd7ba0e",
+      "exit_code": 0,
+      "summaries": [
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0,
+      "retained_log_kind": "Local development lab; raw logs are not public artifacts"
+    },
+    {
+      "target": "native_declassification",
+      "command": [
+        "cargo",
+        "+1.94.1",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "native_flow::support::declassification"
+      ],
+      "log_sha256": "ecbc50a16cf96faf1ca809faf9a10e65fdfe459887bf81025b44cf2167891014",
+      "exit_code": 0,
+      "summaries": [
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 1144
+        }
+      ],
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "retained_log_kind": "Local development lab; raw logs are not public artifacts"
+    },
+    {
+      "target": "response_simulation",
+      "command": [
+        "cargo",
+        "+1.94.1",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--test",
+        "response_dry_run"
+      ],
+      "log_sha256": "7a0bcd020d431d6dbae4a5d935e8d9d065c9d66462cec97813b4defbd3222fac",
+      "exit_code": 0,
+      "summaries": [
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "retained_log_kind": "Local development lab; raw logs are not public artifacts"
+    },
+    {
+      "target": "crash_recovery",
+      "command": [
+        "cargo",
+        "+1.94.1",
+        "test",
+        "--locked",
+        "-p",
+        "chio-process",
+        "--test",
+        "crash_recovery"
+      ],
+      "log_sha256": "3354446c1b6c76ed58bffcd09f868b8e2820a47789204b1ad9d19aef1c1378ad",
+      "exit_code": 0,
+      "summaries": [
+        {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "retained_log_kind": "Local development lab; raw logs are not public artifacts"
+    },
+    {
+      "target": "processes",
+      "command": [
+        "cargo",
+        "+1.94.1",
+        "test",
+        "--locked",
+        "-p",
+        "chio-process",
+        "--test",
+        "processes"
+      ],
+      "log_sha256": "3354446c1b6c76ed58bffcd09f868b8e2820a47789204b1ad9d19aef1c1378ad",
+      "exit_code": 0,
+      "summaries": [
+        {
+          "passed": 16,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "retained_log_kind": "Local development lab; raw logs are not public artifacts"
+    },
+    {
+      "target": "recovery_offer_binding_lab",
+      "command": [
+        "cargo",
+        "+1.94.1",
+        "test",
+        "--locked",
+        "-p",
+        "chio-process",
+        "--test",
+        "recovery_offer_binding_lab"
+      ],
+      "log_sha256": "3354446c1b6c76ed58bffcd09f868b8e2820a47789204b1ad9d19aef1c1378ad",
+      "exit_code": 0,
+      "summaries": [
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "retained_log_kind": "Local development lab; raw logs are not public artifacts"
+    }
+  ],
+  "total_passed": 104,
+  "total_failed": 0,
+  "total_ignored": 0,
+  "counting_note": "Owning target summaries only; nested crash subprocess summaries are excluded. crash_recovery includes one no-op subprocess entry point and nine owning scenario tests.",
+  "prototype_scope": "20 flow/grant/offer tests; two additional real process/kernel binding experiments. Preparation and test-port consumption do not constitute native recovery-workflow execution.",
+  "checks": {
+    "prototype_all_targets_clippy": "passed with -D warnings",
+    "prototype_formatting": "passed",
+    "new_process_test_formatting": "passed",
+    "demo": "captured; dispatch_authorized false"
+  },
+  "initial_results": [
+    {
+      "check": "prototype Clippy",
+      "result": "failed: unused InformationFlowLattice import",
+      "correction": "removed unused import; no lint relaxed"
+    },
+    {
+      "check": "native selection",
+      "result": "initial filename-shaped filter selected zero tests",
+      "correction": "ran native_flow::support::declassification; six tests passed",
+      "included_in_total": false
+    }
+  ],
+  "not_claimed": [
+    "full-workspace qualification",
+    "current process all-target Clippy",
+    "live provider/model evaluation",
+    "joined durable remedy workflow",
+    "public release availability",
+    "hosted acceptance",
+    "production rollout"
+  ]
+}

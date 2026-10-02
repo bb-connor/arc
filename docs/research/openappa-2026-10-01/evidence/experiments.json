@@ -1,0 +1,72 @@
+{
+  "captured_at": "2026-10-01T19:04:22.778540+00:00",
+  "source": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+  "source_clean": true,
+  "binary_sha256": "114a037c72ea31ed5870fcc6c502f246a98734fa244390ba2d3dd96c16dec58c",
+  "platform": "macOS-26.4-arm64-arm-64bit-Mach-O",
+  "build": "debug, debug information disabled; not a release benchmark",
+  "limits": "No model calls, real external effects, live Claude/kagent session, or Linux confinement execution.",
+  "runs": [
+    {
+      "name": "policy-description",
+      "command": [
+        "/private/tmp/chio-openappa-research-20261001/target/debug/appa",
+        "describe",
+        "--check",
+        "--config",
+        "/Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/policy.toml"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.13
+    },
+    {
+      "name": "authored-replay",
+      "command": [
+        "/private/tmp/chio-openappa-research-20261001/target/debug/appa",
+        "replay",
+        "--verbose",
+        "--config",
+        "/Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/policy.toml",
+        "/Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/confidentiality.appa",
+        "/Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/ordering.appa"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.25
+    },
+    {
+      "name": "file-ledger-recreation",
+      "command": [
+        "cargo",
+        "run",
+        "--offline",
+        "--manifest-path",
+        "/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T/chio-appa-probe-16crokne/Cargo.toml",
+        "--",
+        "/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T/chio-appa-probe-16crokne/workspace"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.704
+    }
+  ],
+  "file_ledger_probe": {
+    "experiment": "file-ledger-recreation",
+    "interpretation": "A fresh FileStore forgets the recorded label and adopts configured initial classification. This confirms a documented experimental limitation.",
+    "label_after": {
+      "audience": [],
+      "trust": 255
+    },
+    "label_before": {
+      "audience": [
+        {
+          "readers": [
+            "hr@company.test"
+          ]
+        }
+      ],
+      "trust": 1
+    },
+    "passed": true,
+    "scope": "FileStore API; recreation of the in-memory ledger, not a full runtime restart",
+    "unchanged_digest": "55160bc96eff99b1bbced30a5470bfca1389cb36e74841739dfcea9caac78ea0"
+  }
+}

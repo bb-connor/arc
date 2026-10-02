@@ -1,0 +1,98 @@
+{
+  "schema": "chio.recovery-architecture-foundation-check.v1",
+  "date": "2026-10-02",
+  "source_base": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "chio-process",
+    "--test",
+    "nonce_recovery"
+  ],
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+  "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+  "exit_code": 0,
+  "passed": 3,
+  "failed": 0,
+  "test_names": [
+    "strict_nonce_call_completes_once_and_replays_after_reopening",
+    "strict_nonce_unknown_effect_keeps_original_custody_after_process_death",
+    "strict_nonce_subprocess"
+  ],
+  "count_note": "Three top-level harness tests include one subprocess helper. Nested child invocations are not additional unique tests.",
+  "scope": "Existing process/kernel strict-nonce foundation only; no proposed grant-v2 or recovery-participant implementation.",
+  "record_kind": "Tool-observed command/result summary, not a full build attestation or retained stdout transcript.",
+  "selected_source_inputs": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "ac74f90336f1f2f40021b78a86c4ed64cafb5127aaae247b9a31be653e017a40"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "d9bda38a6c395cd6419760c0edd4473654d011ff1b483d02f36a1667f95a57c8"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/runtime.rs",
+      "sha256": "eef363dcffe4864dc82b6870f5d2f44b07b552073c7177f980f33f32d24e2acb"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
+      "sha256": "052130a5aa2e335c7438ad137cc7b68979386717eef9652bca357d36be8d08c0"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+      "sha256": "ec64cf0470d12b151272e11216bc66688200fc6f5776db5e1aba645a5c542729"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/execution_nonce.rs",
+      "sha256": "5507ab9f47bcfee5e6ebdbc2de8372a52cb2acc6c7f7a7f90c2d632003c8160c"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition/nonce_preflight.rs",
+      "sha256": "b224a7715b60df674a1bd74c919d2241e1fc1cc404016036966028b91de82442"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs",
+      "sha256": "b56e6cf335f3a2c02c9a8a64f5ead286ba6b32bbc84c6502ba985f1dd8748fd3"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/nonces.rs",
+      "sha256": "06b82549daacfaceeb2fa27e488219654658d381455fdd2fabfed73a0fd02863"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/flow_policy.rs",
+      "sha256": "6b2c10c4a1401a7a3a2d63332541939b0a75014792116d92f910c7c1dbf5cc1b"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/nonce_recovery.rs",
+      "sha256": "46fd81995e441421a64dd3b9b098f218733273b66de843dd63161e6b2cb690db"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/support/mod.rs",
+      "sha256": "723d3c7fb53dcd07c1eff7fcd89e22c2bef69d6366c99ba43528afbee7198640"
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/support/supplemental.rs",
+      "sha256": "d0c3e5c6fe86d1461880e5819735be552f23cf2a9a313301ec780e981cbb03c5"
+    },
+    {
+      "path": "crates/kernel/chio-process/Cargo.toml",
+      "sha256": "fa8d558bc2b388ab8e6cc6ce71d387b83934be93393805ac1dc91f31e3582d0c"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/lib.rs",
+      "sha256": "ec6dc924f363b7bdc1ef381005951c0aaf1ba9a9bfedd7b896a5fdc712581624"
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store.rs",
+      "sha256": "b1f08866f54ca067a6e873fb3ba2a28585a9a67c3f91ccabc760ed922d482933"
+    }
+  ],
+  "new_architecture_implementation_qualified": false
+}
