@@ -1,0 +1,2 @@
+RUN native-tests
+PASS: 1 terminal checks, 1 source files, 10 output files; manuscript frozen

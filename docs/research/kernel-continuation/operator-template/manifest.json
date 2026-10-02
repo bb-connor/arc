@@ -4,5 +4,6 @@
   "records": "records.csv",
   "artifacts": {},
   "operators": {},
-  "adjudications": {}
+  "adjudications": {},
+  "scheduled_incidents": {}
 }

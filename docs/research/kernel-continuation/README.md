@@ -30,7 +30,8 @@ From the checkout root:
 
 The first command runs focused tests, capital enumeration, both intake examples,
 native clippy and formatting. It retains terminal commands, exit codes, exact
-stdout/stderr, source digests and native records. The second checks the complete
+stdout/stderr, source digests and native records. Each run starts with an empty
+native evidence directory and archives previous trajectories separately. The second checks the complete
 record against current sources and output bytes. Use an isolated Linux checkout
 with Rust 1.94.1 and Python 3.13; the native fault tests require Unix and `kill`.
 Cargo dependency warnings about unused workspace patches are retained.
@@ -40,6 +41,10 @@ byte historical evidence. Its whole-native-tree check is intentionally bound to
 its earlier source and cannot pass against later added integration tests. Run
 that checker at its recorded revision when auditing the earlier result. Do not
 rewrite the old record to pretend this continuation was tested then.
+
+The [fresh review and correction record](REVIEW.md) describes the incident-accounting,
+trajectory-provenance, signature-control and numeric fixes and their observed
+regressions. No review finding is deferred.
 
 ## Subsequent work, in priority order
 

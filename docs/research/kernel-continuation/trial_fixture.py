@@ -25,9 +25,9 @@ def make_package(root):
             attestation = artifact('synthetic-attestation.txt','SYNTHETIC attestation, no person participated\n')
             attempts = [
                 {'attempt_id':f'I{number}-{arm}-failed','status':'failed', 'hands_on_hours':'1',
-                 'recoverable_incident':False,'recovered_without_repair':False,'database_edits':0,'bespoke_repairs':0},
+                 'incident_id':None,'recoverable_incident':False,'recovered_without_repair':False,'database_edits':0,'bespoke_repairs':0},
                 {'attempt_id':f'I{number}-{arm}-succeeded','status':'succeeded', 'hands_on_hours':'1' if arm=='Chio' else '3',
-                 'recoverable_incident':True,'recovered_without_repair':True,'database_edits':0,'bespoke_repairs':0}]
+                 'incident_id':f'I{number}-{arm}-incident','recoverable_incident':True,'recovered_without_repair':True,'database_edits':0,'bespoke_repairs':0}]
             events = artifact(f'I{number}-{arm}.jsonl',''.join(json.dumps(a)+'\n' for a in attempts))
             row = dict.fromkeys(FIELDS,'0')
             row.update(exercise=f'I{number}',arm=arm,order=str(1 if (arm=='Chio')==(number%2==1) else 2),
@@ -40,6 +40,7 @@ def make_package(root):
     with (root/'records.csv').open('w',newline='') as f:
         writer=csv.DictWriter(f,fieldnames=FIELDS);writer.writeheader();writer.writerows(rows)
     manifest={'schema':'chio.integration-intake.v1','mode':'synthetic','records':'records.csv',
+        'scheduled_incidents':{f'I{i}/{arm}':[f'I{i}-{arm}-incident'] for i in range(1,7) for arm in ('Chio','B1')},
         'artifacts':artifacts,'operators':{'SYNTHETIC-operator':{'administration_id':'SYNTHETIC-admin'}},
         'adjudications':{f'I{i}':{'safety_matched':True,'progress_matched':True,'quality_matched':True,
             'artifact_sha':adjudication} for i in range(1,7)}}

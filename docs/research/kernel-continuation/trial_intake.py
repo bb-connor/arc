@@ -4,6 +4,7 @@ import csv
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
+from fractions import Fraction
 from pathlib import Path
 import re
 from statistics import median
@@ -30,8 +31,25 @@ def number(value, label, integer=False):
         raise ValueError(f'{label}: invalid number') from error
     require(result.is_finite() and result >= 0 and result <= Decimal('1e18'),
             f'{label}: expected finite nonnegative value <= 1e18')
+    if result == 0:
+        return Decimal(0)
+    digits = list(result.as_tuple().digits)
+    exponent = result.as_tuple().exponent
+    while digits[-1] == 0:
+        digits.pop()
+        exponent += 1
+    require(len(digits) <= 18 and -24 <= exponent <= 18,
+            f'{label}: exceeds supported precision (18 significant digits, resolution 1e-24)')
     require(not integer or result == result.to_integral_value(), f'{label}: expected integer')
     return result
+
+
+def decimal_display(value):
+    return str(Decimal(value.numerator) / Decimal(value.denominator))
+
+
+def exact_ratio(value):
+    return {'numerator':str(value.numerator),'denominator':str(value.denominator)}
 
 
 def confined(root, name):
@@ -62,8 +80,13 @@ def analyze(package):
     require(len(rows) == 12, 'six complete pairs required')
     operators = manifest.get('operators')
     require(isinstance(operators, dict) and operators, 'operators are unregistered')
+    schedule = manifest.get('scheduled_incidents')
+    require(isinstance(schedule,dict) and set(schedule) ==
+            {f'I{i}/{arm}' for i in range(1,7) for arm in ('Chio','B1')},
+            'frozen incident schedule required for all pair members')
     indexed = {}
     seen_attempts = set()
+    seen_incidents = set()
     for row in rows:
         require(set(row) == set(FIELDS) and all(isinstance(v,str) and v.strip() for v in row.values()),
                 'blank, extra or truncated CSV field')
@@ -80,9 +103,10 @@ def analyze(package):
             number(row[field], field, field in COUNTS)
         events = [json.loads(line) for line in files[row['event_log_sha']].read_text().splitlines()]
         require(events, 'empty attempt log')
-        total = Decimal(0)
+        total = Fraction(0)
         counts = dict.fromkeys(('failed_attempts','recoverable_incidents','recovered_without_repair',
                                 'database_edits','bespoke_repairs'),0)
+        incidents = {}
         for event in events:
             require(isinstance(event,dict), 'attempt must be an object')
             identity = event.get('attempt_id')
@@ -90,23 +114,46 @@ def analyze(package):
             seen_attempts.add(identity)
             require(event.get('status') in ('succeeded','failed','cancelled'), 'unknown attempt outcome')
             counts['failed_attempts'] += event['status'] != 'succeeded'
-            total += number(event.get('hands_on_hours'), 'attempt effort')
+            total += Fraction(number(event.get('hands_on_hours'), 'attempt effort'))
             for key in ('recoverable_incident','recovered_without_repair'):
                 require(type(event.get(key)) is bool, f'{key} must be boolean')
+            require('incident_id' in event, 'missing incident identity')
+            incident = event['incident_id']
+            require(incident is None or (isinstance(incident,str) and 0 < len(incident) <= 128),
+                    'invalid incident identity')
+            require(event['recoverable_incident'] == (incident is not None),
+                    'incident identity disagrees with recovery classification')
             for key in ('database_edits','bespoke_repairs'):
                 require(type(event.get(key)) is int and event[key] >= 0, f'invalid {key}')
+                require(event[key] == 0 or incident is not None, 'repair has no incident identity')
                 counts[key] += event[key]
             recovered = event['recovered_without_repair']
             require(not recovered or (event['recoverable_incident'] and event['status'] == 'succeeded'
                     and event['database_edits'] == 0 and event['bespoke_repairs'] == 0),
                     'repaired or failed attempt counted as unassisted recovery')
-            counts['recoverable_incidents'] += event['recoverable_incident']
+            if incident is not None:
+                history = incidents.setdefault(incident,[])
+                require(not history or history[-1]['status'] != 'succeeded',
+                        'completed incident reused for another attempt')
+                history.append(event)
+        require(not seen_incidents.intersection(incidents), 'incident identity reused across pair members')
+        scheduled = schedule[f'{exercise}/{arm}']
+        require(isinstance(scheduled,list) and all(isinstance(s,str) for s in scheduled)
+                and len(scheduled) == len(set(scheduled)) and set(scheduled) == set(incidents),
+                'raw attempts do not cover the frozen incident schedule')
+        seen_incidents.update(incidents)
+        counts['recoverable_incidents'] = len(incidents)
+        for history in incidents.values():
+            recovered = history[-1]['recovered_without_repair']
+            repairs = sum(event['database_edits'] + event['bespoke_repairs'] for event in history)
+            require(not recovered or repairs == 0, 'earlier repair invalidates unassisted recovery')
             counts['recovered_without_repair'] += recovered
-        require(total == Decimal(row['repeated_hands_on_hours']), 'omitted or conflicting hands-on effort')
+        require(total == Fraction(Decimal(row['repeated_hands_on_hours'])), 'omitted or conflicting hands-on effort')
         for key, count in counts.items():
             require(count == Decimal(row[key]), f'raw attempts disagree with {key}')
         require(counts['recoverable_incidents'] > 0, 'scheduled recovery incidents missing')
     pairs = []
+    ratios = []
     matched = True
     adjudications = manifest.get('adjudications')
     require(isinstance(adjudications,dict) and set(adjudications) == {f'I{i}' for i in range(1,7)},
@@ -133,19 +180,24 @@ def analyze(package):
             matched &= adjudication[field]
         denominator = Decimal(baseline['repeated_hands_on_hours'])
         require(denominator > 0, 'zero B1 denominator is unresolved')
-        ratio = Decimal(candidate['repeated_hands_on_hours']) / denominator
-        pairs.append({'exercise':exercise,'ratio':str(ratio)})
-    ratios = [Decimal(p['ratio']) for p in pairs]
+        ratio = Fraction(Decimal(candidate['repeated_hands_on_hours'])) / Fraction(denominator)
+        ratios.append(ratio)
+        pairs.append({'exercise':exercise,'ratio':decimal_display(ratio),'exact_ratio':exact_ratio(ratio)})
     recovery = {}
+    recovery_counts = {}
     for arm in ('Chio','B1'):
         arm_rows = [r for r in rows if r['arm'] == arm]
-        recovery[arm] = sum(Decimal(r['recovered_without_repair']) for r in arm_rows) / sum(
-            Decimal(r['recoverable_incidents']) for r in arm_rows)
+        recovered = sum(int(Decimal(r['recovered_without_repair'])) for r in arm_rows)
+        scheduled = sum(int(Decimal(r['recoverable_incidents'])) for r in arm_rows)
+        recovery_counts[arm] = {'scheduled_incidents':scheduled,'recovered_without_repair':recovered}
+        recovery[arm] = Fraction(recovered,scheduled)
     median_ratio = median(ratios)
-    thresholds = median_ratio <= Decimal('.50') and matched and recovery['Chio'] >= Decimal('.95')
+    thresholds = median_ratio <= Fraction(1,2) and matched and recovery['Chio'] >= Fraction(19,20)
     return {'schema':'chio.integration-intake-result.v1','mode':manifest['mode'],
-            'record_complete':True,'pairs':pairs,'median_paired_ratio':str(median_ratio),
-            'recovery_fractions':{arm:str(value) for arm,value in recovery.items()},
+            'record_complete':True,'pairs':pairs,'median_paired_ratio':decimal_display(median_ratio),
+            'median_paired_ratio_exact':exact_ratio(median_ratio),
+            'recovery_fractions':{arm:decimal_display(value) for arm,value in recovery.items()},
+            'recovery_counts':recovery_counts,
             'matched_safety_progress_quality':matched,'numerical_thresholds_met':thresholds,
             'independence':'not_established','empirical_acceptance':False,
             'limitation':'Mechanical validation cannot establish authentic effort, independence, completeness of supplied logs or adjudicator truth. Independent audit remains required.'}

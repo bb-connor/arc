@@ -11,16 +11,25 @@ those requirements or contact participants.
 
 1. Copy `operator-template/` to a new evidence directory. Preserve its 12 rows
    and counterbalanced order. Register real operator IDs in `manifest.json`.
-   Each pair uses the same implementer, task corpus, model pin, trust profile
+   Freeze `scheduled_incidents` before execution: its keys are `I1/Chio`,
+   `I1/B1`, through `I6/B1`, and each value lists that arm's globally unique
+   scheduled incident IDs. The independently attested manifest revision must
+   predate work. Each pair uses the same implementer, task corpus, model pin, trust profile
    and budget profile. Retain full source, configuration, prompt and hardware
    pins in the committed source/attestation artifacts. Pin equivalent provider
    semantics even where independently written adapters have different source.
 2. Preserve every attempted or abandoned run. An event log is JSONL with one
    object per attempt: `attempt_id`, `status` (`succeeded`, `failed`, `cancelled`),
-   decimal-string `hands_on_hours`, boolean `recoverable_incident` and
+   decimal-string `hands_on_hours`, `incident_id` (null for unrelated work),
+   boolean `recoverable_incident` and
    `recovered_without_repair`, integer `database_edits` and `bespoke_repairs`.
-   IDs are unique across the package. Log failed effort too. Split interrupted
-   attempts into distinct entries; never replace a failure with its later retry.
+   Attempt IDs are unique across the package. All attempts and repairs belonging
+   to one incident retain its scheduled incident ID, in chronological order.
+   `recoverable_incident` must equal whether that ID is present. Log failed
+   effort too. Split interrupted attempts into distinct entries; never replace
+   a failure with its later retry. Record an unavailable scheduled incident as
+   an unsuccessful attempt; never remove it from the denominator. A completed
+   incident cannot be reopened under the same ID.
 3. Enter all preregistered costs and counts. Repeated hands-on time includes all
    active effort during the repeated exercise, including failed work, debugging
    and assistance. Record training, assistance and debugging hours separately
@@ -50,13 +59,23 @@ infrastructure, authentic effort, adjudication, task quality and completeness
 of supplied logs still require an independent audit. Mode `independent` records
 the intended study mode and does not certify those facts.
 
+Incidents are counted once, across all attempts. A successful final retry can
+count as unassisted recovery only if no attempt in that incident used database
+edits or bespoke repairs. An earlier repair cannot be hidden by a clean final
+attempt. Repairs require an incident ID. The collector requires complete coverage
+of the supplied schedule; the independent auditor must check that the schedule
+was fixed beforehand and matches the preregistered fault workload.
+
 The primary numerical threshold is the preregistered median Chio/B1 ratio <=
 0.50, matched safety/progress/quality and Chio recovery without database edits or
 bespoke repair >= 0.95. All failed attempts remain in effort and repair counts.
 Zero B1 denominators and missing incidents are unresolved. Report the six pairs
 as exploratory; this is not a population confidence claim or a ratio of summed
-effort. The numeric transport accepts finite nonnegative values up to 1e18 and
-integral counts; larger values require explicit review rather than overflow.
+effort. Exact rational arithmetic decides the threshold and reconciles logged
+effort. Displayed decimals are rounded; exact ratio numerators/denominators and
+recovery counts accompany them. The numeric transport accepts nonnegative values
+up to 1e18, at most 18 significant digits and resolution no finer than 1e-24,
+with integral counts. Unsupported precision returns a structured record error.
 
 ## Dry run
 

@@ -238,12 +238,12 @@ fn run_trajectory(cut: &str, bad: bool) -> Result {
 #[test]
 fn mutated_approvals_and_artifact_handoffs_never_dispatch() -> Result {
     for mutation in [
+        "signature",
         "missing-approval",
         "parameters",
         "recipient",
         "version",
         "operation",
-        "signature",
         "source-content",
         "source-receipt",
     ] {
@@ -260,7 +260,9 @@ fn mutated_approvals_and_artifact_handoffs_never_dispatch() -> Result {
             "operation" => req.request_id = "fresh-operation".into(),
             "signature" => {
                 let mut token = req.approval_token.take().ok_or("approval")?;
-                token.request_id = "substituted".into();
+                // Preserve every binding field so the native verifier must
+                // reach cryptographic signature validation to reject this.
+                token.signature = chio_core::crypto::Signature::from_bytes(&[0; 64]);
                 req.approval_token = Some(token);
             }
             "source-content" | "source-receipt" => {
@@ -283,6 +285,16 @@ fn mutated_approvals_and_artifact_handoffs_never_dispatch() -> Result {
             response.reason
         );
         assert!(response.output.is_none());
+        if mutation == "signature" {
+            assert!(
+                response
+                    .reason
+                    .as_deref()
+                    .is_some_and(|s| s.contains("approval token verification failed")),
+                "signature control never reached cryptographic verification: {:?}",
+                response.reason
+            );
+        }
         assert!(!root.join("effects-3.json").exists(), "{mutation}");
         assert_eq!(Bank::balances(root)?, vec![0, 1000, 100, 0]);
     }

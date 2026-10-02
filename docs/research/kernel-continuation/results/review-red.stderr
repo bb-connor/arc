@@ -1,0 +1,76 @@
+.......F..F...FFE.E...F
+======================================================================
+ERROR: test_repaired_incident_is_counted_once_and_retained (test_trial_intake.IntakeTests.test_repaired_incident_is_counted_once_and_retained)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 119, in test_repaired_incident_is_counted_once_and_retained
+    result=analyze(self.package)
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 107, in analyze
+    require(count == Decimal(row[key]), f'raw attempts disagree with {key}')
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 22, in require
+    raise ValueError(message)
+ValueError: raw attempts disagree with recoverable_incidents
+
+======================================================================
+ERROR: test_retry_counts_one_incident_and_retains_failed_effort (test_trial_intake.IntakeTests.test_retry_counts_one_incident_and_retains_failed_effort)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 105, in test_retry_counts_one_incident_and_retains_failed_effort
+    result=analyze(self.package)
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 107, in analyze
+    require(count == Decimal(row[key]), f'raw attempts disagree with {key}')
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/trial_intake.py", line 22, in require
+    raise ValueError(message)
+ValueError: raw attempts disagree with recoverable_incidents
+
+======================================================================
+FAIL: test_extreme_decimal_exponent_is_a_structured_input_error (test_trial_intake.IntakeTests.test_extreme_decimal_exponent_is_a_structured_input_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 127, in test_extreme_decimal_exponent_is_a_structured_input_error
+    with self.assertRaises(ValueError):number('1e-1000000','hours')
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_missing_incident_identity_is_unresolved (test_trial_intake.IntakeTests.test_missing_incident_identity_is_unresolved)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 124, in test_missing_incident_identity_is_unresolved
+    with self.assertRaises(ValueError):analyze(self.package)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_primary_threshold_comparison_does_not_round_a_failure_to_a_pass (test_trial_intake.IntakeTests.test_primary_threshold_comparison_does_not_round_a_failure_to_a_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 137, in test_primary_threshold_comparison_does_not_round_a_failure_to_a_pass
+    self.assertFalse(analyze(self.package)['numerical_thresholds_met'])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_prior_repair_cannot_be_hidden_by_a_clean_final_attempt (test_trial_intake.IntakeTests.test_prior_repair_cannot_be_hidden_by_a_clean_final_attempt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 113, in test_prior_repair_cannot_be_hidden_by_a_clean_final_attempt
+    with self.assertRaises(ValueError):analyze(self.package)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_stale_native_files_cannot_qualify_a_new_run (test_verify.QualificationTests.test_stale_native_files_cannot_qualify_a_new_run)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_verify.py", line 43, in test_stale_native_files_cannot_qualify_a_new_run
+    with self.assertRaisesRegex(ValueError,'native trajectory evidence is incomplete'):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 23 tests in 0.289s
+
+FAILED (failures=5, errors=2)

@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import shutil
+import uuid
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -90,6 +92,14 @@ def run():
     env = os.environ.copy()
     env.update(CARGO_TARGET_DIR='/tmp/chio-paper-target',CARGO_BUILD_JOBS='4',
                CHIO_CHECKOUT_ROOT=str(ROOT),CHIO_COMPOSITION_EVIDENCE=str(RESULTS/'native'))
+    # A new successful command must produce its own trajectories. Archive the
+    # old bytes before starting, including when the new run later fails.
+    native = RESULTS/'native'
+    if native.exists():
+        archive = RESULTS/'native-history'/uuid.uuid4().hex
+        archive.parent.mkdir(exist_ok=True)
+        shutil.move(native,archive)
+    native.mkdir()
     for name,command,expected in CHECKS:
         print(f'RUN {name}',flush=True)
         with (RESULTS/f'qualified-{name}.stdout').open('wb') as stdout, (RESULTS/f'qualified-{name}.stderr').open('wb') as stderr:

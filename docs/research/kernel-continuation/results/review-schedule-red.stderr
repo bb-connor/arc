@@ -1,0 +1,14 @@
+..............F..
+======================================================================
+FAIL: test_scheduled_incident_missing_from_logs_cannot_disappear (test_trial_intake.IntakeTests.test_scheduled_incident_missing_from_logs_cannot_disappear)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-continuation/test_trial_intake.py", line 143, in test_scheduled_incident_missing_from_logs_cannot_disappear
+    with self.assertRaises(ValueError):analyze(self.package)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.319s
+
+FAILED (failures=1)
