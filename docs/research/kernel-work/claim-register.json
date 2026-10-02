@@ -192,6 +192,7 @@
         "Honest-owner qualified mediation, authentic keys, protected durable state and specified revocation boundaries; a remote receipt is evidence, not live local authority.",
         "Each affected owner authorizes a recipient host for continued restriction enforcement or authorizes the disclosure; no guarantee against an authorized malicious recipient leaking plaintext.",
         "Matched non-equivocating settlement, checker trust, independent child backing, provider observations and resource budgets in Chio and B1-B3.",
+        "Observable settlement facts, including payment occurrence, amount, beneficiary, exposed timing and acceptance-token existence, require affected-owner authorization for their actual observers (including S/V), or an equally provisioned qualified confidential settlement profile. The positive walkthrough permits its limited commercial metadata; this does not approve disclosure of issue content.",
         "Finite acyclic work graph, one unresolved effectful continuation per local workflow, one outbound effect submission in the initial E1/E2 profiles.",
         "Conditional progress requires available dependencies and fair scheduling; E2 unknown effects need not become knowable."
       ],
@@ -402,6 +403,7 @@
         "Honest-owner qualified mediation, authentic keys, protected durable state and specified revocation boundaries; a remote receipt is evidence, not live local authority.",
         "Each affected owner authorizes a recipient host for continued restriction enforcement or authorizes the disclosure; no guarantee against an authorized malicious recipient leaking plaintext.",
         "Matched non-equivocating settlement, checker trust, independent child backing, provider observations and resource budgets in Chio and B1-B3.",
+        "Observable settlement facts, including payment occurrence, amount, beneficiary, exposed timing and acceptance-token existence, require affected-owner authorization for their actual observers (including S/V), or an equally provisioned qualified confidential settlement profile. The positive walkthrough permits its limited commercial metadata; this does not approve disclosure of issue content.",
         "Finite acyclic work graph, one unresolved effectful continuation per local workflow, one outbound effect submission in the initial E1/E2 profiles.",
         "Conditional progress requires available dependencies and fair scheduling; E2 unknown effects need not become knowable."
       ],
@@ -570,6 +572,7 @@
         "Honest-owner qualified mediation, authentic keys, protected durable state and specified revocation boundaries; a remote receipt is evidence, not live local authority.",
         "Each affected owner authorizes a recipient host for continued restriction enforcement or authorizes the disclosure; no guarantee against an authorized malicious recipient leaking plaintext.",
         "Matched non-equivocating settlement, checker trust, independent child backing, provider observations and resource budgets in Chio and B1-B3.",
+        "Observable settlement facts, including payment occurrence, amount, beneficiary, exposed timing and acceptance-token existence, require affected-owner authorization for their actual observers (including S/V), or an equally provisioned qualified confidential settlement profile. The positive walkthrough permits its limited commercial metadata; this does not approve disclosure of issue content.",
         "Finite acyclic work graph, one unresolved effectful continuation per local workflow, one outbound effect submission in the initial E1/E2 profiles.",
         "Conditional progress requires available dependencies and fair scheduling; E2 unknown effects need not become knowable.",
         "Independent teams, matched assistance and an improvement period for baseline shared libraries are required for comparative productivity claims."

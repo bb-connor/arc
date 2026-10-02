@@ -45,10 +45,56 @@ arguments automatically.
 
 ## Fresh review
 
-Pending: a separate, fresh-context automated reviewer will assess Task 1 against
-the plan, source evidence and counterdesign buildability. This is not independent
-human peer review or an external trial. The final record will include findings
-and their disposition before Task 1 is marked complete.
+Reviewer: fresh-context automated `kernel_task1_review`, GPT-6 Astra, reviewing
+`98b3bd2459c9b5421f0122f2eb1cf536412921d9` through
+`3a2693a38eb804afcc6442488af8fa4cd656db68`. The reviewer ran the cache-backed
+verifier, inspected the committed diff, and checked selected primary sources.
+
+**Verdict: Task 1 accepted.** No critical or important findings; two minor
+clarifications were identified. The reviewer judged that a competent engineer
+could construct a strong conventional alternative and identify the claim's
+falsifiers. This is automated acceptance, not independent human scientific
+validation.
+
+The executor treated the two clarifications as important specification
+corrections for the final buildable description, because literal implementation
+of the ambiguous boundaries could block earned settlement or expose protected
+information. Both were resolved in one documentation pass:
+
+1. **OPS-13 separation:** internal settlement uses narrow current recovery
+   authority and historical evidence. External lookup and result release have
+   their own current authority checks. Revoked result-read access cannot itself
+   block authorized internal settlement.
+2. **C11 financial observations:** payment occurrence, amount, beneficiary,
+   exposed timing and acceptance-token existence require authorization for
+   their actual observers, including S/V and public-ledger observers as
+   applicable. A hiding commitment alone is insufficient. The positive scenario
+   now states its metadata permissions; every design receives the same profile.
+
+Verification of these prose corrections used the normative OPS-13 authority
+table and C11/SEC-09 channel rule, plus manual walkthroughs of revoked-read
+settlement and unauthorized public payment facts. These are specification
+checks, not executed Task 2 fixtures. The full artifact/provenance check was
+rerun after the edits. No second automated review or new runtime result is
+claimed. No review finding remains deferred.
+
+The review explicitly left implementation/deployment status under the user's
+shipped assumption, equivalence/proofs/novelty to Tasks 2-4, native/performance
+evidence to later experiments, and external validation/publication open. The
+executor retains all those boundaries. The review's pending-record/checkbox
+administrative items were finalized after its verdict.
+
+## Observed checks
+
+- Cache-backed verification passed: 16 recovery document hashes, 111 normative
+  requirements, 15 disjoint crosswalk groups, three hypothesis records, and 29
+  primary-document hashes. Local links and frozen paper checks passed.
+- The documented no-cache invocation passed and explicitly reported zero
+  primary-document hashes verified, as intended.
+- A temporary copy with a deliberately corrupted S07 PDF was rejected at the
+  expected source-hash check. Original cached sources were left unchanged.
+- Committed and working diff whitespace checks passed. The source paper subtree
+  remained `b8c5b771ca04903e219f9b42a50a050d326ba0ac`.
 
 ## Scope decisions
 
@@ -57,3 +103,5 @@ Tasks 2 onward remain pending. The change consists of research documents and a
 provenance/structure verifier; no Rust behavior changed, so a Rust workspace
 build or runtime test would not validate this deliverable. The current paper and
 the user's original and security/recovery checkouts remain outside the edits.
+The review and validation cover Task 1; later tasks remain unfinished. Keeping
+this worktree and its ignored plan/source cache supports the subsequent research.

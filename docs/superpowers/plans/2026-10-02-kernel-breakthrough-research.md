@@ -128,25 +128,25 @@ historical evidence pins and the dated source comparison.
 **Produces:** one common problem statement, B1/B2/B3 constructions and claim
 records usable by every later experiment.
 
-- [ ] Read the full claim-relevant protocols and assumptions for OpenAPPA,
+- [x] Read the full claim-relevant protocols and assumptions for OpenAPPA,
   Agoric, Beldi/RIFL, knowledge-based action and coordination avoidance. Record
   exact section/source revisions; retain remaining unknowns instead of inferring
   absence from an abstract. Inspect recent agent systems for the chosen property.
-- [ ] Map each used recovery capability to its PR #1172 requirement IDs and
+- [x] Map each used recovery capability to its PR #1172 requirement IDs and
   future experiment seam. Keep existing P0-P6 implementation/qualification
   ownership with that effort. Record any genuinely new cross-owner contract
   separately from supplied baseline behavior.
-- [ ] Write B1 conventional services, B2 capability contracts and B3 recoverable
+- [x] Write B1 conventional services, B2 capability contracts and B3 recoverable
   enforcement with the same trust, observation, effect and resource assumptions
   as Chio. Specify independent local engines and any shared settlement authority.
-- [ ] Walk the support-to-public-issue example through each construction,
+- [x] Walk the support-to-public-issue example through each construction,
   including a paid specialist, exact multiple-owner approval, lost acknowledgement
   and parent cancellation. Identify the actual missing rule or extra machinery.
-- [ ] Create R1/R2/R3 claim records with fields `id`, `statement`, `status`,
+- [x] Create R1/R2/R3 claim records with fields `id`, `statement`, `status`,
   `assumptions`, `recovery_requirements`, `closest_prior_art`, `counterdesign`,
   `observable_difference`, `falsifier`, `evidence`, and `next_test`. Initial
   `status` is `hypothesis`; use `not_examined` for an uninspected behavior.
-- [ ] Write a G0 decision. Reject unsupported exclusivity claims immediately.
+- [x] Write a G0 decision. Reject unsupported exclusivity claims immediately.
   Retain an algorithm, trust/coordination tradeoff or meaningful systems question
   only if its observable difference and importance can be stated precisely.
 
@@ -154,6 +154,8 @@ records usable by every later experiment.
 description, and can say exactly what would defeat the proposed Chio claim.
 Adding one ordinary field or using a competent local authority must not invalidate
 the comparison setup. No implementation is required to reach G0.
+
+**Completion record:** [Task 1 acceptance and verification](../../research/kernel-work/task1-validation.md). G0 proceeds to one shared model; no novelty, implementation or paper-readiness promotion.
 
 ## Task 2: Define one common model and the decisive scenarios
 

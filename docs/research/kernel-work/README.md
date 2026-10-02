@@ -45,7 +45,7 @@ flowchart LR
 | Research and planning package | Written; source and documentation checks recorded in the plan |
 | Assumed shipped baseline | PR #1172 revision 3, all P0-P6 recovery semantics, by the user's explicit instruction |
 | Recommended investigation | R1 composition of the full kernel/recovery design across owners, using R2 cross-owner progress as the first difficult test |
-| Task 1 | Counterdesigns, crosswalk, claim register and G0 decision written; acceptance review recorded in task1-validation.md |
+| Task 1 | Complete: counterdesigns, crosswalk, claim register and G0 decision; fresh automated review accepted, clarifications resolved and checks passed |
 | Next execution task | Task 2: shared model and F01-F16; then Task 3: minimal witness and G1 decision |
 | New theorem or mechanism | Not established |
 | New prototype or production changes | None; Task 1 adds research artifacts and a provenance/structure verifier |

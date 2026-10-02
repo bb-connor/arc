@@ -105,6 +105,17 @@ logs, streams, fork seeds and return channels. A bare secret-derived digest must
 not escape through an otherwise public financial or receipt record; use a
 protected reference or a properly hiding commitment with authorized opening.
 
+Payment occurrence, amount, beneficiary, exposed timing and acceptance-token
+existence are themselves observable information. Hiding a payload commitment
+does not hide those facts. The actual observers, including S and V for what
+they receive and the public for public-ledger events, must be authorized by
+every affected owner. Obtain any required exact approval before the financial
+transition exposes those facts, or use an equally provisioned qualified
+confidential settlement profile. Refuse an unsupported profile. The positive
+walkthrough assumes the owners permit its limited commercial metadata and S/V
+evidence access; their later exact publication approval still governs the issue
+content. Every design receives these same permissions and observer boundaries.
+
 ### Authority and information flow
 
 Keep owner-qualified obligations, not just their intersection of allowed
@@ -163,8 +174,12 @@ for E2: a conventional outbox normally retries delivery.
    no-effect closure also proves no old holder can still send.
 7. Append authenticated outcome/partial-effect facts. Commit knowledge before
    output release. A release denial leaves the external operation spent. A
-   scoped recovery owner may settle existing work after caller revocation,
-   subject to current lookup and output-read permissions.
+   scoped recovery owner may internally settle the original operation after
+   caller revocation, using its current serving fence, narrow recovery authority
+   and retained authenticated evidence. Any external lookup requires current
+   scoped observation authority and recovery resources. Any result release
+   separately requires current recipient/read authority. Revoked result access
+   cannot block otherwise authorized internal settlement.
 
 Cross-store transitions use durable intents and idempotent readback, not a
 fictional distributed transaction. If S commits the encumbrance before local
