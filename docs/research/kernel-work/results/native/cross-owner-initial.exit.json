@@ -1,0 +1,5 @@
+{
+  "exit_code": 101,
+  "status": "compile failure",
+  "cause": "new test used nonserializable response and output types"
+}

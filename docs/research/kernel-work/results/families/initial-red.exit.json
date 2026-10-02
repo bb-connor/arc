@@ -1,0 +1,4 @@
+{
+  "exit_code": 101,
+  "expected": "two assertion failures without materialization and confinement validation"
+}

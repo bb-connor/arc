@@ -1,0 +1,292 @@
+[
+  {
+    "native_calls": 1,
+    "physical_effects": 2,
+    "profile_qualified": false,
+    "scenario": "hidden_connector_retry"
+  },
+  {
+    "cut": "before_admission",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 1
+      }
+    ],
+    "first_owner_effects": 1,
+    "first_owner_unknown": false,
+    "other_owners_completed": 1,
+    "owners": 2,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "before_send",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      }
+    ],
+    "first_owner_effects": 0,
+    "first_owner_unknown": true,
+    "other_owners_completed": 1,
+    "owners": 2,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "after_effect",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 1
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      }
+    ],
+    "first_owner_effects": 1,
+    "first_owner_unknown": true,
+    "other_owners_completed": 1,
+    "owners": 2,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "after_outcome",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 1
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      }
+    ],
+    "first_owner_effects": 1,
+    "first_owner_unknown": false,
+    "other_owners_completed": 1,
+    "owners": 2,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "after_release",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 1
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      }
+    ],
+    "first_owner_effects": 1,
+    "first_owner_unknown": false,
+    "other_owners_completed": 1,
+    "owners": 2,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "before_admission",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 3
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 1
+      }
+    ],
+    "first_owner_effects": 1,
+    "first_owner_unknown": false,
+    "other_owners_completed": 2,
+    "owners": 3,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "before_send",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 3
+      }
+    ],
+    "first_owner_effects": 0,
+    "first_owner_unknown": true,
+    "other_owners_completed": 2,
+    "owners": 3,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "after_effect",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 1
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 3
+      }
+    ],
+    "first_owner_effects": 1,
+    "first_owner_unknown": true,
+    "other_owners_completed": 2,
+    "owners": 3,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "after_outcome",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 1
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 3
+      }
+    ],
+    "first_owner_effects": 1,
+    "first_owner_unknown": false,
+    "other_owners_completed": 2,
+    "owners": 3,
+    "scenario": "separate_owners"
+  },
+  {
+    "cut": "after_release",
+    "effects": [
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 1
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 2
+      },
+      {
+        "arguments": {
+          "recipient": "public-issue",
+          "source": "prepared-artifact",
+          "version": 1
+        },
+        "owner": 3
+      }
+    ],
+    "first_owner_effects": 1,
+    "first_owner_unknown": false,
+    "other_owners_completed": 2,
+    "owners": 3,
+    "scenario": "separate_owners"
+  }
+]

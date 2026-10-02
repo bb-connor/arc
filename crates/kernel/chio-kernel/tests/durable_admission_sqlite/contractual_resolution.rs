@@ -4,6 +4,16 @@ use chio_kernel::payment::*;
 #[test]
 fn capture_waiver_requires_original_terms_and_keeps_positive_budget() -> Result<(), Box<dyn Error>>
 {
+    capture_waiver_fixture(false)
+}
+
+#[test]
+fn capture_waiver_cannot_revive_expired_authority_with_a_backdated_decision(
+) -> Result<(), Box<dyn Error>> {
+    capture_waiver_fixture(true)
+}
+
+fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
     secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
@@ -15,10 +25,17 @@ fn capture_waiver_requires_original_terms_and_keeps_positive_budget() -> Result<
     let observer = Keypair::generate();
     let calls = Arc::new(PaymentCalls::default());
     calls.fail_next_capture.store(true, Ordering::SeqCst);
-    let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?;
     let operations = Arc::new(authority.admission_operation_store());
     let fence = authority.mutation_fence();
-    let mut kernel = ChioKernel::new(kernel_config(receiver.clone()));
+    let mut kernel = ChioKernel::new_with_clock(
+        kernel_config(receiver.clone()),
+        chio_test_support::clock::clock(),
+    );
     kernel.require_durable_request_retention();
     kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
     kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -100,7 +117,11 @@ fn capture_waiver_requires_original_terms_and_keeps_positive_budget() -> Result<
     drop(kernel);
     drop(operations);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?;
     let operations = Arc::new(authority.admission_operation_store());
     let fence = authority.mutation_fence();
     let mut paid_source = source.clone();
@@ -179,12 +200,11 @@ fn capture_waiver_requires_original_terms_and_keeps_positive_budget() -> Result<
     assert!(operations
         .begin_capture_waiver(&policy, &resolution, &stale, now_unix_ms()?)
         .is_err());
-    {
+    // A trusted clock's high-water mark cannot be rewound. Run the expiry
+    // branch in its own fixture, rather than returning this owner to the past.
+    if expired_only {
         let expires = resolution.terms.body.expires_at_unix_ms;
-        let _expired_clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-            (expires + 1000) / 1000,
-            std::iter::empty(),
-        );
+        let _expired_clock = chio_test_support::clock::scope_unix_secs((expires + 1000) / 1000);
         let expired = operations
             .begin_capture_waiver(&policy, &resolution, &fence, expires - 1000)
             .err()
@@ -195,6 +215,7 @@ fn capture_waiver_requires_original_terms_and_keeps_positive_budget() -> Result<
                 .contains("outside its original time window"),
             "{expired}"
         );
+        return Ok(());
     }
     // Two independently valid signed successor intents race at the same owner.
     // Exactly one may win; the loser cannot append or reconcile budget again.
@@ -222,7 +243,12 @@ fn capture_waiver_requires_original_terms_and_keeps_positive_budget() -> Result<
     ) {
         (Ok(accepted), Err(_)) => (accepted, resolution),
         (Err(_), Ok(accepted)) => (accepted, competing),
-        _ => return Err("conflicting waiver race did not have exactly one winner".into()),
+        (first, second) => {
+            return Err(format!(
+                "conflicting waiver race did not have exactly one winner: {first:?}, {second:?}"
+            )
+            .into())
+        }
     };
     assert!(!accepted.is_complete());
     let pending_journal = operations
@@ -272,7 +298,11 @@ fn capture_waiver_requires_original_terms_and_keeps_positive_budget() -> Result<
     // Restart between append-only acceptance and completion.
     drop(operations);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?;
     let operations = Arc::new(authority.admission_operation_store());
     let fence = authority.mutation_fence();
     let completed = operations.complete_capture_waiver(
@@ -311,11 +341,16 @@ fn capture_waiver_requires_original_terms_and_keeps_positive_budget() -> Result<
     );
     drop(operations);
     drop(authority);
-    let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?;
     let operations = Arc::new(authority.admission_operation_store());
     let new_fence = authority.mutation_fence();
     assert!(operations.load_capture_waiver(id, &fence).is_err());
-    let mut kernel = ChioKernel::new(kernel_config(receiver));
+    let mut kernel =
+        ChioKernel::new_with_clock(kernel_config(receiver), chio_test_support::clock::clock());
     kernel.require_durable_request_retention();
     kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
     kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -409,11 +444,16 @@ fn delayed_elicitation_terminalization_refreshes_authority_time() -> Result<(), 
     let locks = temp.path().join("locks");
     create_private_directory(&locks)?;
     SqliteAuthorityStore::provision(&database, &locks)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?;
     let receiver = Keypair::generate();
     let buyer = Keypair::generate();
     let operations = Arc::new(authority.admission_operation_store());
-    let mut kernel = ChioKernel::new(kernel_config(receiver));
+    let mut kernel =
+        ChioKernel::new_with_clock(kernel_config(receiver), chio_test_support::clock::clock());
     kernel.register_tool_server(Box::new(DelayedElicitation));
     kernel.set_durable_admission_store(
         operations.clone(),

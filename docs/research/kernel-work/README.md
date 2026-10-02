@@ -6,12 +6,12 @@ ambition. Read this package before changing that manuscript or restarting the
 novelty argument. The intended result is a consequential advance in how untrusted
 agents perform work across independently owned systems.
 
-**Current judgment:** [G2 is narrowed](results/G2.md). The common model and
-standalone experiment preserve the specified safety and useful progress on KW1,
-with the same tested outcomes in the fully provisioned conventional baseline.
-An exclusive capability or new safe-progress algorithm is not supported. The
-remaining hypothesis is a consequential reduction in repeated integration and
-recovery work; its preregistered empirical threshold remains unmeasured.
+**Current judgment:** [The contribution decision](CONTRIBUTION-DECISION.md) is
+useful implementation without an established research advance. Native fault
+experiments and two-family compatibility provide bounded evidence. The strongest
+provisioned baseline still has the same modeled outcomes; independent integration
+advantage and useful economics remain unmeasured. The flagship manuscript stays
+frozen until the breakthrough gate is supported.
 
 Start with these documents in order:
 
@@ -34,6 +34,10 @@ Start with these documents in order:
    narrowed scientific route registered before implementation.
 7. [G2 results and reproducibility](results/G2.md): 66 variants per arm, bounded
    exploration, controls, corrections and the exact evidence limits.
+
+8. [Native correspondence](results/native-crosswalk.md), [G3 comparison](results/G3.md),
+   [fresh critique](results/independent-review.md) and
+   [contribution decision](CONTRIBUTION-DECISION.md): Tasks 5-7 outcomes and remaining gates.
 
 ```mermaid
 flowchart LR

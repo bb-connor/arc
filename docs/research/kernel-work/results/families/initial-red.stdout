@@ -1,0 +1,31 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test both_families_reject_rebound_materializations_and_invalid_returns ... FAILED
+test confinement_and_return_schema_are_actual_adapter_obligations ... FAILED
+test both_families_preserve_positive_work_uncertainty_and_current_audience ... ok
+
+failures:
+
+---- both_families_reject_rebound_materializations_and_invalid_returns stdout ----
+
+thread 'both_families_reject_rebound_materializations_and_invalid_returns' (1603057) panicked at tests/families.rs:18:17:
+support Candidate payload
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- confinement_and_return_schema_are_actual_adapter_obligations stdout ----
+
+thread 'confinement_and_return_schema_are_actual_adapter_obligations' (1603058) panicked at tests/families.rs:58:9:
+assertion failed: execute(&work, arm, false).is_err()
+
+
+failures:
+    both_families_reject_rebound_materializations_and_invalid_returns
+    confinement_and_return_schema_are_actual_adapter_obligations
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

@@ -1,0 +1,6 @@
+   Compiling kernel-work-families v0.1.0 (/tmp/chio-verifiable-work-paper/labs/kernel-work-families)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.04s
+     Running unittests src/lib.rs (/tmp/chio-paper-tooling-target/debug/deps/kernel_work_families-b94a17cb6dc76ec4)
+     Running unittests src/main.rs (/tmp/chio-paper-tooling-target/debug/deps/kernel_work_families-299fb8651bff1081)
+     Running tests/families.rs (/tmp/chio-paper-tooling-target/debug/deps/families-885f9d479dd284bd)
+   Doc-tests kernel_work_families

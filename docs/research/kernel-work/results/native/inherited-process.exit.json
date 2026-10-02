@@ -1,0 +1,6 @@
+{
+  "exit_code": 0,
+  "command": "CHIO_CHECKOUT_ROOT=/tmp/chio-verifiable-work-paper CARGO_TARGET_DIR=/tmp/chio-paper-target CARGO_BUILD_JOBS=4 cargo test --locked -p chio-process --test crash_recovery --test nonce_recovery --test aggregate_family",
+  "feature_note": "aggregate_family compiled with zero tests without worker-server; explicit feature run required",
+  "source_commit": "188031256600903676eb69bda3144b9e8a1660da"
+}

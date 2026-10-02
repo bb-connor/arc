@@ -1,0 +1,12 @@
+native-process: exit 0
+native-admission: exit 0
+native-lint: exit 0
+admission-lint: exit 0
+native-format: exit 0
+family-tests: exit 0
+family-comparison: exit 0
+family-lint: exit 0
+family-format: exit 0
+prior-model: exit 0
+prior-provenance: exit 0
+{"verified": true, "commands": 11, "scope": "local tested profile only"}

@@ -1,0 +1,10 @@
+{
+  "headRefName": "research/openappa-recovery-20261001",
+  "headRefOid": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "number": 1172,
+  "state": "OPEN",
+  "title": "Specify native recovery architecture and add OpenAPPA research lab",
+  "updatedAt": "2026-10-02T05:09:24Z",
+  "file_count": 89,
+  "observation": "live metadata; conceptual research still assumes specified semantics shipped"
+}
