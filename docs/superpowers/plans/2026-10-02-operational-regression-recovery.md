@@ -78,7 +78,10 @@
 **Files:** Execution report and compact qualification artifact under `docs/reviews/`.
 **Interfaces:** Prior task results feed exact commands, terminal logs/hashes and source manifests.
 
-- [ ] Run formatting, warnings-denied Clippy for changed owners and affected source/CI contracts. Expected: terminal successful outcomes without exceptions.
-- [ ] Obtain one fresh independent review; repair Important/Critical findings with regression evidence.
-- [ ] Record the prior broader consumer workflow's terminal result separately from its passing native acceptance.
-- [ ] Commit and push the batch, verify remote SHA, confirm each task and propose the next queue.
+- [x] Run formatting, warnings-denied Clippy for changed owners and affected source/CI contracts. Expected: terminal successful outcomes without exceptions.
+- [x] Obtain one fresh independent review; repair Important/Critical findings with regression evidence. No Critical/Important findings; the Minor diagnostic finding was also repaired and verified.
+- [x] Record the prior broader consumer workflow's terminal result separately from its passing native acceptance.
+- [x] Commit and push the batch, verify remote SHA, confirm each task and propose the next queue.
+
+Results and bounded acceptance are recorded in
+[`2026-10-02-operational-regression-recovery-execution.md`](../../reviews/2026-10-02-operational-regression-recovery-execution.md).

@@ -1,0 +1,778 @@
+{
+  "schema": "chio.security-qualification.v1",
+  "base_commit": "df9f1791b32b3bd18fd83bb5758587607a20e753",
+  "source_commit": "be925005f6e4a37b6a6f6588fb907b7e55a9b5f2",
+  "branch": "packet/3-retention-accounting",
+  "scope": "PB3, PR3, PR5, NC2 and TR2 operational regressions. Local qualification is separate from hosted acceptance, merge, release and operator activation.",
+  "host": {
+    "os": "Linux",
+    "arch": "aarch64",
+    "rustc": "1.94.1",
+    "cargo_build_jobs": 4,
+    "incremental": false
+  },
+  "archive": "/home/connor/chio-security-evidence/2026-10-02-operational-regression-recovery",
+  "source_manifest_note": "Changed source, configuration and contract documentation bytes verified against the source commit. Reports and plans excluded to avoid recursive hashes. Intermediate runs precede the accepted source; all failures and retries remain terminal evidence. NC2/TR2 owners have unchanged source since their accepted runs.",
+  "source_manifest": {
+    "crates/guards/chio-external-guards/src/external/mod.rs": "d93b7ce48af3fbc3d14e4de3c25cdb7ae92a495df67be12b97924ea6122e1c35",
+    "crates/guards/chio-external-guards/src/external/threat_intel/mod.rs": "1922104ecdcdc2678565a1db11bca0e893ae7df952e8d6ae901ca4b6bcf822f2",
+    "crates/guards/chio-external-guards/src/external/threat_intel/virustotal.rs": "fd23fbe84f2a09a50ed54fd57d6b7723d18d6e96cdeef39f744577d1516d7671",
+    "crates/guards/chio-external-guards/tests/threat_intel.rs": "49ea33a8f54441415c2ccab8e1cd5b40cf4089ae3b862b7bd26a1145cd4c5004",
+    "crates/guards/chio-external-guards/tests/threat_intel/virustotal_outcomes.rs": "855236f7cd2ceeb6dfc4a08a927e5a4657950141ba3e6d23917c5a570a17d99a",
+    "crates/products/chio-api-protect/src/proxy/clock.rs": "66639fc573093755d947cf0227304fcafba831e4a2f6990e5973ff86b7d28d21",
+    "crates/products/chio-api-protect/src/proxy/clock_recovery_tests.rs": "bfbc2d4cafa3e1fc1491397a33058f49701a82b0d01acbeee2fbe109dbe72ab5",
+    "crates/products/chio-api-protect/src/proxy/mediated/budget_configuration.rs": "4b2c7bc5ea291aea60bd7e04216c59aa99ecb7518861b73e9cb1e3cd03856ab0",
+    "crates/products/chio-api-protect/src/proxy/mediated/tests.rs": "26cce20df457f2df7c8bb662030379a3b39450a24e50e2fb05f0193307755908",
+    "crates/products/chio-api-protect/src/proxy/mediated/tests/authorization.rs": "00b52fbefc67a95cacd84921a74185c0b5ece3f8f3c15239dff0cffd047f00e3",
+    "crates/products/chio-api-protect/src/proxy/state.rs": "a38a7021f71623e7046cd58533f1a5ca1924ddd39a21756e8fe5229414ea5530",
+    "crates/products/chio-cli/src/cert.rs": "13a1d9a405a7c8b170f1ff34cbd57d8316f97d54c9797f7cff1ec77f8fffec88",
+    "crates/products/chio-cli/src/cert/session_receipts.rs": "5e1851503b06879282ab6620cc34e4faf1e34fea9ce53c2b8420e36c822ef349",
+    "crates/products/chio-cli/src/cert/session_receipts_tests.rs": "42b2bf0437c806aa88d9e378c4048baa9b99deb4573a42b6f0adf06d2a929085",
+    "crates/products/chio-cli/tests/session_certificate.rs": "a06062124af2a721e3b8eb516329e5334d365612c402422a5869b4c2c2f3ee6e",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests/clock_recovery.rs": "2b49943090f4c4211815de5569ba5b4416120562fc79fe395606e090374b17ac",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests/protocol_boundaries.rs": "b9e96f8597a95fda7095600624f335bb7501d9d1b14456e7642eaaba15aa061f",
+    "crates/protocol/chio-mcp-edge/src/runtime/tasks.rs": "72502d128088d57bbf95abfa1e6123c59ff2adb17c7f01c016ba8587dd52567c",
+    "crates/security/chio-secret-broker/README.md": "d1ab7fafbe54729473cd2472026c06671d96451d9b0666cdb7795109551b4557",
+    "crates/security/chio-secret-broker/src/generic_https.rs": "b399a05325c91c02e42230baa80709949a23cf39c184025159073d399e57af08",
+    "crates/security/chio-secret-broker/src/receipt.rs": "3b84917faac1ba953dc2bdda2474069049bedcb1d0139b24dbff1d83e7733fe5",
+    "crates/security/chio-secret-broker/src/service/tests/recovery_cases.rs": "ec205011af55769974da1bde1b197a9e711dc6b9839406160a75196d86ad2463",
+    "crates/security/chio-security-types/src/clock.rs": "9e75c67b882a52672cd323840bf016947a9e6ab8dd246ee06473705f35beccca",
+    "crates/security/chio-security-types/src/clock/advancing.rs": "5d7253b1e23da8eadac236e07e2c100e426eaf2f0c7bb0633470ea5243d520b7",
+    "crates/security/chio-security-types/src/clock/system.rs": "2c2a6dbf7354251799a64f1e320a46bc831e09b8d05a31ed4a5be3c7553e5c21",
+    "docs/guards/14-EXTERNAL-GUARDS.md": "f7e2302d7b5fdde3b81a9f5f62779a094a5b747b4c024e248bc653b86b197805",
+    "docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md": "455b710efd920e88c1396b6e6a99991dbf1737c147e38131ce6266641fb32169",
+    "docs/security/trust-boundary-inventory.json": "e6ec2943abf1a8ec82186026f9f79f5256a1990ea1ef874cdaa5dbb1a695d518",
+    "docs/security/trusted-time.md": "2f4e2ce4801bb71bd73b09a3aa7c4ca8082f65a7e60755b45893738d9de94b86"
+  },
+  "acceptance": {
+    "PB3": {
+      "red": "pb3-red",
+      "green": [
+        "clock-owners-review"
+      ],
+      "boundary": "actual MCP idle/pending serve-loop liveness and same-session recovery; typed refusal and no dispatch under clock failure; execution-stage errors retained without automatic retry"
+    },
+    "PR3": {
+      "red": "pr3-red",
+      "green": [
+        "clock-owners-review"
+      ],
+      "boundary": "advancing expiry with fractional time, capability/nonce expiry, shared durable and budget owners"
+    },
+    "PR5": {
+      "red": "pr5-red-corrected",
+      "review_red": "review-row-context-red",
+      "green": [
+        "pr5-review-green",
+        "pr5-command-review"
+      ],
+      "boundary": "complete bounded session selection and real CLI generation/full verification beyond 4096 receipts; SQLite conversion errors retain row context and native cause; UTF-16 databases remain supported"
+    },
+    "NC2": {
+      "red": "nc2-red",
+      "green": [
+        "nc2-green"
+      ],
+      "boundary": "stable repeated response value order through signed dispatch, SQLite reopen and exact durable replay; provider executes once"
+    },
+    "TR2": {
+      "red": "tr2-red",
+      "green": [
+        "tr2-green",
+        "tr2-adapter"
+      ],
+      "boundary": "cacheable explicit unseen policy, closed circuit on valid unseen outcomes, failures retain denial/circuit behavior"
+    }
+  },
+  "test_counts": {
+    "clock-owners-review": 383,
+    "pr5-review-green": 12,
+    "pr5-command-review": 1,
+    "nc2-green": 174,
+    "tr2-green": 49,
+    "tr2-adapter": 21
+  },
+  "total_tests": 640,
+  "gates": [
+    "changed-owners-clippy-review",
+    "fmt-workspace-closeout",
+    "fmt-changed-cli-closeout",
+    "source-hygiene-closeout",
+    "clock-inventory-closeout",
+    "egress-contract-closeout",
+    "trust-boundary-closeout",
+    "review-slices-closeout"
+  ],
+  "review": {
+    "range": "df9f1791b32b3bd18fd83bb5758587607a20e753..83d5e8a47a31d01150034ee9a3c4fc8627adbfd4",
+    "record": "docs/reviews/artifacts/2026-10-02-operational-regression-recovery/independent-review.md",
+    "record_sha256": "5b1f8adbaeb13aea472be61b7dc32a586b94908d1e94545390bfcdf580407b9e",
+    "critical": 0,
+    "important": 0,
+    "minor": 1,
+    "disposition": "The Minor SQLite row-context finding is repaired in the source commit and root-verified with RED/GREEN regression evidence. Late-clock boundary controls were added. Final Clippy passed. No second independent review is claimed."
+  },
+  "prior_hosted_run": {
+    "run": 36983882538,
+    "source": "66d1ab85075abb84b328fff1f84091161b474d05",
+    "conclusion": "failure",
+    "native_steps": "success",
+    "log": "prior-consumer-job-110764373932.log",
+    "sha256": "71bdda4ac5a9abac688c1ba31e1cb8125a25dc039ffc5e886159a671da174a9a"
+  },
+  "prior_hosted_note": "Run 36983882538 finished failure after scoped native acceptance succeeded. Missing x86_64-linux-musl-gcc, downstream CHIO_DOCKER_ADAPTER KeyError and Ruff runner formatting remain the next consumer qualification repairs. This is not hosted qualification of the current source.",
+  "non_acceptance_runs": {
+    "review-slices": "Saw zero committed files before source commit; replaced by review-slices-final.",
+    "trust-boundary-inventory": "Caught the new raw typed projection. The final owner uses the existing shared projection helper and has an explicit registered contract."
+  },
+  "runs": {
+    "changed-owners-clippy-review": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-mcp-edge",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-secret-broker",
+        "-p",
+        "chio-external-guards",
+        "--all-targets",
+        "--features",
+        "chio-security-types/std",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 42.72,
+      "log_sha256": "a9f4d356942fff03411398b0dcf21a8adef236bafa5f8ef92568bdedeb0ca0be",
+      "log": "changed-owners-clippy-review.log"
+    },
+    "changed-owners-clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-mcp-edge",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-security-types",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-secret-broker",
+        "-p",
+        "chio-external-guards",
+        "--all-targets",
+        "--features",
+        "chio-security-types/std",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 233.33,
+      "log_sha256": "3321f0f5da10c3ab1f6c7cc3022628b36b00ad14bfc4bf62b10cde6f9730e03c",
+      "log": "changed-owners-clippy.log"
+    },
+    "clock-inventory-closeout": {
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.68,
+      "log_sha256": "c92b975e6627c2659dba5b991b590689840d7b8ccc912e93f8a7636b4e7f3389",
+      "log": "clock-inventory-closeout.log"
+    },
+    "clock-inventory": {
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.92,
+      "log_sha256": "c92b975e6627c2659dba5b991b590689840d7b8ccc912e93f8a7636b4e7f3389",
+      "log": "clock-inventory.log"
+    },
+    "clock-owners-final": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-mcp-edge",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-security-types",
+        "--features",
+        "chio-security-types/std",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 230.5,
+      "log_sha256": "4fbd8fe25d632e5bd96a74f5c5d2686b7df4358d78dd0385dc4e8dde47b094c8",
+      "log": "clock-owners-final.log"
+    },
+    "clock-owners-review": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-mcp-edge",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-security-types",
+        "--features",
+        "chio-security-types/std",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 22.24,
+      "log_sha256": "3a0039f3ee37e7f731683dace6ab62c23bda8a2686d4ed3d433326418787f7f0",
+      "log": "clock-owners-review.log"
+    },
+    "egress-contract-closeout": {
+      "command": [
+        "bash",
+        "scripts/check-http-egress-contract.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.36,
+      "log_sha256": "504ee28d9b04c91b14acb80bdd3e59d814c75bac254c2a2a9b1b6958b2037c8a",
+      "log": "egress-contract-closeout.log"
+    },
+    "egress-contract": {
+      "command": [
+        "bash",
+        "scripts/check-http-egress-contract.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.77,
+      "log_sha256": "504ee28d9b04c91b14acb80bdd3e59d814c75bac254c2a2a9b1b6958b2037c8a",
+      "log": "egress-contract.log"
+    },
+    "fmt-changed-cli-closeout": {
+      "command": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2021",
+        "crates/products/chio-cli/src/cert.rs",
+        "crates/products/chio-cli/tests/session_certificate.rs"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.07,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log": "fmt-changed-cli-closeout.log"
+    },
+    "fmt-changed-cli": {
+      "command": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2021",
+        "crates/products/chio-cli/src/cert.rs",
+        "crates/products/chio-cli/tests/session_certificate.rs"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.06,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log": "fmt-changed-cli.log"
+    },
+    "fmt-workspace-closeout": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 24.85,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log": "fmt-workspace-closeout.log"
+    },
+    "fmt-workspace": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 25.14,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log": "fmt-workspace.log"
+    },
+    "nc2-green": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-secret-broker",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 232.43,
+      "log_sha256": "59da8f886b72b70db6375f50f82521b7e8a61206960d78c3d7b26cbf39a1038e",
+      "log": "nc2-green.log"
+    },
+    "nc2-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-secret-broker",
+        "--lib",
+        "repeated_response_headers_survive_dispatch"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 173.58,
+      "log_sha256": "1f1539b6d3a7a5e9e48bb8984344a282416ca194d480659cd6b4d9cef9d5f575",
+      "log": "nc2-red.log"
+    },
+    "pb3-green": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-mcp-edge",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 14.88,
+      "log_sha256": "e037849cd88392ff6b110cbf3151672288448419829be84f22b92f52496b273a",
+      "log": "pb3-green.log"
+    },
+    "pb3-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-mcp-edge",
+        "--lib",
+        "clock_recovery"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 15.29,
+      "log_sha256": "d94f5c482b742938b01af55d365734e04c0ed1f9fef018b2442c8b67c4a05e33",
+      "log": "pb3-red.log"
+    },
+    "pr3-green": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-api-protect",
+        "--lib",
+        "recovery_tests"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 202.14,
+      "log_sha256": "b9ad0777cc5ee0429caadd16b5f642f624a32903e8a0706b2ec7f95661d51451",
+      "log": "pr3-green.log"
+    },
+    "pr3-owner-accepted": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-security-types",
+        "--features",
+        "chio-security-types/std",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 34.42,
+      "log_sha256": "6e84c1659872d390de56c0eb861be49a6f720ce8bec2a371b52a5f1d1a66dc39",
+      "log": "pr3-owner-accepted.log"
+    },
+    "pr3-owner-corrected": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-security-types",
+        "--features",
+        "chio-security-types/std",
+        "--lib"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 34.8,
+      "log_sha256": "97a689ecd2442b7efdd3f99eb74fee02f658fef1cad9fd8feb7c8cbde1a39529",
+      "log": "pr3-owner-corrected.log"
+    },
+    "pr3-owner-final": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-security-types",
+        "--features",
+        "chio-security-types/std",
+        "--lib"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 35.36,
+      "log_sha256": "6c9b4319df69c544be512b01b0fa862a148ff528cfd700f2fe311d57d49632a4",
+      "log": "pr3-owner-final.log"
+    },
+    "pr3-owner-green": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-security-types",
+        "--features",
+        "chio-security-types/std",
+        "--lib"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 35.58,
+      "log_sha256": "768661b767e2fcd5b632537946fb09d829331e30658595618c10204c211eb20c",
+      "log": "pr3-owner-green.log"
+    },
+    "pr3-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-api-protect",
+        "--lib",
+        "recovery_tests"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 178.36,
+      "log_sha256": "fbd84f7c952e8c78090842314f097f4760ff77b70303816ad54bc709ae0858e9",
+      "log": "pr3-red.log"
+    },
+    "pr5-command-final": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--test",
+        "session_certificate"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 162.87,
+      "log_sha256": "d3a2341f6a442096c3dd72e05e197608fd1b60f596aad25d3a4dd209e06b11be",
+      "log": "pr5-command-final.log"
+    },
+    "pr5-command-review": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--test",
+        "session_certificate"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 158.33,
+      "log_sha256": "877cf5508dd95f0d5779395ce2be83b6ffc3cc5cb146c429b01617afbbf7cc47",
+      "log": "pr5-command-review.log"
+    },
+    "pr5-command": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--test",
+        "session_certificate"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 153.9,
+      "log_sha256": "3b6b53b5706a8ec3e0f18384c854e75fc2bac2340b0804461ec3281474aca360",
+      "log": "pr5-command.log"
+    },
+    "pr5-green": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--bin",
+        "chio",
+        "cert::"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 27.26,
+      "log_sha256": "06b91d8b5d205d381de8c3b6ffabf9503d085c4c44cf66e7c96f6a051e75e595",
+      "log": "pr5-green.log"
+    },
+    "pr5-owner-final": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--bin",
+        "chio",
+        "cert::"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 288.36,
+      "log_sha256": "74ee99404a40c7621b1ef35504bfed0af3fb995f66fbc9b49d0ed61158dec329",
+      "log": "pr5-owner-final.log"
+    },
+    "pr5-red-corrected": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--bin",
+        "chio",
+        "session_receipts_tests"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 269.09,
+      "log_sha256": "b20f1a556d2eba3d25be36c5c208cfd46a89d276f9cc6268889d622174e81582",
+      "log": "pr5-red-corrected.log"
+    },
+    "pr5-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "session_receipts_tests"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 0.91,
+      "log_sha256": "ec0b56a6397bab2fe7d59cce9db220b822a67987dde613dc2d301172f7ec39e7",
+      "log": "pr5-red.log"
+    },
+    "pr5-review-green": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--bin",
+        "chio",
+        "cert::"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 79.27,
+      "log_sha256": "78f866f7312f8e9473a8622c6c6d9ae8391fead19119c02a838ea2df931f0760",
+      "log": "pr5-review-green.log"
+    },
+    "pr5-unit-accepted": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--bin",
+        "chio",
+        "cert::"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 79.08,
+      "log_sha256": "cd16c4d5e639131189de576ee68da557338122161e913138bbd4dbee62b8f1f4",
+      "log": "pr5-unit-accepted.log"
+    },
+    "review-row-context-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--bin",
+        "chio",
+        "certificate_collection_retains_row_context_for_invalid_utf8_text"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 71.97,
+      "log_sha256": "ff9647d933116536cde20215f5d75e4caa620e0999f0b32eae9e7819089465c3",
+      "log": "review-row-context-red.log"
+    },
+    "review-slices-closeout": {
+      "command": [
+        "python3",
+        "scripts/check-review-slices.py",
+        "--base-ref",
+        "df9f1791b32b3bd18fd83bb5758587607a20e753"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.08,
+      "log_sha256": "e39605492613793283fd3364ca668e8043e776ef73b55c53f7485e102d2deb21",
+      "log": "review-slices-closeout.log"
+    },
+    "review-slices-final": {
+      "command": [
+        "python3",
+        "scripts/check-review-slices.py",
+        "--base-ref",
+        "df9f1791b32b3bd18fd83bb5758587607a20e753"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.11,
+      "log_sha256": "e39605492613793283fd3364ca668e8043e776ef73b55c53f7485e102d2deb21",
+      "log": "review-slices-final.log"
+    },
+    "review-slices": {
+      "command": [
+        "python3",
+        "scripts/check-review-slices.py",
+        "--base-ref",
+        "df9f1791b32b3bd18fd83bb5758587607a20e753"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.08,
+      "log_sha256": "f7aadc1df78562532e81968aaa695660e240c5074a12853fceb42aa3ffbf64ce",
+      "log": "review-slices.log"
+    },
+    "source-hygiene-closeout": {
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.34,
+      "log_sha256": "415240202b276b101624908c6b52e2612a952d96703b3e547ca8f8f2358a7d9c",
+      "log": "source-hygiene-closeout.log"
+    },
+    "source-hygiene-final": {
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.3,
+      "log_sha256": "415240202b276b101624908c6b52e2612a952d96703b3e547ca8f8f2358a7d9c",
+      "log": "source-hygiene-final.log"
+    },
+    "source-hygiene": {
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.72,
+      "log_sha256": "c7a2486ea94da66667277904a760c3e642b5b68e04e447e80291f0d14a14fc53",
+      "log": "source-hygiene.log"
+    },
+    "tr2-adapter": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-guards",
+        "--lib",
+        "external::"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 154.12,
+      "log_sha256": "a0d3905c485f61d52dfcdbf571e40cdf6e94849f9e9e2809b723d9322a238f20",
+      "log": "tr2-adapter.log"
+    },
+    "tr2-green": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-external-guards"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 15.63,
+      "log_sha256": "737fc78ff72b2f5cb93ed2d9ee29a897494dec895f099410ec8ae37ac677c77e",
+      "log": "tr2-green.log"
+    },
+    "tr2-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-external-guards",
+        "--test",
+        "threat_intel",
+        "definitive_unseen_results"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 113.2,
+      "log_sha256": "f22c1bb4ecf45072b04a45308d69e4830c2b24845410e0e521800889653c4926",
+      "log": "tr2-red.log"
+    },
+    "trust-boundary-closeout": {
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 48.9,
+      "log_sha256": "469cc7d38b45d8871b614fa115ed5fbf4adcd879e83ed30de4f3f887c4bf92b4",
+      "log": "trust-boundary-closeout.log"
+    },
+    "trust-boundary-final": {
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 49.22,
+      "log_sha256": "469cc7d38b45d8871b614fa115ed5fbf4adcd879e83ed30de4f3f887c4bf92b4",
+      "log": "trust-boundary-final.log"
+    },
+    "trust-boundary-inventory": {
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 49.35,
+      "log_sha256": "625275fab4c97b9ed2984a6537867dcb077c45b41098cc7869540696c451ec83",
+      "log": "trust-boundary-inventory.log"
+    }
+  }
+}
