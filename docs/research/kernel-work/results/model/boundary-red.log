@@ -1,0 +1,98 @@
+
+running 35 tests
+test baseline_f01 ... ok
+test baseline_f07 ... ok
+test baseline_f09 ... FAILED
+test baseline_f02 ... ok
+test baseline_f12 ... ok
+test baseline_f10 ... ok
+test baseline_f04 ... FAILED
+test baseline_f03 ... ok
+test baseline_f05 ... ok
+test baseline_f11 ... ok
+test baseline_f08 ... ok
+test baseline_f06 ... ok
+test baseline_f14 ... ok
+test candidate_f01 ... ok
+test baseline_f13 ... ok
+test baseline_f16 ... FAILED
+test candidate_f02 ... ok
+test candidate_f05 ... ok
+test baseline_f15 ... ok
+test candidate_f07 ... ok
+test candidate_f04 ... FAILED
+test candidate_f03 ... ok
+test candidate_f09 ... FAILED
+test candidate_f08 ... ok
+test candidate_f06 ... ok
+test candidate_f10 ... ok
+test candidate_f12 ... ok
+test candidate_f15 ... ok
+test candidate_f16 ... FAILED
+test candidate_f14 ... ok
+test candidate_f11 ... ok
+test candidate_f13 ... ok
+test controls_fail_for_progress_and_safety_respectively ... ok
+test opaque_histories_have_identical_controller_views ... ok
+test removals_have_named_counterexamples ... ok
+
+failures:
+
+---- baseline_f09 stdout ----
+
+thread 'baseline_f09' (1537274) panicked at tests/scenarios.rs:23:17:
+assertion `left == right` failed: "F09_parent_dependency_local" Baseline effects
+  left: Array [Number(0), Number(0), Number(0)]
+ right: Array [Number(0), Number(1), Number(0)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- baseline_f04 stdout ----
+
+thread 'baseline_f04' (1537269) panicked at tests/scenarios.rs:23:17:
+assertion `left == right` failed: "F04_capture_crash" Baseline effects
+  left: Array [Number(1), Number(0), Number(0)]
+ right: Array [Number(0), Number(0), Number(0)]
+
+---- baseline_f16 stdout ----
+
+thread 'baseline_f16' (1537281) panicked at tests/scenarios.rs:23:17:
+assertion `left == right` failed: "F16_blocked_advice" Baseline advice
+  left: String("feasible")
+ right: String("candidates")
+
+---- candidate_f04 stdout ----
+
+thread 'candidate_f04' (1537285) panicked at tests/scenarios.rs:23:17:
+assertion `left == right` failed: "F04_capture_crash" Candidate effects
+  left: Array [Number(1), Number(0), Number(0)]
+ right: Array [Number(0), Number(0), Number(0)]
+
+---- candidate_f09 stdout ----
+
+thread 'candidate_f09' (1537290) panicked at tests/scenarios.rs:23:17:
+assertion `left == right` failed: "F09_parent_dependency_local" Candidate effects
+  left: Array [Number(0), Number(0), Number(0)]
+ right: Array [Number(0), Number(1), Number(0)]
+
+---- candidate_f16 stdout ----
+
+thread 'candidate_f16' (1537297) panicked at tests/scenarios.rs:23:17:
+assertion `left == right` failed: "F16_blocked_advice" Candidate advice
+  left: String("feasible")
+ right: String("candidates")
+
+
+failures:
+    baseline_f04
+    baseline_f09
+    baseline_f16
+    candidate_f04
+    candidate_f09
+    candidate_f16
+
+test result: FAILED. 29 passed; 6 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.12s
+
+   Compiling kernel-work-composition v0.1.0 (/tmp/chio-verifiable-work-paper/labs/kernel-work-composition)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.94s
+     Running tests/scenarios.rs (labs/kernel-work-composition/target/debug/deps/scenarios-99b10135bce22f23)
+error: test failed, to rerun pass `--test scenarios`

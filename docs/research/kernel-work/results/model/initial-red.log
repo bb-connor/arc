@@ -1,0 +1,211 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling syn v3.0.6
+   Compiling serde_derive v1.0.229
+   Compiling kernel-work-composition v0.1.0 (/tmp/chio-verifiable-work-paper/labs/kernel-work-composition)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.85s
+     Running unittests src/lib.rs (labs/kernel-work-composition/target/debug/deps/kernel_work_composition-33e7eb69bccb1479)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/scenarios.rs (labs/kernel-work-composition/target/debug/deps/scenarios-d4710faeaa81ac1b)
+
+running 36 tests
+test baseline_f03 ... FAILED
+test baseline_f09 ... FAILED
+test baseline_f11 ... FAILED
+test baseline_f13 ... FAILED
+test baseline_f14 ... FAILED
+test bounded_schedules_preserve_safety_and_match_b1 ... FAILED
+test baseline_f15 ... FAILED
+test baseline_f05 ... FAILED
+test baseline_f08 ... FAILED
+test baseline_f16 ... FAILED
+test candidate_f01 ... FAILED
+test baseline_f01 ... FAILED
+test candidate_f02 ... FAILED
+test baseline_f04 ... FAILED
+test baseline_f10 ... FAILED
+test baseline_f07 ... FAILED
+test baseline_f02 ... FAILED
+test baseline_f06 ... FAILED
+test baseline_f12 ... FAILED
+test candidate_f03 ... FAILED
+test candidate_f08 ... FAILED
+test candidate_f06 ... FAILED
+test candidate_f04 ... FAILED
+test candidate_f05 ... FAILED
+test candidate_f09 ... FAILED
+test candidate_f12 ... FAILED
+test candidate_f13 ... FAILED
+test candidate_f15 ... FAILED
+test candidate_f07 ... FAILED
+test candidate_f14 ... FAILED
+test candidate_f10 ... FAILED
+test candidate_f11 ... FAILED
+test candidate_f16 ... FAILED
+test opaque_histories_have_identical_controller_views ... FAILED
+test removals_have_named_counterexamples ... FAILED
+test controls_fail_for_progress_and_safety_respectively ... FAILED
+
+failures:
+
+---- baseline_f03 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f09 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f11 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f13 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f14 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- bounded_schedules_preserve_safety_and_match_b1 stdout ----
+Error: "KW1 bounded exploration not implemented"
+
+---- baseline_f15 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f05 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f08 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f16 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f01 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f01 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f02 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f04 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f10 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f07 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f02 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f06 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- baseline_f12 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f03 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f08 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f06 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f04 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f05 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f09 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f12 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f13 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f15 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f07 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f14 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f10 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f11 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- candidate_f16 stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- opaque_histories_have_identical_controller_views stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- removals_have_named_counterexamples stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+---- controls_fail_for_progress_and_safety_respectively stdout ----
+Error: "KW1 transition mechanism not implemented"
+
+
+failures:
+    baseline_f01
+    baseline_f02
+    baseline_f03
+    baseline_f04
+    baseline_f05
+    baseline_f06
+    baseline_f07
+    baseline_f08
+    baseline_f09
+    baseline_f10
+    baseline_f11
+    baseline_f12
+    baseline_f13
+    baseline_f14
+    baseline_f15
+    baseline_f16
+    bounded_schedules_preserve_safety_and_match_b1
+    candidate_f01
+    candidate_f02
+    candidate_f03
+    candidate_f04
+    candidate_f05
+    candidate_f06
+    candidate_f07
+    candidate_f08
+    candidate_f09
+    candidate_f10
+    candidate_f11
+    candidate_f12
+    candidate_f13
+    candidate_f14
+    candidate_f15
+    candidate_f16
+    controls_fail_for_progress_and_safety_respectively
+    opaque_histories_have_identical_controller_views
+    removals_have_named_counterexamples
+
+test result: FAILED. 0 passed; 36 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+error: test failed, to rerun pass `--test scenarios`

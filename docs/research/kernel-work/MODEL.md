@@ -154,9 +154,26 @@ independent deployments are excluded. Report these abstractions beside results.
 
 [fixtures.json](fixtures.json) is the single input for both arms. Each family
 F01-F16 contains independent variants. Every variant has the plan's required
-initial state, commands, faults, visible observations and seven outcome fields.
+initial state, commands, faults, visible observations and six outcome fields.
 A refusal names an authorized positive counterpart. Environment updates model
 owner-controlled observations, not commands an untrusted agent can use to change
 policy. Decisions consume only visible state and commands. Faults are delivered
 separately to the oracle/transport after the decision. Expectations check accepted
 commands as well as resulting state, so rejecting everything cannot pass.
+
+## Executable vocabulary clarification from Task 4
+
+The initial 52 variants were extended with five regression variants after the
+first implementation: capture/crash ownership, mandatory original-custody
+readback, dependency locality, recovery lookup budget and blocked planning advice.
+A captured native owner lost at crash becomes unknown conservatively; it is never
+reconstructed as a fresh send permit. Dependency records in KW1 attach to the
+publication workflow, so an expired parent predicate does not block a separately
+authorized sibling. Advice reports candidates until capture predicates hold.
+
+`lookup` is new external work that spends a recovery unit and checks current
+connector/recovery authority. `evidence` ingests a previously returned statement
+and verifies context/coverage/retention without requiring a new call. This split
+corrects the initial fixtures' overly broad use of the evidence command for both
+operations. Finalization ACK loss requires exact original readback before capture.
+The state and ports are specified in the [lab README](../../../labs/kernel-work-composition/README.md).
