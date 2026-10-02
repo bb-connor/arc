@@ -4,6 +4,8 @@ This package is prepared for a future partner. It contains no external results
 and authorizes no deployment or payment. The complete experiment remains
 [the September preregistration](../../../market/open-agent-work/06-independent-trial.md).
 The [analysis contract](ANALYSIS.md) preserves its thresholds and denominators.
+An [unsent invitation draft](INVITATION.md) is ready for the project owner to
+adapt after selecting a prospective partner.
 
 ## What an implementer receives
 

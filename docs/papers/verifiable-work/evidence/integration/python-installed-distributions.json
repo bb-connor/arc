@@ -1,0 +1,18 @@
+[
+  {
+    "name": "cffi",
+    "version": "2.1.1"
+  },
+  {
+    "name": "cryptography",
+    "version": "50.0.1"
+  },
+  {
+    "name": "pycparser",
+    "version": "3.0"
+  },
+  {
+    "name": "rfc8785",
+    "version": "0.1.4"
+  }
+]

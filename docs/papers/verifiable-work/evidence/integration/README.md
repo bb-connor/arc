@@ -5,6 +5,11 @@ Combined source: `71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3`, with security paren
 `7755d3762baa5e0fda0d171835a9000c26de9033`. The separate active security worktree
 and its uncommitted changes were not used. No shared branch was published.
 
+`review.md` is the integration worker's original report rooted at
+`/tmp/chio-paper-integration-evidence`. Its `bin/` paths refer to that original
+directory; executables are not redistributed inside this paper artifact.
+Rebuild from the pinned source using the retained environment and lockfiles.
+
 ## Evidence boundaries
 
 | Snapshot | Binary SHA-256 | Executed boundary |
