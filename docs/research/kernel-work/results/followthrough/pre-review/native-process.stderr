@@ -11,4 +11,9 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-    Finished `dev` profile [unoptimized] target(s) in 1.02s
+   Compiling chio-process v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-process)
+    Finished `test` profile [unoptimized] target(s) in 14.62s
+     Running tests/aggregate_family.rs (/tmp/chio-paper-target/debug/deps/aggregate_family-f3d3712a6c6ce9be)
+     Running tests/crash_recovery.rs (/tmp/chio-paper-target/debug/deps/crash_recovery-803541451eaea7f6)
+     Running tests/cross_owner_recovery.rs (/tmp/chio-paper-target/debug/deps/cross_owner_recovery-dabb447c49a1160f)
+     Running tests/nonce_recovery.rs (/tmp/chio-paper-target/debug/deps/nonce_recovery-5ba317c7a1d447d2)

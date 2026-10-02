@@ -1,0 +1,53 @@
+FFFF
+======================================================================
+FAIL: test_claim_register_cannot_change_under_a_green_record (__main__.PrerequisiteEvidence.test_claim_register_cannot_change_under_a_green_record)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/test_followthrough.py", line 65, in test_claim_register_cannot_change_under_a_green_record
+    self.rejected_when_changed("docs/research/kernel-work/claim-register.json")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/test_followthrough.py", line 55, in rejected_when_changed
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_prerequisite_verifier_cannot_change_under_a_green_record (__main__.PrerequisiteEvidence.test_prerequisite_verifier_cannot_change_under_a_green_record)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/test_followthrough.py", line 68, in test_prerequisite_verifier_cannot_change_under_a_green_record
+    self.rejected_when_changed("labs/kernel-work-composition/verify.py")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/test_followthrough.py", line 55, in rejected_when_changed
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_prior_model_manifest_cannot_change_under_a_green_record (__main__.PrerequisiteEvidence.test_prior_model_manifest_cannot_change_under_a_green_record)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/test_followthrough.py", line 62, in test_prior_model_manifest_cannot_change_under_a_green_record
+    self.rejected_when_changed("docs/research/kernel-work/results/model/verification.json")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/test_followthrough.py", line 55, in rejected_when_changed
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_prior_model_output_cannot_change_under_a_green_record (__main__.PrerequisiteEvidence.test_prior_model_output_cannot_change_under_a_green_record)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/test_followthrough.py", line 59, in test_prior_model_output_cannot_change_under_a_green_record
+    self.rejected_when_changed("docs/research/kernel-work/results/model/explorer.stdout")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/chio-verifiable-work-paper/docs/research/kernel-work/test_followthrough.py", line 55, in rejected_when_changed
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 4 tests in 5.474s
+
+FAILED (failures=4)

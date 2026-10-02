@@ -1,0 +1,6 @@
+{
+  "exit_code": 0,
+  "regressions": 4,
+  "passed": 4,
+  "scope": "temporary record-validation fixtures, not native qualification"
+}

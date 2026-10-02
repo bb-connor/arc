@@ -1,0 +1,5 @@
+Probe: simulate changed prior-model explorer.stdout via read-only overlay
+{"verified": true, "commands": 11, "scope": "local tested profile only"}
+AGGREGATE: ACCEPTED; changed prior artifact reads: 0
+PRIOR: REJECTED: ValueError stdout evidence hash mismatch
+No checkout files changed by probe.

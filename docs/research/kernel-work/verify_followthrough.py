@@ -49,12 +49,24 @@ def sources():
         aggregate.update(str(path).encode() + b"\0" + digest(ROOT / path).encode() + b"\n")
     lab_files = [p for p in (ROOT / "labs/kernel-work-families").rglob("*")
                  if p.is_file() and "target" not in p.parts]
-    lab_files += [ROOT / "docs/research/kernel-work/verify_followthrough.py"]
+    lab_files += [ROOT / "docs/research/kernel-work/verify_followthrough.py",
+                  ROOT / "docs/research/kernel-work/test_followthrough.py"]
     lab_files += [p for p in (ROOT / "labs/kernel-work-composition/src").rglob("*.rs")]
     lab_files += [ROOT / "labs/kernel-work-composition/Cargo.toml", ROOT / "labs/kernel-work-composition/Cargo.lock",
                   ROOT / "docs/research/kernel-work/fixtures.json"]
+    # A successful prerequisite-check log is not the prerequisite's evidence.
+    # Bind its manifest and complete declared source/output closure as well.
+    prior_manifest = ROOT / "docs/research/kernel-work/results/model/verification.json"
+    prior = json.loads(prior_manifest.read_text())
+    lab_files.append(prior_manifest)
+    lab_files += [ROOT / path for path in prior["sources"]]
+    lab_files += [ROOT / item[stream] for item in prior["commands"] for stream in ["stdout", "stderr"]]
+    package = ROOT / "docs/research/kernel-work"
+    lab_files += list(package.glob("*.md"))
+    lab_files += [package / name for name in ["verify_task1.py", "claim-register.json", "task1-sources.json",
+                                             "recovery-baseline.json"]]
     return {"native_tree_sha256": aggregate.hexdigest(), "native_file_count": len(files),
-            "files": {str(p.relative_to(ROOT)): digest(p) for p in sorted(lab_files)}}
+            "files": {str(p.relative_to(ROOT)): digest(p) for p in sorted(set(lab_files))}}
 
 
 def write_manifest(manifest):
@@ -75,6 +87,12 @@ def check():
         for stream in ["stdout", "stderr"]:
             if item[f"{stream}_sha256"] != digest(OUT / f"{name}.{stream}"):
                 raise ValueError(f"changed output: {name}.{stream}")
+    # Revalidate the cheap structural predicates too, including the frozen
+    # manuscript and current links. This does not rerun tests or benchmarks.
+    for name, argv in COMMANDS[-2:]:
+        result = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, timeout=60)
+        if result.returncode:
+            raise ValueError(f"prerequisite failed: {name}: {result.stderr.strip()}")
     print(json.dumps({"verified": True, "commands": len(COMMANDS), "scope": "local tested profile only"}))
 
 

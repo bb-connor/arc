@@ -1,0 +1,72 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Checking bit-vec v0.8.0
+    Checking ciborium-io v0.2.2
+    Checking matchers v0.2.0
+    Checking crossbeam-epoch v0.9.20
+    Checking ciborium-ll v0.2.2
+    Checking tracing-subscriber v0.3.23
+    Checking bit-set v0.8.0
+    Checking ciborium v0.2.2
+    Checking crossbeam-deque v0.8.6
+    Checking fancy-regex v0.17.0
+    Checking anstyle v1.0.14
+    Checking clap_lex v1.1.0
+    Checking coset v0.4.2
+    Checking plotters-backend v0.3.7
+    Checking jsonschema v0.46.0
+    Checking gimli v0.32.3
+    Checking chio-custody-hw v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-custody-hw)
+    Checking chio-log-redact v0.1.0 (/tmp/chio-verifiable-work-paper/crates/observability/chio-log-redact)
+    Checking plotters-svg v0.3.7
+    Checking clap_builder v4.6.0
+    Checking rayon-core v1.13.0
+    Checking object v0.37.3
+    Checking chio-manifest v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-manifest)
+    Checking wait-timeout v0.2.1
+    Checking addr2line v0.25.1
+    Checking fnv v1.0.7
+    Checking quick-error v1.2.3
+    Checking cast v0.3.0
+    Checking rustc-demangle v0.1.27
+    Checking criterion-plot v0.5.0
+    Checking rusty-fork v0.3.1
+    Checking clap v4.6.0
+    Checking rayon v1.11.0
+    Checking generator v0.8.8
+    Checking plotters v0.3.7
+    Checking chio-tool-call-fabric v0.1.0 (/tmp/chio-verifiable-work-paper/crates/protocol/chio-tool-call-fabric)
+    Checking chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+    Checking rand_xorshift v0.4.0
+    Checking tinytemplate v1.2.1
+    Checking is-terminal v0.4.17
+    Checking oorandom v11.1.5
+    Checking anes v0.1.6
+    Checking rustc-hash v1.1.0
+    Checking scoped-tls v1.0.1
+    Checking thousands v0.2.0
+    Checking mintex v0.1.4
+    Checking unarray v0.1.4
+    Checking loom v0.7.2
+    Checking proptest v1.10.0
+    Checking backtrace v0.3.76
+    Checking dhat v0.3.3
+    Checking criterion v0.5.1
+    Checking chio-finding-verifier v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-finding-verifier)
+    Checking chio-transaction-passport v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-transaction-passport)
+    Checking chio-risk-comptroller v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-risk-comptroller)
+    Checking chio-commerce-order v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-commerce-order)
+    Checking chio-agent-web-interop v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-agent-web-interop)
+    Checking chio-store-sqlite v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-store-sqlite)
+    Finished `dev` profile [unoptimized] target(s) in 1m 36s

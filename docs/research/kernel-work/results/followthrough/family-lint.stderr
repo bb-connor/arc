@@ -1,9 +1,1 @@
-    Checking serde_core v1.0.229
-    Checking zmij v1.0.23
-    Checking memchr v2.8.3
-    Checking itoa v1.0.18
-    Checking serde_json v1.0.151
-    Checking serde v1.0.229
-    Checking kernel-work-composition v0.1.0 (/tmp/chio-verifiable-work-paper/labs/kernel-work-composition)
-    Checking kernel-work-families v0.1.0 (/tmp/chio-verifiable-work-paper/labs/kernel-work-families)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.86s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s

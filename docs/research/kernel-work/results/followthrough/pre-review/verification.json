@@ -2,53 +2,21 @@
   "schema": "chio.research.followthrough-verification.v1",
   "complete": true,
   "base": "188031256600903676eb69bda3144b9e8a1660da",
-  "head_at_start": "bc3ed4a1839b1a99316f50f9947a0596dcc6d00d",
+  "head_at_start": "0982a9b5daa17aa61ac8c0b7ae120b601068ff94",
   "sources": {
     "native_tree_sha256": "b8ecbca9be984ea16087a03895eb423cd1caaa2b8dd9943f93fd7f5244a1543e",
     "native_file_count": 7392,
     "files": {
-      "docs/research/kernel-work/2026-10-02-prior-art.md": "3d84633b21085377908211990b090c49837c27bbf458cfde02a8fd81bfd8a6b8",
-      "docs/research/kernel-work/CONTRIBUTION-DECISION.md": "a821c272c5e3965d8d33e97b3a5ac6fc4c83222df4562caceb1c2db4113cecc7",
-      "docs/research/kernel-work/G0-DECISION.md": "7e36758c6610a741d836162d468e95cf8d5b8fe480b5d6f1c975e088ff7db32a",
-      "docs/research/kernel-work/G1-DECISION.md": "a782ba3ed8492366626adea547ea360db7175df5ae5d90a5d7b8bb5fbf4c2a42",
-      "docs/research/kernel-work/MODEL.md": "b557abf38c3d4250d31da0bc678dffbb40dde18da1be119187df59136575305b",
-      "docs/research/kernel-work/README.md": "ec74362355b6ed738852d2d7a9226a96c3b7e9ac3d0211eb8fbe38d5b723ea79",
-      "docs/research/kernel-work/WITNESS.md": "dc9c077f14f84f77d03b80d33305a02aa931cee2bf48f3f84d976598d381debe",
-      "docs/research/kernel-work/claim-register.json": "3cadce8abed21535f69b94cb8768664ffba577dedd0d92492f60db650a5ecd91",
-      "docs/research/kernel-work/counterdesigns.md": "1587a8d25129535934334c3025e0ad4010981589e73f6ef0d47f580688aabada",
       "docs/research/kernel-work/fixtures.json": "06eefba4e2a00b927589a231d10090a898cfe74d317a9e003dd7817fc7d15c08",
-      "docs/research/kernel-work/recovery-baseline.json": "d3aa0d749badc2d7536e7e4169274d3e4c57a318bac51218cf7fc825ae8ab73b",
-      "docs/research/kernel-work/recovery-crosswalk.md": "cde1bc51b8dd455d2c218364ddb23281dc10ef7e95358e4506b9479b8d164920",
-      "docs/research/kernel-work/results/model/clippy.stderr": "8d1102b454ebd8e1fa06f91ead268997ec8c780cb2abbecdd4438f84256dd2d3",
-      "docs/research/kernel-work/results/model/clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "docs/research/kernel-work/results/model/explorer.stderr": "4308ec222dc29b99777493aa7ce8f4a0f475877ce6d0bc0495951f7399d379ae",
-      "docs/research/kernel-work/results/model/explorer.stdout": "643e980275589836f42bf6c5fa89e06b363857b3058b55a5910cc902f8cc5569",
-      "docs/research/kernel-work/results/model/format.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "docs/research/kernel-work/results/model/format.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "docs/research/kernel-work/results/model/provenance.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "docs/research/kernel-work/results/model/provenance.stdout": "d96d9b7ce927188e0542df428eb4540b252ef87d1fdc29ef1951dc0f6c77bf1d",
-      "docs/research/kernel-work/results/model/tests.stderr": "282570a6c44f4b4b3ca297dc9e034f7181bc97ffb7a44657459260e3c2fb6eb2",
-      "docs/research/kernel-work/results/model/tests.stdout": "71c23737a8222e711de2cf8f8c07d0a99d8f81c56c69c8fffa42be534d4e1616",
-      "docs/research/kernel-work/results/model/verification.json": "02d32b5fac5329b6b97f5fc498a211e48cada6f85e4afed9d468d4846d855231",
-      "docs/research/kernel-work/task1-source-audit.md": "0690a93f4ed040dc83e5f8d90391c030578cd465ae60aeb3eb7c2fde26310fdc",
-      "docs/research/kernel-work/task1-sources.json": "a3b5ebd0b911097babf09b85854bb014488cff6b703a9026acc8183ce7730bcf",
-      "docs/research/kernel-work/task1-validation.md": "1125f2a83596f41cfa21a361f4fd46d5e9c483e185abe2aebae7db537cdbf218",
-      "docs/research/kernel-work/task3-sources.json": "93ece993ff5ecbd7beba0c7eaaa1f3cd69990996d73213ed3ebbdb887a7fe75c",
-      "docs/research/kernel-work/test_followthrough.py": "20f2b0b9489e5e042d9accf24fef889a4f23b3d3c30f521b444f7cd1095cb0a7",
-      "docs/research/kernel-work/verify_followthrough.py": "8cd1f856602fd17f9dd00615ac15950718b2afea58ee8ed081124f0641eaf237",
-      "docs/research/kernel-work/verify_task1.py": "6ad9fc84aca88f2fbe54e28f88db9042ec2c80f5dab33995688f93caae4fc8aa",
+      "docs/research/kernel-work/verify_followthrough.py": "e232a6b801e0da1a07116fa1f238fcb87a0a488b978426a2c6c11d9098ff6221",
       "labs/kernel-work-composition/Cargo.lock": "e03e42a170fa008809fdd2ad214a010d2e30726c971fb4762e93770518af9e24",
       "labs/kernel-work-composition/Cargo.toml": "0929d242c8072004b6717af28a909c10172908f561ca1f1bb659ece1a8085e5f",
-      "labs/kernel-work-composition/README.md": "02acf386f5d0b62e4fc08f1e44f1fd39e8ba8146511e0ac499cf5db52777d424",
-      "labs/kernel-work-composition/rust-toolchain.toml": "f53198ae4fdecfd87da36fe431c771b54c51e975d01c0e99f653bc14d5d48211",
       "labs/kernel-work-composition/src/baseline.rs": "a5d2fe3b0542e784e512abceac24908c958cb0f3906df4e5ed597c8da4bd83fa",
       "labs/kernel-work-composition/src/bin/explore.rs": "1684338fbbcacb94dec2e2a83131d85e2ebce93caa82e6bf0aca5382fb51ef57",
       "labs/kernel-work-composition/src/continuation.rs": "1f74833212f672090548e0d57a4f9908a3f089492d57083e09f308daf3589ad1",
       "labs/kernel-work-composition/src/exploration.rs": "c9b77478be871f688207a177e2eff6d8031d67bbf27220936e10b3b196c66682",
       "labs/kernel-work-composition/src/lib.rs": "79e20dcd1c30f3931041e26660e080b4261c20f6c06208b80ad5b1a0059d8849",
       "labs/kernel-work-composition/src/model.rs": "6339f4c63adeec2521ff43753011a694babd84bfd8636caacbb66bb9023d06cc",
-      "labs/kernel-work-composition/tests/scenarios.rs": "2e82b087cb5bac7df0ea5dc6d87ed7e11923008bf75c9b1d27658f3dcb6b6e30",
-      "labs/kernel-work-composition/verify.py": "3048d70ee2e137dd0e9fa6160fb7769d9739968aa83843be4c2a4d5a42059abc",
       "labs/kernel-work-families/Cargo.lock": "462f2cfae04adcedf115592e63f27b1d04f2db8d80870fc2bb8abcf7678f062c",
       "labs/kernel-work-families/Cargo.toml": "fed9e90552121f2196870635d1c48e1c1a2683b69fa1a86241945e76b816b29d",
       "labs/kernel-work-families/README.md": "b91b05d2d4463485b314df16aae5bcc97cfb5ddc2f2423e61052e84b4841f3e4",
@@ -87,9 +55,9 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
       },
-      "elapsed_seconds": 126.239,
-      "stdout_sha256": "ce6ac3a60cbdee2723f55b4f89afb2265b7dcdf2028deba03323b17da6b1b001",
-      "stderr_sha256": "ca3c0c2428caf0e207a2c1aee031ed2cb1804feeffdc3f46ae612b96dcbdb787"
+      "elapsed_seconds": 147.032,
+      "stdout_sha256": "04ea129cc566dfa26941ae54f0ad237c5cbecfd762a0a48d40b880b951fa631e",
+      "stderr_sha256": "17a355f36fcce71e4f81f6ce934abf8e7f58d454221d2a7a5709c157e708bd4c"
     },
     {
       "name": "native-admission",
@@ -108,9 +76,9 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
       },
-      "elapsed_seconds": 67.117,
-      "stdout_sha256": "ab1ffa9b2674b3c7d73c1419ce268be4f4764d333c0ef0241cbcd55a1cd91e53",
-      "stderr_sha256": "929dbe70f0d0985f52bd5b1a3aeda84fca214b780cbbc7801fdb2fe29ff86dbb"
+      "elapsed_seconds": 67.824,
+      "stdout_sha256": "aa629e177b5b3665c8befbc2553f43d6eac2860b53f4e4e0605e113f0fa7dafd",
+      "stderr_sha256": "6584940d83a91dfaa2329ec0aafcbf467aa607fea99897a7e81d94016454a5ce"
     },
     {
       "name": "native-lint",
@@ -134,9 +102,9 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
       },
-      "elapsed_seconds": 1.18,
+      "elapsed_seconds": 164.611,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr_sha256": "811d9ecec97bc589e0720b4dad30f3fab73deb23751fabfb4ea3d542322667b2"
+      "stderr_sha256": "0aec951e64b1c7214788502f8f230bfee00c74621adedc9ff81ee5520fb34ab8"
     },
     {
       "name": "admission-lint",
@@ -158,9 +126,9 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
       },
-      "elapsed_seconds": 1.134,
+      "elapsed_seconds": 97.118,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr_sha256": "9b36e2e54d6f48fa39eb2495ac1104a93be2b3fc2d200e45583f0da45c0e81f4"
+      "stderr_sha256": "3d5e6a1607a833b1e7edc6ea47784e5dd28f98a06afcd1737452bad4bcd1d71d"
     },
     {
       "name": "native-format",
@@ -178,7 +146,7 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
       },
-      "elapsed_seconds": 0.066,
+      "elapsed_seconds": 0.068,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -197,9 +165,9 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-tooling-target"
       },
-      "elapsed_seconds": 0.216,
+      "elapsed_seconds": 0.223,
       "stdout_sha256": "62d0ac5b071223ec65c7750cbb5d49a58213ea7c3b56b418f4d199fb6684392e",
-      "stderr_sha256": "69d4242cad0b029f093d6872659e70edc12683dfc55f0ebf24f4abd7b46e100f"
+      "stderr_sha256": "a3956ee9ff16c2fcd0554ba3eac5f4c21a19e399d0276a020ad76ca9b27b0095"
     },
     {
       "name": "family-comparison",
@@ -216,7 +184,7 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-tooling-target"
       },
-      "elapsed_seconds": 0.169,
+      "elapsed_seconds": 0.215,
       "stdout_sha256": "187d91226d051113c4c1cf1c7c0244ae4e9429dbb65f6d36ea03d670997f0cc5",
       "stderr_sha256": "1c8cb42a87ee6b81df73350245d6df9b9b12bc97fc5a7b48ea127a0fa00a7da2"
     },
@@ -239,9 +207,9 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-tooling-target"
       },
-      "elapsed_seconds": 0.169,
+      "elapsed_seconds": 3.96,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr_sha256": "59639588a6f1826f129cbcd121edc07279dab94786f5fa5bde6b3439b2e845cc"
+      "stderr_sha256": "00df12fa8f013e5e00b50204613a14e47846e2a5e0cc7d7b0486eb97e7cb0daa"
     },
     {
       "name": "family-format",
@@ -259,7 +227,7 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-tooling-target"
       },
-      "elapsed_seconds": 0.118,
+      "elapsed_seconds": 0.12,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -276,7 +244,7 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
       },
-      "elapsed_seconds": 0.116,
+      "elapsed_seconds": 0.117,
       "stdout_sha256": "e2aea9286e9ac045450c9714264228bebc94ca81c0028dee194b781bfed5c5ee",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -292,7 +260,7 @@
         "CARGO_BUILD_JOBS": "4",
         "CARGO_TARGET_DIR": "/tmp/chio-paper-target"
       },
-      "elapsed_seconds": 0.27,
+      "elapsed_seconds": 0.215,
       "stdout_sha256": "d96d9b7ce927188e0542df428eb4540b252ef87d1fdc29ef1951dc0f6c77bf1d",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }

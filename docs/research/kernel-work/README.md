@@ -54,12 +54,15 @@ flowchart LR
 | --- | --- |
 | Research and planning package | Written; source and documentation checks recorded in the plan |
 | Assumed shipped baseline | PR #1172 revision 3, all P0-P6 recovery semantics, by the user's explicit instruction |
-| Recommended investigation | R1 composition of the full kernel/recovery design across owners, using R2 cross-owner progress as the first difficult test |
+| Surviving investigation | R3 measured integration advantage; separate R2 algorithm/exclusivity novelty was rejected at G1 |
 | Task 1 | Complete: counterdesigns, crosswalk, claim register and G0 decision; fresh automated review accepted, clarifications resolved and checks passed |
 | Tasks 2-4 | Common model, G1 decision and executable bounded experiment; final review recorded in G2 |
-| Next execution task | Task 5 native correspondence, then Task 6 second-family and paired integration evidence |
+| Task 5 local work | Complete: source crosswalk, real-death local-owner trajectories and connector negative control; full native composition correspondence remains open |
+| Task 6 local work | Complete: two-family compatibility experiment and matched trial package; independent measurements and human critique remain open |
+| Task 7 | Contribution decision complete: useful implementation without established research advance; G4 unsupported |
+| Next execution task | Consume the recovery owners' pinned implementation to close missing native seams, then run the prepared independent integration study; do not repeat completed local experiments |
 | New theorem or mechanism | Not established |
-| Prototype / production | Standalone KW1 research lab; no production or root workspace dependency changes |
+| Prototype / production | KW1 and two-family research labs plus owning native tests; no production implementation or root dependency changes |
 | External operator | None available; existing trial package prepared, invitation unsent |
 | Flagship manuscript | Frozen at the checkpoint below |
 | Publication and breakthrough status | Existing false/open statuses remain in force |
@@ -71,9 +74,10 @@ them. The composed system, including recovery, is eligible to be the contributio
 it need not contain an unrelated additional invention beyond that PR.
 
 The user explicitly requested brainstorming, research and an actual plan before
-touching the paper again. Tasks 1-4 now record the subsequent authorized research execution, with
-assumed semantics, executed symbolic evidence and unmeasured hypotheses kept
-separate. Paper re-entry still requires an earned contribution decision.
+touching the paper again. Tasks 1-7 now record that research execution and its
+decision, with assumed semantics, measured local evidence and open native and
+independent empirical gates kept separate. The recorded contribution decision
+does not support manuscript re-entry yet.
 
 ## Preserved checkpoint
 
