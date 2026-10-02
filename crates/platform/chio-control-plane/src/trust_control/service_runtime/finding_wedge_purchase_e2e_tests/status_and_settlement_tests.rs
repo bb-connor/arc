@@ -1,6 +1,6 @@
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn admission_views_hide_revoked_terminal_authorities() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority, market_config());
     deployment.seed_and_activate(&state).await?;
@@ -262,7 +262,10 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         },
         Arc::clone(&resolver),
     )?;
-    let mut holder_kernel = ChioKernel::new_with_clock(kernel_config(keypair(42), Vec::new()), chio_test_support::clock::clock());
+    let mut holder_kernel = ChioKernel::new_with_clock(
+        kernel_config(keypair(42), Vec::new()),
+        chio_test_support::clock::clock(),
+    );
     holder_kernel.add_guard(Box::new(guard));
     holder_kernel.register_tool_server(Box::new(BuyerMemoryServer));
     let read_capability = holder_kernel.issue_capability(
@@ -325,7 +328,8 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let status_gate_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+    let status_gate_now =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let intent_id = sha256_hex(b"m6-voluntary-retraction-intent");
     let intent_bytes = canonical_json_bytes(&serde_json::json!({
@@ -333,7 +337,9 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         "reason": "seller_voluntary_retraction",
         "schema": "chio.finding.voluntary-retraction.v1",
     }))?;
-    let primary_intent_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")).max(now);
+    let primary_intent_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(now);
     let intent = chio_store_sqlite::FindingRetractionIntentInput {
         intent_id: &intent_id,
         feed_id: &config.status_feed_operator_ref,
@@ -363,7 +369,9 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
     let hook_operator_id = config.status_feed_operator.authority.authority_id.clone();
     let hook_finding_id = lane.deployment.web.finding_id.clone();
     let hook_intent_bytes = intent_bytes.clone();
-    let status_gate_intent_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")).max(status_gate_now);
+    let status_gate_intent_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(status_gate_now);
     let hook_inclusion_sla_secs = config.status_feed_service_bond.inclusion_sla_secs;
     let status_gate_live = status_gate_publisher.publish_non_inclusion(
         &status_lane.deployment.web.finding_id,
@@ -376,7 +384,8 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         .set_payment_adapter(Box::new(ReversibleHoldAdapter {
             calls: status_lane.calls.clone(),
             authorize_hook: Some(Arc::new(move || {
-                let hook_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+                let hook_now = unix_timestamp_now()
+                    .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
                 hook_store
                     .issue_retraction_intent(&chio_store_sqlite::FindingRetractionIntentInput {
                         intent_id: &hook_intent_id,
@@ -412,7 +421,9 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
     assert_eq!(status_lane.calls.releases.load(Ordering::SeqCst), 1);
     assert_eq!(status_lane.invocations.load(Ordering::SeqCst), 0);
 
-    let status_gate_retraction_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")).max(pending_intent.issued_at);
+    let status_gate_retraction_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(pending_intent.issued_at);
     let included =
         status_gate_publisher.publish_retraction(&intent_id, &[], status_gate_retraction_now)?;
     let included_b64 = STANDARD.encode(&included.proof_bytes);
@@ -441,7 +452,9 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         "reason": "seller_voluntary_retraction",
         "schema": "chio.finding.voluntary-retraction.v1",
     }))?;
-    let second_intent_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")).max(status_gate_retraction_now);
+    let second_intent_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(status_gate_retraction_now);
     status_gate_store.issue_retraction_intent(
         &chio_store_sqlite::FindingRetractionIntentInput {
             intent_id: &second_intent_id,
@@ -456,7 +469,9 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
             created_at: second_intent_now,
         },
     )?;
-    let second_publish_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")).max(second_intent_now + 1);
+    let second_publish_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(second_intent_now + 1);
     let second_included =
         status_gate_publisher.publish_retraction(&second_intent_id, &[], second_publish_now)?;
     let refresh_candidates = status_gate_store.list_publication_candidates(
@@ -547,7 +562,9 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
     let prior_epoch = status_gate_store
         .get_feed_floor(&config.status_feed_operator_ref)?
         .map_epoch;
-    let rotation_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")).max(anchor_refresh_at + 1);
+    let rotation_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(anchor_refresh_at + 1);
     let rotated = rotated_publisher.publish_non_inclusion(
         &sha256_hex(b"m6-live-after-operator-rotation"),
         &[],
@@ -561,7 +578,9 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         rotated_operator.authority.key_epoch
     );
 
-    let primary_retraction_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")).max(primary_intent_now);
+    let primary_retraction_now = unix_timestamp_now()
+        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
+        .max(primary_intent_now);
     publisher.publish_retraction(&intent_id, &[], primary_retraction_now)?;
     let delivery_status = delivery
         .status_proof
@@ -678,7 +697,8 @@ async fn finding_status_freshness_rechecks_at_final_clock_samples() -> TestResul
             keypair(36),
             config.status_max_epoch_age_secs,
         )?;
-    let cache_now = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+    let cache_now =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
     cache_publisher.publish_non_inclusion(&cache_lane.deployment.web.finding_id, &[], cache_now)?;
     let cache = crate::trust_control::finding_retraction_resolver::SqliteFindingStatusCache::new(
         &config,
@@ -973,7 +993,8 @@ async fn wedge_purchase_settles_into_a_signed_record() -> TestResult {
         "nonce-settle-1",
     )?;
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    let finalized_at = unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
+    let finalized_at =
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}"));
 
     let purchase_store = lane.authority.finding_purchase_store();
     purchase_store.register_community_fund_destination(

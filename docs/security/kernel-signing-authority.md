@@ -74,12 +74,92 @@ completion. These boundaries remain explicit launch gates.
 
 The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings against key custody and issuer trust:
 
-- **KG1, High.** Cluster followers apply unsigned authority snapshots from peers authenticated by the
-  shared service token over plain HTTP, adding any listed issuer.
-- **KG2, Medium.** SQLite rotation never retires a key and writes no signed record; the witnessed
+- **KG1, High, source repair.** Both cluster import paths now require an
+  authenticated chain rooted in an operator-pinned checkpoint. Off-loopback
+  plaintext peers reject. The [execution record](../reviews/2026-10-02-identity-authority-release-closure-execution.md)
+  owns local acceptance; deployed migration and hosted qualification remain separate.
+- **KG2, Medium.** SQLite rotation still never retires a key. Pinned KG1 streams
+  now retain signed rotation records; lifecycle retirement and recovery remain open. The witnessed
   keyring writes no Retire, Revoke or Recover and ignores `verify_until`; the kernel's receipt key is
   always a trusted capability issuer and approval signer and cannot be rotated.
 - **KG3, Medium.** The authority database stores `seed_hex` in clear and is created with default
   permissions.
 - **KG14, Low.** Remote signing reaches only the finding-market hosted profile.
 - **AP9, Medium.** API protect signs with a fresh `Keypair::generate()` on every start without a seed.
+
+## Signed cluster authority replication (KG1)
+
+Authority replication uses a named, operator-pinned checkpoint and a canonical
+Ed25519 chain. Each rotation is signed by the previous head and commits to the
+exact predecessor, next generation, next key and complete issuer set. The final
+head signs a live snapshot envelope with a maximum five-minute lifetime. The
+receiver rejects future-issued and expired envelopes, unsigned input, changed
+history, generation conflicts, unpinned streams and unhealthy or regressing time.
+
+Both incremental pulls and full cluster recovery use the same SQLite import.
+Signature checks and the durable predecessor comparison run under an immediate
+write transaction. The issuer set, public head, retained chain, envelope and clock
+floor commit together. A rejected import changes none of those rows. An exact
+replay is idempotent. A follower may relay a still-fresh envelope already accepted
+from its custodian; it cannot sign a fresh envelope without that head's key.
+
+Local seeds stay local. Reopening a follower never adds its private-key identity
+back to the verification set. A follower with a mismatched seed cannot issue or
+rotate the replicated authority. Peer transport tokens do not grant issuer trust.
+HTTPS uses the HTTP client's normal certificate and hostname verification. HTTP
+peers must use literal loopback IP addresses; the local-address override does not
+permit plaintext elsewhere, and peer snapshot clients do not follow redirects.
+
+### Provisioning and unsigned-state migration
+
+Provision offline, before starting peer replication. Initialize the source's
+current public state as an explicit checkpoint:
+
+```bash
+chio federation authority replication-init \
+  --database /private/source-authority.db \
+  --stream-id production-cluster-1:capability-authority \
+  --out authority-anchor.json
+```
+
+The command prints the canonical checkpoint digest. Transfer the public anchor
+file and authenticate that digest through an independent operator channel. On a
+follower, pin the checkpoint before enabling cluster traffic:
+
+```bash
+chio federation authority replication-pin \
+  --database /private/follower-authority.db \
+  --anchor authority-anchor.json \
+  --expected-anchor-digest "$AUTHENTICATED_ANCHOR_DIGEST"
+```
+
+The command rejects a mismatched digest before opening the follower database.
+Pinning replaces the follower's public verification set and preserves its private
+seed. Repeating the same checkpoint is idempotent; changing a stored pin rejects.
+Review every issuer in a legacy checkpoint before distributing it. This operation
+asserts operator trust in the current state; it does not manufacture signatures
+for old rotations. Unconfigured databases continue local use but refuse authority
+network import and export. Schema revision 2 makes older store binaries refuse the
+upgraded database rather than reopening an unsigned replication path.
+
+An existing database whose current head is absent from its persisted issuer
+history refuses to open. This includes incomplete legacy initialization with a
+missing or empty history table. Opening never repairs that state by adding the
+local seed's key. Stop the service, retain the database for investigation, and
+restore a known-good authenticated backup before checkpointing. If no trustworthy
+history exists, provision a new authority database and distribute its checkpoint
+explicitly; do not treat the old seed as evidence for missing history.
+
+Upgrade and provision every receiving peer before relying on this boundary.
+Unsigned older peers cannot participate in the authenticated stream. Local
+checks do not establish that a deployed cluster has completed this migration.
+
+A stream permits at most 1,024 signed rotations after its pinned checkpoint and
+4,096 retained issuers, with bounded persisted records. Reaching a bound denies a
+further rotation atomically and requires an explicit new-stream provisioning plan.
+Automatic checkpoint replacement, issuer retirement, revocation and custody
+handover remain KG2. These commands do not activate a cluster or qualify a release.
+
+See the [protocol design](../superpowers/specs/2026-10-02-authority-replication-design.md)
+and [execution plan](../superpowers/plans/2026-10-02-identity-authority-release-closure.md)
+for the acceptance controls and remaining qualification.

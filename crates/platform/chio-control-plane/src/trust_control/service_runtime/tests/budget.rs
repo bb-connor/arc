@@ -1096,10 +1096,10 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
         "totalExposureCharged": 120,
         "totalRealizedSpend": 75,
         "budgetAuthority": {
-            "authorityId": "http://leader-b",
-            "leaderUrl": "http://leader-b",
+            "authorityId": "https://leader-b",
+            "leaderUrl": "https://leader-b",
             "budgetTerm": 8,
-            "leaseId": "http://leader-b#term-8",
+            "leaseId": "https://leader-b#term-8",
             "leaseEpoch": 8,
             "leaseExpiresAt": 5000,
             "leaseTtlMs": 750,
@@ -1112,10 +1112,10 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
             "quorumCommitted": true,
             "quorumSize": 2,
             "committedNodes": 2,
-            "witnessUrls": ["http://leader-a", "http://peer-b"],
-            "authorityId": "http://leader-a",
+            "witnessUrls": ["https://leader-a", "http://peer-b"],
+            "authorityId": "https://leader-a",
             "budgetTerm": 7,
-            "leaseId": "http://leader-a#term-7",
+            "leaseId": "https://leader-a#term-7",
             "leaseEpoch": 7
         }
     })
@@ -1148,8 +1148,8 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
         .metadata
         .authority
         .test_expect("budget authority metadata");
-    assert_eq!(authority.authority_id, "http://leader-a");
-    assert_eq!(authority.lease_id, "http://leader-a#term-7");
+    assert_eq!(authority.authority_id, "https://leader-a");
+    assert_eq!(authority.lease_id, "https://leader-a#term-7");
     assert_eq!(authority.lease_epoch, 7);
     assert_eq!(authorized.metadata.budget_commit_index, Some(41));
     assert_eq!(

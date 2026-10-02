@@ -19,20 +19,21 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use uuid::Uuid;
 
 mod boundaries;
+mod replication;
 use boundaries::*;
 
 #[cfg(test)]
 mod transaction_tests;
 
 pub struct SqliteCapabilityAuthority {
-    clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
+    clock: crate::store_clock::StoreClock,
     path: PathBuf,
     cached_public_key: Mutex<PublicKey>,
     cached_trusted_public_keys: Mutex<Vec<PublicKey>>,
 }
 
 /// Authority-store schema revision. Bump on every schema-affecting change.
-const AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
+const AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const AUTHORITY_STORE_SCHEMA_KEY: &str = "authority";
@@ -69,10 +70,12 @@ impl SqliteCapabilityAuthority {
             fs::create_dir_all(&parent)?;
         }
 
+        let clock = crate::store_clock::StoreClock::new(clock);
         let bootstrap = Keypair::generate();
+        let bootstrap_at = clock.unix_millis()?.as_secs();
         let mut connection = Self::open_connection(&path)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        transaction.execute(
+        let inserted = transaction.execute(
             r#"
             INSERT INTO authority_state (singleton_id, seed_hex, public_key_hex, generation, rotated_at)
             VALUES (1, ?1, ?2, 1, ?3)
@@ -81,7 +84,7 @@ impl SqliteCapabilityAuthority {
             params![
                 bootstrap.seed_hex(),
                 bootstrap.public_key().to_hex(),
-                authority_sqlite_integer(clock.unix_millis()?.as_secs(), "rotation time")?
+                authority_sqlite_integer(bootstrap_at, "rotation time")?
             ],
         )?;
         let current_public_key = transaction
@@ -104,18 +107,27 @@ impl SqliteCapabilityAuthority {
             "#,
             params![current_public_key.public_key().to_hex()],
         )?;
-        transaction.execute(
-            r#"
+        if inserted != 0 {
+            transaction.execute(
+                r#"
             INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
             VALUES (?1, 1, ?2)
             ON CONFLICT(public_key_hex) DO NOTHING
             "#,
-            params![
-                current_public_key.public_key().to_hex(),
-                authority_sqlite_integer(clock.unix_millis()?.as_secs(), "rotation time")?
-            ],
-        )?;
+                params![
+                    current_public_key.public_key().to_hex(),
+                    authority_sqlite_integer(bootstrap_at, "rotation time")?
+                ],
+            )?;
+        }
         let status = Self::read_status_from_connection(&transaction)?;
+        // An interrupted legacy bootstrap is not evidence of issuer trust.
+        // In particular, never repair this by inserting a follower's local key.
+        if !status.trusted_public_keys.contains(&status.public_key) {
+            return Err(AuthorityStoreError::Schema(
+                "authority head is absent from persisted issuer history; restore an authenticated backup before reopening".into(),
+            ));
+        }
         transaction.commit()?;
         Ok(Self {
             clock,
@@ -145,8 +157,21 @@ impl SqliteCapabilityAuthority {
             AuthorityStoreError::Fence("authority generation exhausted".to_owned())
         })?;
         let generation = authority_generation(next_generation)?;
+        let prior_keypair = Self::read_keypair_from_connection(&transaction)?;
+        if prior_keypair.public_key() != status_before.public_key {
+            return Err(AuthorityStoreError::Fence(
+                "rotation requires custody of the current head".into(),
+            ));
+        }
         let keypair = Keypair::generate();
-        let rotated_at = self.clock.unix_millis()?.as_secs();
+        let observed = self.clock.unix_millis()?;
+        let rotated_at = observed.as_secs();
+        replication::record_rotation(
+            &transaction,
+            &prior_keypair,
+            &keypair.public_key(),
+            observed,
+        )?;
         transaction.execute(
             "UPDATE authority_state SET seed_hex = ?1, public_key_hex = ?2,
              generation = ?3, rotated_at = ?4 WHERE singleton_id = 1",
@@ -185,50 +210,14 @@ impl SqliteCapabilityAuthority {
         Ok(snapshot)
     }
 
+    /// Unsigned import was never an authority grant. Retained to reject legacy callers.
     pub fn apply_snapshot(
         &self,
-        snapshot: &AuthoritySnapshot,
+        _snapshot: &AuthoritySnapshot,
     ) -> Result<bool, AuthorityStoreError> {
-        let mut connection = Self::open_connection(&self.path)?;
-        // Compare and replace under one write lock; history validation belongs
-        // to that transaction so a bad later row cannot leave partial trust.
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let (local_key, local_generation, local_rotated_at) =
-            Self::read_public_state_from_connection(&transaction)?;
-        let remote_public_key = persist_trusted_key(
-            &transaction,
-            &snapshot.public_key_hex,
-            snapshot.generation,
-            snapshot.rotated_at,
-        )?;
-        for key in &snapshot.trusted_keys {
-            persist_trusted_key(
-                &transaction,
-                &key.public_key_hex,
-                key.generation,
-                key.activated_at,
-            )?;
-        }
-        let remote_hex = remote_public_key.to_hex();
-        let local_hex = local_key.to_hex();
-        let should_replace = (
-            snapshot.generation,
-            snapshot.rotated_at,
-            remote_hex.as_str(),
-        ) > (local_generation, local_rotated_at, local_hex.as_str());
-        if should_replace {
-            // Replicate verification identity only. Local signing custody stays
-            // local and read_current_keypair refuses a mismatched public head.
-            transaction.execute(
-                "UPDATE authority_state SET public_key_hex = ?1, generation = ?2, rotated_at = ?3 WHERE singleton_id = 1",
-                params![remote_hex, authority_generation(snapshot.generation)?, authority_sqlite_integer(snapshot.rotated_at, "rotation time")?],
-            )?;
-        }
-        let status = Self::read_status_from_connection(&transaction)?;
-        transaction.commit()?;
-        self.update_cached_public_key(status.public_key);
-        self.update_cached_trusted_public_keys(status.trusted_public_keys);
-        Ok(should_replace)
+        Err(AuthorityStoreError::Fence(
+            "unsigned authority snapshot".to_string(),
+        ))
     }
 
     pub fn current_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
@@ -552,6 +541,7 @@ impl SqliteCapabilityAuthority {
                 [],
             )?;
         }
+        replication::ensure_schema(&connection)?;
         crate::stamp_schema_version(
             &connection,
             AUTHORITY_STORE_SCHEMA_KEY,
@@ -1033,10 +1023,12 @@ mod tests {
         let follower = SqliteCapabilityAuthority::open(&follower_path).unwrap();
 
         let follower_local_key = follower.current_keypair().unwrap().public_key();
+        let anchor = source.initialize_replication("test-custody").unwrap();
+        follower.pin_replication_anchor(&anchor).unwrap();
         let rotated = source.rotate().unwrap();
-        let snapshot = source.snapshot().unwrap();
+        let snapshot = source.signed_snapshot().unwrap();
 
-        assert!(follower.apply_snapshot(&snapshot).unwrap());
+        assert!(follower.apply_signed_snapshot(&snapshot).unwrap());
 
         let follower_status = follower.status().unwrap();
         assert_eq!(follower_status.public_key, rotated.public_key);

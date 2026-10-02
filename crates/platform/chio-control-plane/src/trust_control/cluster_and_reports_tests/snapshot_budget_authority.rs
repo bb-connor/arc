@@ -7,30 +7,30 @@ fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
     let source_authority_db = unique_temp_path("cluster-source-anchor-authority", "sqlite3");
     let target_authority_db = unique_temp_path("cluster-target-anchor-authority", "sqlite3");
     let mut source_state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         None,
         Some(source_budget_db.clone()),
     );
     source_state.config.authority_db_path = Some(source_authority_db.clone());
     let mut target_state = state_with_cluster(
-        "http://node-b",
-        &["http://node-a"],
+        "https://node-b",
+        &["https://node-a"],
         None,
         None,
         Some(target_budget_db.clone()),
     );
     target_state.config.authority_db_path = Some(target_authority_db.clone());
-    update_peer_reachable(&source_state, "http://node-b");
-    update_peer_reachable(&target_state, "http://node-a");
+    update_peer_reachable(&source_state, "https://node-b");
+    update_peer_reachable(&target_state, "https://node-a");
     assert_eq!(
         current_leader_url(&source_state).as_deref(),
-        Some("http://node-a")
+        Some("https://node-a")
     );
     assert_eq!(
         current_leader_url(&target_state).as_deref(),
-        Some("http://node-a")
+        Some("https://node-a")
     );
 
     drop(SqliteBudgetStore::open(&source_budget_db).test_unwrap());
@@ -68,10 +68,18 @@ fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
         .test_unwrap();
     drop(source_connection);
 
+    let source_authority = SqliteCapabilityAuthority::open(&source_authority_db).test_unwrap();
+    let anchor = source_authority
+        .initialize_replication("budget-anchor-test")
+        .test_unwrap();
+    SqliteCapabilityAuthority::open(&target_authority_db)
+        .test_unwrap()
+        .pin_replication_anchor(&anchor)
+        .test_unwrap();
     let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
     assert_eq!(snapshot.budget_usage_history_anchors.len(), 1);
     assert!(snapshot.budget_anchor_provenance.is_some());
-    apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
+    apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap();
 
     let target_store = SqliteBudgetStore::open(&target_budget_db).test_unwrap();
     let imported = target_store
@@ -102,23 +110,23 @@ fn snapshot_preserves_exact_budget_origin_heads_and_next_delta() {
     let source_budget_db = unique_temp_path("cluster-source-budget-origin", "sqlite3");
     let target_budget_db = unique_temp_path("cluster-target-budget-origin", "sqlite3");
     let source_state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         None,
         Some(source_budget_db.clone()),
     );
     let target_state = state_with_cluster(
-        "http://node-b",
-        &["http://node-a"],
+        "https://node-b",
+        &["https://node-a"],
         None,
         None,
         Some(target_budget_db.clone()),
     );
 
     let authority = BudgetEventAuthority {
-        authority_id: "http://node-a".to_string(),
-        lease_id: "http://node-a#term-1".to_string(),
+        authority_id: "https://node-a".to_string(),
+        lease_id: "https://node-a#term-1".to_string(),
         lease_epoch: 1,
     };
     let source_store = SqliteBudgetStore::open(&source_budget_db).test_unwrap();
@@ -144,11 +152,11 @@ fn snapshot_preserves_exact_budget_origin_heads_and_next_delta() {
     assert_eq!(
         snapshot.budget_origin_ack_heads,
         vec![BudgetOriginAck {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 1,
         }]
     );
-    apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
+    apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap();
 
     let target_store = SqliteBudgetStore::open(&target_budget_db).test_unwrap();
     assert_eq!(target_store.budget_snapshot_covered_head().test_unwrap(), 1);
@@ -156,7 +164,7 @@ fn snapshot_preserves_exact_budget_origin_heads_and_next_delta() {
         .list_usage_history_anchors()
         .test_unwrap()
         .is_empty());
-    let installed_cursor = peer_budget_cursor(&target_state, "http://node-a").test_unwrap();
+    let installed_cursor = peer_budget_cursor(&target_state, "https://node-a").test_unwrap();
     assert_eq!(installed_cursor.seq, 1);
 
     source_store
@@ -203,23 +211,23 @@ fn snapshot_rejects_forged_budget_origin_head_without_partial_import() {
     let source_budget_db = unique_temp_path("cluster-source-forged-origin", "sqlite3");
     let target_budget_db = unique_temp_path("cluster-target-forged-origin", "sqlite3");
     let source_state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         None,
         Some(source_budget_db.clone()),
     );
     let target_state = state_with_cluster(
-        "http://node-b",
-        &["http://node-a"],
+        "https://node-b",
+        &["https://node-a"],
         None,
         None,
         Some(target_budget_db.clone()),
     );
     let source_store = SqliteBudgetStore::open(&source_budget_db).test_unwrap();
     let authority = BudgetEventAuthority {
-        authority_id: "http://node-a".to_string(),
-        lease_id: "http://node-a#term-1".to_string(),
+        authority_id: "https://node-a".to_string(),
+        lease_id: "https://node-a#term-1".to_string(),
         lease_epoch: 1,
     };
     assert!(source_store
@@ -238,7 +246,7 @@ fn snapshot_rejects_forged_budget_origin_head_without_partial_import() {
     let mut snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
     snapshot.budget_origin_ack_heads[0].event_seq = 2;
 
-    let error = apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap_err();
+    let error = apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap_err();
     assert!(error
         .to_string()
         .contains("origin acknowledgement heads are not proved"));
@@ -262,22 +270,22 @@ fn snapshot_rejects_local_only_history_without_promoting_peer_state() {
     let source_budget_db = unique_temp_path("cluster-source-local-history", "sqlite3");
     let target_budget_db = unique_temp_path("cluster-target-local-history", "sqlite3");
     let source_state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         None,
         Some(source_budget_db.clone()),
     );
     let target_state = state_with_cluster(
-        "http://node-b",
-        &["http://node-a"],
+        "https://node-b",
+        &["https://node-a"],
         None,
         None,
         Some(target_budget_db.clone()),
     );
     let authority = BudgetEventAuthority {
-        authority_id: "http://node-a".to_string(),
-        lease_id: "http://node-a#term-1".to_string(),
+        authority_id: "https://node-a".to_string(),
+        lease_id: "https://node-a#term-1".to_string(),
         lease_epoch: 1,
     };
     let source_store = SqliteBudgetStore::open(&source_budget_db).test_unwrap();
@@ -312,20 +320,20 @@ fn snapshot_rejects_local_only_history_without_promoting_peer_state() {
         .test_unwrap();
     let target_before = target_store.export_budget_snapshot().test_unwrap();
 
-    update_peer_reachable(&target_state, "http://node-a");
+    update_peer_reachable(&target_state, "https://node-a");
     update_peer_budget_acks(
         &target_state,
-        "http://node-a",
+        "https://node-a",
         &[BudgetOriginAck {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 100,
         }],
     );
-    update_peer_state(&target_state, "http://node-a", |peer| {
+    update_peer_state(&target_state, "https://node-a", |peer| {
         peer.force_snapshot = true
     });
 
-    let error = apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap_err();
+    let error = apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap_err();
     assert!(error
         .to_string()
         .contains("does not retain identical local event `hold-local-history-3:authorize`"));
@@ -333,16 +341,16 @@ fn snapshot_rejects_local_only_history_without_promoting_peer_state() {
         target_store.export_budget_snapshot().test_unwrap(),
         target_before
     );
-    assert!(peer_should_force_snapshot(&target_state, "http://node-a"));
+    assert!(peer_should_force_snapshot(&target_state, "https://node-a"));
     assert_eq!(
-        with_peer_state(&target_state, "http://node-a", |peer| peer
+        with_peer_state(&target_state, "https://node-a", |peer| peer
             .budget_import_acks
-            .get("http://node-a")
+            .get("https://node-a")
             .copied()),
         Some(Some(100))
     );
     let write = BudgetWriteToken {
-        origin_id: "http://node-a".to_string(),
+        origin_id: "https://node-a".to_string(),
         event_seq: 100,
         budget_term: 1,
     };

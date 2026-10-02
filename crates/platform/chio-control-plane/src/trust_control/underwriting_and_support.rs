@@ -1519,9 +1519,13 @@ mod underwriting_and_support_tests {
         let follower = SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
         let follower_local_key = follower.local_keypair().test_unwrap();
 
+        let anchor = source
+            .initialize_replication("local-custody-test")
+            .test_unwrap();
+        follower.pin_replication_anchor(&anchor).test_unwrap();
         source.rotate().test_unwrap();
-        let snapshot = source.snapshot().test_unwrap();
-        assert!(follower.apply_snapshot(&snapshot).test_unwrap());
+        let snapshot = source.signed_snapshot().test_unwrap();
+        assert!(follower.apply_signed_snapshot(&snapshot).test_unwrap());
         assert!(follower.current_keypair().is_err());
 
         let signing_key =

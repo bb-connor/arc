@@ -64,20 +64,13 @@ pub(crate) fn json_response_with_leader_visibility_and_budget_commit<T: Serializ
     Json(value).into_response()
 }
 
-pub(crate) fn authority_snapshot_view(snapshot: AuthoritySnapshot) -> AuthoritySnapshotView {
+#[cfg(test)]
+pub(crate) fn authority_snapshot_view(
+    snapshot: chio_kernel::AuthoritySnapshot,
+) -> AuthoritySnapshotView {
     AuthoritySnapshotView {
-        public_key_hex: snapshot.public_key_hex,
-        generation: snapshot.generation,
-        rotated_at: snapshot.rotated_at,
-        trusted_keys: snapshot
-            .trusted_keys
-            .into_iter()
-            .map(|trusted_key| AuthorityTrustedKeyView {
-                public_key_hex: trusted_key.public_key_hex,
-                generation: trusted_key.generation,
-                activated_at: trusted_key.activated_at,
-            })
-            .collect(),
+        snapshot,
+        proof: None,
     }
 }
 
@@ -97,23 +90,6 @@ pub(crate) fn budget_cursor_view(cursor: BudgetCursor) -> BudgetCursorView {
         updated_at: cursor.updated_at,
         capability_id: cursor.capability_id,
         grant_index: cursor.grant_index,
-    }
-}
-
-pub(crate) fn authority_snapshot_from_view(view: AuthoritySnapshotView) -> AuthoritySnapshot {
-    AuthoritySnapshot {
-        public_key_hex: view.public_key_hex,
-        generation: view.generation,
-        rotated_at: view.rotated_at,
-        trusted_keys: view
-            .trusted_keys
-            .into_iter()
-            .map(|trusted_key| chio_kernel::AuthorityTrustedKeySnapshot {
-                public_key_hex: trusted_key.public_key_hex,
-                generation: trusted_key.generation,
-                activated_at: trusted_key.activated_at,
-            })
-            .collect(),
     }
 }
 

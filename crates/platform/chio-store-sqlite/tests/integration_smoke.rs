@@ -42,17 +42,26 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
         .test_expect("read primary local signing key")
         .public_key();
 
+    let anchor = replica
+        .initialize_replication("smoke-authority")
+        .test_unwrap();
+    primary.pin_replication_anchor(&anchor).test_unwrap();
     let rotated = replica.rotate().test_expect("rotate replica authority");
-    let snapshot = replica.snapshot().test_expect("snapshot replica authority");
+    let snapshot = replica
+        .signed_snapshot()
+        .test_expect("snapshot replica authority");
     let replaced = primary
-        .apply_snapshot(&snapshot)
+        .apply_signed_snapshot(&snapshot)
         .test_expect("apply newer replica snapshot");
     let status = primary.status().test_expect("read primary status");
 
     assert!(replaced);
-    assert_eq!(snapshot.public_key_hex, rotated.public_key.to_hex());
+    assert_eq!(
+        snapshot.snapshot.public_key_hex,
+        rotated.public_key.to_hex()
+    );
     assert_eq!(status.generation, rotated.generation);
-    assert_eq!(status.public_key.to_hex(), snapshot.public_key_hex);
+    assert_eq!(status.public_key.to_hex(), snapshot.snapshot.public_key_hex);
     assert_eq!(
         primary
             .local_keypair()
@@ -70,7 +79,7 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
     assert!(status
         .trusted_public_keys
         .iter()
-        .any(|key| key.to_hex() == snapshot.public_key_hex));
+        .any(|key| key.to_hex() == snapshot.snapshot.public_key_hex));
 
     cleanup_sqlite_files(&primary_path);
     cleanup_sqlite_files(&replica_path);
@@ -86,7 +95,7 @@ fn sqlite_capability_authority_rejects_snapshot_with_invalid_public_key() {
     let error = authority
         .apply_snapshot(&snapshot)
         .test_expect_err("invalid public key should fail closed");
-    assert!(error.to_string().contains("invalid public key"));
+    assert!(error.to_string().contains("unsigned authority snapshot"));
 
     cleanup_sqlite_files(&path);
 }

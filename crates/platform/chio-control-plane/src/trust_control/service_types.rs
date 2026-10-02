@@ -32,7 +32,7 @@ mod structured_budget;
 pub(crate) use self::admission_authority::*;
 pub(crate) use self::budget_lifecycle::BudgetMutationLifecycleView;
 pub(crate) use self::cluster_budget::{
-    AbandonedSeqRange, AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView,
+    AbandonedSeqRange, AuthoritySnapshotView, BudgetAuthorityMetadataView,
     BudgetAuthorizeExposureDecision, BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse,
     BudgetMutationAuthorityView, BudgetMutationEventView, BudgetOriginAck, BudgetWriteCommitView,
     CaptureInvocationDecision, CaptureInvocationRequest, CaptureInvocationResponse,

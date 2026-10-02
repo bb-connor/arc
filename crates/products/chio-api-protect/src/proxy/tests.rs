@@ -1411,7 +1411,7 @@ async fn sidecar_mint_returns_canonical_capability_tokens() {
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
                     "job_uid": "job-uid-1",
                 }))
@@ -1439,7 +1439,7 @@ async fn sidecar_mint_returns_canonical_capability_tokens() {
 async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
     let request_body = serde_json::to_vec(&serde_json::json!({
-        "subject": "job/default/demo",
+        "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
         "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
         "job_uid": "job-uid-1",
         "ttl_seconds": 300,
@@ -1494,7 +1494,7 @@ async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -1509,7 +1509,7 @@ async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tool:server-a:fetch:invoke"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2057,7 +2057,7 @@ async fn sidecar_control_endpoints_reject_non_loopback_callers() {
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2139,7 +2139,7 @@ async fn sidecar_control_endpoints_allow_authenticated_non_loopback_callers() {
             .header("authorization", "Bearer cluster-control-token")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2210,7 +2210,7 @@ async fn sidecar_control_endpoints_accept_lowercase_bearer_scheme() {
             .header("authorization", "bearer cluster-control-token")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2237,7 +2237,7 @@ async fn sidecar_control_endpoints_require_bearer_auth_for_loopback_when_configu
             .header("content-type", "application/json")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2274,7 +2274,7 @@ async fn sidecar_control_endpoints_reject_blank_control_token_configuration() {
             .header("authorization", "Bearer ")
             .body(Body::from(
                 serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
+                    "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
                     "scopes": ["tools:search"],
                     "job_uid": "job-uid-1",
                 }))
@@ -2497,7 +2497,7 @@ async fn sidecar_capabilities_alias_accepts_canonical_body_shape() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
 
     let body = serde_json::json!({
-        "subject": "agent-via-canonical",
+        "subject": Keypair::from_seed(&[7; 32]).public_key().to_hex(),
         "scopes": ["filesystem:read"],
         "ttl_seconds": 600,
         "job_uid": "job-canonical-1",

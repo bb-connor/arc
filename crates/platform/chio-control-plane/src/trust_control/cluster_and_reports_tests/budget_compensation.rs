@@ -5,8 +5,8 @@ fn budget_authorize_compensation_tracks_the_authorize_generation(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let budget_db = unique_temp_path("budget-authorize-compensation-generation", "sqlite3");
     let state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         None,
         Some(budget_db.clone()),
@@ -130,10 +130,10 @@ fn apply_cluster_snapshot_fails_when_authority_fence_persistence_fails() {
     let authority_db_path = unique_temp_path("cluster-authority-fence-dir", "d");
     std::fs::create_dir_all(&authority_db_path).test_unwrap();
 
-    let source_state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+    let source_state = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
     let target_state = state_with_cluster(
-        "http://node-b",
-        &["http://node-a"],
+        "https://node-b",
+        &["https://node-a"],
         Some(authority_db_path.clone()),
         None,
         None,
@@ -152,7 +152,7 @@ fn apply_cluster_snapshot_fails_when_authority_fence_persistence_fails() {
     }
 
     let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
-    let error = apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap_err();
+    let error = apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap_err();
     let error_text = error.to_string();
     assert!(
         error_text.contains("directory") || error_text.contains("open database file"),

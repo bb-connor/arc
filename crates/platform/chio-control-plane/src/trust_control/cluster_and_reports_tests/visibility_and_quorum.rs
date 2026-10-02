@@ -2,8 +2,8 @@ use super::*;
 
 #[tokio::test]
 async fn leader_visibility_responses_add_cluster_metadata_and_reject_scalars() {
-    let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-    update_peer_reachable(&state, "http://node-b");
+    let state = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
+    update_peer_reachable(&state, "https://node-b");
 
     let response = json_response_with_leader_visibility(&state, json!({ "stored": true }));
     assert_eq!(response.status(), StatusCode::OK);
@@ -14,16 +14,16 @@ async fn leader_visibility_responses_add_cluster_metadata_and_reject_scalars() {
     assert_eq!(body["stored"], Value::Bool(true));
     assert_eq!(
         body["handledBy"],
-        Value::String("http://node-a".to_string())
+        Value::String("https://node-a".to_string())
     );
     assert_eq!(
         body["leaderUrl"],
-        Value::String("http://node-a".to_string())
+        Value::String("https://node-a".to_string())
     );
     assert_eq!(body["visibleAtLeader"], Value::Bool(true));
     assert_eq!(
         body["clusterAuthority"]["authorityId"],
-        Value::String("http://node-a".to_string())
+        Value::String("https://node-a".to_string())
     );
     assert_eq!(body["clusterAuthority"]["term"], Value::from(1));
     assert_eq!(body["clusterAuthority"]["leaseValid"], Value::Bool(true));
@@ -38,33 +38,33 @@ async fn leader_visibility_responses_add_cluster_metadata_and_reject_scalars() {
 #[tokio::test]
 async fn budget_quorum_commit_metadata_tracks_quorum_witnesses() {
     let state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b", "http://node-c"],
+        "https://node-a",
+        &["https://node-b", "https://node-c"],
         None,
         None,
         None,
     );
-    update_peer_reachable(&state, "http://node-b");
-    update_peer_reachable(&state, "http://node-c");
+    update_peer_reachable(&state, "https://node-b");
+    update_peer_reachable(&state, "https://node-c");
     update_peer_budget_acks(
         &state,
-        "http://node-b",
+        "https://node-b",
         &[BudgetOriginAck {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 9,
         }],
     );
     update_peer_budget_acks(
         &state,
-        "http://node-c",
+        "https://node-c",
         &[BudgetOriginAck {
-            origin_id: "http://node-a".to_string(),
+            origin_id: "https://node-a".to_string(),
             event_seq: 7,
         }],
     );
 
     let write = BudgetWriteToken {
-        origin_id: "http://node-a".to_string(),
+        origin_id: "https://node-a".to_string(),
         event_seq: 8,
         budget_term: 1,
     };
@@ -74,7 +74,7 @@ async fn budget_quorum_commit_metadata_tracks_quorum_witnesses() {
     assert_eq!(commit.committed_nodes, 2); // self + node-b (acked 9 >= 8)
     assert_eq!(
         commit.witness_urls,
-        vec!["http://node-a".to_string(), "http://node-b".to_string()]
+        vec!["https://node-a".to_string(), "https://node-b".to_string()]
     );
 
     let response = json_response_with_leader_visibility_and_budget_commit(
@@ -92,11 +92,11 @@ async fn budget_quorum_commit_metadata_tracks_quorum_witnesses() {
     assert_eq!(body["budgetCommit"]["committedNodes"], Value::from(2));
     assert_eq!(
         body["budgetCommit"]["authorityId"],
-        Value::String("http://node-a".to_string())
+        Value::String("https://node-a".to_string())
     );
     assert_eq!(body["budgetCommit"]["budgetTerm"], Value::from(1));
     assert_eq!(
         body["budgetCommit"]["witnessUrls"],
-        json!(["http://node-a", "http://node-b"])
+        json!(["https://node-a", "https://node-b"])
     );
 }

@@ -18,8 +18,8 @@ fn cluster_replication_heads_reports_heads_without_materializing() {
             .test_unwrap();
     }
     let state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         Some(revocation_db.clone()),
         Some(budget_db.clone()),
@@ -50,7 +50,7 @@ fn status_advertises_contiguous_ack_heads() {
     // when non-empty, and is omitted entirely when empty (additive,
     // backward-compatible with older peers who never witness).
     let response = ClusterStatusResponse {
-        self_url: "http://node-a".to_string(),
+        self_url: "https://node-a".to_string(),
         leader_url: None,
         role: "follower".to_string(),
         has_quorum: true,
@@ -80,10 +80,10 @@ fn status_advertises_contiguous_ack_heads() {
 
 #[test]
 fn apply_cluster_snapshot_seeds_authority_term_for_late_joiner_budget_writes() {
-    let source_state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+    let source_state = state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
     let target_state = state_with_cluster(
-        "http://node-0",
-        &["http://node-a", "http://node-b"],
+        "https://node-0",
+        &["https://node-a", "https://node-b"],
         None,
         None,
         None,
@@ -104,7 +104,7 @@ fn apply_cluster_snapshot_seeds_authority_term_for_late_joiner_budget_writes() {
     let initial_target_consensus = cluster_consensus_view(&target_state).test_unwrap();
     assert_eq!(
         initial_target_consensus.leader_url.as_deref(),
-        Some("http://node-0")
+        Some("https://node-0")
     );
     assert_eq!(initial_target_consensus.election_term, 1);
 
@@ -112,18 +112,18 @@ fn apply_cluster_snapshot_seeds_authority_term_for_late_joiner_budget_writes() {
     assert_eq!(snapshot.election_term, 1);
     assert_eq!(
         snapshot.authority_lease.as_ref().test_unwrap().leader_url,
-        "http://node-a"
+        "https://node-a"
     );
 
-    apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
+    apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap();
 
     let seeded_consensus = cluster_consensus_view(&target_state).test_unwrap();
     assert_eq!(
         seeded_consensus.leader_url.as_deref(),
-        Some("http://node-0")
+        Some("https://node-0")
     );
     assert_eq!(seeded_consensus.election_term, 2);
     let seeded_lease = cluster_authority_lease_view(&target_state).test_unwrap();
-    assert_eq!(seeded_lease.authority_id, "http://node-0");
+    assert_eq!(seeded_lease.authority_id, "https://node-0");
     assert_eq!(seeded_lease.lease_epoch, 2);
 }

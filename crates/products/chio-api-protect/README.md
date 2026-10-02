@@ -115,7 +115,9 @@ Do not use the following as a concrete-call authorization gate:
   revocation (including the delegation chain), and expiry only; it does not
   evaluate policy or scope against a concrete call.
 - `POST /v1/capabilities` / `POST /v1/capabilities/mint` - mint
-  sidecar-signed tokens for development and SDK ergonomics.
+  sidecar-signed tokens bound to the caller's supplied public key. Both reject
+  labels and malformed keys. The caller keeps the private key; structured
+  grants with `dpop_required: true` require its proof on mediated evaluation.
 - `POST /v1/receipts` - accepts operator-submitted receipts for logging;
   acceptance does not imply the kernel mediated the original action.
 

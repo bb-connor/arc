@@ -131,7 +131,7 @@ use chio_kernel::{
     GENERIC_NAMESPACE_ARTIFACT_SCHEMA,
 };
 use chio_kernel::{
-    AuthoritySnapshot, AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
+    AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
     BehavioralFeedPrivacyBoundary, BehavioralFeedQuery, BehavioralFeedReceiptRow,
     BehavioralFeedReport, BudgetDimensionProfile, BudgetDimensionUsage, BudgetStore,
     BudgetStoreError, BudgetUsageRecord, BudgetUtilizationReport, BudgetUtilizationRow,

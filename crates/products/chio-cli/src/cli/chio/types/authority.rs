@@ -3,6 +3,25 @@ use std::path::PathBuf;
 
 #[derive(Subcommand)]
 pub(crate) enum ChioAuthorityCommands {
+    /// Create an operator-pinned public checkpoint for signed cluster replication.
+    ReplicationInit {
+        #[arg(long)]
+        database: PathBuf,
+        #[arg(long)]
+        stream_id: String,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Pin an independently authenticated checkpoint on a follower (local only).
+    ReplicationPin {
+        #[arg(long)]
+        database: PathBuf,
+        #[arg(long)]
+        anchor: PathBuf,
+        /// Canonical checkpoint digest obtained through a separate trusted channel.
+        #[arg(long)]
+        expected_anchor_digest: String,
+    },
     /// Issue capability leases, lease-scope bindings, and governance receipts.
     Issue {
         /// Public authority profile JSON.

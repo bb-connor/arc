@@ -38,19 +38,22 @@ pub(crate) async fn handle_internal_authority_snapshot(
         return response;
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority = match SqliteCapabilityAuthority::open(path) {
+        let authority = match SqliteCapabilityAuthority::open_with_clock(
+            path,
+            state.finding_challenge_clock.clone(),
+        ) {
             Ok(authority) => authority,
             Err(error) => {
                 return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
             }
         };
-        let snapshot = match authority.snapshot() {
+        let snapshot = match authority.signed_snapshot() {
             Ok(snapshot) => snapshot,
             Err(error) => {
                 return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
             }
         };
-        return Json(authority_snapshot_view(snapshot)).into_response();
+        return Json(snapshot).into_response();
     }
 
     plain_http_error(
@@ -120,8 +123,11 @@ pub(crate) fn build_cluster_state_snapshot(
     let consensus = cluster_consensus_view(state);
     let authority_lease = cluster_authority_lease_view(state);
     let authority = if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open(path)?;
-        Some(authority_snapshot_view(authority.snapshot()?))
+        let authority = SqliteCapabilityAuthority::open_with_clock(
+            path,
+            state.finding_challenge_clock.clone(),
+        )?;
+        Some(authority.signed_snapshot()?)
     } else {
         None
     };
@@ -307,13 +313,17 @@ pub(crate) fn apply_cluster_snapshot(
         budget_origin_ack_heads,
     } = snapshot;
 
+    normalize_cluster_config_url(peer_url, true)?;
     let validated_revocation_cursor = validate_revocation_snapshot(&revocations, &replication)?;
 
     if let (Some(path), Some(authority_view)) =
         (state.config.authority_db_path.as_deref(), authority)
     {
-        let authority = SqliteCapabilityAuthority::open(path)?;
-        authority.apply_snapshot(&authority_snapshot_from_view(authority_view))?;
+        let authority = SqliteCapabilityAuthority::open_with_clock(
+            path,
+            state.finding_challenge_clock.clone(),
+        )?;
+        authority.apply_signed_snapshot(&authority_view)?;
     }
 
     if let Some(store) = state
@@ -562,8 +572,9 @@ fn seed_cluster_authority_from_snapshot(
 
     let snapshot_leader = authority_lease.map(|lease| lease.leader_url.clone());
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        let authority = SqliteCapabilityAuthority::open(path)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let authority =
+            SqliteCapabilityAuthority::open_with_clock(path, state.finding_challenge_clock.clone())
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         authority
             .seed_cluster_fence(snapshot_leader.as_deref(), snapshot_term)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;

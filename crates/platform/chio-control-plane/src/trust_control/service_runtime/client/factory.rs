@@ -1,4 +1,4 @@
-use super::super::super::report_validation::normalize_cluster_url;
+use super::super::super::report_validation::{normalize_cluster_config_url, normalize_cluster_url};
 use super::super::*;
 use super::validation::{normalize_control_endpoint, validate_control_token};
 
@@ -23,6 +23,9 @@ pub(crate) fn build_cluster_peer_client(
     control_token: &str,
     node_id: &str,
 ) -> Result<TrustControlClient, CliError> {
+    for endpoint in control_url.split(',') {
+        normalize_cluster_config_url(endpoint, true)?;
+    }
     build_client_with_cluster_peer(
         control_url,
         control_token,
@@ -59,9 +62,13 @@ fn build_client_with_cluster_peer(
             "control URL must not be empty".to_string(),
         ));
     }
-    let http = ureq::AgentBuilder::new()
-        .timeout(CONTROL_HTTP_TIMEOUT)
-        .build();
+    let builder = ureq::AgentBuilder::new().timeout(CONTROL_HTTP_TIMEOUT);
+    let http = if cluster_peer_auth.is_some() {
+        builder.redirects(0)
+    } else {
+        builder
+    }
+    .build();
     Ok(TrustControlClient {
         endpoints: Arc::new(endpoints),
         preferred_index: Arc::new(Mutex::new(0)),

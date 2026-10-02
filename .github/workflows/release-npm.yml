@@ -726,7 +726,13 @@ jobs:
         with:
           cosign-release: "v2.4.1"
 
+      - name: Require canonical release signing identity
+        if: github.event_name == 'push'
+        shell: bash
+        run: python3 scripts/verify-release-identity.py check-context --channel npm
+
       - name: Sign npm tarball with cosign keyless
+        if: github.event_name == 'push'
         # Produces a detached `.sig` and Fulcio leaf cert `.pem` for
         # the npm tarball. npm provenance (--provenance) and cosign keyless
         # are complementary; cosign is verified client-side via the recipe

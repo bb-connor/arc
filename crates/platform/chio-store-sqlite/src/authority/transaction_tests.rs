@@ -5,6 +5,92 @@ use std::sync::{Arc, Barrier};
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
+fn incomplete_legacy_authority_history_is_refused_without_inventing_issuers() -> TestResult {
+    for empty_table in [false, true] {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("legacy.db");
+        let key = Keypair::generate();
+        let connection = Connection::open(&path)?;
+        connection.execute_batch(
+            "CREATE TABLE authority_state (
+                singleton_id INTEGER PRIMARY KEY, seed_hex TEXT NOT NULL,
+                generation INTEGER NOT NULL, rotated_at INTEGER NOT NULL
+            );",
+        )?;
+        connection.execute(
+            "INSERT INTO authority_state VALUES (1, ?1, 1, 100)",
+            [key.seed_hex()],
+        )?;
+        if empty_table {
+            connection.execute_batch(
+                "CREATE TABLE authority_trusted_keys (
+                    public_key_hex TEXT PRIMARY KEY, generation INTEGER NOT NULL,
+                    activated_at INTEGER NOT NULL
+                );",
+            )?;
+        }
+        assert!(matches!(
+            SqliteCapabilityAuthority::open(&path),
+            Err(AuthorityStoreError::Schema(message))
+                if message.contains("authority head is absent from persisted issuer history")
+        ));
+        let seed: String = connection.query_row(
+            "SELECT seed_hex FROM authority_state WHERE singleton_id = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(seed, key.seed_hex());
+        let count: i64 =
+            connection.query_row("SELECT count(*) FROM authority_trusted_keys", [], |row| {
+                row.get(0)
+            })?;
+        assert_eq!(
+            count, 0,
+            "opening must not manufacture legacy issuer history"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn complete_legacy_authority_history_survives_explicit_checkpoint_migration() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("legacy.db");
+    let key = Keypair::generate();
+    let connection = Connection::open(&path)?;
+    connection.execute_batch(
+        "CREATE TABLE authority_state (
+            singleton_id INTEGER PRIMARY KEY, seed_hex TEXT NOT NULL,
+            generation INTEGER NOT NULL, rotated_at INTEGER NOT NULL
+        );
+        CREATE TABLE authority_trusted_keys (
+            public_key_hex TEXT PRIMARY KEY, generation INTEGER NOT NULL,
+            activated_at INTEGER NOT NULL
+        );",
+    )?;
+    connection.execute(
+        "INSERT INTO authority_state VALUES (1, ?1, 1, 100)",
+        [key.seed_hex()],
+    )?;
+    connection.execute(
+        "INSERT INTO authority_trusted_keys VALUES (?1, 1, 100)",
+        [key.public_key().to_hex()],
+    )?;
+    let authority = SqliteCapabilityAuthority::open(&path)?;
+    assert_eq!(authority.trusted_public_keys(), vec![key.public_key()]);
+    assert_eq!(authority.local_keypair()?.seed_hex(), key.seed_hex());
+    assert!(
+        authority.signed_snapshot().is_err(),
+        "opening does not grant network trust"
+    );
+    let anchor = authority.initialize_replication("legacy-reviewed-checkpoint")?;
+    assert_eq!(anchor.snapshot.trusted_keys.len(), 1);
+    assert_eq!(anchor.snapshot.rotated_at, 100);
+    assert!(authority.signed_snapshot()?.proof.is_some());
+    Ok(())
+}
+
+#[test]
 fn rotation_rolls_back_seed_head_and_history_when_trust_insert_fails() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("authority.db");
@@ -105,17 +191,9 @@ fn snapshot_refuses_invalid_late_rows_without_partial_trust_or_head_changes() ->
             _ => unreachable!(),
         }
         let result = authority.apply_snapshot(&snapshot);
-        if field == "key-bytes" {
-            assert!(matches!(result, Err(AuthorityStoreError::Core(_))));
-        } else if field == "zero-generation" {
-            assert!(
-                matches!(result, Err(AuthorityStoreError::Fence(message)) if message == "authority generation must be positive")
-            );
-        } else {
-            assert!(
-                matches!(result, Err(AuthorityStoreError::Fence(message)) if message.contains("exceeds SQLite INTEGER range"))
-            );
-        }
+        assert!(
+            matches!(result, Err(AuthorityStoreError::Fence(message)) if message == "unsigned authority snapshot")
+        );
         assert_eq!(
             authority.snapshot()?,
             before,
@@ -147,44 +225,27 @@ fn generation_exhaustion_does_not_rotate_or_lose_the_signing_seed() -> TestResul
 #[test]
 fn failed_snapshot_head_write_rolls_back_already_inserted_history() -> TestResult {
     let directory = tempfile::tempdir()?;
-    let path = directory.path().join("authority.db");
+    let source = SqliteCapabilityAuthority::open(directory.path().join("source.db"))?;
+    let path = directory.path().join("follower.db");
     let authority = SqliteCapabilityAuthority::open(&path)?;
+    authority.pin_replication_anchor(&source.initialize_replication("test-atomic-import")?)?;
     let before = authority.snapshot()?;
     let seed_before = authority.local_keypair()?.seed_hex();
+    source.rotate()?;
+    let snapshot = source.signed_snapshot()?;
     let connection = Connection::open(&path)?;
-    connection.execute_batch(
-        "CREATE TRIGGER fail_head BEFORE UPDATE ON authority_state
-         BEGIN SELECT RAISE(ABORT, 'injected head write failure'); END;",
-    )?;
-    let remote_key = Keypair::generate().public_key();
-    let snapshot = AuthoritySnapshot {
-        public_key_hex: remote_key.to_hex(),
-        generation: before.generation + 1,
-        rotated_at: before.rotated_at,
-        trusted_keys: vec![AuthorityTrustedKeySnapshot {
-            public_key_hex: Keypair::generate().public_key().to_hex(),
-            generation: 1,
-            activated_at: 0,
-        }],
-    };
-    assert!(matches!(authority.apply_snapshot(&snapshot),
-        Err(AuthorityStoreError::Sqlite(rusqlite::Error::SqliteFailure(error, Some(message))))
-        if error.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER && message == "injected head write failure"));
+    connection.execute_batch("CREATE TRIGGER fail_head BEFORE UPDATE ON authority_state BEGIN SELECT RAISE(ABORT, 'injected head write failure'); END;")?;
+    assert!(matches!(
+        authority.apply_signed_snapshot(&snapshot),
+        Err(AuthorityStoreError::Sqlite(_))
+    ));
     assert_eq!(authority.snapshot()?, before);
-    assert_eq!(
-        authority.authority_public_key().to_hex(),
-        before.public_key_hex
-    );
     assert_eq!(authority.local_keypair()?.seed_hex(), seed_before);
     connection.execute_batch("DROP TRIGGER fail_head")?;
-    assert!(authority.apply_snapshot(&snapshot)?);
-    assert_eq!(authority.authority_public_key(), remote_key);
-    assert_eq!(authority.snapshot()?.trusted_keys.len(), 3);
+    assert!(authority.apply_signed_snapshot(&snapshot)?);
+    assert_eq!(authority.snapshot()?, source.snapshot()?);
     assert_eq!(authority.local_keypair()?.seed_hex(), seed_before);
-    assert!(
-        matches!(authority.current_keypair(), Err(AuthorityStoreError::Fence(message))
-        if message.contains("does not match replicated authority public key"))
-    );
+    assert!(authority.current_keypair().is_err());
     Ok(())
 }
 
@@ -314,5 +375,24 @@ fn injected_clock_failure_preserves_authority_and_cluster_fence() -> TestResult 
     assert_eq!(authority.cluster_fence()?, fence);
     clock.0.store(false, Ordering::SeqCst);
     assert_eq!(authority.rotate()?.generation, before.generation + 1);
+    Ok(())
+}
+
+#[test]
+fn unsigned_authority_snapshot_cannot_add_issuer_even_without_head_change() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let authority = SqliteCapabilityAuthority::open(directory.path().join("authority.db"))?;
+    let before = authority.snapshot()?;
+    let mut forged = before.clone();
+    forged.trusted_keys.push(AuthorityTrustedKeySnapshot {
+        public_key_hex: Keypair::generate().public_key().to_hex(),
+        generation: 1,
+        activated_at: before.rotated_at,
+    });
+    assert!(
+        authority.apply_snapshot(&forged).is_err(),
+        "unsigned issuer insertion must reject"
+    );
+    assert_eq!(authority.snapshot()?, before);
     Ok(())
 }

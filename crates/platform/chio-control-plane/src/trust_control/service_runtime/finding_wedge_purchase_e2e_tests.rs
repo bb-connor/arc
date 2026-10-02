@@ -128,6 +128,8 @@ use chio_store_sqlite::{
 };
 use futures_util::stream;
 
+#[path = "finding_wedge_purchase_e2e_tests/admission_evidence.rs"]
+mod admission_evidence;
 #[path = "finding_wedge_purchase_e2e_tests/durable_finalization_tests.rs"]
 mod durable_finalization_tests;
 #[path = "finding_wedge_purchase_e2e_tests/operator_recovery_tests.rs"]
@@ -136,6 +138,8 @@ mod operator_recovery_tests;
 mod public_route_support;
 #[path = "finding_wedge_purchase_e2e_tests/replay_determinism_tests.rs"]
 mod replay_determinism_tests;
+#[path = "finding_wedge_purchase_e2e_tests/token_binding_tests.rs"]
+mod token_binding_tests;
 use public_route_support::{
     assert_terminal_cannot_rebind_public_request, FixedTerminalExecutor, RoutedPurchaseExecutor,
 };
@@ -1565,7 +1569,7 @@ impl Deployment {
 
     /// Register the profile, retain the recipe, publish the finding,
     /// register the collateral allocation, then activate the admission.
-    async fn seed_and_activate(&self, state: &TrustServiceState) -> TestResult {
+    async fn seed_and_activate(&mut self, state: &TrustServiceState) -> TestResult {
         // Acyclic publication order: profile, then recipe, then finding.
         let web = &self.web;
         let (status, body) = send(
@@ -1624,11 +1628,11 @@ impl Deployment {
         .await?;
         assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
 
-        // The allocation must predate the signed report, and the report
-        // authority status must be observed no earlier than that evaluation.
-        // Let the pre-signed fixture mature before constructing the current
-        // status used at activation.
-        wait_until_unix(web.report.body.evaluation_time).await;
+        // Scheduling may take longer than any preselected report offset.
+        // Construct the report after collateral acceptance, preserving the
+        // production causal-order check instead of guessing a longer timeout.
+        self.web.refresh_admission_evidence(state).await?;
+        let web = &self.web;
         let authority = state
             .joint_authority_store
             .as_ref()
@@ -2554,7 +2558,7 @@ impl LaneOptions {
 }
 
 async fn open_lane(options: LaneOptions) -> Result<Lane, AnyError> {
-    let deployment = provision(options.case)?;
+    let mut deployment = provision(options.case)?;
     let authority = deployment.open()?;
     let state = market_state(authority.clone(), market_config());
     state
@@ -2936,7 +2940,7 @@ impl FindingPurchaseExecutor for RoutedPurchaseExecutor {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_live_purchase_route_exit() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -3238,7 +3242,7 @@ async fn cognition_market_wedge_purchase_e2e() -> TestResult {
 }
 
 pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let calls = Arc::new(PaymentCalls::default());
     let invocations = Arc::new(AtomicU64::new(0));
     let kernel_keypair = keypair(40);
@@ -4036,39 +4040,6 @@ async fn wedge_purchase_wrong_finding_argument_is_out_of_scope() -> TestResult {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn wedge_purchase_alternate_token_denies() -> TestResult {
-    let lane = open_lane(LaneOptions::standard()).await?;
-
-    // A second mint for the same subject and sale: same grant profile, a
-    // different token identity, so the carrier's ask no longer names it.
-    let alternate = handshake(
-        &lane.deployment.web,
-        &lane.witness,
-        &lane.buyer,
-        BUYER_PAYOUT,
-        "finding-purchase-token-0002",
-    )?;
-    assert_ne!(
-        alternate.ask.body.token_offer.id,
-        lane.purchase.capability.id
-    );
-    let request = reveal_request(&RevealRequestInputs {
-        request_id: "wedge-alternate-token-1",
-        capability: &alternate.ask.body.token_offer,
-        buyer: &lane.buyer,
-        finding_id: &lane.deployment.web.finding_id,
-        context_b64: Some(&lane.purchase.context_b64),
-        status_proof_b64: None,
-        nonce: "nonce-alternate-token-1",
-    })?;
-    let response = lane.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_denied_with(&response, "exact ask token offer");
-    assert_eq!(lane.invocations.load(Ordering::SeqCst), 0);
-    assert_eq!(lane.calls.authorizations.load(Ordering::SeqCst), 0);
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_on_a_prepaid_final_rail_denies_before_dispatch() -> TestResult {
     let lane = open_lane(LaneOptions {
         rail: Rail::PrepaidFinal,
@@ -4554,7 +4525,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_reservation_authenticates_the_buyer_and_replays() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -4727,7 +4698,7 @@ async fn wedge_purchase_reservation_authenticates_the_buyer_and_replays() -> Tes
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_second_reservation_overcommits_the_allocation() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -4805,7 +4776,7 @@ struct ReserveFixture {
 }
 
 async fn open_reserve_fixture() -> Result<ReserveFixture, AnyError> {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;

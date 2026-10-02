@@ -225,9 +225,10 @@ pub(crate) async fn sidecar_mint_handler(
         Err(error) => return input::rejected(error),
     };
 
-    if mint_request.subject.trim().is_empty() {
-        return sidecar_bad_request("subject must not be empty").into_response();
-    }
+    let subject = match parse_sidecar_subject_key(&mint_request.subject) {
+        Ok(subject) => subject,
+        Err(message) => return sidecar_bad_request(message).into_response(),
+    };
 
     let scope = match build_sidecar_scope(&mint_request.scopes) {
         Ok(scope) => scope,
@@ -246,7 +247,6 @@ pub(crate) async fn sidecar_mint_handler(
     let Some(expires_at) = issued_at.checked_add(ttl_seconds) else {
         return sidecar_bad_request("capability expiry overflow").into_response();
     };
-    let subject = derive_sidecar_subject_key(&mint_request.subject, &mint_request.job_uid);
     let capability_id = match derive_sidecar_capability_id(
         &mint_request.subject,
         &mint_request.job_uid,
@@ -492,7 +492,7 @@ pub(crate) async fn sidecar_submit_receipt_handler(
 /// Differs from [`SidecarMintRequest`] in two ways:
 /// 1. The scope arrives as a structured `ChioScope` object instead of the
 ///    flat `scopes: Vec<String>` shorthand.
-/// 2. There is no `job_uid`; the alias derives one deterministically.
+/// 2. `job_uid` is optional and defaults to an empty public request label.
 ///
 /// The alias accepts both shapes via `serde(untagged)` so existing callers
 /// of `/v1/capabilities/mint` keep working when they happen to call the
@@ -544,9 +544,6 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
 
     let (subject, scope, job_uid, ttl_seconds_wire, ttl_nanos_wire) = match alias_request {
         SidecarCapabilitiesAliasRequest::Sdk(sdk) => {
-            if sdk.subject.trim().is_empty() {
-                return sidecar_bad_request("subject must not be empty").into_response();
-            }
             let job_uid = sdk.job_uid.unwrap_or_default();
             (
                 sdk.subject,
@@ -557,9 +554,6 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
             )
         }
         SidecarCapabilitiesAliasRequest::Canonical(mint_request) => {
-            if mint_request.subject.trim().is_empty() {
-                return sidecar_bad_request("subject must not be empty").into_response();
-            }
             let scope = match build_sidecar_scope(&mint_request.scopes) {
                 Ok(scope) => scope,
                 Err(error) => return sidecar_bad_request(&error).into_response(),
@@ -574,6 +568,11 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
         }
     };
 
+    let subject_key = match parse_sidecar_subject_key(&subject) {
+        Ok(subject) => subject,
+        Err(message) => return sidecar_bad_request(message).into_response(),
+    };
+
     let issued_at = match state.clock.seconds() {
         Ok(now) => now,
         Err(error) => return clock::rejection(error),
@@ -585,7 +584,6 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
     let Some(expires_at) = issued_at.checked_add(ttl_seconds) else {
         return sidecar_bad_request("capability expiry overflow").into_response();
     };
-    let subject_key = derive_sidecar_subject_key(&subject, &job_uid);
     let capability_id = match derive_sidecar_capability_id(&subject, &job_uid, ttl_seconds, &scope)
     {
         Ok(capability_id) => capability_id,
@@ -1203,16 +1201,13 @@ pub(crate) fn ttl_seconds_from_wire(
     }
 }
 
-pub(crate) fn derive_sidecar_subject_key(
-    subject: &str,
-    job_uid: &str,
-) -> chio_core_types::crypto::PublicKey {
-    let mut hasher = Sha256::new();
-    hasher.update(subject.as_bytes());
-    hasher.update([0]);
-    hasher.update(job_uid.as_bytes());
-    let seed: [u8; 32] = hasher.finalize().into();
-    Keypair::from_seed(&seed).public_key()
+/// Parse caller-owned verification material. Request labels are never signing seeds.
+fn parse_sidecar_subject_key(subject: &str) -> Result<PublicKey, &'static str> {
+    let key = PublicKey::from_hex(subject).map_err(|_| "subject must be a valid public key")?;
+    if key.algorithm() != chio_core_types::SigningAlgorithm::Ed25519 || key.is_weak_ed25519() {
+        return Err("subject must be a strong Ed25519 public key");
+    }
+    Ok(key)
 }
 
 pub(crate) fn derive_sidecar_capability_id(

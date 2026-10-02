@@ -4,8 +4,8 @@ Build the CLI from source. Install Rust with `rustup` and the Protocol Buffers
 compiler (`protoc`) first; the checkout's `rust-toolchain.toml` selects Rust.
 
 ```bash
-git clone https://github.com/backbay-labs/chio.git
-cd chio
+git clone https://github.com/bb-connor/arc.git
+cd arc
 cargo build --locked --release -p chio-cli --bin chio
 export PATH="$PWD/target/release:$PATH"
 chio --help
@@ -27,6 +27,10 @@ stack is distributed. Use source or the explicitly identified development
 preview until current release downloads are available.
 
 ## Release Distribution Contract
+
+For signed artifacts, use [VERIFY.md](VERIFY.md). It pins `bb-connor/arc`, the
+artifact family's workflow and your exact selected release tag. Older unsigned
+releases cannot satisfy that policy.
 
 The binary, checksum, container, and Homebrew docs describe the release contract
 that must be satisfied before those install paths are advertised as available.

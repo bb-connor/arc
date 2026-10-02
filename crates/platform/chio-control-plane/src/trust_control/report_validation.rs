@@ -43,6 +43,15 @@ pub(crate) fn normalize_cluster_config_url(
             )));
         }
     }
+    if parsed.scheme() == "http"
+        && !matches!(parsed.host(),
+        Some(Host::Ipv4(address)) if address.is_loopback())
+        && !matches!(parsed.host(), Some(Host::Ipv6(address)) if address.is_loopback())
+    {
+        return Err(CliError::cli_other_error(
+            "plaintext cluster URLs require a literal loopback address".to_string(),
+        ));
+    }
     if !parsed.username().is_empty() || parsed.password().is_some() {
         return Err(CliError::cli_other_error(
             "cluster URL must not contain username or password material".to_string(),

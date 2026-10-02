@@ -1803,10 +1803,16 @@ mod config_and_public_tests {
             SqliteCapabilityAuthority::open(&follower_path).test_expect("open follower authority");
         let follower_local_key = follower.local_keypair().test_expect("read follower seed");
 
+        let anchor = source
+            .initialize_replication("local-custody-test")
+            .test_unwrap();
+        follower.pin_replication_anchor(&anchor).test_unwrap();
         source.rotate().test_expect("rotate source authority");
-        let snapshot = source.snapshot().test_expect("snapshot source authority");
+        let snapshot = source
+            .signed_snapshot()
+            .test_expect("snapshot source authority");
         assert!(follower
-            .apply_snapshot(&snapshot)
+            .apply_signed_snapshot(&snapshot)
             .test_expect("apply source snapshot"));
         assert!(follower.current_keypair().is_err());
 

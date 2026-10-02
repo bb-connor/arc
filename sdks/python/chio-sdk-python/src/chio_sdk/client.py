@@ -296,6 +296,9 @@ class ChioClient:
         Base URL of the Chio sidecar (default ``http://127.0.0.1:9090``).
     timeout:
         Request timeout in seconds (default 5).
+    control_token:
+        Optional operator bearer for capability minting only. It is never
+        installed as a shared transport header or sent on evaluation requests.
     """
 
     DEFAULT_BASE_URL = "http://127.0.0.1:9090"
@@ -305,7 +308,9 @@ class ChioClient:
         base_url: str | None = None,
         *,
         timeout: float = 5.0,
+        control_token: str | None = None,
     ) -> None:
+        self._control_token = control_token
         self._base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self._http = httpx.AsyncClient(
             base_url=self._base_url,
@@ -347,10 +352,17 @@ class ChioClient:
     ) -> CapabilityToken:
         """Request a new capability token from the sidecar.
 
+        Configure the operator bearer through ``ChioClient(control_token=...)``
+        for an authenticated sidecar. The bearer is attached only to this mint
+        request; the caller public key and private signer are separate authority.
+
         Parameters
         ----------
         subject:
-            Hex-encoded Ed25519 public key of the agent the token is bound to.
+            Caller-owned public key in the kernel crypto wire format (normally
+            64 hex characters for an Ed25519 public key). The sidecar validates
+            it and binds the token to that exact key. Keep its private signing
+            key with the agent; subject/job labels cannot be used as keys.
         scope:
             The scope (tool/resource/prompt grants) to authorize.
         ttl_seconds:
@@ -361,7 +373,12 @@ class ChioClient:
             "scope": scope,
             "ttl_seconds": ttl_seconds,
         }
-        data = await self._post("/v1/capabilities", body)
+        headers = (
+            {"Authorization": f"Bearer {self._control_token}"}
+            if self._control_token
+            else None
+        )
+        data = await self._post("/v1/capabilities", body, headers=headers)
         return CapabilityToken.model_validate(data)
 
     async def validate_capability(

@@ -103,15 +103,15 @@ mod tests {
         validate(&root, 2)?;
         assert!(validate(&root, 1).is_err());
         assert!(validate(&root, 3).is_err());
-        assert!(validate_issued_capability_response(
+        assert!(matches!(validate_issued_capability_response(
             &root,
             &subject,
             &scope,
             300,
             &key.public_key(),
             chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
-        )
-        .is_err());
+        ), Err(KernelError::CapabilityIssuanceDenied(message))
+            if message == "aggregate invocation capability issuance requires atomic composite admission enforcement"));
         let plain = authority.issue_capability(&subject, scope.clone(), 300)?;
         assert!(validate(&plain, 2).is_err());
         let mut changed = root.clone();
@@ -130,7 +130,7 @@ mod tests {
             .max_invocations = 3;
         changed.signature = key.sign_canonical(&changed.signing_body())?.0;
         assert!(validate(&changed, 2).is_err());
-        assert!(validate_issued_aggregate_family_root_response(
+        assert!(matches!(validate_issued_aggregate_family_root_response(
             &root,
             &subject,
             &scope,
@@ -138,8 +138,9 @@ mod tests {
             &key.public_key(),
             2,
             chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
-        )
-        .is_err());
+        ), Err(KernelError::CapabilityIssuanceFailed(message))
+            if message.starts_with("issued capability wall-clock expiry ")
+                && message.contains("exceeds allowed maximum")));
         Ok(())
     }
 

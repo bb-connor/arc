@@ -164,7 +164,7 @@ fn production_purchase_executor(
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_production_operator_purchase_survives_cache_loss() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -280,7 +280,7 @@ async fn cognition_market_production_operator_purchase_survives_cache_loss() -> 
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_production_operator_resumes_after_reserved_restart() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -373,7 +373,7 @@ async fn cognition_market_production_operator_resumes_after_reserved_restart() -
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_terminal_capacity_is_reserved_before_payment() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -434,7 +434,7 @@ async fn cognition_market_terminal_capacity_is_reserved_before_payment() -> Test
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_pre_reservation_crash_releases_terminal_capacity_on_expiry() -> TestResult
 {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -522,7 +522,7 @@ async fn cognition_market_pre_reservation_crash_releases_terminal_capacity_on_ex
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_pre_reservation_crash_releases_capacity_on_bundle_expiry() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -592,7 +592,7 @@ async fn cognition_market_pre_reservation_crash_releases_capacity_on_bundle_expi
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_reclaims_abandoned_capacity_before_a_new_purchase() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -678,7 +678,7 @@ async fn cognition_market_reclaims_abandoned_capacity_before_a_new_purchase() ->
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_predispatch_release_is_a_stable_rejection() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -760,7 +760,7 @@ async fn cognition_market_predispatch_release_is_a_stable_rejection() -> TestRes
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_expired_reserved_restart_is_stably_rejected() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -843,7 +843,7 @@ async fn cognition_market_expired_reserved_restart_is_stably_rejected() -> TestR
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_expired_captured_restart_refunds_before_rejection() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -937,7 +937,7 @@ async fn cognition_market_expired_captured_restart_refunds_before_rejection() ->
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_prepared_job_revalidates_before_first_reservation() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;
@@ -1006,7 +1006,7 @@ async fn cognition_market_prepared_job_revalidates_before_first_reservation() ->
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cognition_market_rejects_expired_prepared_ask_before_reservation() -> TestResult {
-    let deployment = provision(RevealCase::honest())?;
+    let mut deployment = provision(RevealCase::honest())?;
     let authority = deployment.open()?;
     let mut state = market_state(authority.clone(), market_config());
     deployment.seed_and_activate(&state).await?;

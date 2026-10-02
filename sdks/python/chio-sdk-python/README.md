@@ -75,6 +75,41 @@ full signed token can drive the mediated route with
 
 Point the client at a non-default sidecar with `ChioClient(base_url=...)`.
 
+## Capability subject ownership
+
+`create_capability(subject=..., scope=...)` sends the caller's public key to
+`POST /v1/capabilities`. Pass the 64-character hex Ed25519 public key from
+your agent's existing signer (or its supported kernel crypto wire format).
+Keep the private key with that signer. The sidecar rejects missing, malformed,
+weak Ed25519 keys and job or role labels with HTTP 400; it never derives a
+subject signing key from request metadata. Scope grants that require DPoP
+need proofs signed by that caller key. A token alone does not supply the proof.
+
+```python
+import os
+from chio_sdk import ChioClient
+
+# Run minting in the trusted operator, separate from the untrusted agent.
+# agent_public_key_hex comes from your separately provisioned agent signer.
+async with ChioClient(
+    control_token=os.environ["CHIO_SIDECAR_CONTROL_TOKEN"]
+) as operator:
+    token = await operator.create_capability(
+        subject=agent_public_key_hex, scope=scope, ttl_seconds=600
+    )
+    assert token.subject == agent_public_key_hex
+```
+
+The optional constructor `control_token` supplies the bearer only on capability
+minting, never on health or evaluation requests. It is not a default HTTP header.
+Other privileged SDK methods retain their own explicit credential contracts.
+Keep the operator token out of agent processes; give the agent its minted
+capability and its separately owned subject signer.
+
+Legacy canonical `scopes: [strings]` requests also require a public subject key.
+Their shorthand grants do not require DPoP; request `dpop_required=True` on the
+structured `ToolGrant` scope to require sender possession.
+
 ## What is in the box
 
 - `ChioClient` -- async client for sidecar health, capability minting and
@@ -90,6 +125,9 @@ Point the client at a non-default sidecar with `ChioClient(base_url=...)`.
   raises rather than silently allowing.
 
 ## Testing
+
+The mock does not cryptographically validate caller public keys; real sidecar
+subject validation is covered by the production router tests.
 
 The SDK ships a drop-in `MockChioClient` via `chio_sdk.testing`, with
 `allow_all()`, `deny_all()`, and `with_policy(...)` helpers so you can

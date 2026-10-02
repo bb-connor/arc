@@ -10,6 +10,8 @@ mod authenticated;
 mod authorization;
 #[path = "../tests/mediated_boundary_tests.rs"]
 mod boundary_tests;
+#[path = "../tests/subject_identity.rs"]
+mod subject_identity;
 
 /// Build an ephemeral kernel used only to mint capabilities in tests. It
 /// shares the budget store with the state's mediation kernel; cost is never

@@ -12,6 +12,8 @@ use crate::KernelError;
 use chio_security_types::ports::{IsolationEpochId, LineageId, SessionId, TenantId};
 use chio_security_types::PrincipalId;
 
+pub mod replication;
+
 mod aggregate;
 pub use aggregate::validate_issued_aggregate_family_root_response;
 
@@ -1137,14 +1139,16 @@ pub struct AuthorityStatus {
     pub trusted_public_keys: Vec<PublicKey>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AuthorityTrustedKeySnapshot {
     pub public_key_hex: String,
     pub generation: u64,
     pub activated_at: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AuthoritySnapshot {
     pub public_key_hex: String,
     pub generation: u64,
@@ -1154,6 +1158,8 @@ pub struct AuthoritySnapshot {
 
 #[derive(Debug, thiserror::Error)]
 pub enum AuthorityStoreError {
+    #[error(transparent)]
+    SignedJson(#[from] chio_core::canonical::UntrustedJsonError),
     #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("sqlite error: {0}")]

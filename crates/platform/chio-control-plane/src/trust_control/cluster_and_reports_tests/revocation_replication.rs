@@ -4,8 +4,8 @@ use super::*;
 async fn revocation_delta_endpoint_negotiates_legacy_and_sequence_cursors() {
     let revocation_db = unique_temp_path("revocation-delta-upgrade", "sqlite3");
     let state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         Some(revocation_db),
         None,
@@ -26,7 +26,7 @@ async fn revocation_delta_endpoint_negotiates_legacy_and_sequence_cursors() {
         as i64;
     let signature = cluster_peer_auth_signature(
         &state.config.service_token,
-        "http://node-b",
+        "https://node-b",
         INTERNAL_REVOCATIONS_DELTA_PATH,
         issued_at,
         None,
@@ -35,7 +35,7 @@ async fn revocation_delta_endpoint_negotiates_legacy_and_sequence_cursors() {
     let mut headers = HeaderMap::new();
     headers.insert(
         CLUSTER_NODE_ID_HEADER,
-        HeaderValue::from_static("http://node-b"),
+        HeaderValue::from_static("https://node-b"),
     );
     headers.insert(
         CLUSTER_AUTH_ISSUED_AT_HEADER,
@@ -144,15 +144,15 @@ fn revocation_snapshot_is_projection_bounded_and_epoch_bound() {
     let source_revocation_db = unique_temp_path("cluster-source-revocation-snapshot", "sqlite3");
     let target_revocation_db = unique_temp_path("cluster-target-revocation-snapshot", "sqlite3");
     let source_state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         Some(source_revocation_db.clone()),
         None,
     );
     let target_state = state_with_cluster(
-        "http://node-b",
-        &["http://node-a"],
+        "https://node-b",
+        &["https://node-a"],
         None,
         Some(target_revocation_db.clone()),
         None,
@@ -188,7 +188,7 @@ fn revocation_snapshot_is_projection_bounded_and_epoch_bound() {
         .as_mut()
         .test_unwrap()
         .cursor_version = Some(2);
-    let error = apply_cluster_snapshot(&target_state, "http://node-a", snapshot)
+    let error = apply_cluster_snapshot(&target_state, "https://node-a", snapshot)
         .test_unwrap_err()
         .to_string();
     assert!(error.contains("unsupported revocation cursor version 2"));
@@ -198,7 +198,7 @@ fn revocation_snapshot_is_projection_bounded_and_epoch_bound() {
         .test_unwrap()
         .is_empty());
     assert_eq!(
-        with_peer_state(&target_state, "http://node-a", |peer| peer
+        with_peer_state(&target_state, "https://node-a", |peer| peer
             .snapshot_applied_count),
         Some(0)
     );
@@ -214,15 +214,15 @@ fn legacy_revocation_snapshot_recovers_projection_without_reusing_tuple_cursor()
     let target_revocation_db =
         unique_temp_path("cluster-target-legacy-revocation-snapshot", "sqlite3");
     let source_state = state_with_cluster(
-        "http://node-a",
-        &["http://node-b"],
+        "https://node-a",
+        &["https://node-b"],
         None,
         Some(source_revocation_db.clone()),
         None,
     );
     let target_state = state_with_cluster(
-        "http://node-b",
-        &["http://node-a"],
+        "https://node-b",
+        &["https://node-a"],
         None,
         Some(target_revocation_db.clone()),
         None,
@@ -247,12 +247,12 @@ fn legacy_revocation_snapshot_recovers_projection_without_reusing_tuple_cursor()
     cursor.remove("streamId");
     let legacy: ClusterStateSnapshotResponse = serde_json::from_value(legacy_json).test_unwrap();
 
-    apply_cluster_snapshot(&target_state, "http://node-a", legacy).test_unwrap();
+    apply_cluster_snapshot(&target_state, "https://node-a", legacy).test_unwrap();
     assert!(SqliteRevocationStore::open(&target_revocation_db)
         .test_unwrap()
         .is_revoked("cap-legacy-origin")
         .test_unwrap());
-    assert!(peer_revocation_cursor(&target_state, "http://node-a").is_none());
+    assert!(peer_revocation_cursor(&target_state, "https://node-a").is_none());
 
     let _ = std::fs::remove_file(source_revocation_db);
     let _ = std::fs::remove_file(target_revocation_db);

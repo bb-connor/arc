@@ -29,6 +29,22 @@ clients; it does not open raw watches via `client-go`. The single reconciler
    the finalizer ensures the reconciler gets a last chance to release the
    grant before the Job object is garbage-collected.
 
+### Caller subject key provisioning
+
+Before creating a governed Job, provision an Ed25519 signing key for its agent
+and put only its 64-character hex public key in the Job annotation
+`chio.world/subject-public-key`. Supply the private key to the workload through
+your existing signer or secret custody mechanism; do not put it in Job metadata
+or derive it from a namespace, name or UID. The controller forwards the public
+key unchanged. Missing or malformed annotation values reject before finalizer
+or grant mutation and before contacting the mint endpoint. The sidecar performs
+cryptographic public-key validation.
+
+Existing Jobs that need a fresh grant must add this annotation. Already minted
+grants retain their signed subject until expiry or operator revocation; remint
+after provisioning a real caller key. The canonical shorthand scope endpoint
+does not request DPoP, so these grants retain bearer semantics.
+
 ### Fail-closed behavior
 
 If the Chio sidecar is unreachable at mint time (HTTP transport error or
@@ -102,6 +118,8 @@ metadata:
     chio.world/governed: "true"
   annotations:
     chio.world/scopes: "tools:search,tools:fetch"
+    # Replace with the public key of the separately provisioned workload signer.
+    chio.world/subject-public-key: "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
 spec:
   template:
     spec:

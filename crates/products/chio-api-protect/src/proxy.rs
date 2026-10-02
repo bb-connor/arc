@@ -15,7 +15,6 @@ use axum::Router;
 use chio_http_serve::{CappedPeerAddr, MaxConnListener};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 

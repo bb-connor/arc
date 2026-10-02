@@ -176,17 +176,23 @@ fn repeated_response_headers_survive_dispatch_and_durable_replay_in_wire_value_o
     crate::receipt::validate_durable_completed_response(&completed, &signer).test_unwrap();
     let mut reordered = completed.clone();
     reordered.headers.swap(1, 2);
-    assert!(
-        crate::receipt::validate_durable_completed_response(&reordered, &signer).is_err(),
-        "equal-name value order must be signed"
-    );
+    assert!(matches!(
+        crate::receipt::validate_durable_completed_response(&reordered, &signer),
+        Err(BrokerError::ResponseRejected(message))
+            if message == "completed broker response headers differ from signed evidence"
+    ));
     let mut unsorted = completed.clone();
     unsorted.headers.swap(0, 1);
-    assert!(crate::receipt::validate_durable_completed_response(&unsorted, &signer).is_err());
-    assert!(
-        crate::protocol::normalize_headers(completed.headers).is_err(),
-        "request headers still require uniqueness"
-    );
+    assert!(matches!(
+        crate::receipt::validate_durable_completed_response(&unsorted, &signer),
+        Err(BrokerError::ResponseRejected(message))
+            if message == "completed broker response headers are not normalized and sorted"
+    ));
+    assert!(matches!(
+        crate::protocol::normalize_headers(completed.headers),
+        Err(BrokerError::InvalidRequest(message))
+            if message == "duplicate normalized caller header"
+    ));
 }
 
 struct RepeatedHeadersTransport {

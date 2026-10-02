@@ -1,4 +1,5 @@
 use super::*;
+mod replication;
 
 pub(crate) fn dispatch_chio_federation_command(
     command: ChioFederationCommands,
@@ -13,6 +14,16 @@ pub(crate) fn dispatch_chio_authority_command(
     command: ChioAuthorityCommands,
 ) -> Result<(), CliError> {
     match command {
+        ChioAuthorityCommands::ReplicationInit {
+            database,
+            stream_id,
+            out,
+        } => replication::initialize(&database, &stream_id, &out),
+        ChioAuthorityCommands::ReplicationPin {
+            database,
+            anchor,
+            expected_anchor_digest,
+        } => replication::pin(&database, &anchor, &expected_anchor_digest),
         ChioAuthorityCommands::Issue {
             profile,
             request,
