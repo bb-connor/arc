@@ -165,27 +165,27 @@ the comparison setup. No implementation is required to reach G0.
 **Produces:** exact state/event definitions, trust parameters, expected outcomes,
 and a finite profile shared by Chio and the selected executable baseline.
 
-- [ ] Define `Owner`, `WorkEdge`, `LocalWorkflow`, `LocalOperation`,
+- [x] Define `Owner`, `WorkEdge`, `LocalWorkflow`, `LocalOperation`,
   `ResourceAllocation`, `Observation`, `ReleaseAuthority`, `Obligation`,
   `EffectContract` and `EvidenceRef`. Map them to existing recovery types rather
   than introducing competing production authority. State which owner controls
   each field and which facts require external evidence.
-- [ ] Define separate execution, knowledge/release and financial state. Include
+- [x] Define separate execution, knowledge/release and financial state. Include
   unknown execution, completed-but-withheld output, and historical settlement
   after initiating authority expires. Preserve immutable historical records.
-- [ ] Define the supported finite DAG and initial bounds. Respect the recovery
+- [x] Define the supported finite DAG and initial bounds. Respect the recovery
   profile's 16 offers, 8 top-level remedy steps, 32 expanded nodes, depth 8,
   64 evidence references, 16 approval attestations, 64 KiB envelopes, nesting
   32 and aggregate 4,096 entries where applicable. Smaller exploration bounds
   must be named and must not redefine production limits.
-- [ ] Define E1 authoritative lookup and E2 opaque external effects. State
+- [x] Define E1 authoritative lookup and E2 opaque external effects. State
   idempotency scope, retention, transport submission cardinality, closure/fencing,
   partial effects, and what observations an honest receiver actually has. Use
   one submission unless an explicitly supported extension authorizes more.
-- [ ] State K1-K7, the honest-owner quantification and the intended progress
+- [x] State K1-K7, the honest-owner quantification and the intended progress
   property. Separate scope attenuation from additive resource accounting.
   Formulate information-flow/release claims independently of monetary safety.
-- [ ] Encode the following scenarios as symbolic commands and assertions. Every
+- [x] Encode the following scenarios as symbolic commands and assertions. Every
   refusal has a relevant authorized positive counterpart. Each fixture records
   `id`, `profile`, `initial_state`, `commands`, `faults`, `observations`,
   `expected_effects`, `expected_authority`, `expected_knowledge`,
@@ -215,6 +215,8 @@ are available only to the experiment oracle. All fixture identifiers are unique;
 all expected states derive from the common model. A table of denials alone fails
 this task. Existing PR #1172 trajectories supply baseline cases; add cross-owner
 assertions instead of rewriting their entire suite.
+
+**Completion record:** [KW1 model](../../research/kernel-work/MODEL.md) and [52 fixture variants](../../research/kernel-work/fixtures.json); structural checks passed. Execution assertions are qualified in Task 4, not presumed here.
 
 ## Task 3: Find a nontrivial witness and choose the smallest contribution
 
